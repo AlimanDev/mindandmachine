@@ -1,11 +1,12 @@
 from . import utils
 from src.db import models
+from .utils import ParseRequest, JsonResponse
 
 
 def timetable_cashier_get_cashiers_set(request):
-    shop_id, error_resp = utils.get_param_or_error_response(request.GET, 'shop_id', int)
-    if error_resp is not None:
-        return error_resp
+    shop_id, e = ParseRequest.get_simple_param(request.GET, 'shop_id', int)
+    if e is not None:
+        return e
 
     response_data = []
     for w in models.Worker.objects.filter(shop_id=shop_id, is_deleted=False):
@@ -15,14 +16,20 @@ def timetable_cashier_get_cashiers_set(request):
             'last_name': w.last_name,
             'avatar_url': w.avatar.url
         })
-    return utils.JsonResponse.success(response_data)
+    return JsonResponse.success(response_data)
 
 
 def timetable_cashier_get_cashier_timetable(request):
-    user = models.Worker.objects.get(id=request.GET['user_id'])
-    from_dt = utils.parse_date(request.GET['from_dt'])
-    to_dt = utils.parse_date(request.GET['to_dt'])
-    to_file_format = request.GET['to_file_format']
+    worker_id, e = ParseRequest.get_simple_param(request.GET, 'worker_id', int)
+    from_dt, e = ParseRequest.get_simple_param(request.GET, 'from_dt', utils.parse_date, e)
+    to_dt, e = ParseRequest.get_simple_param(request.GET, 'to_dt', utils.parse_date, e)
+    to_file_format, e = ParseRequest.get_match_param(request.GET, 'format', None, ['raw', 'excel'], e)
+    if e is not None:
+        return e
 
+    if from_dt > to_dt:
+        return JsonResponse.value_error('from_dt have to be less than to_dt')
+
+    # days = models.WorkerDay.objects.filter(worker_id=)
 
 

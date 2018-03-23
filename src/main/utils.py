@@ -7,27 +7,22 @@ from django.http import HttpResponse
 class JsonResponse(object):
     @classmethod
     def success(cls, data):
-        return cls.__base_response(200, data)
+        return cls.base_response(200, data)
 
     @classmethod
-    def value_error(cls, key, value):
-        if value is None:
-            msg = 'Key <{}> is missing'.format(key)
-        else:
-            msg = 'Key <{}>, value <{}>'.format(key, value)
-
-        return cls.__base_error_response(400, 'ValueException', msg)
+    def value_error(cls, msg):
+        return JsonResponse.base_error_response(400, 'ValueException', msg)
 
     @classmethod
-    def __base_error_response(cls, code, error_type, error_message):
+    def base_error_response(cls, code, error_type, error_message):
         response_data = {
             'error_type': error_type,
             'error_message': error_message
         }
-        return cls.__base_response(code, response_data)
+        return cls.base_response(code, response_data)
 
     @classmethod
-    def __base_response(cls, code, data):
+    def base_response(cls, code, data):
         response_data = {
             'code': code,
             'data': data
@@ -35,14 +30,34 @@ class JsonResponse(object):
         return HttpResponse(json.dumps(response_data, separators=(',', ':')), content_type="application/json")
 
 
-def get_param_or_error_response(dictionary, key, constructor, prev_error_response=None):
-    if prev_error_response is not None:
-        return None, prev_error_response
+class ParseRequest(object):
+    @classmethod
+    def get_simple_param(cls, dictionary, key, constructor, prev_error=None):
+        if prev_error is not None:
+            return None, prev_error
 
-    try:
-        return constructor(dictionary[key]), None
-    except:
-        return None, JsonResponse.value_error(key, dictionary.get(key, None))
+        param = dictionary.get(key)
+        if param is None:
+            return None, JsonResponse.value_error('Key <{}> is missed'.format(key))
+
+        if constructor is not None:
+            try:
+                param = constructor(param)
+            except:
+                return None, JsonResponse.value_error('Key <{}> value <{}> is invalid'.format(key, param))
+
+        return param, None
+
+    @classmethod
+    def get_match_param(cls, dictionary, key, constructor, collection, prev_error=None):
+        param, e = cls.get_simple_param(dictionary, key, constructor, prev_error)
+        if e is not None:
+            return None, e
+
+        if param not in collection:
+            return None, JsonResponse.value_error('Key <{}> with value <{}> does not match <{}>'.format(key, param, collection))
+
+        return param, None
 
 
 def parse_date(s):

@@ -33,7 +33,7 @@ class Worker(models.Model):
     birthday = models.DateField(null=True, blank=True)
     avatar = models.ImageField(null=True, blank=True)
 
-    shop_id = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     work_type = utils.EnumField(Type)
     permissions = models.BigIntegerField()
 
@@ -41,7 +41,7 @@ class Worker(models.Model):
 class SettingsModel(models.Model):
     id = models.BigAutoField(primary_key=True)
 
-    shop_id = models.OneToOneField(Shop, on_delete=models.PROTECT)
+    shop = models.OneToOneField(Shop, on_delete=models.PROTECT)
 
     mean_queue_length = models.FloatField(default=3)
     max_queue_length = models.FloatField(default=7)
@@ -58,7 +58,7 @@ class CashboxType(models.Model):
     dttm_added = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
-    shop_id = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     name = models.CharField(max_length=128)
 
 

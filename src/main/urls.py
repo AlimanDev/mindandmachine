@@ -20,5 +20,6 @@ from . import views
 
 urlpatterns = [
     path('timetable/cashier/get_cashiers_set', views.timetable_cashier_get_cashiers_set),
+    path('timetable/cashier/get_cashiers_timetable', views.timetable_cashier_get_cashier_timetable),
     path('admin/', admin.site.urls),
 ]
