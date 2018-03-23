@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User as DjangoUser
 from . import utils
 
 
@@ -21,6 +22,7 @@ class Worker(models.Model):
         TYPE_MANAGER = 5
 
     id = models.BigAutoField(primary_key=True)
+    django_user = models.OneToOneField(DjangoUser, on_delete=models.PROTECT)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
@@ -118,7 +120,7 @@ class WorkerConstraint(models.Model):
 
     worker = models.ForeignKey(Worker, on_delete=models.PROTECT)
     weekday = models.PositiveSmallIntegerField()
-    tm = models.PositiveIntegerField()  # time format hhmm, for example : 745 (7:45), 2300 (23:00)
+    tm = utils.DayTimeField()
     is_active = models.BooleanField(default=False)
 
 
@@ -139,9 +141,9 @@ class WorkerDay(models.Model):
     worker = models.ForeignKey(Worker, on_delete=models.PROTECT)
     type = utils.EnumField(Type)
 
-    tm_work_start = models.PositiveIntegerField(null=True, blank=True)
-    tm_work_end = models.PositiveIntegerField(null=True, blank=True)
-    tm_break_start = models.PositiveIntegerField(null=True, blank=True)
+    tm_work_start = utils.DayTimeField(null=True, blank=True)
+    tm_work_end = utils.DayTimeField(null=True, blank=True)
+    tm_break_start = utils.DayTimeField(null=True, blank=True)
 
     is_manual_tuning = models.BooleanField(default=False)
 
@@ -152,8 +154,8 @@ class WorkerDayCashboxDetails(models.Model):
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT)
 
-    tm_from = models.PositiveIntegerField()
-    tm_to = models.PositiveIntegerField()
+    tm_from = utils.DayTimeField()
+    tm_to = utils.DayTimeField()
 
 
 class WorkerChangeRequest(models.Model):
@@ -164,9 +166,9 @@ class WorkerChangeRequest(models.Model):
 
     type = utils.EnumField(WorkerDay.Type)
 
-    tm_start_work = models.PositiveIntegerField(null=True, blank=True)  # time format hhmm, for example : 745 (7:45), 2300 (23:00)
-    tm_end_work = models.PositiveIntegerField(null=True, blank=True)  # for hour work day
-    tm_break = models.PositiveIntegerField(null=True, blank=True)
+    tm_work_start = utils.DayTimeField(null=True, blank=True)
+    tm_work_end = utils.DayTimeField(null=True, blank=True)
+    tm_break_start = utils.DayTimeField(null=True, blank=True)
 
 
 class WorkerDayLog(models.Model):
@@ -178,11 +180,11 @@ class WorkerDayLog(models.Model):
     from_type = utils.EnumField(WorkerDay.Type)
     to_type = utils.EnumField(WorkerDay.Type)
 
-    from_tm_work_start = models.PositiveIntegerField(null=True, blank=True)
-    to_tm_work_start = models.PositiveIntegerField(null=True, blank=True)
+    from_tm_work_start = utils.DayTimeField(null=True, blank=True)
+    to_tm_work_start = utils.DayTimeField(null=True, blank=True)
 
-    from_tm_work_end = models.PositiveIntegerField(null=True, blank=True)
-    to_tm_work_end = models.PositiveIntegerField(null=True, blank=True)
+    from_tm_work_end = utils.DayTimeField(null=True, blank=True)
+    to_tm_work_end = utils.DayTimeField(null=True, blank=True)
 
     changed_by = models.ForeignKey(Worker, on_delete=models.PROTECT)
 
