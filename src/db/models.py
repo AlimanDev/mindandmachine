@@ -7,10 +7,17 @@ class Shop(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
-    is_deleted = models.BooleanField(default=False)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
     title = models.CharField(max_length=64, unique=True)
+
+    mean_queue_length = models.FloatField(default=3)
+    max_queue_length = models.FloatField(default=7)
+    plain_part = models.FloatField(default=0.1)
+
+    beta = models.FloatField(default=0.9)  # for creating timetable, (a function from previous 3 variables)
+
+    demand_coef = models.FloatField(default=1)  # unknown trend for algorithm
 
 
 class Worker(models.Model):
@@ -25,7 +32,6 @@ class Worker(models.Model):
     django_user = models.OneToOneField(DjangoUser, on_delete=models.PROTECT)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
-    is_deleted = models.BooleanField(default=False)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
     first_name = models.CharField(max_length=64)
@@ -38,25 +44,10 @@ class Worker(models.Model):
     permissions = models.BigIntegerField()
 
 
-class SettingsModel(models.Model):
-    id = models.BigAutoField(primary_key=True)
-
-    shop = models.OneToOneField(Shop, on_delete=models.PROTECT)
-
-    mean_queue_length = models.FloatField(default=3)
-    max_queue_length = models.FloatField(default=7)
-    plain_part = models.FloatField(default=0.1)
-
-    beta = models.FloatField(default=0.9)  # for creating timetable, (a function from previous 3 variables)
-
-    demand_coef = models.FloatField(default=1)  # unknown trend for algorithm
-
-
 class CashboxType(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
-    is_deleted = models.BooleanField(default=False)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     name = models.CharField(max_length=128)
@@ -66,7 +57,6 @@ class Cashbox(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
-    is_deleted = models.BooleanField(default=False)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
@@ -106,13 +96,12 @@ class PeriodDemandLog(models.Model):
 class WorkerCashInfo(models.Model):
     id = models.BigAutoField(primary_key=True)
 
-    # for the last 3 month
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
     mean_speed = models.FloatField()
     bills_amount = models.PositiveIntegerField()
     worker = models.ForeignKey(Worker, on_delete=models.PROTECT)
 
-    is_all_period = models.BooleanField()  # show if data about cashier exist for period more or equal then 3 month
+    period = models.PositiveIntegerField(default=90)  # show for how long in days the data was collect
 
 
 class WorkerConstraint(models.Model):
