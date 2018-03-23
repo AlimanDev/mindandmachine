@@ -15,7 +15,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from . import views
+
 
 urlpatterns = [
+    path('timetable/cashier/get_cashiers_set', views.timetable_cashier_get_cashiers_set),
     path('admin/', admin.site.urls),
 ]

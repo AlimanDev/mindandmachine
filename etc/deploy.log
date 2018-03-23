@@ -12,3 +12,6 @@ adduser ksan postgres
 adduser www-data ksan
 
 sudo pip3 install Django==2.0.3
+
+python3 manage.py makemigrations db
+python3 manage.py migrate
