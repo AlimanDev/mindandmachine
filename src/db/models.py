@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User as DjangoUser
+from django.contrib.auth.models import AbstractUser as DjangoAbstractUser
 from . import utils
 
 
@@ -20,7 +20,7 @@ class Shop(models.Model):
     demand_coef = models.FloatField(default=1)  # unknown trend for algorithm
 
 
-class Worker(models.Model):
+class User(DjangoAbstractUser):
     class Type(utils.Enum):
         TYPE_5_2 = 1
         TYPE_2_2 = 2
@@ -29,13 +29,10 @@ class Worker(models.Model):
         TYPE_MANAGER = 5
 
     id = models.BigAutoField(primary_key=True)
-    django_user = models.OneToOneField(DjangoUser, on_delete=models.PROTECT)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
-    first_name = models.CharField(max_length=64)
-    last_name = models.CharField(max_length=64)
     birthday = models.DateField(null=True, blank=True)
     avatar = models.ImageField(null=True, blank=True)
 
@@ -90,7 +87,7 @@ class PeriodDemandLog(models.Model):
     period_demand = models.ForeignKey(PeriodDemand, on_delete=models.PROTECT)
     from_amount = models.PositiveIntegerField()
     to_amount = models.PositiveIntegerField()
-    changed_by = models.ForeignKey(Worker, on_delete=models.PROTECT)
+    changed_by = models.ForeignKey(User, on_delete=models.PROTECT)
 
 
 class WorkerCashInfo(models.Model):
@@ -99,7 +96,7 @@ class WorkerCashInfo(models.Model):
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
     mean_speed = models.FloatField()
     bills_amount = models.PositiveIntegerField()
-    worker = models.ForeignKey(Worker, on_delete=models.PROTECT)
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
 
     period = models.PositiveIntegerField(default=90)  # show for how long in days the data was collect
 
@@ -107,7 +104,7 @@ class WorkerCashInfo(models.Model):
 class WorkerConstraint(models.Model):
     id = models.BigAutoField(primary_key=True)
 
-    worker = models.ForeignKey(Worker, on_delete=models.PROTECT)
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
     weekday = models.PositiveSmallIntegerField()
     tm = utils.DayTimeField()
     is_active = models.BooleanField(default=False)
@@ -127,7 +124,7 @@ class WorkerDay(models.Model):
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dt = models.DateField()
-    worker = models.ForeignKey(Worker, on_delete=models.PROTECT)
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
     type = utils.EnumField(Type)
 
     tm_work_start = utils.DayTimeField(null=True, blank=True)
@@ -175,7 +172,7 @@ class WorkerDayLog(models.Model):
     from_tm_work_end = utils.DayTimeField(null=True, blank=True)
     to_tm_work_end = utils.DayTimeField(null=True, blank=True)
 
-    changed_by = models.ForeignKey(Worker, on_delete=models.PROTECT)
+    changed_by = models.ForeignKey(User, on_delete=models.PROTECT)
 
 
 class Notifications(models.Model):
@@ -188,7 +185,7 @@ class Notifications(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
-    to_worker = models.ForeignKey(Worker, on_delete=models.PROTECT)
+    to_worker = models.ForeignKey(User, on_delete=models.PROTECT)
 
     text = models.CharField(max_length=512)
     type = utils.EnumField(Type)

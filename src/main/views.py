@@ -9,7 +9,7 @@ def timetable_cashier_get_cashiers_set(request):
         return e
 
     response_data = []
-    for w in models.Worker.objects.filter(shop_id=shop_id, is_deleted=False):
+    for w in models.User.objects.filter(shop_id=shop_id, is_deleted=False):
         response_data.append({
             'user_id': w.id,
             'first_name': w.first_name,
@@ -30,6 +30,6 @@ def timetable_cashier_get_cashier_timetable(request):
     if from_dt > to_dt:
         return JsonResponse.value_error('from_dt have to be less than to_dt')
 
-    # days = models.WorkerDay.objects.filter(worker_id=)
-
+    days = list(models.WorkerDay.objects.filter(worker=worker_id, dt__gte=from_dt, dt__lte=to_dt))
+    # work_day_amount = days.count()
 

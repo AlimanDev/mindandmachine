@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'src',
     'src.db',
 ]
 
@@ -89,6 +90,9 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+
+
+AUTH_USER_MODEL = 'db.User'
 
 
 # Password validation

@@ -62,3 +62,11 @@ class ParseRequest(object):
 
 def parse_date(s):
     return datetime.datetime.strptime(s, "%d.%m.%Y")
+
+
+def count(collection, comparer):
+    c = 0
+    for x in collection:
+        if comparer(x):
+            c += 1
+    return c
