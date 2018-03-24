@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
 import os
+from . import djconfig_private
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,12 +21,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 # See https://docs.djangoproject.com/en/2.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '$r-u%!9tnut@#v1o&m!u$=)ofg5$u##3+@_+@q7x^1tovzy2e+'
+SECRET_KEY = djconfig_private.SECRET_KEY
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = djconfig_private.DEBUG
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = djconfig_private.ALLOWED_HOSTS
 
 
 # Application definition
@@ -76,11 +77,9 @@ WSGI_APPLICATION = 'wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/2.0/ref/settings/#databases
 
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    }
+    'default': djconfig_private.DB_DEFAULT
 }
 
 
@@ -124,6 +123,3 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.0/howto/static-files/
 
 STATIC_URL = '/static/'
-
-if os.path.isfile(os.path.join(BASE_DIR, "src/conf", "djconfig_priv.py")):
-    from src.conf.djconfig_priv import *

@@ -13,11 +13,6 @@ class EnumField(models.IntegerField):
         return name, path, args, kwargs
 
 
-# time format hhmm, for example : 745 (7:45), 2300 (23:00)
-class DayTimeField(models.SmallIntegerField):
-    pass
-
-
 class Enum(enum.Enum):
     @classmethod
     def is_valid(cls, value):

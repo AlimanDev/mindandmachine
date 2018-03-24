@@ -7,4 +7,4 @@ db.sqlite3
 src/db/migrations/
 etc/test.py
 
-src/conf/djconfig_priv.py
+src/conf/djconfig_private.py

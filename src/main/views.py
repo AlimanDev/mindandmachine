@@ -9,7 +9,7 @@ def timetable_cashier_get_cashiers_set(request):
         return e
 
     response_data = []
-    for w in models.User.objects.filter(shop_id=shop_id, is_deleted=False):
+    for w in models.User.objects.filter(shop_id=shop_id, dttm_deleted=None):
         response_data.append({
             'user_id': w.id,
             'first_name': w.first_name,
@@ -31,5 +31,19 @@ def timetable_cashier_get_cashier_timetable(request):
         return JsonResponse.value_error('from_dt have to be less than to_dt')
 
     days = list(models.WorkerDay.objects.filter(worker=worker_id, dt__gte=from_dt, dt__lte=to_dt))
-    # work_day_amount = days.count()
+    """
+    work_day_amount -- количество рабочих дней
+    holiday_amount -- количество выходных дней
+    sick_day_amount -- количество больничных
+    work_day_in_holidays_amount -- количество рабочих дней в праздники
+    vacation_day_amount -- количество дней отпуска
+    change_amount -- количество изменений в графике
+    """
+
+    work_day_amount = utils.count(days, lambda x: x.type == models.WorkerDay.Type.TYPE_WORKDAY)
+    holiday_amount = utils.count(days, lambda x: x.type == models.WorkerDay.Type.TYPE_HOLIDAY)
+    sick_day_amount = utils.count(days, lambda x: x.type == models.WorkerDay.Type.TYPE_SICK)
+    vacation_day_amount = utils.count(days, lambda x: x.type == models.WorkerDay.Type.TYPE_VACATION)
+
+
 

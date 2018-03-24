@@ -106,7 +106,7 @@ class WorkerConstraint(models.Model):
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     weekday = models.PositiveSmallIntegerField()
-    tm = utils.DayTimeField()
+    tm = models.TimeField()
     is_active = models.BooleanField(default=False)
 
 
@@ -127,9 +127,9 @@ class WorkerDay(models.Model):
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     type = utils.EnumField(Type)
 
-    tm_work_start = utils.DayTimeField(null=True, blank=True)
-    tm_work_end = utils.DayTimeField(null=True, blank=True)
-    tm_break_start = utils.DayTimeField(null=True, blank=True)
+    tm_work_start = models.TimeField(null=True, blank=True)
+    tm_work_end = models.TimeField(null=True, blank=True)
+    tm_break_start = models.TimeField(null=True, blank=True)
 
     is_manual_tuning = models.BooleanField(default=False)
 
@@ -140,8 +140,8 @@ class WorkerDayCashboxDetails(models.Model):
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT)
 
-    tm_from = utils.DayTimeField()
-    tm_to = utils.DayTimeField()
+    tm_from = models.TimeField()
+    tm_to = models.TimeField()
 
 
 class WorkerChangeRequest(models.Model):
@@ -152,9 +152,9 @@ class WorkerChangeRequest(models.Model):
 
     type = utils.EnumField(WorkerDay.Type)
 
-    tm_work_start = utils.DayTimeField(null=True, blank=True)
-    tm_work_end = utils.DayTimeField(null=True, blank=True)
-    tm_break_start = utils.DayTimeField(null=True, blank=True)
+    tm_work_start = models.TimeField(null=True, blank=True)
+    tm_work_end = models.TimeField(null=True, blank=True)
+    tm_break_start = models.TimeField(null=True, blank=True)
 
 
 class WorkerDayLog(models.Model):
@@ -166,11 +166,11 @@ class WorkerDayLog(models.Model):
     from_type = utils.EnumField(WorkerDay.Type)
     to_type = utils.EnumField(WorkerDay.Type)
 
-    from_tm_work_start = utils.DayTimeField(null=True, blank=True)
-    to_tm_work_start = utils.DayTimeField(null=True, blank=True)
+    from_tm_work_start = models.TimeField(null=True, blank=True)
+    to_tm_work_start = models.TimeField(null=True, blank=True)
 
-    from_tm_work_end = utils.DayTimeField(null=True, blank=True)
-    to_tm_work_end = utils.DayTimeField(null=True, blank=True)
+    from_tm_work_end = models.TimeField(null=True, blank=True)
+    to_tm_work_end = models.TimeField(null=True, blank=True)
 
     changed_by = models.ForeignKey(User, on_delete=models.PROTECT)
 

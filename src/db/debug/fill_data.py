@@ -308,6 +308,5 @@ def load_data(print_loading=True):
     add_demand(shop4[0], now.date(), (now + timezone.timedelta(days=60)).date(), shop4[1])
 
 
-
 def delete_data():
     pass
