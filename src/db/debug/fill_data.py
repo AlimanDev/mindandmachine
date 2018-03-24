@@ -1,7 +1,8 @@
+import datetime
+import random
+
 from src.db import models
 from django.utils import timezone
-from datetime import time
-import random
 
 
 # for load data launch from ./manage.py shell
@@ -241,7 +242,7 @@ def add_constraints(shop, cons_c=0.35, print_loading=True):
             models.WorkerConstraint.objects.get_or_create(
                 worker=user,
                 weekday=d,
-                tm=time(hour=h, minute=p * 30),
+                tm=datetime.time(hour=h, minute=p * 30),
                 defaults={'is_active': is_active},
             )
     if print_loading:
@@ -252,7 +253,7 @@ def add_demand(shop, dt_start, dt_end, cashbox_types=None, step=30, changes_c=0.
     days = (dt_end - dt_start).days
     dts = [dt_start + timezone.timedelta(days=i) for i in range(days)]
     steps_in_h = 60 // step
-    tms = [time(hour=7 + i // steps_in_h, minute=step * (i % steps_in_h)) for i in range(17 * steps_in_h)]
+    tms = [datetime.time(hour=7 + i // steps_in_h, minute=step * (i % steps_in_h)) for i in range(17 * steps_in_h)]
 
     user = models.User.objects.filter(shop=shop).first()
     if cashbox_types is None:
@@ -291,6 +292,64 @@ def add_demand(shop, dt_start, dt_end, cashbox_types=None, step=30, changes_c=0.
         print('add demands for shop: {}'.format(shop.title))
 
 
+class OfficialHolidays(object):
+    @classmethod
+    def add(cls):
+        all_dates = cls.__parse_file()
+        for d in all_dates:
+            models.OfficialHolidays.objects.create(country='ru', date=d)
+
+    @classmethod
+    def __parse_file(cls):
+        all_dates = []
+        with open('src/db/debug/official_ru_holidays.csv') as f:
+            is_header = True
+            for l in f:
+                if is_header:
+                    is_header = False
+                    continue
+
+                arr = cls.__parse_str(l)
+                all_dates += cls.__prepare_dates(int(arr[0]), arr[1:])
+
+        return all_dates
+
+    @classmethod
+    def __parse_str(cls, s):
+        result = []
+        substr = ''
+        is_quote = False
+        for c in s:
+            if c == '"':
+                is_quote = not is_quote
+            elif c == ",":
+                if is_quote:
+                    substr += c
+                else:
+                    result.append(substr)
+                    substr = ''
+            else:
+                substr += c
+
+        if substr != '':
+            result.append(substr)
+
+        # 1 year + 12 months
+        return result[:13]
+
+    @classmethod
+    def __prepare_dates(cls, year, months):
+        month_counter = 0
+        all_dates = []
+        for month in months:
+            month_counter += 1
+            days = [int(x) for x in month.split(',') if '*' not in x]
+            dates = [datetime.date(year, month_counter, d) for d in days]
+            all_dates += dates
+
+        return all_dates
+
+
 def load_data(print_loading=True):
     now = timezone.now()
     shop3, shop4 = add_shops_and_cashboxes(print_loading=print_loading)
@@ -307,6 +366,11 @@ def load_data(print_loading=True):
     add_demand(shop3[0], now.date(), (now + timezone.timedelta(days=60)).date(), shop3[1])
     add_demand(shop4[0], now.date(), (now + timezone.timedelta(days=60)).date(), shop4[1])
 
+    OfficialHolidays.add()
+
 
 def delete_data():
     pass
+
+
+load_data()

@@ -1,0 +1,2 @@
+run script in django shell
+echo 'import src.db.debug.fill_data' | python3 manage.py shell

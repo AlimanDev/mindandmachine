@@ -195,3 +195,10 @@ class Notifications(models.Model):
     period_demand_log = models.ForeignKey(PeriodDemandLog, on_delete=models.PROTECT, null=True, blank=True)
 
     shown = models.BooleanField(default=False)
+
+
+class OfficialHolidays(models.Model):
+    id = models.BigAutoField(primary_key=True)
+
+    country = models.CharField(max_length=4)
+    date = models.DateField()

@@ -14,7 +14,7 @@ def timetable_cashier_get_cashiers_set(request):
             'user_id': w.id,
             'first_name': w.first_name,
             'last_name': w.last_name,
-            'avatar_url': w.avatar.url
+            'avatar_url': w.avatar.url if w.avatar else None
         })
     return JsonResponse.success(response_data)
 
@@ -44,6 +44,4 @@ def timetable_cashier_get_cashier_timetable(request):
     holiday_amount = utils.count(days, lambda x: x.type == models.WorkerDay.Type.TYPE_HOLIDAY)
     sick_day_amount = utils.count(days, lambda x: x.type == models.WorkerDay.Type.TYPE_SICK)
     vacation_day_amount = utils.count(days, lambda x: x.type == models.WorkerDay.Type.TYPE_VACATION)
-
-
 
