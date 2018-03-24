@@ -1,0 +1,313 @@
+from src.db import models
+from django.utils import timezone
+from datetime import time
+import random
+
+
+# for load data launch from ./manage.py shell
+
+# todo: use for adding real function from code (not create), which must check unique current values
+def add_shops_and_cashboxes(print_loading=True):
+    dttm_deleted1 = timezone.now() + timezone.timedelta(days=31)
+
+    # shop 3: kransogorsk
+    shop3, _ = models.Shop.objects.get_or_create(
+        title='003_test',
+        defaults={'beta':0.8},
+    )
+
+    cashbox_types_3 = [
+        models.CashboxType.objects.get_or_create(shop=shop3, name='Линия (обычные)')[0],
+        models.CashboxType.objects.get_or_create(shop=shop3, name='Линия (экспресс)')[0],
+        models.CashboxType.objects.get_or_create(shop=shop3, name='Линия (для юрлиц)')[0],
+        models.CashboxType.objects.get_or_create(shop=shop3, name='Возврат')[0],
+        models.CashboxType.objects.get_or_create(shop=shop3, name='Достака')[0],
+        models.CashboxType.objects.get_or_create(shop=shop3, name='Информация')[0],
+
+        models.CashboxType.objects.get_or_create(shop=shop3, name='На улице', dttm_deleted=dttm_deleted1)[0],
+    ]
+
+    cash_nums3 = [
+        [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
+        [1, 2, 3, 4, 5, 6, 7, 8, 22, 23],
+        [24, 25, 26],
+        [28, 29, 30, 31, 32, 33],
+        [35, 36],
+        # [27, 34],
+        [37, 38],
+        [40],
+    ]
+
+    for j, cash_num_type in enumerate(cash_nums3):
+        for i in cash_num_type:
+            models.Cashbox.objects.get_or_create(
+                    type=cashbox_types_3[j],
+                    number=i,
+                    bio='',
+            )
+
+    if print_loading:
+        print('add test shop3')
+
+    dttm_deleted2 = dttm_deleted1 - timezone.timedelta(days=10)
+    shop4, _ = models.Shop.objects.get_or_create(
+        title='004_test',
+        defaults={'mean_queue_length':2},
+    )
+
+    cashbox_types_4 = [
+        models.CashboxType.objects.get_or_create(shop=shop4, name='Линия (обычные)')[0],
+        models.CashboxType.objects.get_or_create(shop=shop4, name='Линия (экспресс)')[0],
+        models.CashboxType.objects.get_or_create(shop=shop4, name='Линия (для юрлиц)')[0],
+        models.CashboxType.objects.get_or_create(shop=shop4, name='Возврат')[0],
+        models.CashboxType.objects.get_or_create(shop=shop4, name='Достака')[0],
+        models.CashboxType.objects.get_or_create(shop=shop4, name='Информация')[0],
+        models.CashboxType.objects.get_or_create(shop=shop4, name='Выдача')[0],
+        models.CashboxType.objects.get_or_create(shop=shop4, name='Крупногабарит')[0],
+
+        models.CashboxType.objects.get_or_create(shop=shop4, name='Краски', dttm_deleted=dttm_deleted2)[0],
+    ]
+
+    cash_nums4 = [
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 22, 23, 24, 25, 26],
+        [11, 13, 14, 15, 16, 17, 18, 19, 20, 21],
+        [27, 28, 29],
+        [37, 38, 39, 40, 41],
+        [43, 44, 45],
+        [46, 47],
+        [42],
+        [32, 33, 34],
+        [35],
+    ]
+
+    for j, cash_num_type in enumerate(cash_nums4):
+        for i in cash_num_type:
+            models.Cashbox.objects.get_or_create(
+                type=cashbox_types_4[j],
+                number=i,
+                bio='',
+            )
+
+    if print_loading:
+        print('add test shop4')
+        print('func add_shops_and_cashboxes loaded data')
+
+    return (
+        (shop3, cashbox_types_3),
+        (shop4, cashbox_types_4),
+    )
+
+
+def add_users(shop, cashbox_types=None, amount=100, has_special_skill=0.25, print_loading=True):
+    """
+    add users (workers) for select shop + working types
+    :param shop:
+    :return:
+    """
+
+    first_name = ['Анна', 'Ира', 'Ольга', 'Анастасия', 'МегадлинноеИмяДля']
+    last_name = ['Рожкова', 'Цой', 'Пирожкова', 'Рубиникова', 'МегадлиннаяФамилия',]
+    birthdays = [
+        timezone.datetime(1980, 1, 2).date(),
+        timezone.datetime(1990, 3, 5).date(),
+        timezone.datetime(1960, 5, 2).date(),
+        timezone.datetime(1960, 5, 18).date(),
+        timezone.datetime(1960, 1, 2).date(),
+    ]
+
+    if cashbox_types is None:
+        cashbox_types = models.CashboxType.objects.filter(shop=shop).order_by('id')
+
+    for i in range(amount):
+        f, l, b, w = random.randint(0, 4),random.randint(0, 4), random.randint(0, 4), random.randint(1, 5)
+        user, _ = models.User.objects.get_or_create(
+            username=shop.title + str(i),
+            shop=shop,
+            defaults={
+                'first_name': first_name[f],
+                'last_name': last_name[l],
+                'birthday': birthdays[b],
+                'work_type': w,
+                'permissions': 1,
+            }
+        )
+
+        t, d = random.randint(0, 1), random.randint(0, 90)
+        s, st = random.random(), random.randint(2, len(cashbox_types) - 1)
+        models.WorkerCashInfo.objects.get_or_create(
+            type=cashbox_types[t],
+            worker=user,
+            defaults={
+                'mean_speed': random.random() * 3,
+                'bills_amount':d * random.random() * 2,
+                'period':d,
+            }
+        )
+        if s < has_special_skill:
+            models.WorkerCashInfo.objects.get_or_create(
+                type=cashbox_types[st],
+                worker=user,
+                defaults={
+                    'mean_speed': random.random() * 4.5,
+                    'bills_amount': d * random.random(),
+                    'period': d,
+                }
+            )
+
+    if print_loading:
+        print('add users and WorkerCashInfo for shop: {}'.format(shop.title))
+
+
+def add_work_days(shop, dttm_start, dttm_end, work_days, changes=0.2, double_changes=0.1, request_c=0.2, print_loading=True):
+    days = (dttm_end - dttm_start).days
+    threshold = work_days / days
+    not_work_types = [
+        models.WorkerDay.Type.TYPE_HOLIDAY.value,
+        models.WorkerDay.Type.TYPE_VACATION.value,
+        models.WorkerDay.Type.TYPE_SICK.value,
+        models.WorkerDay.Type.TYPE_QUALIFICATION.value,
+        models.WorkerDay.Type.TYPE_ABSENSE.value,
+        models.WorkerDay.Type.TYPE_MATERNITY.value,
+    ]
+    max_ind = len(not_work_types) - 1
+
+    dttms = [dttm_start + timezone.timedelta(days=i) for i in range(days)]
+    users = models.User.objects.filter(shop=shop)
+
+    for user in users:
+        cur_d = -1
+        u_threshold = threshold + (random.random() - 0.5) / 10
+        for i in range(days):
+            if random.random() > u_threshold:
+                st = models.WorkerDay.Type.TYPE_WORKDAY.value
+                tm_work_start = None # timezone.time(random.randint(7, 14))
+                tm_work_end = None # timezone.time(random.randint(11, 18))
+                tm_break_start = None # timezone.time(random.randint(15, 23))
+            else:
+                st = not_work_types[random.randint(0, max_ind)]
+                tm_work_start = None
+                tm_work_end = None
+                tm_break_start = None
+
+            wd, _ = models.WorkerDay.objects.get_or_create(
+                worker=user,
+                type=st,
+                dt=dttms[i],
+
+                defaults={
+                    # 'tm_work_start': tm_work_start,
+                    # 'tm_work_end': tm_work_end,
+                    # 'tm_break_start': tm_break_start,
+                }
+
+
+            )
+            cr = random.random()
+            if cr < changes:
+                tp = not_work_types[random.randint(0, max_ind)]
+                models.WorkerDayLog.objects.create(
+                    worker_day=wd,
+                    from_type=tp,
+                    to_type=st,
+                    changed_by=user, # todo: only main users could do it
+                )
+                if cr < double_changes:
+                    models.WorkerDayLog.objects.create(
+                        worker_day=wd,
+                        from_type=not_work_types[random.randint(0, max_ind)],
+                        to_type=tp,
+                        changed_by=user,  # todo: only main users could do it
+                    )
+            cr = random.random()
+            if cr < request_c:
+                models.WorkerChangeRequest.objects.create(
+                    worker_day=wd,
+                    type=not_work_types[random.randint(0, max_ind)],
+                )
+
+    if print_loading:
+        print('add add_work_days for shop: {}'.format(shop.title))
+
+
+def add_constraints(shop, cons_c=0.35, print_loading=True):
+    users = models.User.objects.filter(shop=shop)
+    cons_amount = 7 * 16 * 2 # days * hours * period in hour
+
+    for user in users:
+        u_cons_c = cons_c + (random.random() + 0.5) / 10
+        for i in range(int(cons_amount * u_cons_c)):
+            d, h, p = random.randint(0, 6), random.randint(7, 23), random.randint(0, 1)
+            is_active = random.random() > 0.1
+            models.WorkerConstraint.objects.get_or_create(
+                worker=user,
+                weekday=d,
+                tm=time(hour=h, minute=p * 30),
+                defaults={'is_active': is_active},
+            )
+    if print_loading:
+        print('add constraints for shop: {}'.format(shop.title))
+
+
+def add_demand(shop, dt_start, dt_end, cashbox_types=None, step=30, changes_c=0.2, print_loading=True):
+    days = (dt_end - dt_start).days
+    dts = [dt_start + timezone.timedelta(days=i) for i in range(days)]
+    steps_in_h = 60 // step
+    tms = [time(hour=7 + i // steps_in_h, minute=step * (i % steps_in_h)) for i in range(17 * steps_in_h)]
+
+    user = models.User.objects.filter(shop=shop).first()
+    if cashbox_types is None:
+        cashbox_types = models.CashboxType.objects.filter(shop=shop).order_by('id')
+
+    for dt in dts:
+        for tm in tms:
+            dttm = timezone.datetime.combine(dt, tm).replace(tzinfo=timezone.utc)
+            for i, cash_tp in enumerate(cashbox_types[:6]):
+                for tp in [models.PeriodDemand.Type.LONG_FORECAST.value, models.PeriodDemand.Type.FACT.value]:
+                    pd, _ = models.PeriodDemand.objects.get_or_create(
+                        # shop=shop,
+                        dttm_forecast=dttm,
+                        type=tp,
+                        сashbox_type=cash_tp,
+                        defaults={
+                            'clients': random.randint(10, 200) // (i + 1),
+                            'products': random.randint(60, 1200) // (i + 1),
+
+                            'queue_wait_time': 1.1 + random.random() * 2,
+                            'queue_wait_length': 1 + random.randint(0, 2),
+                        }
+                    )
+                    if tp == models.PeriodDemand.Type.LONG_FORECAST:
+                        c = random.random()
+                        if c < changes_c:
+                            models.PeriodDemandLog.objects.create(
+                                period_demand=pd,
+                                changed_by=user,
+
+                                from_amount=random.randint(10, 200) // (i + 1),
+                                to_amount=pd.clients,
+                            )
+
+    if print_loading:
+        print('add demands for shop: {}'.format(shop.title))
+
+
+def load_data(print_loading=True):
+    now = timezone.now()
+    shop3, shop4 = add_shops_and_cashboxes(print_loading=print_loading)
+
+    add_users(shop3[0], shop3[1], print_loading=print_loading)
+    add_users(shop4[0], shop4[1], 110, print_loading=print_loading)
+
+    add_work_days(shop3[0], now, now + timezone.timedelta(days=60), 40)
+    add_work_days(shop4[0], now, now + timezone.timedelta(days=60), 40)
+
+    add_constraints(shop3[0])
+    add_constraints(shop4[0])
+
+    add_demand(shop3[0], now.date(), (now + timezone.timedelta(days=60)).date(), shop3[1])
+    add_demand(shop4[0], now.date(), (now + timezone.timedelta(days=60)).date(), shop4[1])
+
+
+
+def delete_data():
+    pass
