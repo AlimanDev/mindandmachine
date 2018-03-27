@@ -14,12 +14,11 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
-from . import views
+from django.urls import path, include
+from .timetable import urls as timetable_urls
 
 
 urlpatterns = [
-    path('timetable/cashier/get_cashiers_set', views.timetable_cashier_get_cashiers_set),
-    path('timetable/cashier/get_cashiers_timetable', views.timetable_cashier_get_cashier_timetable),
+    path('timetable/', include(timetable_urls)),
     path('admin/', admin.site.urls),
 ]

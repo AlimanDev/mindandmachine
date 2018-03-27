@@ -1,17 +1,15 @@
-from . import utils
+from src.util import utils
 from src.db import models
-from .utils import ParseRequest, JsonResponse
-from .models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter
+from src.util.utils import ParseRequest, JsonResponse, api_method
+from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter
+from .forms import GetCashiersSetForm, GetCashierTimetableForm
 
 
-def timetable_cashier_get_cashiers_set(request):
-    shop_id, e = ParseRequest.get_simple_param(request.GET, 'shop_id', int)
-    if e is not None:
-        return e
-
+@utils.api_method('GET', GetCashiersSetForm)
+def get_cashiers_set(request, form):
     users = list(
         models.User.objects.filter(
-            shop_id=shop_id,
+            shop_id=form.cleaned_data['shop_id'],
             dttm_deleted=None
         )
     )
@@ -21,16 +19,11 @@ def timetable_cashier_get_cashiers_set(request):
     return JsonResponse.success(response)
 
 
-def timetable_cashier_get_cashier_timetable(request):
-    worker_id, e = ParseRequest.get_simple_param(request.GET, 'worker_id', int)
-    from_dt, e = ParseRequest.get_simple_param(request.GET, 'from_dt', utils.parse_date, e)
-    to_dt, e = ParseRequest.get_simple_param(request.GET, 'to_dt', utils.parse_date, e)
-    to_file_format, e = ParseRequest.get_match_param(request.GET, 'format', None, ['raw', 'excel'], e)
-    if e is not None:
-        return e
-
-    if from_dt > to_dt:
-        return JsonResponse.value_error('from_dt have to be less than to_dt')
+@api_method('GET', GetCashierTimetableForm)
+def get_cashier_timetable(request, form):
+    worker_id = form.cleaned_data['worker_id']
+    from_dt = form.cleaned_data['from_dt']
+    to_dt = form.cleaned_data['to_dt']
 
     worker_days = list(
         models.WorkerDay.objects.filter(

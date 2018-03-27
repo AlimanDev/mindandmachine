@@ -2,12 +2,17 @@ import json
 import datetime
 
 from django.http import HttpResponse
+from django.conf import settings
 
 
 class JsonResponse(object):
     @classmethod
     def success(cls, data):
         return cls.base_response(200, data)
+
+    @classmethod
+    def method_error(cls, current_method, expected_method):
+        return JsonResponse.base_error_response(400, 'MethodException', 'Invalid method <{}>, expected <{}>'.format(current_method, expected_method))
 
     @classmethod
     def value_error(cls, msg):
@@ -70,3 +75,33 @@ def count(collection, comparer):
         if comparer(x):
             c += 1
     return c
+
+
+def api_method(method, form_cls):
+    def decor(func):
+        def wrapper(request, *args, **kwargs):
+            if request.method != method:
+                return JsonResponse.method_error(request.method, method)
+
+            if request.method == 'GET':
+                form_params = request.GET
+            elif request.method == 'POST':
+                form_params = request.POST
+            else:
+                form_params = {}
+
+            form = form_cls(form_params)
+            if not form.is_valid():
+                return JsonResponse.value_error(str(list(form.errors.items())))
+
+            try:
+                return func(request, form, *args, **kwargs)
+            except Exception as e:
+                if settings.DEBUG:
+                    raise e
+                else:
+                    # todo: add logging at DEBUG = False
+                    pass
+
+        return wrapper
+    return decor
