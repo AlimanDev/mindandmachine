@@ -31,3 +31,8 @@ class ChoiceField(forms.ChoiceField):
             choices=((x, '') for x in choices),
             **kwargs
         )
+
+
+class BooleanField(forms.BooleanField):
+    def __init__(self):
+        super().__init__(required=False)

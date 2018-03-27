@@ -100,3 +100,15 @@ class WorkerDayChangeLogConverter(BaseConverter):
 
             'changed_by': obj.changed_by_id
         }
+
+
+class CashboxTypeConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'dttm_added': cls._convert_datetime(obj.dttm_added),
+            'dttm_deleted': cls._convert_datetime(obj.dttm_deleted),
+            'shop': obj.shop_id,
+            'name': obj.name
+        }

@@ -10,7 +10,12 @@ class GetCashierTimetableForm(forms.Form):
     worker_id = forms.IntegerField()
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
-    format = util_forms.ChoiceField(['raw', 'excel'])
+    format = util_forms.ChoiceField(['raw', 'excel'], required=False)
+
+    def format_clean(self):
+        super().format_clean()
+        if self.cleaned_data.get('format') is None:
+            self.cleaned_data['format'] = 'raw'
 
     def clean(self):
         super().clean()
