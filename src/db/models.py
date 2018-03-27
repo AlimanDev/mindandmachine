@@ -21,6 +21,9 @@ class Shop(models.Model):
 
 
 class User(DjangoAbstractUser):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     class Type(utils.Enum):
         TYPE_5_2 = 1
         TYPE_2_2 = 2

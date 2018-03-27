@@ -1,4 +1,4 @@
-from src.db import models
+from src.db.models import WorkerDay
 
 
 class BaseConverter(object):
@@ -28,13 +28,13 @@ class UserConverter(BaseConverter):
 
 class WorkerDayConverter(BaseConverter):
     __WORKER_DAY_TYPE = {
-        models.WorkerDay.Type.TYPE_HOLIDAY.value: 'H',
-        models.WorkerDay.Type.TYPE_WORKDAY.value: 'W',
-        models.WorkerDay.Type.TYPE_VACATION.value: 'V',
-        models.WorkerDay.Type.TYPE_SICK.value: 'S',
-        models.WorkerDay.Type.TYPE_QUALIFICATION.value: 'Q',
-        models.WorkerDay.Type.TYPE_ABSENSE.value: 'A',
-        models.WorkerDay.Type.TYPE_MATERNITY.value: 'M',
+        WorkerDay.Type.TYPE_HOLIDAY.value: 'H',
+        WorkerDay.Type.TYPE_WORKDAY.value: 'W',
+        WorkerDay.Type.TYPE_VACATION.value: 'V',
+        WorkerDay.Type.TYPE_SICK.value: 'S',
+        WorkerDay.Type.TYPE_QUALIFICATION.value: 'Q',
+        WorkerDay.Type.TYPE_ABSENSE.value: 'A',
+        WorkerDay.Type.TYPE_MATERNITY.value: 'M',
     }
 
     @classmethod
@@ -44,7 +44,7 @@ class WorkerDayConverter(BaseConverter):
     @classmethod
     def convert(cls, obj):
         def __work_tm(__field):
-            return cls._convert_time(__field) if obj.type == models.WorkerDay.Type.TYPE_WORKDAY.value else None
+            return cls._convert_time(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
 
         return {
             'id': obj.id,
@@ -63,7 +63,7 @@ class WorkerDayChangeRequestConverter(BaseConverter):
     @classmethod
     def convert(cls, obj):
         def __work_tm(__field):
-            return cls._convert_time(__field) if obj.type == models.WorkerDay.Type.TYPE_WORKDAY.value else None
+            return cls._convert_time(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
 
         return {
             'id': obj.id,
@@ -81,7 +81,7 @@ class WorkerDayChangeLogConverter(BaseConverter):
     @classmethod
     def convert(cls, obj):
         def __work_tm(__field, __type):
-            return cls._convert_time(__field) if __type == models.WorkerDay.Type.TYPE_WORKDAY.value else None
+            return cls._convert_time(__field) if __type == WorkerDay.Type.TYPE_WORKDAY.value else None
 
         return {
             'id': obj.id,

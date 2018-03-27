@@ -1,14 +1,13 @@
-from src.util import utils
-from src.db import models
-from src.util.utils import ParseRequest, JsonResponse, api_method
+from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays
+from src.util.utils import JsonResponse, api_method, count
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter
 from .forms import GetCashiersSetForm, GetCashierTimetableForm
 
 
-@utils.api_method('GET', GetCashiersSetForm)
+@api_method('GET', GetCashiersSetForm)
 def get_cashiers_set(request, form):
     users = list(
-        models.User.objects.filter(
+        User.objects.filter(
             shop_id=form.cleaned_data['shop_id'],
             dttm_deleted=None
         )
@@ -26,7 +25,7 @@ def get_cashier_timetable(request, form):
     to_dt = form.cleaned_data['to_dt']
 
     worker_days = list(
-        models.WorkerDay.objects.filter(
+        WorkerDay.objects.filter(
             worker_id=worker_id,
             dt__gte=from_dt,
             dt__lte=to_dt
@@ -35,13 +34,13 @@ def get_cashier_timetable(request, form):
         )
     )
     official_holidays = [
-        x.date for x in models.OfficialHolidays.objects.filter(
+        x.date for x in OfficialHolidays.objects.filter(
             date__gte=from_dt,
             date__lte=to_dt
         )
     ]
     worker_day_change_requests = list(
-        models.WorkerDayChangeRequest.objects.filter(
+        WorkerDayChangeRequest.objects.filter(
             worker_day_worker_id=worker_id,
             worker_day_dt__gte=from_dt,
             worker_day_dt__lte=to_dt
@@ -50,7 +49,7 @@ def get_cashier_timetable(request, form):
         )
     )
     worker_day_change_log = list(
-        models.WorkerDayChangeLog.objects.filter(
+        WorkerDayChangeLog.objects.filter(
             worker_day_worker_id=worker_id,
             worker_day_dt__gte=from_dt,
             worker_day_dt__lte=to_dt
@@ -60,11 +59,11 @@ def get_cashier_timetable(request, form):
     )
 
     indicators_response = {
-        'work_day_amount': utils.count(worker_days, lambda x: x.type == models.WorkerDay.Type.TYPE_WORKDAY.value),
-        'holiday_amount': utils.count(worker_days, lambda x: x.type == models.WorkerDay.Type.TYPE_HOLIDAY.value),
-        'sick_day_amount': utils.count(worker_days, lambda x: x.type == models.WorkerDay.Type.TYPE_SICK.value),
-        'vacation_day_amount': utils.count(worker_days, lambda x: x.type == models.WorkerDay.Type.TYPE_VACATION.value),
-        'work_day_in_holidays_amount': utils.count(worker_days, lambda x: x.type == models.WorkerDay.Type.TYPE_WORKDAY.value and x.dt in official_holidays),
+        'work_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value),
+        'holiday_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value),
+        'sick_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_SICK.value),
+        'vacation_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_VACATION.value),
+        'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and x.dt in official_holidays),
         'change_amount': len(worker_day_change_log)
     }
 
