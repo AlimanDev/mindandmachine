@@ -77,10 +77,11 @@ def timetable_cashier_get_cashier_timetable(request):
 
     days_response = []
     for obj in worker_days:
-        obj_response = WorkerDayConverter.convert(obj)
-        obj_response['change_log'] = [WorkerDayChangeLogConverter.convert(x) for x in worker_day_change_log[:10]]
-        obj_response['change_requests'] = [WorkerDayChangeRequestConverter.convert(x) for x in worker_day_change_requests[:10]]
-        days_response.append(obj_response)
+        days_response.append({
+            'day': WorkerDayConverter.convert(obj),
+            'change_log': [WorkerDayChangeLogConverter.convert(x) for x in worker_day_change_log[:10]],
+            'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in worker_day_change_requests[:10]]
+        })
 
     response = {
         'indicators': indicators_response,
