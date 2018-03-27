@@ -206,23 +206,29 @@ def add_work_days(shop, dttm_start, dttm_end, work_days, changes=0.2, double_cha
             cr = random.random()
             if cr < changes:
                 tp = not_work_types[random.randint(0, max_ind)]
-                models.WorkerDayLog.objects.create(
+                models.WorkerDayChangeLog.objects.create(
                     worker_day=wd,
+                    worker_day_dt=wd.dt,
+                    worker_day_worker=wd.worker,
                     from_type=tp,
                     to_type=st,
                     changed_by=user, # todo: only main users could do it
                 )
                 if cr < double_changes:
-                    models.WorkerDayLog.objects.create(
+                    models.WorkerDayChangeLog.objects.create(
                         worker_day=wd,
+                        worker_day_dt=wd.dt,
+                        worker_day_worker=wd.worker,
                         from_type=not_work_types[random.randint(0, max_ind)],
                         to_type=tp,
                         changed_by=user,  # todo: only main users could do it
                     )
             cr = random.random()
             if cr < request_c:
-                models.WorkerChangeRequest.objects.create(
+                models.WorkerDayChangeRequest.objects.create(
                     worker_day=wd,
+                    worker_day_dt=wd.dt,
+                    worker_day_worker=wd.worker,
                     type=not_work_types[random.randint(0, max_ind)],
                 )
 
@@ -280,7 +286,7 @@ def add_demand(shop, dt_start, dt_end, cashbox_types=None, step=30, changes_c=0.
                     if tp == models.PeriodDemand.Type.LONG_FORECAST:
                         c = random.random()
                         if c < changes_c:
-                            models.PeriodDemandLog.objects.create(
+                            models.PeriodDemandChangeLog.objects.create(
                                 period_demand=pd,
                                 changed_by=user,
 

@@ -80,7 +80,7 @@ class PeriodDemand(models.Model):
     queue_wait_length = models.FloatField()
 
 
-class PeriodDemandLog(models.Model):
+class PeriodDemandChangeLog(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_changed = models.DateTimeField(auto_now_add=True)
@@ -111,6 +111,9 @@ class WorkerConstraint(models.Model):
 
 
 class WorkerDay(models.Model):
+    class Meta(object):
+        unique_together = (('dt', 'worker'),)
+
     class Type(utils.Enum):
         TYPE_HOLIDAY = 1
         TYPE_WORKDAY = 2
@@ -123,8 +126,8 @@ class WorkerDay(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
-    dt = models.DateField()
-    worker = models.ForeignKey(User, on_delete=models.PROTECT)
+    dt = models.DateField()  # todo: make immutable
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)  # todo: make immutable
     type = utils.EnumField(Type)
 
     tm_work_start = models.TimeField(null=True, blank=True)
@@ -132,6 +135,12 @@ class WorkerDay(models.Model):
     tm_break_start = models.TimeField(null=True, blank=True)
 
     is_manual_tuning = models.BooleanField(default=False)
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return 'Worker {} | Date {} | {}'.format(self.id, self.dt, self.Type.get_name_by_value(self.type))
 
 
 class WorkerDayCashboxDetails(models.Model):
@@ -144,11 +153,16 @@ class WorkerDayCashboxDetails(models.Model):
     tm_to = models.TimeField()
 
 
-class WorkerChangeRequest(models.Model):
+class WorkerDayChangeRequest(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
+
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
+
+    # extra fields for SQL SELECT performance
+    worker_day_dt = models.DateField()
+    worker_day_worker = models.ForeignKey(User, on_delete=models.PROTECT, related_name='+')
 
     type = utils.EnumField(WorkerDay.Type)
 
@@ -157,20 +171,26 @@ class WorkerChangeRequest(models.Model):
     tm_break_start = models.TimeField(null=True, blank=True)
 
 
-class WorkerDayLog(models.Model):
+class WorkerDayChangeLog(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_changed = models.DateTimeField(auto_now_add=True)
+
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
 
+    # extra fields for SQL SELECT performance
+    worker_day_dt = models.DateField()
+    worker_day_worker = models.ForeignKey(User, on_delete=models.PROTECT, related_name='+')
+
     from_type = utils.EnumField(WorkerDay.Type)
-    to_type = utils.EnumField(WorkerDay.Type)
-
     from_tm_work_start = models.TimeField(null=True, blank=True)
-    to_tm_work_start = models.TimeField(null=True, blank=True)
-
     from_tm_work_end = models.TimeField(null=True, blank=True)
+    from_tm_break_start = models.TimeField(null=True, blank=True)
+
+    to_type = utils.EnumField(WorkerDay.Type)
+    to_tm_work_start = models.TimeField(null=True, blank=True)
     to_tm_work_end = models.TimeField(null=True, blank=True)
+    to_tm_break_start = models.TimeField(null=True, blank=True)
 
     changed_by = models.ForeignKey(User, on_delete=models.PROTECT)
 
@@ -190,9 +210,9 @@ class Notifications(models.Model):
     text = models.CharField(max_length=512)
     type = utils.EnumField(Type)
 
-    worker_change_request = models.ForeignKey(WorkerChangeRequest, on_delete=models.PROTECT, null=True, blank=True)
-    worker_day_log = models.ForeignKey(WorkerDayLog, on_delete=models.PROTECT, null=True, blank=True)
-    period_demand_log = models.ForeignKey(PeriodDemandLog, on_delete=models.PROTECT, null=True, blank=True)
+    worker_day_change_request = models.ForeignKey(WorkerDayChangeRequest, on_delete=models.PROTECT, null=True, blank=True)
+    worker_day_change_log = models.ForeignKey(WorkerDayChangeLog, on_delete=models.PROTECT, null=True, blank=True)
+    period_demand_log = models.ForeignKey(PeriodDemandChangeLog, on_delete=models.PROTECT, null=True, blank=True)
 
     shown = models.BooleanField(default=False)
 

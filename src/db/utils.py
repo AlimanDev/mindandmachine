@@ -20,3 +20,10 @@ class Enum(enum.Enum):
             if x.value == value:
                 return True
         return False
+
+    @classmethod
+    def get_name_by_value(cls, value):
+        for x in cls:
+            if x.value == value:
+                return x
+        return None

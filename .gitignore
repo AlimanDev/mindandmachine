@@ -1,10 +1,11 @@
 *~
 *.pyc
 
-db.sqlite3
-
 .idea/
-src/db/migrations/
-etc/test.py
 
-src/conf/djconfig_private.py
+src/conf/djconfig_local.py
+
+etc/test.py
+etc/report/
+
+db.sqlite3
