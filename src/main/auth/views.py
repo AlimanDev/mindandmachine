@@ -13,7 +13,7 @@ from .forms import SigninForm
 
 @api_method('POST', SigninForm, auth_required=False)
 def signin(request, form):
-    user = authenticate(request, username=form.cleaned_data['username'], password=form.cleaned_data['password'])
+    user = authenticate(request, username=form['username'], password=form['password'])
     if user is None:
         return JsonResponse.base_error_response(400, 'AuthError', 'No such user or password incorrect')
 

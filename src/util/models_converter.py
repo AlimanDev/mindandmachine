@@ -39,9 +39,15 @@ class WorkerDayConverter(BaseConverter):
         WorkerDay.Type.TYPE_MATERNITY.value: 'M',
     }
 
+    __WORKER_DAY_TYPE_REVERSED = {v: k for k, v in __WORKER_DAY_TYPE.items()}
+
     @classmethod
     def convert_type(cls, obj_type):
         return cls.__WORKER_DAY_TYPE.get(obj_type, '')
+
+    @classmethod
+    def parse_type(cls, obj_type):
+        return cls.__WORKER_DAY_TYPE_REVERSED.get(obj_type)
 
     @classmethod
     def convert(cls, obj):

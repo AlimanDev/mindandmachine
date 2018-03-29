@@ -55,7 +55,7 @@ def api_method(method, form_cls=None, auth_required=True):
                 if not form.is_valid():
                     return JsonResponse.value_error(str(list(form.errors.items())))
 
-                kwargs['form'] = form
+                kwargs['form'] = form.cleaned_data
             else:
                 kwargs.pop('form', None)
 
@@ -66,7 +66,7 @@ def api_method(method, form_cls=None, auth_required=True):
                     raise e
                 else:
                     # todo: add logging at DEBUG = False
-                    pass
+                    return JsonResponse.base_error_response(500, 'InternalError', 'Internal server error occurred')
 
         return wrapper
     return decor

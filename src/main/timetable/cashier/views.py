@@ -2,14 +2,14 @@ from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChan
 from src.util.utils import JsonResponse, api_method, count
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter
-from .forms import GetCashiersSetForm, GetCashierTimetableForm, GetCashierInfoForm
-
+from .forms import GetCashiersSetForm, GetCashierTimetableForm, GetCashierInfoForm, SetWorkerDayForm
+from . import utils
 
 @api_method('GET', GetCashiersSetForm)
 def get_cashiers_set(request, form):
     users = list(
         User.objects.filter(
-            shop_id=form.cleaned_data['shop_id'],
+            shop_id=form['shop_id'],
             dttm_deleted=None
         )
     )
@@ -21,12 +21,12 @@ def get_cashiers_set(request, form):
 
 @api_method('GET', GetCashierTimetableForm)
 def get_cashier_timetable(request, form):
-    if form.cleaned_data['format'] == 'excel':
+    if form['format'] == 'excel':
         return JsonResponse.value_error('Excel is not supported yet')
 
-    worker_id = form.cleaned_data['worker_id']
-    from_dt = form.cleaned_data['from_dt']
-    to_dt = form.cleaned_data['to_dt']
+    worker_id = form['worker_id']
+    from_dt = form['from_dt']
+    to_dt = form['to_dt']
 
     worker_days = list(
         WorkerDay.objects.filter(
@@ -92,14 +92,14 @@ def get_cashier_info(request, form):
     response = {}
 
     try:
-        worker = User.objects.get(id=form.cleaned_data['worker_id'])
+        worker = User.objects.get(id=form['worker_id'])
     except User.DoesNotExist:
         return JsonResponse.value_error('Invalid worker_id')
 
-    if 'general_info' in form.cleaned_data['info']:
+    if 'general_info' in form['info']:
         response['general_info'] = UserConverter.convert(worker)
 
-    if 'cashbox_type_info' in form.cleaned_data['info']:
+    if 'cashbox_type_info' in form['info']:
         worker_cashbox_info = WorkerCashboxInfo.objects.filter(worker_id=worker.id)
         cashbox_types = CashboxType.objects.filter(shop_id=worker.shop_id)
         response['cashbox_type_info'] = {
@@ -107,8 +107,39 @@ def get_cashier_info(request, form):
             'cashbox_type': [CashboxTypeConverter.convert(x) for x in cashbox_types]
         }
 
-    if 'constraints_info' in form.cleaned_data['info']:
+    if 'constraints_info' in form['info']:
         constraints = WorkerConstraint.objects.filter(worker_id=worker.id, is_active=True)
         response['constraints_info'] = [WorkerConstraintConverter.convert(x) for x in constraints]
+
+    return JsonResponse.success(response)
+
+
+@api_method('POST', SetWorkerDayForm)
+def set_worker_day(request, form):
+    try:
+        worker = User.objects.get(id=form['worker_id'])
+    except User.DoesNotExist:
+        return JsonResponse.value_error('Invalid worker_id')
+
+    try:
+        day = WorkerDay.objects.get(worker_id=form['worker_id'], dt=form['dt'])
+
+        day_change_args = utils.prepare_worker_day_change_create_args(request, form, day)
+        WorkerDayChangeLog.objects.create(**day_change_args)
+
+        utils.prepare_worker_day_update_obj(form, day)
+        day.save()
+
+        action = 'update'
+    except WorkerDay.DoesNotExist:
+        day_args = utils.prepare_worker_day_create_args(form)
+        day = WorkerDay.objects.create(**day_args)
+
+        action = 'create'
+
+    response = {
+        'day': WorkerDayConverter.convert(day),
+        'action': action
+    }
 
     return JsonResponse.success(response)

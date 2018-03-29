@@ -7,9 +7,9 @@ from .forms import GetTypesForm
 @api_method('GET', GetTypesForm)
 def get_types(request, form):
     filter_params = {
-        'shop_id': form.cleaned_data['shop_id']
+        'shop_id': form['shop_id']
     }
-    if not form.cleaned_data['full']:
+    if not form['full']:
         filter_params['dttm_deleted'] = None
 
     response = [CashboxTypeConverter.convert(x) for x in CashboxType.objects.filter(**filter_params)]
