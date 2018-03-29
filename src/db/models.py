@@ -24,7 +24,8 @@ class User(DjangoAbstractUser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    class Type(utils.Enum):
+    class WorkType(utils.Enum):
+        TYPE_INTERNAL = 0
         TYPE_5_2 = 1
         TYPE_2_2 = 2
         TYPE_HOUR = 3
@@ -36,11 +37,14 @@ class User(DjangoAbstractUser):
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
+    dt_hired = models.DateField(null=True, blank=True)
+    dt_fired = models.DateField(null=True, blank=True)
+
     birthday = models.DateField(null=True, blank=True)
     avatar = models.ImageField(null=True, blank=True)
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
-    work_type = utils.EnumField(Type)
+    work_type = utils.EnumField(WorkType)
     permissions = models.BigIntegerField()
 
 

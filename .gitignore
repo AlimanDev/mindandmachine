@@ -4,8 +4,11 @@
 .idea/
 
 src/conf/djconfig_local.py
+src/conf/config_local.py
 
 etc/test.py
 etc/report/
 
 db.sqlite3
+
+src/db/migrations/

@@ -6,7 +6,7 @@ from django.conf import settings
 
 class JsonResponse(object):
     @classmethod
-    def success(cls, data):
+    def success(cls, data=None):
         return cls.base_response(200, data)
 
     @classmethod
@@ -34,25 +34,33 @@ class JsonResponse(object):
         return HttpResponse(json.dumps(response_data, separators=(',', ':')), content_type="application/json")
 
 
-def api_method(method, form_cls):
+def api_method(method, form_cls=None, auth_required=True):
     def decor(func):
         def wrapper(request, *args, **kwargs):
+            if auth_required and not request.user.is_authenticated:
+                return JsonResponse.base_error_response(403, 'AuthRequired', '')
+
             if request.method != method:
                 return JsonResponse.method_error(request.method, method)
 
-            if request.method == 'GET':
-                form_params = request.GET
-            elif request.method == 'POST':
-                form_params = request.POST
-            else:
-                form_params = {}
+            if form_cls is not None:
+                if request.method == 'GET':
+                    form_params = request.GET
+                elif request.method == 'POST':
+                    form_params = request.POST
+                else:
+                    form_params = {}
 
-            form = form_cls(form_params)
-            if not form.is_valid():
-                return JsonResponse.value_error(str(list(form.errors.items())))
+                form = form_cls(form_params)
+                if not form.is_valid():
+                    return JsonResponse.value_error(str(list(form.errors.items())))
+
+                kwargs['form'] = form
+            else:
+                kwargs.pop('form', None)
 
             try:
-                return func(request, form, *args, **kwargs)
+                return func(request, *args, **kwargs)
             except Exception as e:
                 if settings.DEBUG:
                     raise e

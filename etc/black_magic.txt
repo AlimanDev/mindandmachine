@@ -1,2 +1,16 @@
 run script in django shell
+
 echo 'import src.db.debug.fill_data' | python3 manage.py shell
+
+OR
+
+python3 manage.py shell
+and type 'import src.db.debug.fill_data'
+
+===
+
+nginx config for redirect to backend ololo.com/foo/bar -> localhost/bar
+
+location /foo/ {
+    proxy_pass http://localhost:3200/; # note the trailing slash!
+}
