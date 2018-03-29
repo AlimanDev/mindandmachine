@@ -97,15 +97,16 @@ class PeriodDemandChangeLog(models.Model):
     changed_by = models.ForeignKey(User, on_delete=models.PROTECT)
 
 
-class WorkerCashInfo(models.Model):
+class WorkerCashboxInfo(models.Model):
     id = models.BigAutoField(primary_key=True)
 
-    type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
+    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
     mean_speed = models.FloatField()
     bills_amount = models.PositiveIntegerField()
-    worker = models.ForeignKey(User, on_delete=models.PROTECT)
 
     period = models.PositiveIntegerField(default=90)  # show for how long in days the data was collect
+    dt_period_end = models.DateField()
 
 
 class WorkerConstraint(models.Model):
@@ -119,7 +120,7 @@ class WorkerConstraint(models.Model):
 
 class WorkerDay(models.Model):
     class Meta(object):
-        unique_together = (('dt', 'worker'),)
+        unique_together = (('worker', 'dt'),)
 
     class Type(utils.Enum):
         TYPE_HOLIDAY = 1
@@ -133,8 +134,8 @@ class WorkerDay(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
-    dt = models.DateField()  # todo: make immutable
     worker = models.ForeignKey(User, on_delete=models.PROTECT)  # todo: make immutable
+    dt = models.DateField()  # todo: make immutable
     type = utils.EnumField(Type)
 
     tm_work_start = models.TimeField(null=True, blank=True)

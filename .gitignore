@@ -6,6 +6,8 @@
 src/conf/djconfig_local.py
 src/conf/config_local.py
 
+src/templates/test.html
+
 etc/test.py
 etc/report/
 

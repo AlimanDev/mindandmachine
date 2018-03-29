@@ -22,7 +22,9 @@ class UserConverter(BaseConverter):
             'id': obj.id,
             'first_name': obj.first_name,
             'last_name': obj.last_name,
-            'avatar_url': obj.avatar.url if obj.avatar else None
+            'avatar_url': obj.avatar.url if obj.avatar else None,
+            'dt_hired': cls._convert_date(obj.dt_hired),
+            'dt_fired': cls._convert_date(obj.dt_fired),
         }
 
 
@@ -111,4 +113,30 @@ class CashboxTypeConverter(BaseConverter):
             'dttm_deleted': cls._convert_datetime(obj.dttm_deleted),
             'shop': obj.shop_id,
             'name': obj.name
+        }
+
+
+class WorkerCashboxInfoConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'worker': obj.worker_id,
+            'cashbox_type': obj.cashbox_type_id,
+            'mean_speed': obj.mean_speed,
+            'bills_amount': obj.bills_amount,
+            'period': obj.period,
+            'dt_period_end': cls._convert_date(obj.dt_period_end)
+        }
+
+
+class WorkerConstraintConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'worker': obj.worker_id,
+            'weekday': obj.weekday,
+            'tm': cls._convert_time(obj.tm),
+            'is_active': obj.is_active
         }

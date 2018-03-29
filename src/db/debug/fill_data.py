@@ -135,23 +135,25 @@ def add_users(shop, cashbox_types=None, amount=100, has_special_skill=0.25, prin
 
         t, d = random.randint(0, 1), random.randint(0, 90)
         s, st = random.random(), random.randint(2, len(cashbox_types) - 1)
-        models.WorkerCashInfo.objects.get_or_create(
-            type=cashbox_types[t],
+        models.WorkerCashboxInfo.objects.get_or_create(
+            cashbox_type=cashbox_types[t],
             worker=user,
             defaults={
                 'mean_speed': random.random() * 3,
                 'bills_amount':d * random.random() * 2,
                 'period':d,
+                'dt_period_end': datetime.date.today()
             }
         )
         if s < has_special_skill:
-            models.WorkerCashInfo.objects.get_or_create(
-                type=cashbox_types[st],
+            models.WorkerCashboxInfo.objects.get_or_create(
+                cashbox_type=cashbox_types[st],
                 worker=user,
                 defaults={
                     'mean_speed': random.random() * 4.5,
                     'bills_amount': d * random.random(),
                     'period': d,
+                    'dt_period_end': datetime.date.today()
                 }
             )
 
@@ -377,6 +379,3 @@ def load_data(print_loading=True):
 
 def delete_data():
     pass
-
-
-load_data()
