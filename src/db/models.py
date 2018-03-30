@@ -41,7 +41,7 @@ class User(DjangoAbstractUser):
     dt_fired = models.DateField(null=True, blank=True)
 
     birthday = models.DateField(null=True, blank=True)
-    avatar = models.ImageField(null=True, blank=True)
+    avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     work_type = utils.EnumField(WorkType)

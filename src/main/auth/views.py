@@ -1,14 +1,14 @@
 from django.contrib.auth import authenticate, login, logout
-# from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import ensure_csrf_cookie
 
 from src.util.utils import JsonResponse, api_method
 from .forms import SigninForm
 
 
-# @ensure_csrf_cookie
-# @api_method('GET', auth_required=False)
-# def update_csrf(request):
-#     return JsonResponse.success()
+@ensure_csrf_cookie
+@api_method('GET', auth_required=False)
+def update_csrf(request):
+    return JsonResponse.success()
 
 
 @api_method('POST', SigninForm, auth_required=False)
@@ -25,3 +25,8 @@ def signin(request, form):
 def signout(request):
     logout(request)
     return JsonResponse.success()
+
+
+@api_method('GET', auth_required=False)
+def is_signed(request):
+    return JsonResponse.success(request.user.is_authenticated)

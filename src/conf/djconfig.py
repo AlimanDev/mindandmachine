@@ -107,5 +107,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
+MEDIA_URL = '/_internal/media/'
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

@@ -2,6 +2,7 @@ import json
 
 from django.http import HttpResponse
 from django.conf import settings
+from django.middleware.csrf import CsrfViewMiddleware
 
 
 class JsonResponse(object):
@@ -42,6 +43,12 @@ def api_method(method, form_cls=None, auth_required=True):
 
             if request.method != method:
                 return JsonResponse.method_error(request.method, method)
+
+            if request.method == 'POST':
+                request.csrf_processing_done = False
+                reason = CsrfViewMiddleware().process_view(request, None, (), {})
+                if reason is not None:
+                    return JsonResponse.base_error_response(403, 'CsrfTokenRequired', '')
 
             if form_cls is not None:
                 if request.method == 'GET':

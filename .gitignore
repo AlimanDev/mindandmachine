@@ -2,6 +2,7 @@
 *.pyc
 
 .idea/
+__pycache__/
 
 src/conf/djconfig_local.py
 src/conf/config_local.py
