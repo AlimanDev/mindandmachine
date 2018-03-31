@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from .cashbox import urls as cashbox_urls
@@ -11,3 +13,6 @@ urlpatterns = [
     path('timetable/', include(timetable_urls)),
     path('admin/', admin.site.urls),
 ]
+
+if settings.QOS_DEV_MODE_ENABLED:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -44,8 +44,6 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # todo: enable csrf
-    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -105,9 +103,9 @@ USE_L10N = False
 
 USE_TZ = True
 
-STATIC_URL = '/static/'
+STATIC_URL = '/_i/static/'
 
-MEDIA_URL = '/_internal/media/'
+MEDIA_URL = '/_i/media/'
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

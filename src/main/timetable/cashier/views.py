@@ -5,6 +5,7 @@ from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerD
 from .forms import GetCashiersSetForm, GetCashierTimetableForm, GetCashierInfoForm, SetWorkerDayForm
 from . import utils
 
+
 @api_method('GET', GetCashiersSetForm)
 def get_cashiers_set(request, form):
     users = list(

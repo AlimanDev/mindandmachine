@@ -15,7 +15,7 @@ def update_csrf(request):
 def signin(request, form):
     user = authenticate(request, username=form['username'], password=form['password'])
     if user is None:
-        return JsonResponse.base_error_response(400, 'AuthError', 'No such user or password incorrect')
+        return JsonResponse.__base_error_response(400, 'AuthError', 'No such user or password incorrect')
 
     login(request, user)
     return JsonResponse.success()
