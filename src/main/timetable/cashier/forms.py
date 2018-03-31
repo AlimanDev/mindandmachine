@@ -17,6 +17,9 @@ class GetCashierTimetableForm(forms.Form):
     format = util_forms.ChoiceField(['raw', 'excel'], 'raw')
 
     def clean(self):
+        if self.errors:
+            return
+
         if self.cleaned_data['from_dt'] > self.cleaned_data['to_dt']:
             raise forms.ValidationError('from_dt have to be less or equal than to_dt')
 
@@ -41,6 +44,9 @@ class SetWorkerDayForm(forms.Form):
         return value
 
     def clean(self):
+        if self.errors:
+            return
+
         if self.cleaned_data['type'] == WorkerDay.Type.TYPE_WORKDAY:
-            if self.cleaned_data['tm_work_start'] is None or self.cleaned_data['tm_work_end'] is None or self.cleaned_data['tm_break_start'] is None:
+            if self.cleaned_data.get('tm_work_start') is None or self.cleaned_data.get('tm_work_end') is None or self.cleaned_data.get('tm_break_start') is None:
                 raise ValidationError('tm_work_start, tm_work_end and tm_break_start required')

@@ -1,4 +1,4 @@
-from src.db.models import WorkerDay
+from src.db.models import User, WorkerDay
 
 
 class BaseConverter(object):
@@ -16,10 +16,25 @@ class BaseConverter(object):
 
 
 class UserConverter(BaseConverter):
+    __WORK_TYPE = {
+        User.WorkType.TYPE_INTERNAL.value: '_I',
+        User.WorkType.TYPE_5_2.value: '52',
+        User.WorkType.TYPE_2_2.value: '22',
+        User.WorkType.TYPE_HOUR.value: 'H',
+        User.WorkType.TYPE_SOS.value: 'S',
+        User.WorkType.TYPE_MANAGER.value: 'M',
+    }
+
+    @classmethod
+    def convert_work_type(cls, obj_type):
+        return cls.__WORK_TYPE.get(obj_type, '')
+
     @classmethod
     def convert(cls, obj):
         return {
             'id': obj.id,
+            'shop_id': obj.shop_id,
+            'work_type': cls.convert_work_type(obj.work_type),
             'first_name': obj.first_name,
             'last_name': obj.last_name,
             'avatar_url': obj.avatar.url if obj.avatar else None,

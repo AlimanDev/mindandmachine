@@ -34,6 +34,10 @@ class User(DjangoAbstractUser):
 
     id = models.BigAutoField(primary_key=True)
 
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    work_type = utils.EnumField(WorkType)
+    permissions = models.BigIntegerField()
+
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
@@ -42,10 +46,6 @@ class User(DjangoAbstractUser):
 
     birthday = models.DateField(null=True, blank=True)
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
-
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
-    work_type = utils.EnumField(WorkType)
-    permissions = models.BigIntegerField()
 
 
 class CashboxType(models.Model):
