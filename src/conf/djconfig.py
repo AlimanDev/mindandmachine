@@ -16,11 +16,11 @@ def is_config_exists(file_name):
     return os.path.isfile(os.path.join(BASE_DIR, 'src', 'conf', file_name))
 
 
-if is_config_exists('config.py'):
-    from .config import *
+if is_config_exists('qosconfig.py'):
+    from .qosconfig import *
 
-if is_config_exists('config_local.py'):
-    from .config_local import *
+if is_config_exists('qosconfig_local.py'):
+    from .qosconfig_local import *
 
 
 SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'

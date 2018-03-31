@@ -5,7 +5,7 @@
 __pycache__/
 
 src/conf/djconfig_local.py
-src/conf/config_local.py
+src/conf/qosconfig_local.py
 
 src/templates/test.html
 
