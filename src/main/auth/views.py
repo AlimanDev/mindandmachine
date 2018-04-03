@@ -39,7 +39,7 @@ def signout(request):
 @api_method('GET', auth_required=False)
 def is_signed(request):
     data = {
-        'is_signed': request.user.request.user.is_authenticated
+        'is_signed': request.user.is_authenticated
     }
 
     if request.user.is_authenticated:
