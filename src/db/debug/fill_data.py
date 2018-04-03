@@ -3,6 +3,7 @@ import os
 import random
 
 from django.conf import settings
+from django.core.files import File
 
 from src.db import models
 from django.utils import timezone
@@ -123,18 +124,20 @@ def add_users(shop, cashbox_types=None, amount=100, has_special_skill=0.25, prin
         cashbox_types = models.CashboxType.objects.filter(shop=shop).order_by('id')
 
     for i in range(amount):
-        f, l, b, w = random.randint(0, 4),random.randint(0, 4), random.randint(0, 4), random.randint(1, 5)
-        user, _ = models.User.objects.get_or_create(
-            username=shop.title + str(i),
-            shop=shop,
-            defaults={
-                'first_name': first_name[f],
-                'last_name': last_name[l],
-                'birthday': birthdays[b],
-                'work_type': w,
-                'permissions': 1,
-            }
-        )
+        with open('src/db/debug/avatar.jpg', 'rb') as av_file:
+            f, l, b, w = random.randint(0, 4),random.randint(0, 4), random.randint(0, 4), random.randint(1, 5)
+            user, _ = models.User.objects.get_or_create(
+                username=shop.title + str(i),
+                shop=shop,
+                defaults={
+                    'first_name': first_name[f],
+                    'last_name': last_name[l],
+                    'birthday': birthdays[b],
+                    'work_type': w,
+                    'permissions': 1,
+                    'avatar': File(av_file, name='avatar')
+                }
+            )
 
         t, d = random.randint(0, 1), random.randint(0, 90)
         s, st = random.random(), random.randint(2, len(cashbox_types) - 1)
@@ -381,6 +384,8 @@ def load_data(print_loading=True):
     add_demand(shop4[0], now.date(), (now + timezone.timedelta(days=60)).date(), shop4[1])
 
     OfficialHolidays.add()
+
+
 
 
 def delete_data():
