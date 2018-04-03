@@ -14,3 +14,12 @@ nginx config for redirect to backend ololo.com/foo/bar -> localhost/bar
 location /foo/ {
     proxy_pass http://localhost:3200/; # note the trailing slash!
 }
+
+===
+
+add jquery via browser console
+
+var s = document.createElement('script');
+s.type = 'text/javascript';
+s.src='https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js';
+document.body.appendChild(s);

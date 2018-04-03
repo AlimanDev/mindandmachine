@@ -1,16 +1,18 @@
+from django.db import transaction
+
 from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType
 from src.util.utils import JsonResponse, api_method, count
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter
-from .forms import GetCashiersSetForm, GetCashierTimetableForm, GetCashierInfoForm, SetWorkerDayForm
+from .forms import GetCashierTimetableForm, GetCashierInfoForm, SetWorkerDayForm, SetCashierInfoForm
 from . import utils
 
 
-@api_method('GET', GetCashiersSetForm)
-def get_cashiers_set(request, form):
+@api_method('GET')
+def get_cashiers_set(request):
     users = list(
         User.objects.filter(
-            shop_id=form['shop_id'],
+            shop_id=request.user.shop_id,
             dttm_deleted=None
         )
     )
@@ -126,9 +128,9 @@ def set_worker_day(request, form):
         day = WorkerDay.objects.get(worker_id=form['worker_id'], dt=form['dt'])
 
         day_change_args = utils.prepare_worker_day_change_create_args(request, form, day)
-        WorkerDayChangeLog.objects.create(**day_change_args)
-
         utils.prepare_worker_day_update_obj(form, day)
+
+        WorkerDayChangeLog.objects.create(**day_change_args)
         day.save()
 
         action = 'update'
@@ -144,3 +146,42 @@ def set_worker_day(request, form):
     }
 
     return JsonResponse.success(response)
+
+
+@api_method('POST', SetCashierInfoForm)
+def set_cashier_info(request, form):
+    try:
+        worker = User.objects.get(id=form['worker_id'])
+    except User.DoesNotExist:
+        return JsonResponse.value_error('Invalid worker_id')
+
+    cashbox_types = {
+        x.id: x for x in CashboxType.objects.filter(
+            shop_id=worker.shop_id
+        )
+    }
+
+    new_active_cashboxes = []
+    for obj in form['cashbox_info']:
+        cb = cashbox_types.get(obj.get('cashbox_type_id'))
+        if cb is not None:
+            new_active_cashboxes.append(cb)
+
+    worker_cashbox_info = []
+    WorkerCashboxInfo.objects.filter(worker_id=worker.id).update(is_active=False)
+    for cashbox in new_active_cashboxes:
+        obj, created = WorkerCashboxInfo.objects.update_or_create(
+            worker_id=worker.id,
+            cashbox_type_id=cashbox.id,
+            defaults={
+                'is_active': True
+            }
+        )
+        worker_cashbox_info.append(obj)
+
+    data = {
+        'cashbox_type': [CashboxTypeConverter.convert(x) for x in cashbox_types.values()],
+        'cashbox_type_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info]
+    }
+
+    return JsonResponse.success(data)

@@ -23,6 +23,10 @@ class JsonResponse(object):
         return cls.__base_error_response(400, 'ValueException', msg)
 
     @classmethod
+    def auth_error(cls):
+        return cls.__base_error_response(400, 'AuthError', 'No such user or password incorrect')
+
+    @classmethod
     def auth_required(cls):
         return cls.__base_error_response(403, 'AuthRequired')
 
@@ -51,6 +55,14 @@ class JsonResponse(object):
         return HttpResponse(json.dumps(response_data, separators=(',', ':')), content_type="application/json")
 
 
+# def __process_csrf_protection(request):
+#     request.csrf_processing_done = False
+#     middleware = CsrfViewMiddleware()
+#     middleware.process_request(request)
+#     reason = middleware.process_view(request, None, (), {})
+#     return reason is None
+
+
 def api_method(method, form_cls=None, auth_required=True):
     def decor(func):
         def wrapper(request, *args, **kwargs):
@@ -59,12 +71,6 @@ def api_method(method, form_cls=None, auth_required=True):
 
             if request.method != method:
                 return JsonResponse.method_error(request.method, method)
-
-            if request.method == 'POST':
-                request.csrf_processing_done = False
-                reason = CsrfViewMiddleware().process_view(request, None, (), {})
-                if reason is not None:
-                    return JsonResponse.csrf_required()
 
             if form_cls is not None:
                 if request.method == 'GET':

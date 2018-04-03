@@ -1,5 +1,8 @@
 import datetime
+import os
 import random
+
+from django.conf import settings
 
 from src.db import models
 from django.utils import timezone
@@ -141,8 +144,7 @@ def add_users(shop, cashbox_types=None, amount=100, has_special_skill=0.25, prin
             defaults={
                 'mean_speed': random.random() * 3,
                 'bills_amount':d * random.random() * 2,
-                'period':d,
-                'dt_period_end': datetime.date.today()
+                'period':d
             }
         )
         if s < has_special_skill:
@@ -152,8 +154,7 @@ def add_users(shop, cashbox_types=None, amount=100, has_special_skill=0.25, prin
                 defaults={
                     'mean_speed': random.random() * 4.5,
                     'bills_amount': d * random.random(),
-                    'period': d,
-                    'dt_period_end': datetime.date.today()
+                    'period': d
                 }
             )
 
@@ -359,6 +360,11 @@ class OfficialHolidays(object):
 
 
 def load_data(print_loading=True):
+    if not (isinstance(settings.MEDIA_ROOT, str) and settings.MEDIA_ROOT.endswith('/qos/media/')):
+        raise Exception('cannot remove /qos/media/ folder')
+
+    os.system('rm -r {}*'.format(settings.MEDIA_ROOT))
+
     now = timezone.now()
     shop3, shop4 = add_shops_and_cashboxes(print_loading=print_loading)
 

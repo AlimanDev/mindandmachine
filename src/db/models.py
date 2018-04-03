@@ -98,15 +98,20 @@ class PeriodDemandChangeLog(models.Model):
 
 
 class WorkerCashboxInfo(models.Model):
+    class Meta(object):
+        unique_together = (('worker', 'cashbox_type'),)
+
     id = models.BigAutoField(primary_key=True)
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
-    mean_speed = models.FloatField()
-    bills_amount = models.PositiveIntegerField()
+
+    is_active = models.BooleanField(default=True)
 
     period = models.PositiveIntegerField(default=90)  # show for how long in days the data was collect
-    dt_period_end = models.DateField()
+
+    mean_speed = models.FloatField(default=1)
+    bills_amount = models.PositiveIntegerField(default=0)
 
 
 class WorkerConstraint(models.Model):
@@ -115,7 +120,7 @@ class WorkerConstraint(models.Model):
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     weekday = models.PositiveSmallIntegerField()
     tm = models.TimeField()
-    is_active = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=False)  # todo: remove or use field
 
 
 class WorkerDay(models.Model):
