@@ -8,4 +8,13 @@ def create(username, email, password):
     except Shop.DoesNotExist:
         shop = Shop.objects.create(title=shop_title)
 
-    User.objects.create_superuser(username, email, password, shop=shop, work_type=User.WorkType.TYPE_INTERNAL.value, permissions=0xFFFFFFFF)
+    User.objects.create_superuser(
+        username,
+        email,
+        password,
+        first_name='Админ',
+        last_name='Админский',
+        shop=shop,
+        work_type=User.WorkType.TYPE_INTERNAL.value,
+        permissions=0xFFFFFFFF
+    )

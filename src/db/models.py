@@ -115,12 +115,14 @@ class WorkerCashboxInfo(models.Model):
 
 
 class WorkerConstraint(models.Model):
+    class Meta(object):
+        unique_together = (('worker', 'weekday', 'tm'),)
+
     id = models.BigAutoField(primary_key=True)
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     weekday = models.PositiveSmallIntegerField()
     tm = models.TimeField()
-    is_active = models.BooleanField(default=False)  # todo: remove or use field
 
 
 class WorkerDay(models.Model):

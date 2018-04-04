@@ -52,9 +52,9 @@ class SetWorkerDayForm(forms.Form):
 
 class SetCashierInfoForm(forms.Form):
     worker_id = forms.IntegerField()
-    work_type = forms.CharField()
-    cashbox_info = forms.CharField()
-    constraint = forms.CharField()
+    work_type = forms.CharField(required=False)
+    cashbox_info = forms.CharField(required=False)
+    constraint = forms.CharField(required=False)
 
     def clean_work_type(self):
         value = UserConverter.parse_work_type(self.cleaned_data['work_type'])
@@ -71,6 +71,12 @@ class SetCashierInfoForm(forms.Form):
     def clean_constraint(self):
         try:
             value = json.loads(self.cleaned_data['constraint'])
-            return {int(wd): [BaseConverter.parse_time(x) for x in tms] for wd, tms in value.items()}
+            value = {int(wd): [BaseConverter.parse_time(x) for x in tms] for wd, tms in value.items()}
         except:
             raise ValidationError('Invalid data')
+
+        for wd in value:
+            if wd < 0 or wd > 6:
+                raise ValidationError('Invalid week day')
+
+        return value

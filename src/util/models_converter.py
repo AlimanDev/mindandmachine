@@ -169,6 +169,5 @@ class WorkerConstraintConverter(BaseConverter):
             'id': obj.id,
             'worker': obj.worker_id,
             'weekday': obj.weekday,
-            'tm': cls.convert_time(obj.tm),
-            'is_active': obj.is_active
+            'tm': cls.convert_time(obj.tm)
         }

@@ -181,20 +181,28 @@ def add_work_days(shop, dttm_start, dttm_end, work_days, changes=0.2, double_cha
     dttms = [dttm_start + timezone.timedelta(days=i) for i in range(days)]
     users = models.User.objects.filter(shop=shop)
 
+    def __gen_type(__wk):
+        return models.WorkerDay.Type.TYPE_WORKDAY.value if __wk else not_work_types[random.randint(0, max_ind)]
+
+    def __gen_tm_work_start(__wk):
+        return datetime.time(random.randint(7, 14)) if __wk else None
+
+    def __gen_tm_work_end(__wk):
+        return datetime.time(random.randint(13, 21)) if __wk else None
+
+    def __gen_tm_break_start(__wk):
+        return datetime.time(random.randint(12, 16)) if __wk else None
+
     for user in users:
         cur_d = -1
         u_threshold = threshold + (random.random() - 0.5) / 10
         for i in range(days):
-            if random.random() > u_threshold:
-                st = models.WorkerDay.Type.TYPE_WORKDAY.value
-                tm_work_start = None # timezone.time(random.randint(7, 14))
-                tm_work_end = None # timezone.time(random.randint(11, 18))
-                tm_break_start = None # timezone.time(random.randint(15, 23))
-            else:
-                st = not_work_types[random.randint(0, max_ind)]
-                tm_work_start = None
-                tm_work_end = None
-                tm_break_start = None
+            is_wk = random.random() > u_threshold
+
+            st = __gen_type(is_wk)
+            tm_work_start = __gen_tm_work_start(is_wk)
+            tm_work_end = __gen_tm_work_end(is_wk)
+            tm_break_start = __gen_tm_break_start(is_wk)
 
             wd, _ = models.WorkerDay.objects.get_or_create(
                 worker=user,
@@ -202,12 +210,10 @@ def add_work_days(shop, dttm_start, dttm_end, work_days, changes=0.2, double_cha
                 dt=dttms[i],
 
                 defaults={
-                    # 'tm_work_start': tm_work_start,
-                    # 'tm_work_end': tm_work_end,
-                    # 'tm_break_start': tm_break_start,
+                    'tm_work_start': tm_work_start,
+                    'tm_work_end': tm_work_end,
+                    'tm_break_start': tm_break_start,
                 }
-
-
             )
             cr = random.random()
             if cr < changes:
@@ -218,6 +224,9 @@ def add_work_days(shop, dttm_start, dttm_end, work_days, changes=0.2, double_cha
                     worker_day_worker=wd.worker,
                     from_type=tp,
                     to_type=st,
+                    to_tm_work_start=tm_work_start,
+                    to_tm_work_end=tm_work_end,
+                    to_tm_break_start=tm_break_start,
                     changed_by=user, # todo: only main users could do it
                 )
                 if cr < double_changes:
@@ -251,12 +260,12 @@ def add_constraints(shop, cons_c=0.35, print_loading=True):
         for i in range(int(cons_amount * u_cons_c)):
             d, h, p = random.randint(0, 6), random.randint(7, 23), random.randint(0, 1)
             is_active = random.random() > 0.1
-            models.WorkerConstraint.objects.get_or_create(
-                worker=user,
-                weekday=d,
-                tm=datetime.time(hour=h, minute=p * 30),
-                defaults={'is_active': is_active},
-            )
+            if is_active:
+                models.WorkerConstraint.objects.get_or_create(
+                    worker=user,
+                    weekday=d,
+                    tm=datetime.time(hour=h, minute=p * 30)
+                )
     if print_loading:
         print('add constraints for shop: {}'.format(shop.title))
 
@@ -384,8 +393,6 @@ def load_data(print_loading=True):
     add_demand(shop4[0], now.date(), (now + timezone.timedelta(days=60)).date(), shop4[1])
 
     OfficialHolidays.add()
-
-
 
 
 def delete_data():

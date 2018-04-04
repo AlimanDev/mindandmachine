@@ -3,7 +3,7 @@ from django.db import transaction
 from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType
 from src.util.utils import JsonResponse, api_method, count
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
-    WorkerCashboxInfoConverter, CashboxTypeConverter
+    WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
 from .forms import GetCashierTimetableForm, GetCashierInfoForm, SetWorkerDayForm, SetCashierInfoForm
 from . import utils
 
@@ -155,33 +155,54 @@ def set_cashier_info(request, form):
     except User.DoesNotExist:
         return JsonResponse.value_error('Invalid worker_id')
 
-    cashbox_types = {
-        x.id: x for x in CashboxType.objects.filter(
-            shop_id=worker.shop_id
-        )
-    }
+    response = {}
 
-    new_active_cashboxes = []
-    for obj in form['cashbox_info']:
-        cb = cashbox_types.get(obj.get('cashbox_type_id'))
-        if cb is not None:
-            new_active_cashboxes.append(cb)
+    if 'work_type' in form:
+        worker.work_type = form['work_type']
+        worker.save()
 
-    worker_cashbox_info = []
-    WorkerCashboxInfo.objects.filter(worker_id=worker.id).update(is_active=False)
-    for cashbox in new_active_cashboxes:
-        obj, created = WorkerCashboxInfo.objects.update_or_create(
-            worker_id=worker.id,
-            cashbox_type_id=cashbox.id,
-            defaults={
-                'is_active': True
-            }
-        )
-        worker_cashbox_info.append(obj)
+        response['work_type'] = UserConverter.convert_work_type(worker.work_type)
 
-    data = {
-        'cashbox_type': [CashboxTypeConverter.convert(x) for x in cashbox_types.values()],
-        'cashbox_type_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info]
-    }
+    if 'cashbox_info' in form:
+        cashbox_types = {
+            x.id: x for x in CashboxType.objects.filter(
+                shop_id=worker.shop_id
+            )
+        }
 
-    return JsonResponse.success(data)
+        new_active_cashboxes = []
+        for obj in form['cashbox_info']:
+            cb = cashbox_types.get(obj.get('cashbox_type_id'))
+            if cb is not None:
+                new_active_cashboxes.append(cb)
+
+        worker_cashbox_info = []
+        WorkerCashboxInfo.objects.filter(worker_id=worker.id).update(is_active=False)
+        for cashbox in new_active_cashboxes:
+            obj, created = WorkerCashboxInfo.objects.update_or_create(
+                worker_id=worker.id,
+                cashbox_type_id=cashbox.id,
+                defaults={
+                    'is_active': True
+                }
+            )
+            worker_cashbox_info.append(obj)
+
+        response['cashbox_type'] = [CashboxTypeConverter.convert(x) for x in cashbox_types.values()]
+        response['cashbox_type_info'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info]
+
+    if 'constraint' in form:
+        constraints = []
+        WorkerConstraint.objects.filter(worker_id=worker.id).delete()
+        for wd, times in form['constraint']:
+            for tm in times:
+                c = WorkerConstraint.objects.create(worker_id=worker.id, weekday=wd, tm=tm)
+                constraints.append(c)
+
+        constraints_converted = {x: [] for x in range(7)}
+        for c in constraints:
+            constraints_converted[c.weekday].append(BaseConverter.convert_time(c.tm))
+
+        response['constraint'] = constraints_converted
+
+    return JsonResponse.success(response)
