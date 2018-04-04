@@ -111,7 +111,7 @@ def get_cashier_info(request, form):
         }
 
     if 'constraints_info' in form['info']:
-        constraints = WorkerConstraint.objects.filter(worker_id=worker.id, is_active=True)
+        constraints = WorkerConstraint.objects.filter(worker_id=worker.id)
         response['constraints_info'] = [WorkerConstraintConverter.convert(x) for x in constraints]
 
     return JsonResponse.success(response)

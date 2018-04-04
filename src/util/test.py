@@ -10,6 +10,9 @@ class TestCase(DjangoTestCase):
     def setUp(self):
         self.set_up()
 
+    def auth(self, username, password):
+        self.do_post('/auth/signin', {'username': username, 'password': password})
+
     def do_get(self, path, expected_code=200, expected_error_type=None):
         response = self.client.get(path)
         return self.__process_response(response, expected_code, expected_error_type)
