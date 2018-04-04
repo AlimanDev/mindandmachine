@@ -55,14 +55,6 @@ class JsonResponse(object):
         return HttpResponse(json.dumps(response_data, separators=(',', ':')), content_type="application/json")
 
 
-# def __process_csrf_protection(request):
-#     request.csrf_processing_done = False
-#     middleware = CsrfViewMiddleware()
-#     middleware.process_request(request)
-#     reason = middleware.process_view(request, None, (), {})
-#     return reason is None
-
-
 def api_method(method, form_cls=None, auth_required=True):
     def decor(func):
         def wrapper(request, *args, **kwargs):

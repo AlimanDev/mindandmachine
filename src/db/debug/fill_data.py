@@ -204,16 +204,13 @@ def add_work_days(shop, dttm_start, dttm_end, work_days, changes=0.2, double_cha
             tm_work_end = __gen_tm_work_end(is_wk)
             tm_break_start = __gen_tm_break_start(is_wk)
 
-            wd, _ = models.WorkerDay.objects.get_or_create(
+            wd = models.WorkerDay.objects.create(
                 worker=user,
                 type=st,
                 dt=dttms[i],
-
-                defaults={
-                    'tm_work_start': tm_work_start,
-                    'tm_work_end': tm_work_end,
-                    'tm_break_start': tm_break_start,
-                }
+                tm_work_start=tm_work_start,
+                tm_work_end=tm_work_end,
+                tm_break_start=tm_break_start
             )
             cr = random.random()
             if cr < changes:
@@ -378,19 +375,22 @@ def load_data(print_loading=True):
     os.system('rm -r {}*'.format(settings.MEDIA_ROOT))
 
     now = timezone.now()
+    dt_from = (now - timezone.timedelta(days=60)).date()
+    dt_to = (now + timezone.timedelta(days=60)).date()
+
     shop3, shop4 = add_shops_and_cashboxes(print_loading=print_loading)
 
     add_users(shop3[0], shop3[1], print_loading=print_loading)
     add_users(shop4[0], shop4[1], 110, print_loading=print_loading)
 
-    add_work_days(shop3[0], now, now + timezone.timedelta(days=60), 40)
-    add_work_days(shop4[0], now, now + timezone.timedelta(days=60), 40)
+    add_work_days(shop3[0], dt_from, dt_to, 40)
+    add_work_days(shop4[0], dt_from, dt_to, 40)
 
     add_constraints(shop3[0])
     add_constraints(shop4[0])
 
-    add_demand(shop3[0], now.date(), (now + timezone.timedelta(days=60)).date(), shop3[1])
-    add_demand(shop4[0], now.date(), (now + timezone.timedelta(days=60)).date(), shop4[1])
+    add_demand(shop3[0], dt_from, dt_to, shop3[1])
+    add_demand(shop4[0], dt_from, dt_to, shop4[1])
 
     OfficialHolidays.add()
 

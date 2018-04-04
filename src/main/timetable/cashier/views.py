@@ -9,7 +9,7 @@ from . import utils
 
 
 @api_method('GET')
-def get_cashiers_set(request):
+def get_cashiers_list(request):
     users = list(
         User.objects.filter(
             shop_id=request.user.shop_id,

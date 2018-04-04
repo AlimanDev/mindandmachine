@@ -23,7 +23,6 @@ class BaseConverter(object):
 
 class UserConverter(BaseConverter):
     __WORK_TYPE = {
-        User.WorkType.TYPE_INTERNAL.value: '_I',
         User.WorkType.TYPE_5_2.value: '52',
         User.WorkType.TYPE_2_2.value: '22',
         User.WorkType.TYPE_HOUR.value: 'H',

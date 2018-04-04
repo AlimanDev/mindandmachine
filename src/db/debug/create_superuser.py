@@ -1,20 +1,16 @@
-from ..models import User, Shop
+from ..models import User
 
 
 def create(username, email, password):
-    shop_title = '_internal'
-    try:
-        shop = Shop.objects.get(title=shop_title)
-    except Shop.DoesNotExist:
-        shop = Shop.objects.create(title=shop_title)
-
-    User.objects.create_superuser(
+    u = User.objects.create_superuser(
         username,
         email,
-        password,
-        first_name='Админ',
-        last_name='Админский',
-        shop=shop,
-        work_type=User.WorkType.TYPE_INTERNAL.value,
-        permissions=0xFFFFFFFF
+        password
     )
+
+    u.shop_id = 2
+    u.first_name = 'Админ'
+    u.last_name = 'Админский'
+    u.permissions = 0xFFFFFFFF
+    u.save()
+
