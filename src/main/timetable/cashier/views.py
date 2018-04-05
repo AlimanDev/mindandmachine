@@ -1,9 +1,9 @@
-from django.db import transaction
-
 from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType
 from src.util.utils import JsonResponse, api_method, count
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
+from src.util.collection import group_by
+
 from .forms import GetCashierTimetableForm, GetCashierInfoForm, SetWorkerDayForm, SetCashierInfoForm
 from . import utils
 
@@ -46,23 +46,26 @@ def get_cashier_timetable(request, form):
             date__lte=to_dt
         )
     ]
-    worker_day_change_requests = list(
+    worker_day_change_requests = group_by(
         WorkerDayChangeRequest.objects.filter(
             worker_day_worker_id=worker_id,
             worker_day_dt__gte=from_dt,
             worker_day_dt__lte=to_dt
-        ).order_by(
-            '-worker_day_dt'
-        )
+        ),
+        group_key=lambda _: _.worker_day_id,
+        sort_key=lambda _: _.worker_day_dt,
+        sort_reverse=True
     )
-    worker_day_change_log = list(
+
+    worker_day_change_log = group_by(
         WorkerDayChangeLog.objects.filter(
             worker_day_worker_id=worker_id,
             worker_day_dt__gte=from_dt,
             worker_day_dt__lte=to_dt
-        ).order_by(
-            '-worker_day_dt'
-        )
+        ),
+        group_key=lambda _: _.worker_day_id,
+        sort_key=lambda _: _.worker_day_dt,
+        sort_reverse=True
     )
 
     indicators_response = {
@@ -78,8 +81,8 @@ def get_cashier_timetable(request, form):
     for obj in worker_days:
         days_response.append({
             'day': WorkerDayConverter.convert(obj),
-            'change_log': [WorkerDayChangeLogConverter.convert(x) for x in worker_day_change_log[:10]],
-            'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in worker_day_change_requests[:10]]
+            'change_log': [WorkerDayChangeLogConverter.convert(x) for x in worker_day_change_log.get(obj.id, [])[:10]],
+            'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in worker_day_change_requests.get(obj.id, [])[:10]]
         })
 
     response = {
