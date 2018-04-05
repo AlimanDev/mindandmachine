@@ -33,7 +33,7 @@ class User(DjangoAbstractUser):
 
     id = models.BigAutoField(primary_key=True)
 
-    shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable
     work_type = utils.EnumField(WorkType, null=True, blank=True)
     permissions = models.BigIntegerField(default=0)
 
@@ -143,6 +143,9 @@ class WorkerDay(models.Model):
     worker = models.ForeignKey(User, on_delete=models.PROTECT)  # todo: make immutable
     dt = models.DateField()  # todo: make immutable
     type = utils.EnumField(Type)
+
+    # extra field for SQL select
+    worker_shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='+')
 
     tm_work_start = models.TimeField(null=True, blank=True)
     tm_work_end = models.TimeField(null=True, blank=True)

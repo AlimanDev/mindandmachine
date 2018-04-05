@@ -1,9 +1,10 @@
 from src.db.models import WorkerDay
 
 
-def prepare_worker_day_create_args(form):
+def prepare_worker_day_create_args(form, worker):
     args = {
-        'worker_id': form['worker_id'],
+        'worker_id': worker.id,
+        'worker_shop_id': worker.shop_id,
         'dt': form['dt'],
         'type': form['type'],
         'is_manual_tuning': True

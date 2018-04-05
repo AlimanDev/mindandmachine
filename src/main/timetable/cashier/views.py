@@ -110,7 +110,7 @@ def get_cashier_info(request, form):
         cashbox_types = CashboxType.objects.filter(shop_id=worker.shop_id)
         response['cashbox_type_info'] = {
             'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info],
-            'cashbox_type': [CashboxTypeConverter.convert(x) for x in cashbox_types]
+            'cashbox_type': {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types}
         }
 
     if 'constraints_info' in form['info']:
@@ -128,7 +128,7 @@ def set_worker_day(request, form):
         return JsonResponse.value_error('Invalid worker_id')
 
     try:
-        day = WorkerDay.objects.get(worker_id=form['worker_id'], dt=form['dt'])
+        day = WorkerDay.objects.get(worker_id=worker.id, dt=form['dt'])
 
         day_change_args = utils.prepare_worker_day_change_create_args(request, form, day)
         utils.prepare_worker_day_update_obj(form, day)
@@ -138,7 +138,7 @@ def set_worker_day(request, form):
 
         action = 'update'
     except WorkerDay.DoesNotExist:
-        day_args = utils.prepare_worker_day_create_args(form)
+        day_args = utils.prepare_worker_day_create_args(form, worker)
         day = WorkerDay.objects.create(**day_args)
 
         action = 'create'
@@ -191,7 +191,7 @@ def set_cashier_info(request, form):
             )
             worker_cashbox_info.append(obj)
 
-        response['cashbox_type'] = [CashboxTypeConverter.convert(x) for x in cashbox_types.values()]
+        response['cashbox_type'] = {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types.values()}
         response['cashbox_type_info'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info]
 
     if 'constraint' in form:

@@ -206,6 +206,7 @@ def add_work_days(shop, dttm_start, dttm_end, work_days, changes=0.2, double_cha
 
             wd = models.WorkerDay.objects.create(
                 worker=user,
+                worker_shop_id=user.shop_id,
                 type=st,
                 dt=dttms[i],
                 tm_work_start=tm_work_start,
