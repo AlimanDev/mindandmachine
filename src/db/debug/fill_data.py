@@ -389,8 +389,8 @@ def load_data(print_loading=True):
     os.system('rm -r {}*'.format(settings.MEDIA_ROOT))
 
     now = timezone.now()
-    dt_from = (now - timezone.timedelta(days=60)).date()
-    dt_to = (now + timezone.timedelta(days=60)).date()
+    dt_from = (now - timezone.timedelta(days=45)).date()
+    dt_to = (now + timezone.timedelta(days=45)).date()
 
     shop3, shop4 = add_shops_and_cashboxes(print_loading=print_loading)
 
