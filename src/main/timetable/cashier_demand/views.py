@@ -127,13 +127,13 @@ def get_cashiers_timetable(request, form):
 
     period_demand = list(
         PeriodDemand.objects.select_related(
-            'сashbox_type'
+            'cashbox_type'
         ).filter(
-            сashbox_type__shop_id=shop.id
+            cashbox_type__shop_id=shop.id
         )
     )
     if len(cashbox_type_ids) > 0:
-        period_demand = [x for x in period_demand if x.cashbox_type.id in cashbox_type_ids]
+        period_demand = [x for x in period_demand if x.cashbox_type_id in cashbox_type_ids]
 
     tmp = {}
     for x in period_demand:

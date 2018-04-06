@@ -300,7 +300,7 @@ def add_demand(shop, dt_start, dt_end, cashbox_types=None, step=30, changes_c=0.
                         # shop=shop,
                         dttm_forecast=dttm,
                         type=tp,
-                        сashbox_type=cash_tp,
+                        cashbox_type=cash_tp,
                         defaults={
                             'clients': random.randint(10, 200) // (i + 1),
                             'products': random.randint(60, 1200) // (i + 1),

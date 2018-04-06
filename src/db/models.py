@@ -80,7 +80,7 @@ class PeriodDemand(models.Model):
     products = models.PositiveIntegerField()
 
     type = utils.EnumField(Type)
-    сashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
     queue_wait_time = models.FloatField()  # in minutes
     queue_wait_length = models.FloatField()

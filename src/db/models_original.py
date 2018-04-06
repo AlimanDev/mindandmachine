@@ -48,7 +48,7 @@ class PeriodDemand(models.Model):
     products = models.PositiveIntegerField()
 
     type = models.CharField(max_length=2, choices=TYPE)
-    сashbox_type = models.ForeignKey(CashboxType)
+    cashbox_type = models.ForeignKey(CashboxType)
 
     queue_wait_time = models.FloatField()  # in minutes
     queue_wait_length = models.FloatField()

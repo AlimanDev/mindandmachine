@@ -160,13 +160,13 @@ def set_cashier_info(request, form):
 
     response = {}
 
-    if 'work_type' in form:
+    if form.get('work_type') is not None:
         worker.work_type = form['work_type']
         worker.save()
 
         response['work_type'] = UserConverter.convert_work_type(worker.work_type)
 
-    if 'cashbox_info' in form:
+    if form.get('cashbox_info') is not None:
         cashbox_types = {
             x.id: x for x in CashboxType.objects.filter(
                 shop_id=worker.shop_id
@@ -194,7 +194,7 @@ def set_cashier_info(request, form):
         response['cashbox_type'] = {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types.values()}
         response['cashbox_type_info'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info]
 
-    if 'constraint' in form:
+    if form.get('constraint') is not None:
         constraints = []
         WorkerConstraint.objects.filter(worker_id=worker.id).delete()
         for wd, times in form['constraint']:

@@ -57,20 +57,30 @@ class SetCashierInfoForm(forms.Form):
     constraint = forms.CharField(required=False)
 
     def clean_work_type(self):
-        value = UserConverter.parse_work_type(self.cleaned_data['work_type'])
+        value = self.cleaned_data.get('work_type')
+        if value is None or value == '':
+            return None
+
+        value = UserConverter.parse_work_type(value)
         if value is None:
             raise ValidationError('Invalid enum value')
         return value
 
     def clean_cashbox_info(self):
         try:
-            return json.loads(self.cleaned_data['cashbox_info'])
+            value = self.cleaned_data.get('cashbox_info')
+            if value is None or value == '':
+                return None
+            return json.loads(value)
         except:
             raise ValidationError('Invalid data')
 
     def clean_constraint(self):
         try:
-            value = json.loads(self.cleaned_data['constraint'])
+            value = self.cleaned_data.get('constraint')
+            if value is None or value == '':
+                return
+            value = json.loads(value)
             value = {int(wd): [BaseConverter.parse_time(x) for x in tms] for wd, tms in value.items()}
         except:
             raise ValidationError('Invalid data')
