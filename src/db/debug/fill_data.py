@@ -43,13 +43,15 @@ def add_shops_and_cashboxes(print_loading=True):
         [40],
     ]
 
+    cashboxes_3 = []
     for j, cash_num_type in enumerate(cash_nums3):
         for i in cash_num_type:
-            models.Cashbox.objects.get_or_create(
+            q, w = models.Cashbox.objects.get_or_create(
                     type=cashbox_types_3[j],
                     number=i,
                     bio='',
             )
+            cashboxes_3.append(q)
 
     if print_loading:
         print('add test shop3')
@@ -85,21 +87,23 @@ def add_shops_and_cashboxes(print_loading=True):
         [35],
     ]
 
+    cashboxes_4 = []
     for j, cash_num_type in enumerate(cash_nums4):
         for i in cash_num_type:
-            models.Cashbox.objects.get_or_create(
+            q, w = models.Cashbox.objects.get_or_create(
                 type=cashbox_types_4[j],
                 number=i,
                 bio='',
             )
+            cashboxes_4.append(q)
 
     if print_loading:
         print('add test shop4')
         print('func add_shops_and_cashboxes loaded data')
 
     return (
-        (shop3, cashbox_types_3),
-        (shop4, cashbox_types_4),
+        (shop3, cashbox_types_3, cashboxes_3),
+        (shop4, cashbox_types_4, cashboxes_4),
     )
 
 
@@ -165,7 +169,7 @@ def add_users(shop, cashbox_types=None, amount=100, has_special_skill=0.25, prin
         print('add users and WorkerCashInfo for shop: {}'.format(shop.title))
 
 
-def add_work_days(shop, cashbox_types, dttm_start, dttm_end, work_days, changes=0.2, double_changes=0.1, request_c=0.2, print_loading=True):
+def add_work_days(shop, cashboxes, dttm_start, dttm_end, work_days, changes=0.2, double_changes=0.1, request_c=0.2, print_loading=True):
     days = (dttm_end - dttm_start).days
     threshold = work_days / days
     not_work_types = [
@@ -209,11 +213,19 @@ def add_work_days(shop, cashbox_types, dttm_start, dttm_end, work_days, changes=
                 worker_shop_id=user.shop_id,
                 type=st,
                 dt=dttms[i],
-                cashbox_type_id=random.choice(cashbox_types).id,
                 tm_work_start=tm_work_start,
                 tm_work_end=tm_work_end,
                 tm_break_start=tm_break_start
             )
+
+            if is_wk:
+                models.WorkerDayCashboxDetails.objects.create(
+                    worker_day=wd,
+                    on_cashbox=random.choice(cashboxes),
+                    tm_from=tm_work_start,
+                    tm_to=tm_work_end
+                )
+
             cr = random.random()
             if cr < changes:
                 tp = not_work_types[random.randint(0, max_ind)]
@@ -385,8 +397,8 @@ def load_data(print_loading=True):
     add_users(shop3[0], shop3[1], print_loading=print_loading)
     add_users(shop4[0], shop4[1], 110, print_loading=print_loading)
 
-    add_work_days(shop3[0], shop3[1], dt_from, dt_to, 40)
-    add_work_days(shop4[0], shop4[1], dt_from, dt_to, 40)
+    add_work_days(shop3[0], shop3[2], dt_from, dt_to, 40)
+    add_work_days(shop4[0], shop4[2], dt_from, dt_to, 40)
 
     add_constraints(shop3[0])
     add_constraints(shop4[0])

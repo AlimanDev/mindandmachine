@@ -147,7 +147,6 @@ class WorkerDay(models.Model):
     # extra field for SQL select
     worker_shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='+')
 
-    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
     tm_work_start = models.TimeField(null=True, blank=True)
     tm_work_end = models.TimeField(null=True, blank=True)
     tm_break_start = models.TimeField(null=True, blank=True)
