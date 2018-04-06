@@ -1,3 +1,4 @@
+import datetime
 import time
 
 from src.db.models import User, WorkerDay
@@ -14,7 +15,7 @@ class BaseConverter(object):
 
     @classmethod
     def parse_time(cls, obj):
-        return time.strptime(obj, '%H:%M:%S')
+        return datetime.datetime.strptime(obj, '%H:%M:%S').time()
 
     @classmethod
     def convert_datetime(cls, obj):

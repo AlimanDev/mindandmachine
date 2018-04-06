@@ -197,7 +197,7 @@ def set_cashier_info(request, form):
     if form.get('constraint') is not None:
         constraints = []
         WorkerConstraint.objects.filter(worker_id=worker.id).delete()
-        for wd, times in form['constraint']:
+        for wd, times in form['constraint'].items():
             for tm in times:
                 c = WorkerConstraint.objects.create(worker_id=worker.id, weekday=wd, tm=tm)
                 constraints.append(c)

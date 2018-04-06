@@ -79,7 +79,7 @@ class SetCashierInfoForm(forms.Form):
         try:
             value = self.cleaned_data.get('constraint')
             if value is None or value == '':
-                return
+                return None
             value = json.loads(value)
             value = {int(wd): [BaseConverter.parse_time(x) for x in tms] for wd, tms in value.items()}
         except:
