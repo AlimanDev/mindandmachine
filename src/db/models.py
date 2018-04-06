@@ -69,9 +69,9 @@ class Cashbox(models.Model):
 
 class PeriodDemand(models.Model):
     class Type(utils.Enum):
-        LONG_FORECAST = 1
-        SHORT_FORECAST = 2
-        FACT = 3
+        LONG_FORECAST = 1  # 60 day
+        SHORT_FORECAST = 2  # 10 day
+        FACT = 3  # real
 
     id = models.BigAutoField(primary_key=True)
 
@@ -147,6 +147,7 @@ class WorkerDay(models.Model):
     # extra field for SQL select
     worker_shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='+')
 
+    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
     tm_work_start = models.TimeField(null=True, blank=True)
     tm_work_end = models.TimeField(null=True, blank=True)
     tm_break_start = models.TimeField(null=True, blank=True)

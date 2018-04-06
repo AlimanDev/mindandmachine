@@ -44,6 +44,7 @@ class UserConverter(BaseConverter):
     def convert(cls, obj):
         return {
             'id': obj.id,
+            'username': obj.username,
             'shop_id': obj.shop_id,
             'work_type': cls.convert_work_type(obj.work_type),
             'first_name': obj.first_name,

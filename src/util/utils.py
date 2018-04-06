@@ -1,8 +1,7 @@
 import json
 
-from django.http import HttpResponse
 from django.conf import settings
-from django.middleware.csrf import CsrfViewMiddleware
+from django.http import HttpResponse
 
 
 class JsonResponse(object):
@@ -92,11 +91,4 @@ def api_method(method, form_cls=None, auth_required=True):
         return wrapper
     return decor
 
-
-def count(collection, comparer):
-    c = 0
-    for x in collection:
-        if comparer(x):
-            c += 1
-    return c
 
