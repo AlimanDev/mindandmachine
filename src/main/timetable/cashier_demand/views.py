@@ -8,103 +8,6 @@ from src.util.models_converter import CashboxTypeConverter, UserConverter, Worke
 from src.util.utils import api_method, JsonResponse
 
 
-# @api_method('GET', GetCashiersTimetableForm)
-# def get_cashiers_timetable(request, form):
-#     if form['format'] == 'excel':
-#         return JsonResponse.value_error('Excel is not supported yet')
-#
-#     shop = request.user.shop
-#
-#     days = WorkerDay.objects.filter(
-#         worker_shop_id=shop.id,
-#         type=WorkerDay.Type.TYPE_WORKDAY.value,
-#         dt__gte=form['from_dt'],
-#         dt__lte=form['to_dt'],
-#     )
-#
-#     WorkerDay.objects.select_related('WorkerDayCashboxDetails')
-#     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.\
-#         select_related('worker_day').\
-#         filter(
-#             worker_day__worker_shop_id=shop.id,
-#             worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
-#             worker_day__dt__gte=form['from_dt'],
-#             worker_day__dt__lte=form['to_dt'],
-#         )
-#
-#     days_by_user = group_by(days, lambda _: _.worker_id)
-#     days_by_dt = group_by(days, lambda _: _.dt)
-#
-#     users_ids = list(days_by_user.keys())
-#     users = {u.id: u for u in User.objects.filter(id__in=users_ids)}
-#
-#     cashbox_types = CashboxType.objects.filter(shop_id=shop.id)
-#     worker_cashbox_info = group_by(
-#         WorkerCashboxInfo.objects.filter(worker_id__in=users_ids),
-#         group_key=lambda _: _.worker_id
-#     )
-#
-#     dttm_from = datetime.combine(form['from_dt'], time())
-#     dttm_to = datetime.combine(form['to_dt'], time())
-#     dttm_step = timedelta(minutes=30)
-#
-#     real_cashiers = []
-#     predict_cashier_needs = []
-#     fact_cashier_needs = []
-#     for dttm in range_u(dttm_from, dttm_to, dttm_step):
-#         dttm_converted = BaseConverter.convert_datetime(dttm)
-#
-#         real_cashiers.append({
-#             'dttm': dttm_converted,
-#             'amount': random.randint(5, 10)
-#         })
-#         predict_cashier_needs.append({
-#             'dttm': dttm_converted,
-#             'amount': random.randint(5, 10)
-#         })
-#         fact_cashier_needs.append({
-#             'dttm': dttm_converted,
-#             'amount': random.randint(5, 10)
-#         })
-#
-#         # dt = dttm.date()
-#         # tm = dttm.time()
-#         #
-#         # real_cashiers_amount = 0
-#         # for u in days_by_dt.get(dt, []):
-#         #     if u.tm_work_start > tm or u.tm_work_end <= tm:
-#         #         continue
-#         #
-#         #     if datetime.combine(dt, u.tm_break_start) <= dttm < datetime.combine(dt, u.tm_break_start) + timedelta(hours=1):
-#         #         continue
-#         #
-#         #     real_cashiers_amount += 1
-#         #
-#         # real_cashiers.append({
-#         #     'dttm': dttm,
-#         #     'amount': real_cashiers_amount
-#         # })
-#
-#     response = {
-#         'indicators': {
-#             'mean_notworking_persent': random.uniform(3, 7),
-#             'big_demand_persent': random.randint(0, 2),
-#             'cashier_amount': random.randint(50, 100),
-#             'FOT': -1,
-#             'need_cashier_amount': random.randint(50, 100),
-#             'change_amount': random.randint(10, 20)
-#         },
-#         'period_step': 30,
-#         'tt_periods': {
-#             'real_cashiers': real_cashiers,
-#             'predict_cashier_needs': predict_cashier_needs,
-#             'fact_cashier_needs': fact_cashier_needs
-#         }
-#     }
-#
-#     return JsonResponse.success(response)
-
-
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
     if form['format'] == 'excel':
@@ -176,6 +79,9 @@ def get_cashiers_timetable(request, form):
     dttm_to = datetime.combine(form['to_dt'], time())
     dttm_step = timedelta(minutes=30)
 
+    real_cashiers_total_amount = 0
+    mean_notworking_present = 0
+
     real_cashiers = []
     predict_cashier_needs = []
     fact_cashier_needs = []
@@ -216,6 +122,11 @@ def get_cashiers_timetable(request, form):
             real_cashiers_amount += 1
             cheques_amount += mean_speed * shop.beta
 
+        real_cashiers_total_amount += real_cashiers_amount
+
+        if predict_cheques_fact < cheques_amount:
+            mean_notworking_present += (1 - predict_cheques_fact / cheques_amount) * real_cashiers_amount
+
         real_cashiers.append({
             'dttm': dttm_converted,
             'amount': real_cashiers_amount
@@ -229,9 +140,11 @@ def get_cashiers_timetable(request, form):
             'amount': (predict_cheques_fact - cheques_amount) / 15 + real_cashiers_amount
         })
 
+    mean_notworking_present = mean_notworking_present / real_cashiers_total_amount if real_cashiers_total_amount > 0 else 0
+
     response = {
         'indicators': {
-            'mean_notworking_persent': random.uniform(3, 7),
+            'mean_notworking_persent': mean_notworking_present,
             'big_demand_persent': random.randint(0, 2),
             'cashier_amount': random.randint(50, 100),
             'FOT': -1,
