@@ -1,4 +1,3 @@
-import random
 from datetime import datetime, time, timedelta
 from src.db.models import WorkerDay, User, CashboxType, WorkerCashboxInfo, WorkerDayCashboxDetails, PeriodDemand
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
@@ -81,6 +80,9 @@ def get_cashiers_timetable(request, form):
 
     real_cashiers_total_amount = 0
     mean_notworking_present = 0
+    cashier_amount_max = 0
+    big_demand_persent = 0
+    need_cashier_amount_max = 0
 
     real_cashiers = []
     predict_cashier_needs = []
@@ -123,18 +125,33 @@ def get_cashiers_timetable(request, form):
             cheques_amount += mean_speed * shop.beta
 
         real_cashiers_total_amount += real_cashiers_amount
+        cashier_amount_max = max(real_cashiers_amount, cashier_amount_max)
 
         if predict_cheques_fact < cheques_amount:
             mean_notworking_present += (1 - predict_cheques_fact / cheques_amount) * real_cashiers_amount
+
+        if dt < datetime.today():
+            if predict_cheques_fact > cheques_amount * 2:
+                big_demand_persent += 1
+        else:
+            if predict_cheques_short > cheques_amount * 2:
+                big_demand_persent += 1
+
+        predict_cashier_needs_amount = (predict_cheques_short - cheques_amount) / 15 + real_cashiers_amount
+
+        if dt >= datetime.today():
+            need_cashier_amount_max = max(predict_cashier_needs_amount - real_cashiers_amount, need_cashier_amount_max)
 
         real_cashiers.append({
             'dttm': dttm_converted,
             'amount': real_cashiers_amount
         })
+
         predict_cashier_needs.append({
             'dttm': dttm_converted,
-            'amount': (predict_cheques_short - cheques_amount) / 15 + real_cashiers_amount
+            'amount': predict_cashier_needs_amount
         })
+
         fact_cashier_needs.append({
             'dttm': dttm_converted,
             'amount': (predict_cheques_fact - cheques_amount) / 15 + real_cashiers_amount
@@ -145,11 +162,11 @@ def get_cashiers_timetable(request, form):
     response = {
         'indicators': {
             'mean_notworking_persent': mean_notworking_present,
-            'big_demand_persent': random.randint(0, 2),
-            'cashier_amount': random.randint(50, 100),
+            'big_demand_persent': big_demand_persent,
+            'cashier_amount': cashier_amount_max,
             'FOT': -1,
-            'need_cashier_amount': random.randint(50, 100),
-            'change_amount': random.randint(10, 20)
+            'need_cashier_amount': need_cashier_amount_max,
+            'change_amount': 10
         },
         'period_step': 30,
         'tt_periods': {
