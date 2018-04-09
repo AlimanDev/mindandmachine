@@ -26,7 +26,7 @@ def add_shops_and_cashboxes(print_loading=True):
         models.CashboxType.objects.get_or_create(shop=shop3, name='Линия (экспресс)')[0],
         models.CashboxType.objects.get_or_create(shop=shop3, name='Линия (для юрлиц)')[0],
         models.CashboxType.objects.get_or_create(shop=shop3, name='Возврат')[0],
-        models.CashboxType.objects.get_or_create(shop=shop3, name='Достака')[0],
+        models.CashboxType.objects.get_or_create(shop=shop3, name='Доставка')[0],
         models.CashboxType.objects.get_or_create(shop=shop3, name='Информация')[0],
 
         models.CashboxType.objects.get_or_create(shop=shop3, name='На улице', dttm_deleted=dttm_deleted1)[0],

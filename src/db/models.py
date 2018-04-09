@@ -37,6 +37,8 @@ class User(DjangoAbstractUser):
     work_type = utils.EnumField(WorkType, null=True, blank=True)
     permissions = models.BigIntegerField(default=0)
 
+    middle_name = models.CharField(max_length=64, blank=True, null=True)
+
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 

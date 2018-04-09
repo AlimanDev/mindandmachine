@@ -19,3 +19,7 @@ sudo pip3 install uwsgi
 
 python3 manage.py makemigrations db
 python3 manage.py migrate
+
+
+# DEV ONLY
+pip3 install numpy pandas xlrd
