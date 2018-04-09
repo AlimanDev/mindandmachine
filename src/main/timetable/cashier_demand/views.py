@@ -2,7 +2,7 @@ from datetime import datetime, time, timedelta
 from src.db.models import WorkerDay, User, CashboxType, WorkerCashboxInfo, WorkerDayCashboxDetails, PeriodDemand
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
 from src.main.timetable.cashier_demand.utils import filter_worker_day_by_dttm
-from src.util.collection import group_by, range_u, count
+from src.util.collection import group_by, range_u
 from src.util.models_converter import CashboxTypeConverter, UserConverter, WorkerDayConverter, WorkerCashboxInfoConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
 
@@ -84,6 +84,8 @@ def get_cashiers_timetable(request, form):
     big_demand_persent = 0
     need_cashier_amount_max = 0
 
+    today = datetime.now().date()
+
     real_cashiers = []
     predict_cashier_needs = []
     fact_cashier_needs = []
@@ -130,7 +132,7 @@ def get_cashiers_timetable(request, form):
         if predict_cheques_fact < cheques_amount:
             mean_notworking_present += (1 - predict_cheques_fact / cheques_amount) * real_cashiers_amount
 
-        if dt < datetime.today():
+        if dt < today:
             if predict_cheques_fact > cheques_amount * 2:
                 big_demand_persent += 1
         else:
@@ -139,7 +141,7 @@ def get_cashiers_timetable(request, form):
 
         predict_cashier_needs_amount = (predict_cheques_short - cheques_amount) / 15 + real_cashiers_amount
 
-        if dt >= datetime.today():
+        if dt >= today:
             need_cashier_amount_max = max(predict_cashier_needs_amount - real_cashiers_amount, need_cashier_amount_max)
 
         real_cashiers.append({
