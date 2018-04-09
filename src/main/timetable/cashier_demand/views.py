@@ -116,8 +116,9 @@ def get_cashiers_timetable(request, form):
             if len(cashbox) == 0:
                 continue
 
-            if datetime.combine(dt, day.tm_break_start) <= dttm < datetime.combine(dt, day.tm_break_start) + timedelta(hours=1):
-                continue
+            if day.tm_break_start is not None:
+                if datetime.combine(dt, day.tm_break_start) <= dttm < datetime.combine(dt, day.tm_break_start) + timedelta(hours=1):
+                    continue
 
             cashbox_type = cashbox[0].on_cashbox.type_id
             cashbox_info = user['cashbox_info'].get(cashbox_type)
