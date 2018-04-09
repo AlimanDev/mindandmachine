@@ -95,11 +95,11 @@ def get_cashiers_timetable(request, form):
         dt = dttm.date()
         tm = dttm.time()
 
-        predict_cheques_short = 0
+        predict_cheques_long = 0
         predict_cheques_fact = 0
         for x in period_demand.get(dt, {}).get(tm, []):
-            if x.type == PeriodDemand.Type.SHORT_FORECAST:
-                predict_cheques_short += x.clients
+            if x.type == PeriodDemand.Type.LONG_FORECAST:
+                predict_cheques_long += x.clients
             elif x.type == PeriodDemand.Type.FACT:
                 predict_cheques_fact += x.clients
 
@@ -137,10 +137,10 @@ def get_cashiers_timetable(request, form):
             if predict_cheques_fact > cheques_amount * 2:
                 big_demand_persent += 1
         else:
-            if predict_cheques_short > cheques_amount * 2:
+            if predict_cheques_long > cheques_amount * 2:
                 big_demand_persent += 1
 
-        predict_cashier_needs_amount = (predict_cheques_short - cheques_amount) / 15 + real_cashiers_amount
+        predict_cashier_needs_amount = (predict_cheques_long - cheques_amount) / 15 + real_cashiers_amount
 
         if dt >= today:
             need_cashier_amount_max = max(predict_cashier_needs_amount - real_cashiers_amount, need_cashier_amount_max)

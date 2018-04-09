@@ -75,7 +75,7 @@ def run():
                 dttm_forecast=row[0],
                 clients=row[1],
                 products=0,
-                type=PeriodDemand.Type.SHORT_FORECAST.value,
+                type=PeriodDemand.Type.LONG_FORECAST.value,
                 cashbox_type=cashbox_type,
                 queue_wait_time=0,
                 queue_wait_length=0
