@@ -98,9 +98,9 @@ def get_cashiers_timetable(request, form):
         predict_cheques_long = 0
         predict_cheques_fact = 0
         for x in period_demand.get(dt, {}).get(tm, []):
-            if x.type == PeriodDemand.Type.LONG_FORECAST:
+            if x.type == PeriodDemand.Type.LONG_FORECAST.value:
                 predict_cheques_long += x.clients
-            elif x.type == PeriodDemand.Type.FACT:
+            elif x.type == PeriodDemand.Type.FACT.value:
                 predict_cheques_fact += x.clients
 
         real_cashiers_amount = 0
