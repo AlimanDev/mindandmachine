@@ -38,7 +38,6 @@ def run():
     with open(path, 'rb') as f:
         data = pickle.load(f)
 
-    __print('Columns', data.columns)
     updated_rows_count = 0
 
     for row in data.values:

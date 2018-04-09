@@ -137,6 +137,17 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
     column_sheet_begin = SheetIndexHelper.get_column(column_sheet_begin)
     column_sheet_end = SheetIndexHelper.get_column(column_sheet_end)
 
+    user = User.objects.create_user(
+        username='a_{}'.format(ctx.shop.id),
+        email='q@q.com',
+        password='4242'
+    )
+    user.shop = ctx.shop
+    user.first_name = 'Иван'
+    user.middle_name = 'Иванович'
+    user.last_name = 'Иванов'
+    user.save()
+
     counter = 0
     cashboxes_types = {}
     cashboxes = {}

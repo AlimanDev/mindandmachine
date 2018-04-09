@@ -66,10 +66,12 @@ def run():
     PeriodDemand.objects.all().delete()
     __print('PeriodDemand cleared')
 
+    created_counter = {}
+    non_created_counter = {}
     for row in data:
         cashbox_type = cashboxes_types.get(row[2])
         if cashbox_type is not None:
-            PeriodDemand.objects.create(
+            pd = PeriodDemand.objects.create(
                 dttm_forecast=row[0],
                 clients=row[1],
                 products=0,
@@ -78,3 +80,15 @@ def run():
                 queue_wait_time=0,
                 queue_wait_length=0
             )
+
+            if cashbox_type.name not in created_counter:
+                created_counter[cashbox_type.name] = 0
+            created_counter[cashbox_type.name] += 1
+        else:
+            name = row[2]
+            if name not in non_created_counter:
+                non_created_counter[name] = 0
+            non_created_counter[name] += 1
+
+    __print('PeriodDemand created count {}'.format(created_counter))
+    __print('PeriodDemand NOT created count {}'.format(non_created_counter))
