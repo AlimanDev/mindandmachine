@@ -164,11 +164,11 @@ def get_cashiers_timetable(request, form):
 
     response = {
         'indicators': {
-            'mean_notworking_persent': mean_notworking_present,
+            'mean_notworking_persent': -1,  # mean_notworking_present,
             'big_demand_persent': big_demand_persent,
             'cashier_amount': cashier_amount_max,
             'FOT': -1,
-            'need_cashier_amount': need_cashier_amount_max,
+            'need_cashier_amount': 0,  # need_cashier_amount_max,
             'change_amount': 10
         },
         'period_step': 30,
@@ -198,8 +198,13 @@ def get_workers(request, form):
     users_ids = list(days.keys())
     users = User.objects.filter(id__in=users_ids)
     cashbox_types = CashboxType.objects.filter(shop_id=request.user.shop_id)
+
+    worker_cashbox_info_args = {'worker_id__in': users_ids}
+    if len(form['cashbox_type_ids']) > 0:
+        worker_cashbox_info_args['cashbox_type_id__in'] = form['cashbox_type_ids']
+
     worker_cashbox_info = group_by(
-        WorkerCashboxInfo.objects.filter(worker_id__in=users_ids),
+        WorkerCashboxInfo.objects.filter(**worker_cashbox_info_args),
         group_key=lambda _: _.worker_id
     )
 
