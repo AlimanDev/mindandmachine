@@ -140,7 +140,7 @@ def get_cashiers_timetable(request, form):
             if predict_cheques_long > cheques_amount * 2:
                 big_demand_persent += 1
 
-        predict_cashier_needs_amount = (predict_cheques_long - cheques_amount) / 15 + real_cashiers_amount
+        predict_cashier_needs_amount = predict_cheques_long / 15
 
         if dt >= today:
             need_cashier_amount_max = max(predict_cashier_needs_amount - real_cashiers_amount, need_cashier_amount_max)
