@@ -12,5 +12,20 @@ def get_types(request, form):
     if not form['full']:
         filter_params['dttm_deleted'] = None
 
-    response = [CashboxTypeConverter.convert(x) for x in CashboxType.objects.filter(**filter_params)]
+    types = {x.name: x for x in CashboxType.objects.filter(**filter_params)}
+
+    types_result = []
+
+    def __add_t(__s):
+        __x = types.pop(__s, None)
+        if __x is not None:
+            types_result.append(__x)
+
+    __add_t('Линия')
+    __add_t('Возврат')
+
+    for x in types.values():
+        types_result.append(x)
+
+    response = [CashboxTypeConverter.convert(x) for x in types_result]
     return JsonResponse.success(response)

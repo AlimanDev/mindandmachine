@@ -22,5 +22,5 @@ class Command(BaseCommand):
         # shop_01_users.run()
         # shop_01_speed.run()
         # shop_01_demand.run()
-        # shop_003.run()
+        shop_003.run()
         shop_004.run()
