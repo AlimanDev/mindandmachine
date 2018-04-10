@@ -86,6 +86,8 @@ def get_cashiers_timetable(request, form):
 
     today = datetime.now().date()
 
+    users_amount_dict = {}
+
     real_cashiers = []
     predict_cashier_needs = []
     fact_cashier_needs = []
@@ -125,6 +127,7 @@ def get_cashiers_timetable(request, form):
             mean_speed = cashbox_info.mean_speed if cashbox_info is not None else 0
 
             real_cashiers_amount += 1
+            users_amount_dict[user.id] = True
             cheques_amount += mean_speed * shop.beta
 
         real_cashiers_total_amount += real_cashiers_amount
@@ -166,7 +169,7 @@ def get_cashiers_timetable(request, form):
         'indicators': {
             'mean_notworking_persent': -1,  # mean_notworking_present,
             'big_demand_persent': big_demand_persent,
-            'cashier_amount': cashier_amount_max,
+            'cashier_amount': len(users_amount_dict),
             'FOT': -1,
             'need_cashier_amount': 0,  # need_cashier_amount_max,
             'change_amount': 10
@@ -185,17 +188,6 @@ def get_cashiers_timetable(request, form):
 @api_method('GET', GetWorkersForm)
 def get_workers(request, form):
     shop = request.user.shop
-
-    # days = group_by(
-    #     filter_worker_day_by_dttm(
-    #         shop_id=request.user.shop_id,
-    #         day_type=WorkerDay.Type.TYPE_WORKDAY.value,
-    #         dttm_from=form['from_dttm'],
-    #         dttm_to=form['to_dttm']
-    #     ),
-    #     group_key=lambda _: _.worker_id,
-    #     sort_key=lambda _: _.dt
-    # )
 
     days = {
         d.id: d for d in filter_worker_day_by_dttm(
