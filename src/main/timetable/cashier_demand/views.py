@@ -123,7 +123,6 @@ def get_cashiers_timetable(request, form):
                     if d.tm_from <= tm or d.tm_to > tm:
                         cashbox.append(d)
 
-            # cashbox = [_ for _ in details if _.tm_from <= tm < _.tm_to]
             if len(cashbox) == 0:
                 continue
 
@@ -199,58 +198,162 @@ def get_cashiers_timetable(request, form):
     return JsonResponse.success(response)
 
 
+# @api_method('GET', GetWorkersForm)
+# def get_workers(request, form):
+#     shop = request.user.shop
+#
+#     days = {
+#         d.id: d for d in filter_worker_day_by_dttm(
+#             shop_id=request.user.shop_id,
+#             day_type=WorkerDay.Type.TYPE_WORKDAY.value,
+#             dttm_from=form['from_dttm'],
+#             dttm_to=form['to_dttm']
+#         )
+#     }
+#
+#     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
+#         'worker_day', 'on_cashbox'
+#     ).filter(
+#         worker_day__worker_shop_id=shop,
+#         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
+#         worker_day__dt__gte=form['from_dttm'].date(),
+#         worker_day__dt__lte=form['to_dttm'].date(),
+#     )
+#
+#     cashbox_type_ids = form['cashbox_type_ids']
+#     if len(cashbox_type_ids) > 0:
+#         worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.on_cashbox.type_id in cashbox_type_ids]
+#
+#     tmp = []
+#     for d in worker_day_cashbox_detail:
+#         x = days.get(d.worker_day_id)
+#         if x is not None:
+#             tmp.append(x)
+#     days = group_by(tmp, group_key=lambda _: _.worker_id, sort_key=lambda _: _.dt)
+#
+#     users_ids = list(days.keys())
+#     users = User.objects.filter(id__in=users_ids)
+#     cashbox_types = CashboxType.objects.filter(shop_id=shop.id)
+#
+#     worker_cashbox_info = group_by(
+#         WorkerCashboxInfo.objects.filter(worker_id__in=users_ids),
+#         group_key=lambda _: _.worker_id
+#     )
+#
+#     response = {
+#         'users': {
+#             u.id: {
+#                 'u': UserConverter.convert(u),
+#                 'd': [WorkerDayConverter.convert(x) for x in days.get(u.id, [])],
+#                 'c': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(u.id, [])]
+#             }
+#             for u in users
+#         },
+#         'cashbox_types': {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types}
+#     }
+#
+#     return JsonResponse.success(response)
+
 @api_method('GET', GetWorkersForm)
 def get_workers(request, form):
     shop = request.user.shop
 
-    days = {
-        d.id: d for d in filter_worker_day_by_dttm(
-            shop_id=request.user.shop_id,
-            day_type=WorkerDay.Type.TYPE_WORKDAY.value,
-            dttm_from=form['from_dttm'],
-            dttm_to=form['to_dttm']
-        )
-    }
+    from_dt = form['from_dttm'].date()
+    from_tm = form['from_dttm'].time()
+    to_dt = form['to_dttm'].date()
+    to_tm = form['to_dttm'].time()
 
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
         'worker_day', 'on_cashbox'
     ).filter(
-        worker_day__worker_shop_id=shop,
+        worker_day__worker_shop_id=shop.id,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
-        worker_day__dt__gte=form['from_dttm'].date(),
-        worker_day__dt__lte=form['to_dttm'].date(),
+        worker_day__dt__gte=from_dt,
+        worker_day__dt__lte=to_dt,
     )
+
+    cashboxes_types = {x.id: x for x in CashboxType.objects.filter(shop=shop)}
 
     cashbox_type_ids = form['cashbox_type_ids']
     if len(cashbox_type_ids) > 0:
         worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.on_cashbox.type_id in cashbox_type_ids]
 
-    tmp = []
-    for d in worker_day_cashbox_detail:
-        x = days.get(d.worker_day_id)
-        if x is not None:
-            tmp.append(x)
-    days = group_by(tmp, group_key=lambda _: _.worker_id, sort_key=lambda _: _.dt)
+    users = {}
+    for x in worker_day_cashbox_detail:
+        worker_id = x.worker_day.worker_id
+        if worker_id not in users:
+            users[worker_id] = {
+                'days': {},
+                'cashbox_info': {}
+            }
+        user_item = users[worker_id]
 
-    users_ids = list(days.keys())
-    users = User.objects.filter(id__in=users_ids)
-    cashbox_types = CashboxType.objects.filter(shop_id=shop.id)
+        from_dt = x.worker_day.dt
+        if from_dt not in user_item['days']:
+            user_item['days'][from_dt] = {
+                'day': x.worker_day,
+                'details': []
+            }
 
-    worker_cashbox_info = group_by(
-        WorkerCashboxInfo.objects.filter(worker_id__in=users_ids),
-        group_key=lambda _: _.worker_id
-    )
+        user_item['days'][from_dt]['details'].append(x)
+
+    users_ids = list(users.keys())
+    for x in WorkerCashboxInfo.objects.filter(is_active=True, worker_id__in=users_ids):
+        users[x.worker_id]['cashbox_info'][x.cashbox_type_id] = x
+
+    today = datetime.now().date()
+    response_users_ids = []
+    for uid, user in users.items():
+        if from_dt not in user['days']:
+            continue
+
+        day = user['days'][from_dt]['day']
+        details = user['days'][from_dt]['details']
+
+        cashbox = []
+        for d in details:
+            if d.tm_from < d.tm_to:
+                if d.tm_from <= from_tm < d.tm_to:
+                    cashbox.append(d)
+            else:
+                if d.tm_from <= from_tm or d.tm_to > from_tm:
+                    cashbox.append(d)
+
+        if len(cashbox) == 0:
+            continue
+
+        user['days'][from_dt]['details_one'] = cashbox[0]
+        response_users_ids.append(uid)
+
+        # if day.tm_break_start is not None:
+        #     if datetime.combine(from_dt, day.tm_break_start) <= form['from_dttm'] < datetime.combine(from_dt, day.tm_break_start) + timedelta(hours=1):
+        #         continue
+
+        # cashbox_type = cashbox[0].on_cashbox.type_id
+        # cashbox_info = user['cashbox_info'].get(cashbox_type)
 
     response = {
-        'users': {
-            u.id: {
-                'u': UserConverter.convert(u),
-                'd': [WorkerDayConverter.convert(x) for x in days.get(u.id, [])],
-                'c': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(u.id, [])]
-            }
-            for u in users
-        },
-        'cashbox_types': {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types}
+        'cashbox_types': {x.id: CashboxTypeConverter.convert(x) for x in cashboxes_types.values()},
+        'users': {}
     }
+
+    for x in User.objects.filter(id__in=response_users_ids):
+        response['users'][x.id] = {
+            'u': UserConverter.convert(x),
+            'd': [],
+            'c': []
+        }
+
+    # response = {
+    #     'users': {
+    #         uid: {
+    #             'u': UserConverter.convert(u),
+    #             'd': [WorkerDayConverter.convert(x) for x in days.get(u.id, [])],
+    #             'c': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(u.id, [])]
+    #         }
+    #         for uid in response_users
+    #     },
+    #     'cashbox_types': {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types}
+    # }
 
     return JsonResponse.success(response)
