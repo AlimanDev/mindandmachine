@@ -64,9 +64,6 @@ def run():
     path = 'src/db/works/parser/three/shop_004_demand.csv'
     data = load_csv(path, skip_rows=1)
 
-    PeriodDemand.objects.all().delete()
-    __print('PeriodDemand cleared')
-
     created_counter = {}
     non_created_counter = {}
     for row in data:
