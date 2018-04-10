@@ -106,7 +106,7 @@ def get_cashier_info(request, form):
         response['general_info'] = UserConverter.convert(worker)
 
     if 'cashbox_type_info' in form['info']:
-        worker_cashbox_info = WorkerCashboxInfo.objects.filter(worker_id=worker.id)
+        worker_cashbox_info = WorkerCashboxInfo.objects.filter(worker_id=worker.id, is_active=True)
         cashbox_types = CashboxType.objects.filter(shop_id=worker.shop_id)
         response['cashbox_type_info'] = {
             'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info],
