@@ -14,6 +14,8 @@ def get_cashiers_list(request):
         User.objects.filter(
             shop_id=request.user.shop_id,
             dttm_deleted=None
+        ).order_by(
+            'last_name', 'first_name'
         )
     )
 
