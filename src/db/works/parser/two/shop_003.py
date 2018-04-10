@@ -126,7 +126,7 @@ class DemandParseHelper(object):
     @classmethod
     def parse_date(cls, value):
         if isinstance(value, datetime.date):
-            value += datetime.timedelta(days=365)
+            value += datetime.timedelta(days=364)
             return value
 
         raise Exception('cannot parse {}'.format(value))
