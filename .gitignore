@@ -14,5 +14,3 @@ etc/test.py
 etc/report/
 
 db.sqlite3
-
-src/db/migrations/

@@ -1,3 +1,5 @@
+SET LOCALE
+
 sudo apt-get install -y postgresql-9.5 postgresql-contrib pgbouncer python3-psycopg2
 sudo apt-get install -y python3-pip python3-dev libpcre3 libpcre3-dev git
 
@@ -13,11 +15,7 @@ adduser ksan sudo
 adduser ksan postgres
 adduser www-data ksan
 
-sudo pip3 install Django==2.0.3
-sudo pip3 install Pillow
-sudo pip3 install uwsgi
+sudo pip3 install Django==2.0.3 Pillow uwsgi numpy pandas xlrd
 
 python3 manage.py makemigrations db
 python3 manage.py migrate
-
-pip3 install numpy pandas xlrd
