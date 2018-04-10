@@ -243,7 +243,7 @@ def parse_demand_time_sheet(ctx, data, row_begin, row_end, column_begin, column_
     column_time = SheetIndexHelper.get_column('A')
     row_date = SheetIndexHelper.get_row(2)
 
-    cashbox_type = CashboxType.objects.create(
+    cashbox_type = CashboxType.objects.get(
         shop=ctx.shop,
         name='Линия'
     )
