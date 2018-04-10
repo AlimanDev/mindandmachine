@@ -164,9 +164,9 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
         password='BestCompany004'
     )
     user.shop = ctx.shop
-    user.first_name = 'Иван'
-    user.middle_name = 'Иванович'
-    user.last_name = 'Иванов'
+    user.first_name = 'Ольга'
+    user.middle_name = ' '
+    user.last_name = 'Донкарева'
     user.save()
 
     counter = 0
