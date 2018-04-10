@@ -114,7 +114,16 @@ def get_cashiers_timetable(request, form):
             day = user['days'][dt]['day']
             details = user['days'][dt]['details']
 
-            cashbox = [_ for _ in details if _.tm_from <= tm < _.tm_to]
+            cashbox = []
+            for d in details:
+                if d.tm_from < d.tm_to:
+                    if d.tm_from <= tm < d.tm_to:
+                        cashbox.append(d)
+                else:
+                    if d.tm_from <= tm or d.tm_to > tm:
+                        cashbox.append(d)
+
+            # cashbox = [_ for _ in details if _.tm_from <= tm < _.tm_to]
             if len(cashbox) == 0:
                 continue
 
