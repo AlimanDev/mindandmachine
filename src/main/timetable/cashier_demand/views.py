@@ -107,7 +107,7 @@ def get_cashiers_timetable(request, form):
 
         real_cashiers_amount = 0
         cheques_amount = 0
-        for user in users.values():
+        for uid, user in users.items():
             if dt not in user['days']:
                 continue
 
@@ -127,7 +127,7 @@ def get_cashiers_timetable(request, form):
             mean_speed = cashbox_info.mean_speed if cashbox_info is not None else 0
 
             real_cashiers_amount += 1
-            users_amount_dict[user.id] = True
+            users_amount_dict[uid] = True
             cheques_amount += mean_speed * shop.beta
 
         real_cashiers_total_amount += real_cashiers_amount
