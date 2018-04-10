@@ -184,27 +184,54 @@ def get_cashiers_timetable(request, form):
 
 @api_method('GET', GetWorkersForm)
 def get_workers(request, form):
-    days = group_by(
-        filter_worker_day_by_dttm(
+    shop = request.user.shop
+
+    # days = group_by(
+    #     filter_worker_day_by_dttm(
+    #         shop_id=request.user.shop_id,
+    #         day_type=WorkerDay.Type.TYPE_WORKDAY.value,
+    #         dttm_from=form['from_dttm'],
+    #         dttm_to=form['to_dttm']
+    #     ),
+    #     group_key=lambda _: _.worker_id,
+    #     sort_key=lambda _: _.dt
+    # )
+
+    days = {
+        d.id: d for d in filter_worker_day_by_dttm(
             shop_id=request.user.shop_id,
             day_type=WorkerDay.Type.TYPE_WORKDAY.value,
             dttm_from=form['from_dttm'],
             dttm_to=form['to_dttm']
-        ),
-        group_key=lambda _: _.worker_id,
-        sort_key=lambda _: _.dt
+        )
+    }
+
+    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
+        'worker_day', 'on_cashbox'
+    ).filter(
+        worker_day__worker_shop_id=shop,
+        worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
+        worker_day__dt__gte=form['from_dttm'].date(),
+        worker_day__dt__lte=form['to_dttm'].date(),
     )
+
+    cashbox_type_ids = form['cashbox_type_ids']
+    if len(cashbox_type_ids) > 0:
+        worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.on_cashbox.type_id in cashbox_type_ids]
+
+    tmp = []
+    for d in worker_day_cashbox_detail:
+        x = days.get(d.worker_day_id)
+        if x is not None:
+            tmp.append(x)
+    days = group_by(tmp, group_key=lambda _: _.worker_id, sort_key=lambda _: _.dt)
 
     users_ids = list(days.keys())
     users = User.objects.filter(id__in=users_ids)
-    cashbox_types = CashboxType.objects.filter(shop_id=request.user.shop_id)
-
-    worker_cashbox_info_args = {'worker_id__in': users_ids}
-    if len(form['cashbox_type_ids']) > 0:
-        worker_cashbox_info_args['cashbox_type_id__in'] = form['cashbox_type_ids']
+    cashbox_types = CashboxType.objects.filter(shop_id=shop.id)
 
     worker_cashbox_info = group_by(
-        WorkerCashboxInfo.objects.filter(**worker_cashbox_info_args),
+        WorkerCashboxInfo.objects.filter(worker_id__in=users_ids),
         group_key=lambda _: _.worker_id
     )
 
