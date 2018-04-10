@@ -297,7 +297,7 @@ def run():
         ctx=ctx,
         data=data,
         row_begin=3,
-        row_end=73,
+        row_end=72,
         column_begin='B',
         column_end='AE'
     )
