@@ -160,7 +160,8 @@ def get_cashiers_timetable(request, form):
 
         fact_cashier_needs.append({
             'dttm': dttm_converted,
-            'amount': (predict_cheques_fact - cheques_amount) / 15 + real_cashiers_amount
+            'amount': 0
+            # 'amount': (predict_cheques_fact - cheques_amount) / 15 + real_cashiers_amount
         })
 
     mean_notworking_present = mean_notworking_present / real_cashiers_total_amount if real_cashiers_total_amount > 0 else 0
