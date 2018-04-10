@@ -176,9 +176,13 @@ def get_cashiers_timetable(request, form):
         },
         'period_step': 30,
         'tt_periods': {
-            'real_cashiers': real_cashiers,
+            # очень грязный хак, потому что графики перепутаны
+            'real_cashiers': fact_cashier_needs,
             'predict_cashier_needs': predict_cashier_needs,
-            'fact_cashier_needs': fact_cashier_needs
+            'fact_cashier_needs': real_cashiers
+            # 'real_cashiers': real_cashiers,
+            # 'predict_cashier_needs': predict_cashier_needs,
+            # 'fact_cashier_needs': fact_cashier_needs
         }
     }
 
