@@ -249,11 +249,11 @@ def parse_demand_time_sheet(ctx, data, row_begin, row_end, column_begin, column_
         name='Линия'
     )
 
-    for row in range_i(row_begin, row_end):
-        tm = DemandParseHelper.parse_time(data[column_time][row])
-        for col in range_i(column_begin, column_end):
-            dt = DemandParseHelper.parse_date(data[col][row_date])
-            value = DemandParseHelper.parse_demand(data[col][row])
+    for col in range_i(column_begin, column_end):
+        dt = DemandParseHelper.parse_date(data[col][row_date])
+        for row in range_i(row_begin, row_end, 2):
+            tm = DemandParseHelper.parse_time(data[column_time][row])
+            value = DemandParseHelper.parse_demand(data[col][row]) + DemandParseHelper.parse_demand(data[col][row+1])
             PeriodDemand.objects.create(
                 dttm_forecast=datetime.datetime.combine(dt, tm),
                 clients=value,
