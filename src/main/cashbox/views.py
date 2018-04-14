@@ -1,31 +1,137 @@
-from src.db.models import CashboxType
+import datetime
+
+from src.db.models import CashboxType, Cashbox
+from src.util.db import CashboxTypeUtil
+from src.util.forms import FormUtil
 from src.util.utils import JsonResponse, api_method
-from src.util.models_converter import CashboxTypeConverter
-from .forms import GetTypesForm
+from src.util.models_converter import CashboxTypeConverter, CashboxConverter
+from .forms import GetTypesForm, GetCashboxesForm, CreateCashboxForm, DeleteCashboxForm, UpdateCashboxForm
 
 
 @api_method('GET', GetTypesForm)
 def get_types(request, form):
-    filter_params = {
-        'shop_id': form['shop_id']
-    }
-    if not form['full']:
-        filter_params['dttm_deleted'] = None
+    shop_id = FormUtil.get_shop_id(request, form)
 
-    types = {x.name: x for x in CashboxType.objects.filter(**filter_params)}
+    types = CashboxType.objects.filter(shop_id=shop_id)
 
-    types_result = []
+    return JsonResponse.success(
+        [CashboxTypeConverter.convert(x) for x in CashboxTypeUtil.sort(types)]
+    )
 
-    def __add_t(__s):
-        __x = types.pop(__s, None)
-        if __x is not None:
-            types_result.append(__x)
 
-    __add_t('Линия')
-    __add_t('Возврат')
+@api_method('GET', GetCashboxesForm)
+def get_cashboxes(request, form):
+    shop_id = FormUtil.get_shop_id(request, form)
+    dt_from = FormUtil.get_dt_from(form)
+    dt_to = FormUtil.get_dt_to(form)
+    cashbox_type_ids = form['cashbox_type_ids']
 
-    for x in types.values():
-        types_result.append(x)
+    cashboxes = Cashbox.objects.select_related(
+        'type'
+    ).filter(
+        type__shop_id=shop_id,
+    )
 
-    response = [CashboxTypeConverter.convert(x) for x in types_result]
-    return JsonResponse.success(response)
+    types = CashboxTypeUtil.fetch_from_cashboxes(cashboxes)
+
+    if len(cashbox_type_ids) > 0:
+        cashboxes = [x for x in cashboxes if x.type_id in cashbox_type_ids]
+
+    cashboxes = [x for x in cashboxes if dt_from <= x.dttm_added <= dt_to or dt_from <= x.dttm_deleted <= dt_to]
+
+    return JsonResponse.success({
+        'cashboxes_types': {x.id: CashboxTypeConverter.convert(x) for x in CashboxTypeUtil.sort(types)},
+        'cashboxes': [CashboxConverter.convert(x) for x in cashboxes]
+    })
+
+
+@api_method('POST', CreateCashboxForm)
+def create_cashbox(request, form):
+    cashbox_type_id = form['cashbox_type_id']
+    cashbox_number = form['number']
+
+    try:
+        cashbox_type = CashboxType.objects.get(id=cashbox_type_id)
+    except CashboxType.DoesNotExist:
+        return JsonResponse.does_not_exists_error('cashbox_type does not exist')
+
+    cashboxes_count = Cashbox.objects.select_related(
+        'type'
+    ).filter(
+        type__shop_id=cashbox_type.shop_id,
+        dttm_deleted=None,
+        number=cashbox_number
+    ).count()
+
+    if cashboxes_count > 0:
+        return JsonResponse.already_exists_error('Cashbox with number already exists')
+
+    cashbox = Cashbox.objects.create(type=cashbox_type, number=cashbox_number)
+
+    return JsonResponse.success({
+        'cashbox_type': CashboxTypeConverter.convert(cashbox_type),
+        'cashbox': CashboxConverter.convert(cashbox)
+    })
+
+
+@api_method('POST', DeleteCashboxForm)
+def delete_cashbox(request, form):
+    shop_id = FormUtil.get_shop_id(request, form)
+
+    try:
+        cashbox = Cashbox.objects.select_related(
+            'type'
+        ).get(
+            type__shop_id=shop_id,
+            dttm_deleted=None,
+            number=form['number']
+        )
+    except Cashbox.DoesNotExist:
+        return JsonResponse.does_not_exists_error()
+    except Cashbox.MultipleObjectsReturned:
+        return JsonResponse.internal_error()
+
+    cashbox.dttm_deleted = datetime.datetime.now()
+    cashbox.bio = form['bio']
+    cashbox.save()
+
+    return JsonResponse.success(
+        CashboxConverter.convert(cashbox)
+    )
+
+
+@api_method('POST', UpdateCashboxForm)
+def update_cashbox(request, form):
+    cashbox_number = form['number']
+
+    try:
+        from_cashbox_type = CashboxType.objects.get(id=form['from_cashbox_type_id'])
+    except CashboxType.DoesNotExist:
+        return JsonResponse.does_not_exists_error('from_cashbox_type')
+
+    try:
+        to_cashbox_type = CashboxType.objects.get(id=form['to_cashbox_type_id'])
+    except CashboxType.DoesNotExist:
+        return JsonResponse.does_not_exists_error('to_cashbox_type')
+
+    try:
+        cashbox = Cashbox.objects.select_related(
+            'type'
+        ).filter(
+            type__shop_id=from_cashbox_type.shop_id,
+            dttm_deleted=None,
+            number=cashbox_number
+        )
+    except Cashbox.DoesNotExist:
+        return JsonResponse.does_not_exists_error('cashbox')
+    except Cashbox.MultipleObjectsReturned:
+        return JsonResponse.internal_error()
+
+    cashbox.dttm_deleted = datetime.datetime.now()
+    cashbox.save()
+
+    cashbox = Cashbox.objects.create(type=to_cashbox_type, number=cashbox_number)
+
+    return JsonResponse.success(
+        CashboxConverter.convert(cashbox)
+    )

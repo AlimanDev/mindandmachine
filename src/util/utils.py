@@ -22,6 +22,14 @@ class JsonResponse(object):
         return cls.__base_error_response(400, 'ValueException', msg)
 
     @classmethod
+    def already_exists_error(cls, msg=''):
+        return cls.__base_error_response(400, 'AlreadyExist', msg)
+
+    @classmethod
+    def does_not_exists_error(cls, msg=''):
+        return cls.__base_error_response(400, 'DoesNotExist', msg)
+
+    @classmethod
     def auth_error(cls):
         return cls.__base_error_response(400, 'AuthError', 'No such user or password incorrect')
 
@@ -34,8 +42,8 @@ class JsonResponse(object):
         return cls.__base_error_response(403, 'CsrfTokenRequired')
 
     @classmethod
-    def internal_error(cls):
-        return cls.__base_error_response(500, 'InternalError', '')
+    def internal_error(cls, msg=''):
+        return cls.__base_error_response(500, 'InternalError', msg)
 
     @classmethod
     def __base_error_response(cls, code, error_type, error_message=''):

@@ -1,4 +1,8 @@
+import datetime
+
 from django import forms
+
+from src.util.dict import DictUtil
 
 
 class DateField(forms.DateField):
@@ -71,3 +75,17 @@ class MultipleChoiceField(forms.MultipleChoiceField):
 class BooleanField(forms.BooleanField):
     def __init__(self):
         super().__init__(required=False)
+
+
+class FormUtil(object):
+    @staticmethod
+    def get_shop_id(request, form):
+        return DictUtil.get_not_none(form, 'shop_id', request.user.shop_id)
+
+    @staticmethod
+    def get_dt_from(form):
+        return DictUtil.get_not_none(form, 'dt_from', datetime.date(year=1971))
+
+    @staticmethod
+    def get_dt_to(form):
+        return DictUtil.get_not_none(form, 'dt_to', datetime.date(year=2037))

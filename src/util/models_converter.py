@@ -150,6 +150,19 @@ class CashboxTypeConverter(BaseConverter):
         }
 
 
+class CashboxConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'dttm_added': cls.convert_datetime(obj.dttm_added),
+            'dttm_deleted': cls.convert_datetime(obj.dttm_deleted),
+            'type': obj.type_id,
+            'number': obj.number,
+            'bio': obj.bio
+        }
+
+
 class WorkerCashboxInfoConverter(BaseConverter):
     @classmethod
     def convert(cls, obj):

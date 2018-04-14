@@ -1,8 +1,7 @@
 from datetime import datetime, time, timedelta
 from src.db.models import WorkerDay, User, CashboxType, WorkerCashboxInfo, WorkerDayCashboxDetails, PeriodDemand
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
-from src.main.timetable.cashier_demand.utils import filter_worker_day_by_dttm
-from src.util.collection import group_by, range_u
+from src.util.collection import range_u
 from src.util.models_converter import CashboxTypeConverter, UserConverter, WorkerDayConverter, WorkerCashboxInfoConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
 
