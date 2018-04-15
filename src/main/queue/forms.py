@@ -16,3 +16,11 @@ class GetTimeDistributionForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
     cashbox_type_ids = util_forms.CashboxTypeIds()
+
+
+class GetParametersForm(forms.Form):
+    pass
+
+
+class SetParametersForm(forms.Form):
+    pass

@@ -16,7 +16,7 @@ class GetCashiersTimetableForm(forms.Form):
         if self.errors:
             return
 
-        if self.cleaned_data["from_dttm"] > self.cleaned_data["to_dttm"]:
+        if self.cleaned_data['from_dt'] > self.cleaned_data['to_dt']:
             raise forms.ValidationError('dt_from have to be less or equal than dt_to')
 
 

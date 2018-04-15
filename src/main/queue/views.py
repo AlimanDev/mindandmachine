@@ -4,7 +4,7 @@ from src.db.models import WaitTimeInfo, PeriodDemand, CashboxType
 from src.util.collection import range_u
 from src.util.models_converter import PeriodDemandConverter
 from src.util.utils import api_method, JsonResponse
-from .forms import GetTimeDistributionForm, GetIndicatorsForm
+from .forms import GetTimeDistributionForm, GetIndicatorsForm, GetParametersForm, SetParametersForm
 
 
 @api_method('GET', GetIndicatorsForm)
@@ -131,3 +131,13 @@ def get_time_distribution(request, form):
             }
 
     return JsonResponse.success(result)
+
+
+@api_method('GET', GetParametersForm)
+def get_parameters(request, form):
+    pass
+
+
+@api_method('POST', SetParametersForm)
+def set_parameters(request, form):
+    pass
