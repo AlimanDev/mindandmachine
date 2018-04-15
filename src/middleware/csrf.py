@@ -9,7 +9,7 @@ class CsrfMiddleware(DjangoCsrfViewMiddleware):
         super().__init__(*args, **kwargs)
 
     def process_view(self, request, callback, callback_args, callback_kwargs):
-        if settings.DEBUG and settings.QOS_DEV_CSRF_DISABLED:
+        if settings.QOS_DEV_CSRF_DISABLED:
             return
 
         response = super().process_view(request, None, (), {})

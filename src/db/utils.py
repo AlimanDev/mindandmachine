@@ -27,3 +27,7 @@ class Enum(enum.Enum):
             if x.value == value:
                 return x
         return None
+
+    @classmethod
+    def values(cls):
+        return [x.value for x in cls]

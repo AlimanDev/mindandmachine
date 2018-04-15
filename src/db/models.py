@@ -10,6 +10,7 @@ class Shop(models.Model):
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
     title = models.CharField(max_length=64, unique=True)
+    hidden_title = models.CharField(max_length=64)
 
     mean_queue_length = models.FloatField(default=3)
     max_queue_length = models.FloatField(default=7)
@@ -48,6 +49,8 @@ class User(DjangoAbstractUser):
     birthday = models.DateField(null=True, blank=True)
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
 
+    comment = models.CharField(max_length=2048, default='')
+
 
 class CashboxType(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -56,6 +59,8 @@ class CashboxType(models.Model):
     dttm_deleted = models.DateTimeField(null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     name = models.CharField(max_length=128)
+    speed_coef = models.FloatField(default=1)
+    is_stable = models.BooleanField(default=True)
 
 
 class Cashbox(models.Model):
@@ -243,14 +248,26 @@ class OfficialHolidays(models.Model):
     date = models.DateField()
 
 
-# class LevelType(models.Model):
-#     class Type(utils.Enum):
-#         LOW = 1
-#         MIDDLE = 2
-#         HIGH = 3
-#
-#     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
-#     type = utils.EnumField(Type)
-#     weekday = models.PositiveSmallIntegerField()
-#     tm_from = models.TimeField()
-#     tm_to = models.TimeField()
+class LevelType(models.Model):
+    class Type(utils.Enum):
+        LOW = 1
+        MIDDLE = 2
+        HIGH = 3
+
+    id = models.BigAutoField(primary_key=True)
+
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    type = utils.EnumField(Type)
+    weekday = models.PositiveSmallIntegerField()
+    tm_from = models.TimeField()
+    tm_to = models.TimeField()
+
+
+class WaitTimeInfo(models.Model):
+    id = models.BigAutoField(primary_key=True)
+
+    dt = models.DateField()
+    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    wait_time = models.PositiveIntegerField()
+    proportion = models.FloatField()
+    type = utils.EnumField(PeriodDemand.Type)

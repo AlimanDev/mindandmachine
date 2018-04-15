@@ -45,7 +45,7 @@ def get_forecast(request, form):
 
     today = datetime.now().date()
 
-    forecast_periods = {x.value: [] for x in PeriodDemand.Type if x.value in data_types}
+    forecast_periods = {x: [] for x in PeriodDemand.Type.values() if x in data_types}
 
     for forecast_type, forecast_data in forecast_periods.items():
         for dttm in range_u(dttm_from, dttm_to, dttm_step):

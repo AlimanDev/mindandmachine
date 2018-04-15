@@ -1,4 +1,7 @@
 from datetime import datetime, time, timedelta
+
+from django.shortcuts import redirect
+
 from src.db.models import WorkerDay, User, CashboxType, WorkerCashboxInfo, WorkerDayCashboxDetails, PeriodDemand
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
 from src.util.collection import range_u
@@ -8,10 +11,13 @@ from src.util.utils import api_method, JsonResponse
 
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
-    if form['format'] == 'excel':
-        return JsonResponse.value_error('Excel is not supported yet')
-
     shop = request.user.shop
+
+    if form['format'] == 'excel':
+        if shop.hidden_title == 'shop003':
+            return redirect('/_i/media/timetable_temp/shop003.xlsx')
+
+        return JsonResponse.value_error('Excel is not supported yet')
 
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
         'worker_day', 'on_cashbox'

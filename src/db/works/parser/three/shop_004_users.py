@@ -246,7 +246,7 @@ def run():
             print(*args, **kwargs)
 
     ctx = Context()
-    ctx.shop = Shop.objects.create(title='Алтуфьево')
+    ctx.shop = Shop.objects.create(title='Алтуфьево', hidden_title='shop004')
     __print('Created shop {} with title {}'.format(ctx.shop.id, ctx.shop.title))
 
     path = 'src/db/works/parser/three/shop_004_users.xlsx'

@@ -146,7 +146,8 @@ class CashboxTypeConverter(BaseConverter):
             'dttm_added': cls.convert_datetime(obj.dttm_added),
             'dttm_deleted': cls.convert_datetime(obj.dttm_deleted),
             'shop': obj.shop_id,
-            'name': obj.name
+            'name': obj.name,
+            'is_stable': obj.is_stable
         }
 
 
