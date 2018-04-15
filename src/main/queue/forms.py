@@ -23,4 +23,8 @@ class GetParametersForm(forms.Form):
 
 
 class SetParametersForm(forms.Form):
-    pass
+    shop_id = forms.IntegerField(required=False)
+    mean_queue_length = forms.FloatField()
+    max_queue_length = forms.FloatField()
+    dead_time_part = forms.FloatField()
+

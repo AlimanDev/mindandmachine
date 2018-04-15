@@ -1,7 +1,8 @@
 from datetime import timedelta, datetime, time
 
-from src.db.models import WaitTimeInfo, PeriodDemand, CashboxType
+from src.db.models import WaitTimeInfo, PeriodDemand, CashboxType, Shop
 from src.util.collection import range_u
+from src.util.forms import FormUtil
 from src.util.models_converter import PeriodDemandConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import GetTimeDistributionForm, GetIndicatorsForm, GetParametersForm, SetParametersForm
@@ -135,9 +136,32 @@ def get_time_distribution(request, form):
 
 @api_method('GET', GetParametersForm)
 def get_parameters(request, form):
-    pass
+    try:
+        shop = Shop.objects.get(shop_id=FormUtil.get_shop_id(request, form))
+    except:
+        return JsonResponse.value_error('Cannot get shop')
+
+    return JsonResponse.success({
+        'mean_queue_length': shop.mean_queue_length,
+        'max_queue_length': shop.max_queue_length,
+        'dead_time_part': shop.dead_time_part
+    })
 
 
 @api_method('POST', SetParametersForm)
 def set_parameters(request, form):
-    pass
+    try:
+        shop = Shop.objects.get(shop_id=FormUtil.get_shop_id(request, form))
+    except:
+        return JsonResponse.value_error('Cannot get shop')
+
+    shop.mean_queue_length = form['mean_queue_length']
+    shop.max_queue_length = form['max_queue_length']
+    shop.dead_time_part = form['dead_time_part']
+    shop.save()
+
+    return JsonResponse.success({
+        'mean_queue_length': shop.mean_queue_length,
+        'max_queue_length': shop.max_queue_length,
+        'dead_time_part': shop.dead_time_part
+    })
