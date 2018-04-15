@@ -80,7 +80,7 @@ def get_cashiers_timetable(request, form):
         users[x.worker_id]['cashbox_info'][x.cashbox_type_id] = x
 
     dttm_from = datetime.combine(form['from_dt'], time())
-    dttm_to = datetime.combine(form['to_dt'], time())
+    dttm_to = datetime.combine(form['to_dt'], time()) + timedelta(days=1)
     dttm_step = timedelta(minutes=30)
 
     real_cashiers_total_amount = 0
@@ -91,12 +91,12 @@ def get_cashiers_timetable(request, form):
 
     today = datetime.now().date()
 
-    users_amount_dict = {}
+    users_amount_set = set()
 
     real_cashiers = []
     predict_cashier_needs = []
     fact_cashier_needs = []
-    for dttm in range_u(dttm_from, dttm_to, dttm_step):
+    for dttm in range_u(dttm_from, dttm_to, dttm_step, False):
         dttm_converted = BaseConverter.convert_datetime(dttm)
 
         dt = dttm.date()
@@ -140,7 +140,7 @@ def get_cashiers_timetable(request, form):
             mean_speed = cashbox_info.mean_speed if cashbox_info is not None else 0
 
             real_cashiers_amount += 1
-            users_amount_dict[uid] = True
+            users_amount_set.add(uid)
             cheques_amount += mean_speed * shop.beta
 
         real_cashiers_total_amount += real_cashiers_amount
@@ -183,7 +183,7 @@ def get_cashiers_timetable(request, form):
         'indicators': {
             'mean_notworking_persent': -1,  # mean_notworking_present,
             'big_demand_persent': big_demand_persent,
-            'cashier_amount': len(users_amount_dict),
+            'cashier_amount': len(users_amount_set),
             'FOT': -1,
             'need_cashier_amount': 0,  # need_cashier_amount_max,
             'change_amount': 10

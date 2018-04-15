@@ -8,6 +8,12 @@ from src.util import forms as util_forms
 from src.util.models_converter import PeriodDemandConverter
 
 
+class GetIndicatorsForm(forms.Form):
+    from_dt = util_forms.DateField()
+    to_dt = util_forms.DateField()
+    type = util_forms.PeriodDemandForecastType()
+
+
 class GetForecastForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
@@ -32,8 +38,8 @@ class GetForecastForm(forms.Form):
 
 
 class SetDemandForm(forms.Form):
-    from_dttm = util_forms.DateField()
-    to_dttm = util_forms.DateField()
+    from_dttm = util_forms.DatetimeField()
+    to_dttm = util_forms.DatetimeField()
     cashbox_type_ids = util_forms.CashboxTypeIds()
     multiply_coef = forms.FloatField(required=False)
     set_value = forms.FloatField(required=False)

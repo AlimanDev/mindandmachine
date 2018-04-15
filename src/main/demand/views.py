@@ -4,7 +4,58 @@ from src.db.models import PeriodDemand, WorkerCashboxInfo, WorkerDayCashboxDetai
 from src.util.collection import range_u
 from src.util.models_converter import BaseConverter, PeriodDemandConverter, PeriodDemandChangeLogConverter
 from src.util.utils import api_method, JsonResponse
-from .forms import GetForecastForm, SetDemandForm
+from .forms import GetForecastForm, SetDemandForm, GetIndicatorsForm
+
+
+@api_method('GET', GetIndicatorsForm)
+def get_indicators(request, form):
+    dt_from = form['from_dt']
+    dt_to = form['to_dt']
+
+    forecast_type = form['type']
+
+    shop_id = request.user.shop_id
+
+    period_demands = PeriodDemand.objects.select_related(
+        'cashbox_type'
+    ).filter(
+        cashbox_type__shop_id=shop_id,
+        type=forecast_type,
+        dttm_forecast__gte=datetime.combine(dt_from, time()),
+        dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1)
+    )
+
+    worker_days = WorkerDay.objects.filter(
+        worker_shop_id=shop_id,
+        type=WorkerDay.Type.TYPE_WORKDAY.value,
+        dt__gte=dt_from,
+        dt__lte=dt_to
+    )
+    workers_count = len(set([x.worker_id for x in worker_days]))
+
+    clients = 0
+    products = 0
+    queue_wait_time = 0
+    queue_wait_length = 0
+    counter = 0
+    for x in period_demands:
+        clients += x.clients
+        products += x.products
+        queue_wait_time += x.queue_wait_time
+        queue_wait_length += x.queue_wait_length
+        counter += 1
+
+    return JsonResponse.success({
+        'mean_bills': clients / workers_count if workers_count > 0 else 0,
+        'mean_codes': products / workers_count if workers_count > 0 else 0,
+        'mean_income': -2,
+        'mean_bill_codes': products / clients if clients > 0 else 0,
+        'growth': -2,
+        'total_people': clients,
+        'total_bills': clients,
+        'total_codes': products,
+        'total_income': -2
+    })
 
 
 @api_method('GET', GetForecastForm)
@@ -40,13 +91,13 @@ def get_forecast(request, form):
     period_demand = tmp
 
     dttm_from = datetime.combine(form['from_dt'], time())
-    dttm_to = datetime.combine(form['to_dt'], time())
+    dttm_to = datetime.combine(form['to_dt'], time()) + timedelta(days=1)
     dttm_step = timedelta(minutes=30)
 
     forecast_periods = {x: [] for x in PeriodDemand.Type.values() if x in data_types}
 
     for forecast_type, forecast_data in forecast_periods.items():
-        for dttm in range_u(dttm_from, dttm_to, dttm_step):
+        for dttm in range_u(dttm_from, dttm_to, dttm_step, False):
             clients = 0
             products = 0
             queue_wait_time = 0

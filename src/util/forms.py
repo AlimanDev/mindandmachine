@@ -5,6 +5,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from src.util.dict import DictUtil
+from src.util.models_converter import PeriodDemandConverter
 
 
 class DateField(forms.DateField):
@@ -103,6 +104,19 @@ class CashboxTypeIds(forms.CharField):
         for x in value:
             if not isinstance(x, int):
                 raise ValidationError('invalid CashboxTypeIds')
+
+        return value
+
+
+class PeriodDemandForecastType(forms.CharField):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def clean(self, value):
+        value = super().clean(value)
+        value = PeriodDemandConverter.parse_forecast_type(value)
+        if value is None:
+            raise ValidationError('invalid PeriodDemandForecastType')
 
         return value
 
