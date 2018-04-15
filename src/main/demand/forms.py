@@ -19,22 +19,22 @@ class GetForecastForm(forms.Form):
     to_dt = util_forms.DateField()
     cashbox_type_ids = util_forms.CashboxTypeIds()
     format = util_forms.ChoiceField(choices=['raw', 'excel'], default='raw')
-    data_type = forms.CharField()
+    # data_type = forms.CharField()
 
-    def clean_data_type(self):
-        value = self.cleaned_data.get('data_type')
-        if value is None or value == '':
-            raise ValidationError('Invalid enum value')
-
-        try:
-            value = [PeriodDemandConverter.parse_forecast_type(v) for v in json.loads(value)]
-        except:
-            raise ValidationError('Invalid enum value')
-
-        if None in value:
-            raise ValidationError('Invalid enum value')
-
-        return value
+    # def clean_data_type(self):
+    #     value = self.cleaned_data.get('data_type')
+    #     if value is None or value == '':
+    #         raise ValidationError('Invalid enum value')
+    #
+    #     try:
+    #         value = [PeriodDemandConverter.parse_forecast_type(v) for v in json.loads(value)]
+    #     except:
+    #         raise ValidationError('Invalid enum value')
+    #
+    #     if None in value:
+    #         raise ValidationError('Invalid enum value')
+    #
+    #     return value
 
 
 class SetDemandForm(forms.Form):

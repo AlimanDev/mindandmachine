@@ -19,7 +19,7 @@ class GetTimeDistributionForm(forms.Form):
 
 
 class GetParametersForm(forms.Form):
-    pass
+    shop_id = forms.IntegerField(required=False)
 
 
 class SetParametersForm(forms.Form):

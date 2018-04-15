@@ -59,7 +59,8 @@ def get_forecast(request, form):
 
     shop = request.user.shop
 
-    data_types = form['data_type']
+    # data_types = form['data_type']
+    data_types = PeriodDemand.Type.values()
     cashbox_type_ids = form['cashbox_type_ids']
 
     period_demand = PeriodDemand.objects.select_related(
