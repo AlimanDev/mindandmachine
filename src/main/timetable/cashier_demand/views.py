@@ -173,8 +173,7 @@ def get_cashiers_timetable(request, form):
 
         fact_cashier_needs.append({
             'dttm': dttm_converted,
-            'amount': 0
-            # 'amount': (predict_cheques_fact - cheques_amount) / 15 + real_cashiers_amount
+            'amount': predict_cheques_fact / 15
         })
 
     mean_notworking_present = mean_notworking_present / real_cashiers_total_amount if real_cashiers_total_amount > 0 else 0
@@ -191,12 +190,12 @@ def get_cashiers_timetable(request, form):
         'period_step': 30,
         'tt_periods': {
             # очень грязный хак, потому что графики перепутаны
-            'real_cashiers': fact_cashier_needs,
-            'predict_cashier_needs': predict_cashier_needs,
-            'fact_cashier_needs': real_cashiers
-            # 'real_cashiers': real_cashiers,
+            # 'real_cashiers': fact_cashier_needs,
             # 'predict_cashier_needs': predict_cashier_needs,
-            # 'fact_cashier_needs': fact_cashier_needs
+            # 'fact_cashier_needs': real_cashiers
+            'real_cashiers': real_cashiers,
+            'predict_cashier_needs': predict_cashier_needs,
+            'fact_cashier_needs': fact_cashier_needs
         }
     }
 

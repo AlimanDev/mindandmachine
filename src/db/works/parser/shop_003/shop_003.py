@@ -196,7 +196,7 @@ def parse_users_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, co
                 cashbox_type = cashboxes_types[cashbox_type_name]
                 cashbox = cashboxes[cashbox_type_name]
             else:
-                cashbox_type = CashboxType.objects.create(shop=ctx.shop, name=cashbox_type_name)
+                cashbox_type = CashboxType.objects.create(shop=ctx.shop, name=cashbox_type_name, is_stable=cashbox_type_name in ['Линия', 'Возврат'])
                 cashboxes_types[cashbox_type_name] = cashbox_type
                 __print('Created cashbox_type {} with name {}'.format(cashbox_type.id, cashbox_type.name))
 
