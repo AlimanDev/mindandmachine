@@ -4,7 +4,7 @@ from src.db.models import PeriodDemand, WorkerCashboxInfo, WorkerDayCashboxDetai
 from src.util.collection import range_u
 from src.util.models_converter import BaseConverter, PeriodDemandConverter, PeriodDemandChangeLogConverter
 from src.util.utils import api_method, JsonResponse
-from .forms import GetForecastForm
+from .forms import GetForecastForm, SetDemandForm
 
 
 @api_method('GET', GetForecastForm)
