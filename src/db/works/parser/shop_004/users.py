@@ -2,7 +2,7 @@ import math
 import pandas
 import datetime
 import os
-from src.db.models import Shop, User, WorkerDay, CashboxType, Cashbox, WorkerDayCashboxDetails, WorkerCashboxInfo, PeriodDemand
+from src.db.models import Shop, User, WorkerDay, CashboxType, Cashbox, WorkerDayCashboxDetails, WorkerCashboxInfo
 
 
 class Context(object):
@@ -58,7 +58,7 @@ class SheetIndexHelper(object):
         print('column = {}, row = {}'.format(cls.__COLUMNS_MAPPING_REVERSE[x], y + 1))
 
 
-class UserParseHelper(object):
+class DataParseHelper(object):
     @classmethod
     def parse_fio(cls, value):
         value = {i: v for i, v in enumerate(value.strip().split())}
@@ -72,14 +72,23 @@ class UserParseHelper(object):
         if isinstance(value, datetime.time) or isinstance(value, datetime.datetime):
             return WorkerDay.Type.TYPE_WORKDAY.value
 
-        if value == 'В':
-            return WorkerDay.Type.TYPE_HOLIDAY.value
+        if isinstance(value, str):
+            value = value.upper()
 
-        if value == 'ОТ':
-            return WorkerDay.Type.TYPE_VACATION.value
+            if value == 'В':
+                return WorkerDay.Type.TYPE_HOLIDAY.value
 
-        if value == 'ОВ':  # что это?
-            return WorkerDay.Type.TYPE_HOLIDAY.value
+            if value == 'ОТ':
+                return WorkerDay.Type.TYPE_VACATION.value
+
+            if value == 'ОВ':  # что это?
+                return WorkerDay.Type.TYPE_HOLIDAY.value
+
+            if value == 'ОЖ':
+                return WorkerDay.Type.TYPE_MATERNITY.value
+
+            cls.parse_work_time(value)
+            return WorkerDay.Type.TYPE_WORKDAY.value
 
         raise Exception('cannot parse {}'.format(value))
 
@@ -90,6 +99,9 @@ class UserParseHelper(object):
 
         if isinstance(value, datetime.datetime):
             return value.time()
+
+        if isinstance(value, str):
+            return datetime.datetime.strptime(value, '%H:%M').time()
 
         raise Exception('cannot parse {}'.format(value))
 
@@ -104,38 +116,25 @@ class UserParseHelper(object):
     def parse_cashbox_type_name(cls, value):
         mapping = {
             'инфо': 'Информация',
-            'возв': 'Возврат',
+            'ret': 'Возврат',
             'гк': 'Главная касса',
             'оркк': 'ОРКК',
             'сверка': 'Сверка',
-            'сц': 'СЦ'
+            'сц': 'СЦ',
+            'B2B': 'Линия',
+            'В2В': 'Линия',  # яхз русский у них язык или англб
+            'час': 'Линия',
+            'queer': 'Другое',
+            'серв': 'Другое',
+            'декр': None,
+            'мспок': None,
+            'бух': None
         }
 
         if isinstance(value, str):
             value = value.lower()
 
         return mapping.get(value, 'Линия')
-
-
-class DemandParseHelper(object):
-    @classmethod
-    def parse_time(cls, value):
-        h, m = value.split('h')
-        return datetime.time(int(h), int(m))
-
-    @classmethod
-    def parse_date(cls, value):
-        if isinstance(value, datetime.date):
-            value += datetime.timedelta(days=364)
-            return value
-
-        raise Exception('cannot parse {}'.format(value))
-
-    @classmethod
-    def parse_demand(cls, value):
-        if math.isnan(value):
-            return 0
-        return value
 
 
 def range_i(start, stop=None, step=1):
@@ -145,12 +144,13 @@ def range_i(start, stop=None, step=1):
         return range(start, stop+1, step)
 
 
-def parse_users_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_sheet_end, verbose):
+def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_sheet_end, verbose):
     def __print(*args, **kwargs):
         if verbose:
             print(*args, **kwargs)
 
     column_fio = SheetIndexHelper.get_column('C')
+    column_cashbox_type = SheetIndexHelper.get_column('D')
     row_date = SheetIndexHelper.get_row(3)
 
     row_begin = SheetIndexHelper.get_row(row_begin)
@@ -159,14 +159,14 @@ def parse_users_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, co
     column_sheet_end = SheetIndexHelper.get_column(column_sheet_end)
 
     user = User.objects.create_user(
-        username='cscais001.mag003'.format(ctx.shop.id),
+        username='cscais001.mag004'.format(ctx.shop.id),
         email='q@q.com',
-        password='bestcompany003'
+        password='BestCompany004'
     )
     user.shop = ctx.shop
-    user.first_name = 'Елена'
+    user.first_name = 'Ольга'
     user.middle_name = ' '
-    user.last_name = 'Пивоварова'
+    user.last_name = 'Донкарева'
     user.save()
 
     counter = 0
@@ -175,7 +175,7 @@ def parse_users_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, co
     for row in range_i(row_begin, row_end):
         counter += 1
 
-        first_name, middle_name, last_name = UserParseHelper.parse_fio(data[column_fio][row])
+        first_name, middle_name, last_name = DataParseHelper.parse_fio(data[column_fio][row])
         user = User.objects.create_user(
             username='u_{}_{}'.format(ctx.shop.id, counter),
             email='q@q.com',
@@ -190,25 +190,28 @@ def parse_users_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, co
 
         __print('Created user {} {}'.format(user.first_name, user.last_name))
 
+        cashbox_type_name = DataParseHelper.parse_cashbox_type_name(data[column_cashbox_type][row])
+        if cashbox_type_name is None:
+            continue
+
+        if cashbox_type_name in cashboxes_types:
+            cashbox_type = cashboxes_types[cashbox_type_name]
+            cashbox = cashboxes[cashbox_type_name]
+        else:
+            cashbox_type = CashboxType.objects.create(shop=ctx.shop, name=cashbox_type_name, is_stable=cashbox_type_name in ['Линия', 'Возврат'])
+            cashboxes_types[cashbox_type_name] = cashbox_type
+            __print('Created cashbox_type {} with name {}'.format(cashbox_type.id, cashbox_type.name))
+
+            cashbox = Cashbox.objects.create(type=cashbox_type, number='1')
+            cashboxes[cashbox_type_name] = cashbox
+            __print('Created cashbox {} for type {}:{}'.format(cashbox.id, cashbox_type.id, cashbox_type.name))
+
         for col in range_i(column_sheet_begin, column_sheet_end, 3):
-            cashbox_type_name = UserParseHelper.parse_cashbox_type_name(data[col + 2][row])
-            if cashbox_type_name in cashboxes_types:
-                cashbox_type = cashboxes_types[cashbox_type_name]
-                cashbox = cashboxes[cashbox_type_name]
-            else:
-                cashbox_type = CashboxType.objects.create(shop=ctx.shop, name=cashbox_type_name)
-                cashboxes_types[cashbox_type_name] = cashbox_type
-                __print('Created cashbox_type {} with name {}'.format(cashbox_type.id, cashbox_type.name))
-
-                cashbox = Cashbox.objects.create(type=cashbox_type, number='1')
-                cashboxes[cashbox_type_name] = cashbox
-                __print('Created cashbox {} for type {}:{}'.format(cashbox.id, cashbox_type.id, cashbox_type.name))
-
-            dt = UserParseHelper.parse_date(data[col][row_date])
-            workday_type = UserParseHelper.parse_workday_type(data[col][row])
+            dt = DataParseHelper.parse_date(data[col][row_date])
+            workday_type = DataParseHelper.parse_workday_type(data[col][row])
             is_wk = workday_type == WorkerDay.Type.TYPE_WORKDAY.value
-            tm_work_start = UserParseHelper.parse_work_time(data[col][row]) if is_wk else None
-            tm_work_end = UserParseHelper.parse_work_time(data[col + 1][row]) if is_wk else None
+            tm_work_start = DataParseHelper.parse_work_time(data[col][row]) if is_wk else None
+            tm_work_end = DataParseHelper.parse_work_time(data[col+1][row]) if is_wk else None
 
             wd = WorkerDay.objects.create(
                 worker=user,
@@ -235,36 +238,6 @@ def parse_users_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, co
             )
 
 
-def parse_demand_time_sheet(ctx, data, row_begin, row_end, column_begin, column_end):
-    row_begin = SheetIndexHelper.get_row(row_begin)
-    row_end = SheetIndexHelper.get_row(row_end)
-    column_begin = SheetIndexHelper.get_column(column_begin)
-    column_end = SheetIndexHelper.get_column(column_end)
-
-    column_time = SheetIndexHelper.get_column('A')
-    row_date = SheetIndexHelper.get_row(2)
-
-    cashbox_type = CashboxType.objects.get(
-        shop=ctx.shop,
-        name='Линия'
-    )
-
-    for col in range_i(column_begin, column_end):
-        dt = DemandParseHelper.parse_date(data[col][row_date])
-        for row in range_i(row_begin, row_end, 2):
-            tm = DemandParseHelper.parse_time(data[column_time][row])
-            value = DemandParseHelper.parse_demand(data[col][row]) + DemandParseHelper.parse_demand(data[col][row+1])
-            PeriodDemand.objects.create(
-                dttm_forecast=datetime.datetime.combine(dt, tm),
-                clients=value,
-                products=0,
-                type=PeriodDemand.Type.LONG_FORECAST.value,
-                cashbox_type=cashbox_type,
-                queue_wait_time=0,
-                queue_wait_length=0
-            )
-
-
 def run():
     verbose = True
 
@@ -273,28 +246,18 @@ def run():
             print(*args, **kwargs)
 
     ctx = Context()
-    ctx.shop = Shop.objects.create(title='Красногорск', hidden_title='shop003')
+    ctx.shop = Shop.objects.create(title='Алтуфьево', hidden_title='shop004')
     __print('Created shop {} with title {}'.format(ctx.shop.id, ctx.shop.title))
 
-    path = 'src/db/works/parser/two/shop_003.xlsx'
+    path = 'src/db/works/parser/shop_004/users.xlsx'
     data = pandas.read_excel(path, 'График', header=None)
 
-    parse_users_time_sheet(
+    parse_time_sheet(
         ctx=ctx,
         data=data,
         row_begin=6,
-        row_end=88,
+        row_end=108,
         column_sheet_begin='G',
         column_sheet_end='CP',
         verbose=True
-    )
-
-    data = pandas.read_excel(path, 'Расчет КК', header=None)
-    parse_demand_time_sheet(
-        ctx=ctx,
-        data=data,
-        row_begin=3,
-        row_end=72,
-        column_begin='B',
-        column_end='AE'
     )

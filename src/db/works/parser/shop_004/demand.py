@@ -51,6 +51,30 @@ def load_csv(path, skip_rows=0):
     return data
 
 
+def load_csv_2(path, skip_rows=0):
+    data = []
+    with open(path) as f:
+        counter = 0
+        for line in f:
+            counter += 1
+            if counter <= skip_rows:
+                continue
+
+            arr = line.strip().split(',')
+            if len(arr) != 4:
+                print('skip line {} with data "{}"'.format(counter, line))
+                continue
+
+            data.append([
+                DataParseHelper.parse_datetime(arr[0]),
+                DataParseHelper.parse_clients_count(arr[1]),
+                DataParseHelper.parse_clients_count(arr[2]),
+                DataParseHelper.parse_cashbox_type_name(arr[3])
+            ])
+
+    return data
+
+
 def run():
     verbose = True
 
@@ -61,11 +85,8 @@ def run():
     shop = Shop.objects.get(title='Алтуфьево')
     cashboxes_types = {x.name: x for x in CashboxType.objects.filter(shop=shop)}
 
-    path = 'src/db/works/parser/three/shop_004_demand.csv'
-    data = load_csv(path, skip_rows=1)
-
-    created_counter = {}
-    non_created_counter = {}
+    # stage 1
+    data = load_csv('src/db/works/parser/shop_004/demand_04.csv', skip_rows=1)
     for row in data:
         cashbox_type = cashboxes_types.get(row[2])
         if cashbox_type is not None:
@@ -79,14 +100,32 @@ def run():
                 queue_wait_length=0
             )
 
-            if cashbox_type.name not in created_counter:
-                created_counter[cashbox_type.name] = 0
-            created_counter[cashbox_type.name] += 1
-        else:
-            name = row[2]
-            if name not in non_created_counter:
-                non_created_counter[name] = 0
-            non_created_counter[name] += 1
+    # stage 2
+    data = load_csv('src/db/works/parser/shop_004/demand_05.csv', skip_rows=1)
+    for row in data:
+        cashbox_type = cashboxes_types.get(row[2])
+        if cashbox_type is not None:
+            pd = PeriodDemand.objects.create(
+                dttm_forecast=row[0],
+                clients=row[1],
+                products=0,
+                type=PeriodDemand.Type.LONG_FORECAST.value,
+                cashbox_type=cashbox_type,
+                queue_wait_time=0,
+                queue_wait_length=0
+            )
 
-    __print('PeriodDemand created count {}'.format(created_counter))
-    __print('PeriodDemand NOT created count {}'.format(non_created_counter))
+    # stage 3
+    data = load_csv_2('src/db/works/parser/shop_004/demand_prev.csv', skip_rows=1)
+    for row in data:
+        cashbox_type = cashboxes_types.get(row[3])
+        if cashbox_type is not None:
+            pd = PeriodDemand.objects.create(
+                dttm_forecast=row[0],
+                clients=row[1],
+                products=row[2],
+                type=PeriodDemand.Type.FACT.value,
+                cashbox_type=cashbox_type,
+                queue_wait_time=0,
+                queue_wait_length=0
+            )
