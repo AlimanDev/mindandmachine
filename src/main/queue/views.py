@@ -37,8 +37,8 @@ def get_indicators(request, form):
         queue_wait_time += x.queue_wait_time
         queue_wait_length += x.queue_wait_length
 
-    mean_length_usual = queue_wait_length / len(period_demands)
-    mean_wait_time_usual = queue_wait_time / len(period_demands)
+    mean_length_usual = queue_wait_length / len(period_demands) if len(period_demands) > 0 else 0
+    mean_wait_time_usual = queue_wait_time / len(period_demands) if len(period_demands) > 0 else 0
     dead_time_part_usual = -2
 
     try:
@@ -61,8 +61,8 @@ def get_indicators(request, form):
         queue_wait_time += x.queue_wait_time
         queue_wait_length += x.queue_wait_length
 
-    mean_length_return = queue_wait_length / len(period_demands)
-    mean_wait_time_return = queue_wait_time / len(period_demands)
+    mean_length_return = queue_wait_length / len(period_demands) if len(period_demands) > 0 else 0
+    mean_wait_time_return = queue_wait_time / len(period_demands) if len(period_demands) > 0 else 0
     dead_time_part_return = -2
 
     return JsonResponse.success({
