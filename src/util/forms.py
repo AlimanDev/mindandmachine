@@ -1,6 +1,8 @@
 import datetime
+import json
 
 from django import forms
+from django.core.exceptions import ValidationError
 
 from src.util.dict import DictUtil
 
@@ -75,6 +77,34 @@ class MultipleChoiceField(forms.MultipleChoiceField):
 class BooleanField(forms.BooleanField):
     def __init__(self):
         super().__init__(required=False)
+
+
+class CashboxTypeIds(forms.CharField):
+    def __init__(self, required=False, **kwargs):
+        kwargs['required'] = required
+        super().__init__(**kwargs)
+
+    def clean(self, value):
+        value = super().clean(value)
+
+        if value is None or value == '':
+            if self.required:
+                raise ValidationError('required CashboxTypeIds')
+            return []
+
+        try:
+            value = json.loads(value)
+        except:
+            raise ValidationError('invalid CashboxTypeIds')
+
+        if not isinstance(value, list):
+            raise ValidationError('invalid CashboxTypeIds')
+
+        for x in value:
+            if not isinstance(x, int):
+                raise ValidationError('invalid CashboxTypeIds')
+
+        return value
 
 
 class FormUtil(object):

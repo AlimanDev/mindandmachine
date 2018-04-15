@@ -94,4 +94,45 @@ def get_forecast(request, form):
 
 @api_method('POST', SetDemandForm)
 def set_demand(request, form):
-    pass
+    cashbox_type_ids = form['cashbox_type_ids']
+
+    multiply_coef = form.get('multiply_coef')
+    set_value = form.get('set_value')
+
+    dttm_from = form['from_dttm']
+    dttm_to = form['to_dttm']
+
+    shop_id = request.user.shop_id
+
+    period_demands = PeriodDemand.objects.select_related(
+        'cashbox_type'
+    ).filter(
+        cashbox_type__shop_id=shop_id,
+        type=PeriodDemand.Type.LONG_FORECAST.value,
+        dttm_forecast__gte=dttm_from,
+        dttm_forecast__lte=dttm_to
+    )
+
+    if len(cashbox_type_ids) > 0:
+        period_demands = [x for x in period_demands if period_demands.cashbox_type_id in cashbox_type_ids]
+
+    cashboxes_types = []
+    for x in period_demands:
+        if multiply_coef is not None:
+            x.clients *= multiply_coef
+        else:
+            x.clients = set_value
+
+        x.save()
+        cashboxes_types.append(x.cashbox_type_id)
+
+    for x in cashboxes_types:
+        PeriodDemandChangeLog.objects.create(
+            dttm_from=dttm_from,
+            dttm_to=dttm_to,
+            cashbox_type_id=x,
+            multiply_coef=multiply_coef,
+            set_value=set_value
+        )
+
+    return JsonResponse.success()
