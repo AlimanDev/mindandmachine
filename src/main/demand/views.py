@@ -35,15 +35,9 @@ def get_indicators(request, form):
 
     clients = 0
     products = 0
-    queue_wait_time = 0
-    queue_wait_length = 0
-    counter = 0
     for x in period_demands:
         clients += x.clients
         products += x.products
-        queue_wait_time += x.queue_wait_time
-        queue_wait_length += x.queue_wait_length
-        counter += 1
 
     return JsonResponse.success({
         'mean_bills': clients / workers_count if workers_count > 0 else 0,
