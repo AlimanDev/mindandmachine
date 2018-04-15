@@ -14,8 +14,8 @@ def get_cashiers_timetable(request, form):
     shop = request.user.shop
 
     if form['format'] == 'excel':
-        if shop.hidden_title == 'shop003':
-            return redirect('/_i/media/timetable_temp/shop003.xlsx')
+        if shop.hidden_title == 'shop004':
+            return redirect('/_i/media/timetable_temp/shop004.xlsx')
 
         return JsonResponse.value_error('Excel is not supported yet')
 

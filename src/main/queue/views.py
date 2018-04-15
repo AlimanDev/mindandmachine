@@ -57,7 +57,7 @@ def get_time_distribution(request, form):
                     proportion += x.proportion
                     count += 1
 
-            result[cashbox_type.id][PeriodDemandConverter.convert_type(forecast_type)] = {
+            result[cashbox_type.id][PeriodDemandConverter.convert_forecast_type(forecast_type)] = {
                 'wait_time': wait_time / count if count > 0 else 0,
                 'proportion': proportion / count if count > 0 else 0
             }

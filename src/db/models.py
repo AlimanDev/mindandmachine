@@ -14,7 +14,7 @@ class Shop(models.Model):
 
     mean_queue_length = models.FloatField(default=3)
     max_queue_length = models.FloatField(default=7)
-    plain_part = models.FloatField(default=0.1)
+    dead_time_part = models.FloatField(default=0.1)
 
     beta = models.FloatField(default=0.9)  # for creating timetable, (a function from previous 3 variables)
 
@@ -83,8 +83,8 @@ class PeriodDemand(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_forecast = models.DateTimeField()
-    clients = models.PositiveIntegerField()
-    products = models.PositiveIntegerField()
+    clients = models.FloatField()
+    products = models.FloatField()
 
     type = utils.EnumField(Type)
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
@@ -96,11 +96,11 @@ class PeriodDemand(models.Model):
 class PeriodDemandChangeLog(models.Model):
     id = models.BigAutoField(primary_key=True)
 
-    dttm_changed = models.DateTimeField(auto_now_add=True)
-    period_demand = models.ForeignKey(PeriodDemand, on_delete=models.PROTECT)
-    from_amount = models.PositiveIntegerField()
-    to_amount = models.PositiveIntegerField()
-    changed_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    dttm_from = models.DateTimeField()
+    dttm_to = models.DateTimeField()
+    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    multiply_coef = models.FloatField(null=True, blank=True)
+    set_value = models.FloatField(null=True, blank=True)
 
 
 class WorkerCashboxInfo(models.Model):

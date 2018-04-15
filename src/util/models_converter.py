@@ -198,13 +198,26 @@ class PeriodDemandConverter(BaseConverter):
     __FORECAST_TYPE_REVERSED = {v: k for k, v in __FORECAST_TYPE.items()}
 
     @classmethod
-    def convert_type(cls, obj_type):
+    def convert_forecast_type(cls, obj_type):
         return cls.__FORECAST_TYPE.get(obj_type, '')
 
     @classmethod
-    def parse_type(cls, obj_type):
+    def parse_forecast_type(cls, obj_type):
         return cls.__FORECAST_TYPE_REVERSED.get(obj_type)
 
     @classmethod
     def convert(cls, obj):
         pass
+
+
+class PeriodDemandChangeLogConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'dttm_from': cls.convert_datetime(obj.dttm_from),
+            'dttm_to': cls.convert_datetime(obj.dttm_to),
+            'cashbox_type': obj.cashbox_type_id,
+            'multiply_coef': obj.multiply_coef,
+            'set_value': obj.set_value
+        }

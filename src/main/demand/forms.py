@@ -30,7 +30,7 @@ class GetForecastForm(forms.Form):
             raise ValidationError('Invalid enum value')
 
         try:
-            value = [PeriodDemandConverter.parse_type(v) for v in json.loads(value)]
+            value = [PeriodDemandConverter.parse_forecast_type(v) for v in json.loads(value)]
         except:
             raise ValidationError('Invalid enum value')
 
@@ -38,3 +38,9 @@ class GetForecastForm(forms.Form):
             raise ValidationError('Invalid enum value')
 
         return value
+
+
+class SetDemandForm(forms.Form):
+    from_dt = util_forms.DateField()
+    to_dt = util_forms.DateField()
+    cashbox_type_ids = forms.CharField(required=False)
