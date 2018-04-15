@@ -241,3 +241,16 @@ class OfficialHolidays(models.Model):
 
     country = models.CharField(max_length=4)
     date = models.DateField()
+
+
+# class LevelType(models.Model):
+#     class Type(utils.Enum):
+#         LOW = 1
+#         MIDDLE = 2
+#         HIGH = 3
+#
+#     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+#     type = utils.EnumField(Type)
+#     weekday = models.PositiveSmallIntegerField()
+#     tm_from = models.TimeField()
+#     tm_to = models.TimeField()

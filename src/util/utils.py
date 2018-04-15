@@ -1,6 +1,7 @@
 import json
 
 from django.conf import settings
+from django.contrib.auth import authenticate, login
 from django.http import HttpResponse
 
 
@@ -65,6 +66,12 @@ class JsonResponse(object):
 def api_method(method, form_cls=None, auth_required=True):
     def decor(func):
         def wrapper(request, *args, **kwargs):
+            if auth_required and not request.user.is_authenticated and settings.DEBUG and settings.QOS_DEV_AUTOLOGIN_ENABLED:
+                user = authenticate(request, username=settings.QOS_DEV_AUTOLOGIN_USERNAME, password=settings.QOS_DEV_AUTOLOGIN_PASSWORD)
+                if user is None:
+                    return JsonResponse.internal_error('cannot dev_autologin')
+                login(request, user)
+
             if auth_required and not request.user.is_authenticated:
                 return JsonResponse.auth_required()
 

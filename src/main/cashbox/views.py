@@ -37,7 +37,7 @@ def get_cashboxes(request, form):
     if len(cashbox_type_ids) > 0:
         cashboxes = [x for x in cashboxes if x.type_id in cashbox_type_ids]
 
-    cashboxes = [x for x in cashboxes if dt_from <= x.dttm_added <= dt_to or dt_from <= x.dttm_deleted <= dt_to]
+    cashboxes = [x for x in cashboxes if dt_from <= x.dttm_added.date() <= dt_to or dt_from <= x.dttm_deleted.date() <= dt_to]
 
     return JsonResponse.success({
         'cashboxes_types': {x.id: CashboxTypeConverter.convert(x) for x in CashboxTypeUtil.sort(types)},

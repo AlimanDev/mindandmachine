@@ -1,7 +1,7 @@
 import datetime
 import time
 
-from src.db.models import User, WorkerDay
+from src.db.models import User, WorkerDay, PeriodDemand
 
 
 class BaseConverter(object):
@@ -185,3 +185,25 @@ class WorkerConstraintConverter(BaseConverter):
             'weekday': obj.weekday,
             'tm': cls.convert_time(obj.tm)
         }
+
+
+class PeriodDemandConverter(BaseConverter):
+    __FORECAST_TYPE = {
+        PeriodDemand.Type.SHORT_FORECAST.value: 'S',
+        PeriodDemand.Type.LONG_FORECAST.value: 'L',
+        PeriodDemand.Type.FACT.value: 'F'
+    }
+
+    __FORECAST_TYPE_REVERSED = {v: k for k, v in __FORECAST_TYPE.items()}
+
+    @classmethod
+    def convert_type(cls, obj_type):
+        return cls.__FORECAST_TYPE.get(obj_type, '')
+
+    @classmethod
+    def parse_type(cls, obj_type):
+        return cls.__FORECAST_TYPE_REVERSED.get(obj_type)
+
+    @classmethod
+    def convert(cls, obj):
+        pass
