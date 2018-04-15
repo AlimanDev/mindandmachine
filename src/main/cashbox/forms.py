@@ -14,7 +14,7 @@ class GetCashboxesForm(forms.Form):
     shop_id = forms.IntegerField(required=False)
     from_dt = util_forms.DateField(required=False)
     to_dt = util_forms.DateField(required=False)
-    cashbox_type_ids = util_forms.CashboxTypeIds()
+    cashbox_type_ids = util_forms.IntegersList()
 
 
 class CreateCashboxForm(forms.Form):

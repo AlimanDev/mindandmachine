@@ -17,7 +17,7 @@ class GetIndicatorsForm(forms.Form):
 class GetForecastForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
-    cashbox_type_ids = util_forms.CashboxTypeIds()
+    cashbox_type_ids = util_forms.IntegersList()
     format = util_forms.ChoiceField(choices=['raw', 'excel'], default='raw')
     # data_type = forms.CharField()
 
@@ -40,7 +40,7 @@ class GetForecastForm(forms.Form):
 class SetDemandForm(forms.Form):
     from_dttm = util_forms.DatetimeField()
     to_dttm = util_forms.DatetimeField()
-    cashbox_type_ids = util_forms.CashboxTypeIds()
+    cashbox_type_ids = util_forms.IntegersList()
     multiply_coef = forms.FloatField(required=False)
     set_value = forms.FloatField(required=False)
 

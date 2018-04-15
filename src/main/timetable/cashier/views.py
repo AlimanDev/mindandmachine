@@ -4,7 +4,7 @@ from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerD
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
 from src.util.collection import group_by, count
 
-from .forms import GetCashierTimetableForm, GetCashierInfoForm, SetWorkerDayForm, SetCashierInfoForm
+from .forms import GetCashierTimetableForm, GetCashierInfoForm, SetWorkerDayForm, SetCashierInfoForm, GetWorkerDayForm
 from . import utils
 
 
@@ -29,68 +29,72 @@ def get_cashier_timetable(request, form):
     if form['format'] == 'excel':
         return JsonResponse.value_error('Excel is not supported yet')
 
-    worker_id = form['worker_id']
     from_dt = form['from_dt']
     to_dt = form['to_dt']
 
-    worker_days = list(
-        WorkerDay.objects.filter(
-            worker_id=worker_id,
-            dt__gte=from_dt,
-            dt__lte=to_dt
-        ).order_by(
-            'dt'
+    response = {}
+    for worker_id in form['worker_id']:
+        worker_days = list(
+            WorkerDay.objects.filter(
+                worker_id=worker_id,
+                dt__gte=from_dt,
+                dt__lte=to_dt
+            ).order_by(
+                'dt'
+            )
         )
-    )
-    official_holidays = [
-        x.date for x in OfficialHolidays.objects.filter(
-            date__gte=from_dt,
-            date__lte=to_dt
+        official_holidays = [
+            x.date for x in OfficialHolidays.objects.filter(
+                date__gte=from_dt,
+                date__lte=to_dt
+            )
+        ]
+        worker_day_change_requests = group_by(
+            WorkerDayChangeRequest.objects.filter(
+                worker_day_worker_id=worker_id,
+                worker_day_dt__gte=from_dt,
+                worker_day_dt__lte=to_dt
+            ),
+            group_key=lambda _: _.worker_day_id,
+            sort_key=lambda _: _.worker_day_dt,
+            sort_reverse=True
         )
-    ]
-    worker_day_change_requests = group_by(
-        WorkerDayChangeRequest.objects.filter(
-            worker_day_worker_id=worker_id,
-            worker_day_dt__gte=from_dt,
-            worker_day_dt__lte=to_dt
-        ),
-        group_key=lambda _: _.worker_day_id,
-        sort_key=lambda _: _.worker_day_dt,
-        sort_reverse=True
-    )
 
-    worker_day_change_log = group_by(
-        WorkerDayChangeLog.objects.filter(
-            worker_day_worker_id=worker_id,
-            worker_day_dt__gte=from_dt,
-            worker_day_dt__lte=to_dt
-        ),
-        group_key=lambda _: _.worker_day_id,
-        sort_key=lambda _: _.worker_day_dt,
-        sort_reverse=True
-    )
+        worker_day_change_log = group_by(
+            WorkerDayChangeLog.objects.filter(
+                worker_day_worker_id=worker_id,
+                worker_day_dt__gte=from_dt,
+                worker_day_dt__lte=to_dt
+            ),
+            group_key=lambda _: _.worker_day_id,
+            sort_key=lambda _: _.worker_day_dt,
+            sort_reverse=True
+        )
 
-    indicators_response = {
-        'work_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value),
-        'holiday_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value),
-        'sick_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_SICK.value),
-        'vacation_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_VACATION.value),
-        'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and x.dt in official_holidays),
-        'change_amount': len(worker_day_change_log)
-    }
+        indicators_response = {
+            'work_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value),
+            'holiday_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value),
+            'sick_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_SICK.value),
+            'vacation_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_VACATION.value),
+            'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and x.dt in official_holidays),
+            'change_amount': len(worker_day_change_log)
+        }
 
-    days_response = []
-    for obj in worker_days:
-        days_response.append({
-            'day': WorkerDayConverter.convert(obj),
-            'change_log': [WorkerDayChangeLogConverter.convert(x) for x in worker_day_change_log.get(obj.id, [])[:10]],
-            'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in worker_day_change_requests.get(obj.id, [])[:10]]
-        })
+        days_response = []
+        for obj in worker_days:
+            days_response.append({
+                'day': WorkerDayConverter.convert(obj),
+                'change_log': [WorkerDayChangeLogConverter.convert(x) for x in worker_day_change_log.get(obj.id, [])[:10]],
+                'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in worker_day_change_requests.get(obj.id, [])[:10]]
+            })
 
-    response = {
-        'indicators': indicators_response,
-        'days': days_response
-    }
+        user = User.objects.get(id=worker_id)
+
+        response[worker_id] = {
+            'indicators': indicators_response,
+            'days': days_response,
+            'user': UserConverter.convert(user)
+        }
 
     return JsonResponse.success(response)
 
@@ -120,6 +124,20 @@ def get_cashier_info(request, form):
         response['constraints_info'] = [WorkerConstraintConverter.convert(x) for x in constraints]
 
     return JsonResponse.success(response)
+
+
+@api_method('GET', GetWorkerDayForm)
+def get_worker_day(request, form):
+    try:
+        wd = WorkerDay.objects.get(worker_id=form['worker_id'], dt=form['dt'])
+    except WorkerDay.DoesNotExist:
+        return JsonResponse.does_not_exists_error()
+    except:
+        return JsonResponse.internal_error()
+
+    return JsonResponse.success({
+        'day': WorkerDayConverter.convert(wd)
+    })
 
 
 @api_method('POST', SetWorkerDayForm)

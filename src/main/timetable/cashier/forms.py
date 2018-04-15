@@ -9,7 +9,7 @@ from src.util.models_converter import WorkerDayConverter, UserConverter, BaseCon
 
 
 class GetCashierTimetableForm(forms.Form):
-    worker_id = forms.IntegerField()
+    worker_id = util_forms.IntegersList(required=True)
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
     format = util_forms.ChoiceField(['raw', 'excel'], 'raw')
@@ -25,6 +25,11 @@ class GetCashierTimetableForm(forms.Form):
 class GetCashierInfoForm(forms.Form):
     worker_id = forms.IntegerField()
     info = util_forms.MultipleChoiceField(['general_info', 'cashbox_type_info', 'constraints_info'])
+
+
+class GetWorkerDayForm(forms.Form):
+    worker_id = forms.IntegerField()
+    dt = util_forms.DateField()
 
 
 class SetWorkerDayForm(forms.Form):

@@ -80,7 +80,7 @@ class BooleanField(forms.BooleanField):
         super().__init__(required=False)
 
 
-class CashboxTypeIds(forms.CharField):
+class IntegersList(forms.CharField):
     def __init__(self, required=False, **kwargs):
         kwargs['required'] = required
         super().__init__(**kwargs)
@@ -100,6 +100,9 @@ class CashboxTypeIds(forms.CharField):
 
         if not isinstance(value, list):
             raise ValidationError('invalid CashboxTypeIds')
+
+        if self.required and len(value) <= 0:
+            raise ValidationError('cannot be empty')
 
         for x in value:
             if not isinstance(x, int):

@@ -9,7 +9,7 @@ from src.util import forms as util_forms
 class GetCashiersTimetableForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
-    cashbox_type_ids = util_forms.CashboxTypeIds()
+    cashbox_type_ids = util_forms.IntegersList()
     format = util_forms.ChoiceField(['raw', 'excel'], default='raw')
 
     def clean(self):
@@ -23,7 +23,7 @@ class GetCashiersTimetableForm(forms.Form):
 class GetWorkersForm(forms.Form):
     from_dttm = util_forms.DatetimeField()
     to_dttm = util_forms.DatetimeField()
-    cashbox_type_ids = util_forms.CashboxTypeIds()
+    cashbox_type_ids = util_forms.IntegersList()
 
     def clean(self):
         if self.errors:
