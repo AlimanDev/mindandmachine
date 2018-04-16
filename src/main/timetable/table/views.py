@@ -8,7 +8,7 @@ from .forms import SelectCashiersForm
 def select_cashiers(request, form):
     shop_id = request.user.shop_id
 
-    users = {x.id: x for x in User.objects.filter(shop_id=shop_id)}
+    users = User.objects.filter(shop_id=shop_id)
 
     cashboxes_type_ids = set(form.get('cashbox_types', []))
     if len(cashboxes_type_ids) > 0:
@@ -17,15 +17,15 @@ def select_cashiers(request, form):
             if x.cashbox_type_id in cashboxes_type_ids:
                 users_hits.add(x.worker_id)
 
-        users = {x.id: x for x in users if x.id in users_hits}
+        users = [x for x in users if x.id in users_hits]
 
     cashier_ids = set(form.get('cashier_ids', []))
     if len(cashier_ids) > 0:
-        users = {x.id: x for x in users if x.id in cashier_ids}
+        users = [x for x in users if x.id in cashier_ids]
 
     work_types = set(form.get('work_types', []))
     if len(work_types) > 0:
-        users = {x.id: x for x in users if x.work_type in work_types}
+        users = [x for x in users if x.work_type in work_types]
 
     worker_days = WorkerDay.objects.filter(worker_shop_id=shop_id)
     workday_type = form.get('workday_type')
@@ -45,6 +45,6 @@ def select_cashiers(request, form):
         worker_days = worker_days.filter(tm_work_start__lt=tm_to)
 
     users_hits = set(x.worker_id for x in worker_days)
-    users = {x.id: x for x in users if x.id in users_hits}
+    users = [x for x in users if x.id in users_hits]
 
-    return JsonResponse.success([UserConverter.convert(x) for x in users.values()])
+    return JsonResponse.success([UserConverter.convert(x) for x in users])
