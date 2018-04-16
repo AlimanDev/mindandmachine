@@ -10,6 +10,10 @@ class BaseConverter(object):
         return obj.strftime('%d.%m.%Y') if obj is not None else None
 
     @classmethod
+    def parse_date(cls, obj):
+        return datetime.datetime.strptime(obj, '%d.%m.%Y')
+
+    @classmethod
     def convert_time(cls, obj):
         return obj.strftime('%H:%M:%S') if obj is not None else None
 

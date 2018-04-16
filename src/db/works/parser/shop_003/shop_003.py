@@ -1,4 +1,6 @@
 import math
+import random
+
 import pandas
 import datetime
 import os
@@ -260,8 +262,8 @@ def parse_demand_time_sheet(ctx, data, row_begin, row_end, column_begin, column_
                 products=0,
                 type=PeriodDemand.Type.LONG_FORECAST.value,
                 cashbox_type=cashbox_type,
-                queue_wait_time=0,
-                queue_wait_length=0
+                queue_wait_time=random.randint(1, 9),
+                queue_wait_length=random.randint(1, 5),
             )
 
 

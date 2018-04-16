@@ -90,23 +90,23 @@ class IntegersList(forms.CharField):
 
         if value is None or value == '':
             if self.required:
-                raise ValidationError('required CashboxTypeIds')
+                raise ValidationError('required IntegerListType')
             return []
 
         try:
             value = json.loads(value)
         except:
-            raise ValidationError('invalid CashboxTypeIds')
+            raise ValidationError('invalid IntegerListType')
 
         if not isinstance(value, list):
-            raise ValidationError('invalid CashboxTypeIds')
+            raise ValidationError('invalid IntegerListType')
 
         if self.required and len(value) <= 0:
-            raise ValidationError('cannot be empty')
+            raise ValidationError('IntegerListType cannot be empty')
 
         for x in value:
             if not isinstance(x, int):
-                raise ValidationError('invalid CashboxTypeIds')
+                raise ValidationError('invalid IntegerListType')
 
         return value
 
