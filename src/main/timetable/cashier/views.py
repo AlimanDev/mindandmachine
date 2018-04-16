@@ -1,8 +1,10 @@
+from datetime import time, datetime, timedelta
+
 from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
-from src.util.collection import group_by, count
+from src.util.collection import group_by, count, range_u
 
 from .forms import GetCashierTimetableForm, GetCashierInfoForm, SetWorkerDayForm, SetCashierInfoForm, GetWorkerDayForm
 from . import utils
@@ -128,15 +130,41 @@ def get_cashier_info(request, form):
 
 @api_method('GET', GetWorkerDayForm)
 def get_worker_day(request, form):
+    worker_id = form['worker_id']
+    dt = form['dt']
+
     try:
-        wd = WorkerDay.objects.get(worker_id=form['worker_id'], dt=form['dt'])
+        wd = WorkerDay.objects.get(worker_id=worker_id, dt=dt)
     except WorkerDay.DoesNotExist:
         return JsonResponse.does_not_exists_error()
     except:
         return JsonResponse.internal_error()
 
+    dttm_from = datetime.combine(dt, time())
+    dttm_to = datetime.combine(dt + timedelta(days=1), time())
+    dttm_step = timedelta(minutes=30)
+
+    constraint_times = set(x.tm for x in WorkerConstraint.objects.filter(worker_id=worker_id, weekday=dt.weekday()))
+    times = [dttm for dttm in range_u(dttm_from, dttm_to, dttm_step, False) if dttm.time() not in constraint_times]
+    work_hours = []
+
+    def __create_time_obj(__from, __to):
+        return {
+            'from': BaseConverter.convert_time(__from.time()),
+            'to': BaseConverter.convert_time(__to.time())
+        }
+
+    if len(times) > 0:
+        begin = times[0]
+        for t1, t2 in zip(times, times[1:]):
+            if t2 - t1 != dttm_step:
+                work_hours.append(__create_time_obj(begin, t1 + dttm_step))
+                begin = t2
+        work_hours.append(__create_time_obj(begin, times[-1] + dttm_step))
+
     return JsonResponse.success({
-        'day': WorkerDayConverter.convert(wd)
+        'day': WorkerDayConverter.convert(wd),
+        'work_hours': work_hours
     })
 
 

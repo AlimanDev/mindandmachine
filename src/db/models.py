@@ -127,7 +127,7 @@ class WorkerConstraint(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
-    weekday = models.PositiveSmallIntegerField()
+    weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
     tm = models.TimeField()
 
 
