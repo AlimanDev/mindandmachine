@@ -288,7 +288,7 @@ def run(path):
         row_end=88,
         column_sheet_begin='G',
         column_sheet_end='CP',
-        verbose=True
+        verbose=verbose
     )
 
     data = pandas.read_excel(users_path, 'Расчет КК', header=None)
