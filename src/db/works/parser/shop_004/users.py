@@ -7,6 +7,7 @@ from src.db.models import Shop, User, WorkerDay, CashboxType, Cashbox, WorkerDay
 
 class Context(object):
     def __init__(self):
+        self.verbose = False
         self.shop = None
 
 
@@ -90,6 +91,10 @@ class DataParseHelper(object):
             cls.parse_work_time(value)
             return WorkerDay.Type.TYPE_WORKDAY.value
 
+        if isinstance(value, float):
+            if math.isnan(value):
+                return WorkerDay.Type.TYPE_HOLIDAY.value
+
         raise Exception('cannot parse {}'.format(value))
 
     @classmethod
@@ -109,6 +114,9 @@ class DataParseHelper(object):
     def parse_date(cls, value):
         if isinstance(value, datetime.datetime):
             return value
+
+        if isinstance(value, str):
+            return datetime.datetime.strptime(value + '.2018', '%d.%m.%Y').date()
 
         raise Exception('cannot parse {}'.format(value))
 
@@ -144,9 +152,9 @@ def range_i(start, stop=None, step=1):
         return range(start, stop+1, step)
 
 
-def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_sheet_end, verbose):
+def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_sheet_end, use_one_column):
     def __print(*args, **kwargs):
-        if verbose:
+        if ctx.verbose:
             print(*args, **kwargs)
 
     column_fio = SheetIndexHelper.get_column('C')
@@ -158,17 +166,6 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
     column_sheet_begin = SheetIndexHelper.get_column(column_sheet_begin)
     column_sheet_end = SheetIndexHelper.get_column(column_sheet_end)
 
-    user = User.objects.create_user(
-        username='cscais001.mag004'.format(ctx.shop.id),
-        email='q@q.com',
-        password='BestCompany004'
-    )
-    user.shop = ctx.shop
-    user.first_name = 'Ольга'
-    user.middle_name = ' '
-    user.last_name = 'Донкарева'
-    user.save()
-
     counter = 0
     cashboxes_types = {}
     cashboxes = {}
@@ -176,37 +173,40 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
         counter += 1
 
         first_name, middle_name, last_name = DataParseHelper.parse_fio(data[column_fio][row])
-        user = User.objects.create_user(
-            username='u_{}_{}'.format(ctx.shop.id, counter),
-            email='q@q.com',
-            password='4242'
-        )
-        user.shop = ctx.shop
-        user.work_type = User.WorkType.TYPE_5_2.value
-        user.first_name = first_name
-        user.middle_name = middle_name
-        user.last_name = last_name
-        user.save()
+        try:
+            user = User.objects.get(first_name=first_name, middle_name=middle_name, last_name=last_name)
+        except User.DoesNotExist:
+            user = User.objects.create_user(
+                username='u_{}_{}'.format(ctx.shop.id, counter),
+                email='q@q.com',
+                password='4242'
+            )
+            user.shop = ctx.shop
+            user.work_type = User.WorkType.TYPE_5_2.value
+            user.first_name = first_name
+            user.middle_name = middle_name
+            user.last_name = last_name
+            user.save()
 
         __print('Created user {} {}'.format(user.first_name, user.last_name))
 
-        cashbox_type_name = DataParseHelper.parse_cashbox_type_name(data[column_cashbox_type][row])
-        if cashbox_type_name is None:
-            continue
-
-        if cashbox_type_name in cashboxes_types:
-            cashbox_type = cashboxes_types[cashbox_type_name]
-            cashbox = cashboxes[cashbox_type_name]
-        else:
-            cashbox_type = CashboxType.objects.create(shop=ctx.shop, name=cashbox_type_name, is_stable=cashbox_type_name in ['Линия', 'Возврат'])
-            cashboxes_types[cashbox_type_name] = cashbox_type
-            __print('Created cashbox_type {} with name {}'.format(cashbox_type.id, cashbox_type.name))
-
-            cashbox = Cashbox.objects.create(type=cashbox_type, number='1')
-            cashboxes[cashbox_type_name] = cashbox
-            __print('Created cashbox {} for type {}:{}'.format(cashbox.id, cashbox_type.id, cashbox_type.name))
-
         for col in range_i(column_sheet_begin, column_sheet_end, 3):
+            cashbox_type_name = DataParseHelper.parse_cashbox_type_name(data[column_cashbox_type if use_one_column else (col+2)][row])
+            if cashbox_type_name is None:
+                continue
+
+            if cashbox_type_name in cashboxes_types:
+                cashbox_type = cashboxes_types[cashbox_type_name]
+                cashbox = cashboxes[cashbox_type_name]
+            else:
+                cashbox_type = CashboxType.objects.create(shop=ctx.shop, name=cashbox_type_name, is_stable=cashbox_type_name in ['Линия', 'Возврат'])
+                cashboxes_types[cashbox_type_name] = cashbox_type
+                __print('Created cashbox_type {} with name {}'.format(cashbox_type.id, cashbox_type.name))
+
+                cashbox = Cashbox.objects.create(type=cashbox_type, number='1')
+                cashboxes[cashbox_type_name] = cashbox
+                __print('Created cashbox {} for type {}:{}'.format(cashbox.id, cashbox_type.id, cashbox_type.name))
+
             dt = DataParseHelper.parse_date(data[col][row_date])
             workday_type = DataParseHelper.parse_workday_type(data[col][row])
             is_wk = workday_type == WorkerDay.Type.TYPE_WORKDAY.value
@@ -238,20 +238,28 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
             )
 
 
-def run():
-    verbose = True
-
+def run(path):
     def __print(*args, **kwargs):
-        if verbose:
+        if ctx.verbose:
             print(*args, **kwargs)
 
     ctx = Context()
+    ctx.verbose = False
     ctx.shop = Shop.objects.create(title='Алтуфьево', hidden_title='shop004')
     __print('Created shop {} with title {}'.format(ctx.shop.id, ctx.shop.title))
 
-    path = 'src/db/works/parser/shop_004/users.xlsx'
-    data = pandas.read_excel(path, 'График', header=None)
+    user = User.objects.create_user(
+        username='cscais001.mag004'.format(ctx.shop.id),
+        email='q@q.com',
+        password='BestCompany004'
+    )
+    user.shop = ctx.shop
+    user.first_name = 'Ольга'
+    user.middle_name = ' '
+    user.last_name = 'Донкарева'
+    user.save()
 
+    data = pandas.read_excel(os.path.join(path, 'users_m04.xlsx'), 'График', header=None)
     parse_time_sheet(
         ctx=ctx,
         data=data,
@@ -259,5 +267,16 @@ def run():
         row_end=108,
         column_sheet_begin='G',
         column_sheet_end='CP',
-        verbose=True
+        use_one_column=True
+    )
+
+    data = pandas.read_excel(os.path.join(path, 'users_m05.xlsx'), 'Лист1', header=None)
+    parse_time_sheet(
+        ctx=ctx,
+        data=data,
+        row_begin=6,
+        row_end=108,
+        column_sheet_begin='G',
+        column_sheet_end='CS',
+        use_one_column=False
     )

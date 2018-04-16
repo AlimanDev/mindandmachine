@@ -267,8 +267,8 @@ def parse_demand_time_sheet(ctx, data, row_begin, row_end, column_begin, column_
             )
 
 
-def run():
-    verbose = True
+def run(path):
+    verbose = False
 
     def __print(*args, **kwargs):
         if verbose:
@@ -278,8 +278,8 @@ def run():
     ctx.shop = Shop.objects.create(title='Красногорск', hidden_title='shop003')
     __print('Created shop {} with title {}'.format(ctx.shop.id, ctx.shop.title))
 
-    path = 'src/db/works/parser/shop_003/shop_003.xlsx'
-    data = pandas.read_excel(path, 'График', header=None)
+    users_path = os.path.join(path, 'users.xlsx')
+    data = pandas.read_excel(users_path, 'График', header=None)
 
     parse_users_time_sheet(
         ctx=ctx,
@@ -291,7 +291,7 @@ def run():
         verbose=True
     )
 
-    data = pandas.read_excel(path, 'Расчет КК', header=None)
+    data = pandas.read_excel(users_path, 'Расчет КК', header=None)
     parse_demand_time_sheet(
         ctx=ctx,
         data=data,

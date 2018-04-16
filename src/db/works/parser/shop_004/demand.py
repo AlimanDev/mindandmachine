@@ -1,4 +1,5 @@
 import datetime
+import os
 import random
 
 from src.db.models import Shop, CashboxType, PeriodDemand
@@ -76,18 +77,18 @@ def load_csv_2(path, skip_rows=0):
     return data
 
 
-def run():
+def run(path):
     verbose = True
 
     def __print(*args, **kwargs):
         if verbose:
             print(*args, **kwargs)
 
-    shop = Shop.objects.get(title='Алтуфьево')
+    shop = Shop.objects.get(hidden_title='shop004')
     cashboxes_types = {x.name: x for x in CashboxType.objects.filter(shop=shop)}
 
     # stage 1
-    data = load_csv('src/db/works/parser/shop_004/demand_04.csv', skip_rows=1)
+    data = load_csv(os.path.join(path, 'demand_m04.csv'), skip_rows=1)
     for row in data:
         cashbox_type = cashboxes_types.get(row[2])
         if cashbox_type is not None:
@@ -102,7 +103,7 @@ def run():
             )
 
     # stage 2
-    data = load_csv('src/db/works/parser/shop_004/demand_05.csv', skip_rows=1)
+    data = load_csv(os.path.join(path, 'demand_m05.csv'), skip_rows=1)
     for row in data:
         cashbox_type = cashboxes_types.get(row[2])
         if cashbox_type is not None:
@@ -117,7 +118,7 @@ def run():
             )
 
     # stage 3
-    data = load_csv_2('src/db/works/parser/shop_004/demand_prev.csv', skip_rows=1)
+    data = load_csv_2(os.path.join(path, 'demand_y17.csv'), skip_rows=1)
     for row in data:
         cashbox_type = cashboxes_types.get(row[3])
         if cashbox_type is not None:
