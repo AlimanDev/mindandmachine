@@ -116,20 +116,13 @@ def get_time_distribution(request, form):
         result[cashbox_type.id] = {}
 
         for forecast_type in PeriodDemand.Type.values():
-            wait_time = 0
-            proportion = 0
-            count = 0
-
-            for dt in range_u(dt_from, dt_to, dt_step):
-                for x in wait_time_info.get(cashbox_type.id, {}).get(forecast_type, {}).get(dt, []):
-                    wait_time += x.wait_time
-                    proportion += x.proportion
-                    count += 1
-
-            result[cashbox_type.id][PeriodDemandConverter.convert_forecast_type(forecast_type)] = {
-                'wait_time': wait_time / count if count > 0 else 0,
-                'proportion': proportion / count if count > 0 else 0
-            }
+            arr = []
+            for i in range(1, 10):
+                arr.append({
+                    'wait_time': i,
+                    'proportion': int(30 * (1 - (i-1)/10))
+                })
+            result[cashbox_type.id][PeriodDemandConverter.convert_forecast_type(forecast_type)] = arr
 
     return JsonResponse.success(result)
 
