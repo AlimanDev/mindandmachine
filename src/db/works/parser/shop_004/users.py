@@ -166,6 +166,8 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
     column_sheet_begin = SheetIndexHelper.get_column(column_sheet_begin)
     column_sheet_end = SheetIndexHelper.get_column(column_sheet_end)
 
+    cashboxes_counter = {}
+
     counter = 0
     cashboxes_types = {}
     cashboxes = {}
@@ -192,6 +194,11 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
 
         for col in range_i(column_sheet_begin, column_sheet_end, 3):
             cashbox_type_name = DataParseHelper.parse_cashbox_type_name(data[column_cashbox_type if use_one_column else (col+2)][row])
+
+            if cashbox_type_name not in cashboxes_counter:
+                cashboxes_counter[cashbox_type_name] = 0
+            cashboxes_counter[cashbox_type_name] += 1
+
             if cashbox_type_name is None:
                 continue
 
@@ -229,6 +236,8 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
                     tm_from=tm_work_start,
                     tm_to=tm_work_end
                 )
+
+    print('cc', cashboxes_counter)
 
     for user in User.objects.filter(shop=ctx.shop):
         for cashbox_type in cashboxes_types.values():
