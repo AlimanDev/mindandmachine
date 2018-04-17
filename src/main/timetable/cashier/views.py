@@ -208,12 +208,13 @@ def set_worker_day(request, form):
     cashbox_updated = False
     try:
         if day.type == WorkerDay.Type.TYPE_WORKDAY.value:
-            new_cashbox = Cashbox.objects.get(type_id=new_cashbox_type_id)
-            WorkerCashboxInfo.objects.get(worker_id=day.worker_id, cashbox_type_id=new_cashbox.type_id, is_active=True)
-            rows = WorkerDayCashboxDetails.objects.filter(worker_day=day).update(on_cashbox=new_cashbox, tm_from=day.tm_work_start, tm_to=day.tm_work_end)
-            if rows == 0:
-                WorkerDayCashboxDetails.objects.create(on_cashbox=new_cashbox, worker_day=day, tm_from=day.tm_work_start, tm_to=day.tm_work_end)
-            cashbox_updated = True
+            if new_cashbox_type_id is not None:
+                new_cashbox = Cashbox.objects.get(type_id=new_cashbox_type_id)
+                WorkerCashboxInfo.objects.get(worker_id=day.worker_id, cashbox_type_id=new_cashbox.type_id, is_active=True)
+                rows = WorkerDayCashboxDetails.objects.filter(worker_day=day).update(on_cashbox=new_cashbox, tm_from=day.tm_work_start, tm_to=day.tm_work_end)
+                if rows == 0:
+                    WorkerDayCashboxDetails.objects.create(on_cashbox=new_cashbox, worker_day=day, tm_from=day.tm_work_start, tm_to=day.tm_work_end)
+                cashbox_updated = True
         else:
             rows = WorkerDayCashboxDetails.objects.filter(worker_day=day).delete()
             cashbox_updated = rows > 0
