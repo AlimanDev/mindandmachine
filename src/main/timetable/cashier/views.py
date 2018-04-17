@@ -1,6 +1,6 @@
 from datetime import time, datetime, timedelta
 
-from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType
+from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType, WorkerDayCashboxDetails
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
@@ -162,9 +162,21 @@ def get_worker_day(request, form):
                 begin = t2
         work_hours.append(__create_time_obj(begin, times[-1] + dttm_step))
 
+    details = []
+    cashboxes_types = []
+    for x in WorkerDayCashboxDetails.objects.select_related('on_cashbox', 'on_cashbox__type').filter(worker_day=wd):
+        details.append({
+            'tm_from': BaseConverter.convert_time(x.tm_from),
+            'tm_to': BaseConverter.convert_time(x.tm_to),
+            'cashbox_type': x.on_cashbox.type_id
+        })
+        cashboxes_types.append(CashboxTypeConverter.convert(x.on_cashbox.type))
+
     return JsonResponse.success({
         'day': WorkerDayConverter.convert(wd),
-        'work_hours': work_hours
+        'work_hours': work_hours,
+        'details': details,
+        'cashbox_types': cashboxes_types
     })
 
 
