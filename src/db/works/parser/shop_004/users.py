@@ -169,8 +169,8 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
     cashboxes_counter = {}
 
     counter = 0
-    cashboxes_types = {}
-    cashboxes = {}
+    cashboxes_types = {x.name: x for x in CashboxType.objects.filter(shop_id=ctx.shop.id)}
+    cashboxes = {c_name: Cashbox.objects.filter(type=c)[0] for c_name, c in cashboxes_types.items()}
     for row in range_i(row_begin, row_end):
         counter += 1
 
@@ -241,10 +241,18 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
 
     for user in User.objects.filter(shop=ctx.shop):
         for cashbox_type in cashboxes_types.values():
-            WorkerCashboxInfo.objects.create(
-                worker=user,
-                cashbox_type=cashbox_type
-            )
+            try:
+                WorkerCashboxInfo.objects.get(
+                    worker=user,
+                    cashbox_type=cashbox_type
+                )
+            except WorkerCashboxInfo.DoesNotExist:
+                WorkerCashboxInfo.objects.create(
+                    worker=user,
+                    cashbox_type=cashbox_type
+                )
+            except WorkerCashboxInfo.MultipleObjectsReturned:
+                pass
 
 
 def run(path):
