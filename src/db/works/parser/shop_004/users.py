@@ -287,7 +287,7 @@ def run(path):
         use_one_column=True
     )
 
-    data = pandas.read_excel(os.path.join(path, 'users_m05.xlsx'), 'Лист1', header=None)
+    data = pandas.read_excel(os.path.join(path, 'users_m05_2.xlsx'), 'Лист1', header=None)
     parse_time_sheet(
         ctx=ctx,
         data=data,
