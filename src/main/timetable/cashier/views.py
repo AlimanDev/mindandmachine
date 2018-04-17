@@ -1,6 +1,7 @@
 from datetime import time, datetime, timedelta
 
-from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType, WorkerDayCashboxDetails
+from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType, WorkerDayCashboxDetails, \
+    Cashbox
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
@@ -203,9 +204,21 @@ def set_worker_day(request, form):
 
         action = 'create'
 
+    new_cashbox_type_id = form.get('cashbox_type')
+    cashbox_updated = False
+    if new_cashbox_type_id is not None:
+        try:
+            new_cashbox = Cashbox.objects.get(type_id=new_cashbox_type_id)
+            WorkerCashboxInfo.objects.get(worker_id=day.worker_id, cashbox_type_id=new_cashbox.type_id, is_active=True)
+            WorkerDayCashboxDetails.objects.filter(worker_day=day).update(on_cashbox=new_cashbox, tm_from=day.tm_work_start, tm_to=day.tm_work_end)
+            cashbox_updated = True
+        except:
+            pass
+
     response = {
         'day': WorkerDayConverter.convert(day),
-        'action': action
+        'action': action,
+        'cashbox_updated': cashbox_updated
     }
 
     return JsonResponse.success(response)
