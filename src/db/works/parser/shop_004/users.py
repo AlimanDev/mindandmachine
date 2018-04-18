@@ -257,14 +257,14 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
                 pass
 
 
-def run(path):
+def run(path, super_shop):
     def __print(*args, **kwargs):
         if ctx.verbose:
             print(*args, **kwargs)
 
     ctx = Context()
     ctx.verbose = False
-    ctx.shop = Shop.objects.create(title='Алтуфьево', hidden_title='shop004')
+    ctx.shop = Shop.objects.create(super_shop=super_shop, title='Кассиры', hidden_title='common')
     __print('Created shop {} with title {}'.format(ctx.shop.id, ctx.shop.title))
 
     user = User.objects.create_user(

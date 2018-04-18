@@ -3,13 +3,30 @@ from django.contrib.auth.models import AbstractUser as DjangoAbstractUser
 from . import utils
 
 
-class Shop(models.Model):
+# магазин
+class SuperShop(models.Model):
     id = models.BigAutoField(primary_key=True)
+
+    title = models.CharField(max_length=64, unique=True)
+    hidden_title = models.CharField(max_length=64, unique=True)
+
+    code = models.CharField(max_length=64, null=True, blank=True)
+
+
+# на самом деле это отдел
+class Shop(models.Model):
+    class Meta(object):
+        unique_together = (('super_shop', 'title'), ('super_shop', 'hidden_title'),)
+
+    id = models.BigAutoField(primary_key=True)
+
+    super_shop = models.ForeignKey(SuperShop, on_delete=models.PROTECT)
+    full_interface = models.BooleanField(default=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
-    title = models.CharField(max_length=64, unique=True)
+    title = models.CharField(max_length=64)
     hidden_title = models.CharField(max_length=64)
 
     mean_queue_length = models.FloatField(default=3)

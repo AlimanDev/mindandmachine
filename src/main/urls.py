@@ -7,6 +7,7 @@ from .timetable import urls as timetable_urls
 from .auth import urls as auth_urls
 from .demand import urls as demand_urls
 from .queue import urls as queue_urls
+from .other import urls as other_urls
 
 
 urlpatterns = [
@@ -15,6 +16,7 @@ urlpatterns = [
     path('timetable/', include(timetable_urls)),
     path('demand/', include(demand_urls)),
     path('queue/', include(queue_urls)),
+    path('other/', include(other_urls)),
     path('admin/', admin.site.urls),
 ]
 

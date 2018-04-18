@@ -77,14 +77,14 @@ def load_csv_2(path, skip_rows=0):
     return data
 
 
-def run(path):
+def run(path, super_shop):
     verbose = True
 
     def __print(*args, **kwargs):
         if verbose:
             print(*args, **kwargs)
 
-    shop = Shop.objects.get(hidden_title='shop004')
+    shop = Shop.objects.get(super_shop=super_shop, hidden_title='common')
     cashboxes_types = {x.name: x for x in CashboxType.objects.filter(shop=shop)}
 
     # stage 1

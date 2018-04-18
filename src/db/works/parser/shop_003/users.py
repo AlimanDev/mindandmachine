@@ -267,7 +267,7 @@ def parse_demand_time_sheet(ctx, data, row_begin, row_end, column_begin, column_
             )
 
 
-def run(path):
+def run(path, super_shop):
     verbose = False
 
     def __print(*args, **kwargs):
@@ -275,7 +275,7 @@ def run(path):
             print(*args, **kwargs)
 
     ctx = Context()
-    ctx.shop = Shop.objects.create(title='Красногорск', hidden_title='shop003')
+    ctx.shop = Shop.objects.create(super_shop=super_shop, title='Кассиры', hidden_title='common')
     __print('Created shop {} with title {}'.format(ctx.shop.id, ctx.shop.title))
 
     users_path = os.path.join(path, 'users.xlsx')

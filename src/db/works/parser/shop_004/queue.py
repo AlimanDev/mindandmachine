@@ -5,12 +5,12 @@ from src.db.models import Shop, CashboxType, WaitTimeInfo, PeriodDemand
 from src.util.collection import range_u
 
 
-def run(path):
+def run(path, super_shop):
     dttm_from = datetime.now() - timedelta(days=30)
     dttm_to = datetime.now()
     dttm_step = timedelta(days=1)
 
-    shop = Shop.objects.get(hidden_title='shop004')
+    shop = Shop.objects.get(super_shop=super_shop, hidden_title='common')
     cashboxes_types = CashboxType.objects.filter(shop=shop)
 
     for dttm in range_u(dttm_from, dttm_to, dttm_step):

@@ -224,3 +224,24 @@ class PeriodDemandChangeLogConverter(BaseConverter):
             'multiply_coef': obj.multiply_coef,
             'set_value': obj.set_value
         }
+
+
+class ShopConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'super_shop': obj.super_shop_id,
+            'full_interface': obj.full_interface,
+            'title': obj.title
+        }
+
+
+class SuperShopConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'title': obj.title,
+            'code': obj.code
+        }
