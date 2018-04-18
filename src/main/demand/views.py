@@ -63,7 +63,7 @@ def get_indicators(request, form):
         'mean_income': None,
         'mean_bill_codes': products / clients if clients > 0 else None,
         'growth': growth,
-        'total_people': clients,
+        'total_people': None,
         'total_bills': clients,
         'total_codes': products,
         'total_income': None
