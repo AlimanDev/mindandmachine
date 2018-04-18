@@ -46,7 +46,7 @@ class ParseHelper(object):
         return datetime(year=year, month=month, day=int(value)).date()
 
 
-def load_users(shop, data, year, month, column_cashbox_type, column_fio, row_date, row_begin, row_end, col_timetable_begin, col_timetable_end):
+def load_users(manager_username, shop, data, year, month, column_cashbox_type, column_fio, row_date, row_begin, row_end, col_timetable_begin, col_timetable_end):
     column_cashbox_type = SheetIndexHelper.get_column(column_cashbox_type)
     column_fio = SheetIndexHelper.get_column(column_fio)
     row_begin = SheetIndexHelper.get_row(row_begin)
@@ -54,6 +54,18 @@ def load_users(shop, data, year, month, column_cashbox_type, column_fio, row_dat
     col_timetable_begin = SheetIndexHelper.get_column(col_timetable_begin)
     col_timetable_end = SheetIndexHelper.get_column(col_timetable_end)
     row_date = SheetIndexHelper.get_row(row_date)
+
+    if manager_username is not None:
+        user = User.objects.create_user(
+            username=manager_username,
+            email='q@q.com',
+            password='BestCompany004'
+        )
+        user.shop = shop
+        user.first_name = 'Иван'
+        user.middle_name = ' '
+        user.last_name = 'Иванов'
+        user.save()
 
     counter = 0
     cashboxes_types = {x.name: x for x in CashboxType.objects.filter(shop_id=shop.id)}
@@ -127,6 +139,7 @@ def run(path, super_shop):
     # file #1
     shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Электротовары', hidden_title='electro')
     load_users(
+        manager_username='cs003.mag004',
         shop=shop,
         data=pandas.read_excel(os.path.join(path, 'users_2_a.xlsx'), 'апрель 18', header=None),
         year=2018,
@@ -141,6 +154,7 @@ def run(path, super_shop):
     )
 
     load_users(
+        manager_username=None,
         shop=shop,
         data=pandas.read_excel(os.path.join(path, 'users_2_a.xlsx'), 'май 18', header=None),
         year=2018,
@@ -165,6 +179,7 @@ def run(path, super_shop):
     # file #2
     shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Сантехника', hidden_title='santeh')
     load_users(
+        manager_username='cs007.mag004',
         shop=shop,
         data=pandas.read_excel(os.path.join(path, 'users_2_b.xls'), 'апрель', header=None),
         year=2018,
@@ -179,6 +194,7 @@ def run(path, super_shop):
     )
 
     load_users(
+        manager_username=None,
         shop=shop,
         data=pandas.read_excel(os.path.join(path, 'users_2_b.xls'), 'май', header=None),
         year=2018,
@@ -203,6 +219,7 @@ def run(path, super_shop):
     # file #3
     shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Декор', hidden_title='dekor')
     load_users(
+        manager_username='cs012.mag004',
         shop=shop,
         data=pandas.read_excel(os.path.join(path, 'users_2_c.xlsx'), 'апрель', header=None),
         year=2018,
@@ -217,6 +234,7 @@ def run(path, super_shop):
     )
 
     load_users(
+        manager_username=None,
         shop=shop,
         data=pandas.read_excel(os.path.join(path, 'users_2_c.xlsx'), 'май', header=None),
         year=2018,

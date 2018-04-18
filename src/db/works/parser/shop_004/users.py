@@ -269,7 +269,7 @@ def run(path, super_shop):
     __print('Created shop {} with title {}'.format(ctx.shop.id, ctx.shop.title))
 
     user = User.objects.create_user(
-        username='cscais001.mag004'.format(ctx.shop.id),
+        username='cscais001.mag004',
         email='q@q.com',
         password='BestCompany004'
     )
