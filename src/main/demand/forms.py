@@ -45,14 +45,17 @@ class SetDemandForm(forms.Form):
     set_value = forms.FloatField(required=False)
 
     def clean(self):
+        if self.errors:
+            return
+
         if self.cleaned_data['from_dttm'] > self.cleaned_data['to_dttm']:
             raise ValidationError('cannot from_dt be gt to_dt')
 
         if self.cleaned_data['from_dttm'] < datetime.datetime.now():
             raise ValidationError('cannot change past data')
 
-        m_exists = 'multiply_coef' in self.cleaned_data
-        v_exists = 'set_value' in self.cleaned_data
+        m_exists = self.cleaned_data.get('multiply_coef') is not None
+        v_exists = self.cleaned_data.get('set_value') is not None
         if m_exists and v_exists:
             raise ValidationError('cannot exist both coef and value')
 
