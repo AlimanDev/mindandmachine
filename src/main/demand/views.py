@@ -55,7 +55,6 @@ def get_indicators(request, form):
     growth = 0
     if prev_clients != 0:
         growth = (clients - prev_clients) / prev_clients * 100
-        growth = max(growth, 0)
 
     return JsonResponse.success({
         'mean_bills': clients / workers_count if workers_count > 0 else None,
