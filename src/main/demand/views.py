@@ -39,12 +39,30 @@ def get_indicators(request, form):
         clients += x.clients
         products += x.products
 
+    prev_periods_demands = PeriodDemand.objects.select_related(
+        'cashbox_type'
+    ).filter(
+        cashbox_type__shop_id=shop_id,
+        type=forecast_type,
+        dttm_forecast__gte=datetime.combine(dt_from, time()) - timedelta(days=30),
+        dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1) - timedelta(days=30)
+    )
+
+    prev_clients = 0
+    for x in prev_periods_demands:
+        prev_clients += x.clients
+
+    growth = 0
+    if prev_clients != 0:
+        growth = (clients - prev_clients) / prev_clients * 100
+        growth = max(growth, 0)
+
     return JsonResponse.success({
         'mean_bills': clients / workers_count if workers_count > 0 else 0,
         'mean_codes': products / workers_count if workers_count > 0 else 0,
         'mean_income': -2,
         'mean_bill_codes': products / clients if clients > 0 else 0,
-        'growth': -2,
+        'growth': growth,
         'total_people': clients,
         'total_bills': clients,
         'total_codes': products,
