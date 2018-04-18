@@ -184,7 +184,7 @@ def get_cashiers_timetable(request, form):
             'big_demand_persent': big_demand_persent,
             'cashier_amount': len(users_amount_set),
             'FOT': -1,
-            'need_cashier_amount': 0,  # need_cashier_amount_max,
+            'need_cashier_amount': need_cashier_amount_max,
             'change_amount': 10
         },
         'period_step': 30,
