@@ -72,7 +72,7 @@ def get_indicators(request, form):
         'mean_length_return': mean_length_return,
         'mean_wait_time_return': mean_wait_time_return,
         'dead_time_part_return': dead_time_part_return,
-        'fund': -2
+        'fund': None
     })
 
 

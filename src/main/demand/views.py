@@ -60,13 +60,13 @@ def get_indicators(request, form):
     return JsonResponse.success({
         'mean_bills': clients / workers_count if workers_count > 0 else 0,
         'mean_codes': products / workers_count if workers_count > 0 else 0,
-        'mean_income': -2,
+        'mean_income': None,
         'mean_bill_codes': products / clients if clients > 0 else 0,
         'growth': growth,
         'total_people': clients,
         'total_bills': clients,
         'total_codes': products,
-        'total_income': -2
+        'total_income': None
     })
 
 
