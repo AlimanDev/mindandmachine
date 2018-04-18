@@ -5,7 +5,7 @@ import xlsxwriter
 from datetime import datetime, timedelta
 
 from src.db.models import WorkerDay, User
-from src.util.collection import range_u
+from src.util.collection import range_u, count
 
 
 class Cell(object):
@@ -117,15 +117,23 @@ def add_workers(workbook, data, data_size, shop_id, dt_from, dt_to):
     }
 
     format_text = workbook.add_format(fmt(font_size=12, border=1, bold=True))
+    format_holiday_debt = workbook.add_format(fmt(font_size=10, border=1, bg_color='#FEFF99'))
 
     for worker in User.objects.filter(shop=shop_id):
         worker_days = {x.dt: x for x in WorkerDay.objects.filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
         row = [
             Cell('', format_text),
             Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_text),
-            Cell('кассир-консультант', format_text)
+            Cell('кассир-консультант', format_text),
+            Cell('', format_holiday_debt)
         ] + [
             PrintHelper.get_worker_day_cell(worker_days.get(dttm.date()), format_days) for dttm in __dt_range()
+        ] + [
+            Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value), format_text),
+            Cell('', format_text),
+            Cell('', format_text),
+            Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value), format_text),
+            Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_VACATION.value), format_text)
         ]
 
         data.append(row)
@@ -134,15 +142,11 @@ def add_workers(workbook, data, data_size, shop_id, dt_from, dt_to):
 
 # noinspection PyTypeChecker
 def print_to_file(path, shop_id, dt_from, dt_to):
-    # df = pandas.DataFrame([
-    #     [1010, 2020, 3030, 202220, 1515, 3030, 4545],
-    #     [.1, .2, .33, .25, .5, .75, .45],
-    # ])
-
     def __dt_range():
         return range_u(dt_from, dt_to, timedelta(days=1))
 
     file = io.BytesIO()
+    # file = path
 
     workbook = xlsxwriter.Workbook(filename=file)
     worksheet = workbook.add_worksheet()
@@ -153,13 +157,22 @@ def print_to_file(path, shop_id, dt_from, dt_to):
     format_header_date = workbook.add_format(fmt(font_size=11, border=2, bold=True, num_format='dd/mm'))
 
     data = [
-        ['', '', ''] + [Cell(PrintHelper.get_weekday_name(x), format_header_weekday) for x in __dt_range()],
-        [Cell(x, format_header_text) for x in ['№', 'ФИО', 'ДОЛЖНОСТЬ']] + [Cell(x.date(), format_header_date) for x in __dt_range()],
+        [] for i in range(15)
+    ] + [
+        # weekdays
+        ['', '', '', ''] + [Cell(PrintHelper.get_weekday_name(x), format_header_weekday) for x in __dt_range()],
+
+        # main header
+        [Cell(x, format_header_text) for x in ['№', 'ФИО', 'ДОЛЖНОСТЬ', 'долг по выходным']] +
+        [Cell(x.date(), format_header_date) for x in __dt_range()] +
+        [Cell(x, format_header_text) for x in ['плановые дни', 'дата', 'С графиком работы ознакомлен**. На работу в праздничные дни согласен', 'В', 'ОТ']],
+
+        # empty row
         [],
     ]
     data_size = {
-        'rows': [15, 40, 10],
-        'cols': [25, 25, 25] + [10 for x in __dt_range()]
+        'rows': [15 for i in range(15)] + [15, 40, 10],
+        'cols': [25, 30, 25, 20] + [10 for x in __dt_range()] + [15, 15, 25, 10, 10]
     }
 
     add_workers(
@@ -185,6 +198,75 @@ def print_to_file(path, shop_id, dt_from, dt_to):
                     worksheet.write(row_index, col_index, cell.d, format_default)
             else:
                 worksheet.write(row_index, col_index, cell, format_default)
+
+    format_meta_bold = workbook.add_format(fmt(font_size=11, bold=True, align='left', text_wrap=False))
+    format_meta_bold_bottom = workbook.add_format(fmt(font_size=11, bold=True, align='left', text_wrap=False, bottom=1))
+    format_meta_bold_bottom_2 = workbook.add_format(fmt(font_size=11, bold=True, align='left', text_wrap=False, bottom=2))
+    format_meta_bold_left_small = workbook.add_format(fmt(font_size=9, bold=True, align='left', text_wrap=False))
+    format_meta_bold_right_small = workbook.add_format(fmt(font_size=9, bold=True, align='right', text_wrap=False))
+
+    format_meta_workerday_holiday = workbook.add_format(fmt(font_size=11, bold=True, bg_color='#66FF66'))
+    format_meta_workerday_z = workbook.add_format(fmt(font_size=11, bold=True, bg_color='#99CCFF'))
+    format_meta_common = workbook.add_format(fmt(font_size=9, align='left', text_wrap=False))
+
+    def __wt(__row, __col, __data, __fmt):
+        worksheet.write(SheetIndexHelper.get_row(__row), SheetIndexHelper.get_column(__col), __data, __fmt)
+
+    __wt(2, 'b', 'ООО "ЛЕРУА МЕРЛЕН ВОСТОК"', format_meta_bold)
+    __wt(3, 'b', 'Магазин Алтуфьево', format_meta_bold)
+    __wt(4, 'b', 'График работы отдела', format_meta_bold_bottom_2)
+    __wt(4, 'c', 'сектор по обслуживанию клиентов', format_meta_bold_bottom_2)
+    __wt(4, 'd', '', format_meta_bold_bottom_2)
+
+    __wt(6, 'c', 'Май 2018', format_meta_bold)
+    __wt(7, 'b', 'составил:', format_meta_bold_bottom)
+    __wt(7, 'c', '', format_meta_bold_bottom)
+    __wt(7, 'd', '', format_meta_bold_bottom)
+    __wt(8, 'b', 'подпись', format_meta_bold_right_small)
+    __wt(8, 'd', 'расшифровка', format_meta_bold_left_small)
+
+    __wt(
+        12,
+        'b',
+        '* включает очередной, учебный и административный отпуск, отпуск по берем. и родам, отпуск по уходу за ребенком до 3-х лет, командировка. В случае отмены или переноса запланированного отсутствия сотрудник работает с с 9:00 до 18:00',
+        format_meta_common
+    )
+    __wt(
+        13,
+        'b',
+        '** в обязательном порядке все сотрудники ознакомлены с Графиком сменности до вступления его в силу за 1 месяц',
+        format_meta_common
+    )
+
+    __wt(2, 'h', 'условные обозначения', format_meta_bold)
+    __wt(4, 'h', 'В', format_meta_workerday_holiday)
+    __wt(4, 'i', 'выходой день', format_meta_bold)
+    __wt(6, 'h', 'Z*', format_meta_workerday_z)
+    __wt(6, 'i', 'запланированное отсутствие', format_meta_bold)
+
+    __wt(1, 'w', 'Согласовано:', format_meta_bold)
+    __wt(3, 'w', 'Руководитель сектора по обслуживанию клиентов', format_meta_bold_bottom)
+    __wt(3, 'x', '', format_meta_bold_bottom)
+    __wt(3, 'y', '', format_meta_bold_bottom)
+    __wt(3, 'z', '', format_meta_bold_bottom)
+    __wt(3, 'aa', '', format_meta_bold_bottom)
+    __wt(4, 'x', 'наименование должности', format_meta_common)
+
+    __wt(6, 'x', '', format_meta_bold_bottom)
+    __wt(6, 'y', '', format_meta_bold_bottom)
+    __wt(6, 'z', '', format_meta_bold_bottom)
+    __wt(6, 'aa', '', format_meta_bold_bottom)
+    __wt(6, 'ab', '', format_meta_bold_bottom)
+    __wt(6, 'ac', '', format_meta_bold_bottom)
+    __wt(6, 'ad', '', format_meta_bold_bottom)
+
+    __wt(7, 'y', 'подпись', format_meta_common)
+    __wt(7, 'ac', 'расшифровка', format_meta_common)
+
+    __wt(8, 'x', '', format_meta_bold_bottom)
+    __wt(8, 'y', '', format_meta_bold_bottom)
+    __wt(8, 'z', '', format_meta_bold_bottom)
+    __wt(8, 'aa', '', format_meta_bold_bottom)
 
     workbook.close()
     file.seek(0)
