@@ -126,6 +126,39 @@ def get_cashier_info(request, form):
         constraints = WorkerConstraint.objects.filter(worker_id=worker.id)
         response['constraints_info'] = [WorkerConstraintConverter.convert(x) for x in constraints]
 
+    if 'work_hours' in form['info']:
+        def __create_time_obj(__from, __to):
+            return {
+                'from': BaseConverter.convert_time(__from.time()),
+                'to': BaseConverter.convert_time(__to.time())
+            }
+
+        constraint_times_all = {i: set() for i in range(7)}
+        for x in WorkerConstraint.objects.filter(worker_id=worker.id):
+            constraint_times_all[x.weekday].add(x.tm)
+
+        constraint_times_all = {k: set(v) for k, v in constraint_times_all.items()}
+        work_hours_all = {}
+
+        dttm_from = datetime(year=1971, month=1, day=1)
+        dttm_to = dttm_from + timedelta(days=1)
+        dttm_step = timedelta(minutes=30)
+        for weekday, constraint_times in constraint_times_all.items():
+            times = [dttm for dttm in range_u(dttm_from, dttm_to, dttm_step, False) if dttm.time() not in constraint_times]
+            work_hours = []
+
+            if len(times) > 0:
+                begin = times[0]
+                for t1, t2 in zip(times, times[1:]):
+                    if t2 - t1 != dttm_step:
+                        work_hours.append(__create_time_obj(begin, t1 + dttm_step))
+                        begin = t2
+                work_hours.append(__create_time_obj(begin, times[-1] + dttm_step))
+
+            work_hours_all[weekday] = work_hours
+
+        response['work_hours'] = work_hours_all
+
     return JsonResponse.success(response)
 
 

@@ -24,7 +24,7 @@ class GetCashierTimetableForm(forms.Form):
 
 class GetCashierInfoForm(forms.Form):
     worker_id = forms.IntegerField()
-    info = util_forms.MultipleChoiceField(['general_info', 'cashbox_type_info', 'constraints_info'])
+    info = util_forms.MultipleChoiceField(['general_info', 'cashbox_type_info', 'constraints_info', 'work_hours'])
 
 
 class GetWorkerDayForm(forms.Form):
