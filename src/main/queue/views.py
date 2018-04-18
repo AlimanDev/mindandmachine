@@ -37,9 +37,9 @@ def get_indicators(request, form):
         queue_wait_time += x.queue_wait_time
         queue_wait_length += x.queue_wait_length
 
-    mean_length_usual = queue_wait_length / len(period_demands) if len(period_demands) > 0 else 0
-    mean_wait_time_usual = queue_wait_time / len(period_demands) if len(period_demands) > 0 else 0
-    dead_time_part_usual = -2
+    mean_length_usual = queue_wait_length / len(period_demands) if len(period_demands) > 0 else None
+    mean_wait_time_usual = queue_wait_time / len(period_demands) if len(period_demands) > 0 else None
+    dead_time_part_usual = None
 
     try:
         return_cashbox_type = CashboxType.objects.get(shop_id=shop_id, name='Возврат')
@@ -61,9 +61,9 @@ def get_indicators(request, form):
         queue_wait_time += x.queue_wait_time
         queue_wait_length += x.queue_wait_length
 
-    mean_length_return = queue_wait_length / len(period_demands) if len(period_demands) > 0 else 0
-    mean_wait_time_return = queue_wait_time / len(period_demands) if len(period_demands) > 0 else 0
-    dead_time_part_return = -2
+    mean_length_return = queue_wait_length / len(period_demands) if len(period_demands) > 0 else None
+    mean_wait_time_return = queue_wait_time / len(period_demands) if len(period_demands) > 0 else None
+    dead_time_part_return = None
 
     return JsonResponse.success({
         'mean_length_usual': mean_length_usual,
