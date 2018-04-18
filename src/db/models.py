@@ -152,7 +152,7 @@ class WorkerConstraint(models.Model):
 
 class WorkerDay(models.Model):
     class Meta(object):
-        unique_together = (('worker', 'dt'),)
+        unique_together = (('worker', 'worker_shop', 'dt'),)
 
     class Type(utils.Enum):
         TYPE_HOLIDAY = 1

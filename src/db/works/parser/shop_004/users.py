@@ -64,9 +64,9 @@ class DataParseHelper(object):
     @classmethod
     def parse_fio(cls, value):
         value = {i: v for i, v in enumerate(value.strip().split())}
-        last_name = value.get(0, 'DEFAULT')
-        first_name = value.get(1, 'DEFAULT')
-        middle_name = value.get(2, 'DEFAULT')
+        last_name = value.get(0, '')
+        first_name = value.get(1, '')
+        middle_name = value.get(2, '')
         return first_name, middle_name, last_name
 
     @classmethod
