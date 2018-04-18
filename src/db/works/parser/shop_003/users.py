@@ -4,7 +4,8 @@ import random
 import pandas
 import datetime
 import os
-from src.db.models import Shop, User, WorkerDay, CashboxType, Cashbox, WorkerDayCashboxDetails, WorkerCashboxInfo, PeriodDemand
+from src.db.models import Shop, User, WorkerDay, CashboxType, Cashbox, WorkerDayCashboxDetails, WorkerCashboxInfo, PeriodDemand, WorkerConstraint
+from src.util.collection import range_u
 
 
 class Context(object):
@@ -300,3 +301,11 @@ def run(path, super_shop):
         column_begin='B',
         column_end='AE'
     )
+
+    for user in User.objects.filter(shop_id=ctx.shop.id):
+        dttm_from = datetime.datetime(year=1971, month=1, day=1)
+        dttm_to = datetime.datetime(year=1971, month=1, day=1, hour=7)
+        dttm_step = datetime.timedelta(minutes=30)
+        for i in range(7):
+            for dttm in range_u(dttm_from, dttm_to, dttm_step, False):
+                WorkerConstraint.objects.create(worker=user, weekday=i, tm=dttm.time())
