@@ -130,7 +130,7 @@ def get_time_distribution(request, form):
 @api_method('GET', GetParametersForm)
 def get_parameters(request, form):
     try:
-        shop = Shop.objects.get(shop_id=FormUtil.get_shop_id(request, form))
+        shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
     except:
         return JsonResponse.value_error('Cannot get shop')
 
@@ -144,7 +144,7 @@ def get_parameters(request, form):
 @api_method('POST', SetParametersForm)
 def set_parameters(request, form):
     try:
-        shop = Shop.objects.get(shop_id=FormUtil.get_shop_id(request, form))
+        shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
     except:
         return JsonResponse.value_error('Cannot get shop')
 
