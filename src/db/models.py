@@ -68,6 +68,8 @@ class User(DjangoAbstractUser):
 
     comment = models.CharField(max_length=2048, default='')
 
+    auto_timetable = models.BooleanField(default=True)
+
 
 class CashboxType(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -288,3 +290,20 @@ class WaitTimeInfo(models.Model):
     wait_time = models.PositiveIntegerField()
     proportion = models.FloatField()
     type = utils.EnumField(PeriodDemand.Type)
+
+
+class Timetable(models.Model):
+    class Meta(object):
+        unique_together = (('shop', 'dt'),)
+
+    class Status(utils.Enum):
+        READY = 1
+        PROCESSING = 2
+        ERROR = 3
+
+    id = models.BigAutoField(primary_key=True)
+
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    dt = models.DateField()
+    status = utils.EnumField(Status)
+    dttm_status_change = models.DateTimeField()

@@ -1,6 +1,6 @@
 import datetime
 
-from src.db.models import User, WorkerDay, PeriodDemand
+from src.db.models import User, WorkerDay, PeriodDemand, Timetable
 
 
 class BaseConverter(object):
@@ -244,4 +244,32 @@ class SuperShopConverter(BaseConverter):
             'id': obj.id,
             'title': obj.title,
             'code': obj.code
+        }
+
+
+class TimetableConverter(BaseConverter):
+    __STATUSES = {
+        Timetable.Status.READY.value: 'R',
+        Timetable.Status.PROCESSING.value: 'P',
+        Timetable.Status.ERROR.value: 'E'
+    }
+
+    __STATUSES_REVERSED = {v: k for k, v in __STATUSES.items()}
+
+    @classmethod
+    def convert_status(cls, status_obj):
+        return cls.__STATUSES.get(status_obj, '')
+
+    @classmethod
+    def parse_status(cls, status_obj):
+        return cls.__STATUSES_REVERSED.get(status_obj)
+
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'shop': obj.shop_id,
+            'dt': obj.dt,
+            'status': cls.convert_status(obj.status),
+            'dttm_status_change': cls.convert_datetime(obj.dttm_status_change)
         }

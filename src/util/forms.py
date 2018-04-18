@@ -76,8 +76,8 @@ class MultipleChoiceField(forms.MultipleChoiceField):
 
 
 class BooleanField(forms.BooleanField):
-    def __init__(self):
-        super().__init__(required=False)
+    def __init__(self, required=False):
+        super().__init__(required=required)
 
 
 class IntegersList(forms.CharField):
