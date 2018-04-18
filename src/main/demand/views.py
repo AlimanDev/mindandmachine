@@ -58,10 +58,10 @@ def get_indicators(request, form):
         growth = max(growth, 0)
 
     return JsonResponse.success({
-        'mean_bills': clients / workers_count if workers_count > 0 else 0,
-        'mean_codes': products / workers_count if workers_count > 0 else 0,
+        'mean_bills': clients / workers_count if workers_count > 0 else None,
+        'mean_codes': products / workers_count if workers_count > 0 else None,
         'mean_income': None,
-        'mean_bill_codes': products / clients if clients > 0 else 0,
+        'mean_bill_codes': products / clients if clients > 0 else None,
         'growth': growth,
         'total_people': clients,
         'total_bills': clients,
