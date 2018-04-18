@@ -188,10 +188,10 @@ def get_cashiers_timetable(request, form):
 
     response = {
         'indicators': {
-            'mean_notworking_persent': -1,  # mean_notworking_present,
+            'mean_notworking_persent': None,  # mean_notworking_present,
             'big_demand_persent': big_demand_persent,
             'cashier_amount': len(users_amount_set),
-            'FOT': -1,
+            'FOT': None,
             'need_cashier_amount': need_cashier_amount_max,
             'change_amount': 10
         },
