@@ -8,4 +8,6 @@ class Command(BaseCommand):
         pass
 
     def handle(self, *args, **options):
-        run()
+        run(
+            shop_id=2
+        )

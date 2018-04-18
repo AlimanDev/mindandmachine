@@ -1,5 +1,6 @@
 from datetime import datetime, time, timedelta
 
+from django.http import HttpResponse
 from django.shortcuts import redirect
 
 from src.db.models import WorkerDay, User, CashboxType, WorkerCashboxInfo, WorkerDayCashboxDetails, PeriodDemand
@@ -8,16 +9,23 @@ from src.util.collection import range_u
 from src.util.models_converter import CashboxTypeConverter, UserConverter, WorkerDayConverter, WorkerCashboxInfoConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
 
+from src.db.works.printer.run import run as get_xlsx
+
 
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
     shop = request.user.shop
 
     if form['format'] == 'excel':
-        if shop.hidden_title == 'shop004':
-            return redirect('/api/_i/media/timetable_temp/shop004.xlsx')
+        response = HttpResponse(content_type='application/force-download')
+        response['Content-Disposition'] = 'attachment; filename=timetable.xlsx'
+        response.write(get_xlsx(shop_id=shop.id).read())
+        return response
 
-        return JsonResponse.value_error('Excel is not supported yet')
+        # if shop.hidden_title == 'shop004':
+        #     return redirect('/api/_i/media/timetable_temp/shop004.xlsx')
+
+        # return JsonResponse.value_error('Excel is not supported yet')
 
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
         'worker_day', 'on_cashbox'
