@@ -42,7 +42,7 @@ def load_csv(path, skip_rows=0):
 
 
 def run(path, super_shop):
-    data = load_csv(os.path.join(path, 'demand_m05_line_q.csv'))
+    data = load_csv(os.path.join(path, 'demand_m05_line_q.csv'), skip_rows=1)
     shop = Shop.objects.get(super_shop=super_shop, hidden_title='common')
     cashbox_type = CashboxType.objects.get(shop=shop, name='Линия')
     counter = 0
@@ -59,7 +59,7 @@ def run(path, super_shop):
     print('demand_05_line_q updated {}'.format(counter))
     counter = 0
 
-    data = load_csv(os.path.join(path, 'demand_m05_ret_q.csv'))
+    data = load_csv(os.path.join(path, 'demand_m05_ret_q.csv'), skip_rows=1)
     cashbox_type = CashboxType.objects.get(shop=shop, name='Возврат')
     for x in data:
         counter += PeriodDemand.objects.filter(
