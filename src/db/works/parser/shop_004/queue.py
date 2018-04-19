@@ -10,6 +10,8 @@ def run(path, super_shop):
     dttm_to = datetime.now()
     dttm_step = timedelta(days=1)
 
+    print('queue started')
+
     shop = Shop.objects.get(super_shop=super_shop, hidden_title='common')
     cashboxes_types = CashboxType.objects.filter(shop=shop)
 
@@ -24,3 +26,5 @@ def run(path, super_shop):
                     proportion=min(1 - wt / 10, 0.95),
                     type=forecast_type
                 )
+
+    print('queue finished')
