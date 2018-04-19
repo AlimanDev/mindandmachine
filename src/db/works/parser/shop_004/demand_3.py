@@ -57,7 +57,7 @@ def run(path, super_shop):
         dttm = x[0]
         clients = x[1]
         depart = x[2]
-        counter += PeriodDemand.objects.create(
+        PeriodDemand.objects.create(
             cashbox_type=cashboxes_types[depart],
             type=PeriodDemand.Type.LONG_FORECAST.value,
             dttm_forecast=dttm,
@@ -66,6 +66,7 @@ def run(path, super_shop):
             queue_wait_time=0,
             queue_wait_length=0
         )
+        counter += 1
 
     print('demand3_finished')
     print('demand_depart updated {}'.format(counter))
