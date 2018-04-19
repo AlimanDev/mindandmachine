@@ -98,8 +98,8 @@ def run(path, super_shop):
                 products=0,
                 type=PeriodDemand.Type.LONG_FORECAST.value,
                 cashbox_type=cashbox_type,
-                queue_wait_time=random.randint(1, 9),
-                queue_wait_length=random.randint(1, 5)
+                queue_wait_time=0,
+                queue_wait_length=0
             )
 
     # stage 2
@@ -113,8 +113,8 @@ def run(path, super_shop):
                 products=0,
                 type=PeriodDemand.Type.LONG_FORECAST.value,
                 cashbox_type=cashbox_type,
-                queue_wait_time=random.randint(1, 9),
-                queue_wait_length=random.randint(1, 5)
+                queue_wait_time=0,
+                queue_wait_length=0
             )
 
     # stage 3
@@ -128,6 +128,6 @@ def run(path, super_shop):
                 products=row[2],
                 type=PeriodDemand.Type.FACT.value,
                 cashbox_type=cashbox_type,
-                queue_wait_time=random.randint(1, 9),
-                queue_wait_length=random.randint(1, 5)
+                queue_wait_time=0,
+                queue_wait_length=0
             )
