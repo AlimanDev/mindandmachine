@@ -42,6 +42,8 @@ def load_csv(path, skip_rows=0):
 
 
 def run(path, super_shop):
+    print('demand3_started')
+
     data = load_csv(os.path.join(path, 'demand_depart.csv'), skip_rows=1)
     shops = {
         3: Shop.objects.get(super_shop=super_shop, hidden_title='electro'),
@@ -65,4 +67,5 @@ def run(path, super_shop):
             queue_wait_length=0
         )
 
+    print('demand3_finished')
     print('demand_depart updated {}'.format(counter))
