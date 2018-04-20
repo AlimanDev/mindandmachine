@@ -342,7 +342,7 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
 
     cashboxes_counter = {}
 
-    counter = 0
+    counter = 5000 # todo: if order anoter and new user (DoesNotExist) then username with counter already exist
     cashboxes_types = {x.name: x for x in CashboxType.objects.filter(shop_id=ctx.shop.id)}
     cashboxes = {c_name: Cashbox.objects.filter(type=c)[0] for c_name, c in cashboxes_types.items()}
     for row in range_i(row_begin, row_end):
@@ -469,6 +469,7 @@ def run(path, super_shop):
     ctx = Context()
     ctx.shop = Shop.objects.create(super_shop=super_shop, title='Кассиры', hidden_title='common')
     __print('Created shop {} with title {}'.format(ctx.shop.id, ctx.shop.title))
+    ctx.verbose = False
 
     users_path = os.path.join(path, 'users.xlsx')
     data = pandas.read_excel(users_path, 'График', header=None)
@@ -498,7 +499,7 @@ def run(path, super_shop):
         ctx=ctx,
         data=data,
         row_begin=6,
-        row_end=88,
+        row_end=86,
         column_sheet_begin='G',
         column_sheet_end='CS',
         use_one_column=False
