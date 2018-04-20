@@ -1,7 +1,7 @@
 import os
 
 from src.db.models import SuperShop
-from . import users, users_2, demand
+from . import users, users_2, demand, demand_2, demand_3
 
 
 def run():
@@ -11,3 +11,5 @@ def run():
     users.run(path, super_shop)
     users_2.run(path, super_shop)
     demand.run(path, super_shop)
+    demand_2.run(path, super_shop)
+    demand_3.run(path, super_shop)
