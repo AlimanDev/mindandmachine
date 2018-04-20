@@ -51,21 +51,26 @@ def run(path, super_shop):
         12: Shop.objects.get(super_shop=super_shop, hidden_title='dekor')
     }
 
-    cashboxes_types = {k: CashboxType.objects.filter(shop=v)[0] for k, v in shops.items()}
+    def __get_safe(__v):
+        __data = CashboxType.objects.filter(shop=__v)
+        return __data[0] if len(__data) > 0 else None
+
+    cashboxes_types = {k: __get_safe(v) for k, v in shops.items()}
     counter = 0
     for x in data:
         dttm = x[0]
         clients = x[1]
         depart = x[2]
-        PeriodDemand.objects.create(
-            cashbox_type=cashboxes_types[depart],
-            type=PeriodDemand.Type.LONG_FORECAST.value,
-            dttm_forecast=dttm,
-            clients=clients,
-            products=0,
-            queue_wait_time=0,
-            queue_wait_length=0
-        )
-        counter += 1
+        if cashboxes_types.get(depart) is not None:
+            PeriodDemand.objects.create(
+                cashbox_type=cashboxes_types[depart],
+                type=PeriodDemand.Type.LONG_FORECAST.value,
+                dttm_forecast=dttm,
+                clients=clients,
+                products=0,
+                queue_wait_time=0,
+                queue_wait_length=0
+            )
+            counter += 1
 
     print('demand_depart updated {}'.format(counter))
