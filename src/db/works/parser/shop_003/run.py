@@ -1,9 +1,7 @@
 import os
 
 from src.db.models import SuperShop
-from . import users
-from . import users_2
-from . import demand
+from . import users, users_2, demand
 
 
 def run():

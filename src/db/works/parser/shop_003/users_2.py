@@ -231,7 +231,7 @@ def run(path, super_shop):
     # file #3
     shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Декор', hidden_title='dekor')
     load_users(
-        manager_username='cs012.mag004',
+        manager_username='cs012.mag003',
         shop=shop,
         data=pandas.read_excel(os.path.join(path, 'users_2_c.xlsx'), 'Апрель 2018', header=None),
         year=2018,
