@@ -269,3 +269,4 @@ def run(path, super_shop):
                 WorkerConstraint.objects.create(worker=user, weekday=i, tm=dttm.time())
 
 
+# время ожидания и длина очереди
