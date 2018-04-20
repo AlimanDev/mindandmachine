@@ -2,6 +2,7 @@ import os
 
 from src.db.models import SuperShop
 from . import users
+from . import users_2
 from . import demand
 
 
@@ -10,4 +11,5 @@ def run():
 
     super_shop = SuperShop.objects.create(title='Красногорск', hidden_title='shop003')
     users.run(path, super_shop)
+    users_2.run(path, super_shop)
     demand.run(path, super_shop)
