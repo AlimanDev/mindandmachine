@@ -87,6 +87,20 @@ def run(path, super_shop):
     shop = Shop.objects.get(super_shop=super_shop, hidden_title='common')
     cashboxes_types = {x.name: x for x in CashboxType.objects.filter(shop=shop)}
 
+    data = load_csv(os.path.join(path, 'demand_m05.csv'), skip_rows=1)
+    for row in data:
+        cashbox_type = cashboxes_types.get(row[2])
+        if cashbox_type is not None:
+            pd = PeriodDemand.objects.create(
+                dttm_forecast=row[0],
+                clients=row[1],
+                products=0,
+                type=PeriodDemand.Type.LONG_FORECAST.value,
+                cashbox_type=cashbox_type,
+                queue_wait_time=0,
+                queue_wait_length=0
+            )
+
     # stage 3
     data = load_csv_2(os.path.join(path, 'demand_y17.csv'), skip_rows=1)
     for row in data:
