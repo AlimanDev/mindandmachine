@@ -12,6 +12,9 @@ class SuperShop(models.Model):
 
     code = models.CharField(max_length=64, null=True, blank=True)
 
+    dt_opened = models.DateField(null=True, blank=True)
+    dt_closed = models.DateField(null=True, blank=True)
+
 
 # на самом деле это отдел
 class Shop(models.Model):
@@ -250,14 +253,14 @@ class Notifications(models.Model):
     dttm_added = models.DateTimeField(auto_now_add=True)
     to_worker = models.ForeignKey(User, on_delete=models.PROTECT)
 
+    was_read = models.BooleanField(default=False)
+
     text = models.CharField(max_length=512)
     type = utils.EnumField(Type)
 
     worker_day_change_request = models.ForeignKey(WorkerDayChangeRequest, on_delete=models.PROTECT, null=True, blank=True)
     worker_day_change_log = models.ForeignKey(WorkerDayChangeLog, on_delete=models.PROTECT, null=True, blank=True)
     period_demand_log = models.ForeignKey(PeriodDemandChangeLog, on_delete=models.PROTECT, null=True, blank=True)
-
-    shown = models.BooleanField(default=False)
 
 
 class OfficialHolidays(models.Model):

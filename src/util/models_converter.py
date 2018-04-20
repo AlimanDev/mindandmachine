@@ -243,7 +243,9 @@ class SuperShopConverter(BaseConverter):
         return {
             'id': obj.id,
             'title': obj.title,
-            'code': obj.code
+            'code': obj.code,
+            'dt_opened': obj.dt_opened,
+            'dt_closed': obj.dt_closed
         }
 
 
