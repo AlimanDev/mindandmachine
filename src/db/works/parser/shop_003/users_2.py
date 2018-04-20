@@ -189,7 +189,7 @@ def run(path, super_shop):
     #             WorkerConstraint.objects.create(worker=user, weekday=i, tm=dttm.time())
     #
     # # file #2
-    # shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Сантехника', hidden_title='santeh')
+    shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Сантехника', hidden_title='santeh')
     # load_users(
     #     manager_username='cs007.mag004',
     #     shop=shop,
