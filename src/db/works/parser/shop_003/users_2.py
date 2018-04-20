@@ -45,6 +45,9 @@ class ParseHelper(object):
 
     @classmethod
     def parse_date(cls, year, month, value):
+        if isinstance(value, datetime):
+            return datetime(year=year, month=month, day=value.day)
+        
         return datetime(year=year, month=month, day=int(value)).date()
 
 
