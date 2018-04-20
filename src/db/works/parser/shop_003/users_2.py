@@ -64,7 +64,7 @@ def load_users(manager_username, shop, data, year, month, column_cashbox_type, c
         user = User.objects.create_user(
             username=manager_username,
             email='q@q.com',
-            password='BestCompany004'
+            password='bestcompany003'
         )
         user.shop = shop
         user.first_name = 'Иван'
@@ -267,6 +267,3 @@ def run(path, super_shop):
         for i in range(7):
             for dttm in range_u(dttm_from, dttm_to, dttm_step, False):
                 WorkerConstraint.objects.create(worker=user, weekday=i, tm=dttm.time())
-
-
-# время ожидания и длина очереди
