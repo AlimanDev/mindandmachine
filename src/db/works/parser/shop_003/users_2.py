@@ -47,7 +47,7 @@ class ParseHelper(object):
     def parse_date(cls, year, month, value):
         if isinstance(value, datetime):
             return datetime(year=year, month=month, day=value.day)
-        
+
         return datetime(year=year, month=month, day=int(value)).date()
 
 
@@ -71,6 +71,8 @@ def load_users(manager_username, shop, data, year, month, column_cashbox_type, c
         user.middle_name = ' '
         user.last_name = 'Иванов'
         user.save()
+
+    wd_create_error = 0
 
     counter = 0
     cashboxes_types = {x.name: x for x in CashboxType.objects.filter(shop_id=shop.id)}
@@ -122,22 +124,27 @@ def load_users(manager_username, shop, data, year, month, column_cashbox_type, c
             workday_type, tm_work_start, tm_work_end = ParseHelper.parse_work_day_type(data[col][row])
             is_wk = workday_type == WorkerDay.Type.TYPE_WORKDAY.value
 
-            wd = WorkerDay.objects.create(
-                worker=user,
-                dt=dt,
-                type=workday_type,
-                worker_shop=shop,
-                tm_work_start=tm_work_start,
-                tm_work_end=tm_work_end
-            )
-
-            if is_wk:
-                wdcd = WorkerDayCashboxDetails.objects.create(
-                    worker_day=wd,
-                    on_cashbox=cashbox,
-                    tm_from=tm_work_start,
-                    tm_to=tm_work_end
+            try:
+                wd = WorkerDay.objects.create(
+                    worker=user,
+                    dt=dt,
+                    type=workday_type,
+                    worker_shop=shop,
+                    tm_work_start=tm_work_start,
+                    tm_work_end=tm_work_end
                 )
+
+                if is_wk:
+                    wdcd = WorkerDayCashboxDetails.objects.create(
+                        worker_day=wd,
+                        on_cashbox=cashbox,
+                        tm_from=tm_work_start,
+                        tm_to=tm_work_end
+                    )
+            except:
+                wd_create_error += 1
+
+    print('wd_create_error', wd_create_error)
 
 
 def run(path, super_shop):
