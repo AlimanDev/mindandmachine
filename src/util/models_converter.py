@@ -56,6 +56,7 @@ class UserConverter(BaseConverter):
             'avatar_url': obj.avatar.url if obj.avatar else None,
             'dt_hired': cls.convert_date(obj.dt_hired),
             'dt_fired': cls.convert_date(obj.dt_fired),
+            'auto_timetable': obj.auto_timetable
         }
 
 

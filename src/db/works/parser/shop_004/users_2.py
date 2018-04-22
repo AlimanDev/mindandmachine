@@ -141,13 +141,13 @@ def run(path, super_shop):
     load_users(
         manager_username='cs003.mag004',
         shop=shop,
-        data=pandas.read_excel(os.path.join(path, 'users_2_a.xlsx'), 'апрель 18', header=None),
+        data=pandas.read_excel(os.path.join(path, 'users_2_d003.xlsx'), 'апрель', header=None),
         year=2018,
         month=4,
         column_cashbox_type='c',
         column_fio='D',
         row_date=10,
-        row_begin=12,
+        row_begin=11,
         row_end=22,
         col_timetable_begin='E',
         col_timetable_end='ah'
@@ -156,13 +156,13 @@ def run(path, super_shop):
     load_users(
         manager_username=None,
         shop=shop,
-        data=pandas.read_excel(os.path.join(path, 'users_2_a.xlsx'), 'май 18', header=None),
+        data=pandas.read_excel(os.path.join(path, 'users_2_d003.xlsx'), 'май', header=None),
         year=2018,
         month=5,
         column_cashbox_type='c',
         column_fio='D',
         row_date=10,
-        row_begin=12,
+        row_begin=11,
         row_end=22,
         col_timetable_begin='E',
         col_timetable_end='ai'
@@ -181,7 +181,7 @@ def run(path, super_shop):
     load_users(
         manager_username='cs007.mag004',
         shop=shop,
-        data=pandas.read_excel(os.path.join(path, 'users_2_b.xls'), 'апрель', header=None),
+        data=pandas.read_excel(os.path.join(path, 'users_2_d007_m04.xls'), 'апрель', header=None),
         year=2018,
         month=4,
         column_cashbox_type='c',
@@ -196,13 +196,13 @@ def run(path, super_shop):
     load_users(
         manager_username=None,
         shop=shop,
-        data=pandas.read_excel(os.path.join(path, 'users_2_b.xls'), 'май', header=None),
+        data=pandas.read_excel(os.path.join(path, 'users_2_d007_m05.xls'), 'Лист1', header=None),
         year=2018,
         month=5,
         column_cashbox_type='c',
         column_fio='D',
         row_date=10,
-        row_begin=11,
+        row_begin=12,
         row_end=23,
         col_timetable_begin='E',
         col_timetable_end='ai'
@@ -221,31 +221,31 @@ def run(path, super_shop):
     load_users(
         manager_username='cs012.mag004',
         shop=shop,
-        data=pandas.read_excel(os.path.join(path, 'users_2_c.xlsx'), 'апрель', header=None),
+        data=pandas.read_excel(os.path.join(path, 'users_2_d012.xlsx'), 'апрель', header=None),
         year=2018,
         month=4,
-        column_cashbox_type='E',
-        column_fio='F',
+        column_cashbox_type='C',
+        column_fio='D',
         row_date=10,
         row_begin=11,
-        row_end=26,
-        col_timetable_begin='g',
-        col_timetable_end='aj'
+        row_end=27,
+        col_timetable_begin='E',
+        col_timetable_end='ah'
     )
 
     load_users(
         manager_username=None,
         shop=shop,
-        data=pandas.read_excel(os.path.join(path, 'users_2_c.xlsx'), 'май', header=None),
+        data=pandas.read_excel(os.path.join(path, 'users_2_d012.xlsx'), 'май', header=None),
         year=2018,
         month=5,
-        column_cashbox_type='B',
-        column_fio='C',
+        column_cashbox_type='C',
+        column_fio='D',
         row_date=10,
         row_begin=11,
         row_end=25,
-        col_timetable_begin='D',
-        col_timetable_end='ah'
+        col_timetable_begin='E',
+        col_timetable_end='ai'
     )
 
     dttm_from = datetime(year=1971, month=1, day=1)
@@ -255,5 +255,3 @@ def run(path, super_shop):
         for i in range(7):
             for dttm in range_u(dttm_from, dttm_to, dttm_step, False):
                 WorkerConstraint.objects.create(worker=user, weekday=i, tm=dttm.time())
-
-

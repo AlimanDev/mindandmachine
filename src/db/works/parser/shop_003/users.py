@@ -197,7 +197,7 @@ class DataParseHelper(object):
             'deli': 'Доставка',
             'queer': None,
             'серв': None,
-            'декр': None,
+            'декр': '_декрет',
             'мспок': None,
             'бух': None
         }
@@ -206,7 +206,6 @@ class DataParseHelper(object):
             value = value.lower()
 
         return mapping.get(value, 'Линия')
-
 
 
 class DemandParseHelper(object):
@@ -326,6 +325,7 @@ def parse_users_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, co
                 cashbox_type=cashbox_type
             )
 
+
 def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_sheet_end, use_one_column):
     def __print(*args, **kwargs):
         if ctx.verbose:
@@ -342,7 +342,7 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
 
     cashboxes_counter = {}
 
-    counter = 5000 # todo: if order anoter and new user (DoesNotExist) then username with counter already exist
+    counter = 5000
     cashboxes_types = {x.name: x for x in CashboxType.objects.filter(shop_id=ctx.shop.id)}
     cashboxes = {c_name: Cashbox.objects.filter(type=c)[0] for c_name, c in cashboxes_types.items()}
     for row in range_i(row_begin, row_end):
@@ -367,6 +367,7 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
         __print('Created user {} {}'.format(user.first_name, user.last_name))
 
         for col in range_i(column_sheet_begin, column_sheet_end, 3):
+            one_column_cashbox_type_name = DataParseHelper.parse_cashbox_type_name(data[column_cashbox_type][row])
             cashbox_type_name = DataParseHelper.parse_cashbox_type_name(data[column_cashbox_type if use_one_column else (col+2)][row])
 
             if cashbox_type_name not in cashboxes_counter:
@@ -376,20 +377,29 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
             if cashbox_type_name is None:
                 continue
 
-            if cashbox_type_name in cashboxes_types:
-                cashbox_type = cashboxes_types[cashbox_type_name]
-                cashbox = cashboxes[cashbox_type_name]
-            else:
-                cashbox_type = CashboxType.objects.create(shop=ctx.shop, name=cashbox_type_name, is_stable=cashbox_type_name in ['Линия', 'Возврат'])
-                cashboxes_types[cashbox_type_name] = cashbox_type
-                __print('Created cashbox_type {} with name {}'.format(cashbox_type.id, cashbox_type.name))
+            if one_column_cashbox_type_name is None or not one_column_cashbox_type_name.startswith('_'):
+                if cashbox_type_name in cashboxes_types:
+                    cashbox_type = cashboxes_types[cashbox_type_name]
+                    cashbox = cashboxes[cashbox_type_name]
+                else:
+                    cashbox_type = CashboxType.objects.create(shop=ctx.shop, name=cashbox_type_name, is_stable=cashbox_type_name in ['Линия', 'Возврат'])
+                    cashboxes_types[cashbox_type_name] = cashbox_type
+                    __print('Created cashbox_type {} with name {}'.format(cashbox_type.id, cashbox_type.name))
 
-                cashbox = Cashbox.objects.create(type=cashbox_type, number='1')
-                cashboxes[cashbox_type_name] = cashbox
-                __print('Created cashbox {} for type {}:{}'.format(cashbox.id, cashbox_type.id, cashbox_type.name))
+                    cashbox = Cashbox.objects.create(type=cashbox_type, number='1')
+                    cashboxes[cashbox_type_name] = cashbox
+                    __print('Created cashbox {} for type {}:{}'.format(cashbox.id, cashbox_type.id, cashbox_type.name))
+
+                workday_type = DataParseHelper.parse_workday_type(data[col][row])
+            else:
+                if one_column_cashbox_type_name == '_декрет':
+                    workday_type = WorkerDay.Type.TYPE_MATERNITY.value
+                else:
+                    raise Exception('unknown one_column_cashbox_type_name')
+
+                cashbox = None
 
             dt = DataParseHelper.parse_date(data[col][row_date])
-            workday_type = DataParseHelper.parse_workday_type(data[col][row])
             is_wk = workday_type == WorkerDay.Type.TYPE_WORKDAY.value
             tm_work_start = DataParseHelper.parse_work_time(data[col][row]) if is_wk else None
             tm_work_end = DataParseHelper.parse_work_time(data[col+1][row]) if is_wk else None
@@ -404,6 +414,9 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
             )
 
             if is_wk:
+                if cashbox is None:
+                    raise Exception('cashbox is none')
+
                 wdcd = WorkerDayCashboxDetails.objects.create(
                     worker_day=wd,
                     on_cashbox=cashbox,

@@ -60,7 +60,7 @@ class JsonResponse(object):
             'code': code,
             'data': data
         }
-        return HttpResponse(json.dumps(response_data, separators=(',', ':')), content_type="application/json")
+        return HttpResponse(json.dumps(response_data, separators=(',', ':')), content_type='application/json')
 
 
 def api_method(method, form_cls=None, auth_required=True):
@@ -105,5 +105,3 @@ def api_method(method, form_cls=None, auth_required=True):
 
         return wrapper
     return decor
-
-

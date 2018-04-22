@@ -70,6 +70,7 @@ class User(DjangoAbstractUser):
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
 
     comment = models.CharField(max_length=2048, default='')
+    extra_info = models.CharField(max_length=512, default='')
 
     auto_timetable = models.BooleanField(default=True)
 

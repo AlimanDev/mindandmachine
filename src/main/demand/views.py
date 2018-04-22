@@ -52,9 +52,10 @@ def get_indicators(request, form):
     for x in prev_periods_demands:
         prev_clients += x.clients
 
-    growth = 0
     if prev_clients != 0:
         growth = (clients - prev_clients) / prev_clients * 100
+    else:
+        growth = None
 
     return JsonResponse.success({
         'mean_bills': clients / workers_count if workers_count > 0 else None,
