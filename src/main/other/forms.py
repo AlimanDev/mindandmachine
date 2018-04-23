@@ -18,4 +18,14 @@ class GetSuperShopListForm(forms.Form):
 
 
 class GetNotificationsForm(forms.Form):
-    pass
+    pointer = forms.IntegerField(required=False)
+    count = forms.IntegerField()
+
+
+class GetNewNotificationsForm(forms.Form):
+    pointer = forms.IntegerField()
+    count = forms.IntegerField()
+
+
+class SetNotificationsReadForm(forms.Form):
+    ids = util_forms.IntegersList(required=True)

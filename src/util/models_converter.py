@@ -1,6 +1,6 @@
 import datetime
 
-from src.db.models import User, WorkerDay, PeriodDemand, Timetable
+from src.db.models import User, WorkerDay, PeriodDemand, Timetable, Notifications
 
 
 class BaseConverter(object):
@@ -275,4 +275,32 @@ class TimetableConverter(BaseConverter):
             'dt': obj.dt,
             'status': cls.convert_status(obj.status),
             'dttm_status_change': cls.convert_datetime(obj.dttm_status_change)
+        }
+
+
+class NotificationConverter(BaseConverter):
+    __TYPES = {
+        Notifications.Type.SYSTEM_NOTICE.value: 'S',
+        Notifications.Type.CHANGE_REQUEST_NOTICE.value: 'R',
+        Notifications.Type.CHANGE_TIMETABLE_NOTICE.value: 'T',
+        Notifications.Type.CHANGE_WORKER_INFO.value: 'I'
+    }
+
+    __TYPES_REVERSED = {v: k for k, v in __TYPES.items()}
+
+    @classmethod
+    def convert_type(cls, type_obj):
+        return cls.__TYPES.get(type_obj, '')
+
+    @classmethod
+    def parse_type(cls, type_obj):
+        return cls.__TYPES_REVERSED.get(type_obj)
+
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'type': cls.convert_type(obj.type),
+            'text': obj.text,
+            'to_worker': obj.to_worker_id
         }
