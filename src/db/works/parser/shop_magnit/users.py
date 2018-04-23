@@ -238,7 +238,7 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
 
             wd = WorkerDay.objects.create(
                 worker=user,
-                dt=dt,
+                dt=dt - datetime.timedelta(days=10),
                 type=workday_type,
                 worker_shop=ctx.shop,
                 tm_work_start=tm_work_start,

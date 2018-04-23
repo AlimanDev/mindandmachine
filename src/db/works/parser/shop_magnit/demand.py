@@ -108,7 +108,7 @@ def run(path, super_shop):
         cashbox_type = cashboxes_types.get(row[2])
         if cashbox_type is not None:
             pd = PeriodDemand.objects.create(
-                dttm_forecast=row[0],
+                dttm_forecast=row[0] - datetime.timedelta(days=10),
                 clients=int(float(row[1]) / 0.4 / (0.5 + random.random() / 2)),
                 products=0,
                 type=PeriodDemand.Type.LONG_FORECAST.value,

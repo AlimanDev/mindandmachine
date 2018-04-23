@@ -51,7 +51,7 @@ def run(path, super_shop):
         counter += PeriodDemand.objects.filter(
             cashbox_type=cashbox_type,
             type=PeriodDemand.Type.LONG_FORECAST.value,
-            dttm_forecast=x[0]
+            dttm_forecast=x[0]  - datetime.timedelta(days=10),
         ).update(
             queue_wait_time=x[2] * 1.4 / (0.5 + random.random() / 2),
             queue_wait_length=x[1] * 1.4 / (0.5 + random.random() / 2),
@@ -66,7 +66,7 @@ def run(path, super_shop):
         counter += PeriodDemand.objects.filter(
             cashbox_type=cashbox_type,
             type=PeriodDemand.Type.LONG_FORECAST.value,
-            dttm_forecast=x[0]
+            dttm_forecast=x[0]  - datetime.timedelta(days=10),
         ).update(
             queue_wait_time=x[2] * 1.4 / (0.5 + random.random() / 2),
             queue_wait_length=x[1] * 1.4 / (0.5 + random.random() / 2),
