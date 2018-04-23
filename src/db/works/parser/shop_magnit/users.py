@@ -281,7 +281,7 @@ def run(path, super_shop):
 
     ctx = Context()
     ctx.verbose = False
-    ctx.shop = Shop.objects.create(super_shop=super_shop, title='Кассиры', hidden_title='common')
+    ctx.shop = Shop.objects.create(super_shop=super_shop, title='Кассиры', hidden_title='common_magnit')
     __print('Created shop {} with title {}'.format(ctx.shop.id, ctx.shop.title))
 
     # user = User.objects.create_user(

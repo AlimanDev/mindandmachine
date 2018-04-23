@@ -14,7 +14,9 @@ def run():
     shop = Shop.objects.create(super_shop=super_shop, title='Общий', hidden_title='common')
 
     users.run(path, super_shop)
+    print('add users \n\n')
     demand.run(path, super_shop)
+    print('add demand \n\n')
     demand_2.run(path, super_shop)
 
     # user = User.objects.create_user(

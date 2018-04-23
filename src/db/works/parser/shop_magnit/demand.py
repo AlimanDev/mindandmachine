@@ -22,7 +22,7 @@ class DataParseHelper(object):
             # 'extra': 'Другое',
             # 'big': 'Крупногабаритн.'
         }
-        return mapping[value]
+        return mapping.get(value, 'Линия')
 
     @classmethod
     def parse_clients_count(cls, value):
@@ -84,7 +84,7 @@ def run(path, super_shop):
         if verbose:
             print(*args, **kwargs)
 
-    shop = Shop.objects.get(super_shop=super_shop, hidden_title='common')
+    shop = Shop.objects.get(super_shop=super_shop, hidden_title='common_magnit')
     cashboxes_types = {x.name: x for x in CashboxType.objects.filter(shop=shop)}
 
     # stage 1

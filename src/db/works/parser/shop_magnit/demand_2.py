@@ -43,7 +43,7 @@ def load_csv(path, skip_rows=0):
 
 def run(path, super_shop):
     data = load_csv(os.path.join(path, 'demand_m05_line_q.csv'), skip_rows=1)
-    shop = Shop.objects.get(super_shop=super_shop, hidden_title='common')
+    shop = Shop.objects.get(super_shop=super_shop, hidden_title='common_magnit')
     cashbox_type = CashboxType.objects.get(shop=shop, name='Линия')
     counter = 0
     for x in data:
