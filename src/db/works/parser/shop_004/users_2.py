@@ -196,7 +196,7 @@ def run(path, super_shop):
     load_users(
         manager_username=None,
         shop=shop,
-        data=pandas.read_excel(os.path.join(path, 'users_2_d007_m05.xls'), 'Лист1', header=None),
+        data=pandas.read_excel(os.path.join(path, 'users_2_d007_m05.xlsx'), 'Лист1', header=None),
         year=2018,
         month=5,
         column_cashbox_type='c',
