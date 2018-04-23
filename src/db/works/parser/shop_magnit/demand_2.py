@@ -1,5 +1,6 @@
 import datetime
 import os
+import random
 
 from src.db.models import Shop, PeriodDemand, CashboxType
 
@@ -52,8 +53,8 @@ def run(path, super_shop):
             type=PeriodDemand.Type.LONG_FORECAST.value,
             dttm_forecast=x[0]
         ).update(
-            queue_wait_time=x[2],
-            queue_wait_length=x[1]
+            queue_wait_time=x[2] * 1.4 / (0.5 + random.random() / 2),
+            queue_wait_length=x[1] * 1.4 / (0.5 + random.random() / 2),
         )
 
     print('demand_05_line_q updated {}'.format(counter))
@@ -67,8 +68,8 @@ def run(path, super_shop):
             type=PeriodDemand.Type.LONG_FORECAST.value,
             dttm_forecast=x[0]
         ).update(
-            queue_wait_time=x[2],
-            queue_wait_length=x[1]
+            queue_wait_time=x[2] * 1.4 / (0.5 + random.random() / 2),
+            queue_wait_length=x[1] * 1.4 / (0.5 + random.random() / 2),
         )
 
     print('demand_05_ret_q updated {}'.format(counter))
