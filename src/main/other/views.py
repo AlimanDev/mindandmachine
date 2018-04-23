@@ -1,5 +1,4 @@
 from src.db.models import Shop, SuperShop, User, Notifications
-from src.util.dict import DictUtil
 from src.util.forms import FormUtil
 from src.util.models_converter import ShopConverter, SuperShopConverter, NotificationConverter
 from src.util.utils import api_method, JsonResponse
