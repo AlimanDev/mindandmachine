@@ -1,7 +1,7 @@
 import os
 
 from src.db.models import SuperShop, Shop, User
-
+from . import users, demand, demand_2
 
 def run():
     path = os.path.dirname(os.path.abspath(__file__))
@@ -13,14 +13,18 @@ def run():
 
     shop = Shop.objects.create(super_shop=super_shop, title='Общий', hidden_title='common')
 
-    user = User.objects.create_user(
-        username='magnit',
-        email='q@q.com',
-        password='test'
-    )
-    user.shop = shop
-    user.work_type = User.WorkType.TYPE_5_2.value
-    user.first_name = 'Иван'
-    user.middle_name = 'Иванович'
-    user.last_name = 'Иванов'
-    user.save()
+    users.run(path, super_shop)
+    demand.run(path, super_shop)
+    demand_2.run(path, super_shop)
+
+    # user = User.objects.create_user(
+    #     username='magnit',
+    #     email='q@q.com',
+    #     password='test'
+    # )
+    # user.shop = shop
+    # user.work_type = User.WorkType.TYPE_5_2.value
+    # user.first_name = 'Иван'
+    # user.middle_name = 'Иванович'
+    # user.last_name = 'Иванов'
+    # user.save()
