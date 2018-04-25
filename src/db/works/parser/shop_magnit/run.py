@@ -3,6 +3,7 @@ import os
 from src.db.models import SuperShop, Shop, User
 from . import users, demand, demand_2
 
+
 def run():
     path = os.path.dirname(os.path.abspath(__file__))
 

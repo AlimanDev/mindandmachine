@@ -187,6 +187,7 @@ class DataParseHelper(object):
             'инфо': 'Информация',
             'ret': 'Возврат',
             'гк': 'Главная касса',
+            'ВОЗВ': 'Возврат',
             'оркк': 'ОРКК',
             'сверка': 'Сверка',
             'сц': 'СЦ',
@@ -201,6 +202,7 @@ class DataParseHelper(object):
             'мспок': None,
             'бух': None
         }
+        mapping = {k.lower() if isinstance(k, str) else k: v for k, v in mapping.items()}
 
         if isinstance(value, str):
             value = value.lower()
