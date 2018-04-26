@@ -11,6 +11,7 @@ from .forms import GetForecastForm, SetDemandForm, GetIndicatorsForm
 def get_indicators(request, form):
     dt_from = form['from_dt']
     dt_to = form['to_dt']
+    dt_days_count = (dt_to - dt_from).days + 1
 
     forecast_type = form['type']
 
@@ -57,12 +58,23 @@ def get_indicators(request, form):
     else:
         growth = None
 
+    mean_hour_count = dt_days_count * 18
+
+    def __div_safe(__a, __b):
+        return __a / __b if __b > 0 else None
+
     return JsonResponse.success({
-        'mean_bills': clients / workers_count if workers_count > 0 else None,
-        'mean_codes': products / workers_count if workers_count > 0 else None,
+        'mean_bills': __div_safe(clients, workers_count),
+        'mean_codes': __div_safe(products, workers_count),
         'mean_income': None,
-        'mean_bill_codes': products / clients if clients > 0 else None,
+        'mean_bill_codes': __div_safe(products, clients),
+
+        'mean_hour_bills': __div_safe(clients, mean_hour_count),
+        'mean_hour_codes': __div_safe(products, mean_hour_count),
+        'mean_hour_income': None,
+
         'growth': growth,
+
         'total_people': None,
         'total_bills': clients,
         'total_codes': products,
