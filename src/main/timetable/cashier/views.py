@@ -7,24 +7,21 @@ from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerD
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
 from src.util.collection import group_by, count, range_u
 
-from .forms import GetCashierTimetableForm, GetCashierInfoForm, SetWorkerDayForm, SetCashierInfoForm, GetWorkerDayForm, CreateCashierForm, DeleteCashierForm
+from .forms import GetCashierTimetableForm, GetCashierInfoForm, SetWorkerDayForm, SetCashierInfoForm, GetWorkerDayForm, CreateCashierForm, DeleteCashierForm, GetCashiersListForm
 from . import utils
 
 
-@api_method('GET')
-def get_cashiers_list(request):
-    users = list(
-        User.objects.filter(
-            shop_id=request.user.shop_id,
-            dttm_deleted=None
-        ).order_by(
-            'last_name', 'first_name'
-        )
+@api_method('GET', GetCashiersListForm)
+def get_cashiers_list(request, form):
+    users = User.objects.filter(
+        shop_id=request.user.shop_id,
+        dt_hired__lte=form['dt_hired_before'],
+        dt_fired__gte=form['dt_fired_after']
+    ).order_by(
+        'last_name', 'first_name'
     )
 
-    response = [UserConverter.convert(x) for x in users]
-
-    return JsonResponse.success(response)
+    return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
 @api_method('GET', GetCashierTimetableForm)

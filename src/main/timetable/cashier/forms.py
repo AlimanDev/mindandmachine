@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -6,6 +7,23 @@ from django.core.exceptions import ValidationError
 from src.db.models import WorkerDay
 from src.util import forms as util_forms
 from src.util.models_converter import WorkerDayConverter, UserConverter, BaseConverter
+
+
+class GetCashiersListForm(forms.Form):
+    dt_hired_before = util_forms.DateField(required=False)
+    dt_fired_after = util_forms.DateField(required=False)
+
+    def clean_dt_hired_before(self):
+        value = self.cleaned_data.get('dt_hired_before')
+        if value is None:
+            return (datetime.now() + timedelta(days=10)).date()
+        return value
+
+    def clean_dt_fired_after(self):
+        value = self.cleaned_data.get('dt_fired_after')
+        if value is None:
+            return datetime.now().date()
+        return value
 
 
 class GetCashierTimetableForm(forms.Form):
