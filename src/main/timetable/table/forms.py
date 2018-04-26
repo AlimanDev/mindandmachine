@@ -13,6 +13,8 @@ class SelectCashiersForm(forms.Form):
     work_types = forms.CharField(required=False)
     workday_type = forms.CharField(required=False)
     workdays = forms.CharField(required=False)
+
+    work_workdays = forms.CharField(required=False)
     from_tm = util_forms.TimeField(required=False)
     to_tm = util_forms.TimeField(required=False)
 
@@ -56,3 +58,22 @@ class SelectCashiersForm(forms.Form):
 
         return value
 
+    def clean_work_workdays(self):
+        value = self.cleaned_data['work_workdays']
+        if value is None or value == '':
+            return []
+
+        try:
+            value = json.loads(value)
+            value = [BaseConverter.parse_date(x) for x in value]
+        except:
+            raise ValidationError('invalid')
+
+        return value
+
+    def clean(self):
+        has_wds = len(self.cleaned_data['workdays']) > 0
+        has_wd_type = self.cleaned_data['workday_type'] is not None
+
+        if has_wds and not has_wd_type:
+            raise ValidationError('workday_type have to be set')
