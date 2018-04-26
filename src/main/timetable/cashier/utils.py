@@ -50,7 +50,8 @@ def prepare_worker_day_change_create_args(request, form, day):
         'from_type': day.type,
         'to_type': form['type'],
 
-        'changed_by_id': request.user.id
+        'changed_by_id': request.user.id,
+        'comment': form['comment']
     }
 
     if day.type == WorkerDay.Type.TYPE_WORKDAY.value:

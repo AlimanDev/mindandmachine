@@ -56,7 +56,8 @@ class UserConverter(BaseConverter):
             'avatar_url': obj.avatar.url if obj.avatar else None,
             'dt_hired': cls.convert_date(obj.dt_hired),
             'dt_fired': cls.convert_date(obj.dt_fired),
-            'auto_timetable': obj.auto_timetable
+            'auto_timetable': obj.auto_timetable,
+            'extra_info': obj.extra_info
         }
 
 
@@ -302,5 +303,6 @@ class NotificationConverter(BaseConverter):
             'id': obj.id,
             'type': cls.convert_type(obj.type),
             'text': obj.text,
+            'was_read': obj.was_read,
             'to_worker': obj.to_worker_id
         }

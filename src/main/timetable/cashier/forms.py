@@ -41,6 +41,7 @@ class SetWorkerDayForm(forms.Form):
     tm_break_start = util_forms.TimeField(required=False)
 
     cashbox_type = forms.IntegerField(required=False)
+    comment = forms.CharField(max_length=128)
 
     def clean_type(self):
         value = WorkerDayConverter.parse_type(self.cleaned_data['type'])
@@ -97,3 +98,28 @@ class SetCashierInfoForm(forms.Form):
                 raise ValidationError('Invalid week day')
 
         return value
+
+
+class CreateCashierForm(forms.Form):
+    first_name = forms.CharField(max_length=30)
+    middle_name = forms.CharField(max_length=64)
+    last_name = forms.CharField(max_length=150)
+    username = forms.CharField(max_length=150)
+    password = forms.CharField(max_length=64)
+    work_type = forms.CharField(max_length=3)
+    dt_hired = util_forms.DateField()
+
+    def clean_work_type(self):
+        value = self.cleaned_data.get('work_type')
+        if value is None or value == '':
+            raise ValidationError('Invalid value')
+
+        value = UserConverter.parse_work_type(value)
+        if value is None:
+            raise ValidationError('Invalid enum value')
+        return value
+
+
+class DeleteCashierForm(forms.Form):
+    user_id = forms.IntegerField()
+    dt_fired = util_forms.DateField()

@@ -166,6 +166,8 @@ class WorkerDay(models.Model):
         TYPE_QUALIFICATION = 5
         TYPE_ABSENSE = 6
         TYPE_MATERNITY = 7
+        TYPE_BUSINESS_TRIP = 8
+        TYPE_ETC = 9
 
     id = models.BigAutoField(primary_key=True)
 
@@ -240,6 +242,7 @@ class WorkerDayChangeLog(models.Model):
     to_tm_break_start = models.TimeField(null=True, blank=True)
 
     changed_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    comment = models.CharField(max_length=128, default='')
 
 
 class Notifications(models.Model):
