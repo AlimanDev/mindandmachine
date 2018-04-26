@@ -37,25 +37,31 @@ def select_cashiers(request, form):
     if len(workdays) > 0:
         worker_days = worker_days.filter(dt__in=workdays)
 
-    common_users = [x for x in users if x.id in set(y.worker_id for y in worker_days)]
+    users = [x for x in users if x.id in set(y.worker_id for y in worker_days)]
 
     work_workdays = form.get('work_workdays', [])
     if len(work_workdays) > 0:
+        def __is_match_tm(__x, __tm_from, __tm_to):
+            if __x.tm_work_start < __x.tm_work_end:
+                if __tm_from > __x.tm_work_end:
+                    return False
+                if __tm_to < __x.tm_work_start:
+                    return False
+                return True
+            else:
+                if __tm_from >= __x.tm_work_start:
+                    return True
+                if __tm_to <= __x.tm_work_end:
+                    return True
+                return False
+
         worker_days = WorkerDay.objects.filter(worker_shop_id=shop_id, type=WorkerDay.Type.TYPE_WORKDAY.value, dt__in=work_workdays)
 
         tm_from = form.get('from_tm')
-        if tm_from is not None:
-            worker_days = worker_days.filter(tm_work_end__gt=tm_from)
+        tm_to = form.get('to_tm')
+        if tm_from is not None and tm_to is not None:
+            worker_days = [x for x in worker_days if __is_match_tm(x, tm_from, tm_to)]
 
-        tm_to = form.get('tm_to')
-        if tm_to is not None:
-            worker_days = worker_days.filter(tm_work_start__lt=tm_to)
+        users = [x for x in users if x.id in set(y.worker_id for y in worker_days)]
 
-        work_users = [x for x in users if x.id in set(y.worker_id for y in worker_days)]
-    else:
-        work_users = []
-
-    return JsonResponse.success({
-        'common': {x.id: UserConverter.convert(x) for x in common_users},
-        'work': {x.id: UserConverter.convert(x) for x in work_users}
-    })
+    return JsonResponse.success([UserConverter.convert(x) for x in users])
