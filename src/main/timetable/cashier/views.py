@@ -325,14 +325,17 @@ def set_cashier_info(request, form):
 
 @api_method('POST', CreateCashierForm)
 def create_cashier(request, form):
-    user = User.objects.create_user(username=form['username'], password=form['password'], email='q@q.com')
-    user.first_name = form['first_name']
-    user.middle_name = form['middle_name']
-    user.last_name = form['last_name']
-    user.work_type = form['work_type']
-    user.shop = request.user.shop
-    user.dt_hired = form['dt_hired']
-    user.save()
+    try:
+        user = User.objects.create_user(username=form['username'], password=form['password'], email='q@q.com')
+        user.first_name = form['first_name']
+        user.middle_name = form['middle_name']
+        user.last_name = form['last_name']
+        user.work_type = form['work_type']
+        user.shop = request.user.shop
+        user.dt_hired = form['dt_hired']
+        user.save()
+    except:
+        return JsonResponse.already_exists_error()
 
     return JsonResponse.success(UserConverter.convert(user))
 

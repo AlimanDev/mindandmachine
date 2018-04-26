@@ -414,7 +414,7 @@ def print_to_file(path, shop_id, dt_from, dt_to, debug=False):
     return file
 
 
-def run(shop_id):
+def run(shop_id, debug=False):
     path = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(path, 'test.xlsx')
     if os.path.isfile(file_path):
@@ -425,5 +425,5 @@ def run(shop_id):
         shop_id=shop_id,
         dt_from=datetime(year=2018, month=5, day=1),
         dt_to=datetime(year=2018, month=6, day=1) - timedelta(days=1),
-        debug=False
+        debug=debug
     )
