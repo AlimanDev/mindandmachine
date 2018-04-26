@@ -58,7 +58,7 @@ def get_indicators(request, form):
     else:
         growth = None
 
-    mean_hour_count = dt_days_count * 18
+    mean_hour_count = dt_days_count * 17
 
     def __div_safe(__a, __b):
         return __a / __b if __b > 0 else None
