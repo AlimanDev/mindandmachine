@@ -21,6 +21,17 @@ def fmt(**kwargs):
     return kwargs
 
 
+def fmt2(**kwargs):
+    kwargs.setdefault('align', 'center')
+    kwargs.setdefault('valign', 'vcenter')
+    kwargs.setdefault('text_wrap', True)
+    kwargs.setdefault('top', 1)
+    kwargs.setdefault('bottom', 1)
+    kwargs.setdefault('left', 1)
+    kwargs.setdefault('right', 1)
+    return kwargs
+
+
 class SheetIndexHelper(object):
     __COLUMNS_MAPPING = None
     __COLUMNS_MAPPING_REVERSE = None
@@ -105,6 +116,9 @@ class PrintHelper(object):
         if obj.type == WorkerDay.Type.TYPE_VACATION.value:
             return Cell('ОТ', fmts['default'])
 
+        if obj.type == WorkerDay.Type.TYPE_MATERNITY.value:
+            return Cell('ОЖ', fmts['default'])
+
 
 # noinspection PyTypeChecker
 def add_workers(workbook, data, data_size, shop_id, dt_from, dt_to):
@@ -141,15 +155,11 @@ def add_workers(workbook, data, data_size, shop_id, dt_from, dt_to):
 
 
 # noinspection PyTypeChecker
-def print_to_file(path, shop_id, dt_from, dt_to):
+def fill_sheet_one(workbook, shop_id, dt_from, dt_to):
     def __dt_range():
         return range_u(dt_from, dt_to, timedelta(days=1))
 
-    file = io.BytesIO()
-    # file = path
-
-    workbook = xlsxwriter.Workbook(filename=file)
-    worksheet = workbook.add_worksheet()
+    worksheet = workbook.add_worksheet(name='Расписание на подпись')
 
     format_default = workbook.add_format(fmt(font_size=10))
     format_header_text = workbook.add_format(fmt(font_size=10, border=2))
@@ -157,19 +167,19 @@ def print_to_file(path, shop_id, dt_from, dt_to):
     format_header_date = workbook.add_format(fmt(font_size=11, border=2, bold=True, num_format='dd/mm'))
 
     data = [
-        [] for i in range(15)
-    ] + [
-        # weekdays
-        ['', '', '', ''] + [Cell(PrintHelper.get_weekday_name(x), format_header_weekday) for x in __dt_range()],
+               [] for i in range(15)
+               ] + [
+               # weekdays
+               ['', '', '', ''] + [Cell(PrintHelper.get_weekday_name(x), format_header_weekday) for x in __dt_range()],
 
-        # main header
-        [Cell(x, format_header_text) for x in ['№', 'ФИО', 'ДОЛЖНОСТЬ', 'долг по выходным']] +
-        [Cell(x.date(), format_header_date) for x in __dt_range()] +
-        [Cell(x, format_header_text) for x in ['плановые дни', 'дата', 'С графиком работы ознакомлен**. На работу в праздничные дни согласен', 'В', 'ОТ']],
+               # main header
+               [Cell(x, format_header_text) for x in ['№', 'ФИО', 'ДОЛЖНОСТЬ', 'долг по выходным']] +
+               [Cell(x.date(), format_header_date) for x in __dt_range()] +
+               [Cell(x, format_header_text) for x in ['плановые дни', 'дата', 'С графиком работы ознакомлен**. На работу в праздничные дни согласен', 'В', 'ОТ']],
 
-        # empty row
-        [],
-    ]
+               # empty row
+               [],
+           ]
     data_size = {
         'rows': [15 for i in range(15)] + [15, 40, 10],
         'cols': [25, 30, 25, 20] + [10 for x in __dt_range()] + [15, 15, 25, 10, 10]
@@ -268,8 +278,139 @@ def print_to_file(path, shop_id, dt_from, dt_to):
     __wt(8, 'z', '', format_meta_bold_bottom)
     __wt(8, 'aa', '', format_meta_bold_bottom)
 
+
+def create_rect(workbook, shop_id, dt_from, dt_to):
+    def __dt_range():
+        return range_u(dt_from, dt_to, timedelta(days=1))
+
+    def __transpose(__data):
+        return list(map(list, zip(*__data)))
+
+    format_fio = workbook.add_format(fmt2(font_size=10, bold=True, text_wrap=False, align='left', top=2))
+
+    format_common = workbook.add_format(fmt2(font_size=7, bold=True))
+    format_common_bottom = workbook.add_format(fmt2(font_size=7, bold=True, bottom=2))
+    format_common_bottom_left = workbook.add_format(fmt2(font_size=7, bold=True, bottom=2, left=2))
+    format_common_left = workbook.add_format(fmt2(font_size=7, bold=True, left=2))
+
+    format_common_top = workbook.add_format(fmt2(font_size=7, bold=True, top=2))
+    format_common_top_left = workbook.add_format(fmt2(font_size=7, bold=True, top=2, left=2))
+
+    format_date = workbook.add_format(fmt2(font_size=7, bold=True, num_format='dd/mm', bg_color='#C0C0C0'))
+    format_date_bottom = workbook.add_format(fmt2(font_size=7, bold=True, num_format='dd/mm', bottom=2, bg_color='#C0C0C0'))
+
+    format_time = workbook.add_format(fmt2(font_size=7, bold=True, num_format='hh:mm'))
+    format_time_bottom = workbook.add_format(fmt2(font_size=7, bold=True, num_format='hh:mm', bottom=2))
+
+    weekdays = [Cell(x, format_common_left if x != 'Вс' else format_common_bottom_left) for x in ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']]
+
+    data = []
+    data_size = {
+        'rows': [],
+        'cols': []
+    }
+
+    prev_user_data = None
+    for i, worker in enumerate(User.objects.filter(shop=shop_id)):
+        worker_days = {x.dt: x for x in WorkerDay.objects.filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
+
+        user_data = [weekdays]
+        dt = dt_from - timedelta(days=dt_from.weekday())
+        while dt <= dt_to:
+            weekdays_dts = []
+            work_begin = []
+            work_end = []
+            for xdt in range_u(dt, dt + timedelta(days=7), timedelta(days=1), False):
+                wd = worker_days.get(xdt.date())
+
+                weekdays_dts.append(Cell(xdt, format_date if xdt.weekday() != 6 else format_date_bottom))
+                if wd is None:
+                    work_begin.append(Cell('', format_common if xdt.weekday() != 6 else format_common_bottom))
+                    work_end.append(Cell('', format_common if xdt.weekday() != 6 else format_common_bottom))
+                    continue
+
+                if wd.type == WorkerDay.Type.TYPE_WORKDAY.value:
+                    work_begin.append(Cell(wd.tm_work_start, format_time if xdt.weekday() != 6 else format_time_bottom))
+                    work_end.append(Cell(wd.tm_work_end, format_time if xdt.weekday() != 6 else format_time_bottom))
+                    continue
+
+                mapping = {
+                    WorkerDay.Type.TYPE_HOLIDAY.value: 'В',
+                    WorkerDay.Type.TYPE_VACATION.value: 'ОТ',
+                    WorkerDay.Type.TYPE_MATERNITY.value: 'ОЖ'
+                }
+
+                text = mapping.get(wd.type)
+                work_begin.append(Cell('' if text is None else text, format_common if xdt.weekday() != 6 else format_common_bottom))
+                work_end.append(Cell('' if text is None else text, format_common if xdt.weekday() != 6 else format_common_bottom))
+
+            user_data += [weekdays_dts, work_begin, work_end]
+            dt += timedelta(days=7)
+
+        user_data = __transpose(user_data)
+        user_data = [
+            [
+                Cell('', format_common_top_left),
+                Cell('', format_common_top),
+                Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_fio),
+            ] + [
+                Cell('', format_common_top) for _ in range(len(user_data[0]) - 3)
+            ]
+        ] + user_data
+
+        if i % 2 == 0:
+            prev_user_data = user_data
+        else:
+            data += [row1 + row2 for row1, row2 in zip(prev_user_data, user_data)]
+
+            if len(data_size['cols']) == 0:
+                data_size['cols'] = [3] + [5 for _ in range(len(prev_user_data[0]) - 1)] + [3] + [5 for _ in range(len(user_data[0]) - 1)]
+
+            data_size['rows'] += [25] + [20 for _ in range(7)]
+
+            prev_user_data = None
+
+    return data, data_size
+
+
+# noinspection PyTypeChecker
+def fill_sheet_two(workbook, shop_id, dt_from, dt_to):
+    def __dt_range():
+        return range_u(dt_from, dt_to, timedelta(days=1))
+
+    worksheet = workbook.add_worksheet('На печать')
+    format_default = workbook.add_format(fmt(font_size=10))
+
+    data, data_size = create_rect(workbook, shop_id, dt_from, dt_to)
+
+    for row_index, row_size in enumerate(data_size['rows']):
+        worksheet.set_row(row_index, row_size)
+    for col_index, col_size in enumerate(data_size['cols']):
+        worksheet.set_column(col_index, col_index, col_size)
+
+    for row_index, row in enumerate(data):
+        for col_index, cell in enumerate(row):
+            if isinstance(cell, Cell):
+                if cell.f is not None:
+                    worksheet.write(row_index, col_index, cell.d, cell.f)
+                else:
+                    worksheet.write(row_index, col_index, cell.d, format_default)
+            else:
+                worksheet.write(row_index, col_index, cell, format_default)
+
+
+# noinspection PyTypeChecker
+def print_to_file(path, shop_id, dt_from, dt_to, debug=False):
+    file = path if debug else io.BytesIO()
+
+    workbook = xlsxwriter.Workbook(filename=file)
+    fill_sheet_one(workbook, shop_id, dt_from, dt_to)
+    fill_sheet_two(workbook, shop_id, dt_from, dt_to)
     workbook.close()
-    file.seek(0)
+
+    if not debug:
+        file.seek(0)
+
     return file
 
 
@@ -283,5 +424,6 @@ def run(shop_id):
         path=file_path,
         shop_id=shop_id,
         dt_from=datetime(year=2018, month=5, day=1),
-        dt_to=datetime(year=2018, month=6, day=1) - timedelta(days=1)
+        dt_to=datetime(year=2018, month=6, day=1) - timedelta(days=1),
+        debug=False
     )
