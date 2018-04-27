@@ -13,13 +13,11 @@ from . import utils
 
 @api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
-    users = User.objects.filter(
-        shop_id=request.user.shop_id,
-        dt_hired__lte=form['dt_hired_before'],
-        dt_fired__gte=form['dt_fired_after']
-    ).order_by(
-        'last_name', 'first_name'
-    )
+    users = []
+    for u in User.objects.filter(shop_id=request.user.shop_id).order_by('last_name', 'first_name'):
+        if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
+            if u.dt_fired is None or u.dt_fired >= form['dt_fired_after']:
+                users.append(u)
 
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
