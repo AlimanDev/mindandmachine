@@ -169,6 +169,8 @@ class WorkerDay(models.Model):
         TYPE_BUSINESS_TRIP = 8
         TYPE_ETC = 9
 
+        TYPE_DELETED = 10
+
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)

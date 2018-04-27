@@ -212,7 +212,16 @@ class PeriodDemandConverter(BaseConverter):
 
     @classmethod
     def convert(cls, obj):
-        pass
+        return {
+            'id': obj.id,
+            'dttm_forecast': cls.convert_datetime(obj.dttm_forecast),
+            'clients': obj.clients,
+            'products': obj.products,
+            'type': cls.convert_forecast_type(obj.type),
+            'cashbox_type': obj.cashbox_type_id,
+            'queue_wait_time': obj.queue_wait_time,
+            'queue_wait_length': obj.queue_wait_length
+        }
 
 
 class PeriodDemandChangeLogConverter(BaseConverter):
