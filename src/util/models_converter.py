@@ -70,6 +70,9 @@ class WorkerDayConverter(BaseConverter):
         WorkerDay.Type.TYPE_QUALIFICATION.value: 'Q',
         WorkerDay.Type.TYPE_ABSENSE.value: 'A',
         WorkerDay.Type.TYPE_MATERNITY.value: 'M',
+        WorkerDay.Type.TYPE_BUSINESS_TRIP.value: 'T',
+        WorkerDay.Type.TYPE_ETC.value: 'O',
+        WorkerDay.Type.TYPE_DELETED.value: 'D'
     }
 
     __WORKER_DAY_TYPE_REVERSED = {v: k for k, v in __WORKER_DAY_TYPE.items()}
