@@ -83,8 +83,7 @@ def create_timetable(request, form):
     }
 
     data = json.dumps(data).encode('ascii')
-    # 'http://149.154.64.204/'
-    req = urllib.request.Request('http://127.0.0.1:9000/', data=data, headers={'content-type': 'application/json'})
+    req = urllib.request.Request('http://149.154.64.204/', data=data, headers={'content-type': 'application/json'})
     with urllib.request.urlopen(req) as response:
         data = response.read().decode('utf-8')
 
