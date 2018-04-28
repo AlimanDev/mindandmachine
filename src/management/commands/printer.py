@@ -10,7 +10,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         super_shop = SuperShop.objects.get(hidden_title='shop004')
-        shop = Shop.objects.get(super_shop=super_shop, hidden_title='common')
+        shop = Shop.objects.get(super_shop=super_shop, hidden_title='electro')
 
         run(
             shop_id=shop.id,

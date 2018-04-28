@@ -4,7 +4,7 @@ import io
 import xlsxwriter
 from datetime import datetime, timedelta
 
-from src.db.models import WorkerDay, User
+from src.db.models import WorkerDay, User, Shop
 from src.util.collection import range_u, count
 
 
@@ -29,6 +29,14 @@ def fmt2(**kwargs):
     kwargs.setdefault('bottom', 1)
     kwargs.setdefault('left', 1)
     kwargs.setdefault('right', 1)
+    return kwargs
+
+
+def fmt3(**kwargs):
+    kwargs.setdefault('align', 'center')
+    kwargs.setdefault('valign', 'vcenter')
+    kwargs.setdefault('text_wrap', True)
+    kwargs.setdefault('font_name', 'Arial Cyr')
     return kwargs
 
 
@@ -100,7 +108,7 @@ class PrintHelper(object):
         return mapping[wd]
 
     @classmethod
-    def get_worker_day_cell(cls, obj, fmts):
+    def common_get_worker_day_cell(cls, obj, fmts):
         if obj is None:
             return Cell('', fmts['default'])
 
@@ -119,9 +127,41 @@ class PrintHelper(object):
         if obj.type == WorkerDay.Type.TYPE_MATERNITY.value:
             return Cell('ОЖ', fmts['default'])
 
+        return Cell('', fmts['default'])
+
+    @classmethod
+    def depart_get_worker_day_cell(cls, obj, fmts, timetable):
+        def __ret(__value):
+            return Cell(__value, fmts['default'])
+
+        def __tt_counter(__key):
+            if __key not in timetable:
+                timetable.setdefault('_counter', 0)
+                timetable['_counter'] += 1
+                timetable[__key] = '{}'.format(timetable['_counter'])
+            return timetable[__key]
+
+        if obj is None:
+            return __ret('')
+
+        if obj.type == WorkerDay.Type.TYPE_WORKDAY.value:
+            key = '{}-{}'.format(obj.tm_work_start.strftime('%H:%M'), obj.tm_work_end.strftime('%H:%M'))
+            return __ret(__tt_counter(key))
+
+        if obj.type == WorkerDay.Type.TYPE_HOLIDAY.value:
+            return __ret('в')
+
+        if obj.type == WorkerDay.Type.TYPE_VACATION.value:
+            return __ret('от')
+
+        if obj.type == WorkerDay.Type.TYPE_MATERNITY.value:
+            return __ret('ож')
+
+        return __ret('')
+
 
 # noinspection PyTypeChecker
-def add_workers(workbook, data, data_size, shop_id, dt_from, dt_to):
+def common_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
     def __dt_range():
         return range_u(dt_from, dt_to, timedelta(days=1))
 
@@ -141,7 +181,7 @@ def add_workers(workbook, data, data_size, shop_id, dt_from, dt_to):
             Cell('кассир-консультант', format_text),
             Cell('', format_holiday_debt)
         ] + [
-            PrintHelper.get_worker_day_cell(worker_days.get(dttm.date()), format_days) for dttm in __dt_range()
+            PrintHelper.common_get_worker_day_cell(worker_days.get(dttm.date()), format_days) for dttm in __dt_range()
         ] + [
             Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value), format_text),
             Cell('', format_text),
@@ -155,7 +195,7 @@ def add_workers(workbook, data, data_size, shop_id, dt_from, dt_to):
 
 
 # noinspection PyTypeChecker
-def fill_sheet_one(workbook, shop_id, dt_from, dt_to):
+def common_fill_sheet_one(workbook, shop, dt_from, dt_to):
     def __dt_range():
         return range_u(dt_from, dt_to, timedelta(days=1))
 
@@ -167,29 +207,29 @@ def fill_sheet_one(workbook, shop_id, dt_from, dt_to):
     format_header_date = workbook.add_format(fmt(font_size=11, border=2, bold=True, num_format='dd/mm'))
 
     data = [
-               [] for i in range(15)
-               ] + [
-               # weekdays
-               ['', '', '', ''] + [Cell(PrintHelper.get_weekday_name(x), format_header_weekday) for x in __dt_range()],
+        [] for i in range(15)
+    ] + [
+        # weekdays
+        ['', '', '', ''] + [Cell(PrintHelper.get_weekday_name(x), format_header_weekday) for x in __dt_range()],
 
-               # main header
-               [Cell(x, format_header_text) for x in ['№', 'ФИО', 'ДОЛЖНОСТЬ', 'долг по выходным']] +
-               [Cell(x.date(), format_header_date) for x in __dt_range()] +
-               [Cell(x, format_header_text) for x in ['плановые дни', 'дата', 'С графиком работы ознакомлен**. На работу в праздничные дни согласен', 'В', 'ОТ']],
+        # main header
+        [Cell(x, format_header_text) for x in ['№', 'ФИО', 'ДОЛЖНОСТЬ', 'долг по выходным']] +
+        [Cell(x.date(), format_header_date) for x in __dt_range()] +
+        [Cell(x, format_header_text) for x in ['плановые дни', 'дата', 'С графиком работы ознакомлен**. На работу в праздничные дни согласен', 'В', 'ОТ']],
 
-               # empty row
-               [],
-           ]
+        # empty row
+        [],
+    ]
     data_size = {
         'rows': [15 for i in range(15)] + [15, 40, 10],
         'cols': [25, 30, 25, 20] + [10 for x in __dt_range()] + [15, 15, 25, 10, 10]
     }
 
-    add_workers(
+    common_add_workers_one(
         workbook=workbook,
         data=data,
         data_size=data_size,
-        shop_id=shop_id,
+        shop_id=shop.id,
         dt_from=dt_from,
         dt_to=dt_to
     )
@@ -223,7 +263,7 @@ def fill_sheet_one(workbook, shop_id, dt_from, dt_to):
         worksheet.write(SheetIndexHelper.get_row(__row), SheetIndexHelper.get_column(__col), __data, __fmt)
 
     __wt(2, 'b', 'ООО "ЛЕРУА МЕРЛЕН ВОСТОК"', format_meta_bold)
-    __wt(3, 'b', 'Магазин Алтуфьево', format_meta_bold)
+    __wt(3, 'b', 'Магазин {}'.format(shop.super_shop.title), format_meta_bold)
     __wt(4, 'b', 'График работы отдела', format_meta_bold_bottom_2)
     __wt(4, 'c', 'сектор по обслуживанию клиентов', format_meta_bold_bottom_2)
     __wt(4, 'd', '', format_meta_bold_bottom_2)
@@ -279,10 +319,7 @@ def fill_sheet_one(workbook, shop_id, dt_from, dt_to):
     __wt(8, 'aa', '', format_meta_bold_bottom)
 
 
-def create_rect(workbook, shop_id, dt_from, dt_to):
-    def __dt_range():
-        return range_u(dt_from, dt_to, timedelta(days=1))
-
+def common_add_workers_two(workbook, shop_id, dt_from, dt_to):
     def __transpose(__data):
         return list(map(list, zip(*__data)))
 
@@ -374,14 +411,11 @@ def create_rect(workbook, shop_id, dt_from, dt_to):
 
 
 # noinspection PyTypeChecker
-def fill_sheet_two(workbook, shop_id, dt_from, dt_to):
-    def __dt_range():
-        return range_u(dt_from, dt_to, timedelta(days=1))
-
+def common_fill_sheet_two(workbook, shop, dt_from, dt_to):
     worksheet = workbook.add_worksheet('На печать')
     format_default = workbook.add_format(fmt(font_size=10))
 
-    data, data_size = create_rect(workbook, shop_id, dt_from, dt_to)
+    data, data_size = common_add_workers_two(workbook, shop.id, dt_from, dt_to)
 
     for row_index, row_size in enumerate(data_size['rows']):
         worksheet.set_row(row_index, row_size)
@@ -400,30 +434,194 @@ def fill_sheet_two(workbook, shop_id, dt_from, dt_to):
 
 
 # noinspection PyTypeChecker
-def print_to_file(path, shop_id, dt_from, dt_to, debug=False):
-    file = path if debug else io.BytesIO()
+def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
+    def __dt_range():
+        return range_u(dt_from, dt_to, timedelta(days=1))
+
+    format_days = {
+        'default': workbook.add_format(fmt3(font_size=9, bold=True))
+    }
+
+    format_text = workbook.add_format(fmt3(font_size=9))
+    format_text_left = workbook.add_format(fmt3(font_size=9, align='left'))
+    timetable = {}
+
+    for worker in User.objects.filter(shop=shop_id):
+        worker_days = {x.dt: x for x in WorkerDay.objects.filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
+        row = [
+            Cell('', format_text_left),
+            Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_text_left),
+        ] + [
+            PrintHelper.depart_get_worker_day_cell(worker_days.get(dttm.date()), format_days, timetable) for dttm in __dt_range()
+        ] + [
+            Cell('', format_text),  # утро
+            Cell('', format_text),  # день
+            Cell('', format_text),  # вечер
+            Cell('', format_text),  # ночь
+            Cell('', format_text),  # рабочих
+            Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value), format_text),  # плановых
+            Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value), format_text),  # выходных
+        ]
+
+        data.append(row)
+        data_size['rows'] += [15 for i in range(len(row))]
+
+    data += [
+        [],  # пустая строка
+        [],  # информация
+        [],  # начало-конец
+    ]
+    data_size['rows'] += [15, 15, 15]
+    row_timetable_header = len(data) - 1
+
+    return {
+        'row_timetable_header': row_timetable_header,
+        'timetable': timetable,
+    }
+
+
+# noinspection PyTypeChecker
+def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
+    def __dt_range():
+        return range_u(dt_from, dt_to, timedelta(days=1))
+
+    worksheet = workbook.add_worksheet(name='Расписание на подпись')
+    worksheet.hide_gridlines(2)
+
+    format_default = workbook.add_format(fmt3(font_size=9))
+    format_header_text = workbook.add_format(fmt3(font_size=9))
+    format_header_text_bold = workbook.add_format(fmt3(font_size=9, bold=True))
+    format_header_weekday = workbook.add_format(fmt3(font_size=9))
+    format_header_date = workbook.add_format(fmt3(font_size=9, num_format='dd'))
+
+    data = [
+        [] for i in range(12)
+    ] + [
+        # weekdays
+        ['', ''] + [Cell(x.date(), format_header_date) for x in __dt_range()],
+
+        # main header
+        [Cell(x, format_header_text_bold) for x in ['№', 'ФИО']] +
+        [Cell(PrintHelper.get_weekday_name(x), format_header_weekday) for x in __dt_range()] +
+        [Cell(x, format_header_text) for x in ['утро', 'день', 'вечер', 'ночь', 'рабочих', 'плановых', 'выходных']] +
+        [Cell(x, format_header_text_bold) for x in ['Ознакомлен', 'Дата ознакомления']],
+    ]
+    data_size = {
+        'rows': [14 for i in range(12)] + [10, 35],
+        'cols': [10, 25] + [1.5 for x in __dt_range()] + [5, 5, 5, 5, 5, 5, 5]
+    }
+
+    extra = depart_add_workers_one(
+        workbook=workbook,
+        data=data,
+        data_size=data_size,
+        shop_id=shop.id,
+        dt_from=dt_from,
+        dt_to=dt_to
+    )
+
+    for row_index, row_size in enumerate(data_size['rows']):
+        worksheet.set_row(row_index, row_size)
+    for col_index, col_size in enumerate(data_size['cols']):
+        worksheet.set_column(col_index, col_index, col_size)
+
+    for row_index, row in enumerate(data):
+        for col_index, cell in enumerate(row):
+            if isinstance(cell, Cell):
+                if cell.f is not None:
+                    worksheet.write(row_index, col_index, cell.d, cell.f)
+                else:
+                    worksheet.write(row_index, col_index, cell.d, format_default)
+            else:
+                worksheet.write(row_index, col_index, cell, format_default)
+
+    format_meta_title = workbook.add_format(fmt3(font_size=8, text_wrap=False))
+    format_meta_title_bold = workbook.add_format(fmt3(font_size=8, bold=True, text_wrap=False))
+    format_meta_title_left = workbook.add_format(fmt3(font_size=8, text_wrap=False, align='left'))
+    format_meta_title_bold_left = workbook.add_format(fmt3(font_size=8, bold=True, text_wrap=False, align='left'))
+    format_meta_title_right = workbook.add_format(fmt3(font_size=8, text_wrap=False, align='right'))
+    format_meta_title_bold_right = workbook.add_format(fmt3(font_size=8, bold=True, text_wrap=False, align='right'))
+
+    def __wt(__row, __col, __data, __fmt):
+        worksheet.write(SheetIndexHelper.get_row(__row), SheetIndexHelper.get_column(__col), __data, __fmt)
+
+    __wt(1, 'am', 'Форма утверждена приказом директора магазина Красногорск № 141/ОД/ЛМК от 20.10.2009', format_meta_title)
+
+    __wt(2, 'x', 'ООО "ЛЕРУА МЕРЛЕН ВОСТОК"', format_meta_title_bold)
+    __wt(3, 'x', '(наименование организации)', format_meta_title)
+    __wt(4, 'x', 'МАГАЗИН {}'.format(shop.super_shop.title.upper()), format_meta_title_bold)
+    __wt(5, 'x', '(наименование структурного подразделения)', format_meta_title)
+
+    __wt(6, 'b', 'собрание отдела 19.05.2018', format_meta_title)
+
+    __wt(7, 't', 'ГРАФИК СМЕННОСТИ', format_meta_title_bold)
+    __wt(8, 's', 'ОТДЕЛА', format_meta_title_bold)
+
+    __wt(6, 'ad', '№ ОТДЕЛА', format_meta_title)
+
+    try:
+        s = User.objects.filter(shop=shop).order_by('id')[:1][0].username
+        s = int(s.split('.')[0].replace('cs', ''))
+        __wt(7, 'ad', '{}'.format(s), format_meta_title_bold)
+    except:
+        pass
+
+    __wt(9, 'ab', 'УТВЕРЖДАЮ', format_meta_title_bold_left)
+    __wt(10, 'ab', 'личная подпись', format_meta_title_left)
+    __wt(11, 'ab', 'дата', format_meta_title_bold_left)
+
+    row_timetable_header = extra['row_timetable_header']
+    timetable = extra['timetable']
+
+    __wt(row_timetable_header, 'b', 'ИНФОРМАЦИЯ', format_meta_title_bold_left)
+    __wt(row_timetable_header, 'w', 'Перерывы', format_meta_title_bold)
+
+    __wt(row_timetable_header + 1, 'c', 'Начало', format_meta_title)
+    __wt(row_timetable_header + 1, 'f', 'Конец', format_meta_title)
+
+    for tt_key, tt_value in timetable.items():
+        if tt_key.startswith('_'):
+            continue
+
+        
+
+
+# noinspection PyTypeChecker
+def print_to_file(file, shop_id, dt_from, dt_to):
+    shop = Shop.objects.get(id=shop_id)
 
     workbook = xlsxwriter.Workbook(filename=file)
-    fill_sheet_one(workbook, shop_id, dt_from, dt_to)
-    fill_sheet_two(workbook, shop_id, dt_from, dt_to)
-    workbook.close()
 
-    if not debug:
-        file.seek(0)
+    if shop.hidden_title == 'common':
+        common_fill_sheet_one(workbook, shop, dt_from, dt_to)
+        common_fill_sheet_two(workbook, shop, dt_from, dt_to)
+    else:
+        depart_fill_sheet_one(workbook, shop, dt_from, dt_to)
+
+    workbook.close()
 
     return file
 
 
 def run(shop_id, debug=False):
-    path = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(path, 'test.xlsx')
-    if os.path.isfile(file_path):
-        os.remove(file_path)
+    if not debug:
+        file = io.BytesIO()
+    else:
+        path = os.path.dirname(os.path.abspath(__file__))
+        file_path = os.path.join(path, 'test.xlsx')
+        if os.path.isfile(file_path):
+            os.remove(file_path)
 
-    return print_to_file(
-        path=file_path,
+        file = file_path
+
+    result = print_to_file(
+        file=file,
         shop_id=shop_id,
         dt_from=datetime(year=2018, month=5, day=1),
-        dt_to=datetime(year=2018, month=6, day=1) - timedelta(days=1),
-        debug=debug
+        dt_to=datetime(year=2018, month=6, day=1) - timedelta(days=1)
     )
+
+    if not debug:
+        result.seek(0)
+
+    return result
