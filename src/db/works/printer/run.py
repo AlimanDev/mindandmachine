@@ -131,8 +131,8 @@ class PrintHelper(object):
 
     @classmethod
     def depart_get_worker_day_cell(cls, obj, fmts, timetable):
-        def __ret(__value):
-            return Cell(__value, fmts['default'])
+        def __ret(__value, __fmt='default'):
+            return Cell(__value, fmts[__fmt])
 
         if obj is None:
             return __ret('')
@@ -142,7 +142,7 @@ class PrintHelper(object):
             return __ret(timetable[key])
 
         if obj.type == WorkerDay.Type.TYPE_HOLIDAY.value:
-            return __ret('в')
+            return __ret('в', 'holiday')
 
         if obj.type == WorkerDay.Type.TYPE_VACATION.value:
             return __ret('от')
@@ -432,7 +432,8 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
         return range_u(dt_from, dt_to, timedelta(days=1))
 
     format_days = {
-        'default': workbook.add_format(fmt3(font_size=9, bold=True))
+        'default': workbook.add_format(fmt3(font_size=9, bold=True)),
+        'holiday': workbook.add_format(fmt(font_size=9, bold=True, bg_color='#66FF66'))
     }
 
     format_text = workbook.add_format(fmt3(font_size=9))
@@ -498,7 +499,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
         return range_u(dt_from, dt_to, timedelta(days=1))
 
     worksheet = workbook.add_worksheet(name='Расписание на подпись')
-    worksheet.hide_gridlines(2)
+    # worksheet.hide_gridlines(2)
 
     format_default = workbook.add_format(fmt3(font_size=9))
     format_header_text = workbook.add_format(fmt3(font_size=9))
