@@ -134,19 +134,12 @@ class PrintHelper(object):
         def __ret(__value):
             return Cell(__value, fmts['default'])
 
-        def __tt_counter(__key):
-            if __key not in timetable:
-                timetable.setdefault('_counter', 0)
-                timetable['_counter'] += 1
-                timetable[__key] = '{}'.format(timetable['_counter'])
-            return timetable[__key]
-
         if obj is None:
             return __ret('')
 
         if obj.type == WorkerDay.Type.TYPE_WORKDAY.value:
             key = '{}-{}'.format(obj.tm_work_start.strftime('%H:%M'), obj.tm_work_end.strftime('%H:%M'))
-            return __ret(__tt_counter(key))
+            return __ret(timetable[key])
 
         if obj.type == WorkerDay.Type.TYPE_HOLIDAY.value:
             return __ret('в')
@@ -444,10 +437,29 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
 
     format_text = workbook.add_format(fmt3(font_size=9))
     format_text_left = workbook.add_format(fmt3(font_size=9, align='left'))
-    timetable = {}
 
-    for worker in User.objects.filter(shop=shop_id):
+    cache_workers = User.objects.filter(shop_id=shop_id)
+    cache_worker_days = {}
+
+    timetable_raw = {}
+    for worker in cache_workers:
         worker_days = {x.dt: x for x in WorkerDay.objects.filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
+        cache_worker_days[worker.id] = worker_days
+
+        for wd in worker_days.values():
+            if wd.type != WorkerDay.Type.TYPE_WORKDAY.value:
+                continue
+            key = '{}-{}'.format(wd.tm_work_start.strftime('%H:%M'), wd.tm_work_end.strftime('%H:%M'))
+            timetable_raw[key] = [wd.tm_work_start, wd.tm_work_end]
+
+    timetable = {}
+    counter = 1
+    for x in sorted([[tt_key, tt_value[0], tt_value[1]] for tt_key, tt_value in timetable_raw.items()], key=lambda x: x[1]):
+        timetable[x[0]] = counter
+        counter += 1
+
+    for worker in cache_workers:
+        worker_days = cache_worker_days[worker.id]
         row = [
             Cell('', format_text_left),
             Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_text_left),
@@ -536,6 +548,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
                 worksheet.write(row_index, col_index, cell, format_default)
 
     format_meta_title = workbook.add_format(fmt3(font_size=8, text_wrap=False))
+    format_meta_title_10 = workbook.add_format(fmt3(font_size=10, text_wrap=False))
     format_meta_title_bold = workbook.add_format(fmt3(font_size=8, bold=True, text_wrap=False))
     format_meta_title_left = workbook.add_format(fmt3(font_size=8, text_wrap=False, align='left'))
     format_meta_title_bold_left = workbook.add_format(fmt3(font_size=8, bold=True, text_wrap=False, align='left'))
@@ -570,20 +583,45 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
     __wt(10, 'ab', 'личная подпись', format_meta_title_left)
     __wt(11, 'ab', 'дата', format_meta_title_bold_left)
 
+    __wt(7, 'AK', 'Май', format_meta_title_10)
+
     row_timetable_header = extra['row_timetable_header']
-    timetable = extra['timetable']
+    timetable = {v: k for k, v in extra['timetable'].items()}
 
     __wt(row_timetable_header, 'b', 'ИНФОРМАЦИЯ', format_meta_title_bold_left)
     __wt(row_timetable_header, 'w', 'Перерывы', format_meta_title_bold)
 
-    __wt(row_timetable_header + 1, 'c', 'Начало', format_meta_title)
-    __wt(row_timetable_header + 1, 'f', 'Конец', format_meta_title)
+    __wt(row_timetable_header + 1, 'd', 'Начало', format_meta_title)
+    __wt(row_timetable_header + 1, 'g', 'Конец', format_meta_title)
 
-    for tt_key, tt_value in timetable.items():
-        if tt_key.startswith('_'):
-            continue
+    # __wt(row_timetable_header + 1, 'J', 'с', format_meta_title)
+    # __wt(row_timetable_header + 1, 'L', 'по', format_meta_title)
+    # __wt(row_timetable_header + 1, 'O', 'длительность', format_meta_title)
+    #
+    # __wt(row_timetable_header + 1, 'r', 'с', format_meta_title)
+    # __wt(row_timetable_header + 1, 's', 'по', format_meta_title)
+    # __wt(row_timetable_header + 1, 'v', 'длительность', format_meta_title)
 
-        
+    i = 0
+    for tt_value in sorted(timetable):
+        tt_key = timetable[tt_value]
+
+        tt_begin, tt_end = tt_key.split('-')
+        row_index = row_timetable_header + 2 + i
+        __wt(row_index, 'b', 'Смена № {}'.format(tt_value), format_meta_title_bold_right)
+
+        __wt(row_index, 'd', tt_begin, format_meta_title_bold)
+        __wt(row_index, 'g', tt_end, format_meta_title_bold)
+
+        i += 1
+
+    __wt(row_timetable_header + 2 + i, 'u', 'общая продолжительность перерывов в течение рабочей смены - 1 час', format_meta_title_bold)
+    __wt(
+        row_timetable_header + 2 + i + 1,
+        'u',
+        'Запрещено меняться сменами, выходными днями во избежание нарушения трудового распорядка. В крайних случаях по согласованию с РС и письменному заявлению.',
+        format_meta_title_bold
+    )
 
 
 # noinspection PyTypeChecker
