@@ -1,8 +1,9 @@
 import json
 import urllib.request
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 
@@ -35,10 +36,13 @@ def set_selected_cashiers(request, form):
 @api_method('POST', CreateTimetableForm)
 def create_timetable(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
+    dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
+    dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
+
     try:
         tt = Timetable.objects.create(
             shop_id=shop_id,
-            dt=form['dt'],
+            dt=dt_from,
             status=Timetable.Status.PROCESSING.value,
             dttm_status_change=datetime.now()
         )
@@ -49,7 +53,9 @@ def create_timetable(request, form):
         'cashbox_type'
     ).filter(
         cashbox_type__shop_id=shop_id,
-        type__in=[PeriodDemand.Type.LONG_FORECAST.value, PeriodDemand.Type.SHORT_FORECAST.value]
+        type__in=[PeriodDemand.Type.LONG_FORECAST.value, PeriodDemand.Type.SHORT_FORECAST.value],
+        dttm_forecast__date__gte=dt_from,
+        dttm_forecast__date__lte=dt_to
     )
 
     constraints = group_by(
@@ -63,7 +69,7 @@ def create_timetable(request, form):
     )
 
     worker_day = group_by(
-        collection=WorkerDay.objects.filter(worker_shop_id=shop_id),
+        collection=WorkerDay.objects.filter(worker_shop_id=shop_id, dt__gte=dt_from, dt__lte=dt_to),
         group_key=lambda x: x.worker_id
     )
 
@@ -82,10 +88,13 @@ def create_timetable(request, form):
         ]
     }
 
-    data = json.dumps(data).encode('ascii')
-    req = urllib.request.Request('http://149.154.64.204/', data=data, headers={'content-type': 'application/json'})
-    with urllib.request.urlopen(req) as response:
-        data = response.read().decode('utf-8')
+    try:
+        data = json.dumps(data).encode('ascii')
+        req = urllib.request.Request('http://149.154.64.204/', data=data, headers={'content-type': 'application/json'})
+        with urllib.request.urlopen(req) as response:
+            data = response.read().decode('utf-8')
+    except:
+        JsonResponse.internal_error('Error sending data to server')
 
     return JsonResponse.success()
 
@@ -94,13 +103,13 @@ def create_timetable(request, form):
 def delete_timetable(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
 
-    dt = form['dt']
-    dt_now = datetime.now()
+    dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
+    dt_now = datetime.now().date()
 
-    if dt.month != dt_now.month and dt < dt_now:
+    if dt_from < dt_now:
         return JsonResponse.value_error('Cannot delete past month')
 
-    count, _ = Timetable.objects.filter(shop_id=shop_id, dt=form['dt']).delete()
+    count, _ = Timetable.objects.filter(shop_id=shop_id, dt=dt_from).delete()
 
     if count > 1:
         return JsonResponse.internal_error(msg='too much deleted')
