@@ -46,9 +46,9 @@ def run(path, super_shop):
 
     data = load_csv(os.path.join(path, 'demand_depart_m0506.csv'), skip_rows=1)
     shops = {
-        3: Shop.objects.get(super_shop=super_shop, hidden_title='electro'),
-        7: Shop.objects.get(super_shop=super_shop, hidden_title='santeh'),
-        12: Shop.objects.get(super_shop=super_shop, hidden_title='dekor')
+        3: Shop.objects.get(super_shop=super_shop, hidden_title='d003'),
+        7: Shop.objects.get(super_shop=super_shop, hidden_title='d007'),
+        12: Shop.objects.get(super_shop=super_shop, hidden_title='d012')
     }
 
     def __get_safe(__v):

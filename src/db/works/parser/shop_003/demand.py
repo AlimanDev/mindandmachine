@@ -40,7 +40,7 @@ def load_csv(path, skip_rows=0):
                 continue
 
             arr = line.strip().split(',')
-            if len(arr) != 4:
+            if len(arr) != 5:
                 print('skip line {} with data "{}"'.format(counter, line))
                 continue
 

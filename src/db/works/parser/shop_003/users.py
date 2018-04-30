@@ -254,7 +254,7 @@ def parse_users_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, co
     user = User.objects.create_user(
         username='cscais001.mag003'.format(ctx.shop.id),
         email='q@q.com',
-        password='bestcompany003'
+        password='qwerty003'
     )
     user.shop = ctx.shop
     user.first_name = 'Елена'

@@ -286,7 +286,7 @@ def run(path, super_shop):
     user = User.objects.create_user(
         username='cscais001.mag004',
         email='q@q.com',
-        password='BestCompany004'
+        password='qwerty004'
     )
     user.shop = ctx.shop
     user.first_name = 'Ольга'

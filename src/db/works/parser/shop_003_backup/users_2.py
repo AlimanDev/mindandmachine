@@ -171,7 +171,7 @@ def load_users(manager_username, shop, data, year, month, column_cashbox_type, c
 
 def run(path, super_shop):
     # file #1
-    shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Электротовары', hidden_title='electro')
+    shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Электротовары', hidden_title='d003')
     load_users(
         manager_username='cs003.mag003',
         shop=shop,
@@ -212,7 +212,7 @@ def run(path, super_shop):
     #             WorkerConstraint.objects.create(worker=user, weekday=i, tm=dttm.time())
     #
     # # file #2
-    shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Сантехника', hidden_title='santeh')
+    shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Сантехника', hidden_title='d007')
     # load_users(
     #     manager_username='cs007.mag004',
     #     shop=shop,
@@ -252,7 +252,7 @@ def run(path, super_shop):
     #             WorkerConstraint.objects.create(worker=user, weekday=i, tm=dttm.time())
 
     # file #3
-    shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Декор', hidden_title='dekor')
+    shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Декор', hidden_title='d012')
     load_users(
         manager_username='cs012.mag003',
         shop=shop,
