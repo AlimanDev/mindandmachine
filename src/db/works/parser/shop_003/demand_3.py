@@ -44,7 +44,7 @@ def load_csv(path, skip_rows=0):
 def run(path, super_shop):
     print('demand3_started')
 
-    data = load_csv(os.path.join(path, 'demand_depart.csv'), skip_rows=1)
+    data = load_csv(os.path.join(path, 'demand_depart_m0506.csv'), skip_rows=1)
     shops = {
         3: Shop.objects.get(super_shop=super_shop, hidden_title='electro'),
         7: Shop.objects.get(super_shop=super_shop, hidden_title='santeh'),

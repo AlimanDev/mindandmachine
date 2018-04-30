@@ -87,7 +87,7 @@ def run(path, super_shop):
     shop = Shop.objects.get(super_shop=super_shop, hidden_title='common')
     cashboxes_types = {x.name: x for x in CashboxType.objects.filter(shop=shop)}
 
-    data = load_csv(os.path.join(path, 'demand_m05.csv'), skip_rows=1)
+    data = load_csv(os.path.join(path, 'demand_m0506.csv'), skip_rows=1)
     for row in data:
         cashbox_type = cashboxes_types.get(row[2])
         if cashbox_type is not None:
