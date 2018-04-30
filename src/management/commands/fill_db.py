@@ -16,5 +16,5 @@ class Command(BaseCommand):
         print('Old database flushed')
 
         run_shop_003()
-        # run_shop_004()
-        # run_magnit()
+        run_shop_004()
+        run_magnit()

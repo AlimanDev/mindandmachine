@@ -13,6 +13,7 @@ class ParseHelper(object):
     def parse_work_day_type(cls, value):
         work_times = {
             'у': [WorkerDay.Type.TYPE_WORKDAY.value, time(7, 30), time(16, 30)],
+            'у1': [WorkerDay.Type.TYPE_WORKDAY.value, time(8, 00), time(17, 00)],
             'у3': [WorkerDay.Type.TYPE_WORKDAY.value, time(7, 30), time(19, 30)],
             'д': [WorkerDay.Type.TYPE_WORKDAY.value, time(10, 00), time(19, 00)],
             'в1': [WorkerDay.Type.TYPE_WORKDAY.value, time(13, 00), time(22, 00)],
@@ -46,7 +47,23 @@ class ParseHelper(object):
         return datetime(year=year, month=month, day=int(value)).date()
 
 
-def load_users(manager_username, shop, data, year, month, column_cashbox_type, column_fio, row_date, row_begin, row_end, col_timetable_begin, col_timetable_end):
+class ParseHelperD012(ParseHelper):
+    @classmethod
+    def parse_work_day_type(cls, value):
+        work_times = {
+            'у': [WorkerDay.Type.TYPE_WORKDAY.value, time(7, 00), time(16, 00)],
+            'у1': [WorkerDay.Type.TYPE_WORKDAY.value, time(8, 00), time(17, 00)],
+            'д': [WorkerDay.Type.TYPE_WORKDAY.value, time(10, 00), time(19, 00)],
+            'в2': [WorkerDay.Type.TYPE_WORKDAY.value, time(15, 00), time(00, 00)],
+            'в': [WorkerDay.Type.TYPE_HOLIDAY.value, None, None],
+            'от': [WorkerDay.Type.TYPE_HOLIDAY.value, None, None],
+            'н': [WorkerDay.Type.TYPE_WORKDAY.value, time(21, 00), time(9, 00)]
+        }
+
+        return work_times.get(str(value).lower(), work_times['в'])
+
+
+def load_users(manager_username, shop, data, year, month, column_cashbox_type, column_fio, row_date, row_begin, row_end, col_timetable_begin, col_timetable_end, parse_helper):
     column_cashbox_type = SheetIndexHelper.get_column(column_cashbox_type)
     column_fio = SheetIndexHelper.get_column(column_fio)
     row_begin = SheetIndexHelper.get_row(row_begin)
@@ -74,7 +91,7 @@ def load_users(manager_username, shop, data, year, month, column_cashbox_type, c
         counter += 1
 
         try:
-            first_name, middle_name, last_name = ParseHelper.parse_fio(data[column_fio][row])
+            first_name, middle_name, last_name = parse_helper.parse_fio(data[column_fio][row])
         except:
             continue
 
@@ -95,7 +112,7 @@ def load_users(manager_username, shop, data, year, month, column_cashbox_type, c
 
         for i in range(20):
             try:
-                cashbox_type_name = ParseHelper.parse_cashbox_type(data[column_cashbox_type][row-i])
+                cashbox_type_name = parse_helper.parse_cashbox_type(data[column_cashbox_type][row-i])
                 break
             except:
                 pass
@@ -113,8 +130,8 @@ def load_users(manager_username, shop, data, year, month, column_cashbox_type, c
             cashboxes[cashbox_type_name] = cashbox
 
         for col in range_i(col_timetable_begin, col_timetable_end):
-            dt = ParseHelper.parse_date(year, month, data[col][row_date])
-            workday_type, tm_work_start, tm_work_end = ParseHelper.parse_work_day_type(data[col][row])
+            dt = parse_helper.parse_date(year, month, data[col][row_date])
+            workday_type, tm_work_start, tm_work_end = parse_helper.parse_work_day_type(data[col][row])
             is_wk = workday_type == WorkerDay.Type.TYPE_WORKDAY.value
 
             wd = WorkerDay.objects.create(
@@ -138,25 +155,25 @@ def load_users(manager_username, shop, data, year, month, column_cashbox_type, c
 def run(path, super_shop):
     # file #1
     shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Электротовары', hidden_title='d003')
+    # load_users(
+    #     manager_username='cs003.mag004',
+    #     shop=shop,
+    #     data=pandas.read_excel(os.path.join(path, 'users_2_d003.xlsx'), 'апрель', header=None),
+    #     year=2018,
+    #     month=4,
+    #     column_cashbox_type='c',
+    #     column_fio='D',
+    #     row_date=10,
+    #     row_begin=11,
+    #     row_end=22,
+    #     col_timetable_begin='E',
+    #     col_timetable_end='ah'
+    # )
+
     load_users(
         manager_username='cs003.mag004',
         shop=shop,
-        data=pandas.read_excel(os.path.join(path, 'users_2_d003.xlsx'), 'апрель', header=None),
-        year=2018,
-        month=4,
-        column_cashbox_type='c',
-        column_fio='D',
-        row_date=10,
-        row_begin=11,
-        row_end=22,
-        col_timetable_begin='E',
-        col_timetable_end='ah'
-    )
-
-    load_users(
-        manager_username=None,
-        shop=shop,
-        data=pandas.read_excel(os.path.join(path, 'users_2_d003.xlsx'), 'май', header=None),
+        data=pandas.read_excel(os.path.join(path, 'users_2_d003_m05.xlsx'), 'май', header=None),
         year=2018,
         month=5,
         column_cashbox_type='c',
@@ -165,7 +182,8 @@ def run(path, super_shop):
         row_begin=11,
         row_end=22,
         col_timetable_begin='E',
-        col_timetable_end='ai'
+        col_timetable_end='ai',
+        parse_helper=ParseHelper
     )
 
     dttm_from = datetime(year=1971, month=1, day=1)
@@ -178,20 +196,20 @@ def run(path, super_shop):
 
     # file #2
     shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Сантехника', hidden_title='d007')
-    load_users(
-        manager_username='cs007.mag004',
-        shop=shop,
-        data=pandas.read_excel(os.path.join(path, 'users_2_d007_m04.xls'), 'апрель', header=None),
-        year=2018,
-        month=4,
-        column_cashbox_type='c',
-        column_fio='D',
-        row_date=10,
-        row_begin=12,
-        row_end=23,
-        col_timetable_begin='E',
-        col_timetable_end='ah'
-    )
+    # load_users(
+    #     manager_username='cs007.mag004',
+    #     shop=shop,
+    #     data=pandas.read_excel(os.path.join(path, 'users_2_d007_m04.xls'), 'апрель', header=None),
+    #     year=2018,
+    #     month=4,
+    #     column_cashbox_type='c',
+    #     column_fio='D',
+    #     row_date=10,
+    #     row_begin=12,
+    #     row_end=23,
+    #     col_timetable_begin='E',
+    #     col_timetable_end='ah'
+    # )
 
     load_users(
         manager_username=None,
@@ -202,10 +220,11 @@ def run(path, super_shop):
         column_cashbox_type='c',
         column_fio='D',
         row_date=10,
-        row_begin=12,
+        row_begin=11,
         row_end=23,
         col_timetable_begin='E',
-        col_timetable_end='ai'
+        col_timetable_end='ai',
+        parse_helper=ParseHelper
     )
 
     dttm_from = datetime(year=1971, month=1, day=1)
@@ -218,25 +237,25 @@ def run(path, super_shop):
 
     # file #3
     shop = Shop.objects.create(super_shop=super_shop, full_interface=False, title='Декор', hidden_title='d012')
-    load_users(
-        manager_username='cs012.mag004',
-        shop=shop,
-        data=pandas.read_excel(os.path.join(path, 'users_2_d012.xlsx'), 'апрель', header=None),
-        year=2018,
-        month=4,
-        column_cashbox_type='C',
-        column_fio='D',
-        row_date=10,
-        row_begin=11,
-        row_end=27,
-        col_timetable_begin='E',
-        col_timetable_end='ah'
-    )
+    # load_users(
+    #     manager_username='cs012.mag004',
+    #     shop=shop,
+    #     data=pandas.read_excel(os.path.join(path, 'users_2_d012.xlsx'), 'апрель', header=None),
+    #     year=2018,
+    #     month=4,
+    #     column_cashbox_type='C',
+    #     column_fio='D',
+    #     row_date=10,
+    #     row_begin=11,
+    #     row_end=27,
+    #     col_timetable_begin='E',
+    #     col_timetable_end='ah'
+    # )
 
     load_users(
         manager_username=None,
         shop=shop,
-        data=pandas.read_excel(os.path.join(path, 'users_2_d012.xlsx'), 'май', header=None),
+        data=pandas.read_excel(os.path.join(path, 'users_2_d012_m05.xlsx'), 'май', header=None),
         year=2018,
         month=5,
         column_cashbox_type='C',
@@ -245,7 +264,8 @@ def run(path, super_shop):
         row_begin=11,
         row_end=25,
         col_timetable_begin='E',
-        col_timetable_end='ai'
+        col_timetable_end='ai',
+        parse_helper=ParseHelperD012
     )
 
     dttm_from = datetime(year=1971, month=1, day=1)

@@ -574,8 +574,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
     __wt(6, 'ad', '№ ОТДЕЛА', format_meta_title)
 
     try:
-        s = User.objects.filter(shop=shop).order_by('id')[:1][0].username
-        s = int(s.split('.')[0].replace('cs', ''))
+        s = int(shop.hidden_title.replace('d', ''))
         __wt(7, 'ad', '{}'.format(s), format_meta_title_bold)
     except:
         pass
