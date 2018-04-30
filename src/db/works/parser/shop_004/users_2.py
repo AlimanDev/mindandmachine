@@ -24,7 +24,7 @@ class ParseHelper(object):
             'н': [WorkerDay.Type.TYPE_WORKDAY.value, time(21, 00), time(9, 00)]
         }
 
-        return work_times.get(str(value).lower(), WorkerDay.Type.TYPE_EMPTY.value)
+        return work_times.get(str(value).lower(), [WorkerDay.Type.TYPE_EMPTY.value, None, None])
 
     @classmethod
     def parse_cashbox_type(cls, value):
@@ -60,7 +60,7 @@ class ParseHelperD012(ParseHelper):
             'н': [WorkerDay.Type.TYPE_WORKDAY.value, time(21, 00), time(9, 00)]
         }
 
-        return work_times.get(str(value).lower(), WorkerDay.Type.TYPE_EMPTY.value)
+        return work_times.get(str(value).lower(), [WorkerDay.Type.TYPE_EMPTY.value, None, None])
 
 
 def load_users(manager_username, shop, data, year, month, column_cashbox_type, column_fio, row_date, row_begin, row_end, col_timetable_begin, col_timetable_end, parse_helper):

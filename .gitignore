@@ -9,6 +9,7 @@ src/conf/djconfig_local.py
 src/conf/qosconfig_local.py
 
 src/templates/test.html
+src/db/works/printer/test.xlsx
 
 etc/test.py
 etc/report/

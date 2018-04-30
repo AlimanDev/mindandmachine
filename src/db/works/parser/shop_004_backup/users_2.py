@@ -23,7 +23,7 @@ class ParseHelper(object):
             'н': [WorkerDay.Type.TYPE_WORKDAY.value, time(21, 00), time(9, 00)]
         }
 
-        return work_times.get(str(value).lower(), WorkerDay.Type.TYPE_EMPTY.value)
+        return work_times.get(str(value).lower(), [WorkerDay.Type.TYPE_EMPTY.value, None, None])
 
     @classmethod
     def parse_cashbox_type(cls, value):
