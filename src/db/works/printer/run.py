@@ -166,7 +166,7 @@ def common_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
     format_text = workbook.add_format(fmt(font_size=12, border=1, bold=True))
     format_holiday_debt = workbook.add_format(fmt(font_size=10, border=1, bg_color='#FEFF99'))
 
-    for worker in User.objects.filter(shop=shop_id):
+    for worker in User.objects.filter(shop=shop_id).order_by('id'):
         worker_days = {x.dt: x for x in WorkerDay.objects.filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
         row = [
             Cell('', format_text),
@@ -341,7 +341,7 @@ def common_add_workers_two(workbook, shop_id, dt_from, dt_to):
     }
 
     prev_user_data = None
-    for i, worker in enumerate(User.objects.filter(shop=shop_id)):
+    for i, worker in enumerate(User.objects.filter(shop=shop_id).order_by('id')):
         worker_days = {x.dt: x for x in WorkerDay.objects.filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
 
         user_data = [weekdays]
@@ -439,7 +439,7 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
     format_text = workbook.add_format(fmt3(font_size=9))
     format_text_left = workbook.add_format(fmt3(font_size=9, align='left'))
 
-    cache_workers = User.objects.filter(shop_id=shop_id)
+    cache_workers = User.objects.filter(shop_id=shop_id).order_by('id')
     cache_worker_days = {}
 
     timetable_raw = {}
