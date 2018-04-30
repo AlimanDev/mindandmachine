@@ -212,7 +212,7 @@ def run(path, super_shop):
     # )
 
     load_users(
-        manager_username=None,
+        manager_username='cs007.mag004',
         shop=shop,
         data=pandas.read_excel(os.path.join(path, 'users_2_d007_m05.xlsx'), 'Лист1', header=None),
         year=2018,
@@ -253,7 +253,7 @@ def run(path, super_shop):
     # )
 
     load_users(
-        manager_username=None,
+        manager_username='cs012.mag004',
         shop=shop,
         data=pandas.read_excel(os.path.join(path, 'users_2_d012_m05.xlsx'), 'май', header=None),
         year=2018,

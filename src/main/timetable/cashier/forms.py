@@ -72,7 +72,7 @@ class SetWorkerDayForm(forms.Form):
         if self.errors:
             return
 
-        if self.cleaned_data['type'] == WorkerDay.Type.TYPE_WORKDAY:
+        if self.cleaned_data['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
             if self.cleaned_data.get('tm_work_start') is None or self.cleaned_data.get('tm_work_end') is None or self.cleaned_data.get('tm_break_start') is None:
                 raise ValidationError('tm_work_start, tm_work_end and tm_break_start required')
 

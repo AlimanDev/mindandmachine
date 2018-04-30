@@ -196,6 +196,9 @@ class WorkerDay(models.Model):
     def __str__(self):
         return 'Worker {} | Date {} | {}'.format(self.id, self.dt, self.Type.get_name_by_value(self.type))
 
+    def is_type_with_tm_range(self, t):
+        return t in (self.Type.TYPE_WORKDAY.value, self.Type.TYPE_BUSINESS_TRIP.value, self.Type.TYPE_QUALIFICATION.value)
+
 
 class WorkerDayCashboxDetails(models.Model):
     id = models.BigAutoField(primary_key=True)
