@@ -60,7 +60,7 @@ class SetWorkerDayForm(forms.Form):
     tm_break_start = util_forms.TimeField(required=False)
 
     cashbox_type = forms.IntegerField(required=False)
-    comment = forms.CharField(max_length=128)
+    comment = forms.CharField(max_length=128, required=False)
 
     def clean_type(self):
         value = WorkerDayConverter.parse_type(self.cleaned_data['type'])
