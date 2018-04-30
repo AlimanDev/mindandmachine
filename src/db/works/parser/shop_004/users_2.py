@@ -20,7 +20,7 @@ class ParseHelper(object):
             'в2': [WorkerDay.Type.TYPE_WORKDAY.value, time(15, 00), time(00, 00)],
             'в3': [WorkerDay.Type.TYPE_WORKDAY.value, time(12, 30), time(00, 00)],
             'в': [WorkerDay.Type.TYPE_HOLIDAY.value, None, None],
-            'от': [WorkerDay.Type.TYPE_HOLIDAY.value, None, None],
+            'от': [WorkerDay.Type.TYPE_VACATION.value, None, None],
             'н': [WorkerDay.Type.TYPE_WORKDAY.value, time(21, 00), time(9, 00)]
         }
 
@@ -56,7 +56,7 @@ class ParseHelperD012(ParseHelper):
             'д': [WorkerDay.Type.TYPE_WORKDAY.value, time(10, 00), time(19, 00)],
             'в2': [WorkerDay.Type.TYPE_WORKDAY.value, time(15, 00), time(00, 00)],
             'в': [WorkerDay.Type.TYPE_HOLIDAY.value, None, None],
-            'от': [WorkerDay.Type.TYPE_HOLIDAY.value, None, None],
+            'от': [WorkerDay.Type.TYPE_VACATION.value, None, None],
             'н': [WorkerDay.Type.TYPE_WORKDAY.value, time(21, 00), time(9, 00)]
         }
 

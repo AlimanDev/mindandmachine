@@ -10,7 +10,7 @@ def prepare_worker_day_create_args(form, worker):
         'is_manual_tuning': True
     }
 
-    if form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
+    if WorkerDay.is_type_with_tm_range(form['type']):
         args.update({
             'tm_work_start': form['tm_work_start'],
             'tm_work_end': form['tm_work_start'],
@@ -30,7 +30,7 @@ def prepare_worker_day_update_obj(form, day):
     day.type = form['type']
     day.is_manual_tuning = True
 
-    if form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
+    if WorkerDay.is_type_with_tm_range(form['type']):
         day.tm_work_start = form['tm_work_start']
         day.tm_work_end = form['tm_work_end']
         day.tm_break_start = form['tm_break_start']
@@ -54,13 +54,13 @@ def prepare_worker_day_change_create_args(request, form, day):
         'comment': form['comment']
     }
 
-    if day.type == WorkerDay.Type.TYPE_WORKDAY.value:
+    if WorkerDay.is_type_with_tm_range(day.type):
         args.update({
             'from_tm_work_start': day.tm_work_start,
             'from_tm_work_end': day.tm_work_end,
             'from_tm_break_start': day.tm_break_start
         })
-    if form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
+    if WorkerDay.is_type_with_tm_range(form['type']):
         args.update({
             'to_tm_work_start': form['tm_work_start'],
             'to_tm_work_end': form['tm_work_end'],
