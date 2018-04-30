@@ -171,8 +171,8 @@ class WorkerDay(models.Model):
         TYPE_MATERNITY = 7
         TYPE_BUSINESS_TRIP = 8
         TYPE_ETC = 9
-
         TYPE_DELETED = 10
+        TYPE_EMPTY = 11
 
     id = models.BigAutoField(primary_key=True)
 

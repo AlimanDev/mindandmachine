@@ -53,7 +53,7 @@ class ParseHelperD003(ParseHelper):
             'от': [WorkerDay.Type.TYPE_VACATION.value, None, None],
         }
 
-        return work_times.get(str(value).lower(), work_times['в'])
+        return work_times.get(str(value).lower(), WorkerDay.Type.TYPE_EMPTY.value)
 
 
 class ParseHelperD007(ParseHelper):
@@ -68,7 +68,7 @@ class ParseHelperD007(ParseHelper):
             'от': [WorkerDay.Type.TYPE_VACATION.value, None, None],
         }
 
-        return work_times.get(str(value).lower(), work_times['в'])
+        return work_times.get(str(value).lower(), WorkerDay.Type.TYPE_EMPTY.value)
 
 
 class ParseHelperD012(ParseHelper):
@@ -87,7 +87,7 @@ class ParseHelperD012(ParseHelper):
             'от': [WorkerDay.Type.TYPE_VACATION.value, None, None],
         }
 
-        return work_times.get(str(value).lower(), work_times['в'])
+        return work_times.get(str(value).lower(), WorkerDay.Type.TYPE_EMPTY.value)
 
 
 def load_users(manager_username, shop, data, year, month, column_cashbox_type, column_fio, row_date, row_begin, row_end, col_timetable_begin, col_timetable_end, parse_helper):
@@ -200,7 +200,7 @@ def run(path, super_shop):
         row_date=11,
         row_begin=14,
         row_end=25,
-        col_timetable_begin='e',
+        col_timetable_begin='d',
         col_timetable_end='ah',
         parse_helper=ParseHelperD003
     )
