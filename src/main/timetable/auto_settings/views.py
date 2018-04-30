@@ -7,7 +7,17 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 
-from src.db.models import Timetable, User, CashboxType, PeriodDemand, WorkerConstraint, WorkerCashboxInfo, WorkerDay, WorkerDayCashboxDetails
+from src.db.models import (
+    Timetable,
+    User,
+    CashboxType,
+    PeriodDemand,
+    WorkerConstraint,
+    WorkerCashboxInfo,
+    WorkerDay,
+    WorkerDayCashboxDetails,
+    Shop,
+)
 from src.util.collection import group_by
 from src.util.forms import FormUtil
 from src.util.models_converter import TimetableConverter, CashboxTypeConverter, PeriodDemandConverter, UserConverter, WorkerConstraintConverter, WorkerCashboxInfoConverter, \
@@ -63,6 +73,7 @@ def create_timetable(request, form):
         group_key=lambda x: x.worker_id
     )
 
+    # todo: tooooo slow
     worker_cashbox_info = group_by(
         collection=WorkerCashboxInfo.objects.select_related('cashbox_type').filter(cashbox_type__shop_id=shop_id),
         group_key=lambda x: x.worker_id
@@ -73,29 +84,168 @@ def create_timetable(request, form):
         group_key=lambda x: x.worker_id
     )
 
+    prev_data = group_by(
+        collection=WorkerDay.objects.filter(worker_shop_id=shop_id, dt__gte=dt_from - timedelta(days=7), dt__lt=dt_from),
+        group_key=lambda x: x.worker_id
+    )
+
+    shop = Shop.objects.get(id=shop_id)
+    cashboxes = [CashboxTypeConverter.convert(x) for x in CashboxType.objects.filter(shop_id=shop_id)]
+
+    cost_weigths = {}
+    method_params = {}
+    if shop.full_interface:
+        main_types = [
+            'Линия',
+            'Возврат',
+            'Доставка',
+            'Информация',
+        ]
+
+        special_types = [
+            'Главная касса',
+            'CЦ',
+            'ОРКК',
+            'Сверка',
+        ]
+
+        cost_weigths = {
+            'F': 1,
+            '40hours': 0,
+            'days': 2*10**2,
+            '15rest': 10**4,
+            '5d': 10**4,
+            'hard': 10,
+            'soft': 0,
+            'overwork_fact_days': 3*10**6,
+            'F_bills_coef': 3,
+            'diff_days_coef': 1,
+            'solitary_days': 5*10**5,
+            'holidays': 3*10**5, #3*10**5,# 2*10**6,
+            'zero_cashiers': 3,
+            'slots': 2*10**7,
+        }
+
+        method_params = [
+            {
+                'steps': 100,
+                'select_best': 8,
+                'changes': 10,
+                'variety': 8,
+                'days_change_prob': 0.05,
+                'periods_change_prob': 0.55,
+                'add_day_prob': 0.33,
+                'del_day_prob': 0.33
+            },
+            {
+                'steps': 700,
+                'select_best': 8,
+                'changes': 30,
+                'variety': 8,
+                'days_change_prob': 0.33,
+                'periods_change_prob': 0.33,
+                'add_day_prob': 0.33,
+                'del_day_prob': 0.33
+            },
+
+        ]
+
+        probs = {}
+        prior_weigths = {}
+        slots = {}
+        if shop.super_shop.code == '003':
+            probs = {
+                'Линия': 3,
+                'Возврат': 0.5,
+                'Доставка': 1,
+                'Информация': 0.2,
+                'Главная касса': 5,
+                'CЦ': 1,
+                'ОРКК': 3.5,
+                'Сверка': 10,
+            }
+
+            slots = {
+                'Главная касса': [(0, 36), (20, 56), (40, 76)],
+                'ОРКК': [(8, 44), (36, 72)],
+                'СЦ': [(8, 44), (36, 72)],
+                'Сверка': [(12, 48)],
+            }
+            prior_weigths ={
+                'Линия': 1.5,
+                'Возврат': 15,
+                'Доставка': 10,
+                'Информация': 30,
+                'Главная касса': 0,
+                'CЦ': 0,
+                'ОРКК': 0,
+                'Сверка': 0,
+            }
+        elif shop.super_shop.code == '004':
+            probs = {
+                'Линия': 3,
+                'Возврат': 0.5,
+                'Доставка': 1,
+                'Информация': 0.2,
+                'Главная касса': 3,
+            }
+
+            slots = {
+                'Главная касса': [(2, 38), (38, 74)],
+            }
+            prior_weigths = {
+                'Линия': 1.5,
+                'Возврат': 15,
+                'Доставка': 10,
+                'Информация': 30,
+                'Главная касса': 2000,
+            }
+
+        for cashbox in cashboxes:
+            if cashbox['name'] in main_types:
+                cashbox['prediction'] = 1
+            elif cashbox['name'] in special_types:
+                cashbox['prediction'] = 2
+            else:
+                cashbox['prediction'] = 0
+            if cashbox['prediction']:
+                cashbox['prob'] = probs[cashbox['name']]
+            else:
+                cashbox['prob'] = 0
+            cashbox['slots'] = slots.get(cashbox['name'], [])
+            cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
+
     data = {
         'start_dt': BaseConverter.convert_date(tt.dt),
+        'IP': '127.0.0.1:8000',
         'timetable_id': tt.id,
-        'cashbox_types': [CashboxTypeConverter.convert(x) for x in CashboxType.objects.filter(shop_id=shop_id)],
+        'cashbox_types': cashboxes,
         'demand': [PeriodDemandConverter.convert(x) for x in periods],
         'cashiers': [
             {
                 'general_info': UserConverter.convert(u),
                 'constraints_info': [WorkerConstraintConverter.convert(x) for x in constraints.get(u.id, [])],
                 'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(u.id, [])],
-                'workdays': [WorkerDayConverter.convert_type(x.type) for x in worker_day.get(u.id, [])]
+                'workdays': [WorkerDayConverter.convert(x) for x in worker_day.get(u.id, [])],
+                'prev_data': [WorkerDayConverter.convert(x) for x in prev_data.get(u.id, [])],
             } for u in User.objects.filter(shop_id=shop_id)
-        ]
+        ],
+        'algo_params': {
+            'cost_weights': cost_weigths,
+            'method_params': method_params,
+        },
     }
 
     try:
+
         data = json.dumps(data).encode('ascii')
-        req = urllib.request.Request('http://149.154.64.204/', data=data, headers={'content-type': 'application/json'})
+        with open('./send_data_tmp.json', 'wb+') as f:
+            f.write(data)
+        req = urllib.request.Request('http://127.0.0.1:5000/', data=data, headers={'content-type': 'application/json'})
         with urllib.request.urlopen(req) as response:
             data = response.read().decode('utf-8')
     except:
         JsonResponse.internal_error('Error sending data to server')
-
     return JsonResponse.success()
 
 

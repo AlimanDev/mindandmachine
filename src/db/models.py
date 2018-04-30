@@ -51,6 +51,9 @@ class User(DjangoAbstractUser):
         TYPE_HOUR = 3
         TYPE_SOS = 4
         TYPE_MANAGER = 5
+        # TYPE_3_3 = 6
+        # TYPE_DISABLED = 7
+        # TYPE_PREGNANT = 8
 
     id = models.BigAutoField(primary_key=True)
 

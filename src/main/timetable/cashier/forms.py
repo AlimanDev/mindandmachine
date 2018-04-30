@@ -12,6 +12,7 @@ from src.util.models_converter import WorkerDayConverter, UserConverter, BaseCon
 class GetCashiersListForm(forms.Form):
     dt_hired_before = util_forms.DateField(required=False)
     dt_fired_after = util_forms.DateField(required=False)
+    shop_id = forms.IntegerField(required=False)
 
     def clean_dt_hired_before(self):
         value = self.cleaned_data.get('dt_hired_before')
@@ -81,6 +82,7 @@ class SetCashierInfoForm(forms.Form):
     work_type = forms.CharField(required=False)
     cashbox_info = forms.CharField(required=False)
     constraint = forms.CharField(required=False)
+    extra_info = forms.CharField(required=False)
 
     def clean_work_type(self):
         value = self.cleaned_data.get('work_type')

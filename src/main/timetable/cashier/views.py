@@ -14,7 +14,11 @@ from . import utils
 @api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
     users = []
-    for u in User.objects.filter(shop_id=request.user.shop_id).order_by('last_name', 'first_name'):
+    if form['shop_id']:
+        shop_id = form['shop_id']
+    else:
+        shop_id = request.user.shop_id
+    for u in User.objects.filter(shop_id=shop_id).order_by('last_name', 'first_name'):
         if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
             if u.dt_fired is None or u.dt_fired >= form['dt_fired_after']:
                 users.append(u)
@@ -269,9 +273,10 @@ def set_cashier_info(request, form):
 
     if form.get('work_type') is not None:
         worker.work_type = form['work_type']
-        worker.save()
-
         response['work_type'] = UserConverter.convert_work_type(worker.work_type)
+
+    worker.extra_info = form.get('extra_info', '')
+    worker.save()
 
     if form.get('cashbox_info') is not None:
         cashbox_types = {
