@@ -83,6 +83,15 @@ class SheetIndexHelper(object):
         return y - 1
 
     @classmethod
+    def reverse_column(cls, x):
+        cls.__check_columns_mapping()
+        return cls.__COLUMNS_MAPPING_REVERSE[x]
+
+    @classmethod
+    def reverse_row(cls, y):
+        return y + 1
+
+    @classmethod
     def print_indexes(cls, x, y):
         cls.__check_columns_mapping()
         print('column = {}, row = {}'.format(cls.__COLUMNS_MAPPING_REVERSE[x], y + 1))
@@ -145,7 +154,7 @@ class PrintHelper(object):
             return __ret('в', 'holiday')
 
         if obj.type == WorkerDay.Type.TYPE_VACATION.value:
-            return __ret('от')
+            return __ret('от', 'vacation')
 
         if obj.type == WorkerDay.Type.TYPE_MATERNITY.value:
             return __ret('ож')
@@ -426,18 +435,24 @@ def common_fill_sheet_two(workbook, shop, dt_from, dt_to):
                 worksheet.write(row_index, col_index, cell, format_default)
 
 
+# !!!
 # noinspection PyTypeChecker
 def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
     def __dt_range():
         return range_u(dt_from, dt_to, timedelta(days=1))
 
     format_days = {
-        'default': workbook.add_format(fmt3(font_size=9, bold=True)),
-        'holiday': workbook.add_format(fmt(font_size=9, bold=True, bg_color='#66FF66'))
+        'default': workbook.add_format(fmt3(font_size=10, border=1)),
+        'holiday': workbook.add_format(fmt3(font_size=10, bg_color='#66FF66', border=1, bottom=2)),
+        'vacation': workbook.add_format(fmt3(font_size=10, bg_color='#ccffff', border=1))
     }
 
-    format_text = workbook.add_format(fmt3(font_size=9))
+    format_text = workbook.add_format(fmt3(font_size=10, border=1))
+    format_text_bold = workbook.add_format(fmt3(font_size=10, bold=True, border=1))
     format_text_left = workbook.add_format(fmt3(font_size=9, align='left'))
+    format_text_workers = workbook.add_format(fmt3(font_size=11, bold=True, align='left', border=1, right=2))
+    format_text_yellow = workbook.add_format(fmt3(font_size=10, border=1, bg_color='#ffff99'))
+    format_text_border = workbook.add_format(fmt3(font_size=11, bold=True, align='left', border=1))
 
     cache_workers = User.objects.filter(shop_id=shop_id).order_by('id')
     cache_worker_days = {}
@@ -462,30 +477,30 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
     for worker in cache_workers:
         worker_days = cache_worker_days[worker.id]
         row = [
-            Cell('', format_text_left),
-            Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_text_left),
+            Cell('', format_text_border),
+            Cell('', format_text_border),
+            Cell('', format_text_border),
+            Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_text_workers),
         ] + [
             PrintHelper.depart_get_worker_day_cell(worker_days.get(dttm.date()), format_days, timetable) for dttm in __dt_range()
         ] + [
-            Cell('', format_text),  # утро
-            Cell('', format_text),  # день
-            Cell('', format_text),  # вечер
-            Cell('', format_text),  # ночь
-            Cell('', format_text),  # рабочих
-            Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value), format_text),  # плановых
             Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value), format_text),  # выходных
+            Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value), format_text_bold),  # плановых
+            Cell('', format_text_yellow),
+            Cell('', format_text),
+            Cell('', format_text)
         ]
 
         data.append(row)
-        data_size['rows'] += [15 for i in range(len(row))]
+        data_size['rows'] += [15]
 
     data += [
         [],  # пустая строка
         [],  # информация
         [],  # начало-конец
     ]
-    data_size['rows'] += [15, 15, 15]
-    row_timetable_header = len(data) - 1
+    data_size['rows'] += [30, 15, 15, 30]
+    row_timetable_header = len(data) - 2
 
     return {
         'row_timetable_header': row_timetable_header,
@@ -493,35 +508,36 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
     }
 
 
+# !!!
 # noinspection PyTypeChecker
 def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
     def __dt_range():
         return range_u(dt_from, dt_to, timedelta(days=1))
 
+    def __dt_range_len():
+        return len([1 for _ in __dt_range()])
+
     worksheet = workbook.add_worksheet(name='Расписание на подпись')
     # worksheet.hide_gridlines(2)
 
     format_default = workbook.add_format(fmt3(font_size=9))
-    format_header_text = workbook.add_format(fmt3(font_size=9))
-    format_header_text_bold = workbook.add_format(fmt3(font_size=9, bold=True))
+    format_header_text = workbook.add_format(fmt3(font_size=8, border=1))
+    format_header_text_bold = workbook.add_format(fmt3(font_size=8, bold=True))
     format_header_weekday = workbook.add_format(fmt3(font_size=9))
-    format_header_date = workbook.add_format(fmt3(font_size=9, num_format='dd'))
+    format_header_date = workbook.add_format(fmt3(font_size=8, bold=True, num_format='dd', border=1))
 
     data = [
-        [] for i in range(12)
+        [] for i in range(9)
     ] + [
-        # weekdays
-        ['', ''] + [Cell(x.date(), format_header_date) for x in __dt_range()],
-
         # main header
-        [Cell(x, format_header_text_bold) for x in ['№', 'ФИО']] +
-        [Cell(PrintHelper.get_weekday_name(x), format_header_weekday) for x in __dt_range()] +
-        [Cell(x, format_header_text) for x in ['утро', 'день', 'вечер', 'ночь', 'рабочих', 'плановых', 'выходных']] +
-        [Cell(x, format_header_text_bold) for x in ['Ознакомлен', 'Дата ознакомления']],
+        [Cell(x, format_header_text) for x in ['№ п/п', 'Таб №', 'должн', 'Фамилия Имя Отчество']] +
+        [Cell(x.date(), format_header_date) for x in __dt_range()] +
+        # [Cell(PrintHelper.get_weekday_name(x), format_header_text_bold) for x in __dt_range()] +
+        [Cell(x, format_header_text) for x in ['вых дни', 'раб дни', 'вых дни', 'дата', 'подпись']]
     ]
     data_size = {
-        'rows': [14 for i in range(12)] + [10, 35],
-        'cols': [10, 25] + [1.5 for x in __dt_range()] + [5, 5, 5, 5, 5, 5, 5]
+        'rows': [14, 20, 14, 20, 14, 35, 14, 14, 20, 40],
+        'cols': [5, 10, 5, 40] + [1.5 for x in __dt_range()] + [3, 3, 4, 5, 5]
     }
 
     extra = depart_add_workers_one(
@@ -549,8 +565,24 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
                 worksheet.write(row_index, col_index, cell, format_default)
 
     format_meta_title = workbook.add_format(fmt3(font_size=8, text_wrap=False))
+    format_meta_title_border = workbook.add_format(fmt3(font_size=8, border=1))
+    format_meta_title_border_10_yellow = workbook.add_format(fmt3(font_size=10, border=1, bg_color='#ffc000'))
+    format_meta_title_border_10_right_yellow = workbook.add_format(fmt3(font_size=10, border=1, bg_color='#ffc000', right=2))
+    format_meta_title_border_bottom = workbook.add_format(fmt3(font_size=8, text_wrap=False, bottom=1))
+    format_meta_main_title = workbook.add_format(fmt3(font_size=28, bold=True, text_wrap=False, align='center', bottom=1))
     format_meta_title_10 = workbook.add_format(fmt3(font_size=10, text_wrap=False))
+    format_meta_title_bold_12_left = workbook.add_format(fmt3(font_size=12, bold=True, text_wrap=False, align='left'))
+    format_meta_title_bold_14_left = workbook.add_format(fmt3(font_size=14, bold=True, text_wrap=False, align='left'))
+    format_meta_title_bold_10_right_bottom = workbook.add_format(fmt3(font_size=10, bold=True, text_wrap=False, align='right', valign='bottom'))
+    format_meta_title_bold_10_bold_border = workbook.add_format(fmt3(font_size=10, text_wrap=False, align='right', border=2))
+    format_meta_title_bold_14_border = workbook.add_format(fmt3(font_size=14, bold=True, text_wrap=False, align='center', border=1))
     format_meta_title_bold = workbook.add_format(fmt3(font_size=8, bold=True, text_wrap=False))
+    format_meta_text_cursive_7 = workbook.add_format(fmt3(font_size=7, text_wrap=False))
+    format_meta_title_16 = workbook.add_format(fmt3(font_size=16, text_wrap=False, right=1))
+    format_meta_text_border_10 = workbook.add_format(fmt3(font_size=10, text_wrap=False, border=1))
+    format_meta_text_border_10_right = workbook.add_format(fmt3(font_size=10, text_wrap=False, border=1, right=2))
+
+    format_meta_title_border_right = workbook.add_format(fmt3(font_size=8, border=1, right=2))
     format_meta_title_left = workbook.add_format(fmt3(font_size=8, text_wrap=False, align='left'))
     format_meta_title_bold_left = workbook.add_format(fmt3(font_size=8, bold=True, text_wrap=False, align='left'))
     format_meta_title_right = workbook.add_format(fmt3(font_size=8, text_wrap=False, align='right'))
@@ -559,40 +591,188 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
     def __wt(__row, __col, __data, __fmt):
         worksheet.write(SheetIndexHelper.get_row(__row), SheetIndexHelper.get_column(__col), __data, __fmt)
 
-    __wt(1, 'am', 'Форма утверждена приказом директора магазина Красногорск № 141/ОД/ЛМК от 20.10.2009', format_meta_title)
+    def __wt_f(__row, __col, __data, __fmt):
+        worksheet.write_formula(SheetIndexHelper.get_row(__row), SheetIndexHelper.get_column(__col), __data, __fmt)
 
-    __wt(2, 'x', 'ООО "ЛЕРУА МЕРЛЕН ВОСТОК"', format_meta_title_bold)
-    __wt(3, 'x', '(наименование организации)', format_meta_title)
-    __wt(4, 'x', 'МАГАЗИН {}'.format(shop.super_shop.title.upper()), format_meta_title_bold)
-    __wt(5, 'x', '(наименование структурного подразделения)', format_meta_title)
+    __wt(2, 'g', 'ГРАФИК РАБОТЫ', format_meta_title_bold_14_left)
+    worksheet.merge_range('AH3:AM3', 'Наименование должности', format_meta_title)
+    worksheet.merge_range('AH5:AM5', 'Подпись, расшифровка', format_meta_title)
+    __wt(6, 'd', 'Подразделение:', format_meta_title_bold_10_right_bottom)
 
-    __wt(6, 'b', 'собрание отдела 19.05.2018', format_meta_title)
+    worksheet.merge_range('AH1:AM1', 'УТВЕРЖДАЮ', format_meta_title_bold_12_left)
+    worksheet.merge_range('E6:AB6', '{}'.format(shop.title), format_meta_main_title)
+    worksheet.merge_range('AH2:AM2', '', format_meta_title_border_bottom)
+    worksheet.merge_range('AH4:AM4', '', format_meta_title_border_bottom)
+    worksheet.merge_range('AH7:AM7', '\"____\" __________ 2018 г.', format_meta_title)
 
-    __wt(7, 't', 'ГРАФИК СМЕННОСТИ', format_meta_title_bold)
-    __wt(8, 's', 'ОТДЕЛА', format_meta_title_bold)
+    last_dt_column_index = SheetIndexHelper.get_column('e') + __dt_range_len() - 1
 
-    __wt(6, 'ad', '№ ОТДЕЛА', format_meta_title)
+    worksheet.merge_range(
+        'E9:{}9'.format(SheetIndexHelper.reverse_column(last_dt_column_index).upper()),
+        'МАЙ 2018',
+        format_meta_title_bold_14_border
+    )
 
-    try:
-        s = int(shop.hidden_title.replace('d', ''))
-        __wt(7, 'ad', '{}'.format(s), format_meta_title_bold)
-    except:
-        pass
+    worksheet.merge_range(
+        '{}9:{}9'.format(SheetIndexHelper.reverse_column(last_dt_column_index + 1), SheetIndexHelper.reverse_column(last_dt_column_index + 2)).upper(),
+        'Запланировано',
+        format_header_text
+    )
 
-    __wt(9, 'ab', 'УТВЕРЖДАЮ', format_meta_title_bold_left)
-    __wt(10, 'ab', 'личная подпись', format_meta_title_left)
-    __wt(11, 'ab', 'дата', format_meta_title_bold_left)
+    __wt(9, SheetIndexHelper.reverse_column(last_dt_column_index + 3), 'Отклонения', format_header_text)
 
-    __wt(7, 'AK', 'Май', format_meta_title_10)
+    worksheet.merge_range(
+        '{}9:{}9'.format(SheetIndexHelper.reverse_column(last_dt_column_index + 4), SheetIndexHelper.reverse_column(last_dt_column_index + 5)).upper(),
+        'С графиком ознакомлен',
+        format_header_text
+    )
+
+    # __wt(2, 'x', 'ООО "ЛЕРУА МЕРЛЕН ВОСТОК"', format_meta_title_bold)
+    # __wt(3, 'x', '(наименование организации)', format_meta_title)
+    # __wt(4, 'x', 'МАГАЗИН {}'.format(shop.super_shop.title.upper()), format_meta_title_bold)
+    # __wt(5, 'x', '(наименование структурного подразделения)', format_meta_title)
+    #
+    # __wt(6, 'b', 'собрание отдела 19.05.2018', format_meta_title)
+    #
+    # __wt(7, 't', 'ГРАФИК СМЕННОСТИ', format_meta_title_bold)
+    # __wt(8, 's', 'ОТДЕЛА', format_meta_title_bold)
+    #
+    # __wt(6, 'ad', '№ ОТДЕЛА', format_meta_title)
+    #
+    # try:
+    #     s = int(shop.hidden_title.replace('d', ''))
+    #     __wt(7, 'ad', '{}'.format(s), format_meta_title_bold)
+    # except:
+    #     pass
+    #
+    # __wt(9, 'ab', 'УТВЕРЖДАЮ', format_meta_title_bold_left)
+    # __wt(10, 'ab', 'личная подпись', format_meta_title_left)
+    # __wt(11, 'ab', 'дата', format_meta_title_bold_left)
+    #
+    # __wt(7, 'AK', 'Май', format_meta_title_bold_12)
 
     row_timetable_header = extra['row_timetable_header']
     timetable = {v: k for k, v in extra['timetable'].items()}
 
-    __wt(row_timetable_header, 'b', 'ИНФОРМАЦИЯ', format_meta_title_bold_left)
-    __wt(row_timetable_header, 'w', 'Перерывы', format_meta_title_bold)
+    __wt(row_timetable_header, 'd', 'Составил:', format_meta_title_bold_10_bold_border)
+    worksheet.merge_range('E{0}:J{0}'.format(row_timetable_header), '', format_meta_title_border_bottom)
+    worksheet.merge_range('N{0}:Q{0}'.format(row_timetable_header), '', format_meta_title_border_bottom)
+    worksheet.merge_range('T{0}:Y{0}'.format(row_timetable_header), '', format_meta_title_border_bottom)
+    worksheet.merge_range('AC{0}:AF{0}'.format(row_timetable_header), '', format_meta_title_border_bottom)
 
-    __wt(row_timetable_header + 1, 'd', 'Начало', format_meta_title)
-    __wt(row_timetable_header + 1, 'g', 'Конец', format_meta_title)
+    worksheet.merge_range('E{0}:J{0}'.format(row_timetable_header + 1), 'Наименование должности', format_meta_text_cursive_7)
+    worksheet.merge_range('N{0}:Q{0}'.format(row_timetable_header + 1), 'Подпись', format_meta_text_cursive_7)
+    worksheet.merge_range('T{0}:Y{0}'.format(row_timetable_header + 1), 'Расшифровка подписи', format_meta_text_cursive_7)
+    worksheet.merge_range('AC{0}:AF{0}'.format(row_timetable_header + 1), 'Дата', format_meta_text_cursive_7)
+
+    __wt(row_timetable_header + 2, 'b', 'СПРАВОЧНО:', format_meta_title_bold)
+
+    __wt(row_timetable_header + 3, 'b', 'Обозначение', format_meta_title_border)
+    __wt(row_timetable_header + 3, 'c', '', format_meta_title_border)
+    __wt(row_timetable_header + 3, 'd', 'Время начала и окончания смен (с учетом перерыва продолжительностью 1 час)', format_meta_title_border)
+
+    col_index = SheetIndexHelper.get_column('e')
+    for x in __dt_range():
+        __wt(row_timetable_header + 3, SheetIndexHelper.reverse_column(col_index), x.date(), format_header_date)
+        col_index += 1
+
+    i = 0
+    for tt_value in sorted(timetable):
+        tt_key = timetable[tt_value]
+
+        tt_begin, tt_end = tt_key.split('-')
+        row_index = row_timetable_header + 4 + i
+        __wt(row_index, 'b', tt_value, format_meta_text_border_10)
+        __wt(row_index, 'c', '', format_meta_text_border_10)
+        __wt(row_index, 'd', 'с {} до {}'.format(tt_begin, tt_end), format_meta_text_border_10_right)
+
+        col_index = SheetIndexHelper.get_column('e')
+        for x in __dt_range():
+            __wt_f(
+                row_index,
+                SheetIndexHelper.reverse_column(col_index),
+                '=COUNTIF({0}$11:{0}${1},$B{2}'.format(
+                    SheetIndexHelper.reverse_column(col_index),
+                    SheetIndexHelper.reverse_row(row_timetable_header - 2),
+                    row_index
+                ),
+                format_meta_text_border_10
+            )
+            col_index += 1
+
+        i += 1
+
+    for tt_key, tt_value in {'в': 'выходной', 'от': 'отпуск'}.items():
+        row_index = row_timetable_header + 4 + i
+        __wt(row_index, 'b', tt_key, format_meta_text_border_10)
+        __wt(row_index, 'c', '', format_meta_text_border_10)
+        __wt(row_index, 'd', tt_value, format_meta_text_border_10_right)
+
+        col_index = SheetIndexHelper.get_column('e')
+        for x in __dt_range():
+            __wt_f(
+                row_index,
+                SheetIndexHelper.reverse_column(col_index),
+                '=COUNTIF({0}$11:{0}${1},$B{2}'.format(
+                    SheetIndexHelper.reverse_column(col_index),
+                    SheetIndexHelper.reverse_row(row_timetable_header - 2),
+                    row_index
+                ),
+                format_meta_text_border_10
+            )
+            col_index += 1
+
+        i += 1
+
+    row_index = row_timetable_header + 4 + i
+
+    worksheet.merge_range('B{0}:D{0}'.format(row_index), 'всего вых и отп', format_meta_text_border_10_right)
+
+    col_index = SheetIndexHelper.get_column('e')
+    for x in __dt_range():
+        __wt_f(
+            row_index,
+            SheetIndexHelper.reverse_column(col_index),
+            '=SUM(${0}{1}:${0}{2})'.format(
+                SheetIndexHelper.reverse_column(col_index),
+                SheetIndexHelper.reverse_row(row_index - 3),
+                SheetIndexHelper.reverse_row(row_index - 2),
+            ),
+            format_meta_text_border_10
+        )
+        col_index += 1
+
+    worksheet.merge_range('B{0}:D{0}'.format(row_index + 1), 'всего раб', format_meta_title_border_10_right_yellow)
+
+    col_index = SheetIndexHelper.get_column('e')
+    for x in __dt_range():
+        __wt_f(
+            row_index + 1,
+            SheetIndexHelper.reverse_column(col_index),
+            '=SUM(${0}{1}:${0}{2})'.format(
+                SheetIndexHelper.reverse_column(col_index),
+                SheetIndexHelper.reverse_row(row_timetable_header + 4 - 1),
+                SheetIndexHelper.reverse_row(row_timetable_header + 4 - 1 + len(timetable) - 1),
+            ),
+            format_meta_title_border_10_yellow
+        )
+        col_index += 1
+
+    worksheet.merge_range('B{0}:D{0}'.format(row_index + 2), 'СОБРАНИЕ ОТДЕЛА СОСТОИТСЯ:', format_meta_title_16)
+    __wt(row_index + 4, 'd', 'РАСПИСАНИЕ ПЕРЕРЫВОВ', format_meta_title_10)
+    __wt(row_index + 5, 'd', 'Смена', format_meta_title_border)
+    worksheet.merge_range('E{0}:H{0}'.format(row_index + 5), '1 перерыв', format_meta_title_border)
+    worksheet.merge_range('I{0}:L{0}'.format(row_index + 5), '2 перерыв', format_meta_title_border)
+    worksheet.merge_range('M{0}:P{0}'.format(row_index + 5), '3 перерыв', format_meta_title_border)
+
+    i = 0
+    for tt_value in sorted(timetable):
+        __wt(row_index + 6 + i, 'd', tt_value, format_meta_title_border)
+        worksheet.merge_range('E{0}:H{0}'.format(row_index + 6 + i), '', format_meta_title_border)
+        worksheet.merge_range('I{0}:L{0}'.format(row_index + 6 + i), '', format_meta_title_border)
+        worksheet.merge_range('M{0}:P{0}'.format(row_index + 6 + i), '', format_meta_title_border)
+
+        i += 1
 
     # __wt(row_timetable_header + 1, 'J', 'с', format_meta_title)
     # __wt(row_timetable_header + 1, 'L', 'по', format_meta_title)
@@ -602,26 +782,26 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
     # __wt(row_timetable_header + 1, 's', 'по', format_meta_title)
     # __wt(row_timetable_header + 1, 'v', 'длительность', format_meta_title)
 
-    i = 0
-    for tt_value in sorted(timetable):
-        tt_key = timetable[tt_value]
+    # i = 0
+    # for tt_value in sorted(timetable):
+    #     tt_key = timetable[tt_value]
+    #
+    #     tt_begin, tt_end = tt_key.split('-')
+    #     row_index = row_timetable_header + 4 + i
+    #     __wt(row_index, 'b', 'Смена № {}'.format(tt_value), format_meta_title_bold_right)
+    #
+    #     __wt(row_index, 'd', tt_begin, format_meta_title_bold)
+    #     __wt(row_index, 'g', tt_end, format_meta_title_bold)
+    #
+    #     i += 1
 
-        tt_begin, tt_end = tt_key.split('-')
-        row_index = row_timetable_header + 2 + i
-        __wt(row_index, 'b', 'Смена № {}'.format(tt_value), format_meta_title_bold_right)
-
-        __wt(row_index, 'd', tt_begin, format_meta_title_bold)
-        __wt(row_index, 'g', tt_end, format_meta_title_bold)
-
-        i += 1
-
-    __wt(row_timetable_header + 2 + i, 'u', 'общая продолжительность перерывов в течение рабочей смены - 1 час', format_meta_title_bold)
-    __wt(
-        row_timetable_header + 2 + i + 1,
-        'u',
-        'Запрещено меняться сменами, выходными днями во избежание нарушения трудового распорядка. В крайних случаях по согласованию с РС и письменному заявлению.',
-        format_meta_title_bold
-    )
+    # __wt(row_timetable_header + 2 + i, 'u', 'общая продолжительность перерывов в течение рабочей смены - 1 час', format_meta_title_bold)
+    # __wt(
+    #     row_timetable_header + 2 + i + 1,
+    #     'u',
+    #     'Запрещено меняться сменами, выходными днями во избежание нарушения трудового распорядка. В крайних случаях по согласованию с РС и письменному заявлению.',
+    #     format_meta_title_bold
+    # )
 
 
 # noinspection PyTypeChecker
