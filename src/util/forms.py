@@ -131,8 +131,8 @@ class FormUtil(object):
 
     @staticmethod
     def get_dt_from(form):
-        return DictUtil.get_not_none(form, 'dt_from', datetime.date(year=1971))
+        return DictUtil.get_not_none(form, 'from_dt', datetime.date(year=1971))
 
     @staticmethod
     def get_dt_to(form):
-        return DictUtil.get_not_none(form, 'dt_to', datetime.date(year=2037))
+        return DictUtil.get_not_none(form, 'to_dt', datetime.date(year=2037))
