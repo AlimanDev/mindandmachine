@@ -13,7 +13,7 @@ def prepare_worker_day_create_args(form, worker):
     if WorkerDay.is_type_with_tm_range(form['type']):
         args.update({
             'tm_work_start': form['tm_work_start'],
-            'tm_work_end': form['tm_work_start'],
+            'tm_work_end': form['tm_work_end'],
             'tm_break_start': form['tm_break_start']
         })
     else:

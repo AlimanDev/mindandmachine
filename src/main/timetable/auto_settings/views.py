@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Q
 
 from src.db.models import (
     Timetable,
@@ -17,6 +18,9 @@ from src.db.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     Shop,
+
+    WorkerDayChangeLog,
+    WorkerDayChangeRequest,
 )
 from src.util.collection import group_by
 from src.util.forms import FormUtil
@@ -39,7 +43,8 @@ def get_status(request, form):
 
 @api_method('POST', SetSelectedCashiersForm)
 def set_selected_cashiers(request, form):
-    User.objects.filter(id__in=form['cashier_ids']).update(auto_timetable=form['value'])
+    User.objects.exclude(id__in=form['cashier_ids']).update(auto_timetable=False)
+    User.objects.filter(id__in=form['cashier_ids']).update(auto_timetable=True)
     return JsonResponse.success()
 
 
@@ -63,7 +68,7 @@ def create_timetable(request, form):
         'cashbox_type'
     ).filter(
         cashbox_type__shop_id=shop_id,
-        type__in=[PeriodDemand.Type.LONG_FORECAST.value, PeriodDemand.Type.SHORT_FORECAST.value],
+        type=PeriodDemand.Type.LONG_FORECAST.value,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to
     )
@@ -94,6 +99,8 @@ def create_timetable(request, form):
 
     cost_weigths = {}
     method_params = {}
+
+    # todo: this params should be in db
     if shop.full_interface:
         main_types = [
             'Линия',
@@ -104,7 +111,7 @@ def create_timetable(request, form):
 
         special_types = [
             'Главная касса',
-            'CЦ',
+            'СЦ',
             'ОРКК',
             'Сверка',
         ]
@@ -160,7 +167,7 @@ def create_timetable(request, form):
                 'Доставка': 1,
                 'Информация': 0.2,
                 'Главная касса': 5,
-                'CЦ': 1,
+                'СЦ': 1,
                 'ОРКК': 3.5,
                 'Сверка': 10,
             }
@@ -177,7 +184,7 @@ def create_timetable(request, form):
                 'Доставка': 10,
                 'Информация': 30,
                 'Главная касса': 0,
-                'CЦ': 0,
+                'СЦ': 0,
                 'ОРКК': 0,
                 'Сверка': 0,
             }
@@ -228,7 +235,7 @@ def create_timetable(request, form):
                 'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(u.id, [])],
                 'workdays': [WorkerDayConverter.convert(x) for x in worker_day.get(u.id, [])],
                 'prev_data': [WorkerDayConverter.convert(x) for x in prev_data.get(u.id, [])],
-            } for u in User.objects.filter(shop_id=shop_id)
+            } for u in User.objects.filter(shop_id=shop_id, auto_timetable=True)
         ],
         'algo_params': {
             'cost_weights': cost_weigths,
@@ -239,8 +246,8 @@ def create_timetable(request, form):
     try:
 
         data = json.dumps(data).encode('ascii')
-        with open('./send_data_tmp.json', 'wb+') as f:
-            f.write(data)
+        # with open('./send_data_tmp.json', 'wb+') as f:
+        #     f.write(data)
         req = urllib.request.Request('http://127.0.0.1:5000/', data=data, headers={'content-type': 'application/json'})
         with urllib.request.urlopen(req) as response:
             data = response.read().decode('utf-8')
@@ -256,15 +263,48 @@ def delete_timetable(request, form):
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
     dt_now = datetime.now().date()
 
-    if dt_from < dt_now:
+    if dt_from.date() < dt_now:
         return JsonResponse.value_error('Cannot delete past month')
 
     count, _ = Timetable.objects.filter(shop_id=shop_id, dt=dt_from).delete()
 
-    if count > 1:
-        return JsonResponse.internal_error(msg='too much deleted')
-    elif count == 0:
-        return JsonResponse.does_not_exists_error()
+    WorkerDayChangeLog.objects.filter(
+        worker_day__dt__month=dt_from.month,
+        worker_day__dt__year=dt_from.year,
+    ).filter(
+        Q(worker_day__is_manual_tuning=False) |
+        Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
+    ).delete()
+
+    WorkerDayChangeRequest.objects.filter(
+        worker_day__dt__month=dt_from.month,
+        worker_day__dt__year=dt_from.year,
+    ).filter(
+        Q(worker_day__is_manual_tuning=False) |
+        Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
+    ).delete()
+
+    WorkerDayCashboxDetails.objects.filter(
+        worker_day__dt__month=dt_from.month,
+        worker_day__dt__year=dt_from.year,
+    ).filter(
+        Q(worker_day__is_manual_tuning=False) |
+        Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
+    ).delete()
+
+    WorkerDay.objects.filter(
+        dt__month=dt_from.month,
+        dt__year=dt_from.year,
+        is_manual_tuning=False,
+    ).filter(
+        Q(is_manual_tuning=False) |
+        Q(type=WorkerDay.Type.TYPE_EMPTY.value)
+    ).delete()
+
+    # if count > 1:
+    #     return JsonResponse.internal_error(msg='too much deleted')
+    # elif count == 0:
+    #     return JsonResponse.does_not_exists_error()
 
     return JsonResponse.success()
 
@@ -289,6 +329,7 @@ def set_timetable(request, form):
         return JsonResponse.does_not_exists_error('timetable')
 
     timetable.status = TimetableConverter.parse_status(data['timetable_status'])
+    timetable.save()
     if timetable.status != Timetable.Status.READY.value:
         return JsonResponse.success()
 
@@ -296,54 +337,91 @@ def set_timetable(request, form):
 
     for uid, v in data['users'].items():
         for wd in v['workdays']:
-            dt = BaseConverter.parse_date(wd['dt'])
-            wd_type = WorkerDayConverter.parse_type(wd['type'])
-            tm_work_start = BaseConverter.parse_time(wd['tm_work_start'])
-            tm_work_end = BaseConverter.parse_time(wd['tm_work_end'])
-            tm_break_start = BaseConverter.parse_time(wd['tm_break_start'])
-            cashbox_type_id = wd['cashbox_type_id']
+            # todo: actually use a form here is better
+            # todo: too much request to db
 
+            dt = BaseConverter.parse_date(wd['dt'])
             try:
                 wd_obj = WorkerDay.objects.get(worker_id=uid, dt=dt)
-
-                try:
-                    cd = WorkerDayCashboxDetails.objects.get(worker_day=wd_obj, tm_from=wd_obj.tm_work_start, tm_to=wd_obj.tm_work_end)
-                    cd.on_cashbox_id = cashbox_type_id
-                    cd.tm_from = tm_work_start
-                    cd.tm_to = tm_work_end
-                    cd.save()
-                except WorkerDayCashboxDetails.DoesNotExist:
-                    WorkerDayCashboxDetails.objects.create(
-                        worker_day=wd_obj,
-                        on_cashbox_id=cashbox_type_id,
-                        tm_from=tm_work_start,
-                        tm_to=tm_work_end
-                    )
-                except:
-                    pass
-
-                wd_obj.type = wd_type
-                wd_obj.tm_work_start = tm_work_start
-                wd_obj.tm_work_end = tm_work_end
-                wd_obj.tm_break_start = tm_break_start
-                wd_obj.save()
+                if wd_obj.is_manual_tuning or wd_obj.type != WorkerDay.Type.TYPE_EMPTY:
+                    continue
             except WorkerDay.DoesNotExist:
-                wd_obj = WorkerDay.objects.create(
+                wd_obj = WorkerDay(
+                    dt=BaseConverter.parse_date(wd['dt']),
                     worker_id=uid,
-                    dt=dt,
-                    type=wd_type,
-                    tm_work_start=tm_work_start,
-                    tm_work_end=tm_work_end,
-                    tm_break_start=tm_break_start,
-                    worker_shop_id=users[uid].shop_id
+
                 )
-                cd = WorkerDayCashboxDetails.objects.create(
+
+            wd_obj.worker_shop_id=users[int(uid)].shop_id
+            wd_obj.type = WorkerDayConverter.parse_type(wd['type'])
+            if WorkerDay.is_type_with_tm_range(wd_obj.type):
+                wd_obj.tm_work_start = BaseConverter.parse_time(wd['tm_work_start'])
+                wd_obj.tm_work_end = BaseConverter.parse_time(wd['tm_work_end'])
+                if wd['tm_break_start']:
+                    wd_obj.tm_break_start = BaseConverter.parse_time(wd['tm_break_start'])
+                else:
+                    wd_obj.tm_break_start = None
+
+                wd_obj.save()
+                WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
+                WorkerDayCashboxDetails.objects.create(
                     worker_day=wd_obj,
-                    on_cashbox_id=cashbox_type_id,
+                    on_cashbox_id=wd['cashbox_type_id'],
                     tm_from=wd_obj.tm_work_start,
                     tm_to=wd_obj.tm_work_end
                 )
-            except:
-                pass
+            else:
+                wd_obj.save()
+
+
+
+            # wd_type = WorkerDayConverter.parse_type(wd['type'])
+            # tm_work_start = BaseConverter.parse_time(wd['tm_work_start'])
+            # tm_work_end = BaseConverter.parse_time(wd['tm_work_end'])
+            # tm_break_start = BaseConverter.parse_time(wd['tm_break_start'])
+            # cashbox_type_id = wd['cashbox_type_id']
+            #
+            # try:
+            #     wd_obj = WorkerDay.objects.get(worker_id=uid, dt=dt)
+            #
+            #     try:
+            #         cd = WorkerDayCashboxDetails.objects.get(worker_day=wd_obj, tm_from=wd_obj.tm_work_start, tm_to=wd_obj.tm_work_end)
+            #         cd.on_cashbox_id = cashbox_type_id
+            #         cd.tm_from = tm_work_start
+            #         cd.tm_to = tm_work_end
+            #         cd.save()
+            #     except WorkerDayCashboxDetails.DoesNotExist:
+            #         WorkerDayCashboxDetails.objects.create(
+            #             worker_day=wd_obj,
+            #             on_cashbox_id=cashbox_type_id,
+            #             tm_from=tm_work_start,
+            #             tm_to=tm_work_end
+            #         )
+            #     # except:
+            #     #     pass
+            #
+            #     wd_obj.type = wd_type
+            #     wd_obj.tm_work_start = tm_work_start
+            #     wd_obj.tm_work_end = tm_work_end
+            #     wd_obj.tm_break_start = tm_break_start
+            #     wd_obj.save()
+            # except WorkerDay.DoesNotExist:
+            #     wd_obj = WorkerDay.objects.create(
+            #         worker_id=uid,
+            #         dt=dt,
+            #         type=wd_type,
+            #         tm_work_start=tm_work_start,
+            #         tm_work_end=tm_work_end,
+            #         tm_break_start=tm_break_start,
+            #         worker_shop_id=users[uid].shop_id
+            #     )
+            #     cd = WorkerDayCashboxDetails.objects.create(
+            #         worker_day=wd_obj,
+            #         on_cashbox_id=cashbox_type_id,
+            #         tm_from=wd_obj.tm_work_start,
+            #         tm_to=wd_obj.tm_work_end
+            #     )
+            # except:
+            #     pass
 
     return JsonResponse.success()
