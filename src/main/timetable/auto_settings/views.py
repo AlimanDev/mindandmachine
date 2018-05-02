@@ -224,7 +224,7 @@ def create_timetable(request, form):
 
     data = {
         'start_dt': BaseConverter.convert_date(tt.dt),
-        'IP': '127.0.0.1:8000',
+        'IP': settings.HOST_IP,
         'timetable_id': tt.id,
         'cashbox_types': cashboxes,
         'demand': [PeriodDemandConverter.convert(x) for x in periods],
@@ -248,7 +248,7 @@ def create_timetable(request, form):
         data = json.dumps(data).encode('ascii')
         # with open('./send_data_tmp.json', 'wb+') as f:
         #     f.write(data)
-        req = urllib.request.Request('http://127.0.0.1:5000/', data=data, headers={'content-type': 'application/json'})
+        req = urllib.request.Request('http://{}/'.format(settings.TIMETABLE_IP), data=data, headers={'content-type': 'application/json'})
         with urllib.request.urlopen(req) as response:
             data = response.read().decode('utf-8')
     except:
