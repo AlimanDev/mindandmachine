@@ -8,6 +8,9 @@ django = "*"
 xlsxwriter = "*"
 python-dateutil = "*"
 pillow = "*"
+pandas = "*"
+xlrd = "*"
+joblib = "*"
 
 [dev-packages]
 
