@@ -145,7 +145,7 @@ def create_timetable(request, form):
                 'del_day_prob': 0.33
             },
             {
-                'steps': 700,
+                'steps': 2000,
                 'select_best': 8,
                 'changes': 30,
                 'variety': 8,
