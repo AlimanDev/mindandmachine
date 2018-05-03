@@ -19,16 +19,16 @@ class Command(BaseCommand):
             cashiers_map[name] = cashier
 
         # load new data
-        new_data = joblib.load(filename=options['infile'])
-        for entry in new_data.iterrows():
-            _, data = entry
-            cashier_name = data['index']
+        new_cashiers_data = joblib.load(filename=options['infile'])
+        for new_cashier_data_entry in new_cashiers_data.iterrows():
+            _, new_cashier_data = new_cashier_data_entry
+            cashier_name = new_cashier_data['index']
             if cashier_name not in cashiers_map:
-                print('There is no such user: {}'.format(data['index']))
+                print('There is no such user: {}'.format(new_cashier_data['index']))
             else:
                 cashier = cashiers_map[cashier_name]
                 # update speed
-                speeds = data['types_speeds']
+                speeds = new_cashier_data['types_speeds']
                 for speed_type, speed_value in speeds.items():
                     speed_translation = {
                         'usual': 'Линия',
@@ -51,7 +51,7 @@ class Command(BaseCommand):
                     '4/3': User.WorkType.TYPE_5_2.value,
                     '2/2': User.WorkType.TYPE_2_2.value
                 }
-                new_work_type = worktype_translation.get(data['type'], User.WorkType.TYPE_5_2.value)
+                new_work_type = worktype_translation.get(new_cashier_data['type'], User.WorkType.TYPE_5_2.value)
                 cashier.work_type = new_work_type
                 cashier.save()
 
@@ -61,12 +61,19 @@ class Command(BaseCommand):
                 constraints = []
                 for weekday in range(7):
                     # склеиваем constraints, т.к. они по 15 минут, а в базе по 30
-                    new_constraints = data['constraints'][first_monday + weekday][::2]
                     time = datetime.datetime(year=1971, month=1, day=1)
                     time_step = datetime.timedelta(minutes=30)
+                    # никто не работает до 7:00
+                    while time.hour < 7:
+                        constraints.append(WorkerConstraint(
+                            worker=cashier,
+                            weekday=weekday,
+                            tm=time
+                        ))
+                        time += time_step
+                    new_constraints = new_cashier_data['constraints'][first_monday + weekday][::2]
                     for constraint in new_constraints:
-                        # никто не работает до 7 и после 00:00
-                        if constraint or time.hour < 7:
+                        if constraint:
                             constraints.append(WorkerConstraint(
                                 worker=cashier,
                                 weekday=weekday,
