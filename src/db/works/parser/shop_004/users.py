@@ -88,6 +88,10 @@ class DataParseHelper(object):
 
             if value == 'ОЖ':
                 return WorkerDay.Type.TYPE_MATERNITY.value
+            if value == 'ДО':
+                return WorkerDay.Type.TYPE_QUALIFICATION.value
+            if value == 'Н':
+                return WorkerDay.Type.TYPE_EMPTY.value
 
             cls.parse_work_time(value)
             return WorkerDay.Type.TYPE_WORKDAY.value
