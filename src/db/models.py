@@ -53,7 +53,7 @@ class WorkerPosition(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     department = models.CharField(max_length=64)
-    position = models.CharField(max_length=64)
+    title = models.CharField(max_length=64)
 
 class User(DjangoAbstractUser):
     def __init__(self, *args, **kwargs):
