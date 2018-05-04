@@ -672,7 +672,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
     timetable = {v: k for k, v in extra['timetable'].items()}
 
     def __tt_counters(__key, __dt):
-        return extra['timetable_counters'][__key].get(__dt, 0)
+        return extra['timetable_counters'][__key].get(__dt.date(), 0)
 
     __wt(row_timetable_header, 'd', 'Составил:', format_meta_title_bold_10_bold_border)
     worksheet.merge_range('E{0}:J{0}'.format(row_timetable_header), '', format_meta_title_border_bottom)
