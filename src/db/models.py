@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser as DjangoAbstractUser
 from . import utils
-
+import datetime
 
 # магазин
 class SuperShop(models.Model):
@@ -14,6 +14,9 @@ class SuperShop(models.Model):
 
     dt_opened = models.DateField(null=True, blank=True)
     dt_closed = models.DateField(null=True, blank=True)
+
+    tm_start = models.TimeField(null=True, blank=True, default=datetime.time(hour=7))
+    tm_end = models.TimeField(null=True, blank=True, default=datetime.time(hour=23, minute=59, second=59))
 
 
 # на самом деле это отдел
