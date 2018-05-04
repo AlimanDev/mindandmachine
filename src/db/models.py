@@ -110,6 +110,21 @@ class CashboxType(models.Model):
     name = models.CharField(max_length=128)
     speed_coef = models.FloatField(default=1)
     is_stable = models.BooleanField(default=True)
+    FORECAST_HARD='H'
+    FORECAST_LITE='L'
+    FORECAST_NONE='N'
+    FORECAST_CHOICES = (
+        (FORECAST_HARD, 'Hard',),
+        (FORECAST_LITE, 'Lite',),
+        (FORECAST_NONE, 'None',),
+    )
+    do_forecast = models.CharField(
+        max_length=1,
+        default=FORECAST_LITE,
+        choices=FORECAST_CHOICES,
+    )
+    probability = models.FloatField(default=1.0)
+    prior_weight = models.FloatField(default=1.0)
 
 
 class Cashbox(models.Model):
