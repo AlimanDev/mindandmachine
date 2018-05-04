@@ -41,6 +41,15 @@ class Shop(models.Model):
     demand_coef = models.FloatField(default=1)  # unknown trend for algorithm
 
 
+class WorkerPosition(models.Model):
+    '''
+    Describe employee's department and position
+    '''
+    id = models.BigAutoField(primary_key=True)
+
+    department = models.CharField(max_length=64)
+    position = models.CharField(max_length=64)
+
 class User(DjangoAbstractUser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -58,7 +67,10 @@ class User(DjangoAbstractUser):
     id = models.BigAutoField(primary_key=True)
 
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable
+    position = models.ForeignKey(WorkerPosition, null=True, on_delete=models.PROTECT)
     work_type = utils.EnumField(WorkType, null=True, blank=True)
+    is_fixed_hours = models.NullBooleanField(null=True)
+    is_fixed_days = models.NullBooleanField(null=True)
     permissions = models.BigIntegerField(default=0)
 
     middle_name = models.CharField(max_length=64, blank=True, null=True)
@@ -70,6 +82,17 @@ class User(DjangoAbstractUser):
     dt_fired = models.DateField(null=True, blank=True)
 
     birthday = models.DateField(null=True, blank=True)
+    SEX_FEMALE='F'
+    SEX_MALE='M'
+    SEX_CHOICES = (
+        (SEX_FEMALE, 'Female',),
+        (SEX_MALE, 'Male',),
+    )
+    sex = models.CharField(
+        max_length=1,
+        default=SEX_FEMALE,
+        choices=SEX_CHOICES,
+    )
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
 
     comment = models.CharField(max_length=2048, default='')
