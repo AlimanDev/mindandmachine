@@ -1,7 +1,7 @@
 from datetime import time, datetime, timedelta
 
 from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType, WorkerDayCashboxDetails, \
-    Cashbox
+    Cashbox, WorkerPosition
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
@@ -320,6 +320,32 @@ def set_cashier_info(request, form):
             constraints_converted[c.weekday].append(BaseConverter.convert_time(c.tm))
 
         response['constraint'] = constraints_converted
+
+    if form.get('sex') is not None:
+        worker.sex = form['sex']
+        response['sex'] = worker.sex
+
+    if form.get('is_fixed_hours') is not None:
+        worker.is_fixed_hours = form['is_fixed_hours']
+        response['is_fixed_hours'] = worker.is_fixed_hours
+
+    if form.get('is_fixed_days') is not None:
+        worker.is_fixed_days = form['is_fixed_days']
+        response['is_fixed_days'] = worker.is_fixed_days
+
+    if form.get('position_title') is not None\
+        and form.get('position_department') is not None:
+        position = WorkerPosition(
+            title=form['position_title'],
+            department=form['position_department'],
+        )
+        worker.position = position
+        response['position'] = {
+            'title': form['position_title'],
+            'department': form['position_department'],
+        }
+
+    worker.save()
 
     return JsonResponse.success(response)
 
