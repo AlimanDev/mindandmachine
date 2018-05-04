@@ -713,7 +713,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
             __wt_f(
                 row_index,
                 SheetIndexHelper.reverse_column(col_index),
-                '=COUNTIF({0}$11:{0}${1},$B{2}'.format(
+                '=COUNTIF({0}$11:{0}${1},$B{2})'.format(
                     SheetIndexHelper.reverse_column(col_index),
                     SheetIndexHelper.reverse_row(row_timetable_header - 2),
                     row_index
