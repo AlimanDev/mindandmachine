@@ -18,7 +18,7 @@ def get_cashiers_timetable(request, form):
 
     if form['format'] == 'excel':
         response = HttpResponse(content_type='application/force-download')
-        response['Content-Disposition'] = 'attachment; filename=График_Май.xlsx'
+        response['Content-Disposition'] = 'attachment; filename=Graphic_May.xlsx'
         response.write(get_xlsx(shop_id=shop.id).read())
         return response
 
