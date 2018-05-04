@@ -670,7 +670,9 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
 
     row_timetable_header = extra['row_timetable_header']
     timetable = {v: k for k, v in extra['timetable'].items()}
-    timetable_counters = extra['timetable_counters']
+
+    def __tt_counters(__key, __dt):
+        return extra['timetable_counters'][__key].get(__dt, 0)
 
     __wt(row_timetable_header, 'd', 'Составил:', format_meta_title_bold_10_bold_border)
     worksheet.merge_range('E{0}:J{0}'.format(row_timetable_header), '', format_meta_title_border_bottom)
@@ -709,7 +711,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
             __wt(
                 row_index,
                 SheetIndexHelper.reverse_column(col_index),
-                timetable_counters[tt_value][x],
+                __tt_counters(tt_value, x),
                 format_meta_text_border_10
             )
             col_index += 1
@@ -729,7 +731,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
             __wt(
                 row_index,
                 SheetIndexHelper.reverse_column(col_index),
-                timetable_counters[tt_value_raw[1]][x.dt],
+                __tt_counters(tt_value_raw[1], x),
                 format_meta_text_border_10
             )
             col_index += 1
@@ -745,7 +747,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
         __wt_f(
             row_index,
             SheetIndexHelper.reverse_column(col_index),
-            timetable_counters['_holiday_and_vacation'][x],
+            __tt_counters('_holiday_and_vacation', x),
             format_meta_text_border_10
         )
         col_index += 1
@@ -757,7 +759,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
         __wt_f(
             row_index + 1,
             SheetIndexHelper.reverse_column(col_index),
-            timetable_counters['_work_all'][x],
+            __tt_counters('_work_all', x),
             format_meta_title_border_10_yellow
         )
         col_index += 1
