@@ -69,8 +69,8 @@ class User(DjangoAbstractUser):
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable
     position = models.ForeignKey(WorkerPosition, null=True, on_delete=models.PROTECT)
     work_type = utils.EnumField(WorkType, null=True, blank=True)
-    is_fixed_hours = models.NullBooleanField(null=True)
-    is_fixed_days = models.NullBooleanField(null=True)
+    is_fixed_hours = models.BooleanField(default=False)
+    is_fixed_days = models.BooleanField(default=False)
     permissions = models.BigIntegerField(default=0)
 
     middle_name = models.CharField(max_length=64, blank=True, null=True)
