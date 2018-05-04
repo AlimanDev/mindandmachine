@@ -554,7 +554,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
     ]
     data_size = {
         'rows': [14, 20, 14, 20, 14, 35, 14, 14, 20, 40],
-        'cols': [5, 10, 5, 40] + [1.8 for x in __dt_range()] + [3, 3, 4, 5, 5]
+        'cols': [5, 10, 5, 40] + [2 for x in __dt_range()] + [3, 3, 4, 5, 5]
     }
 
     extra = depart_add_workers_one(
