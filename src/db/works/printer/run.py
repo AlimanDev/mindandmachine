@@ -744,7 +744,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
 
     col_index = SheetIndexHelper.get_column('e')
     for x in __dt_range():
-        __wt_f(
+        __wt(
             row_index,
             SheetIndexHelper.reverse_column(col_index),
             __tt_counters('_holiday_and_vacation', x),
@@ -756,7 +756,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
 
     col_index = SheetIndexHelper.get_column('e')
     for x in __dt_range():
-        __wt_f(
+        __wt(
             row_index + 1,
             SheetIndexHelper.reverse_column(col_index),
             __tt_counters('_work_all', x),
