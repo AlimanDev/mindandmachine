@@ -1,0 +1,21 @@
+SET LOCALE
+
+sudo apt-get install -y postgresql-9.5 postgresql-contrib pgbouncer python3-psycopg2
+sudo apt-get install -y python3-pip python3-dev libpcre3 libpcre3-dev git
+
+sudo su postgres
+createdb qos_v1
+createuser -SDR -P --interactive  # qos_v1_user
+psql -c "GRANT ALL PRIVILEGES ON DATABASE qos_v1 TO qos_v1_user;"
+
+psql -c "ALTER USER qos_v1_user CREATEDB;"
+
+adduser ksan
+adduser ksan sudo
+adduser ksan postgres
+adduser www-data ksan
+
+sudo pip3 install Django==2.0.3 Pillow uwsgi numpy pandas xlrd xlsxwriter
+
+python3 manage.py makemigrations db
+python3 manage.py migrate

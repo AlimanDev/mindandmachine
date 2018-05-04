@@ -1,0 +1,6 @@
+/usr/local/lib/python3.5/dist-packages/django/db/migrations/serializer.py
+django.db.migrations.serializer.TypeSerializer
+changed
+    return "%s.%s" % (module, self.value.__name__), {"import %s" % module}
+to
+    return "%s.%s" % (module, self.value.__qualname__), {"import %s" % module}
