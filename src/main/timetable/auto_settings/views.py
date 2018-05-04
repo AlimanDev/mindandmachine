@@ -131,6 +131,7 @@ def create_timetable(request, form):
             'holidays': 3*10**5, #3*10**5,# 2*10**6,
             'zero_cashiers': 3,
             'slots': 2*10**7,
+            'too_much_days': 22,
         }
 
         method_params = [
@@ -221,12 +222,59 @@ def create_timetable(request, form):
                 cashbox['prob'] = 0
             cashbox['slots'] = slots.get(cashbox['name'], [])
             cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
+    else:
+        cost_weigths = {
+            'F': 1,
+            '40hours': 0,
+            'days': 100,
+            '15rest': 0,
+            '5d': 0,
+            'hard': 0,
+            'soft': 0,
+            'overwork_fact_days': 3 * 10 ** 4,
+            'F_bills_coef': 3,
+            'diff_days_coef': 1,
+            'solitary_days': 5 * 10 ** 4,
+            'holidays': 10 ** 3,  # 3*10**5,# 2*10**6,
+            'zero_cashiers': 0,
+            'slots': 0,  # 2*10**3,
+        }
+        method_params = [{
+            'steps':30,
+            'select_best':8,
+            'changes': 5,
+            'variety': 8,
+            'days_change_prob': 0.5,
+            'periods_change_prob': 0.5,
+            'add_day_prob': 0.33,
+            'del_day_prob': 0.33,
+        }]
+        slots_periods_dict = []
+        if shop.title == 'Сантехника':
+            slots_periods_dict = [(4, 40), (20, 56), (36, 72)]
+        elif shop.title == 'Декор':
+            slots_periods_dict = [(4, 40), (12, 48), (28, 64), (36, 72), (4, 52)]
+        elif shop.title == 'Электротовары':
+            slots_periods_dict = [(4, 40), (8, 44), (28, 64), (36, 72), (16, 52), (28, 64)]
+
+        cashboxes = [{
+            'id': periods[0].cashbox_type_id,
+            'slots': slots_periods_dict,
+            'speed_coef': 1,
+            'types_priority_weights': 1,
+            'prob': 1,
+            'prior_weight': 1,
+            'prediction': 1,
+        }]
+
+        # todo: send slots to server
 
     data = {
         'start_dt': BaseConverter.convert_date(tt.dt),
         'IP': settings.HOST_IP,
         'timetable_id': tt.id,
         'cashbox_types': cashboxes,
+        'shop_type': shop.full_interface,
         'demand': [PeriodDemandConverter.convert(x) for x in periods],
         'cashiers': [
             {
@@ -373,8 +421,6 @@ def set_timetable(request, form):
             else:
                 wd_obj.save()
 
-
-
             # wd_type = WorkerDayConverter.parse_type(wd['type'])
             # tm_work_start = BaseConverter.parse_time(wd['tm_work_start'])
             # tm_work_end = BaseConverter.parse_time(wd['tm_work_end'])
@@ -423,5 +469,4 @@ def set_timetable(request, form):
             #     )
             # except:
             #     pass
-
     return JsonResponse.success()
