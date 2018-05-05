@@ -1,4 +1,5 @@
 from datetime import time, datetime, timedelta
+from django.db.models import Avg
 
 from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType, WorkerDayCashboxDetails, \
     Cashbox, WorkerPosition
@@ -295,12 +296,20 @@ def set_cashier_info(request, form):
         worker_cashbox_info = []
         WorkerCashboxInfo.objects.filter(worker_id=worker.id).update(is_active=False)
         for cashbox in new_active_cashboxes:
+            cashboxtype_forecast = CashboxType.objects.get(id=cashbox.id)
+            mean_speed = 1
+            if cashboxtype_forecast.do_forecast == CashboxType.FORECAST_HARD:
+                mean_speed = WorkerCashboxInfo.objects\
+                    .filter(cashbox_type__id=cashbox.id)\
+                    .aggregate(Avg('mean_speed'))['mean_speed__avg']
+
             obj, created = WorkerCashboxInfo.objects.update_or_create(
                 worker_id=worker.id,
                 cashbox_type_id=cashbox.id,
                 defaults={
-                    'is_active': True
-                }
+                    'is_active': True,
+                    'mean_speed': mean_speed,
+                },
             )
             worker_cashbox_info.append(obj)
 
@@ -339,6 +348,7 @@ def set_cashier_info(request, form):
             title=form['position_title'],
             department=form['position_department'],
         )
+        position.save()
         worker.position = position
         response['position'] = {
             'title': form['position_title'],
