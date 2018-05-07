@@ -1,32 +1,35 @@
 import json
+from django.test import TestCase
+from src.db.models import User
 
-from django.test import TestCase as DjangoTestCase
 
-
-class TestCase(DjangoTestCase):
-    def set_up(self):
-        pass
+class LocalTestCase(TestCase):
+    USER_USERNAME="u_1_1"
+    USER_EMAIL="q@q.q"
+    USER_PASSWORD="4242"
 
     def setUp(self):
-        self.set_up()
+        super().setUp()
+        self.user = User.objects.create_user(self.USER_USERNAME, self.USER_EMAIL, self.USER_PASSWORD, id=11)
 
-    def auth(self, username, password):
-        self.do_post('/auth/signin', {'username': username, 'password': password})
 
-    def do_get(self, path, expected_code=200, expected_error_type=None):
-        response = self.client.get(path)
-        return self.__process_response(response, expected_code, expected_error_type)
+    def auth(self):
+        self.client.post(
+            '/api/auth/signin',
+            {
+                'username': self.USER_USERNAME,
+                'password': self.USER_PASSWORD
+            }
+        )
 
-    def do_post(self, path, data=None, expected_code=200, expected_error_type=None):
-        response = self.client.post(path, data)
-        return self.__process_response(response, expected_code, expected_error_type)
 
-    def __process_response(self, response, expected_code, expected_error_type):
-        self.assertEqual(response.status_code, 200)
+    def api_get(self, *args, **kwargs):
+        response = self.client.get(*args, **kwargs)
+        response.json = json.loads(response.content.decode('utf-8'))
+        return response
 
-        data = json.loads(response.content.decode('utf-8'))
-        self.assertEqual(data['code'], expected_code)
-        if expected_code != 200:
-            self.assertEqual(data['data']['error_type'], expected_error_type)
 
-        return data['data']
+    def api_post(self, *args, **kwargs):
+        response = self.client.post(*args, **kwargs)
+        response.json = json.loads(response.content.decode('utf-8'))
+        return response
