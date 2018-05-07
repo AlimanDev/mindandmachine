@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'src',
     'src.db',
+    'src.main',
 ]
 
 MIDDLEWARE = [

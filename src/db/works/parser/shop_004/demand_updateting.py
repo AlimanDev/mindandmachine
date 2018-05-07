@@ -64,5 +64,8 @@ def create_demand(path, shop):
             if len(inst) > 500:
                 PeriodDemand.objects.bulk_create(inst)
                 inst = []
+    if len(inst):
+        PeriodDemand.objects.bulk_create(inst)
+
 
 
