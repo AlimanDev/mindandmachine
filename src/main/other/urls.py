@@ -9,5 +9,5 @@ urlpatterns = [
     path('get_notifications', views.get_notifications),
     path('get_new_notifications', views.get_new_notifications),
     path('set_notifications_read', views.set_notifications_read),
-    path('get_cashbox_types', views.get_cashbox_types),
+    path('get_slots', views.get_slots),
 ]

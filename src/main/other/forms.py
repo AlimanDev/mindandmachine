@@ -30,5 +30,5 @@ class GetNewNotificationsForm(forms.Form):
 class SetNotificationsReadForm(forms.Form):
     ids = util_forms.IntegersList(required=True)
 
-class GetCashboxTypes(forms.Form):
-    shop_id = forms.IntegerField(required=True)
+class GetSlots(forms.Form):
+    user_id = forms.IntegerField(required=True)

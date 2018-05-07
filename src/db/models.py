@@ -135,10 +135,11 @@ class CashboxType(models.Model):
 class Slot(models.Model):
     id = models.BigAutoField(primary_key=True)
 
-    tm_start = models.TimeField(null=True, blank=True, default=datetime.time(hour=7))
-    tm_end = models.TimeField(null=True, blank=True, default=datetime.time(hour=23, minute=59, second=59))
+    tm_start = models.TimeField(default=datetime.time(hour=7))
+    tm_end = models.TimeField(default=datetime.time(hour=23, minute=59, second=59))
     name = models.CharField(max_length=32, null=True, blank=True)
-    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, default=0)
+    cashbox_type = models.ForeignKey(CashboxType, null=True, blank=True, on_delete=models.PROTECT)
 
 
 class Cashbox(models.Model):
