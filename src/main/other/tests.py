@@ -19,24 +19,22 @@ class TestCashboxTypes(LocalTestCase):
       id=1,
       shop=shop,
     )
-
     Slot.objects.create(
       name='Slot1',
       shop=shop,
       tm_start=datetime.time(hour=7),
-      tm_end=datetime.time(hour=23),
+      tm_end=datetime.time(hour=12),
     )
-    # good constraint
+    Slot.objects.create(
+      name='Slot2',
+      shop=shop,
+      tm_start=datetime.time(hour=12),
+      tm_end=datetime.time(hour=17),
+    )
     WorkerConstraint.objects.create(
-      tm = datetime.time(hour=4),
+      tm=datetime.time(hour=14),
       worker=worker,
       weekday=0,
-    )
-    # bad constraint
-    WorkerConstraint.objects.create(
-      tm = datetime.time(hour=12),
-      worker=worker,
-      weekday=1,
     )
 
 
@@ -51,15 +49,44 @@ class TestCashboxTypes(LocalTestCase):
     response = self.api_get('/api/other/get_slots?user_id=1')
     self.assertEqual(response.status_code, 200)
     self.assertEqual(response.json['code'], 200)
-    self.assertEqual(response.json['data']['schedule'], [
+    self.assertEqual(response.json['data']['slots'], [
       {
         'name': 'Slot1',
         'tm_start': '07:00:00',
-        'tm_end': '23:00:00',
-      }
+        'tm_end': '12:00:00',
+      },
     ])
 
-    # response = self.api_get('/api/other/get_schedule?shop_id=12&user_id=1')
-    # self.assertEqual(response.status_code, 200)
-    # self.assertEqual(response.json['code'], 200)
-    # self.assertEqual(response.json['data']['schedule'], [])
+    response = self.api_get('/api/other/get_slots?user_id=3')
+    self.assertEqual(response.status_code, 200)
+    self.assertEqual(response.json['code'], 400)
+
+
+  def test_get_all_slots(self):
+    response = self.api_get('/api/other/get_all_slots?shop_id=1')
+    self.assertEqual(response.status_code, 200)
+    self.assertEqual(response.json['code'], 403)
+    self.assertEqual(response.json['data']['error_type'], 'AuthRequired')
+
+    self.auth()
+
+    response = self.api_get('/api/other/get_all_slots?shop_id=1')
+    self.assertEqual(response.status_code, 200)
+    self.assertEqual(response.json['code'], 200)
+    self.assertEqual(response.json['data']['slots'], [
+      {
+        'name': 'Slot1',
+        'tm_start': '07:00:00',
+        'tm_end': '12:00:00',
+      },
+      {
+        'name': 'Slot2',
+        'tm_start': '12:00:00',
+        'tm_end': '17:00:00',
+      },
+    ])
+
+    response = self.api_get('/api/other/get_all_slots?shop_id=2')
+    self.assertEqual(response.status_code, 200)
+    self.assertEqual(response.json['code'], 200)
+    self.assertEqual(response.json['data']['slots'], [])

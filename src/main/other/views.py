@@ -2,7 +2,7 @@ from src.db.models import Shop, SuperShop, User, Notifications, CashboxType, Slo
 from src.util.forms import FormUtil
 from src.util.models_converter import ShopConverter, SuperShopConverter, NotificationConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
-from .forms import GetDepartmentForm, GetSuperShopForm, GetSuperShopListForm, GetNotificationsForm, GetNewNotificationsForm, SetNotificationsReadForm, GetSlots
+from .forms import GetDepartmentForm, GetSuperShopForm, GetSuperShopListForm, GetNotificationsForm, GetNewNotificationsForm, SetNotificationsReadForm, GetSlots, GetAllSlots
 from collections import defaultdict
 
 @api_method('GET', GetDepartmentForm)
@@ -122,41 +122,52 @@ def set_notifications_read(request, form):
     })
 
 
-@api_method('GET', GetSlots)
-def get_all_slots():
-    pass
+@api_method('GET', GetAllSlots)
+def get_all_slots(request, form):
+    result = []
+    slots = Slot.objects.filter(shop__id=form['shop_id'])
+    for slot in slots:
+        result.append({
+            'name': slot.name,
+            'tm_start': BaseConverter.convert_time(slot.tm_start),
+            'tm_end': BaseConverter.convert_time(slot.tm_end),
+        })
+    return JsonResponse.success({
+        'slots': result,
+    })
 
 
-@api_method('GET', GetSlots)
-def set_slots():
-    pass
+# @api_method('GET', GetSlots)
+# def set_slots():
+#     pass
 
 
 @api_method('GET', GetSlots)
 def get_slots(request, form):
     try:
         worker = User.objects.get(id=form['user_id'])
-        slots = Slot.objects.filter(shop=worker.shop)
-        constraints = WorkerConstraint.objects.filter(worker=worker)
-        group_by_weekday = defaultdict(list)
-        for constraint in constraints:
-            group_by_weekday[constraint.weekday].append(constraint)
-
-        available_slots = []
-        for slot in slots:
-            for _, constraints in group_by_weekday.items():
-                # добавить поддержку слотов
-                for constraint in constraints:
-                    if slot.tm_start < constraint.tm < slot.tm_end:
-                        break
-                else:
-                    available_slots.append({
-                        'name': slot.name,
-                        'tm_start': BaseConverter.convert_time(slot.tm_start),
-                        'tm_end': BaseConverter.convert_time(slot.tm_end),
-                    })
-        return JsonResponse.success({
-            'schedule': available_slots,
-        })
     except User.DoesNotExist:
         return JsonResponse.does_not_exists_error('user_id')
+
+    slots = Slot.objects.filter(shop=worker.shop)
+    constraints = WorkerConstraint.objects.filter(worker=worker)
+    group_by_weekday = defaultdict(list)
+    for constraint in constraints:
+        group_by_weekday[constraint.weekday].append(constraint)
+
+    available_slots = []
+    for slot in slots:
+        for _, constraints in group_by_weekday.items():
+            # добавить поддержку слотов
+            for constraint in constraints:
+                if slot.tm_start < constraint.tm < slot.tm_end:
+                    break
+            else:
+                available_slots.append({
+                    'name': slot.name,
+                    'tm_start': BaseConverter.convert_time(slot.tm_start),
+                    'tm_end': BaseConverter.convert_time(slot.tm_end),
+                })
+    return JsonResponse.success({
+        'slots': available_slots,
+    })

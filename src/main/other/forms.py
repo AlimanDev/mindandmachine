@@ -32,3 +32,6 @@ class SetNotificationsReadForm(forms.Form):
 
 class GetSlots(forms.Form):
     user_id = forms.IntegerField(required=True)
+
+class GetAllSlots(forms.Form):
+    shop_id = forms.IntegerField(required=True)
