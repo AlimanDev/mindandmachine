@@ -1,8 +1,8 @@
-from src.db.models import Shop, SuperShop, User, Notifications
+from src.db.models import Shop, SuperShop, User, Notifications, CashboxType
 from src.util.forms import FormUtil
 from src.util.models_converter import ShopConverter, SuperShopConverter, NotificationConverter
 from src.util.utils import api_method, JsonResponse
-from .forms import GetDepartmentForm, GetSuperShopForm, GetSuperShopListForm, GetNotificationsForm, GetNewNotificationsForm, SetNotificationsReadForm
+from .forms import GetDepartmentForm, GetSuperShopForm, GetSuperShopListForm, GetNotificationsForm, GetNewNotificationsForm, SetNotificationsReadForm, GetCashboxTypes
 
 
 @api_method('GET', GetDepartmentForm)
@@ -119,4 +119,11 @@ def set_notifications_read(request, form):
     count = Notifications.objects.filter(user=request.user, id__in=form['ids']).update(was_read=True)
     return JsonResponse.success({
         'updated_count': count
+    })
+
+@api_method('GET', GetCashboxTypes)
+def get_cashbox_types(request, form):
+    cashbox_types = [item.name for item in CashboxType.objects.filter(shop__id=form['shop_id'])]
+    return JsonResponse.success({
+        'cashbox_types': cashbox_types,
     })
