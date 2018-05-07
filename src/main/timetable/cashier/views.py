@@ -2,7 +2,7 @@ from datetime import time, datetime, timedelta
 from django.db.models import Avg
 
 from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType, WorkerDayCashboxDetails, \
-    Cashbox, WorkerPosition
+    Cashbox, WorkerPosition, Shop
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
@@ -308,9 +308,11 @@ def set_cashier_info(request, form):
                 cashbox_type_id=cashbox.id,
                 defaults={
                     'is_active': True,
-                    'mean_speed': mean_speed,
                 },
             )
+            if created:
+                obj.mean_speed = mean_speed
+                obj.save()
             worker_cashbox_info.append(obj)
 
         response['cashbox_type'] = {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types.values()}
@@ -344,11 +346,11 @@ def set_cashier_info(request, form):
 
     if form.get('position_title') is not None\
         and form.get('position_department') is not None:
-        position = WorkerPosition(
+        department = Shop.objects.get(id=form['position_department'])
+        position, created = WorkerPosition.objects.get_or_create(
             title=form['position_title'],
-            department=form['position_department'],
+            department=department,
         )
-        position.save()
         worker.position = position
         response['position'] = {
             'title': form['position_title'],

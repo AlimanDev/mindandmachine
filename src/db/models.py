@@ -52,7 +52,7 @@ class WorkerPosition(models.Model):
     '''
     id = models.BigAutoField(primary_key=True)
 
-    department = models.CharField(max_length=64)
+    department = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)
     title = models.CharField(max_length=64)
 
 class User(DjangoAbstractUser):

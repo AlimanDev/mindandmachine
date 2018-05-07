@@ -86,7 +86,7 @@ class SetCashierInfoForm(forms.Form):
     sex = forms.CharField(required=False)
     is_fixed_hours = forms.BooleanField(required=False)
     is_fixed_days = forms.BooleanField(required=False)
-    position_department = forms.CharField(max_length=64, required=False)
+    position_department = forms.IntegerField()
     position_title = forms.CharField(max_length=64, required=False)
 
     def clean_work_type(self):
