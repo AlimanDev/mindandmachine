@@ -17,9 +17,25 @@ def get_cashiers_timetable(request, form):
     shop = request.user.shop
 
     if form['format'] == 'excel':
+        def __file_name(__dt):
+            return {
+                1: 'January',
+                2: 'February',
+                3: 'March',
+                4: 'April',
+                5: 'May',
+                6: 'June',
+                7: 'Jule',
+                8: 'August',
+                9: 'September',
+                10: 'October',
+                11: 'November',
+                12: 'December',
+            }.get(__dt.month, 'Raspisanie')
+
         response = HttpResponse(content_type='application/force-download')
-        response['Content-Disposition'] = 'attachment; filename=timetable.xlsx'
-        response.write(get_xlsx(shop_id=shop.id).read())
+        response['Content-Disposition'] = 'attachment; filename={}.xlsx'.format(__file_name(form['from_dt']))
+        response.write(get_xlsx(shop_id=shop.id, dt_from=form['from_dt']).read())
         return response
 
         # if shop.hidden_title == 'shop004':

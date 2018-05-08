@@ -4,6 +4,8 @@ import io
 import xlsxwriter
 from datetime import datetime, timedelta
 
+from dateutil.relativedelta import relativedelta
+
 from src.db.models import WorkerDay, User, Shop
 from src.util.collection import range_u, count
 
@@ -139,27 +141,59 @@ class PrintHelper(object):
         return Cell('', fmts['default'])
 
     @classmethod
-    def depart_get_worker_day_cell(cls, obj, fmts, timetable):
+    def depart_get_worker_day_cell(cls, obj, fmts, timetable, timetable_counters):
         def __ret(__value, __fmt='default'):
             return Cell(__value, fmts[__fmt])
+
+        def __tt_add(__key):
+            timetable_counters.setdefault(__key, {})
+            timetable_counters[__key].setdefault(obj.dt, 0)
+            timetable_counters[__key][obj.dt] += 1
 
         if obj is None:
             return __ret('')
 
         if obj.type == WorkerDay.Type.TYPE_WORKDAY.value:
             key = '{}-{}'.format(obj.tm_work_start.strftime('%H:%M'), obj.tm_work_end.strftime('%H:%M'))
-            return __ret(timetable[key])
+            value = timetable[key]
+
+            __tt_add(value)
+            __tt_add('_work_all')
+
+            return __ret(value)
 
         if obj.type == WorkerDay.Type.TYPE_HOLIDAY.value:
+            __tt_add('_holiday')
+            __tt_add('_holiday_and_vacation')
+
             return __ret('в', 'holiday')
 
         if obj.type == WorkerDay.Type.TYPE_VACATION.value:
+            __tt_add('_vacation')
+            __tt_add('_holiday_and_vacation')
             return __ret('от', 'vacation')
 
         if obj.type == WorkerDay.Type.TYPE_MATERNITY.value:
             return __ret('ож')
 
         return __ret('')
+
+    @classmethod
+    def get_month_name(cls, dt_from):
+        return {
+            1: 'Январь',
+            2: 'Февраль',
+            3: 'Март',
+            4: 'Апрель',
+            5: 'Май',
+            6: 'Июнь',
+            7: 'Июль',
+            8: 'Август',
+            9: 'Сентябрь',
+            10: 'Октябрь',
+            11: 'Ноябрь',
+            12: 'Декабрь',
+        }.get(dt_from.month, '')
 
 
 # noinspection PyTypeChecker
@@ -270,7 +304,7 @@ def common_fill_sheet_one(workbook, shop, dt_from, dt_to):
     __wt(4, 'c', 'сектор по обслуживанию клиентов', format_meta_bold_bottom_2)
     __wt(4, 'd', '', format_meta_bold_bottom_2)
 
-    __wt(6, 'c', 'Май 2018', format_meta_bold)
+    __wt(6, 'c', '{} 2018'.format(PrintHelper.get_month_name(dt_from)), format_meta_bold)
     __wt(7, 'b', 'составил:', format_meta_bold_bottom)
     __wt(7, 'c', '', format_meta_bold_bottom)
     __wt(7, 'd', '', format_meta_bold_bottom)
@@ -474,6 +508,12 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
         timetable[x[0]] = counter
         counter += 1
 
+    timetable_counters = {
+        '_holiday': {},
+        '_vacation': {},
+        '_holiday_and_vacation': {},
+        '_work_all': {},
+    }
     for worker in cache_workers:
         worker_days = cache_worker_days[worker.id]
         row = [
@@ -482,7 +522,7 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
             Cell('', format_text_border),
             Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_text_workers),
         ] + [
-            PrintHelper.depart_get_worker_day_cell(worker_days.get(dttm.date()), format_days, timetable) for dttm in __dt_range()
+            PrintHelper.depart_get_worker_day_cell(worker_days.get(dttm.date()), format_days, timetable, timetable_counters) for dttm in __dt_range()
         ] + [
             Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value), format_text),  # выходных
             Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value), format_text_bold),  # плановых
@@ -505,6 +545,7 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
     return {
         'row_timetable_header': row_timetable_header,
         'timetable': timetable,
+        'timetable_counters': timetable_counters
     }
 
 
@@ -537,7 +578,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
     ]
     data_size = {
         'rows': [14, 20, 14, 20, 14, 35, 14, 14, 20, 40],
-        'cols': [5, 10, 5, 40] + [1.5 for x in __dt_range()] + [3, 3, 4, 5, 5]
+        'cols': [5, 10, 5, 40] + [2 for x in __dt_range()] + [3, 3, 4, 5, 5]
     }
 
     extra = depart_add_workers_one(
@@ -609,7 +650,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
 
     worksheet.merge_range(
         'E9:{}9'.format(SheetIndexHelper.reverse_column(last_dt_column_index).upper()),
-        'МАЙ 2018',
+        '{} 2018'.format(PrintHelper.get_month_name(dt_from).upper()),
         format_meta_title_bold_14_border
     )
 
@@ -654,6 +695,9 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
     row_timetable_header = extra['row_timetable_header']
     timetable = {v: k for k, v in extra['timetable'].items()}
 
+    def __tt_counters(__key, __dt):
+        return extra['timetable_counters'][__key].get(__dt.date(), 0)
+
     __wt(row_timetable_header, 'd', 'Составил:', format_meta_title_bold_10_bold_border)
     worksheet.merge_range('E{0}:J{0}'.format(row_timetable_header), '', format_meta_title_border_bottom)
     worksheet.merge_range('N{0}:Q{0}'.format(row_timetable_header), '', format_meta_title_border_bottom)
@@ -688,21 +732,19 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
 
         col_index = SheetIndexHelper.get_column('e')
         for x in __dt_range():
-            __wt_f(
+            __wt(
                 row_index,
                 SheetIndexHelper.reverse_column(col_index),
-                '=COUNTIF({0}$11:{0}${1},$B{2}'.format(
-                    SheetIndexHelper.reverse_column(col_index),
-                    SheetIndexHelper.reverse_row(row_timetable_header - 2),
-                    row_index
-                ),
+                __tt_counters(tt_value, x),
                 format_meta_text_border_10
             )
             col_index += 1
 
         i += 1
 
-    for tt_key, tt_value in {'в': 'выходной', 'от': 'отпуск'}.items():
+    for tt_key, tt_value_raw in {'в': ('выходной', '_holiday'), 'от': ('отпуск', '_vacation')}.items():
+        tt_value = tt_value_raw[0]
+
         row_index = row_timetable_header + 4 + i
         __wt(row_index, 'b', tt_key, format_meta_text_border_10)
         __wt(row_index, 'c', '', format_meta_text_border_10)
@@ -710,14 +752,10 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
 
         col_index = SheetIndexHelper.get_column('e')
         for x in __dt_range():
-            __wt_f(
+            __wt(
                 row_index,
                 SheetIndexHelper.reverse_column(col_index),
-                '=COUNTIF({0}$11:{0}${1},$B{2}'.format(
-                    SheetIndexHelper.reverse_column(col_index),
-                    SheetIndexHelper.reverse_row(row_timetable_header - 2),
-                    row_index
-                ),
+                __tt_counters(tt_value_raw[1], x),
                 format_meta_text_border_10
             )
             col_index += 1
@@ -730,14 +768,10 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
 
     col_index = SheetIndexHelper.get_column('e')
     for x in __dt_range():
-        __wt_f(
+        __wt(
             row_index,
             SheetIndexHelper.reverse_column(col_index),
-            '=SUM(${0}{1}:${0}{2})'.format(
-                SheetIndexHelper.reverse_column(col_index),
-                SheetIndexHelper.reverse_row(row_index - 3),
-                SheetIndexHelper.reverse_row(row_index - 2),
-            ),
+            __tt_counters('_holiday_and_vacation', x),
             format_meta_text_border_10
         )
         col_index += 1
@@ -746,14 +780,10 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
 
     col_index = SheetIndexHelper.get_column('e')
     for x in __dt_range():
-        __wt_f(
+        __wt(
             row_index + 1,
             SheetIndexHelper.reverse_column(col_index),
-            '=SUM(${0}{1}:${0}{2})'.format(
-                SheetIndexHelper.reverse_column(col_index),
-                SheetIndexHelper.reverse_row(row_timetable_header + 4 - 1),
-                SheetIndexHelper.reverse_row(row_timetable_header + 4 - 1 + len(timetable) - 1),
-            ),
+            __tt_counters('_work_all', x),
             format_meta_title_border_10_yellow
         )
         col_index += 1
@@ -810,7 +840,7 @@ def print_to_file(file, shop_id, dt_from, dt_to):
 
     workbook = xlsxwriter.Workbook(filename=file)
 
-    if shop.hidden_title == 'common':
+    if shop.full_interface:
         common_fill_sheet_one(workbook, shop, dt_from, dt_to)
         common_fill_sheet_two(workbook, shop, dt_from, dt_to)
     else:
@@ -821,7 +851,10 @@ def print_to_file(file, shop_id, dt_from, dt_to):
     return file
 
 
-def run(shop_id, debug=False):
+def run(shop_id, dt_from, debug=False):
+    dt_from = datetime(year=dt_from.year, month=dt_from.month, day=1)
+    dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
+
     if not debug:
         file = io.BytesIO()
     else:
@@ -835,8 +868,8 @@ def run(shop_id, debug=False):
     result = print_to_file(
         file=file,
         shop_id=shop_id,
-        dt_from=datetime(year=2018, month=5, day=1),
-        dt_to=datetime(year=2018, month=6, day=1) - timedelta(days=1)
+        dt_from=dt_from,
+        dt_to=dt_to
     )
 
     if not debug:

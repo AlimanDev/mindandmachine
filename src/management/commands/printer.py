@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.core.management.base import BaseCommand
 
 from src.db.models import SuperShop, Shop
@@ -14,5 +16,6 @@ class Command(BaseCommand):
 
         run(
             shop_id=shop.id,
+            dt_from=datetime(year=2018, month=5, day=1),
             debug=True
         )

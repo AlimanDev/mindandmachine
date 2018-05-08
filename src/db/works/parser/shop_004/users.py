@@ -314,7 +314,7 @@ def run(path, super_shop):
         ctx=ctx,
         data=data,
         row_begin=6,
-        row_end=108,
+        row_end=104,
         column_sheet_begin='G',
         column_sheet_end='CS',
         use_one_column=False
