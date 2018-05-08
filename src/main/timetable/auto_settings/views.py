@@ -43,7 +43,8 @@ def get_status(request, form):
 
 @api_method('POST', SetSelectedCashiersForm)
 def set_selected_cashiers(request, form):
-    User.objects.exclude(id__in=form['cashier_ids']).update(auto_timetable=False)
+    shop = Shop.objects.get(user__id=form['cashier_ids'][0])
+    User.objects.filter(shop=shop).exclude(id__in=form['cashier_ids']).update(auto_timetable=False)
     User.objects.filter(id__in=form['cashier_ids']).update(auto_timetable=True)
     return JsonResponse.success()
 
