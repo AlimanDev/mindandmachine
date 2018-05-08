@@ -2,8 +2,9 @@ from src.db.models import Shop, SuperShop, User, Notifications, CashboxType, Slo
 from src.util.forms import FormUtil
 from src.util.models_converter import ShopConverter, SuperShopConverter, NotificationConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
-from .forms import GetDepartmentForm, GetSuperShopForm, GetSuperShopListForm, GetNotificationsForm, GetNewNotificationsForm, SetNotificationsReadForm, GetSlots, GetAllSlots
+from .forms import GetDepartmentForm, GetSuperShopForm, GetSuperShopListForm, GetNotificationsForm, GetNewNotificationsForm, SetNotificationsReadForm, GetSlots, GetAllSlots, SetSlot
 from collections import defaultdict
+import datetime
 
 @api_method('GET', GetDepartmentForm)
 def get_department(request, form):
@@ -128,6 +129,7 @@ def get_all_slots(request, form):
     slots = Slot.objects.filter(shop__id=form['shop_id'])
     for slot in slots:
         result.append({
+            'id': slot.id,
             'name': slot.name,
             'tm_start': BaseConverter.convert_time(slot.tm_start),
             'tm_end': BaseConverter.convert_time(slot.tm_end),
@@ -137,9 +139,38 @@ def get_all_slots(request, form):
     })
 
 
-# @api_method('GET', GetSlots)
-# def set_slots():
-#     pass
+@api_method('POST', SetSlot)
+def set_slot(request, form):
+    weekday = form['weekday']
+    user = User.objects.get(id=form['user_id'])
+    WorkerConstraint.objects\
+        .filter(worker=user)\
+        .delete()
+    slot = Slot.objects.get(id=form['slot_id'])
+    today = datetime.date.today()
+    tm = datetime.datetime.combine(today, datetime.time())
+    day_end = datetime.datetime.combine(today, datetime.time(hour=23, minute=59, second=59))
+    constraints = []
+    tm_step = datetime.timedelta(minutes=30)
+    dm_start = datetime.datetime.combine(today, slot.tm_start)
+    while tm < dm_start:
+        constraints.append(WorkerConstraint(
+            worker=user,
+            weekday=weekday,
+            tm=tm,
+        ))
+        tm += tm_step
+
+    tm = datetime.datetime.combine(today, slot.tm_end)
+    while tm < day_end:
+        constraints.append(WorkerConstraint(
+            worker=user,
+            weekday=weekday,
+            tm=tm,
+        ))
+        tm += tm_step
+    WorkerConstraint.objects.bulk_create(constraints)
+    return JsonResponse.success()
 
 
 @api_method('GET', GetSlots)
@@ -155,19 +186,20 @@ def get_slots(request, form):
     for constraint in constraints:
         group_by_weekday[constraint.weekday].append(constraint)
 
-    available_slots = []
+    slots_by_weekday = defaultdict(list)
     for slot in slots:
-        for _, constraints in group_by_weekday.items():
-            # добавить поддержку слотов
+        for weekday, constraints in group_by_weekday.items():
             for constraint in constraints:
                 if slot.tm_start < constraint.tm < slot.tm_end:
                     break
             else:
-                available_slots.append({
+                slots_by_weekday[weekday].append({
+                    'id': slot.id,
                     'name': slot.name,
                     'tm_start': BaseConverter.convert_time(slot.tm_start),
                     'tm_end': BaseConverter.convert_time(slot.tm_end),
                 })
+                break
     return JsonResponse.success({
-        'slots': available_slots,
+        'slots': slots_by_weekday,
     })

@@ -35,3 +35,8 @@ class GetSlots(forms.Form):
 
 class GetAllSlots(forms.Form):
     shop_id = forms.IntegerField(required=True)
+
+class SetSlot(forms.Form):
+    weekday = forms.IntegerField(required=True)
+    slot_id = forms.IntegerField(required=True)
+    user_id = forms.IntegerField()

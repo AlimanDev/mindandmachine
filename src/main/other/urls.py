@@ -11,4 +11,5 @@ urlpatterns = [
     path('set_notifications_read', views.set_notifications_read),
     path('get_slots', views.get_slots),
     path('get_all_slots', views.get_all_slots),
+    path('set_slot', views.set_slot),
 ]
