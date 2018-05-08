@@ -509,12 +509,12 @@ def run(path, super_shop):
         column_end='AE'
     )
 
-    data = pandas.read_excel(os.path.join(path, 'users_m05.xlsx'), 'Лист1', header=None)
+    data = pandas.read_excel(os.path.join(path, 'users_m05.xlsx'), 'Лист 1', header=None)
     parse_time_sheet(
         ctx=ctx,
         data=data,
         row_begin=6,
-        row_end=86,
+        row_end=85,
         column_sheet_begin='G',
         column_sheet_end='CS',
         use_one_column=False

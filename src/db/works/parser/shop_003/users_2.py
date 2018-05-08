@@ -200,7 +200,7 @@ def run(path, super_shop):
         row_date=11,
         row_begin=14,
         row_end=25,
-        col_timetable_begin='с',
+        col_timetable_begin='c',
         col_timetable_end='ag',
         parse_helper=ParseHelperD003
     )
