@@ -12,6 +12,6 @@ class CsrfMiddleware(DjangoCsrfViewMiddleware):
         if settings.QOS_DEV_CSRF_DISABLED:
             return
 
-        response = super().process_view(request, None, (), {})
+        response = super().process_view(request, callback, callback_args, callback_kwargs)
         if response is not None:
             return JsonResponse.csrf_required()

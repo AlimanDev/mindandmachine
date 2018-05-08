@@ -156,7 +156,8 @@ class CashboxTypeConverter(BaseConverter):
             'dttm_deleted': cls.convert_datetime(obj.dttm_deleted),
             'shop': obj.shop_id,
             'name': obj.name,
-            'is_stable': obj.is_stable
+            'is_stable': obj.is_stable,
+            'speed_coef': obj.speed_coef
         }
 
 
@@ -286,7 +287,7 @@ class TimetableConverter(BaseConverter):
         return {
             'id': obj.id,
             'shop': obj.shop_id,
-            'dt': obj.dt,
+            'dt': cls.convert_date(obj.dt),
             'status': cls.convert_status(obj.status),
             'dttm_status_change': cls.convert_datetime(obj.dttm_status_change)
         }

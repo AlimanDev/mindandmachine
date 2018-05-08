@@ -10,7 +10,7 @@ from .queue import urls as queue_urls
 from .other import urls as other_urls
 
 
-urlpatterns = [
+api_urlpatterns = [
     path('auth/', include(auth_urls)),
     path('cashbox/', include(cashbox_urls)),
     path('timetable/', include(timetable_urls)),
@@ -18,6 +18,10 @@ urlpatterns = [
     path('queue/', include(queue_urls)),
     path('other/', include(other_urls)),
     path('admin/', admin.site.urls),
+]
+
+urlpatterns = [
+    path('api/', include(api_urlpatterns))
 ]
 
 if settings.QOS_DEV_STATIC_ENABLED:
