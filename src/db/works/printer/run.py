@@ -508,7 +508,12 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
         timetable[x[0]] = counter
         counter += 1
 
-    timetable_counters = {}
+    timetable_counters = {
+        '_holiday': {},
+        '_vacation': {},
+        '_holiday_and_vacation': {},
+        '_work_all': {},
+    }
     for worker in cache_workers:
         worker_days = cache_worker_days[worker.id]
         row = [
