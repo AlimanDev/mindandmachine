@@ -4,6 +4,8 @@ import io
 import xlsxwriter
 from datetime import datetime, timedelta
 
+from dateutil.relativedelta import relativedelta
+
 from src.db.models import WorkerDay, User, Shop
 from src.util.collection import range_u, count
 
@@ -176,6 +178,23 @@ class PrintHelper(object):
 
         return __ret('')
 
+    @classmethod
+    def get_month_name(cls, dt_from):
+        return {
+            1: 'Январь',
+            2: 'Февраль',
+            3: 'Март',
+            4: 'Апрель',
+            5: 'Май',
+            6: 'Июнь',
+            7: 'Июль',
+            8: 'Август',
+            9: 'Сентябрь',
+            10: 'Октябрь',
+            11: 'Ноябрь',
+            12: 'Декабрь',
+        }.get(dt_from.month, '')
+
 
 # noinspection PyTypeChecker
 def common_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
@@ -285,7 +304,7 @@ def common_fill_sheet_one(workbook, shop, dt_from, dt_to):
     __wt(4, 'c', 'сектор по обслуживанию клиентов', format_meta_bold_bottom_2)
     __wt(4, 'd', '', format_meta_bold_bottom_2)
 
-    __wt(6, 'c', 'Май 2018', format_meta_bold)
+    __wt(6, 'c', '{} 2018'.format(PrintHelper.get_month_name(dt_from)), format_meta_bold)
     __wt(7, 'b', 'составил:', format_meta_bold_bottom)
     __wt(7, 'c', '', format_meta_bold_bottom)
     __wt(7, 'd', '', format_meta_bold_bottom)
@@ -626,7 +645,7 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
 
     worksheet.merge_range(
         'E9:{}9'.format(SheetIndexHelper.reverse_column(last_dt_column_index).upper()),
-        'МАЙ 2018',
+        '{} 2018'.format(PrintHelper.get_month_name(dt_from).upper()),
         format_meta_title_bold_14_border
     )
 
@@ -827,7 +846,10 @@ def print_to_file(file, shop_id, dt_from, dt_to):
     return file
 
 
-def run(shop_id, debug=False):
+def run(shop_id, dt_from, debug=False):
+    dt_from = datetime(year=dt_from.year, month=dt_from.month, day=1)
+    dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
+
     if not debug:
         file = io.BytesIO()
     else:
@@ -841,8 +863,8 @@ def run(shop_id, debug=False):
     result = print_to_file(
         file=file,
         shop_id=shop_id,
-        dt_from=datetime(year=2018, month=5, day=1),
-        dt_to=datetime(year=2018, month=6, day=1) - timedelta(days=1)
+        dt_from=dt_from,
+        dt_to=dt_to
     )
 
     if not debug:
