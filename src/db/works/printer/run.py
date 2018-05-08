@@ -816,7 +816,7 @@ def print_to_file(file, shop_id, dt_from, dt_to):
 
     workbook = xlsxwriter.Workbook(filename=file)
 
-    if shop.hidden_title == 'common':
+    if shop.full_interface:
         common_fill_sheet_one(workbook, shop, dt_from, dt_to)
         common_fill_sheet_two(workbook, shop, dt_from, dt_to)
     else:
