@@ -241,7 +241,7 @@ def create_timetable(request, form):
             'slots': 0,  # 2*10**3,
         }
         method_params = [{
-            'steps':30,
+            'steps': 200,
             'select_best':8,
             'changes': 5,
             'variety': 8,

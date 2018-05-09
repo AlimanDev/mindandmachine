@@ -22,12 +22,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='user',
             name='is_fixed_days',
-            field=models.NullBooleanField(),
+            field=models.BooleanField(default=False),
         ),
         migrations.AddField(
             model_name='user',
             name='is_fixed_hours',
-            field=models.NullBooleanField(),
+            field=models.BooleanField(default=False),
         ),
         migrations.AddField(
             model_name='user',

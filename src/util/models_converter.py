@@ -57,7 +57,7 @@ class UserConverter(BaseConverter):
             'dt_hired': cls.convert_date(obj.dt_hired),
             'dt_fired': cls.convert_date(obj.dt_fired),
             'auto_timetable': obj.auto_timetable,
-            'extra_info': obj.extra_info
+            'comment': obj.extra_info
         }
 
 
