@@ -1,8 +1,19 @@
-from src.db.models import Shop, SuperShop, User, Notifications
+from src.db.models import (
+    Shop,
+    SuperShop,
+    User,
+    Notifications,
+    CashboxType,
+    Slot,
+    WorkerConstraint,
+    UserWeekdaySlot,
+)
 from src.util.forms import FormUtil
-from src.util.models_converter import ShopConverter, SuperShopConverter, NotificationConverter
+from src.util.models_converter import ShopConverter, SuperShopConverter, NotificationConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
-from .forms import GetDepartmentForm, GetSuperShopForm, GetSuperShopListForm, GetNotificationsForm, GetNewNotificationsForm, SetNotificationsReadForm
+from .forms import GetDepartmentForm, GetSuperShopForm, GetSuperShopListForm, GetNotificationsForm, GetNewNotificationsForm, SetNotificationsReadForm, GetSlots, GetAllSlots, SetSlot
+from collections import defaultdict
+import datetime
 
 
 @api_method('GET', GetDepartmentForm)
@@ -119,4 +130,78 @@ def set_notifications_read(request, form):
     count = Notifications.objects.filter(user=request.user, id__in=form['ids']).update(was_read=True)
     return JsonResponse.success({
         'updated_count': count
+    })
+
+
+@api_method('GET', GetAllSlots)
+def get_all_slots(request, form):
+    result = []
+    slots = Slot.objects.filter(shop__id=form['shop_id'])
+    for slot in slots:
+        result.append({
+            'id': slot.id,
+            'name': slot.name,
+            'tm_start': BaseConverter.convert_time(slot.tm_start),
+            'tm_end': BaseConverter.convert_time(slot.tm_end),
+        })
+    return JsonResponse.success({
+        'slots': result,
+    })
+
+
+@api_method('POST', SetSlot)
+def set_slot(request, form):
+    # weekday = form['weekday']
+    try:
+        user = User.objects.get(id=form['user_id'])
+    except User.DoesNotExist:
+        return JsonResponse.does_not_exists_error('user_id')
+
+    # slot = Slot.objects.get(id=form['slot_id'])
+    shop_slots = Slot.objects.filter(shop_id=user.shop_id).values_list('id', flat=True)
+
+    slots_list = []
+    bad_slot = False
+    for wd, slot_ids in form['slots'].items():
+        for slot_id in slot_ids:
+            if slot_id in shop_slots:
+                slots_list.append(
+                    UserWeekdaySlot(
+                        worker=user,
+                        weekday=wd,
+                        slot_id=slot_id,
+                    )
+                )
+            else:
+                bad_slot =True
+                break
+        if bad_slot:
+            break
+
+    if not bad_slot:
+        UserWeekdaySlot.objects.filter(worker=user).delete()
+        UserWeekdaySlot.objects.bulk_create(slots_list)
+        return JsonResponse.success()
+    return JsonResponse.value_error('there is no slot with id {} in the shop (id {})'.format(slot_id, user.shop_id))
+
+
+@api_method('GET', GetSlots)
+def get_slots(request, form):
+    weekday_slots = UserWeekdaySlot.objects.select_related(
+        'slot'
+    ).filter(
+        worker_id=form['user_id']
+    )
+
+    slots_by_weekday = defaultdict(list)
+    for ws in weekday_slots:
+        slots_by_weekday[ws.weekday].append({
+            'id': ws.slot.id,
+            'name': ws.slot.name,
+            'tm_start': BaseConverter.convert_time(ws.slot.tm_start),
+            'tm_end': BaseConverter.convert_time(ws.slot.tm_end),
+        })
+
+    return JsonResponse.success({
+        'slots': slots_by_weekday,
     })

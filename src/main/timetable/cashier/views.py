@@ -1,7 +1,8 @@
 from datetime import time, datetime, timedelta
+from django.db.models import Avg
 
 from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType, WorkerDayCashboxDetails, \
-    Cashbox
+    Cashbox, WorkerPosition, Shop
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
@@ -295,13 +296,23 @@ def set_cashier_info(request, form):
         worker_cashbox_info = []
         WorkerCashboxInfo.objects.filter(worker_id=worker.id).update(is_active=False)
         for cashbox in new_active_cashboxes:
+            cashboxtype_forecast = CashboxType.objects.get(id=cashbox.id)
+            mean_speed = 1
+            if cashboxtype_forecast.do_forecast == CashboxType.FORECAST_HARD:
+                mean_speed = WorkerCashboxInfo.objects\
+                    .filter(cashbox_type__id=cashbox.id)\
+                    .aggregate(Avg('mean_speed'))['mean_speed__avg']
+
             obj, created = WorkerCashboxInfo.objects.update_or_create(
                 worker_id=worker.id,
                 cashbox_type_id=cashbox.id,
                 defaults={
-                    'is_active': True
-                }
+                    'is_active': True,
+                },
             )
+            if created:
+                obj.mean_speed = mean_speed
+                obj.save()
             worker_cashbox_info.append(obj)
 
         response['cashbox_type'] = {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types.values()}
@@ -320,6 +331,33 @@ def set_cashier_info(request, form):
             constraints_converted[c.weekday].append(BaseConverter.convert_time(c.tm))
 
         response['constraint'] = constraints_converted
+
+    if form.get('sex') is not None:
+        worker.sex = form['sex']
+        response['sex'] = worker.sex
+
+    if form.get('is_fixed_hours') is not None:
+        worker.is_fixed_hours = form['is_fixed_hours']
+        response['is_fixed_hours'] = worker.is_fixed_hours
+
+    if form.get('is_fixed_days') is not None:
+        worker.is_fixed_days = form['is_fixed_days']
+        response['is_fixed_days'] = worker.is_fixed_days
+
+    if form.get('position_title') is not None\
+        and form.get('position_department') is not None:
+        department = Shop.objects.get(id=form['position_department'])
+        position, created = WorkerPosition.objects.get_or_create(
+            title=form['position_title'],
+            department=department,
+        )
+        worker.position = position
+        response['position'] = {
+            'title': form['position_title'],
+            'department': form['position_department'],
+        }
+
+    worker.save()
 
     return JsonResponse.success(response)
 

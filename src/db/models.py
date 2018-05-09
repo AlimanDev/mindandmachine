@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser as DjangoAbstractUser
 from . import utils
-
+import datetime
 
 # магазин
 class SuperShop(models.Model):
@@ -14,6 +14,9 @@ class SuperShop(models.Model):
 
     dt_opened = models.DateField(null=True, blank=True)
     dt_closed = models.DateField(null=True, blank=True)
+
+    tm_start = models.TimeField(null=True, blank=True, default=datetime.time(hour=7))
+    tm_end = models.TimeField(null=True, blank=True, default=datetime.time(hour=23, minute=59, second=59))
 
 
 # на самом деле это отдел
@@ -40,6 +43,18 @@ class Shop(models.Model):
 
     demand_coef = models.FloatField(default=1)  # unknown trend for algorithm
 
+    forecast_step_minutes = models.TimeField(default=datetime.time(minute=15))
+
+
+class WorkerPosition(models.Model):
+    '''
+    Describe employee's department and position
+    '''
+    id = models.BigAutoField(primary_key=True)
+
+    department = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)
+    title = models.CharField(max_length=64)
+
 
 class User(DjangoAbstractUser):
     def __init__(self, *args, **kwargs):
@@ -58,7 +73,10 @@ class User(DjangoAbstractUser):
     id = models.BigAutoField(primary_key=True)
 
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable
+    position = models.ForeignKey(WorkerPosition, null=True, on_delete=models.PROTECT)
     work_type = utils.EnumField(WorkType, null=True, blank=True)
+    is_fixed_hours = models.BooleanField(default=False)
+    is_fixed_days = models.BooleanField(default=False)
     permissions = models.BigIntegerField(default=0)
 
     middle_name = models.CharField(max_length=64, blank=True, null=True)
@@ -70,6 +88,17 @@ class User(DjangoAbstractUser):
     dt_fired = models.DateField(null=True, blank=True)
 
     birthday = models.DateField(null=True, blank=True)
+    SEX_FEMALE='F'
+    SEX_MALE='M'
+    SEX_CHOICES = (
+        (SEX_FEMALE, 'Female',),
+        (SEX_MALE, 'Male',),
+    )
+    sex = models.CharField(
+        max_length=1,
+        default=SEX_FEMALE,
+        choices=SEX_CHOICES,
+    )
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
 
     comment = models.CharField(max_length=2048, default='')
@@ -87,6 +116,39 @@ class CashboxType(models.Model):
     name = models.CharField(max_length=128)
     speed_coef = models.FloatField(default=1)
     is_stable = models.BooleanField(default=True)
+    FORECAST_HARD='H'
+    FORECAST_LITE='L'
+    FORECAST_NONE='N'
+    FORECAST_CHOICES = (
+        (FORECAST_HARD, 'Hard',),
+        (FORECAST_LITE, 'Lite',),
+        (FORECAST_NONE, 'None',),
+    )
+    do_forecast = models.CharField(
+        max_length=1,
+        default=FORECAST_LITE,
+        choices=FORECAST_CHOICES,
+    )
+    probability = models.FloatField(default=1.0)
+    prior_weight = models.FloatField(default=1.0)
+
+
+class UserWeekdaySlot(models.Model):
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
+    slot = models.ForeignKey('Slot', on_delete=models.CASCADE)
+    weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
+
+
+class Slot(models.Model):
+    id = models.BigAutoField(primary_key=True)
+
+    tm_start = models.TimeField(default=datetime.time(hour=7))
+    tm_end = models.TimeField(default=datetime.time(hour=23, minute=59, second=59))
+    name = models.CharField(max_length=32, null=True, blank=True)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    cashbox_type = models.ForeignKey(CashboxType, null=True, blank=True, on_delete=models.PROTECT)
+
+    worker = models.ManyToManyField(User, through=UserWeekdaySlot)
 
 
 class Cashbox(models.Model):
