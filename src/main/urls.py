@@ -17,11 +17,11 @@ api_urlpatterns = [
     path('demand/', include(demand_urls)),
     path('queue/', include(queue_urls)),
     path('other/', include(other_urls)),
-    path('admin/', admin.site.urls),
 ]
 
 urlpatterns = [
-    path('api/', include(api_urlpatterns))
+    path('api/', include(api_urlpatterns)),
+    path('admin/', admin.site.urls),
 ]
 
 if settings.QOS_DEV_STATIC_ENABLED:
