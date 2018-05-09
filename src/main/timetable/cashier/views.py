@@ -277,7 +277,7 @@ def set_cashier_info(request, form):
         worker.work_type = form['work_type']
         response['work_type'] = UserConverter.convert_work_type(worker.work_type)
 
-    worker.extra_info = form.get('extra_info', '')
+    worker.extra_info = form.get('comment', '')
     worker.save()
 
     if form.get('cashbox_info') is not None:
