@@ -55,6 +55,7 @@ class WorkerPosition(models.Model):
     department = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)
     title = models.CharField(max_length=64)
 
+
 class User(DjangoAbstractUser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -132,14 +133,22 @@ class CashboxType(models.Model):
     prior_weight = models.FloatField(default=1.0)
 
 
+class UserWeekdaySlot(models.Model):
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
+    slot = models.ForeignKey('Slot', on_delete=models.CASCADE)
+    weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
+
+
 class Slot(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     tm_start = models.TimeField(default=datetime.time(hour=7))
     tm_end = models.TimeField(default=datetime.time(hour=23, minute=59, second=59))
     name = models.CharField(max_length=32, null=True, blank=True)
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, default=0)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     cashbox_type = models.ForeignKey(CashboxType, null=True, blank=True, on_delete=models.PROTECT)
+
+    worker = models.ManyToManyField(User, through=UserWeekdaySlot)
 
 
 class Cashbox(models.Model):
