@@ -10,14 +10,4 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name='user',
-            name='is_fixed_days',
-            field=models.BooleanField(default=False),
-        ),
-        migrations.AlterField(
-            model_name='user',
-            name='is_fixed_hours',
-            field=models.BooleanField(default=False),
-        ),
     ]
