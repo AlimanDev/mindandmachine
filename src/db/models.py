@@ -88,8 +88,8 @@ class User(DjangoAbstractUser):
     dt_fired = models.DateField(null=True, blank=True)
 
     birthday = models.DateField(null=True, blank=True)
-    SEX_FEMALE='F'
-    SEX_MALE='M'
+    SEX_FEMALE = 'F'
+    SEX_MALE = 'M'
     SEX_CHOICES = (
         (SEX_FEMALE, 'Female',),
         (SEX_MALE, 'Male',),

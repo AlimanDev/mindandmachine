@@ -318,6 +318,7 @@ def delete_timetable(request, form):
     count, _ = Timetable.objects.filter(shop_id=shop_id, dt=dt_from).delete()
 
     WorkerDayChangeLog.objects.filter(
+        worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
     ).filter(
@@ -326,6 +327,7 @@ def delete_timetable(request, form):
     ).delete()
 
     WorkerDayChangeRequest.objects.filter(
+        worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
     ).filter(
@@ -334,6 +336,7 @@ def delete_timetable(request, form):
     ).delete()
 
     WorkerDayCashboxDetails.objects.filter(
+        worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
     ).filter(
@@ -342,6 +345,7 @@ def delete_timetable(request, form):
     ).delete()
 
     WorkerDay.objects.filter(
+        worker_shop_id=shop_id,
         dt__month=dt_from.month,
         dt__year=dt_from.year,
         is_manual_tuning=False,
