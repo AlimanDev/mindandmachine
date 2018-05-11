@@ -21,13 +21,27 @@ from src.db.models import (
 
     WorkerDayChangeLog,
     WorkerDayChangeRequest,
+    Slot,
+    UserWeekdaySlot,
 )
 from src.util.collection import group_by
 from src.util.forms import FormUtil
-from src.util.models_converter import TimetableConverter, CashboxTypeConverter, PeriodDemandConverter, UserConverter, WorkerConstraintConverter, WorkerCashboxInfoConverter, \
-    WorkerDayConverter, BaseConverter
+from src.util.models_converter import (
+    TimetableConverter,
+    CashboxTypeConverter,
+    PeriodDemandConverter,
+    UserConverter,
+    WorkerConstraintConverter,
+    WorkerCashboxInfoConverter,
+    WorkerDayConverter,
+    BaseConverter,
+
+    SlotConverter,
+)
 from src.util.utils import api_method, JsonResponse
 from .forms import GetStatusForm, SetSelectedCashiersForm, CreateTimetableForm, DeleteTimetableForm, SetTimetableForm
+import requests
+from .utils import time2int
 
 
 @api_method('GET', GetStatusForm)
@@ -98,8 +112,23 @@ def create_timetable(request, form):
     shop = Shop.objects.get(id=shop_id)
     cashboxes = [CashboxTypeConverter.convert(x) for x in CashboxType.objects.filter(shop_id=shop_id)]
 
+
+    slots_all = group_by(
+        collection=[SlotConverter.convert(x) for x in Slot.objects.filter(shop_id=shop_id)],
+        group_key=lambda x: x.cashbox_type_id if shop.full_interface else lambda x: x.shop_id,
+    )
+
+    users = User.objects.qos_filter_active(
+        dt_from,
+        dt_to,
+        shop_id=shop_id,
+        auto_timetable=True,
+    )
+
     cost_weigths = {}
     method_params = {}
+    extra_constr = {}
+    breaks_triplets = []
 
     # todo: this params should be in db
     if shop.full_interface:
@@ -137,7 +166,7 @@ def create_timetable(request, form):
 
         method_params = [
             {
-                'steps': 100,
+                'steps': 1,
                 'select_best': 8,
                 'changes': 10,
                 'variety': 8,
@@ -147,7 +176,7 @@ def create_timetable(request, form):
                 'del_day_prob': 0.33
             },
             {
-                'steps': 2000,
+                'steps': 1,
                 'select_best': 8,
                 'changes': 30,
                 'variety': 8,
@@ -163,6 +192,11 @@ def create_timetable(request, form):
         prior_weigths = {}
         slots = {}
         if shop.super_shop.code == '003':
+            breaks_triplets = [
+                [0, 6 * 60, [30]],
+                [6 * 60, 13 * 60, [30, 30]]
+            ]
+
             probs = {
                 'Линия': 3,
                 'Возврат': 0.5,
@@ -191,6 +225,11 @@ def create_timetable(request, form):
                 'Сверка': 0,
             }
         elif shop.super_shop.code == '004':
+            breaks_triplets = [
+                [0, 6 * 60, [30]],
+                [6 * 60, 13 * 60, [30, 45]]
+            ]
+
             probs = {
                 'Линия': 3,
                 'Возврат': 0.5,
@@ -224,6 +263,7 @@ def create_timetable(request, form):
             cashbox['slots'] = slots.get(cashbox['name'], [])
             cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
     else:
+
         cost_weigths = {
             'F': 1,
             '40hours': 0,
@@ -251,12 +291,45 @@ def create_timetable(request, form):
             'del_day_prob': 0.33,
         }]
         slots_periods_dict = []
-        if shop.title == 'Сантехника':
-            slots_periods_dict = [(4, 40), (20, 56), (36, 72)]
-        elif shop.title == 'Декор':
-            slots_periods_dict = [(4, 40), (12, 48), (28, 64), (36, 72), (4, 52)]
-        elif shop.title == 'Электротовары':
-            slots_periods_dict = [(4, 40), (8, 44), (28, 64), (36, 72), (16, 52), (28, 64)]
+
+        for slot in slots_all:
+            slots_periods_dict.append([
+                time2int(slot.tm_start),
+                time2int(slot.tm_end),
+            ])
+
+        # todo: fix trash constraints slots
+        dttm_temp = datetime(2018, 1, 1, 0, 0)
+        tms = [dttm_temp + timedelta(seconds=i * 1800) for i in range(48)]
+        extra_constr = {}
+
+        for user in users:
+            user_slots = group_by(
+                collection=UserWeekdaySlot.objects.select_related('slot').filter(worker=user),
+                group_key=lambda x: x.weekday
+            )
+            constr = []
+            for day in range(7):
+                for tm in tms:
+                    for slot in user_slots[day]:
+                        if tm > slot.slot.tm_start and tm < slot.slot.tm_end:
+                            break
+                    else:
+                        constr.append({
+                            'id': '',
+                            'worker': user.id,
+                            'weekday': day,
+                            'tm': BaseConverter.convert_time(tm),
+                        })
+            extra_constr[user.id] = constr
+
+
+        # if shop.title == 'Сантехника':
+        #     slots_periods_dict = [(4, 40), (20, 56), (36, 72)]
+        # elif shop.title == 'Декор':
+        #     slots_periods_dict = [(4, 40), (12, 48), (28, 64), (36, 72), (4, 52)]
+        # elif shop.title == 'Электротовары':
+        #     slots_periods_dict = [(4, 40), (8, 44), (28, 64), (36, 72), (16, 52), (28, 64)]
 
         cashboxes = [{
             'id': periods[0].cashbox_type_id,
@@ -280,15 +353,16 @@ def create_timetable(request, form):
         'cashiers': [
             {
                 'general_info': UserConverter.convert(u),
-                'constraints_info': [WorkerConstraintConverter.convert(x) for x in constraints.get(u.id, [])],
+                'constraints_info': [WorkerConstraintConverter.convert(x) for x in constraints.get(u.id, [])] + extra_constr.get(u.id, []),
                 'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(u.id, [])],
                 'workdays': [WorkerDayConverter.convert(x) for x in worker_day.get(u.id, [])],
                 'prev_data': [WorkerDayConverter.convert(x) for x in prev_data.get(u.id, [])],
-            } for u in User.objects.filter(shop_id=shop_id, auto_timetable=True)
+            } for u in users
         ],
         'algo_params': {
             'cost_weights': cost_weigths,
             'method_params': method_params,
+            'breaks_triplets': breaks_triplets,
         },
     }
 
@@ -299,7 +373,12 @@ def create_timetable(request, form):
         #     f.write(data)
         req = urllib.request.Request('http://{}/'.format(settings.TIMETABLE_IP), data=data, headers={'content-type': 'application/json'})
         with urllib.request.urlopen(req) as response:
-            data = response.read().decode('utf-8')
+            res = response.read().decode('utf-8')
+        tt.task_id = json.loads(res).get('task_id', '')
+        # print('\n\n\n\ {} \n\n\n'.format(tt.task_id))
+        if tt.task_id is None:
+            tt.status = Timetable.Status.ERROR.value
+        tt.save()
     except:
         JsonResponse.internal_error('Error sending data to server')
     return JsonResponse.success()
@@ -315,7 +394,15 @@ def delete_timetable(request, form):
     if dt_from.date() < dt_now:
         return JsonResponse.value_error('Cannot delete past month')
 
-    count, _ = Timetable.objects.filter(shop_id=shop_id, dt=dt_from).delete()
+    tts = Timetable.objects.filter(shop_id=shop_id, dt=dt_from)
+    for tt in tts:
+        try:
+            requests.post(
+                'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id})
+            )
+        except (requests.ConnectionError, requests.ConnectTimeout):
+            pass
+    tts.delete()
 
     WorkerDayChangeLog.objects.filter(
         worker_day__worker_shop_id=shop_id,

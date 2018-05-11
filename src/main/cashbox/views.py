@@ -10,9 +10,14 @@ from .forms import GetTypesForm, GetCashboxesForm, CreateCashboxForm, DeleteCash
 
 @api_method('GET', GetTypesForm)
 def get_types(request, form):
-    shop_id = FormUtil.get_shop_id(request, form)
+    # shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form.get('shop_id', request.user.shop_id)
 
-    types = CashboxType.objects.filter(shop_id=shop_id)
+    # todo: add selecting in time period
+    types = CashboxType.objects.filter(
+        shop_id=shop_id,
+        dttm_deleted__isnull=True,
+    )
 
     return JsonResponse.success(
         [CashboxTypeConverter.convert(x) for x in CashboxTypeUtil.sort(types)]
