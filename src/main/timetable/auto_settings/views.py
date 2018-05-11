@@ -125,7 +125,7 @@ def create_timetable(request, form):
         auto_timetable=True,
     )
 
-    cost_weigths = {}
+    cost_weights = {}
     method_params = {}
     extra_constr = {}
     breaks_triplets = []
@@ -146,27 +146,26 @@ def create_timetable(request, form):
             'Сверка',
         ]
 
-        cost_weigths = {
+        cost_weights = {
             'F': 1,
             '40hours': 0,
-            'days': 2*10**2,
-            '15rest': 10**4,
-            '5d': 10**4,
-            'hard': 10,
+            'days': 2 * 10 ** 4,
+            '15rest': 0,  # 10**4,
+            '5d': 10 ** 4,
+            'hard': 0,
             'soft': 0,
-            'overwork_fact_days': 3*10**6,
-            'F_bills_coef': 3,
-            'diff_days_coef': 1,
-            'solitary_days': 5*10**5,
-            'holidays': 3*10**5, #3*10**5,# 2*10**6,
+            'overwork_fact_days': 3 * 10 ** 6,
+            'solitary_days': 5 * 10 ** 5,
+            'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
             'zero_cashiers': 3,
-            'slots': 2*10**7,
+            'slots': 2 * 10 ** 7,
             'too_much_days': 22,
+            'man_presence': 0,
         }
 
         method_params = [
             {
-                'steps': 1,
+                'steps': 100,
                 'select_best': 8,
                 'changes': 10,
                 'variety': 8,
@@ -176,7 +175,7 @@ def create_timetable(request, form):
                 'del_day_prob': 0.33
             },
             {
-                'steps': 1,
+                'steps': 2000,
                 'select_best': 8,
                 'changes': 30,
                 'variety': 8,
@@ -264,21 +263,21 @@ def create_timetable(request, form):
             cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
     else:
 
-        cost_weigths = {
+        cost_weights = {
             'F': 1,
             '40hours': 0,
-            'days': 100,
-            '15rest': 0,
-            '5d': 0,
+            'days': 2 * 10 ** 4,
+            '15rest': 0,  # 10**4,
+            '5d': 10 ** 4,
             'hard': 0,
             'soft': 0,
-            'overwork_fact_days': 3 * 10 ** 4,
-            'F_bills_coef': 3,
-            'diff_days_coef': 1,
-            'solitary_days': 5 * 10 ** 4,
-            'holidays': 10 ** 3,  # 3*10**5,# 2*10**6,
-            'zero_cashiers': 0,
-            'slots': 0,  # 2*10**3,
+            'overwork_fact_days': 3 * 10 ** 6,
+            'solitary_days': 5 * 10 ** 5,
+            'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
+            'zero_cashiers': 3,
+            'slots': 2 * 10 ** 7,
+            'too_much_days': 22,
+            'man_presence': 0,
         }
         method_params = [{
             'steps': 200,
@@ -360,7 +359,7 @@ def create_timetable(request, form):
             } for u in users
         ],
         'algo_params': {
-            'cost_weights': cost_weigths,
+            'cost_weights': cost_weights,
             'method_params': method_params,
             'breaks_triplets': breaks_triplets,
         },
