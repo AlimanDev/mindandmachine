@@ -331,8 +331,8 @@ class SlotConverter(BaseConverter):
         return {
             'id': obj.id,
             'shop': obj.shop_id,
-            'tm_start': cls.convert_time(obj.full_interface),
-            'tm_end':  cls.convert_time(obj.full_interface),
+            'tm_start': cls.convert_time(obj.tm_start),
+            'tm_end':  cls.convert_time(obj.tm_end),
             'name': obj.name
         }
 

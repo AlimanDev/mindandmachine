@@ -114,8 +114,8 @@ def create_timetable(request, form):
 
 
     slots_all = group_by(
-        collection=[SlotConverter.convert(x) for x in Slot.objects.filter(shop_id=shop_id)],
-        group_key=lambda x: x.cashbox_type_id if shop.full_interface else lambda x: x.shop_id,
+        collection=Slot.objects.filter(shop_id=shop_id),
+        group_key=lambda x: x.shop_id,
     )
 
     users = User.objects.qos_filter_active(
@@ -160,7 +160,7 @@ def create_timetable(request, form):
             'zero_cashiers': 3,
             'slots': 2 * 10 ** 7,
             'too_much_days': 22,
-            'man_presence': 0,
+            'man_presence': shop.man_presence,
         }
 
         method_params = [
@@ -277,8 +277,10 @@ def create_timetable(request, form):
             'zero_cashiers': 3,
             'slots': 2 * 10 ** 7,
             'too_much_days': 22,
-            'man_presence': 0,
+            'man_presence': shop.man_presence,
         }
+
+
         method_params = [{
             'steps': 200,
             'select_best':8,
@@ -291,35 +293,42 @@ def create_timetable(request, form):
         }]
         slots_periods_dict = []
 
-        for slot in slots_all:
-            slots_periods_dict.append([
-                time2int(slot.tm_start),
-                time2int(slot.tm_end),
-            ])
+        for slot in slots_all[shop.id]:
+            # todo: temp fix for algo
+
+            int_s = time2int(slot.tm_start)
+            int_e = time2int(slot.tm_end)
+            if int_s < int_e:
+                slots_periods_dict.append([
+                    time2int(slot.tm_start),
+                    time2int(slot.tm_end),
+                ])
 
         # todo: fix trash constraints slots
         dttm_temp = datetime(2018, 1, 1, 0, 0)
-        tms = [dttm_temp + timedelta(seconds=i * 1800) for i in range(48)]
+        tms = [(dttm_temp + timedelta(seconds=i * 1800)).time() for i in range(48)]
         extra_constr = {}
 
         for user in users:
-            user_slots = group_by(
-                collection=UserWeekdaySlot.objects.select_related('slot').filter(worker=user),
-                group_key=lambda x: x.weekday
-            )
             constr = []
-            for day in range(7):
-                for tm in tms:
-                    for slot in user_slots[day]:
-                        if tm > slot.slot.tm_start and tm < slot.slot.tm_end:
-                            break
-                    else:
-                        constr.append({
-                            'id': '',
-                            'worker': user.id,
-                            'weekday': day,
-                            'tm': BaseConverter.convert_time(tm),
-                        })
+            user_weekdays_slots = UserWeekdaySlot.objects.select_related('slot').filter(worker=user)
+            if len(user_weekdays_slots):
+                user_slots = group_by(
+                    collection=user_weekdays_slots,
+                    group_key=lambda x: x.weekday
+                )
+                for day in range(7):
+                    for tm in tms:
+                        for slot in user_slots.get(day, []):
+                            if tm > slot.slot.tm_start and tm < slot.slot.tm_end:
+                                break
+                        else:
+                            constr.append({
+                                'id': '',
+                                'worker': user.id,
+                                'weekday': day,
+                                'tm': BaseConverter.convert_time(tm),
+                            })
             extra_constr[user.id] = constr
 
 
@@ -330,6 +339,7 @@ def create_timetable(request, form):
         # elif shop.title == 'Электротовары':
         #     slots_periods_dict = [(4, 40), (8, 44), (28, 64), (36, 72), (16, 52), (28, 64)]
 
+        # print(slots_periods_dict)
         cashboxes = [{
             'id': periods[0].cashbox_type_id,
             'slots': slots_periods_dict,
