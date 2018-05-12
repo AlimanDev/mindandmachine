@@ -395,12 +395,13 @@ def delete_timetable(request, form):
 
     tts = Timetable.objects.filter(shop_id=shop_id, dt=dt_from)
     for tt in tts:
-        try:
-            requests.post(
-                'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id})
-            )
-        except (requests.ConnectionError, requests.ConnectTimeout):
-            pass
+        if (tt.status == Timetable.Status.PROCESSING) and (not tt.task_id is None):
+            try:
+                requests.post(
+                    'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id})
+                )
+            except (requests.ConnectionError, requests.ConnectTimeout):
+                pass
     tts.delete()
 
     WorkerDayChangeLog.objects.filter(
