@@ -1,5 +1,8 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser as DjangoAbstractUser
+from django.contrib.auth.models import (
+    AbstractUser as DjangoAbstractUser,
+    UserManager
+)
 from . import utils
 import datetime
 
@@ -56,6 +59,15 @@ class WorkerPosition(models.Model):
     title = models.CharField(max_length=64)
 
 
+class WorkerManager(UserManager):
+    def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
+        return self.filter(
+            models.Q(dt_hired__lte=dt_from) | models.Q(dt_hired__isnull=True)
+        ).filter(
+            models.Q(dt_fired__gte=dt_to) | models.Q(dt_fired__isnull=True)
+        ).filter(*args, **kwargs)
+
+
 class User(DjangoAbstractUser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -105,6 +117,8 @@ class User(DjangoAbstractUser):
     extra_info = models.CharField(max_length=512, default='')
 
     auto_timetable = models.BooleanField(default=True)
+
+    objects = WorkerManager()
 
 
 class CashboxType(models.Model):
@@ -385,3 +399,5 @@ class Timetable(models.Model):
     dt = models.DateField()
     status = utils.EnumField(Status)
     dttm_status_change = models.DateTimeField()
+
+    task_id = models.CharField(max_length=256, null=True, blank=True)

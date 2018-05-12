@@ -323,3 +323,16 @@ class NotificationConverter(BaseConverter):
             'was_read': obj.was_read,
             'to_worker': obj.to_worker_id
         }
+
+
+class SlotConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'shop': obj.shop_id,
+            'tm_start': cls.convert_time(obj.full_interface),
+            'tm_end':  cls.convert_time(obj.full_interface),
+            'name': obj.name
+        }
+

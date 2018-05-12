@@ -4,6 +4,7 @@ import numpy
 from django.core.management.base import BaseCommand, CommandError
 from src.db.models import Shop, Slot, User, WorkerConstraint
 
+
 class Command(BaseCommand):
     help = 'print to excel file users constraints in department'
 
@@ -38,4 +39,3 @@ class Command(BaseCommand):
 
             df = pandas.DataFrame(table, columns=tms, index=weekdays)
             df.to_excel(writer, sheet_name='{}_{}'.format(u.first_name, u.last_name))
-
