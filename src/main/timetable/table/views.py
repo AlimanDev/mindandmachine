@@ -158,7 +158,7 @@ def write_users(worksheet, super_shop_code, stats):
     return local_stats
 
 
-def write_stats(worksheet, stats, today):
+def write_stats(worksheet, stats, today, super_shop_code):
     # write stats
     row = 3
     col = 13
@@ -172,7 +172,8 @@ def write_stats(worksheet, stats, today):
             dttm_forecast=datetime.datetime.combine(
                 today,
                 tm
-            )
+            ),
+            cashbox_type__shop__super_shop__code=super_shop_code
         )
         result_prediction = 0
         for prediction in predicted:
@@ -219,7 +220,9 @@ def get_table(request):
     today = datetime.date.today()
 
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    # workbook = xlsxwriter.Workbook('hello.xlsx')
     worksheet = workbook.add_worksheet()
+    worksheet.set_column(0, 0, 23)
 
     write_global_header(worksheet, today)
     write_workers_header(worksheet)
@@ -227,13 +230,13 @@ def get_table(request):
 
     stats = create_stats_dictionary()
     stats = write_users(worksheet, super_shop_code, stats)
-    last_row = write_stats(worksheet, stats, today)
+    last_row = write_stats(worksheet, stats, today, super_shop_code)
     write_stats_summary(worksheet, stats, last_row)
 
     workbook.close()
     output.seek(0)
 
-    response = HttpResponse(output, content_type='application/vnd.ms-excel')
-    response['Content-Disposition'] = 'attachment; filename="планшет.xls"'
+    response = HttpResponse(output, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="table.xlsx"'
 
     return response
