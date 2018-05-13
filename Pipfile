@@ -11,9 +11,11 @@ pillow = "*"
 pandas = "*"
 xlrd = "*"
 joblib = "*"
+pylint-django = "*"
 
 [dev-packages]
 pylint = "*"
+rope = "*"
 
 [requires]
 python_version = "3.6"
