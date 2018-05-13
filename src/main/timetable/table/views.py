@@ -1,13 +1,15 @@
 import xlsxwriter
 import datetime
 import locale
+import io
 locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
 
+from django.http import HttpResponse
+from src.util.utils import JsonResponse
 from src.db.models import User, WorkerCashboxInfo, WorkerDay, PeriodDemand
 from src.util.models_converter import UserConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import SelectCashiersForm, GetTable
-
 
 @api_method('GET', SelectCashiersForm)
 def select_cashiers(request, form):
@@ -207,27 +209,31 @@ def write_stats_summary(worksheet, stats, last_row):
     worksheet.write(row, col+3, len(stats[datetime.time(hour=21)]))
 
 
-def write_timetable(worksheet, super_shop_code):
+def get_table(request):
+    output = io.BytesIO()
+    form = GetTable(request.GET)
+    if not form.is_valid():
+        return JsonResponse.value_error(str(list(form.errors.items())))
+    form = form.cleaned_data
+    super_shop_code = form['super_shop_code']
     today = datetime.date.today()
+
+    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    worksheet = workbook.add_worksheet()
 
     write_global_header(worksheet, today)
     write_workers_header(worksheet)
     write_stats_header(worksheet)
 
     stats = create_stats_dictionary()
-
     stats = write_users(worksheet, super_shop_code, stats)
-
     last_row = write_stats(worksheet, stats, today)
     write_stats_summary(worksheet, stats, last_row)
 
-
-@api_method('GET', GetTable)
-def get_table(request, form):
-    workbook = xlsxwriter.Workbook('hello.xlsx')
-    worksheet = workbook.add_worksheet()
-
-    write_timetable(worksheet, form['super_shop_code'])
     workbook.close()
+    output.seek(0)
 
-    return JsonResponse.success()
+    response = HttpResponse(output, content_type='application/vnd.ms-excel')
+    response['Content-Disposition'] = 'attachment; filename="планшет.xls"'
+
+    return response
