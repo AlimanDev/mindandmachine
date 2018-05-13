@@ -72,32 +72,30 @@ def select_cashiers(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
-def write_timetable(worksheet, super_shop_code):
-    # write global header
-    TODAY = datetime.date.today()
+def write_global_header(worksheet, today):
     worksheet.write('A1', 'Дата:')
-    worksheet.merge_range('B1:C1', TODAY.strftime('%d/%m/%Y'))
+    worksheet.merge_range('B1:C1', today.strftime('%d/%m/%Y'))
     worksheet.merge_range('F1:G1', 'День недели:')
-    worksheet.merge_range('H1:K1', TODAY.strftime('%A'))
+    worksheet.merge_range('H1:K1', today.strftime('%A'))
     worksheet.merge_range('A2:K2', '')
 
-    # write left header
+
+def write_workers_header(worksheet):
     worksheet.write('A3', 'Фамилия')
     worksheet.merge_range('B3:C3', 'Специализация')
     worksheet.write('D3', 'Время прихода')
     worksheet.write('F3', 'Время ухода')
     worksheet.merge_range('H3:K3', 'Перерывы')
 
-    # write right header
-    row = 3
-    col = 13
-    worksheet.write(row, col, 'Время')
-    worksheet.write(row, col+1, 'Факт')
-    worksheet.write(row, col+2, 'Должно быть')
-    worksheet.write(row, col+3, 'Разница')
-    row += 1
 
-    # prepare stats dict
+def write_stats_header(worksheet):
+    worksheet.write('N3', 'Время')
+    worksheet.write('O3', 'Факт')
+    worksheet.write('P3', 'Должно быть')
+    worksheet.write('Q3', 'Разница')
+
+
+def create_stats_dictionary():
     stats = {}
     tm = datetime.datetime.combine(
         datetime.date.today(),
@@ -116,47 +114,61 @@ def write_timetable(worksheet, super_shop_code):
         tm += tm_step
         stats[tm.time()] = []
 
-    # write user data
+    return stats
+
+
+def write_users(worksheet, super_shop_code, stats):
+    # TODO: move status updation to other function
+    local_stats = dict(stats)
     users = User.objects.filter(
         shop__super_shop__code=super_shop_code,
         shop__title="Кассиры",
     )
     row = 3
     for user in users:
-        worksheet.write(row, 0, '{} {}'.format(user.last_name, user.first_name))
-        rest_time = ['0:00', '0:15', '0:15', '0:45']
-        worksheet.write_row(row, 7, rest_time)
         try:
             workerday = WorkerDay.objects.get(
                 worker=user,
                 dt=datetime.date.today(),
             )
-        except WorkerDay.DoesNotExist:
-            print("There is no workerday for user with id =", user.id)
-            row += 1
-            continue
-        if workerday.tm_work_start is not None\
-            and workerday.tm_work_end is not None:
+            if workerday.tm_work_start is None\
+                or workerday.tm_work_end is None:
+                continue
+            # user data
+            worksheet.write(row, 0, '{} {}'.format(user.last_name, user.first_name))
+            # rest time
+            rest_time = ['0:00', '0:15', '0:15', '0:45']
+            worksheet.write_row(row, 7, rest_time)
+            # start and end time
             worksheet.write(row, 3, workerday.tm_work_start.strftime("%H:%M"))
             worksheet.write(row, 5, workerday.tm_work_end.strftime("%H:%M"))
-            for stat_time in stats:
+            # update stats
+            for stat_time in local_stats:
                 if stat_time >= workerday.tm_work_start and (\
                     stat_time < workerday.tm_work_end or\
                     workerday.tm_work_end.hour == 0):
-                    stats[stat_time].append(workerday)
+                    local_stats[stat_time].append(workerday)
+            row += 1
 
-        row += 1
+        except WorkerDay.DoesNotExist:
+            continue
 
+    return local_stats
+
+
+def write_stats(worksheet, stats, today):
     # write stats
-    row = 4
+    row = 3
     col = 13
     for tm in stats:
         worksheet.write(row, col, tm.strftime('%H:%M'))
+        # in facts workers
         in_fact = len(stats[tm])
         worksheet.write(row, col+1, in_fact)
+        # predicted workers
         predicted = PeriodDemand.objects.filter(
             dttm_forecast=datetime.datetime.combine(
-                TODAY,
+                today,
                 tm
             )
         )
@@ -171,7 +183,13 @@ def write_timetable(worksheet, super_shop_code):
         worksheet.write(row, col+3, abs(in_fact - result_prediction))
         row += 1
 
-    # write total stats
+    return row
+
+
+def write_stats_summary(worksheet, stats, last_row):
+    row = last_row
+    col = 13
+
     row += 1
     worksheet.merge_range(row, col, row, col+2, 'утро 08:00')
     worksheet.write(row, col+3, len(stats[datetime.time(hour=8)]))
@@ -188,6 +206,20 @@ def write_timetable(worksheet, super_shop_code):
     worksheet.merge_range(row, col, row, col+2, 'вечер')
     worksheet.write(row, col+3, len(stats[datetime.time(hour=21)]))
 
+
+def write_timetable(worksheet, super_shop_code):
+    today = datetime.date.today()
+
+    write_global_header(worksheet, today)
+    write_workers_header(worksheet)
+    write_stats_header(worksheet)
+
+    stats = create_stats_dictionary()
+
+    stats = write_users(worksheet, super_shop_code, stats)
+
+    last_row = write_stats(worksheet, stats, today)
+    write_stats_summary(worksheet, stats, last_row)
 
 
 @api_method('GET', GetTable)
