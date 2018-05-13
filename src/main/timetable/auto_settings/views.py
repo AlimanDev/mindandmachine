@@ -222,10 +222,10 @@ def create_timetable(request, form):
             ]
 
             probs = {
-                'Линия': 3,
+                'Линия': 4,
                 'Возврат': 0.5,
-                'Доставка': 1,
-                'Информация': 0.2,
+                'Доставка': 0.1,
+                'Информация': 0.1,
                 'Главная касса': 5,
                 'СЦ': 1,
                 'ОРКК': 3.5,
@@ -239,9 +239,9 @@ def create_timetable(request, form):
                 'Сверка': [(12, 48)],
             }
             prior_weigths ={
-                'Линия': 1.5,
+                'Линия': 2.5,
                 'Возврат': 15,
-                'Доставка': 10,
+                'Доставка': 25,
                 'Информация': 30,
                 'Главная касса': 0,
                 'СЦ': 0,
@@ -257,8 +257,8 @@ def create_timetable(request, form):
             probs = {
                 'Линия': 3,
                 'Возврат': 0.5,
-                'Доставка': 1,
-                'Информация': 0.2,
+                'Доставка': 0.1,
+                'Информация': 0.1,
                 'Главная касса': 3,
             }
 
@@ -266,11 +266,11 @@ def create_timetable(request, form):
                 'Главная касса': [(2, 38), (38, 74)],
             }
             prior_weigths = {
-                'Линия': 1.5,
+                'Линия': 1,
                 'Возврат': 15,
-                'Доставка': 10,
-                'Информация': 30,
-                'Главная касса': 2000,
+                'Доставка': 40,
+                'Информация': 10,
+                'Главная касса': 0, # 2000
             }
 
         for cashbox in cashboxes:
@@ -288,23 +288,38 @@ def create_timetable(request, form):
             cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
     else:
 
-        cost_weights = {
-            'F': 1,
-            '40hours': 0,
-            'days': 2 * 10 ** 4,
-            '15rest': 0,  # 10**4,
-            '5d': 10 ** 4,
-            'hard': 0,
-            'soft': 0,
-            'overwork_fact_days': 3 * 10 ** 6,
-            'solitary_days': 5 * 10 ** 5,
-            'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
-            'zero_cashiers': 3,
-            'slots': 2 * 10 ** 7,
-            'too_much_days': 22,
-            'man_presence': shop.man_presence,
-        }
+        # cost_weights = {
+        #     'F': 1,
+        #     '40hours': 0,
+        #     'days': 2 * 10 ** 4,
+        #     '15rest': 0,  # 10**4,
+        #     '5d': 10 ** 4,
+        #     'hard': 0,
+        #     'soft': 0,
+        #     'overwork_fact_days': 3 * 10 ** 6,
+        #     'solitary_days': 5 * 10 ** 5,
+        #     'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
+        #     'zero_cashiers': 3,
+        #     'slots': 2 * 10 ** 7,
+        #     'too_much_days': 22,
+        #     'man_presence': shop.man_presence,
+        # }
 
+        weights = {
+            'bills': 1,
+            '40hours': 0,
+            'days': 10 ** 2,
+            '15rest': 0,  # 10**4,
+            '5days': 0,
+            'hard_constraints': 0,
+            'soft_constraints': 0,
+            'overwork_fact_days': 3 * 10 ** 4,
+            'solitary_days': 5 * 10 ** 4,
+            'holidays': 10 ** 3,  # 3*10**5,# 2*10**6,
+            'zero_cashiers': 0,
+            'slots': 2 * 10 ** 2,
+            'man_presence': 10 ** 2,
+        }
 
         method_params = [{
             'steps': 200,
