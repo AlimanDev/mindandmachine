@@ -145,46 +145,71 @@ def create_timetable(request, form):
             'ОРКК',
             'Сверка',
         ]
+        #
+        # cost_weights = {
+        #     'F': 1,
+        #     '40hours': 0,
+        #     'days': 2 * 10 ** 4,
+        #     '15rest': 0,  # 10**4,
+        #     '5d': 10 ** 4,
+        #     'hard': 0,
+        #     'soft': 0,
+        #     'overwork_fact_days': 3 * 10 ** 6,
+        #     'solitary_days': 5 * 10 ** 5,
+        #     'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
+        #     'zero_cashiers': 3,
+        #     'slots': 2 * 10 ** 7,
+        #     'too_much_days': 22,
+        #     'man_presence': shop.man_presence,
+        # }
 
         cost_weights = {
-            'F': 1,
+            'bills': 2,
             '40hours': 0,
-            'days': 2 * 10 ** 4,
+            'days': 2 * 10 ** 2,
             '15rest': 0,  # 10**4,
-            '5d': 10 ** 4,
-            'hard': 0,
-            'soft': 0,
+            '5days': 0,
+            'hard_constraints': 0,
+            'soft_constraints': 0,
             'overwork_fact_days': 3 * 10 ** 6,
-            'solitary_days': 5 * 10 ** 5,
+            'solitary_days': 5 * 10 ** 3,
             'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
-            'zero_cashiers': 3,
-            'slots': 2 * 10 ** 7,
-            'too_much_days': 22,
-            'man_presence': shop.man_presence,
+            'zero_cashiers': 2,
+            'slots': 5 * 10 ** 7,
+            'man_presence': 0,
         }
 
         method_params = [
+            # {
+            #     'steps': 100,
+            #     'select_best': 8,
+            #     'changes': 10,
+            #     'variety': 8,
+            #     'days_change_prob': 0.05,
+            #     'periods_change_prob': 0.55,
+            #     'add_day_prob': 0.33,
+            #     'del_day_prob': 0.33
+            # },
+            # {
+            #     'steps': 2000,
+            #     'select_best': 8,
+            #     'changes': 30,
+            #     'variety': 8,
+            #     'days_change_prob': 0.33,
+            #     'periods_change_prob': 0.33,
+            #     'add_day_prob': 0.33,
+            #     'del_day_prob': 0.33
+            # },
             {
-                'steps': 100,
+                'steps': 2000,
                 'select_best': 8,
-                'changes': 10,
+                'changes': 15,
                 'variety': 8,
-                'days_change_prob': 0.05,
+                'days_change_prob': 0.1,
                 'periods_change_prob': 0.55,
                 'add_day_prob': 0.33,
                 'del_day_prob': 0.33
             },
-            {
-                'steps': 2000,
-                'select_best': 8,
-                'changes': 30,
-                'variety': 8,
-                'days_change_prob': 0.33,
-                'periods_change_prob': 0.33,
-                'add_day_prob': 0.33,
-                'del_day_prob': 0.33
-            },
-
         ]
 
         probs = {}
