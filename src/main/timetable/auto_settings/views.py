@@ -318,7 +318,7 @@ def create_timetable(request, form):
             'holidays': 10 ** 3,  # 3*10**5,# 2*10**6,
             'zero_cashiers': 0,
             'slots': 2 * 10 ** 2,
-            'man_presence': 10 ** 2,
+            'man_presence': shop.man_presence * 10 ** 2,
         }
 
         method_params = [{
