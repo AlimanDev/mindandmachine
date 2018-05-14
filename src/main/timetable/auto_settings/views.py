@@ -359,7 +359,7 @@ def create_timetable(request, form):
                 for day in range(7):
                     for tm in tms:
                         for slot in user_slots.get(day, []):
-                            if tm > slot.slot.tm_start and tm < slot.slot.tm_end:
+                            if tm >= slot.slot.tm_start and tm <= slot.slot.tm_end:
                                 break
                         else:
                             constr.append({
