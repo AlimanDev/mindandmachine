@@ -305,19 +305,19 @@ def create_timetable(request, form):
         #     'man_presence': shop.man_presence,
         # }
 
-        weights = {
+        cost_weights = {
             'bills': 1,
             '40hours': 0,
-            'days': 10 ** 2,
+            'days': 10 ** 4,
             '15rest': 0,  # 10**4,
             '5days': 0,
             'hard_constraints': 0,
             'soft_constraints': 0,
-            'overwork_fact_days': 3 * 10 ** 4,
-            'solitary_days': 5 * 10 ** 4,
-            'holidays': 10 ** 3,  # 3*10**5,# 2*10**6,
+            'overwork_fact_days': 3 * 10 ** 3,
+            'solitary_days': 5 * 10 ** 3,
+            'holidays': 10 ** 2,  # 3*10**5,# 2*10**6,
             'zero_cashiers': 0,
-            'slots': 2 * 10 ** 2,
+            'slots': 0,
             'man_presence': 10 ** 2,
         }
 
@@ -326,8 +326,8 @@ def create_timetable(request, form):
             'select_best':8,
             'changes': 5,
             'variety': 8,
-            'days_change_prob': 0.5,
-            'periods_change_prob': 0.5,
+            'days_change_prob': 0.2,
+            'periods_change_prob': 0.8,
             'add_day_prob': 0.33,
             'del_day_prob': 0.33,
         }]
@@ -412,6 +412,7 @@ def create_timetable(request, form):
             'cost_weights': cost_weights,
             'method_params': method_params,
             'breaks_triplets': breaks_triplets,
+            'n_working_days_optimal': 20, # Very kostil, very hot fix, we should take this param from proizvodstveny calendar'
         },
     }
 
