@@ -125,8 +125,6 @@ def create_timetable(request, form):
         auto_timetable=True,
     )
 
-    cost_weights = {}
-    method_params = {}
     extra_constr = {}
     breaks_triplets = []
 
@@ -305,7 +303,7 @@ def create_timetable(request, form):
         #     'man_presence': shop.man_presence,
         # }
 
-        weights = {
+        cost_weights = {
             'bills': 1,
             '40hours': 0,
             'days': 10 ** 2,
@@ -336,8 +334,8 @@ def create_timetable(request, form):
         for slot in slots_all[shop.id]:
             # todo: temp fix for algo
 
-            int_s = time2int(slot.tm_start)
-            int_e = time2int(slot.tm_end)
+            int_s = time2int(slot.tm_start, shop.forecast_step_minutes)
+            int_e = time2int(slot.tm_end, shop.forecast_step_minutes)
             if int_s < int_e:
                 slots_periods_dict.append([
                     time2int(slot.tm_start),
@@ -396,6 +394,7 @@ def create_timetable(request, form):
         'start_dt': BaseConverter.convert_date(tt.dt),
         'IP': settings.HOST_IP,
         'timetable_id': tt.id,
+        'forecast_step_minutes': shop.forecast_step_minutes,
         'cashbox_types': cashboxes,
         'shop_type': shop.full_interface,
         'demand': [PeriodDemandConverter.convert(x) for x in periods],
