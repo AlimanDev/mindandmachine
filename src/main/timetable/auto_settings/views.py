@@ -127,6 +127,7 @@ def create_timetable(request, form):
 
     extra_constr = {}
     breaks_triplets = []
+    slots_periods_dict = 0
 
     # todo: this params should be in db
     if shop.full_interface:
@@ -334,8 +335,8 @@ def create_timetable(request, form):
         for slot in slots_all[shop.id]:
             # todo: temp fix for algo
 
-            int_s = time2int(slot.tm_start, shop.forecast_step_minutes)
-            int_e = time2int(slot.tm_end, shop.forecast_step_minutes)
+            int_s = time2int(slot.tm_start, shop.forecast_step_minutes.minute, start_h=6)
+            int_e = time2int(slot.tm_end, shop.forecast_step_minutes.minute, start_h=6)
             if int_s < int_e:
                 slots_periods_dict.append([
                     time2int(slot.tm_start),
@@ -388,14 +389,18 @@ def create_timetable(request, form):
             'prediction': 1,
         }]
 
+        # for cashbox in cashboxes:
+        #     cashbox['prediction'] = 1
+
         # todo: send slots to server
 
     data = {
         'start_dt': BaseConverter.convert_date(tt.dt),
         'IP': settings.HOST_IP,
         'timetable_id': tt.id,
-        'forecast_step_minutes': shop.forecast_step_minutes,
+        'forecast_step_minutes': shop.forecast_step_minutes.minute,
         'cashbox_types': cashboxes,
+        # 'slots': slots_periods_dict,
         'shop_type': shop.full_interface,
         'demand': [PeriodDemandConverter.convert(x) for x in periods],
         'cashiers': [
