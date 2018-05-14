@@ -201,7 +201,7 @@ def create_timetable(request, form):
             #     'del_day_prob': 0.33
             # },
             {
-                'steps': 2000,
+                'steps': 3000,
                 'select_best': 8,
                 'changes': 15,
                 'variety': 8,
@@ -239,7 +239,7 @@ def create_timetable(request, form):
                 'Сверка': [(12, 48)],
             }
             prior_weigths ={
-                'Линия': 2.5,
+                'Линия': 10,
                 'Возврат': 15,
                 'Доставка': 25,
                 'Информация': 30,
@@ -266,7 +266,7 @@ def create_timetable(request, form):
                 'Главная касса': [(2, 38), (38, 74)],
             }
             prior_weigths = {
-                'Линия': 1,
+                'Линия': 10,
                 'Возврат': 15,
                 'Доставка': 40,
                 'Информация': 10,
