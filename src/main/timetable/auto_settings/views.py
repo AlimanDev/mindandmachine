@@ -95,7 +95,7 @@ def create_timetable(request, form):
 
     # todo: tooooo slow
     worker_cashbox_info = group_by(
-        collection=WorkerCashboxInfo.objects.select_related('cashbox_type').filter(cashbox_type__shop_id=shop_id),
+        collection=WorkerCashboxInfo.objects.select_related('cashbox_type').filter(cashbox_type__shop_id=shop_id, is_active=True),
         group_key=lambda x: x.worker_id
     )
 
