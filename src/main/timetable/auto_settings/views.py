@@ -308,7 +308,7 @@ def create_timetable(request, form):
         cost_weights = {
             'bills': 1,
             '40hours': 0,
-            'days': 10 ** 4,
+            'days': 3 * 10 ** 4,
             '15rest': 0,  # 10**4,
             '5days': 0,
             'hard_constraints': 0,
@@ -326,8 +326,8 @@ def create_timetable(request, form):
             'select_best':8,
             'changes': 5,
             'variety': 8,
-            'days_change_prob': 0.5,
-            'periods_change_prob': 0.5,
+            'days_change_prob': 0.15,
+            'periods_change_prob': 0.85,
             'add_day_prob': 0.33,
             'del_day_prob': 0.33,
         }]
