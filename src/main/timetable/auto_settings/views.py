@@ -95,7 +95,7 @@ def create_timetable(request, form):
 
     # todo: tooooo slow
     worker_cashbox_info = group_by(
-        collection=WorkerCashboxInfo.objects.select_related('cashbox_type').filter(cashbox_type__shop_id=shop_id),
+        collection=WorkerCashboxInfo.objects.select_related('cashbox_type').filter(cashbox_type__shop_id=shop_id, is_active=True),
         group_key=lambda x: x.worker_id
     )
 
@@ -125,10 +125,9 @@ def create_timetable(request, form):
         auto_timetable=True,
     )
 
-    cost_weights = {}
-    method_params = {}
     extra_constr = {}
     breaks_triplets = []
+    slots_periods_dict = 0
 
     # todo: this params should be in db
     if shop.full_interface:
@@ -201,7 +200,7 @@ def create_timetable(request, form):
             #     'del_day_prob': 0.33
             # },
             {
-                'steps': 2000,
+                'steps': 3000,
                 'select_best': 8,
                 'changes': 15,
                 'variety': 8,
@@ -239,7 +238,7 @@ def create_timetable(request, form):
                 'Сверка': [(12, 48)],
             }
             prior_weigths ={
-                'Линия': 2.5,
+                'Линия': 10,
                 'Возврат': 15,
                 'Доставка': 25,
                 'Информация': 30,
@@ -266,7 +265,7 @@ def create_timetable(request, form):
                 'Главная касса': [(2, 38), (38, 74)],
             }
             prior_weigths = {
-                'Линия': 1,
+                'Линия': 10,
                 'Возврат': 15,
                 'Доставка': 40,
                 'Информация': 10,
@@ -305,7 +304,7 @@ def create_timetable(request, form):
         #     'man_presence': shop.man_presence,
         # }
 
-        weights = {
+        cost_weights = {
             'bills': 1,
             '40hours': 0,
             'days': 10 ** 2,
@@ -336,8 +335,8 @@ def create_timetable(request, form):
         for slot in slots_all[shop.id]:
             # todo: temp fix for algo
 
-            int_s = time2int(slot.tm_start)
-            int_e = time2int(slot.tm_end)
+            int_s = time2int(slot.tm_start, shop.forecast_step_minutes.minute, start_h=6)
+            int_e = time2int(slot.tm_end, shop.forecast_step_minutes.minute, start_h=6)
             if int_s < int_e:
                 slots_periods_dict.append([
                     time2int(slot.tm_start),
@@ -360,7 +359,7 @@ def create_timetable(request, form):
                 for day in range(7):
                     for tm in tms:
                         for slot in user_slots.get(day, []):
-                            if tm > slot.slot.tm_start and tm < slot.slot.tm_end:
+                            if tm >= slot.slot.tm_start and tm <= slot.slot.tm_end:
                                 break
                         else:
                             constr.append({
@@ -390,13 +389,18 @@ def create_timetable(request, form):
             'prediction': 1,
         }]
 
+        # for cashbox in cashboxes:
+        #     cashbox['prediction'] = 1
+
         # todo: send slots to server
 
     data = {
         'start_dt': BaseConverter.convert_date(tt.dt),
         'IP': settings.HOST_IP,
         'timetable_id': tt.id,
+        'forecast_step_minutes': shop.forecast_step_minutes.minute,
         'cashbox_types': cashboxes,
+        # 'slots': slots_periods_dict,
         'shop_type': shop.full_interface,
         'demand': [PeriodDemandConverter.convert(x) for x in periods],
         'cashiers': [
