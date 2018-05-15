@@ -317,7 +317,7 @@ def create_timetable(request, form):
             'overwork_fact_days': 3 * 10 ** 3,
             'solitary_days': 5 * 10 ** 3,
             'holidays': 10 ** 2,  # 3*10**5,# 2*10**6,
-            'zero_cashiers': 0,
+            'zero_cashiers': 5,
             'slots': 0,
             'man_presence': shop.man_presence * 10 ** 2,
         }
@@ -327,8 +327,8 @@ def create_timetable(request, form):
             'select_best':8,
             'changes': 5,
             'variety': 8,
-            'days_change_prob': 0.2,
-            'periods_change_prob': 0.8,
+            'days_change_prob': 0.5,
+            'periods_change_prob': 0.5,
             'add_day_prob': 0.33,
             'del_day_prob': 0.33,
         }]
