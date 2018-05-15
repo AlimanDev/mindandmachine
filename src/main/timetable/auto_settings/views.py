@@ -465,7 +465,7 @@ def delete_timetable(request, form):
         worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
-        worker_day__worker_auto_timetable=True,
+        worker_day__worker__auto_timetable=True,
     ).filter(
         Q(worker_day__is_manual_tuning=False) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -475,7 +475,7 @@ def delete_timetable(request, form):
         worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
-        worker_day__worker_auto_timetable=True,
+        worker_day__worker__auto_timetable=True,
     ).filter(
         Q(worker_day__is_manual_tuning=False) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -485,7 +485,7 @@ def delete_timetable(request, form):
         worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
-        worker_day__worker_auto_timetable=True,
+        worker_day__worker__auto_timetable=True,
     ).filter(
         Q(worker_day__is_manual_tuning=False) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -495,7 +495,7 @@ def delete_timetable(request, form):
         worker_shop_id=shop_id,
         dt__month=dt_from.month,
         dt__year=dt_from.year,
-        worker_day__worker_auto_timetable=True,
+        worker__auto_timetable=True,
     ).filter(
         Q(is_manual_tuning=False) |
         Q(type=WorkerDay.Type.TYPE_EMPTY.value)
