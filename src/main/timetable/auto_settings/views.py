@@ -131,6 +131,8 @@ def create_timetable(request, form):
 
     # todo: this params should be in db
     if shop.full_interface:
+        working_days = 21
+
         main_types = [
             'Линия',
             'Возврат',
@@ -286,7 +288,7 @@ def create_timetable(request, form):
             cashbox['slots'] = slots.get(cashbox['name'], [])
             cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
     else:
-
+        working_days = 20
         # cost_weights = {
         #     'F': 1,
         #     '40hours': 0,
@@ -416,7 +418,7 @@ def create_timetable(request, form):
             'cost_weights': cost_weights,
             'method_params': method_params,
             'breaks_triplets': breaks_triplets,
-            'n_working_days_optimal': 20, # Very kostil, very hot fix, we should take this param from proizvodstveny calendar'
+            'n_working_days_optimal': working_days, # Very kostil, very hot fix, we should take this param from proizvodstveny calendar'
         },
     }
 
@@ -463,6 +465,7 @@ def delete_timetable(request, form):
         worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
+        worker_day__worker_auto_timetable=True,
     ).filter(
         Q(worker_day__is_manual_tuning=False) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -472,6 +475,7 @@ def delete_timetable(request, form):
         worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
+        worker_day__worker_auto_timetable=True,
     ).filter(
         Q(worker_day__is_manual_tuning=False) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -481,6 +485,7 @@ def delete_timetable(request, form):
         worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
+        worker_day__worker_auto_timetable=True,
     ).filter(
         Q(worker_day__is_manual_tuning=False) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -490,7 +495,7 @@ def delete_timetable(request, form):
         worker_shop_id=shop_id,
         dt__month=dt_from.month,
         dt__year=dt_from.year,
-        is_manual_tuning=False,
+        worker_day__worker_auto_timetable=True,
     ).filter(
         Q(is_manual_tuning=False) |
         Q(type=WorkerDay.Type.TYPE_EMPTY.value)
