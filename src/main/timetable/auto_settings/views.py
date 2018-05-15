@@ -326,8 +326,8 @@ def create_timetable(request, form):
             'select_best':8,
             'changes': 5,
             'variety': 8,
-            'days_change_prob': 0.2,
-            'periods_change_prob': 0.8,
+            'days_change_prob': 0.5,
+            'periods_change_prob': 0.5,
             'add_day_prob': 0.33,
             'del_day_prob': 0.33,
         }]
