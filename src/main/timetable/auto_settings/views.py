@@ -131,7 +131,7 @@ def create_timetable(request, form):
 
     # todo: this params should be in db
     if shop.full_interface:
-        working_days = 21
+        working_days = 22
 
         main_types = [
             'Линия',
@@ -323,7 +323,7 @@ def create_timetable(request, form):
         }
 
         method_params = [{
-            'steps': 200,
+            'steps': 1000,
             'select_best':8,
             'changes': 5,
             'variety': 8,
