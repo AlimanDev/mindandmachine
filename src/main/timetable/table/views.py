@@ -5,6 +5,7 @@ import io
 locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
 
 from django.http import HttpResponse
+from functools import reduce
 from src.util.utils import JsonResponse
 from src.db.models import User, WorkerCashboxInfo, WorkerDay, WorkerDayCashboxDetails, PeriodDemand
 from src.util.models_converter import UserConverter
@@ -74,26 +75,31 @@ def select_cashiers(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
+def mix_formats(workbook, *args):
+    return workbook.add_format(reduce(lambda x, y: {**x, **y} if y is not None else x, args[1:], {}))
+
+
 def get_table(request):
     def write_global_header(workbook, worksheet, weekday):
         right_border = workbook.add_format({'right': 2})
+        bold_right_border = workbook.add_format({'right': 2, 'bold': True})
         border = workbook.add_format({'border': 2})
         worksheet.write('A1', 'Дата:')
         worksheet.merge_range('B1:C1', weekday.strftime('%d/%m/%Y'), right_border)
         worksheet.write_blank(0, 4, '', right_border)
         worksheet.merge_range('F1:G1', 'День недели:')
-        worksheet.merge_range('H1:K1', weekday.strftime('%A'), right_border)
+        worksheet.merge_range('H1:K1', weekday.strftime('%A'), bold_right_border)
         worksheet.merge_range('A2:K2', '', border)
 
     def write_workers_header(workbook, worksheet):
-        border = workbook.add_format({'border': 2, 'align': 'vjustify'})
-        worksheet.write('A3', 'Фамилия', border)
-        worksheet.merge_range('B3:C3', 'Специализация', border)
-        worksheet.write('D3', 'Время прихода', border)
-        worksheet.write_blank('E3', '', border)
-        worksheet.write('F3', 'Время ухода', border)
-        worksheet.write_blank('G3', '', border)
-        worksheet.merge_range('H3:K3', 'Перерывы', border)
+        centred_bold_border = workbook.add_format({'border': 2, 'text_wrap': True, 'bold': True, 'align': 'center'})
+        worksheet.write('A3', 'Фамилия', centred_bold_border)
+        worksheet.merge_range('B3:C3', 'Специализация', centred_bold_border)
+        worksheet.write('D3', 'Время прихода', centred_bold_border)
+        worksheet.write_blank('E3', '', centred_bold_border)
+        worksheet.write('F3', 'Время ухода', centred_bold_border)
+        worksheet.write_blank('G3', '', centred_bold_border)
+        worksheet.merge_range('H3:K3', 'Перерывы', centred_bold_border)
 
     def write_stats_header(workbook, worksheet):
         border = workbook.add_format({'border': 1})
@@ -123,14 +129,16 @@ def get_table(request):
 
         return stats
 
-    def write_users(workbook, worksheet, shop_id, stats, weekday):
-        left_cell = workbook.add_format({'left': 2, 'bottom': 1, 'right': 1})
-        middle_cell = workbook.add_format({'left': 1, 'bottom': 1, 'right': 1})
-        right_cell = workbook.add_format({'left': 1, 'bottom': 1, 'right': 2})
+    def write_workers(workbook, worksheet, shop_id, stats, weekday):
+        bold_right_cell_format = {'right': 2}
+        bold_left_cell_format = {'left': 2}
+        cell_format = {'left': 1, 'bottom': 1, 'right': 1}
+        bold_format = {'bold': True}
 
         # TODO: move status updation to other function
         local_stats = dict(stats)
         row = 3
+        start_row = row
         workerdays = WorkerDay.objects\
             .filter(
                 worker__shop__id=shop_id,
@@ -139,6 +147,7 @@ def get_table(request):
             )\
             .order_by('tm_work_start', 'worker__last_name')
         for workerday in workerdays:
+            bg_color_format = {'bg_color': 'gray'} if (row - start_row) % 5 == 0 else None
             if workerday.tm_work_start is None\
                 or workerday.tm_work_end is None:
                 continue
@@ -147,24 +156,36 @@ def get_table(request):
                 row,
                 0,
                 '{} {}'.format(workerday.worker.last_name, workerday.worker.first_name),
-                right_cell
+                mix_formats(
+                    workbook,
+                    cell_format,
+                    bold_left_cell_format,
+                    bold_format,
+                    bg_color_format
+                )
             )
             # specialization
             try:
                 workerday_cashbox_details = WorkerDayCashboxDetails.objects.get(worker_day=workerday)
-                worksheet.write(row, 1, workerday_cashbox_details.on_cashbox.type.name, left_cell)
-                worksheet.write_blank(row, 2, '', right_cell)
+                worksheet.write(row, 1, workerday_cashbox_details.on_cashbox.type.name,
+                    mix_formats(workbook, cell_format, bold_left_cell_format, bold_format, bg_color_format))
+                worksheet.write_blank(row, 2, '', mix_formats(workbook, cell_format, bold_right_cell_format, bold_format, bg_color_format))
             except WorkerDayCashboxDetails.DoesNotExist:
                 pass
             # rest time
             rest_time = ['0:00', '0:15', '0:15', '0:45']
-            worksheet.write_row(row, 7, rest_time, middle_cell)
-            # worksheet.write_blank(row, 7+len(rest_time)+1, '')
+            worksheet.write_row(row, 7, rest_time, mix_formats(workbook, cell_format, bg_color_format))
+            worksheet.write_blank(row, 7+len(rest_time), '',
+                mix_formats(workbook, cell_format, bold_left_cell_format))
             # start and end time
-            worksheet.write(row, 3, workerday.tm_work_start.strftime("%H:%M"), left_cell)
-            worksheet.write_blank(row, 4, '', right_cell)
-            worksheet.write(row, 5, workerday.tm_work_end.strftime("%H:%M"), left_cell)
-            worksheet.write_blank(row, 6, '', right_cell)
+            worksheet.write(row, 3, workerday.tm_work_start.strftime("%H:%M"),
+                mix_formats(workbook, cell_format, bold_left_cell_format, bold_format, bg_color_format))
+            worksheet.write_blank(row, 4, '',
+                mix_formats(workbook, cell_format, bold_left_cell_format, bg_color_format))
+            worksheet.write(row, 5, workerday.tm_work_end.strftime("%H:%M"),
+                mix_formats(workbook, cell_format, bold_left_cell_format, bold_format, bg_color_format))
+            worksheet.write_blank(row, 6, '',
+                mix_formats(workbook, cell_format, bold_left_cell_format, bold_right_cell_format, bg_color_format))
             # update stats
             for stat_time in local_stats:
                 if stat_time >= workerday.tm_work_start and (\
@@ -207,30 +228,39 @@ def get_table(request):
         return row
 
     def write_stats_summary(workbook, worksheet, stats, last_row):
-        border = workbook.add_format({'border': 1})
+        centered_border = workbook.add_format({'border': 1, 'align': 'center'})
         row = last_row
         col = 13
 
         row += 1
-        worksheet.merge_range(row, col, row, col+2, 'утро 08:00', border)
-        worksheet.write(row, col+3, len(stats[datetime.time(hour=8)]), border)
+        worksheet.merge_range(row, col, row, col+2, 'утро 08:00', centered_border)
+        worksheet.write(row, col+3, len(stats[datetime.time(hour=8)]), centered_border)
 
         row += 1
-        worksheet.merge_range(row, col, row, col+2, 'утро 8:00 - 9:30', border)
-        worksheet.write(row, col+3, len(stats[datetime.time(hour=9, minute=30)]), border)
+        worksheet.merge_range(row, col, row, col+2, 'утро 8:00 - 9:30', centered_border)
+        worksheet.write(row, col+3, len(stats[datetime.time(hour=9, minute=30)]), centered_border)
 
         row += 1
-        worksheet.merge_range(row, col, row, col+2, 'утро 8:00 - 12:30', border)
-        worksheet.write(row, col+3, len(stats[datetime.time(hour=12, minute=30)]), border)
+        worksheet.merge_range(row, col, row, col+2, 'утро 8:00 - 12:30', centered_border)
+        worksheet.write(row, col+3, len(stats[datetime.time(hour=12, minute=30)]), centered_border)
 
         row += 1
-        worksheet.merge_range(row, col, row, col+2, 'вечер', border)
-        worksheet.write(row, col+3, len(stats[datetime.time(hour=21)]), border)
+        worksheet.merge_range(row, col, row, col+2, 'вечер', centered_border)
+        worksheet.write(row, col+3, len(stats[datetime.time(hour=21)]), centered_border)
 
         return row
 
-    def write_overtime(worksheet, last_row):
-        worksheet.write(last_row, 0, 'Подработка, выход в выходной')
+    def write_overtime(workbook, worksheet, last_row):
+        gray_bg_color = workbook.add_format({'bg_color': 'gray'})
+        border = workbook.add_format({'border': 1})
+        row = last_row + 4
+        worksheet.write(row, 0, 'Подработка, выход в выходной', gray_bg_color)
+        for col in range(1, 11):
+            worksheet.write_blank(row, col, '', gray_bg_color)
+        row += 1
+        for i in range(5):
+            for col in range(11):
+                worksheet.write_blank(row + i, col, '', border)
 
 
     output = io.BytesIO()
@@ -244,17 +274,18 @@ def get_table(request):
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
     # workbook = xlsxwriter.Workbook('hello.xlsx')
     worksheet = workbook.add_worksheet()
-    worksheet.set_column(0, 0, 23)
-    worksheet.set_column(1, 1, 15)
+    # worksheet.set_column(0, 0, 23)
+    # worksheet.set_column(1, 1, 15)
+    worksheet.set_column(11, 11, 3)
+    worksheet.set_column(12, 12, 3)
 
     write_global_header(workbook, worksheet, weekday)
     write_workers_header(workbook, worksheet)
     write_stats_header(workbook, worksheet)
 
     stats = create_stats_dictionary()
-    stats, last_users_row = write_users(workbook, worksheet, shop_id, stats, weekday)
-    last_users_row += 4
-    write_overtime(worksheet, last_users_row)
+    stats, last_users_row = write_workers(workbook, worksheet, shop_id, stats, weekday)
+    write_overtime(workbook, worksheet, last_users_row)
     last_stats_row = write_stats(workbook, worksheet, stats, weekday, shop_id)
     write_stats_summary(workbook, worksheet, stats, last_stats_row)
 
