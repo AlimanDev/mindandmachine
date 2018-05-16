@@ -157,7 +157,7 @@ def get_table(request):
                     local_stats[stat_time].append(workerday)
             row += 1
 
-        return local_stats
+        return local_stats, row
 
     def write_stats(worksheet, stats, weekday, shop_id):
         # write stats
@@ -209,6 +209,11 @@ def get_table(request):
         worksheet.merge_range(row, col, row, col+2, 'вечер')
         worksheet.write(row, col+3, len(stats[datetime.time(hour=21)]))
 
+        return row
+
+    def write_overtime(worksheet, last_row):
+        worksheet.write(last_row, 0, 'Подработка, выход в выходной')
+
 
     output = io.BytesIO()
     form = GetTable(request.GET)
@@ -229,9 +234,11 @@ def get_table(request):
     write_stats_header(worksheet)
 
     stats = create_stats_dictionary()
-    stats = write_users(worksheet, shop_id, stats, weekday)
-    last_row = write_stats(worksheet, stats, weekday, shop_id)
-    write_stats_summary(worksheet, stats, last_row)
+    stats, last_users_row = write_users(worksheet, shop_id, stats, weekday)
+    last_users_row += 4
+    write_overtime(worksheet, last_users_row)
+    last_stats_row = write_stats(worksheet, stats, weekday, shop_id)
+    write_stats_summary(worksheet, stats, last_stats_row)
 
     workbook.close()
     output.seek(0)
