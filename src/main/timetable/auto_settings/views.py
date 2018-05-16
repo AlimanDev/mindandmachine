@@ -145,6 +145,9 @@ def create_timetable(request, form):
             'СЦ',
             'ОРКК',
             'Сверка',
+
+            'B2B',
+            'Сервис Центр',
         ]
         #
         # cost_weights = {
@@ -261,10 +264,14 @@ def create_timetable(request, form):
                 'Доставка': 0.1,
                 'Информация': 0.1,
                 'Главная касса': 3,
+                'B2B': 3,
+                'Сервис Центр': 3,
             }
 
             slots = {
                 'Главная касса': [(2, 38), (38, 74)],
+                'B2B': [(4, 40), (8, 44), (16, 52), (24, 60), (36, 73)],
+                'Сервис Центр': [(12, 48), (36, 72)],
             }
             prior_weigths = {
                 'Линия': 10,
@@ -272,6 +279,9 @@ def create_timetable(request, form):
                 'Доставка': 40,
                 'Информация': 10,
                 'Главная касса': 0, # 2000
+
+                'B2B': 0,
+                'Сервис Центр': 0,
             }
 
         for cashbox in cashboxes:
@@ -309,7 +319,7 @@ def create_timetable(request, form):
         cost_weights = {
             'bills': 1,
             '40hours': 0,
-            'days': 10 ** 4,
+            'days': 3 * 10 ** 4,
             '15rest': 0,  # 10**4,
             '5days': 0,
             'hard_constraints': 0,
@@ -327,8 +337,8 @@ def create_timetable(request, form):
             'select_best':8,
             'changes': 5,
             'variety': 8,
-            'days_change_prob': 0.5,
-            'periods_change_prob': 0.5,
+            'days_change_prob': 0.15,
+            'periods_change_prob': 0.85,
             'add_day_prob': 0.33,
             'del_day_prob': 0.33,
         }]
