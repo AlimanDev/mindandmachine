@@ -80,4 +80,5 @@ class SelectCashiersForm(forms.Form):
 
 
 class GetTable(forms.Form):
-    super_shop_code = forms.CharField(max_length=3)
+    shop_id = forms.CharField(max_length=3)
+    weekday = forms.DateField()

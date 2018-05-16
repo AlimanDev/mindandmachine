@@ -74,11 +74,11 @@ def select_cashiers(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
-def write_global_header(worksheet, today):
+def write_global_header(worksheet, weekday):
     worksheet.write('A1', 'Дата:')
-    worksheet.merge_range('B1:C1', today.strftime('%d/%m/%Y'))
+    worksheet.merge_range('B1:C1', weekday.strftime('%d/%m/%Y'))
     worksheet.merge_range('F1:G1', 'День недели:')
-    worksheet.merge_range('H1:K1', today.strftime('%A'))
+    worksheet.merge_range('H1:K1', weekday.strftime('%A'))
     worksheet.merge_range('A2:K2', '')
 
 
@@ -119,11 +119,11 @@ def create_stats_dictionary():
     return stats
 
 
-def write_users(worksheet, super_shop_code, stats):
+def write_users(worksheet, shop_id, stats, weekday):
     # TODO: move status updation to other function
     local_stats = dict(stats)
     users = User.objects.filter(
-        shop__super_shop__code=super_shop_code,
+        shop__id=shop_id,
         shop__title="Кассиры",
     )
     row = 3
@@ -131,7 +131,7 @@ def write_users(worksheet, super_shop_code, stats):
         try:
             workerday = WorkerDay.objects.get(
                 worker=user,
-                dt=datetime.date.today(),
+                dt=weekday,
             )
             if workerday.tm_work_start is None\
                 or workerday.tm_work_end is None:
@@ -158,7 +158,7 @@ def write_users(worksheet, super_shop_code, stats):
     return local_stats
 
 
-def write_stats(worksheet, stats, today, super_shop_code):
+def write_stats(worksheet, stats, weekday, shop_id):
     # write stats
     row = 3
     col = 13
@@ -170,10 +170,10 @@ def write_stats(worksheet, stats, today, super_shop_code):
         # predicted workers
         predicted = PeriodDemand.objects.filter(
             dttm_forecast=datetime.datetime.combine(
-                today,
+                weekday,
                 tm
             ),
-            cashbox_type__shop__super_shop__code=super_shop_code
+            cashbox_type__shop__id=shop_id
         )
         result_prediction = 0
         for prediction in predicted:
@@ -216,21 +216,21 @@ def get_table(request):
     if not form.is_valid():
         return JsonResponse.value_error(str(list(form.errors.items())))
     form = form.cleaned_data
-    super_shop_code = form['super_shop_code']
-    today = datetime.date.today()
+    shop_id = form['shop_id']
+    weekday = form['weekday']
 
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
     # workbook = xlsxwriter.Workbook('hello.xlsx')
     worksheet = workbook.add_worksheet()
     worksheet.set_column(0, 0, 23)
 
-    write_global_header(worksheet, today)
+    write_global_header(worksheet, weekday)
     write_workers_header(worksheet)
     write_stats_header(worksheet)
 
     stats = create_stats_dictionary()
-    stats = write_users(worksheet, super_shop_code, stats)
-    last_row = write_stats(worksheet, stats, today, super_shop_code)
+    stats = write_users(worksheet, shop_id, stats, weekday)
+    last_row = write_stats(worksheet, stats, weekday, shop_id)
     write_stats_summary(worksheet, stats, last_row)
 
     workbook.close()
