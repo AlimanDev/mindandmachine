@@ -75,25 +75,32 @@ def select_cashiers(request, form):
 
 
 def get_table(request):
-    def write_global_header(worksheet, weekday):
+    def write_global_header(workbook, worksheet, weekday):
+        right_border = workbook.add_format({'right': 2})
+        border = workbook.add_format({'border': 2})
         worksheet.write('A1', 'Дата:')
-        worksheet.merge_range('B1:C1', weekday.strftime('%d/%m/%Y'))
+        worksheet.merge_range('B1:C1', weekday.strftime('%d/%m/%Y'), right_border)
+        worksheet.write_blank(0, 4, '', right_border)
         worksheet.merge_range('F1:G1', 'День недели:')
-        worksheet.merge_range('H1:K1', weekday.strftime('%A'))
-        worksheet.merge_range('A2:K2', '')
+        worksheet.merge_range('H1:K1', weekday.strftime('%A'), right_border)
+        worksheet.merge_range('A2:K2', '', border)
 
-    def write_workers_header(worksheet):
-        worksheet.write('A3', 'Фамилия')
-        worksheet.merge_range('B3:C3', 'Специализация')
-        worksheet.write('D3', 'Время прихода')
-        worksheet.write('F3', 'Время ухода')
-        worksheet.merge_range('H3:K3', 'Перерывы')
+    def write_workers_header(workbook, worksheet):
+        border = workbook.add_format({'border': 2, 'align': 'vjustify'})
+        worksheet.write('A3', 'Фамилия', border)
+        worksheet.merge_range('B3:C3', 'Специализация', border)
+        worksheet.write('D3', 'Время прихода', border)
+        worksheet.write_blank('E3', '', border)
+        worksheet.write('F3', 'Время ухода', border)
+        worksheet.write_blank('G3', '', border)
+        worksheet.merge_range('H3:K3', 'Перерывы', border)
 
-    def write_stats_header(worksheet):
-        worksheet.write('N3', 'Время')
-        worksheet.write('O3', 'Факт')
-        worksheet.write('P3', 'Должно быть')
-        worksheet.write('Q3', 'Разница')
+    def write_stats_header(workbook, worksheet):
+        border = workbook.add_format({'border': 1})
+        worksheet.write('N3', 'Время', border)
+        worksheet.write('O3', 'Факт', border)
+        worksheet.write('P3', 'Должно быть', border)
+        worksheet.write('Q3', 'Разница', border)
 
     def create_stats_dictionary():
         stats = {}
@@ -116,7 +123,11 @@ def get_table(request):
 
         return stats
 
-    def write_users(worksheet, shop_id, stats, weekday):
+    def write_users(workbook, worksheet, shop_id, stats, weekday):
+        left_cell = workbook.add_format({'left': 2, 'bottom': 1, 'right': 1})
+        middle_cell = workbook.add_format({'left': 1, 'bottom': 1, 'right': 1})
+        right_cell = workbook.add_format({'left': 1, 'bottom': 1, 'right': 2})
+
         # TODO: move status updation to other function
         local_stats = dict(stats)
         row = 3
@@ -135,20 +146,25 @@ def get_table(request):
             worksheet.write(
                 row,
                 0,
-                '{} {}'.format(workerday.worker.last_name, workerday.worker.first_name)
+                '{} {}'.format(workerday.worker.last_name, workerday.worker.first_name),
+                right_cell
             )
             # specialization
             try:
                 workerday_cashbox_details = WorkerDayCashboxDetails.objects.get(worker_day=workerday)
-                worksheet.write(row, 1, workerday_cashbox_details.on_cashbox.type.name)
+                worksheet.write(row, 1, workerday_cashbox_details.on_cashbox.type.name, left_cell)
+                worksheet.write_blank(row, 2, '', right_cell)
             except WorkerDayCashboxDetails.DoesNotExist:
                 pass
             # rest time
             rest_time = ['0:00', '0:15', '0:15', '0:45']
-            worksheet.write_row(row, 7, rest_time)
+            worksheet.write_row(row, 7, rest_time, middle_cell)
+            # worksheet.write_blank(row, 7+len(rest_time)+1, '')
             # start and end time
-            worksheet.write(row, 3, workerday.tm_work_start.strftime("%H:%M"))
-            worksheet.write(row, 5, workerday.tm_work_end.strftime("%H:%M"))
+            worksheet.write(row, 3, workerday.tm_work_start.strftime("%H:%M"), left_cell)
+            worksheet.write_blank(row, 4, '', right_cell)
+            worksheet.write(row, 5, workerday.tm_work_end.strftime("%H:%M"), left_cell)
+            worksheet.write_blank(row, 6, '', right_cell)
             # update stats
             for stat_time in local_stats:
                 if stat_time >= workerday.tm_work_start and (\
@@ -159,15 +175,16 @@ def get_table(request):
 
         return local_stats, row
 
-    def write_stats(worksheet, stats, weekday, shop_id):
+    def write_stats(workbook, worksheet, stats, weekday, shop_id):
+        border = workbook.add_format({'border': 1})
         # write stats
         row = 3
         col = 13
         for tm in stats:
-            worksheet.write(row, col, tm.strftime('%H:%M'))
+            worksheet.write(row, col, tm.strftime('%H:%M'), border)
             # in facts workers
             in_fact = len(stats[tm])
-            worksheet.write(row, col+1, in_fact)
+            worksheet.write(row, col+1, in_fact, border)
             # predicted workers
             predicted = PeriodDemand.objects.filter(
                 dttm_forecast=datetime.datetime.combine(
@@ -183,31 +200,32 @@ def get_table(request):
                 else:
                     result_prediction += prediction.clients/5
             result_prediction = int(result_prediction)
-            worksheet.write(row, col+2, result_prediction)
-            worksheet.write(row, col+3, abs(in_fact - result_prediction))
+            worksheet.write(row, col+2, result_prediction, border)
+            worksheet.write(row, col+3, abs(in_fact - result_prediction), border)
             row += 1
 
         return row
 
-    def write_stats_summary(worksheet, stats, last_row):
+    def write_stats_summary(workbook, worksheet, stats, last_row):
+        border = workbook.add_format({'border': 1})
         row = last_row
         col = 13
 
         row += 1
-        worksheet.merge_range(row, col, row, col+2, 'утро 08:00')
-        worksheet.write(row, col+3, len(stats[datetime.time(hour=8)]))
+        worksheet.merge_range(row, col, row, col+2, 'утро 08:00', border)
+        worksheet.write(row, col+3, len(stats[datetime.time(hour=8)]), border)
 
         row += 1
-        worksheet.merge_range(row, col, row, col+2, 'утро 8:00 - 9:30')
-        worksheet.write(row, col+3, len(stats[datetime.time(hour=9, minute=30)]))
+        worksheet.merge_range(row, col, row, col+2, 'утро 8:00 - 9:30', border)
+        worksheet.write(row, col+3, len(stats[datetime.time(hour=9, minute=30)]), border)
 
         row += 1
-        worksheet.merge_range(row, col, row, col+2, 'утро 8:00 - 12:30')
-        worksheet.write(row, col+3, len(stats[datetime.time(hour=12, minute=30)]))
+        worksheet.merge_range(row, col, row, col+2, 'утро 8:00 - 12:30', border)
+        worksheet.write(row, col+3, len(stats[datetime.time(hour=12, minute=30)]), border)
 
         row += 1
-        worksheet.merge_range(row, col, row, col+2, 'вечер')
-        worksheet.write(row, col+3, len(stats[datetime.time(hour=21)]))
+        worksheet.merge_range(row, col, row, col+2, 'вечер', border)
+        worksheet.write(row, col+3, len(stats[datetime.time(hour=21)]), border)
 
         return row
 
@@ -229,16 +247,16 @@ def get_table(request):
     worksheet.set_column(0, 0, 23)
     worksheet.set_column(1, 1, 15)
 
-    write_global_header(worksheet, weekday)
-    write_workers_header(worksheet)
-    write_stats_header(worksheet)
+    write_global_header(workbook, worksheet, weekday)
+    write_workers_header(workbook, worksheet)
+    write_stats_header(workbook, worksheet)
 
     stats = create_stats_dictionary()
-    stats, last_users_row = write_users(worksheet, shop_id, stats, weekday)
+    stats, last_users_row = write_users(workbook, worksheet, shop_id, stats, weekday)
     last_users_row += 4
     write_overtime(worksheet, last_users_row)
-    last_stats_row = write_stats(worksheet, stats, weekday, shop_id)
-    write_stats_summary(worksheet, stats, last_stats_row)
+    last_stats_row = write_stats(workbook, worksheet, stats, weekday, shop_id)
+    write_stats_summary(workbook, worksheet, stats, last_stats_row)
 
     workbook.close()
     output.seek(0)
