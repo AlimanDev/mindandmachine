@@ -6,7 +6,7 @@ locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
 
 from django.http import HttpResponse
 from src.util.utils import JsonResponse
-from src.db.models import User, WorkerCashboxInfo, WorkerDay, PeriodDemand
+from src.db.models import User, WorkerCashboxInfo, WorkerDay, WorkerDayCashboxDetails, PeriodDemand
 from src.util.models_converter import UserConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import SelectCashiersForm, GetTable
@@ -133,27 +133,34 @@ def write_users(worksheet, shop_id, stats, weekday):
                 worker=user,
                 dt=weekday,
             )
-            if workerday.tm_work_start is None\
-                or workerday.tm_work_end is None:
-                continue
-            # user data
-            worksheet.write(row, 0, '{} {}'.format(user.last_name, user.first_name))
-            # rest time
-            rest_time = ['0:00', '0:15', '0:15', '0:45']
-            worksheet.write_row(row, 7, rest_time)
-            # start and end time
-            worksheet.write(row, 3, workerday.tm_work_start.strftime("%H:%M"))
-            worksheet.write(row, 5, workerday.tm_work_end.strftime("%H:%M"))
-            # update stats
-            for stat_time in local_stats:
-                if stat_time >= workerday.tm_work_start and (\
-                    stat_time < workerday.tm_work_end or\
-                    workerday.tm_work_end.hour == 0):
-                    local_stats[stat_time].append(workerday)
-            row += 1
-
         except WorkerDay.DoesNotExist:
             continue
+
+        if workerday.tm_work_start is None\
+            or workerday.tm_work_end is None:
+            continue
+        # user data
+        worksheet.write(row, 0, '{} {}'.format(user.last_name, user.first_name))
+        # specialization
+        try:
+            workerday_cashbox_details = WorkerDayCashboxDetails.objects.get(worker_day=workerday)
+            worksheet.write(row, 1, workerday_cashbox_details.on_cashbox.type.name)
+        except WorkerDayCashboxDetails.DoesNotExist:
+            pass
+
+        # rest time
+        rest_time = ['0:00', '0:15', '0:15', '0:45']
+        worksheet.write_row(row, 7, rest_time)
+        # start and end time
+        worksheet.write(row, 3, workerday.tm_work_start.strftime("%H:%M"))
+        worksheet.write(row, 5, workerday.tm_work_end.strftime("%H:%M"))
+        # update stats
+        for stat_time in local_stats:
+            if stat_time >= workerday.tm_work_start and (\
+                stat_time < workerday.tm_work_end or\
+                workerday.tm_work_end.hour == 0):
+                local_stats[stat_time].append(workerday)
+        row += 1
 
     return local_stats
 
@@ -223,6 +230,7 @@ def get_table(request):
     # workbook = xlsxwriter.Workbook('hello.xlsx')
     worksheet = workbook.add_worksheet()
     worksheet.set_column(0, 0, 23)
+    worksheet.set_column(1, 1, 15)
 
     write_global_header(worksheet, weekday)
     write_workers_header(worksheet)
