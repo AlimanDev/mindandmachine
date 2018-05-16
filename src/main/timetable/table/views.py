@@ -122,32 +122,26 @@ def create_stats_dictionary():
 def write_users(worksheet, shop_id, stats, weekday):
     # TODO: move status updation to other function
     local_stats = dict(stats)
-    users = User.objects.filter(
-        shop__id=shop_id,
-        shop__title="Кассиры",
-    )
     row = 3
-    for user in users:
-        try:
-            workerday = WorkerDay.objects.get(
-                worker=user,
-                dt=weekday,
-            )
-        except WorkerDay.DoesNotExist:
-            continue
-
+    workerdays = WorkerDay.objects\
+        .filter(
+            worker__shop__id=shop_id,
+            worker__shop__title="Кассиры",
+            dt=weekday
+        )\
+        .order_by('tm_work_start', 'worker__last_name')
+    for workerday in workerdays:
         if workerday.tm_work_start is None\
             or workerday.tm_work_end is None:
             continue
         # user data
-        worksheet.write(row, 0, '{} {}'.format(user.last_name, user.first_name))
+        worksheet.write(row, 0, '{} {}'.format(workerday.worker.last_name, workerday.worker.first_name))
         # specialization
         try:
             workerday_cashbox_details = WorkerDayCashboxDetails.objects.get(worker_day=workerday)
             worksheet.write(row, 1, workerday_cashbox_details.on_cashbox.type.name)
         except WorkerDayCashboxDetails.DoesNotExist:
             pass
-
         # rest time
         rest_time = ['0:00', '0:15', '0:15', '0:45']
         worksheet.write_row(row, 7, rest_time)
