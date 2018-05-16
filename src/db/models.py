@@ -119,6 +119,8 @@ class User(DjangoAbstractUser):
 
     auto_timetable = models.BooleanField(default=True)
 
+    # tabel_code = models.CharField(max_length='15', null=True, blank=True)
+
     objects = WorkerManager()
 
 
