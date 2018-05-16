@@ -74,144 +74,142 @@ def select_cashiers(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
-def write_global_header(worksheet, weekday):
-    worksheet.write('A1', 'Дата:')
-    worksheet.merge_range('B1:C1', weekday.strftime('%d/%m/%Y'))
-    worksheet.merge_range('F1:G1', 'День недели:')
-    worksheet.merge_range('H1:K1', weekday.strftime('%A'))
-    worksheet.merge_range('A2:K2', '')
-
-
-def write_workers_header(worksheet):
-    worksheet.write('A3', 'Фамилия')
-    worksheet.merge_range('B3:C3', 'Специализация')
-    worksheet.write('D3', 'Время прихода')
-    worksheet.write('F3', 'Время ухода')
-    worksheet.merge_range('H3:K3', 'Перерывы')
-
-
-def write_stats_header(worksheet):
-    worksheet.write('N3', 'Время')
-    worksheet.write('O3', 'Факт')
-    worksheet.write('P3', 'Должно быть')
-    worksheet.write('Q3', 'Разница')
-
-
-def create_stats_dictionary():
-    stats = {}
-    tm = datetime.datetime.combine(
-        datetime.date.today(),
-        datetime.time(hour=7)
-    )
-    tm_step = datetime.timedelta(
-        minutes=30
-    )
-    tm_end = datetime.datetime.combine(
-        datetime.date.today(),
-        datetime.time(hour=23, minute=59)
-    )
-    before_start = datetime.time(hour=6, minute=45)
-    stats[before_start] = []
-    while tm < tm_end:
-        tm += tm_step
-        stats[tm.time()] = []
-
-    return stats
-
-
-def write_users(worksheet, shop_id, stats, weekday):
-    # TODO: move status updation to other function
-    local_stats = dict(stats)
-    row = 3
-    workerdays = WorkerDay.objects\
-        .filter(
-            worker__shop__id=shop_id,
-            worker__shop__title="Кассиры",
-            dt=weekday
-        )\
-        .order_by('tm_work_start', 'worker__last_name')
-    for workerday in workerdays:
-        if workerday.tm_work_start is None\
-            or workerday.tm_work_end is None:
-            continue
-        # user data
-        worksheet.write(row, 0, '{} {}'.format(workerday.worker.last_name, workerday.worker.first_name))
-        # specialization
-        try:
-            workerday_cashbox_details = WorkerDayCashboxDetails.objects.get(worker_day=workerday)
-            worksheet.write(row, 1, workerday_cashbox_details.on_cashbox.type.name)
-        except WorkerDayCashboxDetails.DoesNotExist:
-            pass
-        # rest time
-        rest_time = ['0:00', '0:15', '0:15', '0:45']
-        worksheet.write_row(row, 7, rest_time)
-        # start and end time
-        worksheet.write(row, 3, workerday.tm_work_start.strftime("%H:%M"))
-        worksheet.write(row, 5, workerday.tm_work_end.strftime("%H:%M"))
-        # update stats
-        for stat_time in local_stats:
-            if stat_time >= workerday.tm_work_start and (\
-                stat_time < workerday.tm_work_end or\
-                workerday.tm_work_end.hour == 0):
-                local_stats[stat_time].append(workerday)
-        row += 1
-
-    return local_stats
-
-
-def write_stats(worksheet, stats, weekday, shop_id):
-    # write stats
-    row = 3
-    col = 13
-    for tm in stats:
-        worksheet.write(row, col, tm.strftime('%H:%M'))
-        # in facts workers
-        in_fact = len(stats[tm])
-        worksheet.write(row, col+1, in_fact)
-        # predicted workers
-        predicted = PeriodDemand.objects.filter(
-            dttm_forecast=datetime.datetime.combine(
-                weekday,
-                tm
-            ),
-            cashbox_type__shop__id=shop_id
-        )
-        result_prediction = 0
-        for prediction in predicted:
-            if prediction.cashbox_type.name == 'Линия':
-                result_prediction += prediction.clients/15
-            else:
-                result_prediction += prediction.clients/5
-        result_prediction = int(result_prediction)
-        worksheet.write(row, col+2, result_prediction)
-        worksheet.write(row, col+3, abs(in_fact - result_prediction))
-        row += 1
-
-    return row
-
-
-def write_stats_summary(worksheet, stats, last_row):
-    row = last_row
-    col = 13
-
-    row += 1
-    worksheet.merge_range(row, col, row, col+2, 'утро 08:00')
-    worksheet.write(row, col+3, len(stats[datetime.time(hour=8)]))
-
-    row += 1
-    worksheet.merge_range(row, col, row, col+2, 'утро 8:00 - 9:30')
-    worksheet.write(row, col+3, len(stats[datetime.time(hour=9, minute=30)]))
-
-    row += 1
-    worksheet.merge_range(row, col, row, col+2, 'утро 8:00 - 12:30')
-    worksheet.write(row, col+3, len(stats[datetime.time(hour=12, minute=30)]))
-
-    row += 1
-    worksheet.merge_range(row, col, row, col+2, 'вечер')
-    worksheet.write(row, col+3, len(stats[datetime.time(hour=21)]))
-
-
 def get_table(request):
+    def write_global_header(worksheet, weekday):
+        worksheet.write('A1', 'Дата:')
+        worksheet.merge_range('B1:C1', weekday.strftime('%d/%m/%Y'))
+        worksheet.merge_range('F1:G1', 'День недели:')
+        worksheet.merge_range('H1:K1', weekday.strftime('%A'))
+        worksheet.merge_range('A2:K2', '')
+
+    def write_workers_header(worksheet):
+        worksheet.write('A3', 'Фамилия')
+        worksheet.merge_range('B3:C3', 'Специализация')
+        worksheet.write('D3', 'Время прихода')
+        worksheet.write('F3', 'Время ухода')
+        worksheet.merge_range('H3:K3', 'Перерывы')
+
+    def write_stats_header(worksheet):
+        worksheet.write('N3', 'Время')
+        worksheet.write('O3', 'Факт')
+        worksheet.write('P3', 'Должно быть')
+        worksheet.write('Q3', 'Разница')
+
+    def create_stats_dictionary():
+        stats = {}
+        tm = datetime.datetime.combine(
+            datetime.date.today(),
+            datetime.time(hour=7)
+        )
+        tm_step = datetime.timedelta(
+            minutes=30
+        )
+        tm_end = datetime.datetime.combine(
+            datetime.date.today(),
+            datetime.time(hour=23, minute=59)
+        )
+        before_start = datetime.time(hour=6, minute=45)
+        stats[before_start] = []
+        while tm < tm_end:
+            tm += tm_step
+            stats[tm.time()] = []
+
+        return stats
+
+    def write_users(worksheet, shop_id, stats, weekday):
+        # TODO: move status updation to other function
+        local_stats = dict(stats)
+        row = 3
+        workerdays = WorkerDay.objects\
+            .filter(
+                worker__shop__id=shop_id,
+                worker__shop__title="Кассиры",
+                dt=weekday
+            )\
+            .order_by('tm_work_start', 'worker__last_name')
+        for workerday in workerdays:
+            if workerday.tm_work_start is None\
+                or workerday.tm_work_end is None:
+                continue
+            # user data
+            worksheet.write(
+                row,
+                0,
+                '{} {}'.format(workerday.worker.last_name, workerday.worker.first_name)
+            )
+            # specialization
+            try:
+                workerday_cashbox_details = WorkerDayCashboxDetails.objects.get(worker_day=workerday)
+                worksheet.write(row, 1, workerday_cashbox_details.on_cashbox.type.name)
+            except WorkerDayCashboxDetails.DoesNotExist:
+                pass
+            # rest time
+            rest_time = ['0:00', '0:15', '0:15', '0:45']
+            worksheet.write_row(row, 7, rest_time)
+            # start and end time
+            worksheet.write(row, 3, workerday.tm_work_start.strftime("%H:%M"))
+            worksheet.write(row, 5, workerday.tm_work_end.strftime("%H:%M"))
+            # update stats
+            for stat_time in local_stats:
+                if stat_time >= workerday.tm_work_start and (\
+                    stat_time < workerday.tm_work_end or\
+                    workerday.tm_work_end.hour == 0):
+                    local_stats[stat_time].append(workerday)
+            row += 1
+
+        return local_stats
+
+    def write_stats(worksheet, stats, weekday, shop_id):
+        # write stats
+        row = 3
+        col = 13
+        for tm in stats:
+            worksheet.write(row, col, tm.strftime('%H:%M'))
+            # in facts workers
+            in_fact = len(stats[tm])
+            worksheet.write(row, col+1, in_fact)
+            # predicted workers
+            predicted = PeriodDemand.objects.filter(
+                dttm_forecast=datetime.datetime.combine(
+                    weekday,
+                    tm
+                ),
+                cashbox_type__shop__id=shop_id
+            )
+            result_prediction = 0
+            for prediction in predicted:
+                if prediction.cashbox_type.name == 'Линия':
+                    result_prediction += prediction.clients/15
+                else:
+                    result_prediction += prediction.clients/5
+            result_prediction = int(result_prediction)
+            worksheet.write(row, col+2, result_prediction)
+            worksheet.write(row, col+3, abs(in_fact - result_prediction))
+            row += 1
+
+        return row
+
+    def write_stats_summary(worksheet, stats, last_row):
+        row = last_row
+        col = 13
+
+        row += 1
+        worksheet.merge_range(row, col, row, col+2, 'утро 08:00')
+        worksheet.write(row, col+3, len(stats[datetime.time(hour=8)]))
+
+        row += 1
+        worksheet.merge_range(row, col, row, col+2, 'утро 8:00 - 9:30')
+        worksheet.write(row, col+3, len(stats[datetime.time(hour=9, minute=30)]))
+
+        row += 1
+        worksheet.merge_range(row, col, row, col+2, 'утро 8:00 - 12:30')
+        worksheet.write(row, col+3, len(stats[datetime.time(hour=12, minute=30)]))
+
+        row += 1
+        worksheet.merge_range(row, col, row, col+2, 'вечер')
+        worksheet.write(row, col+3, len(stats[datetime.time(hour=21)]))
+
+
     output = io.BytesIO()
     form = GetTable(request.GET)
     if not form.is_valid():
@@ -238,7 +236,10 @@ def get_table(request):
     workbook.close()
     output.seek(0)
 
-    response = HttpResponse(output, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response = HttpResponse(
+        output,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
     response['Content-Disposition'] = 'attachment; filename="table.xlsx"'
 
     return response
