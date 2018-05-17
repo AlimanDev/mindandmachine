@@ -110,7 +110,7 @@ def create_timetable(request, form):
     )
 
     shop = Shop.objects.get(id=shop_id)
-    cashboxes = [CashboxTypeConverter.convert(x) for x in CashboxType.objects.filter(shop_id=shop_id)]
+    cashboxes = [CashboxTypeConverter.convert(x, True) for x in CashboxType.objects.filter(shop_id=shop_id)]
 
 
     users = User.objects.qos_filter_active(
@@ -141,7 +141,7 @@ def create_timetable(request, form):
         group_key=lambda_func,
     )
 
-    slots_periods_dict = {k: [] for k in slots_all.keys()}
+    slots_periods_dict = {k['id']: [] for k in cashboxes}
     for key, slots in slots_all.items():
         for slot in slots:
             # todo: temp fix for algo
@@ -448,7 +448,7 @@ def create_timetable(request, form):
         'algo_params': {
             'cost_weights': json.loads(shop.cost_weights),
             'method_params': json.loads(shop.method_params),
-            'breaks_triplets': json.loads(shop.breaks_triplets),
+            'breaks_triplets': json.loads(shop.break_triplets),
             'n_working_days_optimal': working_days, # Very kostil, very hot fix, we should take this param from proizvodstveny calendar'
         },
     }
