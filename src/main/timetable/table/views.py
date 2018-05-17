@@ -276,8 +276,8 @@ def get_table(request):
     worksheet = workbook.add_worksheet()
     # worksheet.set_column(0, 0, 23)
     # worksheet.set_column(1, 1, 15)
-    worksheet.set_column(11, 11, 3)
-    worksheet.set_column(12, 12, 3)
+    worksheet.set_column(11, 11, 1)
+    worksheet.set_column(12, 12, 1)
 
     write_global_header(workbook, worksheet, weekday)
     write_workers_header(workbook, worksheet)
