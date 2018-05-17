@@ -122,6 +122,7 @@ def create_timetable(request, form):
 
     if shop.full_interface:
         lambda_func = lambda x: x.cashbox_type_id
+        working_days = 22
     else:
         lambda_func = lambda x: periods[0].cashbox_type_id
 
@@ -133,6 +134,7 @@ def create_timetable(request, form):
             'prior_weight': 1,
             'prediction': 1,
         }]
+        working_days = 20
 
     slots_all = group_by(
         collection=Slot.objects.filter(shop_id=shop_id),
@@ -447,6 +449,7 @@ def create_timetable(request, form):
             'cost_weights': json.loads(shop.cost_weights),
             'method_params': json.loads(shop.method_params),
             'breaks_triplets': json.loads(shop.breaks_triplets),
+            'n_working_days_optimal': working_days, # Very kostil, very hot fix, we should take this param from proizvodstveny calendar'
         },
     }
 
@@ -493,6 +496,7 @@ def delete_timetable(request, form):
         worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
+        worker_day__worker__auto_timetable=True,
     ).filter(
         Q(worker_day__is_manual_tuning=False) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -502,6 +506,7 @@ def delete_timetable(request, form):
         worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
+        worker_day__worker__auto_timetable=True,
     ).filter(
         Q(worker_day__is_manual_tuning=False) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -511,6 +516,7 @@ def delete_timetable(request, form):
         worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
+        worker_day__worker__auto_timetable=True,
     ).filter(
         Q(worker_day__is_manual_tuning=False) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -520,7 +526,7 @@ def delete_timetable(request, form):
         worker_shop_id=shop_id,
         dt__month=dt_from.month,
         dt__year=dt_from.year,
-        is_manual_tuning=False,
+        worker__auto_timetable=True,
     ).filter(
         Q(is_manual_tuning=False) |
         Q(type=WorkerDay.Type.TYPE_EMPTY.value)
