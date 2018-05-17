@@ -6,9 +6,10 @@ from django.http import HttpResponse
 from functools import reduce
 from src.util.utils import JsonResponse
 from src.db.models import User, WorkerCashboxInfo, WorkerDay, WorkerDayCashboxDetails, PeriodDemand
-from src.util.models_converter import UserConverter
+from src.util.models_converter import UserConverter,  BaseConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import SelectCashiersForm, GetTable
+
 
 @api_method('GET', SelectCashiersForm)
 def select_cashiers(request, form):
@@ -306,6 +307,6 @@ def get_table(request):
         output,
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    response['Content-Disposition'] = 'attachment; filename="table.xlsx"'
+    response['Content-Disposition'] = 'attachment; filename="Tablet_{}.xlsx"'.format(BaseConverter.convert_date(weekday))
 
     return response
