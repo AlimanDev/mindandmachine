@@ -1,8 +1,6 @@
 import xlsxwriter
 import datetime
-import locale
 import io
-locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
 
 from django.http import HttpResponse
 from functools import reduce
@@ -75,12 +73,20 @@ def select_cashiers(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
-def mix_formats(workbook, *args):
-    return workbook.add_format(reduce(lambda x, y: {**x, **y} if y is not None else x, args[1:], {}))
-
-
 def get_table(request):
+    def mix_formats(workbook, *args):
+        return workbook.add_format(reduce(lambda x, y: {**x, **y} if y is not None else x, args[1:], {}))
+
     def write_global_header(workbook, worksheet, weekday):
+        weekday_translation = [
+            'Понедельник',
+            'Вторник',
+            'Среда',
+            'Четверг',
+            'Пятница',
+            'Суббота',
+            'Воскресенье'
+        ]
         right_border = workbook.add_format({'right': 2})
         bold_right_border = workbook.add_format({'right': 2, 'bold': True})
         border = workbook.add_format({'border': 2})
@@ -88,7 +94,7 @@ def get_table(request):
         worksheet.merge_range('B1:C1', weekday.strftime('%d/%m/%Y'), right_border)
         worksheet.write_blank(0, 4, '', right_border)
         worksheet.merge_range('F1:G1', 'День недели:')
-        worksheet.merge_range('H1:K1', weekday.strftime('%A'), bold_right_border)
+        worksheet.merge_range('H1:K1', weekday_translation[weekday.weekday()], bold_right_border)
         worksheet.merge_range('A2:K2', '', border)
 
     def write_workers_header(workbook, worksheet):
@@ -201,19 +207,23 @@ def get_table(request):
         # write stats
         row = 3
         col = 13
+        predictions = PeriodDemand.objects.filter(
+            dttm_forecast__range=(
+                datetime.datetime.combine(weekday, datetime.time()),
+                datetime.datetime.combine(weekday, datetime.time(hour=23, minute=59))
+            ),
+            cashbox_type__shop__id=shop_id
+        )
         for tm in stats:
             worksheet.write(row, col, tm.strftime('%H:%M'), border)
             # in facts workers
             in_fact = len(stats[tm])
             worksheet.write(row, col+1, in_fact, border)
             # predicted workers
-            predicted = PeriodDemand.objects.filter(
-                dttm_forecast=datetime.datetime.combine(
-                    weekday,
-                    tm
-                ),
-                cashbox_type__shop__id=shop_id
-            )
+            predicted = list(filter(
+                lambda prediction: prediction.dttm_forecast == datetime.datetime.combine(weekday, tm),
+                predictions
+            ))
             result_prediction = 0
             for prediction in predicted:
                 if prediction.cashbox_type.name == 'Линия':
