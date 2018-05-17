@@ -123,6 +123,10 @@ def get_cashiers_timetable(request, form):
     for dttm in range_u(dttm_from, dttm_to, dttm_step, False):
         dttm_converted = BaseConverter.convert_datetime(dttm)
 
+        if dttm == datetime(2018, 6, 3, 0, 0):
+            import pdb
+            pdb.set_trace()
+
         dt = dttm.date()
         tm = dttm.time()
 

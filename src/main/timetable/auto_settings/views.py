@@ -113,11 +113,6 @@ def create_timetable(request, form):
     cashboxes = [CashboxTypeConverter.convert(x) for x in CashboxType.objects.filter(shop_id=shop_id)]
 
 
-    slots_all = group_by(
-        collection=Slot.objects.filter(shop_id=shop_id),
-        group_key=lambda x: x.shop_id,
-    )
-
     users = User.objects.qos_filter_active(
         dt_from,
         dt_to,
@@ -125,223 +120,259 @@ def create_timetable(request, form):
         auto_timetable=True,
     )
 
-    extra_constr = {}
-    breaks_triplets = []
-    slots_periods_dict = 0
-
-    # todo: this params should be in db
     if shop.full_interface:
-        main_types = [
-            'Линия',
-            'Возврат',
-            'Доставка',
-            'Информация',
-        ]
-
-        special_types = [
-            'Главная касса',
-            'СЦ',
-            'ОРКК',
-            'Сверка',
-        ]
-        #
-        # cost_weights = {
-        #     'F': 1,
-        #     '40hours': 0,
-        #     'days': 2 * 10 ** 4,
-        #     '15rest': 0,  # 10**4,
-        #     '5d': 10 ** 4,
-        #     'hard': 0,
-        #     'soft': 0,
-        #     'overwork_fact_days': 3 * 10 ** 6,
-        #     'solitary_days': 5 * 10 ** 5,
-        #     'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
-        #     'zero_cashiers': 3,
-        #     'slots': 2 * 10 ** 7,
-        #     'too_much_days': 22,
-        #     'man_presence': shop.man_presence,
-        # }
-
-        cost_weights = {
-            'bills': 2,
-            '40hours': 0,
-            'days': 2 * 10 ** 2,
-            '15rest': 0,  # 10**4,
-            '5days': 0,
-            'hard_constraints': 0,
-            'soft_constraints': 0,
-            'overwork_fact_days': 3 * 10 ** 6,
-            'solitary_days': 5 * 10 ** 3,
-            'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
-            'zero_cashiers': 2,
-            'slots': 5 * 10 ** 7,
-            'man_presence': 0,
-        }
-
-        method_params = [
-            # {
-            #     'steps': 100,
-            #     'select_best': 8,
-            #     'changes': 10,
-            #     'variety': 8,
-            #     'days_change_prob': 0.05,
-            #     'periods_change_prob': 0.55,
-            #     'add_day_prob': 0.33,
-            #     'del_day_prob': 0.33
-            # },
-            # {
-            #     'steps': 2000,
-            #     'select_best': 8,
-            #     'changes': 30,
-            #     'variety': 8,
-            #     'days_change_prob': 0.33,
-            #     'periods_change_prob': 0.33,
-            #     'add_day_prob': 0.33,
-            #     'del_day_prob': 0.33
-            # },
-            {
-                'steps': 3000,
-                'select_best': 8,
-                'changes': 15,
-                'variety': 8,
-                'days_change_prob': 0.1,
-                'periods_change_prob': 0.55,
-                'add_day_prob': 0.33,
-                'del_day_prob': 0.33
-            },
-        ]
-
-        probs = {}
-        prior_weigths = {}
-        slots = {}
-        if shop.super_shop.code == '003':
-            breaks_triplets = [
-                [0, 6 * 60, [30]],
-                [6 * 60, 13 * 60, [30, 30]]
-            ]
-
-            probs = {
-                'Линия': 4,
-                'Возврат': 0.5,
-                'Доставка': 0.1,
-                'Информация': 0.1,
-                'Главная касса': 5,
-                'СЦ': 1,
-                'ОРКК': 3.5,
-                'Сверка': 10,
-            }
-
-            slots = {
-                'Главная касса': [(0, 36), (20, 56), (40, 76)],
-                'ОРКК': [(8, 44), (36, 72)],
-                'СЦ': [(8, 44), (36, 72)],
-                'Сверка': [(12, 48)],
-            }
-            prior_weigths ={
-                'Линия': 10,
-                'Возврат': 15,
-                'Доставка': 25,
-                'Информация': 30,
-                'Главная касса': 0,
-                'СЦ': 0,
-                'ОРКК': 0,
-                'Сверка': 0,
-            }
-        elif shop.super_shop.code == '004':
-            breaks_triplets = [
-                [0, 6 * 60, [30]],
-                [6 * 60, 13 * 60, [30, 45]]
-            ]
-
-            probs = {
-                'Линия': 3,
-                'Возврат': 0.5,
-                'Доставка': 0.1,
-                'Информация': 0.1,
-                'Главная касса': 3,
-            }
-
-            slots = {
-                'Главная касса': [(2, 38), (38, 74)],
-            }
-            prior_weigths = {
-                'Линия': 10,
-                'Возврат': 15,
-                'Доставка': 40,
-                'Информация': 10,
-                'Главная касса': 0, # 2000
-            }
-
-        for cashbox in cashboxes:
-            if cashbox['name'] in main_types:
-                cashbox['prediction'] = 1
-            elif cashbox['name'] in special_types:
-                cashbox['prediction'] = 2
-            else:
-                cashbox['prediction'] = 0
-            if cashbox['prediction']:
-                cashbox['prob'] = probs[cashbox['name']]
-            else:
-                cashbox['prob'] = 0
-            cashbox['slots'] = slots.get(cashbox['name'], [])
-            cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
+        lambda_func = lambda x: x.cashbox_type_id
     else:
+        lambda_func = lambda x: periods[0].cashbox_type_id
 
-        # cost_weights = {
-        #     'F': 1,
-        #     '40hours': 0,
-        #     'days': 2 * 10 ** 4,
-        #     '15rest': 0,  # 10**4,
-        #     '5d': 10 ** 4,
-        #     'hard': 0,
-        #     'soft': 0,
-        #     'overwork_fact_days': 3 * 10 ** 6,
-        #     'solitary_days': 5 * 10 ** 5,
-        #     'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
-        #     'zero_cashiers': 3,
-        #     'slots': 2 * 10 ** 7,
-        #     'too_much_days': 22,
-        #     'man_presence': shop.man_presence,
-        # }
-
-        cost_weights = {
-            'bills': 1,
-            '40hours': 0,
-            'days': 10 ** 2,
-            '15rest': 0,  # 10**4,
-            '5days': 0,
-            'hard_constraints': 0,
-            'soft_constraints': 0,
-            'overwork_fact_days': 3 * 10 ** 4,
-            'solitary_days': 5 * 10 ** 4,
-            'holidays': 10 ** 3,  # 3*10**5,# 2*10**6,
-            'zero_cashiers': 0,
-            'slots': 2 * 10 ** 2,
-            'man_presence': shop.man_presence * 10 ** 2,
-        }
-
-        method_params = [{
-            'steps': 200,
-            'select_best':8,
-            'changes': 5,
-            'variety': 8,
-            'days_change_prob': 0.5,
-            'periods_change_prob': 0.5,
-            'add_day_prob': 0.33,
-            'del_day_prob': 0.33,
+        cashboxes = [{
+            'id': periods[0].cashbox_type_id,
+            'speed_coef': 1,
+            'types_priority_weights': 1,
+            'prob': 1,
+            'prior_weight': 1,
+            'prediction': 1,
         }]
-        slots_periods_dict = []
 
-        for slot in slots_all[shop.id]:
+    slots_all = group_by(
+        collection=Slot.objects.filter(shop_id=shop_id),
+        group_key=lambda_func,
+    )
+
+    slots_periods_dict = {k: [] for k in slots_all.keys()}
+    for key, slots in slots_all.items():
+        for slot in slots:
             # todo: temp fix for algo
-
             int_s = time2int(slot.tm_start, shop.forecast_step_minutes.minute, start_h=6)
             int_e = time2int(slot.tm_end, shop.forecast_step_minutes.minute, start_h=6)
             if int_s < int_e:
-                slots_periods_dict.append([
+                slots_periods_dict[key].append([
                     time2int(slot.tm_start),
                     time2int(slot.tm_end),
                 ])
+
+    for cashbox in cashboxes:
+        cashbox['slots'] = slots_periods_dict[cashbox['id']]
+
+    extra_constr = {}
+
+    # todo: this params should be in db
+    if shop.full_interface:
+        pass
+        # main_types = [
+        #     'Линия',
+        #     'Возврат',
+        #     'Доставка',
+        #     'Информация',
+        # ]
+        #
+        # special_types = [
+        #     'Главная касса',
+        #     'СЦ',
+        #     'ОРКК',
+        #     'Сверка',
+        # ]
+        # #
+        # # cost_weights = {
+        # #     'F': 1,
+        # #     '40hours': 0,
+        # #     'days': 2 * 10 ** 4,
+        # #     '15rest': 0,  # 10**4,
+        # #     '5d': 10 ** 4,
+        # #     'hard': 0,
+        # #     'soft': 0,
+        # #     'overwork_fact_days': 3 * 10 ** 6,
+        # #     'solitary_days': 5 * 10 ** 5,
+        # #     'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
+        # #     'zero_cashiers': 3,
+        # #     'slots': 2 * 10 ** 7,
+        # #     'too_much_days': 22,
+        # #     'man_presence': shop.man_presence,
+        # # }
+        #
+        # cost_weights = {
+        #     'bills': 2,
+        #     '40hours': 0,
+        #     'days': 2 * 10 ** 2,
+        #     '15rest': 0,  # 10**4,
+        #     '5days': 0,
+        #     'hard_constraints': 0,
+        #     'soft_constraints': 0,
+        #     'overwork_fact_days': 3 * 10 ** 6,
+        #     'solitary_days': 5 * 10 ** 3,
+        #     'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
+        #     'zero_cashiers': 2,
+        #     'slots': 5 * 10 ** 7,
+        #     'man_presence': 0,
+        # }
+        #
+        # method_params = [
+        #     # {
+        #     #     'steps': 100,
+        #     #     'select_best': 8,
+        #     #     'changes': 10,
+        #     #     'variety': 8,
+        #     #     'days_change_prob': 0.05,
+        #     #     'periods_change_prob': 0.55,
+        #     #     'add_day_prob': 0.33,
+        #     #     'del_day_prob': 0.33
+        #     # },
+        #     # {
+        #     #     'steps': 2000,
+        #     #     'select_best': 8,
+        #     #     'changes': 30,
+        #     #     'variety': 8,
+        #     #     'days_change_prob': 0.33,
+        #     #     'periods_change_prob': 0.33,
+        #     #     'add_day_prob': 0.33,
+        #     #     'del_day_prob': 0.33
+        #     # },
+        #     {
+        #         'steps': 3000,
+        #         'select_best': 8,
+        #         'changes': 15,
+        #         'variety': 8,
+        #         'days_change_prob': 0.1,
+        #         'periods_change_prob': 0.55,
+        #         'add_day_prob': 0.33,
+        #         'del_day_prob': 0.33
+        #     },
+        # ]
+        #
+        # probs = {}
+        # prior_weigths = {}
+        # slots = {}
+        # if shop.super_shop.code == '003':
+        #     breaks_triplets = [
+        #         [0, 6 * 60, [30]],
+        #         [6 * 60, 13 * 60, [30, 30]]
+        #     ]
+        #
+        #     probs = {
+        #         'Линия': 4,
+        #         'Возврат': 0.5,
+        #         'Доставка': 0.1,
+        #         'Информация': 0.1,
+        #         'Главная касса': 5,
+        #         'СЦ': 1,
+        #         'ОРКК': 3.5,
+        #         'Сверка': 10,
+        #     }
+        #
+        #     slots = {
+        #         'Главная касса': [(0, 36), (20, 56), (40, 76)],
+        #         'ОРКК': [(8, 44), (36, 72)],
+        #         'СЦ': [(8, 44), (36, 72)],
+        #         'Сверка': [(12, 48)],
+        #     }
+        #     prior_weigths ={
+        #         'Линия': 10,
+        #         'Возврат': 15,
+        #         'Доставка': 25,
+        #         'Информация': 30,
+        #         'Главная касса': 0,
+        #         'СЦ': 0,
+        #         'ОРКК': 0,
+        #         'Сверка': 0,
+        #     }
+        # elif shop.super_shop.code == '004':
+        #     breaks_triplets = [
+        #         [0, 6 * 60, [30]],
+        #         [6 * 60, 13 * 60, [30, 45]]
+        #     ]
+        #
+        #     probs = {
+        #         'Линия': 3,
+        #         'Возврат': 0.5,
+        #         'Доставка': 0.1,
+        #         'Информация': 0.1,
+        #         'Главная касса': 3,
+        #     }
+        #
+        #     slots = {
+        #         'Главная касса': [(2, 38), (38, 74)],
+        #     }
+        #     prior_weigths = {
+        #         'Линия': 10,
+        #         'Возврат': 15,
+        #         'Доставка': 40,
+        #         'Информация': 10,
+        #         'Главная касса': 0, # 2000
+        #     }
+
+            # if cashbox['name'] in main_types:
+            #     cashbox['prediction'] = 1
+            # elif cashbox['name'] in special_types:
+            #     cashbox['prediction'] = 2
+            # else:
+            #     cashbox['prediction'] = 0
+            # if cashbox['prediction']:
+            #     cashbox['prob'] = probs[cashbox['name']]
+            # else:
+            #     cashbox['prob'] = 0
+            # cashbox['slots'] = slots.get(cashbox['name'], [])
+            # cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
+    else:
+        # slots_all = group_by(
+        #     collection=Slot.objects.filter(shop_id=shop_id),
+        #     group_key=lambda x: x.shop_id,
+        # )
+        #
+        # # cost_weights = {
+        # #     'F': 1,
+        # #     '40hours': 0,
+        # #     'days': 2 * 10 ** 4,
+        # #     '15rest': 0,  # 10**4,
+        # #     '5d': 10 ** 4,
+        # #     'hard': 0,
+        # #     'soft': 0,
+        # #     'overwork_fact_days': 3 * 10 ** 6,
+        # #     'solitary_days': 5 * 10 ** 5,
+        # #     'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
+        # #     'zero_cashiers': 3,
+        # #     'slots': 2 * 10 ** 7,
+        # #     'too_much_days': 22,
+        # #     'man_presence': shop.man_presence,
+        # # }
+        #
+        # cost_weights = {
+        #     'bills': 1,
+        #     '40hours': 0,
+        #     'days': 10 ** 2,
+        #     '15rest': 0,  # 10**4,
+        #     '5days': 0,
+        #     'hard_constraints': 0,
+        #     'soft_constraints': 0,
+        #     'overwork_fact_days': 3 * 10 ** 4,
+        #     'solitary_days': 5 * 10 ** 4,
+        #     'holidays': 10 ** 3,  # 3*10**5,# 2*10**6,
+        #     'zero_cashiers': 0,
+        #     'slots': 2 * 10 ** 2,
+        #     'man_presence': shop.man_presence * 10 ** 2,
+        # }
+        #
+        # method_params = [{
+        #     'steps': 200,
+        #     'select_best':8,
+        #     'changes': 5,
+        #     'variety': 8,
+        #     'days_change_prob': 0.5,
+        #     'periods_change_prob': 0.5,
+        #     'add_day_prob': 0.33,
+        #     'del_day_prob': 0.33,
+        # }]
+        # slots_periods_dict = []
+        #
+        # for slot in slots_all[shop.id]:
+        #     # todo: temp fix for algo
+        #
+        #     int_s = time2int(slot.tm_start, shop.forecast_step_minutes.minute, start_h=6)
+        #     int_e = time2int(slot.tm_end, shop.forecast_step_minutes.minute, start_h=6)
+        #     if int_s < int_e:
+        #         slots_periods_dict.append([
+        #             time2int(slot.tm_start),
+        #             time2int(slot.tm_end),
+        #         ])
 
         # todo: fix trash constraints slots
         dttm_temp = datetime(2018, 1, 1, 0, 0)
@@ -379,15 +410,15 @@ def create_timetable(request, form):
         #     slots_periods_dict = [(4, 40), (8, 44), (28, 64), (36, 72), (16, 52), (28, 64)]
 
         # print(slots_periods_dict)
-        cashboxes = [{
-            'id': periods[0].cashbox_type_id,
-            'slots': slots_periods_dict,
-            'speed_coef': 1,
-            'types_priority_weights': 1,
-            'prob': 1,
-            'prior_weight': 1,
-            'prediction': 1,
-        }]
+        # cashboxes = [{
+        #     'id': periods[0].cashbox_type_id,
+        #     'slots': slots_periods_dict,
+        #     'speed_coef': 1,
+        #     'types_priority_weights': 1,
+        #     'prob': 1,
+        #     'prior_weight': 1,
+        #     'prediction': 1,
+        # }]
 
         # for cashbox in cashboxes:
         #     cashbox['prediction'] = 1
@@ -413,9 +444,9 @@ def create_timetable(request, form):
             } for u in users
         ],
         'algo_params': {
-            'cost_weights': cost_weights,
-            'method_params': method_params,
-            'breaks_triplets': breaks_triplets,
+            'cost_weights': json.loads(shop.cost_weights),
+            'method_params': json.loads(shop.method_params),
+            'breaks_triplets': json.loads(shop.breaks_triplets),
         },
     }
 

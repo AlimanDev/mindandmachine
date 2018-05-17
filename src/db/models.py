@@ -49,6 +49,11 @@ class Shop(models.Model):
     forecast_step_minutes = models.TimeField(default=datetime.time(minute=15))
     man_presence = models.FloatField(default=0)
 
+    # json fields
+    method_params  = models.CharField(max_length=4096, default='[]')
+    cost_weights   = models.CharField(max_length=4096, default='{}')
+    break_triplets = models.CharField(max_length=1024, default='[]')
+
 
 class WorkerPosition(models.Model):
     '''

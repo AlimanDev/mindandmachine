@@ -224,10 +224,7 @@ def set_worker_day(request, form):
     try:
         day = WorkerDay.objects.get(worker_id=worker.id, dt=form['dt'])
 
-        day_change_args = utils.prepare_worker_day_change_create_args(request, form, day)
         utils.prepare_worker_day_update_obj(form, day)
-
-        WorkerDayChangeLog.objects.create(**day_change_args)
         day.save()
 
         action = 'update'
@@ -236,6 +233,9 @@ def set_worker_day(request, form):
         day = WorkerDay.objects.create(**day_args)
 
         action = 'create'
+
+    day_change_args = utils.prepare_worker_day_change_create_args(request, form, day)
+    WorkerDayChangeLog.objects.create(**day_change_args)
 
     new_cashbox_type_id = form.get('cashbox_type')
     cashbox_updated = False
