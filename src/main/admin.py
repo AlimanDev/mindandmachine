@@ -29,7 +29,9 @@ class QsUserAdmin(admin.ModelAdmin):
 
     @staticmethod
     def super_shop_title(instance: User):
-        return instance.shop.super_shop.title
+        if instance.shop and instance.shop.super_shop:
+            return instance.shop.super_shop.title
+        return 'без магазина'
 
     @staticmethod
     def position_title(instance: User):
