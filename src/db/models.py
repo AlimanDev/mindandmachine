@@ -175,8 +175,8 @@ class User(DjangoAbstractUser):
     )
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
 
-    comment = models.CharField(max_length=2048, default='')
-    extra_info = models.CharField(max_length=512, default='')
+    comment = models.CharField(max_length=2048, default='', blank=True)
+    extra_info = models.CharField(max_length=512, default='', blank=True)
 
     auto_timetable = models.BooleanField(default=True)
 
@@ -268,7 +268,7 @@ class Cashbox(models.Model):
 
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
     number = models.CharField(max_length=6)
-    bio = models.CharField(max_length=512, default='')
+    bio = models.CharField(max_length=512, default='', blank=True)
 
 
 class PeriodDemand(models.Model):
@@ -455,7 +455,7 @@ class WorkerDayChangeLog(models.Model):
     to_tm_break_start = models.TimeField(null=True, blank=True)
 
     changed_by = models.ForeignKey(User, on_delete=models.PROTECT)
-    comment = models.CharField(max_length=128, default='')
+    comment = models.CharField(max_length=128, default='', blank=True)
 
 
 class Notifications(models.Model):

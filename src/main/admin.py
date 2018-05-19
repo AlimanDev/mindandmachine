@@ -22,16 +22,18 @@ from src.db.models import (
 
 
 @admin.register(User)
-class QsUserAdmin(UserAdmin):
-    list_display = ('first_name', 'last_name', 'super_shop_title', 'cashbox_type_name', 'position', 'id')
+class QsUserAdmin(admin.ModelAdmin):
+    list_display = ('first_name', 'last_name', 'super_shop_title', 'cashbox_type_name', 'position_title', 'id')
+    search_fields = ('first_name', 'last_name', 'shop__super_shop__title', 'workercashboxinfo__cashbox_type__name', 'position__title', 'id')
     list_filter = ('shop', )
 
     @staticmethod
     def super_shop_title(instance: User):
-        if instance.shop:
-            return instance.shop.super_shop.title
-        else:
-            return None
+        return instance.shop.super_shop.title
+
+    @staticmethod
+    def position_title(instance: User):
+        return instance.position.title if instance.position else ''
 
     @staticmethod
     def cashbox_type_name(instance: User):
