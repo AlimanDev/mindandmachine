@@ -54,15 +54,15 @@ def get_cashier_timetable(request, form):
             'tm_work_end',
             'tm_break_start',
             'is_manual_tuning',
-            'cashbox_types__name',
+            'cashbox_types__id',
         )
 
         worker_days = []
         worker_days_mask = {}
         for wd in worker_days_db:
-            if (wd['id'] in worker_days_mask) and wd['cashbox_types__name']:
+            if (wd['id'] in worker_days_mask) and wd['cashbox_types__id']:
                 ind = worker_days_mask[wd['id']]
-                worker_days[ind].cashbox_types.append(wd['cashbox_types__name'])
+                worker_days[ind].cashbox_types_ids.append(wd['cashbox_types__id'])
             else:
                 worker_days_mask[wd['id']] = len(worker_days)
                 wd_m = WorkerDay(
@@ -76,7 +76,7 @@ def get_cashier_timetable(request, form):
                     tm_break_start=wd['tm_break_start'],
                     is_manual_tuning=wd['is_manual_tuning'],
                 )
-                wd_m.cashbox_types_names = [wd['cashbox_types__name']] if wd['cashbox_types__name'] else []
+                wd_m.cashbox_types_ids = [wd['cashbox_types__id']] if wd['cashbox_types__id'] else []
                 worker_days.append(
                     wd_m
                 )
