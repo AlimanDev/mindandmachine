@@ -233,13 +233,13 @@ def get_worker_day(request, form):
 
     details = []
     cashboxes_types = {}
-    for x in WorkerDayCashboxDetails.objects.select_related('on_cashbox', 'on_cashbox__type').filter(worker_day=wd):
+    for x in WorkerDayCashboxDetails.objects.select_related('on_cashbox', 'cashbox_type').filter(worker_day=wd):
         details.append({
             'tm_from': BaseConverter.convert_time(x.tm_from),
             'tm_to': BaseConverter.convert_time(x.tm_to),
-            'cashbox_type': x.on_cashbox.type_id
+            'cashbox_type': x.cashbox_type_id,
         })
-        cashboxes_types[x.on_cashbox.type_id] = CashboxTypeConverter.convert(x.on_cashbox.type)
+        cashboxes_types[x.cashbox_type_id] = CashboxTypeConverter.convert(x.cashbox_type)
 
     return JsonResponse.success({
         'day': WorkerDayConverter.convert(wd),
@@ -272,17 +272,28 @@ def set_worker_day(request, form):
 
         action = 'create'
 
-    new_cashbox_type_id = form.get('cashbox_type')
+    cashbox_type_id = form.get('cashbox_type')
     cashbox_updated = False
     try:
         if day.type == WorkerDay.Type.TYPE_WORKDAY.value:
-            if new_cashbox_type_id is not None:
-                new_cashbox = Cashbox.objects.filter(type_id=new_cashbox_type_id).first()
+            if cashbox_type_id is not None:
+                # new_cashbox = Cashbox.objects.filter(type_id=new_cashbox_type_id).first()
                 # check if could work
-                WorkerCashboxInfo.objects.get(worker_id=day.worker_id, cashbox_type_id=new_cashbox.type_id, is_active=True)
-                rows = WorkerDayCashboxDetails.objects.filter(worker_day=day).update(on_cashbox=new_cashbox, tm_from=day.tm_work_start, tm_to=day.tm_work_end)
+                # WorkerCashboxInfo.objects.get(worker_id=day.worker_id, cashbox_type_id=new_cashbox.type_id, is_active=True)
+
+                # todo: understand idea of updating -- seems must be deleted
+                rows = WorkerDayCashboxDetails.objects.filter(worker_day=day).update(
+                    cashbox_type_id=cashbox_type_id,
+                    tm_from=day.tm_work_start,
+                    tm_to=day.tm_work_end
+                )
                 if rows == 0:
-                    WorkerDayCashboxDetails.objects.create(on_cashbox=new_cashbox, worker_day=day, tm_from=day.tm_work_start, tm_to=day.tm_work_end)
+                    WorkerDayCashboxDetails.objects.create(
+                        cashbox_type_id=cashbox_type_id,
+                        worker_day=day,
+                        tm_from=day.tm_work_start,
+                        tm_to=day.tm_work_end
+                    )
                 cashbox_updated = True
         else:
             rows = WorkerDayCashboxDetails.objects.filter(worker_day=day).delete()
