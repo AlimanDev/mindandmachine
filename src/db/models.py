@@ -389,6 +389,7 @@ class WorkerDay(models.Model):
     tm_break_start = models.TimeField(null=True, blank=True)
 
     is_manual_tuning = models.BooleanField(default=False)
+    cashbox_types = models.ManyToManyField(CashboxType, through='WorkerDayCashboxDetails')
 
     @classmethod
     def is_type_with_tm_range(cls, t):
@@ -404,7 +405,8 @@ class WorkerDayCashboxDetails(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
-    on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT)
+    on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
+    cashbox_type =models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
     tm_from = models.TimeField()
     tm_to = models.TimeField()

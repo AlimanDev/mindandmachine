@@ -36,16 +36,51 @@ def get_cashier_timetable(request, form):
     to_dt = form['to_dt']
 
     response = {}
+    # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_id']:
-        worker_days = list(
-            WorkerDay.objects.filter(
-                worker_id=worker_id,
-                dt__gte=from_dt,
-                dt__lte=to_dt
-            ).order_by(
-                'dt'
-            )
+        worker_days_db = WorkerDay.objects.filter(
+            worker_id=worker_id,
+            dt__gte=from_dt,
+            dt__lte=to_dt
+        ).order_by(
+            'dt'
+        ).values(
+            'id',
+            'type',
+            'dttm_added',
+            'dt',
+            'worker_id',
+            'tm_work_start',
+            'tm_work_end',
+            'tm_break_start',
+            'is_manual_tuning',
+            'cashbox_types__name',
         )
+
+        worker_days = []
+        worker_days_mask = {}
+        for wd in worker_days_db:
+            if (wd['id'] in worker_days_mask) and wd['cashbox_types__name']:
+                ind = worker_days_mask[wd['id']]
+                worker_days[ind].cashbox_types.append(wd['cashbox_types__name'])
+            else:
+                worker_days_mask[wd['id']] = len(worker_days)
+                wd_m = WorkerDay(
+                    id=wd['id'],
+                    type=wd['type'],
+                    dttm_added=wd['dttm_added'],
+                    dt=wd['dt'],
+                    worker_id=wd['worker_id'],
+                    tm_work_start=wd['tm_work_start'],
+                    tm_work_end=wd['tm_work_end'],
+                    tm_break_start=wd['tm_break_start'],
+                    is_manual_tuning=wd['is_manual_tuning'],
+                )
+                wd_m.cashbox_types_names = [wd['cashbox_types__name']] if wd['cashbox_types__name'] else []
+                worker_days.append(
+                    wd_m
+                )
+        
         official_holidays = [
             x.date for x in OfficialHolidays.objects.filter(
                 date__gte=from_dt,

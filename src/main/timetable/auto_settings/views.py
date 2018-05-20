@@ -578,7 +578,7 @@ def set_timetable(request, form):
                 WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
                 WorkerDayCashboxDetails.objects.create(
                     worker_day=wd_obj,
-                    on_cashbox_id=wd['cashbox_type_id'],
+                    cashbox_type_id=wd['cashbox_type_id'],
                     tm_from=wd_obj.tm_work_start,
                     tm_to=wd_obj.tm_work_end
                 )
