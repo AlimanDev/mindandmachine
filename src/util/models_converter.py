@@ -103,7 +103,8 @@ class WorkerDayConverter(BaseConverter):
             'tm_work_start': __work_tm(obj.tm_work_start),
             'tm_work_end': __work_tm(obj.tm_work_end),
             'tm_break_start': __work_tm(obj.tm_break_start),
-            'is_manual_tuning': obj.is_manual_tuning
+            'is_manual_tuning': obj.is_manual_tuning,
+            'cashbox_types': obj.cashbox_types_ids if hasattr(obj, 'cashbox_types_ids') else [],
         }
 
 
