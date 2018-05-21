@@ -5,7 +5,7 @@ import io
 from django.http import HttpResponse
 from functools import reduce
 from src.util.utils import JsonResponse
-from src.db.models import User, WorkerCashboxInfo, WorkerDay, WorkerDayCashboxDetails, PeriodDemand
+from src.db.models import User, WorkerCashboxInfo, WorkerDay, WorkerDayCashboxDetails, PeriodDemand, CashboxType
 from src.util.models_converter import UserConverter,  BaseConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import SelectCashiersForm, GetTable
@@ -211,6 +211,11 @@ def get_table(request):
         return local_stats, row
 
     def write_stats(workbook, worksheet, stats, weekday, shop_id):
+        tm_st_ad2 = datetime.time(8, 30)
+        tm_st_ad4 = datetime.time(10)
+        tm_end_ad4 = datetime.time(21)
+        tm_end_ad2 = datetime.time(22, 30)
+
         border = workbook.add_format({'border': 1})
         # write stats
         row = 3
@@ -220,11 +225,14 @@ def get_table(request):
                 datetime.datetime.combine(weekday, datetime.time()),
                 datetime.datetime.combine(weekday, datetime.time(hour=23, minute=59))
             ),
-            cashbox_type__shop__id=shop_id
+            cashbox_type__shop_id=shop_id,
+            cashbox_type__do_forecast=CashboxType.FORECAST_HARD,
         )
 
         inds = list(stats)
         inds.sort()
+
+        ct_add = CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_LITE).count()
 
         for tm in inds:
             worksheet.write(row, col, tm.strftime('%H:%M'), border)
@@ -239,12 +247,17 @@ def get_table(request):
             result_prediction = 0
             for prediction in predicted:
                 if prediction.cashbox_type.name == 'Линия':
-                    result_prediction += prediction.clients/15
+                    result_prediction += prediction.clients / 14
                 else:
-                    result_prediction += prediction.clients/5
-            result_prediction = int(result_prediction)
+                    result_prediction += prediction.clients / 4
+            if tm_st_ad4 < tm < tm_end_ad4:
+                result_prediction += 4
+            elif tm_st_ad2 < tm < tm_end_ad2:
+                result_prediction += 2
+            result_prediction += ct_add
+            result_prediction = int(result_prediction + 0.5)
             worksheet.write(row, col+2, result_prediction, border)
-            worksheet.write(row, col+3, abs(in_fact - result_prediction), border)
+            worksheet.write(row, col+3, in_fact - result_prediction, border)
             row += 1
 
         return row
