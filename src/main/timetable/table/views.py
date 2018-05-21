@@ -99,14 +99,19 @@ def get_table(request):
         worksheet.merge_range('A2:K2', '', border)
 
     def write_workers_header(workbook, worksheet):
+        width_step = 8.43 * 0.8
         centred_bold_border = workbook.add_format({'border': 2, 'text_wrap': True, 'bold': True, 'align': 'center'})
         worksheet.write('A3', 'Фамилия', centred_bold_border)
+        worksheet.set_column('A:A', 135 / width_step)
         worksheet.merge_range('B3:C3', 'Специализация', centred_bold_border)
         worksheet.write('D3', 'Время прихода', centred_bold_border)
         worksheet.write_blank('E3', '', centred_bold_border)
         worksheet.write('F3', 'Время ухода', centred_bold_border)
         worksheet.write_blank('G3', '', centred_bold_border)
         worksheet.merge_range('H3:K3', 'Перерывы', centred_bold_border)
+        worksheet.set_column('H:K', 45 / width_step)
+
+        worksheet.set_column('N:Q', 45 / width_step)
 
     def write_stats_header(workbook, worksheet):
         border = workbook.add_format({'border': 1})
@@ -146,13 +151,15 @@ def get_table(request):
         local_stats = dict(stats)
         row = 3
         start_row = row
-        workerdays = WorkerDay.objects\
-            .filter(
-                worker__shop__id=shop_id,
-                worker__shop__title="Кассиры",
-                dt=weekday
-            )\
-            .order_by('tm_work_start', 'worker__last_name')
+        workerdays = WorkerDay.objects.select_related('worker').filter(
+            worker__shop__id=shop_id,
+            worker__shop__title="Кассиры",
+            dt=weekday,
+        ).order_by(
+            'tm_work_start',
+            'worker__last_name'
+        )
+
         for workerday in workerdays:
             bg_color_format = {'bg_color': 'gray'} if (row - start_row) % 5 == 0 else None
             if workerday.tm_work_start is None\
@@ -180,7 +187,7 @@ def get_table(request):
             except WorkerDayCashboxDetails.DoesNotExist:
                 pass
             # rest time
-            rest_time = ['0:00', '0:15', '0:15', '0:45']
+            rest_time = ['', '0:15', '0:15', '0:45']
             worksheet.write_row(row, 7, rest_time, mix_formats(workbook, cell_format, bg_color_format))
             worksheet.write_blank(row, 7+len(rest_time), '',
                 mix_formats(workbook, cell_format, bold_left_cell_format))
@@ -215,7 +222,11 @@ def get_table(request):
             ),
             cashbox_type__shop__id=shop_id
         )
-        for tm in stats:
+
+        inds = list(stats)
+        inds.sort()
+
+        for tm in inds:
             worksheet.write(row, col, tm.strftime('%H:%M'), border)
             # in facts workers
             in_fact = len(stats[tm])
