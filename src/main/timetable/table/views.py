@@ -120,24 +120,24 @@ def get_table(request):
         worksheet.write('P3', 'Должно быть', border)
         worksheet.write('Q3', 'Разница', border)
 
-    def create_stats_dictionary():
+    def create_stats_dictionary(tm_st, tm_end):
         stats = {}
         tm = datetime.datetime.combine(
             datetime.date.today(),
-            datetime.time(hour=7)
+            tm_st,
         )
         tm_step = datetime.timedelta(
             minutes=30
         )
         tm_end = datetime.datetime.combine(
             datetime.date.today(),
-            datetime.time(hour=23, minute=59)
+            tm_end,
         )
         before_start = datetime.time(hour=6, minute=45)
         stats[before_start] = []
         while tm < tm_end:
-            tm += tm_step
             stats[tm.time()] = []
+            tm += tm_step
 
         return stats
 
@@ -305,7 +305,10 @@ def get_table(request):
     write_workers_header(workbook, worksheet)
     write_stats_header(workbook, worksheet)
 
-    stats = create_stats_dictionary()
+    stats = create_stats_dictionary(
+        datetime.time(7),
+        datetime.time(23, 59, 59),
+    )
     stats, last_users_row = write_workers(workbook, worksheet, shop_id, stats, weekday)
     write_overtime(workbook, worksheet, last_users_row)
     last_stats_row = write_stats(workbook, worksheet, stats, weekday, shop_id)
