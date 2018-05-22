@@ -102,7 +102,7 @@ def get_table(request):
         width_step = 8.43 * 0.8
         centred_bold_border = workbook.add_format({'border': 2, 'text_wrap': True, 'bold': True, 'align': 'center'})
         worksheet.write('A3', 'Фамилия', centred_bold_border)
-        worksheet.set_column('A:A', 135 / width_step)
+        worksheet.set_column('A:A', 145 / width_step)
         worksheet.merge_range('B3:C3', 'Специализация', centred_bold_border)
         worksheet.write('D3', 'Время прихода', centred_bold_border)
         worksheet.write_blank('E3', '', centred_bold_border)

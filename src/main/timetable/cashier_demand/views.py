@@ -54,7 +54,7 @@ def get_cashiers_timetable(request, form):
 
     cashbox_type_ids = form['cashbox_type_ids']
     if len(cashbox_type_ids) > 0:
-        worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.on_cashbox.type_id in cashbox_type_ids]
+        worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.worker_day.cashbox_type_id in cashbox_type_ids]
 
     period_demand = list(
         PeriodDemand.objects.select_related(
@@ -304,7 +304,7 @@ def get_workers(request, form):
 
     cashbox_type_ids = form['cashbox_type_ids']
     if len(cashbox_type_ids) > 0:
-        worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.on_cashbox.type_id in cashbox_type_ids]
+        worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.worker_day.cashbox_type_id in cashbox_type_ids]
 
     users = {}
     for x in worker_day_cashbox_detail:
