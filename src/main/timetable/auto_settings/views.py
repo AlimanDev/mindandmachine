@@ -332,7 +332,7 @@ def create_timetable(request, form):
         }
 
         method_params = [{
-            'steps': 200,
+            'steps': 1000,
             'select_best':8,
             'changes': 5,
             'variety': 8,
@@ -351,7 +351,9 @@ def create_timetable(request, form):
             if int_s < int_e:
                 slots_periods_dict.append([
                     time2int(slot.tm_start),
+                    # slot.tm_start,
                     time2int(slot.tm_end),
+                    # slot.tm_end,
                 ])
 
         # todo: fix trash constraints slots
@@ -422,7 +424,7 @@ def create_timetable(request, form):
             'cost_weights': cost_weights,
             'method_params': method_params,
             'breaks_triplets': breaks_triplets,
-            'n_working_days_optimal': 20, # Very kostil, very hot fix, we should take this param from proizvodstveny calendar'
+            'n_working_days_optimal': 20, # Very kostil, very hot fix, we should take this param from proizvodstvenny calendar'
         },
     }
 
