@@ -180,8 +180,12 @@ def get_table(request):
             )
             # specialization
             try:
-                workerday_cashbox_details = WorkerDayCashboxDetails.objects.get(worker_day=workerday)
-                worksheet.write(row, 1, workerday_cashbox_details.on_cashbox.type.name,
+                workerday_cashbox_details = WorkerDayCashboxDetails.objects.select_related(
+                    'cashbox_type'
+                ).filter(
+                    worker_day=workerday
+                ).first()
+                worksheet.write(row, 1, workerday_cashbox_details.cashbox_type.name,
                     mix_formats(workbook, cell_format, bold_left_cell_format, bold_format, bg_color_format))
                 worksheet.write_blank(row, 2, '', mix_formats(workbook, cell_format, bold_right_cell_format, bold_format, bg_color_format))
             except WorkerDayCashboxDetails.DoesNotExist:

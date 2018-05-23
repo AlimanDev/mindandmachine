@@ -178,7 +178,8 @@ def load_users(manager_username, shop, data, year, month, column_cashbox_type, c
                         worker_day=wd,
                         on_cashbox=cashbox,
                         tm_from=tm_work_start,
-                        tm_to=tm_work_end
+                        tm_to=tm_work_end,
+                        cashbox_type_id=cashbox.type_id,
                     )
             except:
                 wd_create_error += 1
@@ -202,7 +203,7 @@ def run(path, super_shop):
         row_end=25,
         col_timetable_begin='c',
         col_timetable_end='ag',
-        parse_helper=ParseHelperD003
+        parse_helper=ParseHelperD003,
     )
 
     dttm_from = datetime(year=1971, month=1, day=1)

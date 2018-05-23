@@ -223,7 +223,8 @@ def add_work_days(shop, cashboxes, dttm_start, dttm_end, work_days, changes=0.2,
                     worker_day=wd,
                     on_cashbox=random.choice(cashboxes),
                     tm_from=tm_work_start,
-                    tm_to=tm_work_end
+                    tm_to=tm_work_end,
+                    cashbox_type_id=2,
                 )
 
             cr = random.random()

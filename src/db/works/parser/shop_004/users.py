@@ -256,7 +256,8 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
                     worker_day=wd,
                     on_cashbox=cashbox,
                     tm_from=tm_work_start,
-                    tm_to=tm_work_end
+                    tm_to=tm_work_end,
+                    cashbox_type_id=cashbox.type_id,
                 )
 
     print('cc', cashboxes_counter)
