@@ -82,7 +82,7 @@ class Shop(models.Model):
     demand_coef = models.FloatField(default=1)  # unknown trend for algorithm
 
     forecast_step_minutes = models.TimeField(default=datetime.time(minute=15))
-    man_presence = models.FloatField(default=0)
+    # man_presence = models.FloatField(default=0)
 
 
     # json fields
