@@ -6,8 +6,37 @@ from django.contrib.auth.models import (
 from . import utils
 import datetime
 
+__all__ = [
+    'SuperShop',
+    'Shop',
+    'WorkerPosition',
+    'User',
+    'CashboxType',
+    'UserWeekdaySlot',
+    'Slot',
+    'Cashbox',
+    'PeriodDemand',
+    'PeriodDemandChangeLog',
+    'WorkerCashboxInfo',
+    'WorkerConstraint',
+    'WorkerDay',
+    'WorkerDayCashboxDetails',
+    'WorkerDayChangeRequest',
+    'WorkerDayChangeLog',
+    'Notifications',
+    'OfficialHolidays',
+    'LevelType',
+    'WaitTimeInfo',
+    'Timetable',
+]
+
+
 # магазин
 class SuperShop(models.Model):
+    class Meta:
+        verbose_name = 'Магазин'
+        verbose_name_plural = 'Магазины'
+
     id = models.BigAutoField(primary_key=True)
 
     title = models.CharField(max_length=64, unique=True)
@@ -21,11 +50,17 @@ class SuperShop(models.Model):
     tm_start = models.TimeField(null=True, blank=True, default=datetime.time(hour=7))
     tm_end = models.TimeField(null=True, blank=True, default=datetime.time(hour=23, minute=59, second=59))
 
+    def __str__(self):
+        return '{}, {}, {}'.format(self.title, self.code, self.id)
+        # return f'{self.title}, {self.code}, {self.id}'
+
 
 # на самом деле это отдел
 class Shop(models.Model):
     class Meta(object):
         unique_together = (('super_shop', 'title'), ('super_shop', 'hidden_title'),)
+        verbose_name = 'Отдел'
+        verbose_name_plural = 'Отделы'
 
     id = models.BigAutoField(primary_key=True)
 
@@ -49,20 +84,35 @@ class Shop(models.Model):
     forecast_step_minutes = models.TimeField(default=datetime.time(minute=15))
     man_presence = models.FloatField(default=0)
 
+
     # json fields
     method_params  = models.CharField(max_length=4096, default='[]')
     cost_weights   = models.CharField(max_length=4096, default='{}')
     break_triplets = models.CharField(max_length=1024, default='[]')
 
+    def __str__(self):
+        return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)
+        # return f'{self.title}, {self.super_shop.title}, {self.id}'
+
+
 
 class WorkerPosition(models.Model):
-    '''
+    """
     Describe employee's department and position
-    '''
+    """
+
+    class Meta:
+        verbose_name = 'Должность сотрудника'
+        verbose_name_plural = 'Должности сотрудников'
+
     id = models.BigAutoField(primary_key=True)
 
     department = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)
     title = models.CharField(max_length=64)
+
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.title, self.department.title, self.department.super_shop.title, self.id)
+        # return f'{self.title}, {self.department.title}, {# self.department.super_shop.title}, {self.id}'
 
 
 class WorkerManager(UserManager):
@@ -75,6 +125,19 @@ class WorkerManager(UserManager):
 
 
 class User(DjangoAbstractUser):
+
+    class Meta:
+        verbose_name = 'Пользователь'
+        verbose_name_plural = 'Пользователи'
+
+    def __str__(self):
+        if self.shop and self.shop.super_shop:
+            ss_title = self.shop.super_shop.title
+        else:
+            ss_title = None
+        return '{}, {}, {}, {}'.format(self.first_name, self.last_name, ss_title, self.id)
+        # return f'{self.first_name}, {self.last_name}, {ss_title}, {self.id}'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -119,8 +182,8 @@ class User(DjangoAbstractUser):
     )
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
 
-    comment = models.CharField(max_length=2048, default='')
-    extra_info = models.CharField(max_length=512, default='')
+    comment = models.CharField(max_length=2048, default='', blank=True)
+    extra_info = models.CharField(max_length=512, default='', blank=True)
 
     auto_timetable = models.BooleanField(default=True)
 
@@ -130,6 +193,14 @@ class User(DjangoAbstractUser):
 
 
 class CashboxType(models.Model):
+    class Meta:
+        verbose_name = 'Тип кассы'
+        verbose_name_plural = 'Типы касс'
+
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.name, self.shop.title, self.shop.super_shop.title, self.id)
+        # return f'{self.name}, {self.shop.title}, {self.shop.super_shop.title}, {self.id}'
+
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
@@ -138,9 +209,9 @@ class CashboxType(models.Model):
     name = models.CharField(max_length=128)
     speed_coef = models.FloatField(default=1)
     is_stable = models.BooleanField(default=True)
-    FORECAST_HARD='H'
-    FORECAST_LITE='L'
-    FORECAST_NONE='N'
+    FORECAST_HARD = 'H'
+    FORECAST_LITE = 'L'
+    FORECAST_NONE = 'N'
     FORECAST_CHOICES = (
         (FORECAST_HARD, 'Hard',),
         (FORECAST_LITE, 'Lite',),
@@ -156,12 +227,29 @@ class CashboxType(models.Model):
 
 
 class UserWeekdaySlot(models.Model):
+    def __str__(self):
+        # return f'{self.worker.last_name}, {self.slot.name}, {self.weekday}, {self.id}'
+        return '{}, {}, {}, {}'.format(self.worker.last_name, self.slot.name, self.weekday, self.id)
+
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     slot = models.ForeignKey('Slot', on_delete=models.CASCADE)
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
 
 
 class Slot(models.Model):
+    class Meta:
+        # FIXME: уточнить значение
+        verbose_name = 'Слот'
+        verbose_name_plural = 'Слоты'
+
+    def __str__(self):
+        if self.cashbox_type:
+            cbt_name = self.cashbox_type.name
+        else:
+            cbt_name = None
+        return '{}, {}, {}, {}, {}'.format(self.name, cbt_name, self.shop.title, self.shop.super_shop.title, self.id)
+        # return f'{self.name}, {cbt_name}, {self.shop.title}, {self.shop.super_shop.title}, {self.id}'
+
     id = models.BigAutoField(primary_key=True)
 
     tm_start = models.TimeField(default=datetime.time(hour=7))
@@ -174,6 +262,14 @@ class Slot(models.Model):
 
 
 class Cashbox(models.Model):
+    class Meta:
+        verbose_name = 'Касса'
+        verbose_name_plural = 'Кассы'
+
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.type.name, self.type.shop.title, self.type.shop.super_shop.title, self.id)
+        # return f'{self.type.name}, {self.type.shop.title}, {self.type.shop.super_shop.title}, {self.id}'
+
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
@@ -181,7 +277,7 @@ class Cashbox(models.Model):
 
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
     number = models.CharField(max_length=6)
-    bio = models.CharField(max_length=512, default='')
+    bio = models.CharField(max_length=512, default='', blank=True)
 
 
 class PeriodDemand(models.Model):
@@ -189,6 +285,11 @@ class PeriodDemand(models.Model):
         LONG_FORECAST = 1  # 60 day
         SHORT_FORECAST = 2  # 10 day
         FACT = 3  # real
+
+    def __str__(self):
+        return '{}, {}, {}, {}, {}'.format(self.cashbox_type.name, self.cashbox_type.shop.title, self.dttm_forecast,
+                                           self.type, self.id)
+        # return f'{self.cashbox_type.name}, {self.cashbox_type.shop.title}, {self.dttm_forecast}, {self.type}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
 
@@ -204,6 +305,11 @@ class PeriodDemand(models.Model):
 
 
 class PeriodDemandChangeLog(models.Model):
+    # FIXME: как относится к PeriodDemand?
+    def __str__(self):
+        # return f'{self.cashbox_type.name}, {self.cashbox_type.shop.title}, {self.dttm_from}, {self.dttm_to}, {self.id}'
+        return '{}, {}, {}, {}, {}'.format(self.cashbox_type.name, self.cashbox_type.shop.title, self.dttm_from, self.dttm_to, self.id)
+
     id = models.BigAutoField(primary_key=True)
 
     dttm_from = models.DateTimeField()
@@ -216,6 +322,10 @@ class PeriodDemandChangeLog(models.Model):
 class WorkerCashboxInfo(models.Model):
     class Meta(object):
         unique_together = (('worker', 'cashbox_type'),)
+
+    def __str__(self):
+        return '{}, {}, {}'.format(self.worker.last_name, self.cashbox_type.name, self.id)
+        # return f'{self.worker.last_name}, {self.cashbox_type.name}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
 
@@ -233,6 +343,10 @@ class WorkerCashboxInfo(models.Model):
 class WorkerConstraint(models.Model):
     class Meta(object):
         unique_together = (('worker', 'weekday', 'tm'),)
+
+    def __str__(self):
+        return ''.format(self.worker.last_name, self.weekday, self.tm, self.id)
+        # return f'{self.worker.last_name}, {self.weekday}, {self.tm}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
 
@@ -258,6 +372,17 @@ class WorkerDay(models.Model):
         TYPE_DELETED = 10
         TYPE_EMPTY = 11
 
+    def __str__(self):
+        # return f'{self.worker.last_name}, {self.worker.shop.title}, {self.worker.shop.super_shop.title}, {self.dt},' \
+        #        f' {self.Type.get_name_by_value(self.type)}, {self.id}'
+        return '{}, {}, {}, {}, {}, {}'.format(self.worker.last_name, self.worker.shop.title, self.worker.shop.super_shop.title, self.dt, self.Type.get_name_by_value(self.type), self.id)
+
+    def __repr__(self):
+        return self.__str__()
+
+    # def __str__(self):
+    #     return 'Worker {} | Date {} | {}'.format(self.id, self.dt, self.Type.get_name_by_value(self.type))
+
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
@@ -273,12 +398,7 @@ class WorkerDay(models.Model):
     tm_break_start = models.TimeField(null=True, blank=True)
 
     is_manual_tuning = models.BooleanField(default=False)
-
-    def __repr__(self):
-        return self.__str__()
-
-    def __str__(self):
-        return 'Worker {} | Date {} | {}'.format(self.id, self.dt, self.Type.get_name_by_value(self.type))
+    cashbox_types = models.ManyToManyField(CashboxType, through='WorkerDayCashboxDetails')
 
     @classmethod
     def is_type_with_tm_range(cls, t):
@@ -286,10 +406,16 @@ class WorkerDay(models.Model):
 
 
 class WorkerDayCashboxDetails(models.Model):
+    def __str__(self):
+        # return f'{self.worker_day.worker.last_name}, {self.worker_day.worker.shop.super_shop.title},' \
+        #        f' {self.worker_day.dt}, {self.on_cashbox.type.name}, {self.id}'
+        return '{}, {}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.on_cashbox.type.name, self.id)
+
     id = models.BigAutoField(primary_key=True)
 
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
-    on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT)
+    on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
+    cashbox_type =models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
     tm_from = models.TimeField()
     tm_to = models.TimeField()
@@ -314,6 +440,11 @@ class WorkerDayChangeRequest(models.Model):
 
 
 class WorkerDayChangeLog(models.Model):
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.id)
+        # return f'{self.worker_day.worker.last_name}, {self.worker_day.worker.shop.super_shop.title},' \
+        #        f' {self.worker_day.dt}, {self.id}'
+
     id = models.BigAutoField(primary_key=True)
 
     dttm_changed = models.DateTimeField(auto_now_add=True)
@@ -335,7 +466,7 @@ class WorkerDayChangeLog(models.Model):
     to_tm_break_start = models.TimeField(null=True, blank=True)
 
     changed_by = models.ForeignKey(User, on_delete=models.PROTECT)
-    comment = models.CharField(max_length=128, default='')
+    comment = models.CharField(max_length=128, default='', blank=True)
 
 
 class Notifications(models.Model):
@@ -344,6 +475,11 @@ class Notifications(models.Model):
         CHANGE_REQUEST_NOTICE = 2
         CHANGE_TIMETABLE_NOTICE = 3
         CHANGE_WORKER_INFO = 4
+
+    def __str__(self):
+        return '{}, {}, {}, {}, {}'.format(self.to_worker.last_name, self.to_worker.shop.title, self.to_worker.shop.super_shop.title, self.dttm_added, self.id)
+        # return f'{self.to_worker.last_name}, {self.to_worker.shop.title}, {self.to_worker.shop.super_shop.title}, ' \
+        #        f'{self.dttm_added}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
 

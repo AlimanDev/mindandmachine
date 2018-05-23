@@ -207,6 +207,22 @@ def create_timetable(request, form):
         #     'slots': 5 * 10 ** 7,
         #     'man_presence': 0,
         # }
+
+        # cost_weights = {
+        #     'bills': 2,
+        #     '40hours': 0,
+        #     'days': 2 * 10 ** 2,
+        #     '15rest': 0,  # 10**4,
+        #     '5days': 0,
+        #     'hard_constraints': 0,
+        #     'soft_constraints': 0,
+        #     'overwork_fact_days': 3 * 10 ** 6,
+        #     'solitary_days': 5 * 10 ** 3,
+        #     'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
+        #     'zero_cashiers': 2,
+        #     'slots': 5 * 10 ** 7,
+        #     'man_presence': 0,
+        # }
         #
         # method_params = [
         #     # {
@@ -289,10 +305,15 @@ def create_timetable(request, form):
         #         'Доставка': 0.1,
         #         'Информация': 0.1,
         #         'Главная касса': 3,
+        #         'B2B': 3,
+        #         'Сервис Центр': 3,
         #     }
         #
         #     slots = {
         #         'Главная касса': [(2, 38), (38, 74)],
+        #         'B2B': [(4, 40), (8, 44), (16, 52), (24, 60), (37, 73)],
+        #         'Сервис Центр': [(12, 48), (36, 72)],
+        #         'Информация': [(3, 39), (20, 56), (37, 73)]
         #     }
         #     prior_weigths = {
         #         'Линия': 10,
@@ -300,20 +321,24 @@ def create_timetable(request, form):
         #         'Доставка': 40,
         #         'Информация': 10,
         #         'Главная касса': 0, # 2000
+        #
+        #         'B2B': 0,
+        #         'Сервис Центр': 0,
         #     }
-
-            # if cashbox['name'] in main_types:
-            #     cashbox['prediction'] = 1
-            # elif cashbox['name'] in special_types:
-            #     cashbox['prediction'] = 2
-            # else:
-            #     cashbox['prediction'] = 0
-            # if cashbox['prediction']:
-            #     cashbox['prob'] = probs[cashbox['name']]
-            # else:
-            #     cashbox['prob'] = 0
-            # cashbox['slots'] = slots.get(cashbox['name'], [])
-            # cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
+        #
+        # for cashbox in cashboxes:
+        #     if cashbox['name'] in main_types:
+        #         cashbox['prediction'] = 1
+        #     elif cashbox['name'] in special_types:
+        #         cashbox['prediction'] = 2
+        #     else:
+        #         cashbox['prediction'] = 0
+        #     if cashbox['prediction']:
+        #         cashbox['prob'] = probs[cashbox['name']]
+        #     else:
+        #         cashbox['prob'] = 0
+        #     cashbox['slots'] = slots.get(cashbox['name'], [])
+        #     cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
     else:
         # slots_all = group_by(
         #     collection=Slot.objects.filter(shop_id=shop_id),
@@ -467,6 +492,8 @@ def create_timetable(request, form):
             tt.status = Timetable.Status.ERROR.value
         tt.save()
     except:
+        tt.status = Timetable.Status.ERROR.value
+        tt.save()
         JsonResponse.internal_error('Error sending data to server')
     return JsonResponse.success()
 
@@ -597,7 +624,7 @@ def set_timetable(request, form):
                 WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
                 WorkerDayCashboxDetails.objects.create(
                     worker_day=wd_obj,
-                    on_cashbox_id=wd['cashbox_type_id'],
+                    cashbox_type_id=wd['cashbox_type_id'],
                     tm_from=wd_obj.tm_work_start,
                     tm_to=wd_obj.tm_work_end
                 )
