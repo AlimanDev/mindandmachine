@@ -159,7 +159,7 @@ def get_cashiers_timetable(request, form):
                 if datetime.combine(dt, day.tm_break_start) <= dttm < datetime.combine(dt, day.tm_break_start) + timedelta(hours=1):
                     continue
 
-            cashbox_type = cashbox[0].on_cashbox.type_id
+            cashbox_type = cashbox[0].cashbox_type_id
             cashbox_info = user['cashbox_info'].get(cashbox_type)
             mean_speed = cashbox_info.mean_speed if cashbox_info is not None else 0
 
