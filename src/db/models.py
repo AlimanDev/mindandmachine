@@ -593,3 +593,21 @@ class WorkerMonthStat(models.Model):
     work_days = models.SmallIntegerField()
     work_hours = models.FloatField()
 
+
+class CameraCashbox(models.Model):
+    name = models.CharField(max_length=64)
+    cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
+
+    def __str__(self):
+        return '{}, {}, {}'.format(self.name, self.cashbox, self.id)
+
+
+class CameraCashboxStat(models.Model):
+    camera_cashbox = models.ForeignKey(CameraCashbox, on_delete=models.PROTECT)
+    dttm = models.DateTimeField()
+    queue = models.FloatField()
+
+    def __str__(self):
+        return '{}, {}, {}'.format(self.dttm, self.camera_cashbox.name, self.id)
+
+
