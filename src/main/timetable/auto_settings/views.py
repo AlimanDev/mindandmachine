@@ -177,7 +177,7 @@ def create_timetable(request, form):
             'soft_constraints': 0,
             'overwork_fact_days': 3 * 10 ** 6,
             'solitary_days': 5 * 10 ** 3,
-            'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
+            'holidays': 10 ** 5,  # 3*10**5,# 2*10**6,
             'zero_cashiers': 2,
             'slots': 5 * 10 ** 7,
             'man_presence': 0,
@@ -205,7 +205,17 @@ def create_timetable(request, form):
             #     'del_day_prob': 0.33
             # },
             {
-                'steps': 3000,
+                'steps': 0,
+                'select_best': 64, # Certalty picking the best initialization # Further params doesn't matter at all
+                'changes': 15,
+                'variety': 8,
+                'days_change_prob': 0.1,
+                'periods_change_prob': 0.55,
+                'add_day_prob': 0.33,
+                'del_day_prob': 0.33
+            },
+            {
+                'steps': 2500,
                 'select_best': 8,
                 'changes': 15,
                 'variety': 8,
@@ -331,18 +341,31 @@ def create_timetable(request, form):
             'zero_cashiers': 5,
             'slots': 0,
             'man_presence': shop.man_presence * 10 ** 2,
+            'critical_slots': 2 * 10 ** 5,
         }
 
-        method_params = [{
-            'steps': 500,
-            'select_best':8,
+        method_params = [
+        {
+            'steps': 0,
+            'select_best':256, # Certalty picking the best initialization # Further params doesn't matter at all
             'changes': 5,
             'variety': 8,
             'days_change_prob': 0.15,
             'periods_change_prob': 0.85,
             'add_day_prob': 0.33,
             'del_day_prob': 0.33,
-        }]
+        },
+        {
+            'steps': 1000,
+            'select_best':16,
+            'changes': 5,
+            'variety': 16,
+            'days_change_prob': 0.15,
+            'periods_change_prob': 0.85,
+            'add_day_prob': 0.33,
+            'del_day_prob': 0.33,
+        },
+        ]
         slots_periods_dict = []
 
         for slot in slots_all[shop.id]:
@@ -353,7 +376,9 @@ def create_timetable(request, form):
             if int_s < int_e:
                 slots_periods_dict.append([
                     time2int(slot.tm_start),
+                    # slot.tm_start,
                     time2int(slot.tm_end),
+                    # slot.tm_end,
                 ])
 
         # todo: fix trash constraints slots
