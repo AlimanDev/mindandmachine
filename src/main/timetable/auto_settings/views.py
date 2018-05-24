@@ -337,7 +337,7 @@ def create_timetable(request, form):
             'soft_constraints': 0,
             'overwork_fact_days': 3 * 10 ** 3,
             'solitary_days': 5 * 10 ** 3,
-            'holidays': 10 ** 2,  # 3*10**5,# 2*10**6,
+            'holidays': 10, # 10 ** 2,  # 3*10**5,# 2*10**6,
             'zero_cashiers': 5,
             'slots': 0,
             'man_presence': shop.man_presence * 10 ** 2,
@@ -356,7 +356,7 @@ def create_timetable(request, form):
             'del_day_prob': 0.33,
         },
         {
-            'steps': 1000,
+            'steps': 200,
             'select_best':16,
             'changes': 5,
             'variety': 16,
