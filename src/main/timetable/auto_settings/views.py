@@ -205,7 +205,7 @@ def create_timetable(request, form):
             # },
             {
                 'steps': 0,
-                'select_best': 256, # Certalty picking the best initialization # Further params doesn't matter at all
+                'select_best': 128, # Certalty picking the best initialization # Further params doesn't matter at all
                 'changes': 15,
                 'variety': 8,
                 'days_change_prob': 0.1,
