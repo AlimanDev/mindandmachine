@@ -176,7 +176,7 @@ def create_timetable(request, form):
             'soft_constraints': 0,
             'overwork_fact_days': 3 * 10 ** 6,
             'solitary_days': 5 * 10 ** 3,
-            'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
+            'holidays': 10 ** 5,  # 3*10**5,# 2*10**6,
             'zero_cashiers': 2,
             'slots': 5 * 10 ** 7,
             'man_presence': 0,
@@ -339,9 +339,21 @@ def create_timetable(request, form):
             'zero_cashiers': 5,
             'slots': 0,
             'man_presence': shop.man_presence * 10 ** 2,
+            'critical_slots': 2 * 10 ** 4,
         }
 
-        method_params = [{
+        method_params = [
+        {
+            'steps': 0,
+            'select_best':1024, # Certalty picking the best initialization # Further params doesn't matter at all
+            'changes': 5,
+            'variety': 8,
+            'days_change_prob': 0.15,
+            'periods_change_prob': 0.85,
+            'add_day_prob': 0.33,
+            'del_day_prob': 0.33,
+        },
+        {
             'steps': 1000,
             'select_best':8,
             'changes': 5,
@@ -350,7 +362,8 @@ def create_timetable(request, form):
             'periods_change_prob': 0.85,
             'add_day_prob': 0.33,
             'del_day_prob': 0.33,
-        }]
+        },
+        ]
         slots_periods_dict = []
 
         for slot in slots_all[shop.id]:
