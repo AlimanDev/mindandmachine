@@ -181,6 +181,8 @@ def create_timetable(request, form):
             'zero_cashiers': 2,
             'slots': 5 * 10 ** 7,
             'man_presence': 0,
+            'critical_slots': 100,
+            'critical_periods': 5 * 10 ** 3,
         }
 
         method_params = [
@@ -215,7 +217,7 @@ def create_timetable(request, form):
                 'del_day_prob': 0.33
             },
             {
-                'steps': 2500,
+                'steps': 10, # 2500,
                 'select_best': 8,
                 'changes': 15,
                 'variety': 8,
@@ -342,6 +344,7 @@ def create_timetable(request, form):
             'slots': 0,
             'man_presence': shop.man_presence * 10 ** 2,
             'critical_slots': 2 * 10 ** 5,
+            'critical_periods': 0,
         }
 
         method_params = [
