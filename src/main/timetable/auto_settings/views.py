@@ -354,10 +354,10 @@ def create_timetable(request, form):
             'del_day_prob': 0.33,
         },
         {
-            'steps': 1000,
-            'select_best':8,
+            'steps': 500,
+            'select_best':16,
             'changes': 5,
-            'variety': 8,
+            'variety': 16,
             'days_change_prob': 0.15,
             'periods_change_prob': 0.85,
             'add_day_prob': 0.33,
