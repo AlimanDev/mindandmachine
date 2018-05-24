@@ -205,7 +205,6 @@ def create_timetable(request, form):
             #     'del_day_prob': 0.33
             # },
             {
-<<<<<<< HEAD
                 'steps': 0,
                 'select_best': 64, # Certalty picking the best initialization # Further params doesn't matter at all
                 'changes': 15,
@@ -217,9 +216,6 @@ def create_timetable(request, form):
             },
             {
                 'steps': 2500,
-=======
-                'steps': 3000,
->>>>>>> master
                 'select_best': 8,
                 'changes': 15,
                 'variety': 8,
@@ -348,16 +344,10 @@ def create_timetable(request, form):
             'critical_slots': 2 * 10 ** 5,
         }
 
-<<<<<<< HEAD
         method_params = [
         {
             'steps': 0,
             'select_best':256, # Certalty picking the best initialization # Further params doesn't matter at all
-=======
-        method_params = [{
-            'steps': 500,
-            'select_best':8,
->>>>>>> master
             'changes': 5,
             'variety': 8,
             'days_change_prob': 0.15,
@@ -464,11 +454,7 @@ def create_timetable(request, form):
             'cost_weights': cost_weights,
             'method_params': method_params,
             'breaks_triplets': breaks_triplets,
-<<<<<<< HEAD
-            'n_working_days_optimal': 20, # Very kostil, very hot fix, we should take this param from proizvodstvenny calendar'
-=======
             'n_working_days_optimal': working_days, # Very kostil, very hot fix, we should take this param from proizvodstveny calendar'
->>>>>>> master
         },
     }
 
