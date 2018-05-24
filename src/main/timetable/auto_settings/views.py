@@ -328,7 +328,7 @@ def create_timetable(request, form):
         # }
 
         cost_weights = {
-            'bills': 1,
+            'bills': 100,
             '40hours': 0,
             'days': 3 * 10 ** 4,
             '15rest': 0,  # 10**4,
