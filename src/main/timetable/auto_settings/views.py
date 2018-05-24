@@ -330,7 +330,7 @@ def create_timetable(request, form):
         cost_weights = {
             'bills': 100,
             '40hours': 0,
-            'days': 3 * 10 ** 4,
+            'days': 10 ** 5,
             '15rest': 0,  # 10**4,
             '5days': 0,
             'hard_constraints': 0,
@@ -356,7 +356,7 @@ def create_timetable(request, form):
             'del_day_prob': 0.33,
         },
         {
-            'steps': 0,
+            'steps': 200,
             'select_best':16,
             'changes': 5,
             'variety': 16,
