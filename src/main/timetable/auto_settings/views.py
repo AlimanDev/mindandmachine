@@ -339,7 +339,7 @@ def create_timetable(request, form):
             'zero_cashiers': 5,
             'slots': 0,
             'man_presence': shop.man_presence * 10 ** 2,
-            'critical_slots': 2 * 10 ** 4,
+            'critical_slots': 10 ** 6,
         }
 
         method_params = [
