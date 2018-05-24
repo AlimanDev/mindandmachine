@@ -95,7 +95,7 @@ def create_timetable(request, form):
 
     # todo: tooooo slow
     worker_cashbox_info = group_by(
-        collection=WorkerCashboxInfo.objects.select_related('cashbox_type').filter(cashbox_type__shop_id=shop_id),
+        collection=WorkerCashboxInfo.objects.select_related('cashbox_type').filter(cashbox_type__shop_id=shop_id, is_active=True),
         group_key=lambda x: x.worker_id
     )
 
@@ -125,13 +125,14 @@ def create_timetable(request, form):
         auto_timetable=True,
     )
 
-    cost_weights = {}
-    method_params = {}
     extra_constr = {}
     breaks_triplets = []
+    slots_periods_dict = 0
 
     # todo: this params should be in db
     if shop.full_interface:
+        working_days = 22
+
         main_types = [
             'Линия',
             'Возврат',
@@ -204,6 +205,7 @@ def create_timetable(request, form):
             #     'del_day_prob': 0.33
             # },
             {
+<<<<<<< HEAD
                 'steps': 0,
                 'select_best': 64, # Certalty picking the best initialization # Further params doesn't matter at all
                 'changes': 15,
@@ -215,6 +217,9 @@ def create_timetable(request, form):
             },
             {
                 'steps': 2500,
+=======
+                'steps': 3000,
+>>>>>>> master
                 'select_best': 8,
                 'changes': 15,
                 'variety': 8,
@@ -252,7 +257,7 @@ def create_timetable(request, form):
                 'Сверка': [(12, 48)],
             }
             prior_weigths ={
-                'Линия': 2.5,
+                'Линия': 10,
                 'Возврат': 15,
                 'Доставка': 25,
                 'Информация': 30,
@@ -279,11 +284,12 @@ def create_timetable(request, form):
 
             slots = {
                 'Главная касса': [(2, 38), (38, 74)],
-                'B2B': [(4, 40), (8, 44), (16, 52), (24, 60), (36, 73)],
+                'B2B': [(4, 40), (8, 44), (16, 52), (24, 60), (37, 73)],
                 'Сервис Центр': [(12, 48), (36, 72)],
+                'Информация': [(3, 39), (20, 56), (37, 73)]
             }
             prior_weigths = {
-                'Линия': 1,
+                'Линия': 10,
                 'Возврат': 15,
                 'Доставка': 40,
                 'Информация': 10,
@@ -307,7 +313,7 @@ def create_timetable(request, form):
             cashbox['slots'] = slots.get(cashbox['name'], [])
             cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
     else:
-
+        working_days = 20
         # cost_weights = {
         #     'F': 1,
         #     '40hours': 0,
@@ -342,10 +348,16 @@ def create_timetable(request, form):
             'critical_slots': 2 * 10 ** 5,
         }
 
+<<<<<<< HEAD
         method_params = [
         {
             'steps': 0,
             'select_best':256, # Certalty picking the best initialization # Further params doesn't matter at all
+=======
+        method_params = [{
+            'steps': 500,
+            'select_best':8,
+>>>>>>> master
             'changes': 5,
             'variety': 8,
             'days_change_prob': 0.15,
@@ -369,8 +381,8 @@ def create_timetable(request, form):
         for slot in slots_all[shop.id]:
             # todo: temp fix for algo
 
-            int_s = time2int(slot.tm_start)
-            int_e = time2int(slot.tm_end)
+            int_s = time2int(slot.tm_start, shop.forecast_step_minutes.minute, start_h=6)
+            int_e = time2int(slot.tm_end, shop.forecast_step_minutes.minute, start_h=6)
             if int_s < int_e:
                 slots_periods_dict.append([
                     time2int(slot.tm_start),
@@ -395,7 +407,7 @@ def create_timetable(request, form):
                 for day in range(7):
                     for tm in tms:
                         for slot in user_slots.get(day, []):
-                            if tm > slot.slot.tm_start and tm < slot.slot.tm_end:
+                            if tm >= slot.slot.tm_start and tm <= slot.slot.tm_end:
                                 break
                         else:
                             constr.append({
@@ -425,13 +437,18 @@ def create_timetable(request, form):
             'prediction': 1,
         }]
 
+        # for cashbox in cashboxes:
+        #     cashbox['prediction'] = 1
+
         # todo: send slots to server
 
     data = {
         'start_dt': BaseConverter.convert_date(tt.dt),
         'IP': settings.HOST_IP,
         'timetable_id': tt.id,
+        'forecast_step_minutes': shop.forecast_step_minutes.minute,
         'cashbox_types': cashboxes,
+        # 'slots': slots_periods_dict,
         'shop_type': shop.full_interface,
         'demand': [PeriodDemandConverter.convert(x) for x in periods],
         'cashiers': [
@@ -447,7 +464,11 @@ def create_timetable(request, form):
             'cost_weights': cost_weights,
             'method_params': method_params,
             'breaks_triplets': breaks_triplets,
+<<<<<<< HEAD
             'n_working_days_optimal': 20, # Very kostil, very hot fix, we should take this param from proizvodstvenny calendar'
+=======
+            'n_working_days_optimal': working_days, # Very kostil, very hot fix, we should take this param from proizvodstveny calendar'
+>>>>>>> master
         },
     }
 
@@ -465,6 +486,8 @@ def create_timetable(request, form):
             tt.status = Timetable.Status.ERROR.value
         tt.save()
     except:
+        tt.status = Timetable.Status.ERROR.value
+        tt.save()
         JsonResponse.internal_error('Error sending data to server')
     return JsonResponse.success()
 
@@ -494,6 +517,7 @@ def delete_timetable(request, form):
         worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
+        worker_day__worker__auto_timetable=True,
     ).filter(
         Q(worker_day__is_manual_tuning=False) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -503,6 +527,7 @@ def delete_timetable(request, form):
         worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
+        worker_day__worker__auto_timetable=True,
     ).filter(
         Q(worker_day__is_manual_tuning=False) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -512,6 +537,7 @@ def delete_timetable(request, form):
         worker_day__worker_shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
+        worker_day__worker__auto_timetable=True,
     ).filter(
         Q(worker_day__is_manual_tuning=False) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -521,7 +547,7 @@ def delete_timetable(request, form):
         worker_shop_id=shop_id,
         dt__month=dt_from.month,
         dt__year=dt_from.year,
-        is_manual_tuning=False,
+        worker__auto_timetable=True,
     ).filter(
         Q(is_manual_tuning=False) |
         Q(type=WorkerDay.Type.TYPE_EMPTY.value)
@@ -592,7 +618,7 @@ def set_timetable(request, form):
                 WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
                 WorkerDayCashboxDetails.objects.create(
                     worker_day=wd_obj,
-                    on_cashbox_id=wd['cashbox_type_id'],
+                    cashbox_type_id=wd['cashbox_type_id'],
                     tm_from=wd_obj.tm_work_start,
                     tm_to=wd_obj.tm_work_end
                 )
