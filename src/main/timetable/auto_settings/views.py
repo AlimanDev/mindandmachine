@@ -345,7 +345,7 @@ def create_timetable(request, form):
         method_params = [
         {
             'steps': 0,
-            'select_best':1024, # Certalty picking the best initialization # Further params doesn't matter at all
+            'select_best':256, # Certalty picking the best initialization # Further params doesn't matter at all
             'changes': 5,
             'variety': 8,
             'days_change_prob': 0.15,
