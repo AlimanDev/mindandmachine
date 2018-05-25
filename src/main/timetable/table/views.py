@@ -185,6 +185,9 @@ def get_table(request):
                 ).filter(
                     worker_day=workerday
                 ).first()
+                if workerday_cashbox_details is None:
+                    raise WorkerDayCashboxDetails.DoesNotExist
+                
                 worksheet.write(row, 1, workerday_cashbox_details.cashbox_type.name,
                     mix_formats(workbook, cell_format, bold_left_cell_format, bold_format, bg_color_format))
                 worksheet.write_blank(row, 2, '', mix_formats(workbook, cell_format, bold_right_cell_format, bold_format, bg_color_format))
