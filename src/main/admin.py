@@ -252,7 +252,7 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
 
     @staticmethod
     def on_cashbox_type(instance: WorkerDayCashboxDetails):
-        return instance.on_cashbox.type.name
+        return instance.cashbox_type.name
 
 
 @admin.register(WorkerDayChangeLog)
