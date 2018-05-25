@@ -155,7 +155,6 @@ def create_timetable(request, form):
 
     for cashbox in cashboxes:
         cashbox['slots'] = slots_periods_dict[cashbox['id']]
-
     extra_constr = {}
 
     # todo: this params should be in db
@@ -207,6 +206,150 @@ def create_timetable(request, form):
         #     'slots': 5 * 10 ** 7,
         #     'man_presence': 0,
         # }
+
+        # cost_weights = {
+            # 'bills': 2,
+            # '40hours': 0,
+            # 'days': 2 * 10 ** 2,
+            # '15rest': 0,  # 10**4,
+            # '5days': 0,
+            # 'hard_constraints': 0,
+            # 'soft_constraints': 0,
+            # 'overwork_fact_days': 3 * 10 ** 6,
+            # 'solitary_days': 5 * 10 ** 3,
+            # 'holidays': 10 ** 5,  # 3*10**5,# 2*10**6,
+            # 'zero_cashiers': 2,
+            # 'slots': 5 * 10 ** 7,
+            # 'man_presence': 0,
+        # }
+
+        # method_params = [
+            # {
+            #     'steps': 100,
+            #     'select_best': 8,
+            #     'changes': 10,
+            #     'variety': 8,
+            #     'days_change_prob': 0.05,
+            #     'periods_change_prob': 0.55,
+            #     'add_day_prob': 0.33,
+            #     'del_day_prob': 0.33
+            # },
+            # {
+            #     'steps': 2000,
+            #     'select_best': 8,
+            #     'changes': 30,
+            #     'variety': 8,
+            #     'days_change_prob': 0.33,
+            #     'periods_change_prob': 0.33,
+            #     'add_day_prob': 0.33,
+            #     'del_day_prob': 0.33
+            # },
+        #     {
+        #         'steps': 0,
+        #         'select_best': 64, # Certalty picking the best initialization # Further params doesn't matter at all
+        #         'changes': 15,
+        #         'variety': 8,
+        #         'days_change_prob': 0.1,
+        #         'periods_change_prob': 0.55,
+        #         'add_day_prob': 0.33,
+        #         'del_day_prob': 0.33
+        #     },
+        #     {
+        #         'steps': 2500,
+        #         'select_best': 8,
+        #         'changes': 15,
+        #         'variety': 8,
+        #         'days_change_prob': 0.1,
+        #         'periods_change_prob': 0.55,
+        #         'add_day_prob': 0.33,
+        #         'del_day_prob': 0.33
+        #     },
+        # ]
+        #
+        # probs = {}
+        # prior_weigths = {}
+        # slots = {}
+        # if shop.super_shop.code == '003':
+        #     breaks_triplets = [
+        #         [0, 6 * 60, [30]],
+        #         [6 * 60, 13 * 60, [30, 30]]
+        #     ]
+        #
+        #     probs = {
+        #         'Линия': 4,
+        #         'Возврат': 0.5,
+        #         'Доставка': 0.1,
+        #         'Информация': 0.1,
+        #         'Главная касса': 5,
+        #         'СЦ': 1,
+        #         'ОРКК': 3.5,
+        #         'Сверка': 10,
+        #     }
+        #
+        #     slots = {
+        #         'Главная касса': [(0, 36), (20, 56), (40, 76)],
+        #         'ОРКК': [(8, 44), (36, 72)],
+        #         'СЦ': [(8, 44), (36, 72)],
+        #         'Сверка': [(12, 48)],
+        #     }
+        #     prior_weigths ={
+        #         'Линия': 10,
+        #         'Возврат': 15,
+        #         'Доставка': 25,
+        #         'Информация': 30,
+        #         'Главная касса': 0,
+        #         'СЦ': 0,
+        #         'ОРКК': 0,
+        #         'Сверка': 0,
+        #     }
+        # elif shop.super_shop.code == '004':
+        #     breaks_triplets = [
+        #         [0, 6 * 60, [30]],
+        #         [6 * 60, 13 * 60, [30, 45]]
+        #     ]
+        #
+        #     probs = {
+        #         'Линия': 3,
+        #         'Возврат': 0.5,
+        #         'Доставка': 0.1,
+        #         'Информация': 0.1,
+        #         'Главная касса': 3,
+        #         'B2B': 3,
+        #         'Сервис Центр': 3,
+        #     }
+        #
+        #     slots = {
+        #         'Главная касса': [(2, 38), (38, 74)],
+        #         'B2B': [(4, 40), (8, 44), (16, 52), (24, 60), (37, 73)],
+        #         'Сервис Центр': [(12, 48), (36, 72)],
+        #         'Информация': [(3, 39), (20, 56), (37, 73)]
+        #     }
+        #     prior_weigths = {
+        #         'Линия': 10,
+        #         'Возврат': 15,
+        #         'Доставка': 40,
+        #         'Информация': 10,
+        #         'Главная касса': 0, # 2000
+        #
+        #         'B2B': 0,
+        #         'Сервис Центр': 0,
+        #     }
+        #
+        # for cashbox in cashboxes:
+        #     if cashbox['name'] in main_types:
+        #         cashbox['prediction'] = 1
+        #     elif cashbox['name'] in special_types:
+        #         cashbox['prediction'] = 2
+        #     else:
+        #         cashbox['prediction'] = 0
+        #     if cashbox['prediction']:
+        #         cashbox['prob'] = probs[cashbox['name']]
+        #     else:
+        #         cashbox['prob'] = 0
+        #     cashbox['slots'] = slots.get(cashbox['name'], [])
+        #     cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
+    else:
+        working_days = 20
 
         # cost_weights = {
         #     'bills': 2,
@@ -339,7 +482,6 @@ def create_timetable(request, form):
         #         cashbox['prob'] = 0
         #     cashbox['slots'] = slots.get(cashbox['name'], [])
         #     cashbox['prior_weight'] = prior_weigths.get(cashbox['name'], 1)
-    else:
         # slots_all = group_by(
         #     collection=Slot.objects.filter(shop_id=shop_id),
         #     group_key=lambda x: x.shop_id,
@@ -399,6 +541,61 @@ def create_timetable(request, form):
         #         slots_periods_dict.append([
         #             time2int(slot.tm_start),
         #             time2int(slot.tm_end),
+        #         ])
+
+
+        # cost_weights = {
+        #     'bills': 1,
+        #     '40hours': 0,
+        #     'days': 3 * 10 ** 4,
+        #     '15rest': 0,  # 10**4,
+        #     '5days': 0,
+        #     'hard_constraints': 0,
+        #     'soft_constraints': 0,
+        #     'overwork_fact_days': 3 * 10 ** 3,
+        #     'solitary_days': 5 * 10 ** 3,
+        #     'holidays': 10 ** 2,  # 3*10**5,# 2*10**6,
+        #     'zero_cashiers': 5,
+        #     'slots': 0,
+        #     'man_presence': shop.man_presence * 10 ** 2,
+        #     'critical_slots': 2 * 10 ** 5,
+        # }
+        #
+        # method_params = [
+        # {
+        #     'steps': 0,
+        #     'select_best':256, # Certalty picking the best initialization # Further params doesn't matter at all
+        #     'changes': 5,
+        #     'variety': 8,
+        #     'days_change_prob': 0.15,
+        #     'periods_change_prob': 0.85,
+        #     'add_day_prob': 0.33,
+        #     'del_day_prob': 0.33,
+        # },
+        # {
+        #     'steps': 1000,
+        #     'select_best':16,
+        #     'changes': 5,
+        #     'variety': 16,
+        #     'days_change_prob': 0.15,
+        #     'periods_change_prob': 0.85,
+        #     'add_day_prob': 0.33,
+        #     'del_day_prob': 0.33,
+        # },
+        # ]
+        # slots_periods_dict = []
+        #
+        # for slot in slots_all[shop.id]:
+        #     # todo: temp fix for algo
+        #
+        #     int_s = time2int(slot.tm_start, shop.forecast_step_minutes.minute, start_h=6)
+        #     int_e = time2int(slot.tm_end, shop.forecast_step_minutes.minute, start_h=6)
+        #     if int_s < int_e:
+        #         slots_periods_dict.append([
+        #             time2int(slot.tm_start),
+        #             # slot.tm_start,
+        #             time2int(slot.tm_end),
+        #             # slot.tm_end,
         #         ])
 
         # todo: fix trash constraints slots

@@ -11,24 +11,37 @@ def load_algo_info(apps, schema_editor):
 
     full_info = {
         'cost_weights': json.dumps({
-            'F': 1,
-            '40hours': 0,
-            'days': 2 * 10 ** 4,
-            '15rest': 0,  # 10**4,
             '5d': 10 ** 4,
             'hard': 0,
             'soft': 0,
-            'overwork_fact_days': 3 * 10 ** 6,
-            'solitary_days': 5 * 10 ** 5,
-            'holidays': 3 * 10 ** 5,  # 3*10**5,# 2*10**6,
-            'zero_cashiers': 3,
-            'slots': 2 * 10 ** 7,
             'too_much_days': 22,
+            'bills': 2,
+            '40hours': 0,
+            'days': 2 * 10 ** 2,
+            '15rest': 0,  # 10**4,
+            '5days': 0,
+            'hard_constraints': 0,
+            'soft_constraints': 0,
+            'overwork_fact_days': 3 * 10 ** 6,
+            'solitary_days': 5 * 10 ** 3,
+            'holidays': 10 ** 5,  # 3*10**5,# 2*10**6,
+            'zero_cashiers': 2,
+            'slots': 5 * 10 ** 7,
             'man_presence': 0,
         }),
         'method_params': json.dumps([
             {
-                'steps': 3000,
+                'steps': 0,
+                'select_best': 64, # Certalty picking the best initialization # Further params doesn't matter at all
+                'changes': 15,
+                'variety': 8,
+                'days_change_prob': 0.1,
+                'periods_change_prob': 0.55,
+                'add_day_prob': 0.33,
+                'del_day_prob': 0.33
+            },
+            {
+                'steps': 2500,
                 'select_best': 8,
                 'changes': 15,
                 'variety': 8,
@@ -42,24 +55,25 @@ def load_algo_info(apps, schema_editor):
 
     small_info = {
         'cost_weights': json.dumps({
-            'bills': 1,
+            'bills': 100,
             '40hours': 0,
-            'days': 10 ** 2,
+            'days': 3 * 10 ** 4,
             '15rest': 0,  # 10**4,
             '5days': 0,
             'hard_constraints': 0,
             'soft_constraints': 0,
-            'overwork_fact_days': 3 * 10 ** 4,
-            'solitary_days': 5 * 10 ** 4,
-            'holidays': 10 ** 3,  # 3*10**5,# 2*10**6,
-            'zero_cashiers': 0,
-            'slots': 2 * 10 ** 2,
+            'overwork_fact_days': 3 * 10 ** 3,
+            'solitary_days': 5 * 10 ** 3,
+            'holidays': 10 ** 2,  # 3*10**5,# 2*10**6,
+            'zero_cashiers': 5,
+            'slots': 0,
             'man_presence': 0,
+            'critical_slots': 2 * 10 ** 5
         }),
         'method_params': json.dumps([
             {
-                'steps': 500,
-                'select_best':8,
+                'steps': 0,
+                'select_best': 256,  # Certalty picking the best initialization # Further params doesn't matter at all
                 'changes': 5,
                 'variety': 8,
                 'days_change_prob': 0.15,
@@ -67,6 +81,16 @@ def load_algo_info(apps, schema_editor):
                 'add_day_prob': 0.33,
                 'del_day_prob': 0.33,
             },
+            {
+                'steps': 1000,
+                'select_best': 16,
+                'changes': 5,
+                'variety': 16,
+                'days_change_prob': 0.15,
+                'periods_change_prob': 0.85,
+                'add_day_prob': 0.33,
+                'del_day_prob': 0.33,
+            }
         ]),
     }
 

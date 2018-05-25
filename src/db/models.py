@@ -6,29 +6,29 @@ from django.contrib.auth.models import (
 from . import utils
 import datetime
 
-__all__ = [
-    'SuperShop',
-    'Shop',
-    'WorkerPosition',
-    'User',
-    'CashboxType',
-    'UserWeekdaySlot',
-    'Slot',
-    'Cashbox',
-    'PeriodDemand',
-    'PeriodDemandChangeLog',
-    'WorkerCashboxInfo',
-    'WorkerConstraint',
-    'WorkerDay',
-    'WorkerDayCashboxDetails',
-    'WorkerDayChangeRequest',
-    'WorkerDayChangeLog',
-    'Notifications',
-    'OfficialHolidays',
-    'LevelType',
-    'WaitTimeInfo',
-    'Timetable',
-]
+# __all__ = [
+#     'SuperShop',
+#     'Shop',
+#     'WorkerPosition',
+#     'User',
+#     'CashboxType',
+#     'UserWeekdaySlot',
+#     'Slot',
+#     'Cashbox',
+#     'PeriodDemand',
+#     'PeriodDemandChangeLog',
+#     'WorkerCashboxInfo',
+#     'WorkerConstraint',
+#     'WorkerDay',
+#     'WorkerDayCashboxDetails',
+#     'WorkerDayChangeRequest',
+#     'WorkerDayChangeLog',
+#     'Notifications',
+#     'OfficialHolidays',
+#     'LevelType',
+#     'WaitTimeInfo',
+#     'Timetable',
+# ]
 
 
 # магазин
@@ -545,3 +545,78 @@ class Timetable(models.Model):
     dttm_status_change = models.DateTimeField()
 
     task_id = models.CharField(max_length=256, null=True, blank=True)
+
+
+class ProductionMonth(models.Model):
+    """
+    производственный календарь
+
+    """
+
+    first_dt = models.DateField()
+    total_days = models.SmallIntegerField()
+    norm_work_days = models.SmallIntegerField()
+    norm_work_hours = models.FloatField()
+
+
+class ProductionDay(models.Model):
+    """
+    день из производственного календаря короч.
+
+    """
+
+    TYPE_WORK = 'W'
+    TYPE_HOLIDAY = 'H'
+    TYPE_SHORT_WORK = 'S'
+    TYPES = (
+        (TYPE_WORK, 'workday'),
+        (TYPE_HOLIDAY, 'holiday'),
+        (TYPE_SHORT_WORK, 'short workday')
+    )
+
+    dt = models.DateField()
+    type = models.CharField(max_length=1, choices=TYPES)
+
+    def __str__(self):
+        # return f'{self.worker.last_name}, {self.worker.shop.title}, {self.worker.shop.super_shop.title}, {self.dt},' \
+        #        f' {self.Type.get_name_by_value(self.type)}, {self.id}'
+
+        for tp in self.TYPES:
+            if tp[0] == self.type:
+                break
+        else:
+            tp = ('', 'bad_bal')
+
+        return '{}, {}, {}'.format(self.dt, self.tp[1], self.id)
+
+    def __repr__(self):
+        return self.__str__()
+    
+    # is it enough or work hours also needs?
+
+
+class WorkerMonthStat(models.Model):
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
+    month = models.ForeignKey(ProductionMonth, on_delete=models.PROTECT)
+
+    work_days = models.SmallIntegerField()
+    work_hours = models.FloatField()
+
+
+class CameraCashbox(models.Model):
+    name = models.CharField(max_length=64)
+    cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
+
+    def __str__(self):
+        return '{}, {}, {}'.format(self.name, self.cashbox, self.id)
+
+
+class CameraCashboxStat(models.Model):
+    camera_cashbox = models.ForeignKey(CameraCashbox, on_delete=models.PROTECT)
+    dttm = models.DateTimeField()
+    queue = models.FloatField()
+
+    def __str__(self):
+        return '{}, {}, {}'.format(self.dttm, self.camera_cashbox.name, self.id)
+
+

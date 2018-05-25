@@ -10,6 +10,10 @@ from src.util.models_converter import CashboxTypeConverter, UserConverter, Worke
 from src.util.utils import api_method, JsonResponse
 
 from src.db.works.printer.run import run as get_xlsx
+from dateutil.relativedelta import relativedelta
+
+import xlsxwriter
+import io
 
 
 @api_method('GET', GetCashiersTimetableForm)
@@ -385,3 +389,58 @@ def get_workers(request, form):
     # }
 
     return JsonResponse.success(response)
+
+
+@api_method('GET', GetCashiersTimetableForm)
+def get_timetable_xlsx(request, form):
+    shop = request.user.shop
+    dt_from = datetime(year=form['from_dt'].year, month=form['from_dt'].month, day=1)
+    dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    worksheet = workbook.add_worksheet()
+
+    row = 6
+    col = 5
+    for user in User.objects.qos_filter_active(dt_from, dt_to, shop=shop).order_by('id'):
+        worksheet.write(row, 0, "{} {} {}".format(user.last_name, user.first_name, user.middle_name))
+        for i in range(dt_to.day):
+            worksheet.write(row, col + 3 * i + 0, 'НД')
+            worksheet.write(row, col + 3 * i + 1, 'НД')
+
+        for wd in WorkerDay.objects.filter(worker=user, dt__gte=dt_from, dt__lte=dt_to).order_by('dt'):
+            if wd.type == WorkerDay.Type.TYPE_HOLIDAY.value:
+                cell_1 = 'В'
+                cell_2 = 'В'
+            elif wd.type == WorkerDay.Type.TYPE_VACATION.value:
+                cell_1 = 'ОТ'
+                cell_2 = 'ОТ'
+            else:
+                cell_1 = ''
+                cell_2 = ''
+
+            worksheet.write_string(row, col + 3 * int(wd.dt.day) - 3, cell_1)
+            worksheet.write_string(row, col + 3 * int(wd.dt.day) - 2, cell_2)
+
+        for wd in WorkerDayCashboxDetails.objects.select_related('cashbox_type', 'worker_day').filter(worker_day__worker=user, worker_day__dt__gte=dt_from, worker_day__dt__lte=dt_to).order_by('worker_day__dt'):
+            cell_1 = wd.worker_day.tm_work_start.strftime('%H:%M')
+            cell_2 = wd.worker_day.tm_work_end.strftime('%H:%M')
+            cell_3 = wd.cashbox_type.name
+
+            # print(row, col + 3 * int(wd.worker_day.dt.day) - 3, cell_3, wd.cashbox_type.name,  wd.worker_day.type, WorkerDay.Type.TYPE_WORKDAY, wd.worker_day.type == WorkerDay.Type.TYPE_WORKDAY)
+            worksheet.write_string(row, col + 3 * int(wd.worker_day.dt.day) - 3, cell_1)
+            worksheet.write_string(row, col + 3 * int(wd.worker_day.dt.day) - 2, cell_2)
+            worksheet.write_string(row, col + 3 * int(wd.worker_day.dt.day) - 1, cell_3)
+        row += 1
+
+    workbook.close()
+    output.seek(0)
+
+    response = HttpResponse(
+        output,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="Timetable_{}.xlsx"'.format(
+        BaseConverter.convert_date(dt_from))
+
+    return response
