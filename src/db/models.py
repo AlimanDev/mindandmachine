@@ -82,11 +82,18 @@ class Shop(models.Model):
     demand_coef = models.FloatField(default=1)  # unknown trend for algorithm
 
     forecast_step_minutes = models.TimeField(default=datetime.time(minute=15))
-    man_presence = models.FloatField(default=0)
+    # man_presence = models.FloatField(default=0)
+
+
+    # json fields
+    method_params  = models.CharField(max_length=4096, default='[]')
+    cost_weights   = models.CharField(max_length=4096, default='{}')
+    break_triplets = models.CharField(max_length=1024, default='[]')
 
     def __str__(self):
         return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)
         # return f'{self.title}, {self.super_shop.title}, {self.id}'
+
 
 
 class WorkerPosition(models.Model):
@@ -179,6 +186,8 @@ class User(DjangoAbstractUser):
     extra_info = models.CharField(max_length=512, default='', blank=True)
 
     auto_timetable = models.BooleanField(default=True)
+
+    tabel_code = models.CharField(max_length=15, null=True, blank=True)
 
     objects = WorkerManager()
 

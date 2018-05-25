@@ -1,6 +1,6 @@
 import datetime
 
-from src.db.models import User, WorkerDay, PeriodDemand, Timetable, Notifications
+from src.db.models import User, WorkerDay, PeriodDemand, Timetable, Notifications, CashboxType
 
 
 class BaseConverter(object):
@@ -146,15 +146,28 @@ class WorkerDayChangeLogConverter(BaseConverter):
             'to_tm_work_start': __work_tm(obj.to_tm_work_start, obj.to_type),
             'to_tm_work_end': __work_tm(obj.to_tm_work_end, obj.to_type),
             'to_tm_break_start': __work_tm(obj.to_tm_break_start, obj.to_type),
+            'comment': obj.comment,
 
-            'changed_by': obj.changed_by_id
+            'changed_by': obj.changed_by_id,
         }
 
 
 class CashboxTypeConverter(BaseConverter):
+    __FORECAST_TYPE = {
+        CashboxType.FORECAST_HARD: 1,
+        CashboxType.FORECAST_LITE: 2,
+        CashboxType.FORECAST_NONE: 0,
+    }
+
+    __FORECAST_TYPE_REVERSED = {v: k for k, v in __FORECAST_TYPE.items()}
+
     @classmethod
-    def convert(cls, obj):
-        return {
+    def convert_type(cls, obj_type):
+        return cls.__FORECAST_TYPE.get(obj_type, '')
+
+    @classmethod
+    def convert(cls, obj, add_algo_params=False):
+        vals = {
             'id': obj.id,
             'dttm_added': cls.convert_datetime(obj.dttm_added),
             'dttm_deleted': cls.convert_datetime(obj.dttm_deleted),
@@ -163,6 +176,13 @@ class CashboxTypeConverter(BaseConverter):
             'is_stable': obj.is_stable,
             'speed_coef': obj.speed_coef
         }
+        if add_algo_params:
+            vals.update({
+                'prob': obj.probability,
+                'prior_weight': obj.prior_weight,
+                'prediction': cls.convert_type(obj.do_forecast),
+            })
+        return vals
 
 
 class CashboxConverter(BaseConverter):
