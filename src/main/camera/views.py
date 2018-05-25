@@ -15,7 +15,7 @@ def set_queue(request):
             return JsonResponse.value_error(form.errors)
     except:
         return JsonResponse.value_error('not a dictionary')
-    if (not settings.QOS_CAMERA_KEY is None) and (form['key'] == settings.QOS_SET_TIMETABLE_KEY):
+    if (not settings.QOS_CAMERA_KEY is None) and (form['key'].value() != settings.QOS_CAMERA_KEY):
         return JsonResponse.internal_error('invalid key')
 
     bad_csf = []
