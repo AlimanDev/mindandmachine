@@ -9,7 +9,7 @@ import json
 @csrf_exempt
 @api_method('POST', None, auth_required=False)
 def set_queue(request):
-    form = CamRequestForm(json.loads(request.body))
+    form = CamRequestForm(json.loads(request.body.decode('utf-8')))
     try:
         if not form.is_valid():
             return JsonResponse.value_error(form.errors)
