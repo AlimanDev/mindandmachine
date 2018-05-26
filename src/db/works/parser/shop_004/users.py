@@ -144,7 +144,10 @@ class DataParseHelper(object):
             'серв': None,
             'декр': '_декрет',
             'мспок': None,
-            'бух': None
+            'бух': None,
+            'x': 'Линия',
+            '!': 'Линия',
+            'м': 'Линия',
         }
         mapping = {k.lower() if isinstance(k, str) else k: v for k, v in mapping.items()}
 
