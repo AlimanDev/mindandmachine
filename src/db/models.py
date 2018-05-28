@@ -88,6 +88,7 @@ class Shop(models.Model):
     # json fields
     method_params  = models.CharField(max_length=4096, default='[]')
     cost_weights   = models.CharField(max_length=4096, default='{}')
+    init_params    = models.CharField(max_length=2048, default='{"n_working_days_optimal": 20}')
     break_triplets = models.CharField(max_length=1024, default='[]')
 
     def __str__(self):
