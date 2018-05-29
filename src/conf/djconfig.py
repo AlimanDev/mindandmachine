@@ -109,5 +109,8 @@ STATIC_URL = '/_i/static/'
 
 MEDIA_URL = '/_i/media/'
 
+
+DATETIME_FORMAT = '%H:%M:%S %d.%m.%Y'
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

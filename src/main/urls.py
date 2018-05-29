@@ -8,7 +8,7 @@ from .auth import urls as auth_urls
 from .demand import urls as demand_urls
 from .queue import urls as queue_urls
 from .other import urls as other_urls
-
+from .camera import urls as camera_urls
 
 api_urlpatterns = [
     path('auth/', include(auth_urls)),
@@ -16,6 +16,7 @@ api_urlpatterns = [
     path('timetable/', include(timetable_urls)),
     path('demand/', include(demand_urls)),
     path('queue/', include(queue_urls)),
+    path('camera/', include(camera_urls)),
     path('other/', include(other_urls)),
 ]
 

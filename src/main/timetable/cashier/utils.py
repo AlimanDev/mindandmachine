@@ -7,7 +7,8 @@ def prepare_worker_day_create_args(form, worker):
         'worker_shop_id': worker.shop_id,
         'dt': form['dt'],
         'type': form['type'],
-        'is_manual_tuning': True
+        'is_manual_tuning': True,
+
     }
 
     if WorkerDay.is_type_with_tm_range(form['type']):

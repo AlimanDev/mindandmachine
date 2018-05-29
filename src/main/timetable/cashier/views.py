@@ -1,8 +1,19 @@
 from datetime import time, datetime, timedelta
 from django.db.models import Avg
 
-from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerDayChangeLog, OfficialHolidays, WorkerCashboxInfo, WorkerConstraint, CashboxType, WorkerDayCashboxDetails, \
-    Cashbox, WorkerPosition, Shop
+from src.db.models import (
+    User,
+    WorkerDay,
+    WorkerDayChangeRequest,
+    WorkerDayChangeLog, ProductionDay,
+    WorkerCashboxInfo,
+    WorkerConstraint,
+    CashboxType,
+    WorkerDayCashboxDetails,
+    Cashbox,
+    WorkerPosition,
+    Shop,
+)
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
@@ -82,11 +93,13 @@ def get_cashier_timetable(request, form):
                 )
         
         official_holidays = [
-            x.date for x in OfficialHolidays.objects.filter(
-                date__gte=from_dt,
-                date__lte=to_dt
+            x.dt for x in ProductionDay.objects.filter(
+                dt__gte=from_dt,
+                dt__lte=to_dt,
+                type=ProductionDay.TYPE_HOLIDAY,
             )
         ]
+
         worker_day_change_requests = group_by(
             WorkerDayChangeRequest.objects.filter(
                 worker_day_worker_id=worker_id,
@@ -259,10 +272,7 @@ def set_worker_day(request, form):
     try:
         day = WorkerDay.objects.get(worker_id=worker.id, dt=form['dt'])
 
-        day_change_args = utils.prepare_worker_day_change_create_args(request, form, day)
         utils.prepare_worker_day_update_obj(form, day)
-
-        WorkerDayChangeLog.objects.create(**day_change_args)
         day.save()
 
         action = 'update'
@@ -271,6 +281,9 @@ def set_worker_day(request, form):
         day = WorkerDay.objects.create(**day_args)
 
         action = 'create'
+
+    day_change_args = utils.prepare_worker_day_change_create_args(request, form, day)
+    WorkerDayChangeLog.objects.create(**day_change_args)
 
     cashbox_type_id = form.get('cashbox_type')
     cashbox_updated = False
