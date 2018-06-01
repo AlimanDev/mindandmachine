@@ -410,7 +410,7 @@ class WorkerDayCashboxDetails(models.Model):
     def __str__(self):
         # return f'{self.worker_day.worker.last_name}, {self.worker_day.worker.shop.super_shop.title},' \
         #        f' {self.worker_day.dt}, {self.on_cashbox.type.name}, {self.id}'
-        return '{}, {}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.on_cashbox.type.name, self.id)
+        return '{}, {}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.cashbox_type.name, self.id)
 
     id = models.BigAutoField(primary_key=True)
 
