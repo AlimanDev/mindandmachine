@@ -19,7 +19,17 @@ from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerD
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
 from src.util.collection import group_by, count, range_u
 
-from .forms import GetCashierTimetableForm, GetCashierInfoForm, SetWorkerDayForm, SetCashierInfoForm, GetWorkerDayForm, CreateCashierForm, DeleteCashierForm, GetCashiersListForm
+from .forms import (
+    GetCashierTimetableForm,
+    GetCashierInfoForm,
+    SetWorkerDayForm,
+    SetCashierInfoForm,
+    GetWorkerDayForm,
+    CreateCashierForm,
+    DeleteCashierForm,
+    GetCashiersListForm,
+    DublicateCashierTimetableForm
+)
 from . import utils
 
 
@@ -437,6 +447,43 @@ def create_cashier(request, form):
 
     return JsonResponse.success(UserConverter.convert(user))
 
+
+@api_method('POST', DublicateCashierTimetableForm)
+def dublicate_cashier_table(request, form):
+    main_worker = User.objects.get(id=form['main_worker_id'])
+    trainee_worker = User.objects.get(id=form['trainee_worker_id'])
+    dt_begin = form['dt_begin']
+    dt_end = form['dt_end']
+
+    main_worker_days = WorkerDay.objects.prefetch_related('day_details').filter(worker=main_worker)
+
+    for main_worker_day in main_worker_days:
+        trainee_worker_day = WorkerDay.objects.create(
+            worker=trainee_worker,
+            dt__gte=dt_begin,
+            dt__lte=dt_end,
+            type=main_worker_day.type,
+            woker_shop=main_worker_day.woker_shop,
+            tm_work_start=main_worker_day.tm_work_start,
+            tm_work_end=main_worker_day.tm_work_end,
+            tm_break_start=main_worker_day.tm_break_start,
+        )
+        WorkerDayCashboxDetails.objects.bulk_create([
+            WorkerDayCashboxDetails(
+                worker_day=trainee_worker_day,
+                on_cashbox=day_detail.on_cashbox,
+                cashbox_type=day_detail.cashbox_type,
+                tm_from=day_detail.tm_from,
+                tm_to=day_detail.tm_to
+            ) for day_detail in main_worker_day.day_details.all()
+        ])
+
+    response = {
+            'main_worker': main_worker,
+            'trainee_worker': trainee_worker,
+        }
+
+    return JsonResponse.success(response)
 
 @api_method('POST', DeleteCashierForm)
 def delete_cashier(request, form):

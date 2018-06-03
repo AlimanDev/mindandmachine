@@ -10,5 +10,7 @@ urlpatterns = [
     path('set_worker_day', views.set_worker_day),
 
     path('create_cashier', views.create_cashier),
+    path('dublicate_cashier', views.dublicate_cashier_table),
     path('delete_cashier', views.delete_cashier),
+    
 ]

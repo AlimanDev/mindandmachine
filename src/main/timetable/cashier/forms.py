@@ -4,9 +4,10 @@ from datetime import datetime, timedelta
 from django import forms
 from django.core.exceptions import ValidationError
 
-from src.db.models import WorkerDay
+from src.db.models import WorkerDay, User
 from src.util import forms as util_forms
 from src.util.models_converter import WorkerDayConverter, UserConverter, BaseConverter
+
 
 
 class GetCashiersListForm(forms.Form):
@@ -39,6 +40,34 @@ class GetCashierTimetableForm(forms.Form):
 
         if self.cleaned_data['from_dt'] > self.cleaned_data['to_dt']:
             raise forms.ValidationError('from_dt have to be less or equal than to_dt')
+
+
+class DublicateCashierTimetableForm(forms.Form):
+    main_worker_id = forms.IntegerField(required=True)
+    trainee_worker_id = forms.IntegerField(required=True)
+    dt_begin = util_forms.DateField()
+    dt_end = util_forms.DateField()
+
+    def clean_main_worker_id(self):
+        try:
+            main_worker = User.objects.get(id=self.cleaned_data['main_worker_id'])
+        except User.DoesNotExist:
+            raise forms.ValidationError('Invalid main_worker_id')
+        return main_worker.id
+
+    def clean_trainee_worker_id(self):
+        try:
+            trainee_worker = User.objects.get(id=self.cleaned_data['trainee_worker_id'])
+        except User.DoesNotExist:
+            raise forms.ValidationError('Invalid trainee_worker_id')
+        return trainee_worker.id
+
+    def clean(self):
+        if self.errors:
+            return
+
+        if self.cleaned_data['dt_begin'] > self.cleaned_data['dt_end']:
+            raise forms.ValidationError('dt_begin have to be less or equal than dt_end')
 
 
 class GetCashierInfoForm(forms.Form):
@@ -148,3 +177,4 @@ class CreateCashierForm(forms.Form):
 class DeleteCashierForm(forms.Form):
     user_id = forms.IntegerField()
     dt_fired = util_forms.DateField()
+

@@ -414,9 +414,9 @@ class WorkerDayCashboxDetails(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
+    worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT, related_name='day_details')
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
-    cashbox_type =models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
     tm_from = models.TimeField()
     tm_to = models.TimeField()
