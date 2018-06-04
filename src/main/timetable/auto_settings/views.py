@@ -149,10 +149,10 @@ def create_timetable(request, form):
             int_e = time2int(slot.tm_end, shop.forecast_step_minutes.minute, start_h=6)
             if int_s < int_e:
                 slots_periods_dict[key].append([
-                    # time2int(slot.tm_start),
-                    slot.tm_start,
-                    # time2int(slot.tm_end),
-                    slot.tm_end,
+                    time2int(slot.tm_start),
+                    # BaseConverter.convert_time(slot.tm_start),
+                    time2int(slot.tm_end),
+                    # BaseConverter.convert_time(slot.tm_end),
                 ])
 
     for cashbox in cashboxes:
