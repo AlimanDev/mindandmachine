@@ -4,11 +4,12 @@ import io
 
 from django.http import HttpResponse
 from functools import reduce
-from src.util.utils import JsonResponse
 from src.db.models import User, WorkerCashboxInfo, WorkerDay, WorkerDayCashboxDetails, PeriodDemand, CashboxType
 from src.util.models_converter import UserConverter,  BaseConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import SelectCashiersForm, GetTable
+from src.conf.djconfig import SHORT_TIME_FORMAT
+
 
 
 @api_method('GET', SelectCashiersForm)
@@ -199,11 +200,11 @@ def get_table(request):
             worksheet.write_blank(row, 7+len(rest_time), '',
                 mix_formats(workbook, cell_format, bold_left_cell_format))
             # start and end time
-            worksheet.write(row, 3, workerday.tm_work_start.strftime("%H:%M"),
+            worksheet.write(row, 3, workerday.tm_work_start.strftime(SHORT_TIME_FORMAT),
                 mix_formats(workbook, cell_format, bold_left_cell_format, bold_format, bg_color_format))
             worksheet.write_blank(row, 4, '',
                 mix_formats(workbook, cell_format, bold_left_cell_format, bg_color_format))
-            worksheet.write(row, 5, workerday.tm_work_end.strftime("%H:%M"),
+            worksheet.write(row, 5, workerday.tm_work_end.strftime(SHORT_TIME_FORMAT),
                 mix_formats(workbook, cell_format, bold_left_cell_format, bold_format, bg_color_format))
             worksheet.write_blank(row, 6, '',
                 mix_formats(workbook, cell_format, bold_left_cell_format, bold_right_cell_format, bg_color_format))
@@ -242,7 +243,7 @@ def get_table(request):
         ct_add = CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_LITE).count()
 
         for tm in inds:
-            worksheet.write(row, col, tm.strftime('%H:%M'), border)
+            worksheet.write(row, col, tm.strftime(SHORT_TIME_FORMAT), border)
             # in facts workers
             in_fact = len(stats[tm])
             worksheet.write(row, col+1, in_fact, border)
@@ -344,3 +345,7 @@ def get_table(request):
     response['Content-Disposition'] = 'attachment; filename="Tablet_{}.xlsx"'.format(BaseConverter.convert_date(weekday))
 
     return response
+
+
+def get_month_stat(req):
+    pass

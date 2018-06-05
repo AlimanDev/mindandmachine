@@ -7,6 +7,9 @@ from src.util import forms as util_forms
 from src.util.models_converter import UserConverter, WorkerDayConverter, BaseConverter
 
 
+from rest_framework import serializers
+
+
 class SelectCashiersForm(forms.Form):
     cashbox_types = util_forms.IntegersList()
     cashier_ids = util_forms.IntegersList()
@@ -82,3 +85,11 @@ class SelectCashiersForm(forms.Form):
 class GetTable(forms.Form):
     shop_id = forms.IntegerField()
     weekday = util_forms.DateField()
+
+
+class GetWorkerStat(forms.Form):
+    shop_id = forms.IntegerField(required=False)
+    dt = util_forms.DateField()
+
+    worker_ids = util_forms.IntegersList(required=False)
+
