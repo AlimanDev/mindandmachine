@@ -87,7 +87,7 @@ class GetTable(forms.Form):
     weekday = util_forms.DateField()
 
 
-class GetWorkerStat(forms.Form):
+class GetWorkerStatForm(forms.Form):
     shop_id = forms.IntegerField(required=False)
     dt = util_forms.DateField()
 
