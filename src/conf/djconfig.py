@@ -39,7 +39,7 @@ INSTALLED_APPS = [
     'src',
     'src.db',
     'src.main',
-    'rest_framework'
+    # 'rest_framework',
 ]
 
 MIDDLEWARE = [
