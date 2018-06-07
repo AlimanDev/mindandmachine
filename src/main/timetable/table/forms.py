@@ -7,9 +7,6 @@ from src.util import forms as util_forms
 from src.util.models_converter import UserConverter, WorkerDayConverter, BaseConverter
 
 
-from rest_framework import serializers
-
-
 class SelectCashiersForm(forms.Form):
     cashbox_types = util_forms.IntegersList()
     cashier_ids = util_forms.IntegersList()
