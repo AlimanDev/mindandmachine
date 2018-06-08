@@ -422,7 +422,7 @@ def get_month_stat(request, form):
     # add priv_info to user + convert types (fucking idiotism!)
 
     for u_it in range(len(usrs)):
-        dt_u_st = usrs[u_it].hired if usrs[u_it].dt_hired and (usrs[u_it].dt_hired > dt_start_year) else dt_start_year
+        dt_u_st = usrs[u_it].dt_hired if usrs[u_it].dt_hired and (usrs[u_it].dt_hired > dt_start_year) else dt_start_year
         total_norm_days, total_norm_hours = dts_start_count_dict[dt_u_st]
         diff_priv_days = priv_info[u_it]['count_workdays'] - total_norm_days
         diff_priv_hours = priv_info[u_it]['count_hours'] - total_norm_hours

@@ -60,15 +60,14 @@ def get_cashiers_timetable(request, form):
     if len(cashbox_type_ids) > 0:
         worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.cashbox_type_id in cashbox_type_ids]
 
-    period_demand = list(
-        PeriodDemand.objects.select_related(
-            'cashbox_type'
-        ).filter(
-            cashbox_type__shop_id=shop.id
-        )
+    period_demand = PeriodDemand.objects.filter(
+        cashbox_type__shop_id=shop.id,
+        dttm_forecast__gte=form['from_dt'],
+        dttm_forecast__lte=form['to_dt'] + timedelta(days=1),
     )
     if len(cashbox_type_ids) > 0:
-        period_demand = [x for x in period_demand if x.cashbox_type_id in cashbox_type_ids]
+        period_demand = period_demand.filter(cashbox_type_id__in=cashbox_type_ids)
+    period_demand = list(period_demand)
 
     tmp = {}
     for x in period_demand:
@@ -82,7 +81,6 @@ def get_cashiers_timetable(request, form):
 
         tmp[dt][tm].append(x)
     period_demand = tmp
-
     users = {}
     for x in worker_day_cashbox_detail:
         worker_id = x.worker_day.worker_id
@@ -120,7 +118,6 @@ def get_cashiers_timetable(request, form):
     today = datetime.now().date()
 
     users_amount_set = set()
-
     real_cashiers = []
     predict_cashier_needs = []
     fact_cashier_needs = []
@@ -213,7 +210,7 @@ def get_cashiers_timetable(request, form):
             'cashier_amount': len(users_amount_set),
             'FOT': None,
             'need_cashier_amount': need_cashier_amount_max,
-            'change_amount': 10
+            'change_amount': None,
         },
         'period_step': 30,
         'tt_periods': {
