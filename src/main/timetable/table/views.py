@@ -386,6 +386,7 @@ def get_month_stat(request, form):
     dt_end = datetime.date(dt_tmp.year, dt_tmp.month, 1) - datetime.timedelta(days=1)
 
     usrs = User.objects.qos_filter_active(dt_start, dt_end)
+    # todo: add code for permissions check (check stat of workers from another shops)
     worker_ids = form['worker_ids']
 
     if (worker_ids is None) or (len(worker_ids) == 0):
@@ -432,8 +433,8 @@ def get_month_stat(request, form):
         user_info_dict.update({
             'diff_priv_paid_days': diff_priv_days,
             'diff_priv_paid_hours': diff_priv_hours,
-            'total_paid_days': diff_priv_days + user_info_dict['diff_norm_days'],
-            'total_paid_hours': diff_priv_hours + user_info_dict['diff_norm_hours'],
+            'diff_total_paid_days': diff_priv_days + user_info_dict['diff_norm_days'],
+            'diff_total_paid_hours': diff_priv_hours + user_info_dict['diff_norm_hours'],
         })
 
         for day_type in WorkerDay.Type:
