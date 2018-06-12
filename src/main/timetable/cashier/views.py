@@ -1,4 +1,5 @@
 from datetime import time, datetime, timedelta
+from django.db import transaction
 from django.db.models import Avg
 
 from src.db.models import (
@@ -448,42 +449,147 @@ def create_cashier(request, form):
     return JsonResponse.success(UserConverter.convert(user))
 
 
-@api_method('POST', DublicateCashierTimetableForm)
+@api_method('GET', DublicateCashierTimetableForm)
 def dublicate_cashier_table(request, form):
     main_worker = User.objects.get(id=form['main_worker_id'])
     trainee_worker = User.objects.get(id=form['trainee_worker_id'])
     dt_begin = form['dt_begin']
     dt_end = form['dt_end']
 
-    main_worker_days = WorkerDay.objects.prefetch_related('day_details').filter(worker=main_worker)
+    main_worker_days = WorkerDay.objects.prefetch_related('day_details').filter(
+                                                                worker=main_worker,
+                                                                dt__gte=dt_begin,
+                                                                dt__lte=dt_end
+                                                            )
+    main_worker_days_details = WorkerDayCashboxDetails.objects.filter(worker_day__in=main_worker_days)
 
-    for main_worker_day in main_worker_days:
-        trainee_worker_day = WorkerDay.objects.create(
-            worker=trainee_worker,
-            dt__gte=dt_begin,
-            dt__lte=dt_end,
-            type=main_worker_day.type,
-            woker_shop=main_worker_day.woker_shop,
-            tm_work_start=main_worker_day.tm_work_start,
-            tm_work_end=main_worker_day.tm_work_end,
-            tm_break_start=main_worker_day.tm_break_start,
-        )
+    trainee_worker_days = WorkerDay.objects.prefetch_related('day_details').filter(
+                                                                worker=trainee_worker,
+                                                                dt__gte=dt_begin,
+                                                                dt__lte=dt_end
+                                                              )
+
+    # проверка на наличие дней у стажера
+    trainee_blank_days = [] # дни, у которых не назначен график по заданному интервалу
+    log = {}
+
+    if trainee_worker_days:
+        for main_worker_day in main_worker_days:
+            if main_worker_day.dt in trainee_worker_days.values_list('dt', flat=True): # создаем change log для изменяемых дней
+                log[main_worker_day.dt] = trainee_worker_days.get(dt=main_worker_day.dt)
+
+                # обновляем дни и удаляем details для этих дней
+                for trainee_worker_day in trainee_worker_days:  
+                    trainee_worker_day.type = main_worker_day.type
+                    trainee_worker_day.worker_shop = main_worker_day.worker_shop
+                    trainee_worker_day.tm_work_start = main_worker_day.tm_work_start
+                    trainee_worker_day.tm_work_end = main_worker_day.tm_work_end
+                    trainee_worker_day.tm_break_start = main_worker_day.tm_break_start
+                    trainee_worker_day.save()
+                    WorkerDayCashboxDetails.objects.filter(worker_day=trainee_worker_day).delete()
+
+                # создаем day details для обновленных дней
+                WorkerDayCashboxDetails.objects.bulk_create([
+                    WorkerDayCashboxDetails(
+                        worker_day=WorkerDay.objects.get(
+                                worker=trainee_worker,
+                                dt=day_detail.worker_day.dt,
+                                type=day_detail.worker_day.type,
+                                worker_shop=day_detail.worker_day.worker_shop,
+                                tm_work_start=day_detail.worker_day.tm_work_start,
+                                tm_work_end=day_detail.worker_day.tm_work_end,
+                                tm_break_start=day_detail.worker_day.tm_break_start
+                            ),
+                        on_cashbox=day_detail.on_cashbox,
+                        cashbox_type=day_detail.cashbox_type,
+                        tm_from=day_detail.tm_from,
+                        tm_to=day_detail.tm_to
+                    ) for day_detail in main_worker_days_details
+                ])
+
+            else:
+                trainee_blank_days.append(main_worker_day) # дни, которых еще нет в графике стажера
+
+        WorkerDayChangeLog.objects.bulk_create([
+                    WorkerDayChangeLog(
+                        worker_day=trainee_worker_day,
+                        worker_day_worker=trainee_worker_day.worker,
+                        worker_day_dt=trainee_worker_day.dt,
+                        from_type=log.get(trainee_worker_day.dt).type,
+                        from_tm_work_start=log.get(trainee_worker_day.dt).tm_work_start,
+                        from_tm_work_end=log.get(trainee_worker_day.dt).tm_work_end,
+                        from_tm_break_start=log.get(trainee_worker_day.dt).tm_break_start,
+                        to_type=trainee_worker_day.type,
+                        to_tm_work_start=trainee_worker_day.tm_work_start,
+                        to_tm_work_end=trainee_worker_day.tm_work_end,
+                        to_tm_break_start=trainee_worker_day.tm_break_start,
+                        changed_by=request.user
+                    ) for trainee_worker_day in trainee_worker_days 
+                ])
+
+        if trainee_blank_days:
+            trainee_blank_days_details = WorkerDayCashboxDetails.objects.filter(
+                                                                worker_day__in=trainee_blank_days
+                                                            )
+            WorkerDay.objects.bulk_create([
+                WorkerDay(
+                    worker=trainee_worker,
+                    dt=blank_day.dt,
+                    type=blank_day.type,
+                    worker_shop=blank_day.worker_shop,
+                    tm_work_start=blank_day.tm_work_start,
+                    tm_work_end=blank_day.tm_work_end,
+                    tm_break_start=blank_day.tm_break_start
+                ) for blank_day in trainee_blank_days
+            ])
+            WorkerDayCashboxDetails.objects.bulk_create([
+                WorkerDayCashboxDetails(
+                    worker_day=WorkerDay.objects.get(
+                            worker=trainee_worker,
+                            dt=day_detail.worker_day.dt,
+                            type=day_detail.worker_day.type,
+                            worker_shop=day_detail.worker_day.worker_shop,
+                            tm_work_start=day_detail.worker_day.tm_work_start,
+                            tm_work_end=day_detail.worker_day.tm_work_end,
+                            tm_break_start=day_detail.worker_day.tm_break_start
+                        ),
+                    on_cashbox=day_detail.on_cashbox,
+                    cashbox_type=day_detail.cashbox_type,
+                    tm_from=day_detail.tm_from,
+                    tm_to=day_detail.tm_to
+                ) for day_detail in trainee_blank_days_details
+            ])
+    else:
+        WorkerDay.objects.bulk_create([
+            WorkerDay(
+                worker=trainee_worker,
+                dt=main_worker_day.dt,
+                type=main_worker_day.type,
+                worker_shop=main_worker_day.worker_shop,
+                tm_work_start=main_worker_day.tm_work_start,
+                tm_work_end=main_worker_day.tm_work_end,
+                tm_break_start=main_worker_day.tm_break_start
+            ) for main_worker_day in main_worker_days
+        ])
         WorkerDayCashboxDetails.objects.bulk_create([
             WorkerDayCashboxDetails(
-                worker_day=trainee_worker_day,
+                worker_day=WorkerDay.objects.get(
+                        worker=trainee_worker,
+                        dt=day_detail.worker_day.dt,
+                        type=day_detail.worker_day.type,
+                        worker_shop=day_detail.worker_day.worker_shop,
+                        tm_work_start=day_detail.worker_day.tm_work_start,
+                        tm_work_end=day_detail.worker_day.tm_work_end,
+                        tm_break_start=day_detail.worker_day.tm_break_start
+                    ),
                 on_cashbox=day_detail.on_cashbox,
                 cashbox_type=day_detail.cashbox_type,
                 tm_from=day_detail.tm_from,
                 tm_to=day_detail.tm_to
-            ) for day_detail in main_worker_day.day_details.all()
+            ) for day_detail in main_worker_days_details
         ])
 
-    response = {
-            'main_worker': main_worker,
-            'trainee_worker': trainee_worker,
-        }
-
-    return JsonResponse.success(response)
+    return JsonResponse.success({})
 
 @api_method('POST', DeleteCashierForm)
 def delete_cashier(request, form):

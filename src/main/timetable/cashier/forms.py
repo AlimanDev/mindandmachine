@@ -105,6 +105,8 @@ class SetWorkerDayForm(forms.Form):
             if self.cleaned_data.get('tm_work_start') is None or self.cleaned_data.get('tm_work_end') is None or self.cleaned_data.get('tm_break_start') is None:
                 raise ValidationError('tm_work_start, tm_work_end and tm_break_start required')
 
+                
+
 
 class SetCashierInfoForm(forms.Form):
     worker_id = forms.IntegerField()
