@@ -1,6 +1,7 @@
 from datetime import time, datetime, timedelta
 from django.db import transaction
 from django.db.models import Avg
+from django.forms.models import model_to_dict
 
 from src.db.models import (
     User,
@@ -29,7 +30,8 @@ from .forms import (
     CreateCashierForm,
     DeleteCashierForm,
     GetCashiersListForm,
-    DublicateCashierTimetableForm
+    DublicateCashierTimetableForm,
+    SetWorkerDaysForm
 )
 from . import utils
 
@@ -467,26 +469,33 @@ def dublicate_cashier_table(request, form):
                                                                 worker=trainee_worker,
                                                                 dt__gte=dt_begin,
                                                                 dt__lte=dt_end
-                                                              )
-
+                                                            )
     # проверка на наличие дней у стажера
     trainee_blank_days = [] # дни, у которых не назначен график по заданному интервалу
     log = {}
-
     if trainee_worker_days:
         for main_worker_day in main_worker_days:
-            if main_worker_day.dt in trainee_worker_days.values_list('dt', flat=True): # создаем change log для изменяемых дней
-                log[main_worker_day.dt] = trainee_worker_days.get(dt=main_worker_day.dt)
-
+            if main_worker_day.dt in trainee_worker_days.values_list('dt', flat=True):
+                # создаем change log для изменяемых дней
+                trainee_worker_day = trainee_worker_days.get(dt=main_worker_day.dt)
+                log[main_worker_day.dt] = model_to_dict(
+                                                trainee_worker_day,
+                                                fields=[
+                                                    'dt',
+                                                    'type',
+                                                    'tm_work_start',
+                                                    'tm_work_end',
+                                                    'tm_break_start'
+                                                ]
+                                            )
                 # обновляем дни и удаляем details для этих дней
-                for trainee_worker_day in trainee_worker_days:  
-                    trainee_worker_day.type = main_worker_day.type
-                    trainee_worker_day.worker_shop = main_worker_day.worker_shop
-                    trainee_worker_day.tm_work_start = main_worker_day.tm_work_start
-                    trainee_worker_day.tm_work_end = main_worker_day.tm_work_end
-                    trainee_worker_day.tm_break_start = main_worker_day.tm_break_start
-                    trainee_worker_day.save()
-                    WorkerDayCashboxDetails.objects.filter(worker_day=trainee_worker_day).delete()
+                trainee_worker_day.type = main_worker_day.type
+                trainee_worker_day.worker_shop = main_worker_day.worker_shop
+                trainee_worker_day.tm_work_start = main_worker_day.tm_work_start
+                trainee_worker_day.tm_work_end = main_worker_day.tm_work_end
+                trainee_worker_day.tm_break_start = main_worker_day.tm_break_start
+                trainee_worker_day.save()
+                WorkerDayCashboxDetails.objects.filter(worker_day=trainee_worker_day).delete()
 
                 # создаем day details для обновленных дней
                 WorkerDayCashboxDetails.objects.bulk_create([
@@ -494,11 +503,6 @@ def dublicate_cashier_table(request, form):
                         worker_day=WorkerDay.objects.get(
                                 worker=trainee_worker,
                                 dt=day_detail.worker_day.dt,
-                                type=day_detail.worker_day.type,
-                                worker_shop=day_detail.worker_day.worker_shop,
-                                tm_work_start=day_detail.worker_day.tm_work_start,
-                                tm_work_end=day_detail.worker_day.tm_work_end,
-                                tm_break_start=day_detail.worker_day.tm_break_start
                             ),
                         on_cashbox=day_detail.on_cashbox,
                         cashbox_type=day_detail.cashbox_type,
@@ -510,27 +514,32 @@ def dublicate_cashier_table(request, form):
             else:
                 trainee_blank_days.append(main_worker_day) # дни, которых еще нет в графике стажера
 
+        updated_trainee_worker_days = WorkerDay.objects.prefetch_related('day_details').filter(
+                                                                worker=trainee_worker,
+                                                                dt__gte=dt_begin,
+                                                                dt__lte=dt_end
+                                                              )
         WorkerDayChangeLog.objects.bulk_create([
-                    WorkerDayChangeLog(
-                        worker_day=trainee_worker_day,
-                        worker_day_worker=trainee_worker_day.worker,
-                        worker_day_dt=trainee_worker_day.dt,
-                        from_type=log.get(trainee_worker_day.dt).type,
-                        from_tm_work_start=log.get(trainee_worker_day.dt).tm_work_start,
-                        from_tm_work_end=log.get(trainee_worker_day.dt).tm_work_end,
-                        from_tm_break_start=log.get(trainee_worker_day.dt).tm_break_start,
-                        to_type=trainee_worker_day.type,
-                        to_tm_work_start=trainee_worker_day.tm_work_start,
-                        to_tm_work_end=trainee_worker_day.tm_work_end,
-                        to_tm_break_start=trainee_worker_day.tm_break_start,
-                        changed_by=request.user
-                    ) for trainee_worker_day in trainee_worker_days 
-                ])
+            WorkerDayChangeLog(
+                worker_day=trainee_worker_day,
+                worker_day_worker=trainee_worker_day.worker,
+                worker_day_dt=trainee_worker_day.dt,
+                from_type=log.get(trainee_worker_day.dt)['type'],
+                from_tm_work_start=log.get(trainee_worker_day.dt)['tm_work_start'],
+                from_tm_work_end=log.get(trainee_worker_day.dt)['tm_work_end'],
+                from_tm_break_start=log.get(trainee_worker_day.dt)['tm_break_start'],
+                to_type=trainee_worker_day.type,
+                to_tm_work_start=trainee_worker_day.tm_work_start,
+                to_tm_work_end=trainee_worker_day.tm_work_end,
+                to_tm_break_start=trainee_worker_day.tm_break_start,
+                changed_by=request.user
+            ) for trainee_worker_day in updated_trainee_worker_days 
+        ])
 
         if trainee_blank_days:
             trainee_blank_days_details = WorkerDayCashboxDetails.objects.filter(
-                                                                worker_day__in=trainee_blank_days
-                                                            )
+                                                            worker_day__in=trainee_blank_days
+                                                        )
             WorkerDay.objects.bulk_create([
                 WorkerDay(
                     worker=trainee_worker,
@@ -547,11 +556,6 @@ def dublicate_cashier_table(request, form):
                     worker_day=WorkerDay.objects.get(
                             worker=trainee_worker,
                             dt=day_detail.worker_day.dt,
-                            type=day_detail.worker_day.type,
-                            worker_shop=day_detail.worker_day.worker_shop,
-                            tm_work_start=day_detail.worker_day.tm_work_start,
-                            tm_work_end=day_detail.worker_day.tm_work_end,
-                            tm_break_start=day_detail.worker_day.tm_break_start
                         ),
                     on_cashbox=day_detail.on_cashbox,
                     cashbox_type=day_detail.cashbox_type,
@@ -576,11 +580,6 @@ def dublicate_cashier_table(request, form):
                 worker_day=WorkerDay.objects.get(
                         worker=trainee_worker,
                         dt=day_detail.worker_day.dt,
-                        type=day_detail.worker_day.type,
-                        worker_shop=day_detail.worker_day.worker_shop,
-                        tm_work_start=day_detail.worker_day.tm_work_start,
-                        tm_work_end=day_detail.worker_day.tm_work_end,
-                        tm_break_start=day_detail.worker_day.tm_break_start
                     ),
                 on_cashbox=day_detail.on_cashbox,
                 cashbox_type=day_detail.cashbox_type,
@@ -590,6 +589,7 @@ def dublicate_cashier_table(request, form):
         ])
 
     return JsonResponse.success({})
+
 
 @api_method('POST', DeleteCashierForm)
 def delete_cashier(request, form):
