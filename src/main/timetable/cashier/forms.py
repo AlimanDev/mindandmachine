@@ -80,6 +80,42 @@ class GetWorkerDayForm(forms.Form):
     dt = util_forms.DateField()
 
 
+class SetWorkerDaysForm(forms.Form):
+    worker_id = forms.IntegerField()
+    dt_begin = util_forms.DateField()
+    dt_end = util_forms.DateField()
+    type = forms.CharField()
+    tm_work_start = util_forms.TimeField(required=False)
+    tm_work_end = util_forms.TimeField(required=False)
+
+    cashbox_type = forms.IntegerField(required=False)
+    comment = forms.CharField(max_length=128, required=False)
+
+    def clean_worker_id(self):
+        try:
+            worker = User.objects.get(id=self.cleaned_data['worker_id'])
+        except User.DoesNotExist:
+            raise forms.ValidationError('Invalid worker_id')
+        return worker.id
+
+    def clean_type(self):
+        value = WorkerDayConverter.parse_type(self.cleaned_data['type'])
+        if value is None:
+            raise ValidationError('Invalid enum value')
+        return value
+
+    def clean(self):
+        if self.errors:
+            return
+
+        if WorkerDay.is_type_with_tm_range(self.cleaned_data['type']):
+            if self.cleaned_data.get('tm_work_start') is None or self.cleaned_data.get('tm_work_end') is None:
+                raise ValidationError('tm_work_start, tm_work_end required')
+
+        if self.cleaned_data['dt_begin'] > self.cleaned_data['dt_end']:
+            raise forms.ValidationError('dt_begin have to be less or equal than dt_end')
+
+
 class SetWorkerDayForm(forms.Form):
     worker_id = forms.IntegerField()
     dt = util_forms.DateField()
@@ -104,8 +140,6 @@ class SetWorkerDayForm(forms.Form):
         if WorkerDay.is_type_with_tm_range(self.cleaned_data['type']):
             if self.cleaned_data.get('tm_work_start') is None or self.cleaned_data.get('tm_work_end') is None or self.cleaned_data.get('tm_break_start') is None:
                 raise ValidationError('tm_work_start, tm_work_end and tm_break_start required')
-
-                
 
 
 class SetCashierInfoForm(forms.Form):
