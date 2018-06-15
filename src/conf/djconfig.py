@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'src',
     'src.db',
     'src.main',
+    # 'rest_framework',
 ]
 
 MIDDLEWARE = [
@@ -111,6 +112,10 @@ MEDIA_URL = '/_i/media/'
 
 
 DATETIME_FORMAT = '%H:%M:%S %d.%m.%Y'
+DATE_FORMAT = '%d.%m.%Y'
+TIME_FORMAT = '%H:%M:%S'
+SHORT_TIME_FORMAT = '%H:%M'
+
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

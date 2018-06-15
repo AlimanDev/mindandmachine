@@ -373,6 +373,14 @@ class WorkerDay(models.Model):
         TYPE_DELETED = 10
         TYPE_EMPTY = 11
 
+    TYPES_PAID = [
+        Type.TYPE_WORKDAY.value,
+        Type.TYPE_QUALIFICATION.value,
+        Type.TYPE_VACATION.value,
+        Type.TYPE_BUSINESS_TRIP.value,
+    ]
+
+
     def __str__(self):
         # return f'{self.worker.last_name}, {self.worker.shop.title}, {self.worker.shop.super_shop.title}, {self.dt},' \
         #        f' {self.Type.get_name_by_value(self.type)}, {self.id}'
@@ -416,7 +424,9 @@ class WorkerDayCashboxDetails(models.Model):
 
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
-    cashbox_type =models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT, null=True, blank=True)
+
+    is_break = models.BooleanField(default=False)  # True if it is time for rest
 
     tm_from = models.TimeField()
     tm_to = models.TimeField()
@@ -554,10 +564,13 @@ class ProductionMonth(models.Model):
 
     """
 
-    first_dt = models.DateField()
+    dt_first = models.DateField()
     total_days = models.SmallIntegerField()
     norm_work_days = models.SmallIntegerField()
     norm_work_hours = models.FloatField()
+
+    class Meta:
+        ordering = ('dt_first',)
 
 
 class ProductionDay(models.Model):
@@ -575,8 +588,19 @@ class ProductionDay(models.Model):
         (TYPE_SHORT_WORK, 'short workday')
     )
 
-    dt = models.DateField()
+    WORK_TYPES = [
+        TYPE_WORK,
+        TYPE_SHORT_WORK
+    ]
+
+    WORK_NORM_HOURS = {
+        TYPE_WORK: 8,
+        TYPE_SHORT_WORK: 7,
+    }
+
+    dt = models.DateField(unique=True)
     type = models.CharField(max_length=1, choices=TYPES)
+    is_celebration = models.BooleanField(default=False)
 
     def __str__(self):
         # return f'{self.worker.last_name}, {self.worker.shop.title}, {self.worker.shop.super_shop.title}, {self.dt},' \
@@ -588,7 +612,7 @@ class ProductionDay(models.Model):
         else:
             tp = ('', 'bad_bal')
 
-        return '{}, {}, {}'.format(self.dt, self.tp[1], self.id)
+        return '(dt {}, type {}, id {})'.format(self.dt, self.type, self.id)
 
     def __repr__(self):
         return self.__str__()
