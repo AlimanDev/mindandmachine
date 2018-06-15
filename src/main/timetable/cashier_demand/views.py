@@ -175,7 +175,7 @@ def get_cashiers_timetable(request, form):
     wdcds = worker_day_cashbox_detail  # alias
     wdcds_len = len(wdcds)
     # for each period count:
-    import pdb
+    # import pdb
     # pdb.set_trace()
 
     for day_ind in range((form['to_dt'] - form['from_dt']).days):
@@ -208,8 +208,8 @@ def get_cashiers_timetable(request, form):
                         TOTAL_PERIOD_SECONDS
                     ) / TOTAL_PERIOD_SECONDS
 
-                    period_bills[wdcds[ind_e].cashbox_type_id] += proportion *  \
-                        (PERIOD_MINUTES / worker_cashbox_info[(wdcds[ind_e].worker_day.worker_id, wdcds[ind_e].cashbox_type_id)][0].mean_speed)
+                    # period_bills[wdcds[ind_e].cashbox_type_id] += proportion *  \
+                    #     (PERIOD_MINUTES / worker_cashbox_info[(wdcds[ind_e].worker_day.worker_id, wdcds[ind_e].cashbox_type_id)][0].mean_speed)
 
                     period_cashiers += 1 * proportion
                 ind_e += 1
