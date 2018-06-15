@@ -12,8 +12,8 @@ class Command(BaseCommand):
         pass
 
     def handle(self, *args, **options):
-        os.system('./manage.py flush --noinput')
-        print('Old database flushed')
+        # os.system('./manage.py flush --noinput')
+        # print('Old database flushed')
 
         run_shop_003()
         run_shop_004()

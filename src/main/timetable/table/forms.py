@@ -82,3 +82,11 @@ class SelectCashiersForm(forms.Form):
 class GetTable(forms.Form):
     shop_id = forms.IntegerField()
     weekday = util_forms.DateField()
+
+
+class GetWorkerStatForm(forms.Form):
+    shop_id = forms.IntegerField(required=False)
+    dt = util_forms.DateField()
+
+    worker_ids = util_forms.IntegersList(required=False)
+
