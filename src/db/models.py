@@ -375,9 +375,9 @@ class WorkerDay(models.Model):
 
     TYPES_PAID = [
         Type.TYPE_WORKDAY.value,
-        Type.TYPE_QUALIFICATION,
-        Type.TYPE_VACATION,
-        Type.TYPE_BUSINESS_TRIP,
+        Type.TYPE_QUALIFICATION.value,
+        Type.TYPE_VACATION.value,
+        Type.TYPE_BUSINESS_TRIP.value,
     ]
 
 
