@@ -353,19 +353,29 @@ def set_timetable(request, form):
             if WorkerDay.is_type_with_tm_range(wd_obj.type):
                 wd_obj.tm_work_start = BaseConverter.parse_time(wd['tm_work_start'])
                 wd_obj.tm_work_end = BaseConverter.parse_time(wd['tm_work_end'])
-                if wd['tm_break_start']:
-                    wd_obj.tm_break_start = BaseConverter.parse_time(wd['tm_break_start'])
-                else:
-                    wd_obj.tm_break_start = None
+                # if wd['tm_break_start']:
+                #     wd_obj.tm_break_start = BaseConverter.parse_time(wd['tm_break_start'])
+                # else:
+                #     wd_obj.tm_break_start = None
 
                 wd_obj.save()
                 WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
-                WorkerDayCashboxDetails.objects.create(
-                    worker_day=wd_obj,
-                    cashbox_type_id=wd['cashbox_type_id'],
-                    tm_from=wd_obj.tm_work_start,
-                    tm_to=wd_obj.tm_work_end
-                )
+                wdd_list = []
+
+                for wdd in wd['details']:
+                    wdd_el = WorkerDayCashboxDetails(
+                        worker_day=wd_obj,
+                        tm_from=BaseConverter.parse_time(wdd['tm_from']),
+                        tm_to=BaseConverter.parse_time(wdd['tm_to']),
+                    )
+                    if wdd['type'] > 0:
+                        wdd_el.cashbox_type_id = wdd['type']
+                    else:
+                        wdd_el.is_break = True
+
+                    wdd_list.append(wdd_el)
+                WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
+
             else:
                 wd_obj.save()
     return JsonResponse.success()

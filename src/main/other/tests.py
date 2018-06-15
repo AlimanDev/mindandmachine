@@ -70,7 +70,6 @@ class TestCashboxTypes(LocalTestCase):
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data']['slots'], {})
 
-
     def test_get_all_slots(self):
         response = self.api_get('/api/other/get_all_slots?shop_id=1')
         self.assertEqual(response.status_code, 200)

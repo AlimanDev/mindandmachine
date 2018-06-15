@@ -1,10 +1,19 @@
 from datetime import datetime, time, timedelta
 
 from django.http import HttpResponse
+from django.db.models import Avg, Max
 
-from src.db.models import WorkerDay, User, CashboxType, WorkerCashboxInfo, WorkerDayCashboxDetails, PeriodDemand
+from src.db.models import (
+    WorkerDay,
+    User,
+    CashboxType,
+    WorkerCashboxInfo,
+    WorkerDayCashboxDetails,
+    PeriodDemand,
+    SuperShop,
+)
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
-from src.util.collection import range_u
+from src.util.collection import range_u, group_by
 from src.util.models_converter import CashboxTypeConverter, UserConverter, WorkerDayConverter, WorkerCashboxInfoConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
 from src.conf.djconfig import SHORT_TIME_FORMAT
@@ -12,13 +21,42 @@ from src.conf.djconfig import SHORT_TIME_FORMAT
 from src.db.works.printer.run import run as get_xlsx
 from dateutil.relativedelta import relativedelta
 
+from ..utils import dttm_combine
 import xlsxwriter
 import io
 
 
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
-    shop = request.user.shop
+    def count_diff(dttm, period_demands, demand_ind, period_bills, mean_bills_per_step, cashbox_types):
+        # fixme: aa: work only if all steps are 30 minutes
+        # period_demand is sorted by dttm_forecast, so find the dttm
+        dem_len = len(period_demands)
+        while (demand_ind < dem_len) and (period_demands[demand_ind].dttm_forecast < dttm):
+            demand_ind += 1
+
+        need_amount = 0
+        ct_ids = []
+        # if dttm.time() == time(6, 30):
+        #     import pdb
+        #     pdb.set_trace()
+
+        if demand_ind < dem_len:
+            for ind_shift in range(len(cashbox_types)):
+                ind = demand_ind + ind_shift
+                if (ind < dem_len) and (period_demands[ind].dttm_forecast == dttm):
+                    ct_id = period_demands[ind].cashbox_type_id
+                    ct_ids.append(ct_id)
+                    need_amount += period_demands[ind].clients / cashbox_types[ct_id][0].speed_coef \
+                               / (PERIOD_MINUTES / mean_bills_per_step[ct_id])
+        # if len(ct_ids) == 0:
+        #     ct_ids = cashbox_types.keys()
+        # for ct_id in ct_ids:
+        #     need_amount -= period_bills[ct_id] / (PERIOD_MINUTES / mean_bills_per_step[ct_id])
+        return need_amount, demand_ind
+
+
+    shop_id = request.user.shop_id
 
     if form['format'] == 'excel':
         def __file_name(__dt):
@@ -39,7 +77,7 @@ def get_cashiers_timetable(request, form):
 
         response = HttpResponse(content_type='application/force-download')
         response['Content-Disposition'] = 'attachment; filename={}.xlsx'.format(__file_name(form['from_dt']))
-        response.write(get_xlsx(shop_id=shop.id, dt_from=form['from_dt']).read())
+        response.write(get_xlsx(shop_id=shop_id, dt_from=form['from_dt']).read())
         return response
 
         # if shop.hidden_title == 'shop004':
@@ -47,183 +85,174 @@ def get_cashiers_timetable(request, form):
 
         # return JsonResponse.value_error('Excel is not supported yet')
 
+    PERIOD_MINUTES = 30
+    PERIOD_STEP = timedelta(minutes=PERIOD_MINUTES)
+    TOTAL_PERIOD_SECONDS = PERIOD_STEP.total_seconds()
+
+    # get data from db
+    cashbox_types = CashboxType.objects.filter(shop_id=shop_id).order_by('id')
+    if len(form['cashbox_type_ids']) > 0:
+        cashbox_types = cashbox_types.filter(id__in=form['cashbox_type_ids'])
+        if len(cashbox_types) != len(form['cashbox_type_ids']):
+            return JsonResponse.value_error('bad cashbox_type_ids')
+
+    cashbox_types = group_by(cashbox_types, group_key=lambda x: x.id)
+
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
-        'worker_day', 'on_cashbox'
+        'worker_day',
     ).filter(
-        worker_day__worker_shop_id=shop.id,
-        worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
+        worker_day__worker_shop_id=shop_id,
+        # worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         worker_day__dt__gte=form['from_dt'],
         worker_day__dt__lte=form['to_dt'],
+        is_break=False,
+        cashbox_type_id__in=cashbox_types.keys(),
+    ).order_by(
+        'worker_day__dt',
+        'tm_from',
+        'tm_to',
     )
 
-    cashbox_type_ids = form['cashbox_type_ids']
-    if len(cashbox_type_ids) > 0:
-        worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.cashbox_type_id in cashbox_type_ids]
+    worker_cashbox_info = list(WorkerCashboxInfo.objects.filter(
+        is_active=True,
+        worker__workerday__dt__gte=form['from_dt'],
+        worker__workerday__dt__lte=form['to_dt'],
+        cashbox_type_id__in=cashbox_types.keys()
+    ).distinct())
+
+    mean_bills_per_step = WorkerCashboxInfo.objects.filter(
+        is_active=True,
+        cashbox_type_id__in=cashbox_types.keys()
+    ).values('cashbox_type_id').annotate(speed_usual=Max('mean_speed'))
+    mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
+
+    worker_amount = len(set([w.worker_id for w in worker_cashbox_info]))
+    worker_cashbox_info = group_by(
+        worker_cashbox_info,
+        group_key=lambda x: (x.worker_id, x.cashbox_type_id)
+    )
 
     period_demand = PeriodDemand.objects.filter(
-        cashbox_type__shop_id=shop.id,
+        cashbox_type__shop_id=shop_id,
         dttm_forecast__gte=form['from_dt'],
         dttm_forecast__lte=form['to_dt'] + timedelta(days=1),
+        type__in=[
+            PeriodDemand.Type.LONG_FORECAST.value,
+            PeriodDemand.Type.FACT.value,
+        ],
+        cashbox_type_id__in=cashbox_types.keys()
+    ).order_by(
+        'type',
+        'dttm_forecast',
+        'cashbox_type_id'
     )
-    if len(cashbox_type_ids) > 0:
-        period_demand = period_demand.filter(cashbox_type_id__in=cashbox_type_ids)
-    period_demand = list(period_demand)
 
-    tmp = {}
-    for x in period_demand:
-        dt = x.dttm_forecast.date()
-        if dt not in tmp:
-            tmp[dt] = {}
+    supeshop = SuperShop.objects.get(shop__id=shop_id)
 
-        tm = x.dttm_forecast.time()
-        if tm not in tmp[dt]:
-            tmp[dt][tm] = []
-
-        tmp[dt][tm].append(x)
-    period_demand = tmp
-    users = {}
-    for x in worker_day_cashbox_detail:
-        worker_id = x.worker_day.worker_id
-        if worker_id not in users:
-            users[worker_id] = {
-                'days': {},
-                'cashbox_info': {}
-            }
-        user_item = users[worker_id]
-
-        dt = x.worker_day.dt
-        if dt not in user_item['days']:
-            user_item['days'][dt] = {
-                'day': x.worker_day,
-                'details': []
-            }
-
-        user_item['days'][dt]['details'].append(x)
-
-    users_ids = list(users.keys())
-    worker_cashbox_info = WorkerCashboxInfo.objects.filter(is_active=True, worker_id__in=users_ids)
-    for x in worker_cashbox_info:
-        users[x.worker_id]['cashbox_info'][x.cashbox_type_id] = x
-
-    dttm_from = datetime.combine(form['from_dt'], time())
-    dttm_to = datetime.combine(form['to_dt'], time()) + timedelta(days=1)
-    dttm_step = timedelta(minutes=30)
-
-    real_cashiers_total_amount = 0
-    mean_notworking_present = 0
-    cashier_amount_max = 0
-    big_demand_persent = 0
-    need_cashier_amount_max = 0
-
-    today = datetime.now().date()
-
-    users_amount_set = set()
+    # init data
     real_cashiers = []
     predict_cashier_needs = []
     fact_cashier_needs = []
-    for dttm in range_u(dttm_from, dttm_to, dttm_step, False):
-        dttm_converted = BaseConverter.convert_datetime(dttm)
+    dttm_start = datetime.combine(form['from_dt'], time(3, 0))
+    periods = 48
+    # dttm_start = datetime.combine(form['from_dt'], supeshop.tm_start) - PERIOD_STEP
+    # periods = int(timediff(supeshop.tm_start, supeshop.tm_end) * 2 + 0.99999) + 5 # period 30 minutes
 
-        dt = dttm.date()
-        tm = dttm.time()
+    need_cashier_amount = 0
 
-        predict_cheques_long = 0
-        predict_cheques_fact = 0
-        for x in period_demand.get(dt, {}).get(tm, []):
-            if x.type == PeriodDemand.Type.LONG_FORECAST.value:
-                predict_cheques_long += x.clients
-            elif x.type == PeriodDemand.Type.FACT.value:
-                predict_cheques_fact += x.clients
+    ind_b = 0
+    demand_ind = 0
+    fact_ind = 0
 
-        real_cashiers_amount = 0
-        cheques_amount = 0
-        for uid, user in users.items():
-            if dt not in user['days']:
-                continue
+    edge_ind = 0
+    while (edge_ind < len(period_demand)) and (period_demand[edge_ind].type != PeriodDemand.Type.FACT.value):
+        edge_ind += 1
 
-            day = user['days'][dt]['day']
-            details = user['days'][dt]['details']
+    predict_demand = period_demand[:edge_ind]
+    fact_demand = period_demand[edge_ind:]
 
-            cashbox = []
-            for d in details:
-                if d.tm_from < d.tm_to:
-                    if d.tm_from <= tm < d.tm_to:
-                        cashbox.append(d)
-                else:
-                    if d.tm_from <= tm or d.tm_to > tm:
-                        cashbox.append(d)
 
-            if len(cashbox) == 0:
-                continue
+    wdcds = worker_day_cashbox_detail  # alias
+    wdcds_len = len(wdcds)
+    # for each period count:
+    import pdb
+    # pdb.set_trace()
 
-            if day.tm_break_start is not None:
-                if datetime.combine(dt, day.tm_break_start) <= dttm < datetime.combine(dt, day.tm_break_start) + timedelta(hours=1):
-                    continue
+    for day_ind in range((form['to_dt'] - form['from_dt']).days):
+        for time_ind in range(periods):
+            dttm = dttm_start + timedelta(days=day_ind) + time_ind * PERIOD_STEP
+            # if dttm.hour > 22:
+            #     pdb.set_trace()
 
-            cashbox_type = cashbox[0].cashbox_type_id
-            cashbox_info = user['cashbox_info'].get(cashbox_type)
-            mean_speed = cashbox_info.mean_speed if cashbox_info is not None else 0
+            dttm_end = dttm + PERIOD_STEP
+            dttm_ind = dttm - PERIOD_STEP
 
-            real_cashiers_amount += 1
-            users_amount_set.add(uid)
-            cheques_amount += mean_speed * shop.beta
+            # shift to first model, which has intersection
+            while (ind_b < wdcds_len) and (dttm_ind <= dttm):
+                dttm_ind = dttm_combine(wdcds[ind_b].worker_day.dt, wdcds[ind_b].tm_to)
+                ind_b += 1
+            ind_b = ind_b - 1 if (dttm_ind > dttm) and ind_b else ind_b
 
-        real_cashiers_total_amount += real_cashiers_amount
-        cashier_amount_max = max(real_cashiers_amount, cashier_amount_max)
+            ind_e = ind_b
+            period_bills = {i: 0 for i in cashbox_types.keys()}
+            period_cashiers = 0.0
+            if ind_e < wdcds_len:
+                dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_from)
+                dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_to)
 
-        if predict_cheques_fact < cheques_amount:
-            mean_notworking_present += (1 - predict_cheques_fact / cheques_amount) * real_cashiers_amount
+            while (ind_e < wdcds_len) and (dttm_ind < dttm_end):
+                if dttm_ind_end > dttm:
+                    proportion = min(
+                        (dttm_ind_end - dttm).total_seconds(),
+                        (dttm_end - dttm_ind).total_seconds(),
+                        TOTAL_PERIOD_SECONDS
+                    ) / TOTAL_PERIOD_SECONDS
 
-        if dt < today:
-            if predict_cheques_fact > cheques_amount * 2:
-                big_demand_persent += 1
-        else:
-            if predict_cheques_long > cheques_amount * 2:
-                big_demand_persent += 1
+                    period_bills[wdcds[ind_e].cashbox_type_id] += proportion *  \
+                        (PERIOD_MINUTES / worker_cashbox_info[(wdcds[ind_e].worker_day.worker_id, wdcds[ind_e].cashbox_type_id)][0].mean_speed)
 
-        predict_cashier_needs_amount = predict_cheques_long / 15
+                    period_cashiers += 1 * proportion
+                ind_e += 1
+                if ind_e < wdcds_len:
+                    dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_from)
+                    dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_to)
 
-        if dt >= today:
-            need_cashier_amount_max = max(predict_cashier_needs_amount - real_cashiers_amount, need_cashier_amount_max)
+            dttm_converted = BaseConverter.convert_datetime(dttm)
+            real_cashiers.append({
+                'dttm': dttm_converted,
+                'amount': period_cashiers
+            })
 
-        real_cashiers.append({
-            'dttm': dttm_converted,
-            'amount': real_cashiers_amount
-        })
+            predict_diff, demand_ind = count_diff(dttm, predict_demand, demand_ind, period_bills,  mean_bills_per_step, cashbox_types)
+            if predict_diff > need_cashier_amount:
+                need_cashier_amount = predict_diff
+            predict_cashier_needs.append({
+                'dttm': dttm_converted,
+                'amount': predict_diff, #+ period_cashiers,
+            })
 
-        predict_cashier_needs.append({
-            'dttm': dttm_converted,
-            'amount': predict_cashier_needs_amount
-        })
-
-        fact_cashier_needs.append({
-            'dttm': dttm_converted,
-            'amount': predict_cheques_fact / 15
-        })
-
-    mean_notworking_present = mean_notworking_present / real_cashiers_total_amount if real_cashiers_total_amount > 0 else 0
+            real_diff, fact_ind = count_diff(dttm, fact_demand, fact_ind, period_bills,  mean_bills_per_step, cashbox_types)
+            fact_cashier_needs.append({
+                'dttm': dttm_converted,
+                'amount': real_diff, # + period_cashiers,
+            })
 
     response = {
         'indicators': {
             'mean_notworking_persent': None,  # mean_notworking_present,
-            'big_demand_persent': big_demand_persent,
-            'cashier_amount': len(users_amount_set),
+            'big_demand_persent': 0,  # big_demand_persent,
+            'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': None,
-            'need_cashier_amount': need_cashier_amount_max,
+            'need_cashier_amount': need_cashier_amount,
             'change_amount': None,
         },
         'period_step': 30,
         'tt_periods': {
-            # очень грязный хак, потому что графики перепутаны
-            # 'real_cashiers': fact_cashier_needs,
-            # 'predict_cashier_needs': predict_cashier_needs,
-            # 'fact_cashier_needs': real_cashiers
             'real_cashiers': real_cashiers,
             'predict_cashier_needs': predict_cashier_needs,
             'fact_cashier_needs': fact_cashier_needs
         }
     }
-
     return JsonResponse.success(response)
 
 

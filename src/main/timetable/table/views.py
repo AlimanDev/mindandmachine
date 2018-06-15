@@ -13,9 +13,6 @@ from src.db.models import (
     WorkerDayCashboxDetails,
     PeriodDemand,
     CashboxType,
-    WorkerMonthStat,
-    ProductionMonth,
-    ProductionDay
 )
 from src.util.models_converter import (
     UserConverter,
@@ -370,13 +367,6 @@ def get_table(request):
     return response
 
 
-import time
-def check_time(t=None):
-    t2 = time.time()
-    if t:
-        print(t2 - t)
-    return t2
-
 @api_method('GET', GetWorkerStatForm)
 def get_month_stat(request, form):
     # prepare data
@@ -400,12 +390,9 @@ def get_month_stat(request, form):
     usrs = usrs.order_by('id')
 
     usrs_ids = [u.id for u in usrs]
-    t = check_time()
-
 
     # count info of current month
     month_info = count_work_month_stats(dt_start, dt_end, usrs)
-    t = check_time(t)
 
     # block for count normal amount of working days and working hours
     dts_start_count_dict, _ = count_normal_days(dt_start_year, dt_start, usrs)

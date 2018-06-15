@@ -4,14 +4,15 @@ from src.db.models import (
     ProductionDay,
 )
 from datetime import time
+from ..utils import timediff
 
-
-import time as time2
-def check_time(t=None):
-    t2 = time2.time()
-    if t:
-        print(t2 - t)
-    return t2
+# import time as time2
+# def check_time(t=None):
+#     t2 = time2.time()
+#     if t:
+#         # print(t2 - t)
+#         pass
+#     return t2
 
 
 def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
@@ -50,7 +51,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
             [time(23, 59), 'n'],
         ]
 
-    t = check_time()
+    # t = check_time()
     users_ids = {u.id: u for u in users}
     prod_days_list = list(ProductionDay.objects.filter(dt__gte=dt_start, dt__lte=dt_end).order_by('dt'))
 
@@ -81,7 +82,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
     worker_id = 0
     dt = None
 
-    t = check_time(t)
+    # t = check_time(t)
     for row in wdds:
         if worker_id != row['worker_id']:
             workers_info[worker_id] = worker
@@ -122,7 +123,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
                 row['workerdaycashboxdetails__tm_to'],
             )
 
-    t = check_time(t)
+    # t = check_time(t)
     workers_info[worker_id] = worker
     workers_info.pop(0)
     for key, worker in workers_info.items():
@@ -132,7 +133,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
     for worker_id in users_ids.keys():
         if worker_id not in workers_info.keys():
             workers_info[worker_id] = init_values(times_borders, total_norm)
-    t = check_time(t)
+    # t = check_time(t)
     return workers_info
 
 
@@ -168,10 +169,3 @@ def count_normal_days(dt_start, dt_end, usrs):
         ind_dt -= 1
     dts_start_count_dict[dts_start_count[ind]] = [sum_days, sum_hours]
     return dts_start_count_dict, year_days
-
-
-def timediff(tm_s, tm_e):
-    diff = (tm_e.hour - tm_s.hour) + (tm_e.minute - tm_s.minute) / 60
-    if diff < 0:
-        diff += 24
-    return diff
