@@ -22,7 +22,6 @@ from src.util.models_converter import (
 from src.util.utils import api_method, JsonResponse
 from .forms import (
     SelectCashiersForm,
-    GetTable,
     GetWorkerStatForm,
 )
 from src.conf.djconfig import SHORT_TIME_FORMAT
@@ -30,6 +29,8 @@ from .utils import (
     count_work_month_stats,
     count_normal_days,
 )
+
+from src.main.download.forms import GetTable
 
 
 @api_method('GET', SelectCashiersForm)

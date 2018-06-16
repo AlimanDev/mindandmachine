@@ -9,6 +9,8 @@ from .demand import urls as demand_urls
 from .queue import urls as queue_urls
 from .other import urls as other_urls
 from .camera import urls as camera_urls
+from .download import urls as download_urls
+
 
 api_urlpatterns = [
     path('auth/', include(auth_urls)),
@@ -18,6 +20,7 @@ api_urlpatterns = [
     path('queue/', include(queue_urls)),
     path('camera/', include(camera_urls)),
     path('other/', include(other_urls)),
+    path('download/', include(download_urls)),
 ]
 
 urlpatterns = [
