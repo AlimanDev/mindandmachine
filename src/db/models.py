@@ -118,6 +118,15 @@ class WorkerPosition(models.Model):
 
 class WorkerManager(UserManager):
     def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
+        """
+        hired earlier then dt_from, hired later then dt_to
+        :param dt_from:
+        :param dt_to:
+        :param args:
+        :param kwargs:
+        :return:
+        """
+
         return self.filter(
             models.Q(dt_hired__lte=dt_from) | models.Q(dt_hired__isnull=True)
         ).filter(
@@ -369,15 +378,28 @@ class WorkerDay(models.Model):
         TYPE_ABSENSE = 6
         TYPE_MATERNITY = 7
         TYPE_BUSINESS_TRIP = 8
+
         TYPE_ETC = 9
         TYPE_DELETED = 10
         TYPE_EMPTY = 11
+
+        TYPE_HOLIDAY_WORK = 12
+        TYPE_REAL_ABSENCE = 13
+        TYPE_EXTRA_VACATION = 14
+        TYPE_TRAIN_VACATION = 15
+        TYPE_SELF_VACATION = 16
+        TYPE_SELF_VACATION_TRUE = 17
+        TYPE_GOVERNMENT = 18
+
 
     TYPES_PAID = [
         Type.TYPE_WORKDAY.value,
         Type.TYPE_QUALIFICATION.value,
         Type.TYPE_VACATION.value,
         Type.TYPE_BUSINESS_TRIP.value,
+        Type.TYPE_HOLIDAY_WORK.value,
+        Type.TYPE_EXTRA_VACATION.value,
+        Type.TYPE_TRAIN_VACATION.value,
     ]
 
 
@@ -596,6 +618,7 @@ class ProductionDay(models.Model):
     WORK_NORM_HOURS = {
         TYPE_WORK: 8,
         TYPE_SHORT_WORK: 7,
+        TYPE_HOLIDAY: 0
     }
 
     dt = models.DateField(unique=True)
