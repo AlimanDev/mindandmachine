@@ -47,22 +47,3 @@ def set_queue(request):
     if len(bad_csf):
         return JsonResponse.value_error(json.dumps(bad_csf))
     return JsonResponse.success()
-
-def agrigate_cameras():
-    pass
-
-@api_method('GET', CameraStatFrom)
-def get_queue_from_cameras(request, form):
-    try:
-        dttm = form['dttm']
-        queue = form['queue']
-        print('--------------',queue,dttm)
-    except:
-        pass
-        # return JsonResponse.value_error('Cannot get shop')
-    #
-    # return JsonResponse.success({
-    #     'mean_queue_length': shop.mean_queue_length,
-    #     'max_queue_length': shop.max_queue_length,
-    #     'dead_time_part': shop.dead_time_part
-    # })
