@@ -31,10 +31,10 @@ def get_tabel(request, workbook, form):
     tabel.construct_dates('%d', 13, 5, int)
 
     # construct weekday
-    tabel.construct_dates('%w', 15, 5)
+    tabel.construct_dates('%w', 17, 5)
 
     #construct day 2
-    tabel.construct_dates('d%d', 16, 5)
+    tabel.construct_dates('d%d', 20, 5)
 
     users = User.objects.qos_filter_active(
         dt_from=tabel.prod_days[-1].dt,
