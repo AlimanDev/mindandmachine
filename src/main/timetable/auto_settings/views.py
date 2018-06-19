@@ -218,7 +218,7 @@ def create_timetable(request, form):
             'cost_weights': json.loads(shop.cost_weights),
             'method_params': json.loads(shop.method_params),
             'breaks_triplets': json.loads(shop.break_triplets),
-            'init_params': json.loads(shop.init_params),
+            'init_params': init_params,
             # 'n_working_days_optimal': working_days, # Very kostil, very hot fix, we should take this param from proizvodstveny calendar'
         },
     }
