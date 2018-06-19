@@ -53,14 +53,14 @@ class DublicateCashierTimetableForm(forms.Form):
             main_worker = User.objects.get(id=self.cleaned_data['main_worker_id'])
         except User.DoesNotExist:
             raise forms.ValidationError('Invalid main_worker_id')
-        return main_worker.id
+        return main_worker
 
     def clean_trainee_worker_id(self):
         try:
             trainee_worker = User.objects.get(id=self.cleaned_data['trainee_worker_id'])
         except User.DoesNotExist:
             raise forms.ValidationError('Invalid trainee_worker_id')
-        return trainee_worker.id
+        return trainee_worker
 
     def clean(self):
         if self.errors:
@@ -96,7 +96,7 @@ class SetWorkerDaysForm(forms.Form):
             worker = User.objects.get(id=self.cleaned_data['worker_id'])
         except User.DoesNotExist:
             raise forms.ValidationError('Invalid worker_id')
-        return worker.id
+        return worker
 
     def clean_type(self):
         value = WorkerDayConverter.parse_type(self.cleaned_data['type'])
