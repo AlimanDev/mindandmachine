@@ -2,32 +2,32 @@ import datetime
 
 from src.db.models import User, WorkerDay, PeriodDemand, Timetable, Notifications, CashboxType
 from src.conf.djconfig import (
-    DATE_FORMAT,
-    DATETIME_FORMAT,
-    TIME_FORMAT,
+    QOS_DATE_FORMAT,
+    QOS_DATETIME_FORMAT,
+    QOS_TIME_FORMAT,
 )
 
 
 class BaseConverter(object):
     @classmethod
     def convert_date(cls, obj):
-        return obj.strftime(DATE_FORMAT) if obj is not None else None
+        return obj.strftime(QOS_DATE_FORMAT) if obj is not None else None
 
     @classmethod
     def parse_date(cls, obj):
-        return datetime.datetime.strptime(obj, DATE_FORMAT)
+        return datetime.datetime.strptime(obj, QOS_DATE_FORMAT)
 
     @classmethod
     def convert_time(cls, obj):
-        return obj.strftime(TIME_FORMAT) if obj is not None else None
+        return obj.strftime(QOS_TIME_FORMAT) if obj is not None else None
 
     @classmethod
     def parse_time(cls, obj):
-        return datetime.datetime.strptime(obj, TIME_FORMAT).time()
+        return datetime.datetime.strptime(obj, QOS_TIME_FORMAT).time()
 
     @classmethod
     def convert_datetime(cls, obj):
-        return obj.strftime(DATETIME_FORMAT) if obj is not None else None
+        return obj.strftime(QOS_DATETIME_FORMAT) if obj is not None else None
 
 
 class UserConverter(BaseConverter):

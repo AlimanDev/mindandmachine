@@ -3,7 +3,7 @@
 from django.db import migrations, models
 import pandas as pd
 
-from src.conf.djconfig import DATE_FORMAT
+from src.conf.djconfig import QOS_DATE_FORMAT
 
 
 def fill_days(apps, schema_editor):
@@ -39,7 +39,7 @@ def fill_days(apps, schema_editor):
         names=['dts', 'types']
     )
 
-    days['dts'] = pd.to_datetime(days['dts'], format=DATE_FORMAT)
+    days['dts'] = pd.to_datetime(days['dts'], format=QOS_DATE_FORMAT)
     for row in days.iterrows():
         el = row[1]
         ProductionDay.objects.get_or_create(

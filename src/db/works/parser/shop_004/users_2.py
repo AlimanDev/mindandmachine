@@ -1,4 +1,5 @@
 import os
+import os
 from datetime import time, datetime, timedelta
 
 import pandas
@@ -21,7 +22,8 @@ class ParseHelper(object):
             'в3': [WorkerDay.Type.TYPE_WORKDAY.value, time(12, 30), time(00, 00)],
             'в': [WorkerDay.Type.TYPE_HOLIDAY.value, None, None],
             'от': [WorkerDay.Type.TYPE_VACATION.value, None, None],
-            'н': [WorkerDay.Type.TYPE_WORKDAY.value, time(21, 00), time(9, 00)]
+            'н': [WorkerDay.Type.TYPE_WORKDAY.value, time(21, 00), time(9, 00)],
+            'к': [WorkerDay.Type.TYPE_QUALIFICATION.value, None, None],
         }
 
         return work_times.get(str(value).lower(), [WorkerDay.Type.TYPE_EMPTY.value, None, None])

@@ -8,7 +8,7 @@ from dateutil.relativedelta import relativedelta
 
 from src.db.models import WorkerDay, User, Shop
 from src.util.collection import range_u, count
-from src.conf.djconfig import SHORT_TIME_FORMAT
+from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
 
 class Cell(object):
     def __init__(self, d, f=None):
@@ -125,7 +125,7 @@ class PrintHelper(object):
 
         if obj.type == WorkerDay.Type.TYPE_WORKDAY.value:
             return Cell(
-                '{}-{}'.format(obj.tm_work_start.strftime(SHORT_TIME_FORMAT), obj.tm_work_end.strftime(SHORT_TIME_FORMAT)),
+                '{}-{}'.format(obj.tm_work_start.strftime(QOS_SHORT_TIME_FORMAT), obj.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT)),
                 fmts['default']
             )
 
@@ -154,7 +154,7 @@ class PrintHelper(object):
             return __ret('')
 
         if obj.type == WorkerDay.Type.TYPE_WORKDAY.value:
-            key = '{}-{}'.format(obj.tm_work_start.strftime(SHORT_TIME_FORMAT), obj.tm_work_end.strftime(SHORT_TIME_FORMAT))
+            key = '{}-{}'.format(obj.tm_work_start.strftime(QOS_SHORT_TIME_FORMAT), obj.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT))
             value = timetable[key]
 
             __tt_add(value)
@@ -499,7 +499,7 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
         for wd in worker_days.values():
             if wd.type != WorkerDay.Type.TYPE_WORKDAY.value:
                 continue
-            key = '{}-{}'.format(wd.tm_work_start.strftime(SHORT_TIME_FORMAT), wd.tm_work_end.strftime(SHORT_TIME_FORMAT))
+            key = '{}-{}'.format(wd.tm_work_start.strftime(QOS_SHORT_TIME_FORMAT), wd.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT))
             timetable_raw[key] = [wd.tm_work_start, wd.tm_work_end]
 
     timetable = {}
