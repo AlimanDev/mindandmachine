@@ -4,6 +4,7 @@ from .forms import CameraStatFrom, CamRequestForm
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 import json
+from .forms import CameraStatFrom
 
 
 @csrf_exempt
@@ -46,4 +47,3 @@ def set_queue(request):
     if len(bad_csf):
         return JsonResponse.value_error(json.dumps(bad_csf))
     return JsonResponse.success()
-

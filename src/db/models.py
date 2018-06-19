@@ -215,6 +215,7 @@ class CashboxType(models.Model):
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
+    dttm_last_update_queue = models.DateTimeField(null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     name = models.CharField(max_length=128)
     speed_coef = models.FloatField(default=1)
