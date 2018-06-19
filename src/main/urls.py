@@ -10,6 +10,7 @@ from .queue import urls as queue_urls
 from .other import urls as other_urls
 from .camera import urls as camera_urls
 from .download import urls as download_urls
+from .tablet import urls as tablet_urls
 
 
 api_urlpatterns = [
@@ -21,6 +22,7 @@ api_urlpatterns = [
     path('camera/', include(camera_urls)),
     path('other/', include(other_urls)),
     path('download/', include(download_urls)),
+    path('tablet/', include(tablet_urls)),
 ]
 
 urlpatterns = [
