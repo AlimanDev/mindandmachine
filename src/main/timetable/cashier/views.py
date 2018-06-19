@@ -544,14 +544,14 @@ def dublicate_cashier_table(request, form):
     dt_begin = form['dt_begin']
     dt_end = form['dt_end']
 
-    main_worker_days = WorkerDay.objects.prefetch_related('day_details').filter(
+    main_worker_days = WorkerDay.objects.prefetch_related('workerdaycashboxdetails_set').filter(
                             worker=main_worker,
                             dt__gte=dt_begin,
                             dt__lte=dt_end
                         )
     main_worker_days_details = WorkerDayCashboxDetails.objects.filter(worker_day__in=main_worker_days)
 
-    trainee_worker_days = WorkerDay.objects.prefetch_related('day_details').filter(
+    trainee_worker_days = WorkerDay.objects.prefetch_related('workerdaycashboxdetails_set').filter(
                             worker=trainee_worker,
                             dt__gte=dt_begin,
                             dt__lte=dt_end
@@ -613,7 +613,7 @@ def dublicate_cashier_table(request, form):
             tm_break_start=blank_day.tm_break_start
         ) for blank_day in main_worker_days
     ])
-    updated_trainee_worker_days = WorkerDay.objects.prefetch_related('day_details').filter(
+    updated_trainee_worker_days = WorkerDay.objects.prefetch_related('workerdaycashboxdetails_set').filter(
                                 worker=trainee_worker,
                                 dt__gte=dt_begin,
                                 dt__lte=dt_end
