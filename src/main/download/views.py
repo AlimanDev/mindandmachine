@@ -25,25 +25,26 @@ def get_tabel(request, workbook, form):
         worksheet=ws,
         prod_days=None
     )
-    tabel.add_main_info()
-
-    # construct day
-    tabel.construct_dates('%d', 13, 5, int)
-
-    # construct weekday
-    tabel.construct_dates('%w', 17, 5)
-
-    #construct day 2
-    tabel.construct_dates('d%d', 20, 5)
-
-    users = User.objects.qos_filter_active(
+    users = list(User.objects.qos_filter_active(
         dt_from=tabel.prod_days[-1].dt,
         dt_to=tabel.prod_days[0].dt,
         shop=shop,
-    ).select_related('position').order_by('position_id')
+    ).select_related('position').order_by('position_id', 'last_name', 'first_name', 'tabel_code'))
 
-    tabel.construnts_users_info(users, 17, 0, ['code', 'fio', 'position', 'hired'])
+    tabel.format_cells(len(users))
+    tabel.add_main_info()
 
-    # tabel.add_sign(20)
+    # construct day
+    tabel.construct_dates('%d', 12, 4, int)
+
+    # construct weekday
+    tabel.construct_dates('%w', 14, 4)
+
+    #construct day 2
+    tabel.construct_dates('d%d', 15, 4)
+
+    tabel.construnts_users_info(users, 16, 0, ['code', 'fio', 'position', 'hired'])
+
+    tabel.add_sign(16 + len(users) + 2)
 
     return workbook, 'Tabel'

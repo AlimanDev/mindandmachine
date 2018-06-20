@@ -1,7 +1,7 @@
 import datetime
 from src.db.models import ProductionDay
 from .colors import *
-
+from src.util.models_converter import BaseConverter
 
 class Xlsx_base:
     MONTH_NAMES = {
@@ -19,6 +19,16 @@ class Xlsx_base:
         12: 'Декабрь',
     }
 
+    WEEKDAY_TRANSLATION = [
+        'вс',
+        'пн',
+        'вт',
+        'ср',
+        'чт',
+        'пт',
+        'сб',
+    ]
+
     def __init__(self, workbook, shop, dt, worksheet=None, prod_days=None):
         self.workbook = workbook
 
@@ -28,10 +38,12 @@ class Xlsx_base:
 
         # fucking formatting
 
-        self.default_text = workbook.add_format({
+        self.default_text_settings = {
             'font_size': 10,
             'font_name': 'Arial',
-        })
+            'align': 'center',
+            'bold': True,
+        }
 
         self.shop = shop
         self.super_shop = shop.super_shop
@@ -56,45 +68,51 @@ class Xlsx_base:
         :param xlsx_format:
         :return: None
         """
-        weekday_translation = [
-            'Понедельник',
-            'Вторник',
-            'Среда',
-            'Четверг',
-            'Пятница',
-            'Суббота',
-            'Воскресенье'
-        ]
+
+        text_dict = {
+            'font_size': 11,
+            'font_name': 'Arial',
+            'bold': True,
+            'align': 'center',
+            'font_color': COLOR_BLACK,
+            'border': 1,
+            'bg_color': '',
+        }
+
+        if (xlsx_format == str) :
+            writer = self.worksheet.write_string
+        elif xlsx_format == int:
+            writer = self.worksheet.write_number
+        elif type(xlsx_format) == str:
+            writer = self.worksheet.write_datetime
+            text_dict['num_format'] = xlsx_format
+        else:
+            # todo: log error
+            writer = self.worksheet.write_string
 
         i = 0
         for item in self.prod_days:
-            color = COLOR_WHITE
+            text_dict['bg_color'] = COLOR_WHITE
             if item.type == 'H':
-                color = COLOR_GREEN
+                text_dict['bg_color'] = COLOR_GREEN
             if item.type == 'S':
-                color = COLOR_ORANGE
-            text_type = self.workbook.add_format({
-                'font_size': 11,
-                'font_name': 'Arial',
-                'bold': True,
-                'align': 'center',
-                'font_color': COLOR_BLACK,
-                'border': 1,
-                'bg_color': color
-            })
+                text_dict['bg_color'] = COLOR_ORANGE
 
+            text_type = self.workbook.add_format(text_dict)
             if format == '%w':
                 self.worksheet.write_string(row, col + i,
-                                            '{}'.format(weekday_translation[int(item.dt.strftime(format))]), text_type)
+                                            self.WEEKDAY_TRANSLATION[int(item.dt.strftime(format))], text_type)
             else:
-                self.worksheet.write_string(row, col + i, '{}'.format(item.dt.strftime(format)), text_type)
+                cell_str = item.dt.strftime(format)
+                cell_str = int(cell_str) if xlsx_format==int else cell_str
+                writer(row, col + i, cell_str, text_type)
             i += 1
 
+        text_type = self.workbook.add_format({
+            'border': 1,
+            'bg_color': COLOR_GREY
+        })
         while i < 31:
-            text_type = self.workbook.add_format({
-                'border': 1,
-                'bg_color': COLOR_GREY
-            })
             self.worksheet.write_string(row, col + i, '', text_type)
             i += 1
 
@@ -109,3 +127,32 @@ class Xlsx_base:
         :param ordered_columns: list из 'code', 'fio', 'position', 'hired'
         :return:
         """
+
+        format_s = dict(self.default_text_settings)
+        format_s['border'] = 1
+        text_format = self.workbook.add_format(format_s)
+        format_s['num_format'] = 'dd.mm.yyyy'
+        date_format = self.workbook.add_format(format_s)
+
+        user_elem_dict = {
+            'code': (lambda u: u.tabel_code, text_format, self.worksheet.write_string),
+            'fio': (lambda u: '{} {} {}'.format(u.last_name, u.first_name, u.middle_name), text_format,
+                    self.worksheet.write_string),
+            'position': (lambda u: u.position.title if u.position else '', text_format, self.worksheet.write_string),
+            'hired': (lambda u: BaseConverter.convert_date(u.dt_hired), date_format, self.worksheet.write_datetime),
+        }
+
+        for it, user in enumerate(list(users)):
+            for col_shift, elem in enumerate(ordered_columns):
+                lambda_f, data_format, writer = user_elem_dict[elem]
+                try:
+                    writer(
+                        row + it,
+                        col + col_shift,
+                        lambda_f(user) or '',
+                        data_format
+                    )
+                except TypeError:
+                    self.worksheet.write_string(row + it, col + col_shift, '', text_format)
+
+
