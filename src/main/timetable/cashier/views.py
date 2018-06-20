@@ -537,7 +537,7 @@ def create_cashier(request, form):
     return JsonResponse.success(UserConverter.convert(user))
 
     
-@api_method('GET', DublicateCashierTimetableForm)
+@api_method('POST', DublicateCashierTimetableForm)
 def dublicate_cashier_table(request, form):
 
     main_worker = form['main_worker_id']
