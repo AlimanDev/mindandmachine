@@ -7,15 +7,15 @@ from django.core.exceptions import ValidationError
 from src.util.dict import DictUtil
 from src.util.models_converter import PeriodDemandConverter
 from src.conf.djconfig import (
-    DATE_FORMAT,
-    DATETIME_FORMAT,
-    TIME_FORMAT,
+    QOS_DATE_FORMAT,
+    QOS_DATETIME_FORMAT,
+    QOS_TIME_FORMAT,
 )
 
 class DateField(forms.DateField):
     def __init__(self, **kwargs):
         super().__init__(
-            input_formats=(DATE_FORMAT,),
+            input_formats=(QOS_DATE_FORMAT,),
             **kwargs
         )
 
@@ -23,7 +23,7 @@ class DateField(forms.DateField):
 class TimeField(forms.TimeField):
     def __init__(self, **kwargs):
         super().__init__(
-            input_formats=(TIME_FORMAT,),
+            input_formats=(QOS_TIME_FORMAT,),
             **kwargs
         )
 
@@ -31,7 +31,7 @@ class TimeField(forms.TimeField):
 class DatetimeField(forms.DateTimeField):
     def __init__(self, **kwargs):
         super().__init__(
-            input_formats=(DATETIME_FORMAT,),
+            input_formats=(QOS_DATETIME_FORMAT,),
             **kwargs
         )
 

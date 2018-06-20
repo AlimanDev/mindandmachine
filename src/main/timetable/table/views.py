@@ -25,7 +25,7 @@ from .forms import (
     GetTable,
     GetWorkerStatForm,
 )
-from src.conf.djconfig import SHORT_TIME_FORMAT
+from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
 from .utils import (
     count_work_month_stats,
     count_normal_days,
@@ -220,11 +220,11 @@ def get_table(request):
             worksheet.write_blank(row, 7+len(rest_time), '',
                 mix_formats(workbook, cell_format, bold_left_cell_format))
             # start and end time
-            worksheet.write(row, 3, workerday.tm_work_start.strftime(SHORT_TIME_FORMAT),
+            worksheet.write(row, 3, workerday.tm_work_start.strftime(QOS_SHORT_TIME_FORMAT),
                 mix_formats(workbook, cell_format, bold_left_cell_format, bold_format, bg_color_format))
             worksheet.write_blank(row, 4, '',
                 mix_formats(workbook, cell_format, bold_left_cell_format, bg_color_format))
-            worksheet.write(row, 5, workerday.tm_work_end.strftime(SHORT_TIME_FORMAT),
+            worksheet.write(row, 5, workerday.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT),
                 mix_formats(workbook, cell_format, bold_left_cell_format, bold_format, bg_color_format))
             worksheet.write_blank(row, 6, '',
                 mix_formats(workbook, cell_format, bold_left_cell_format, bold_right_cell_format, bg_color_format))
@@ -263,7 +263,7 @@ def get_table(request):
         ct_add = CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_LITE).count()
 
         for tm in inds:
-            worksheet.write(row, col, tm.strftime(SHORT_TIME_FORMAT), border)
+            worksheet.write(row, col, tm.strftime(QOS_SHORT_TIME_FORMAT), border)
             # in facts workers
             in_fact = len(stats[tm])
             worksheet.write(row, col+1, in_fact, border)

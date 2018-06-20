@@ -146,7 +146,6 @@ def get_cashier_timetable(request, form):
             'days': days_response,
             'user': UserConverter.convert(user)
         }
-
     return JsonResponse.success(response)
 
 

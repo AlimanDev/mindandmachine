@@ -18,6 +18,11 @@ from src.db.models import (
     WorkerConstraint,
     WorkerDayChangeLog,
     Timetable,
+    ProductionDay,
+    ProductionMonth,
+    WorkerMonthStat,
+    CameraCashboxStat,
+    CameraCashbox
 )
 
 
@@ -306,3 +311,19 @@ class TimetableAdmin(admin.ModelAdmin):
     @staticmethod
     def shop_title(instance: Timetable):
         return instance.shop.title
+
+
+
+@admin.register(ProductionDay)
+class ProductionDayAdmin(admin.ModelAdmin):
+    list_display = ('dt', 'type')
+
+
+@admin.register(WorkerMonthStat)
+class WorkerMonthStatAdmin(admin.ModelAdmin):
+    list_display = ('worker_id', 'month')
+
+
+@admin.register(CameraCashboxStat)
+class CameraCashboxStatAdmin(admin.ModelAdmin):
+    list_display = ('camera_cashbox', 'dttm', 'queue')

@@ -23,6 +23,7 @@ from src.db.models import (
     WorkerDayChangeRequest,
     Slot,
     UserWeekdaySlot,
+    ProductionDay,
 )
 from src.util.collection import group_by
 from src.util.forms import FormUtil
@@ -190,6 +191,12 @@ def create_timetable(request, form):
                             })
             extra_constr[user.id] = constr
 
+    init_params = json.loads(shop.init_params)
+    init_params['n_working_days_optimal'] = ProductionDay.objects.filter(
+        dt__gte=dt_from,
+        dt__lte=dt_to,
+        type__in=ProductionDay.WORK_TYPES,
+    )
 
     data = {
         'start_dt': BaseConverter.convert_date(tt.dt),
@@ -213,7 +220,7 @@ def create_timetable(request, form):
             'cost_weights': json.loads(shop.cost_weights),
             'method_params': json.loads(shop.method_params),
             'breaks_triplets': json.loads(shop.break_triplets),
-            'init_params': json.loads(shop.init_params),
+            'init_params': init_params,
             # 'n_working_days_optimal': working_days, # Very kostil, very hot fix, we should take this param from proizvodstveny calendar'
         },
     }
