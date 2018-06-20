@@ -19,7 +19,7 @@ from src.db.models import (
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
-from src.util.collection import group_by, count, range_u
+from src.util.collection import group_by, count, range_u, group_by_object
 
 from .forms import (
     GetCashierTimetableForm,
@@ -536,9 +536,10 @@ def create_cashier(request, form):
 
     return JsonResponse.success(UserConverter.convert(user))
 
-
-@api_method('POST', DublicateCashierTimetableForm)
+    
+@api_method('GET', DublicateCashierTimetableForm)
 def dublicate_cashier_table(request, form):
+
     main_worker = form['main_worker_id']
     trainee_worker = form['trainee_worker_id']
     dt_begin = form['dt_begin']
@@ -551,28 +552,33 @@ def dublicate_cashier_table(request, form):
                         )
     main_worker_days_details = WorkerDayCashboxDetails.objects.filter(worker_day__in=main_worker_days)
 
-    trainee_worker_days = WorkerDay.objects.prefetch_related('workerdaycashboxdetails_set').filter(
-                                worker=trainee_worker,
-                                dt__gte=dt_begin,
-                                dt__lte=dt_end
-                            )
-
     # проверка на наличие дней у стажера
-    change_log = {}
+    trainee_worker_days = group_by_object(
+            WorkerDay.objects.prefetch_related('workerdaycashboxdetails_set').filter(
+                worker=trainee_worker,
+                dt__gte=dt_begin,
+                dt__lte=dt_end
+            ),
+            group_key=lambda _: _.dt,
+        )
+
+
+    old_values = {}
     for main_worker_day in main_worker_days:
-        if main_worker_day.dt in trainee_worker_days.values_list('dt', flat=True):
+        if main_worker_day.dt in trainee_worker_days:
             # записываем аргументы для лога до изменения WorkerDay
-            trainee_worker_day = trainee_worker_days.get(dt=main_worker_day.dt)
-            change_log[main_worker_day.dt] = model_to_dict(
-                                                trainee_worker_day,
-                                                fields=[
-                                                    'dt',
-                                                    'type',
-                                                    'tm_work_start',
-                                                    'tm_work_end',
-                                                    'tm_break_start'
-                                                ]
-                                            )
+            trainee_worker_day = trainee_worker_days.get(main_worker_day.dt)
+            old_values[trainee_worker_day.dt] = model_to_dict(
+                                                    trainee_worker_day,
+                                                    fields=[
+                                                        'dt',
+                                                        'type',
+                                                        'tm_work_start',
+                                                        'tm_work_end',
+                                                        'tm_break_start'
+                                                    ]
+                                                )
+
             # обновляем дни и удаляем details для этих дней
             trainee_worker_day.type = main_worker_day.type
             trainee_worker_day.worker_shop = main_worker_day.worker_shop
@@ -583,27 +589,27 @@ def dublicate_cashier_table(request, form):
 
             main_worker_days = main_worker_days.exclude(dt=main_worker_day.dt)
 
-    WorkerDayCashboxDetails.objects.filter(worker_day__in=trainee_worker_days).delete()
-    
+    WorkerDayCashboxDetails.objects.filter(worker_day__in=trainee_worker_days.values()).delete()
+
     WorkerDayChangeLog.objects.bulk_create([
         WorkerDayChangeLog(
-            worker_day=trainee_worker_day,
-            worker_day_worker=trainee_worker_day.worker,
-            worker_day_dt=trainee_worker_day.dt,
-            from_type=change_log.get(trainee_worker_day.dt)['type'],
-            from_tm_work_start=change_log.get(trainee_worker_day.dt)['tm_work_start'],
-            from_tm_work_end=change_log.get(trainee_worker_day.dt)['tm_work_end'],
-            from_tm_break_start=change_log.get(trainee_worker_day.dt)['tm_break_start'],
-            to_type=trainee_worker_day.type,
-            to_tm_work_start=trainee_worker_day.tm_work_start,
-            to_tm_work_end=trainee_worker_day.tm_work_end,
-            to_tm_break_start=trainee_worker_day.tm_break_start,
+            worker_day=trainee_worker_days.get(trainee_worker_day_dt),
+            worker_day_worker=trainee_worker_days.get(trainee_worker_day_dt).worker,
+            worker_day_dt=trainee_worker_day_dt,
+            from_type=old_values.get(trainee_worker_day.dt)['type'],
+            from_tm_work_start=old_values.get(trainee_worker_day.dt)['tm_work_start'],
+            from_tm_work_end=old_values.get(trainee_worker_day.dt)['tm_work_end'],
+            from_tm_break_start=old_values.get(trainee_worker_day.dt)['tm_break_start'],
+            to_type=trainee_worker_days.get(trainee_worker_day_dt).type,
+            to_tm_work_start=trainee_worker_days.get(trainee_worker_day_dt).tm_work_start,
+            to_tm_work_end=trainee_worker_days.get(trainee_worker_day_dt).tm_work_end,
+            to_tm_break_start=trainee_worker_days.get(trainee_worker_day_dt).tm_break_start,
             changed_by=request.user
-        ) for trainee_worker_day in trainee_worker_days 
+        ) for trainee_worker_day_dt in trainee_worker_days 
     ])
 
     # незаполненные дни
-    created_days = WorkerDay.objects.bulk_create([
+    WorkerDay.objects.bulk_create([
         WorkerDay(
             worker=trainee_worker,
             dt=blank_day.dt,
@@ -615,12 +621,18 @@ def dublicate_cashier_table(request, form):
         ) for blank_day in main_worker_days
     ])
 
-    # add created days to trainee_worker_days
-    trainee_worker_days._result_cache.append(created_days)
+    full_trainee_worker_days = group_by_object(
+            WorkerDay.objects.prefetch_related('workerdaycashboxdetails_set').filter(
+                worker=trainee_worker,
+                dt__gte=dt_begin,
+                dt__lte=dt_end
+            ),
+            group_key=lambda _: _.dt,
+        )
 
     WorkerDayCashboxDetails.objects.bulk_create([
         WorkerDayCashboxDetails(
-            worker_day=trainee_worker_days.get(dt=day_detail.worker_day.dt),
+            worker_day=full_trainee_worker_days.get(day_detail.worker_day.dt),
             on_cashbox=day_detail.on_cashbox,
             cashbox_type=day_detail.cashbox_type,
             tm_from=day_detail.tm_from,
