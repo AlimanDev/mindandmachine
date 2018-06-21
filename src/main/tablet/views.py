@@ -11,11 +11,11 @@ from django.utils.timezone import now
 @api_method('GET', GetCashboxesInfo)
 def get_cashboxes_info(request, form):
     response = {}
-
+    time = now()
     shop_id = form['shop_id']
 
-    list_of_cashbox = Cashbox.objects.qos_filter_active(now(),
-                                                        now(),
+    list_of_cashbox = Cashbox.objects.qos_filter_active(time,
+                                                        time,
                                                         type__shop__id=shop_id).order_by('number')
     for cashbox in list_of_cashbox:
 
@@ -25,19 +25,20 @@ def get_cashboxes_info(request, form):
         else:
             with_queue = True
             mean_queue = CameraCashboxStat.objects.all().filter(camera_cashbox__cashbox__id=cashbox.id,
-                                                                dttm__gte=now() - timedelta(seconds=60),
-                                                                dttm__lt=now()).values(
+                                                                dttm__gte=time - timedelta(seconds=60),
+                                                                dttm__lt=time).values(
                 'queue').aggregate(mean_queue=Avg('queue'))
 
         if not mean_queue['mean_queue']:
             mean_queue['mean_queue'] = 0
 
-        status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(on_cashbox__id=cashbox.id,
-                                                                                     tm_from__lt=now(),
-                                                                                     tm_to__gte=now(),
+        status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+                                                                                     on_cashbox__id=cashbox.id,
+                                                                                     tm_from__lt=time.time(),
+                                                                                     tm_to__gte=time.time(),
                                                                                      on_cashbox=cashbox.id,
                                                                                      cashbox_type__id=cashbox.type.id,
-                                                                                     worker_day__dt=now().date(),
+                                                                                     worker_day__dt=time.date(),
                                                                                      worker_day__worker_shop__id=shop_id
                                                                                      )
         user_id = 'no_user'
