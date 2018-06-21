@@ -196,7 +196,7 @@ def create_timetable(request, form):
         dt__gte=dt_from,
         dt__lte=dt_to,
         type__in=ProductionDay.WORK_TYPES,
-    )
+    ).count()
 
     data = {
         'start_dt': BaseConverter.convert_date(tt.dt),
@@ -238,7 +238,8 @@ def create_timetable(request, form):
         if tt.task_id is None:
             tt.status = Timetable.Status.ERROR.value
         tt.save()
-    except:
+    except Exception as e:
+        print(e)
         tt.status = Timetable.Status.ERROR.value
         tt.save()
         JsonResponse.internal_error('Error sending data to server')
