@@ -1,82 +1,74 @@
-from datetime import datetime, timedelta, time
+from datetime import timedelta
 
-from src.db.models import Shop, CameraCashboxStat, CashboxType, Cashbox
+from src.db.models import CameraCashboxStat, Cashbox, WorkerDayCashboxDetails
 from django.db.models import Avg
 
-from src.util.collection import range_u
-from src.util.models_converter import BaseConverter, PeriodDemandConverter, PeriodDemandChangeLogConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import GetCashboxesInfo
+from django.utils.timezone import now
 
 
 @api_method('GET', GetCashboxesInfo)
 def get_cashboxes_info(request, form):
     response = {}
 
-    shop = Shop.objects.get(id=form['shop_id'])
+    shop_id = form['shop_id']
 
-    list_of_cashbox = Cashbox.objects.select_related('type')
-
+    list_of_cashbox = Cashbox.objects.qos_filter_active(now(),
+                                                        now(),
+                                                        type__shop__id=shop_id).order_by('number')
     for cashbox in list_of_cashbox:
-        mean_queue = CameraCashboxStat.objects.all().filter(
-            camera_cashbox__cashbox__id=cashbox.id,
-        ).values('queue') \
-            .aggregate(mean_queue=Avg('queue'))
-        if mean_queue['mean_queue']:
-            response.update({cashbox.type.id:
-                                 {'name': cashbox.type.name,
-                                  'number': cashbox.number,
-                                  'status': '',
-                                  'queue': mean_queue['mean_queue']
-                                  },
-                             })
+
+        if cashbox.type.dttm_last_update_queue is None:
+            with_queue = False
+
+        else:
+            with_queue = True
+            mean_queue = CameraCashboxStat.objects.all().filter(camera_cashbox__cashbox__id=cashbox.id,
+                                                                dttm__gte=now() - timedelta(seconds=60),
+                                                                dttm__lt=now()).values(
+                'queue').aggregate(mean_queue=Avg('queue'))
+
+        if not mean_queue['mean_queue']:
+            mean_queue['mean_queue'] = 0
+
+        status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(on_cashbox__id=cashbox.id,
+                                                                                     tm_from__lt=now(),
+                                                                                     tm_to__gte=now(),
+                                                                                     on_cashbox=cashbox.id,
+                                                                                     cashbox_type__id=cashbox.type.id,
+                                                                                     worker_day__dt=now().date(),
+                                                                                     worker_day__worker_shop__id=shop_id
+                                                                                     )
+        user_id = 'no_user'
+
+        if not status:
+            status = 'C'
+        else:
+            status = 'O'
+
+            for item in status:
+                u_id = str(item.worker_day.worker.id)
+                if user_id:
+                    user_id = u_id
+
+        if cashbox.type.id in response:
+            response[cashbox.type.id]["кассы"] += {
+                                                      "number": cashbox.number,
+                                                      "status": status,
+                                                      "queue": mean_queue['mean_queue'],
+                                                      "user_id": user_id,
+                                                  },
+        else:
+            response.update({cashbox.type.id: {
+                "name": cashbox.type.name,
+                "with_queue": with_queue,
+                "кассы": [
+                    {
+                        "number": cashbox.number,
+                        "status": status,
+                        "queue": mean_queue['mean_queue'],
+                        "user_id": user_id,
+                    }, ]}, })
 
     return JsonResponse.success(response)
-
-    # # for items in last_update_queue:
-    # mean_queue = CameraCashboxStat.objects.all().filter(
-    #     # camera_cashbox__cashbox__type__id=1,
-    # ).values('queue') \
-    #     .aggregate(mean_queue=Avg('queue'))
-
-    # for items in last_update_queue:
-    #     mean_queue = CameraCashboxStat.objects.all().filter(
-    #             camera_cashbox__cashbox__type__id=items['id']).order_by('dttm').values('queue').aggregate(mean_queue=Avg('queue'))
-    #     mean = mean_queue
-    # # print(mean_queue)
-
-# def update_queue():
-#     last_update_queue = CashboxType.objects.all().filter(dttm_last_update_queue__isnull=False) \
-#         .values('id', 'dttm_last_update_queue')
-#     for items in last_update_queue:
-#
-#         dif_time = (now() - items['dttm_last_update_queue'])
-#         while (dif_time.seconds > 1800) and dif_time.days >= 0:
-#             mean_queue = CameraCashboxStat.objects.all().filter(
-#                 camera_cashbox__cashbox__type__id=items['id'],
-#                 dttm__gte=items['dttm_last_update_queue'],
-#                 dttm__lt=items['dttm_last_update_queue'] + timedelta(seconds=1800)
-#             ).values('queue') \
-#                 .aggregate(mean_queue=Avg('queue'))
-#
-#             period_demand = PeriodDemand.objects.all().filter(dttm_forecast=items['dttm_last_update_queue'],
-#                                                               cashbox_type_id=items['id'], type=3).values()
-#             if mean_queue['mean_queue']:
-#                 if not period_demand:
-#                     PeriodDemand.objects.create(
-#                         dttm_forecast=items['dttm_last_update_queue'],
-#                         clients=0,
-#                         products=0,
-#                         type=3,
-#                         queue_wait_time=0,
-#                         queue_wait_length=mean_queue['mean_queue'],
-#                         cashbox_type_id=items['id']
-#                     )
-#                 else:
-#                     PeriodDemand.objects.filter(dttm_forecast=items['dttm_last_update_queue'],
-#                                                 cashbox_type_id=items['id']) \
-#                         .update(queue_wait_length=mean_queue['mean_queue'])
-#             CashboxType.objects.filter(id=items['id']) \
-#                 .update(dttm_last_update_queue=items['dttm_last_update_queue'] + timedelta(seconds=1800))
-#             items['dttm_last_update_queue'] += timedelta(seconds=1800)
-#             dif_time -= timedelta(seconds=1800)

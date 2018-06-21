@@ -272,6 +272,24 @@ class Slot(models.Model):
     worker = models.ManyToManyField(User, through=UserWeekdaySlot)
 
 
+class CashboxManager(models.Manager):
+    def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
+        """
+        added earlier then dt_from, added later then dt_to
+        :param dt_from:
+        :param dt_to:
+        :param args:
+        :param kwargs:
+        :return:
+        """
+
+        return self.filter(
+            models.Q(dttm_added__lte=dt_from) | models.Q(dttm_added__isnull=True)
+        ).filter(
+            models.Q(dttm_deleted__gte=dt_to) | models.Q(dttm_deleted__isnull=True)
+        ).filter(*args, **kwargs)
+
+
 class Cashbox(models.Model):
     class Meta:
         verbose_name = 'Касса'
@@ -289,6 +307,7 @@ class Cashbox(models.Model):
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
     number = models.CharField(max_length=6)
     bio = models.CharField(max_length=512, default='', blank=True)
+    objects = CashboxManager()
 
 
 class PeriodDemand(models.Model):
