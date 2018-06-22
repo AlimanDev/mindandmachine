@@ -390,6 +390,7 @@ class WorkerDay(models.Model):
         TYPE_SELF_VACATION = 16
         TYPE_SELF_VACATION_TRUE = 17
         TYPE_GOVERNMENT = 18
+        TYPE_HOLIDAY_SPECIAL = 19
 
 
     TYPES_PAID = [
