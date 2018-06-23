@@ -40,7 +40,6 @@ class TestCashboxTypes(LocalTestCase):
           worker=self.user,
         )
 
-
     def test_get_slots(self):
         response = self.api_get('/api/other/get_slots?user_id=1')
         self.assertEqual(response.status_code, 200)
