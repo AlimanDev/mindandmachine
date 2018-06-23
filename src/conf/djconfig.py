@@ -39,6 +39,9 @@ INSTALLED_APPS = [
     'src',
     'src.db',
     'src.main',
+    'django_celery_beat',
+    'django_celery_results',
+    'src.celery'
     # 'rest_framework',
 ]
 
@@ -115,6 +118,20 @@ QOS_DATETIME_FORMAT = '%H:%M:%S %d.%m.%Y'
 QOS_DATE_FORMAT = '%d.%m.%Y'
 QOS_TIME_FORMAT = '%H:%M:%S'
 QOS_SHORT_TIME_FORMAT = '%H:%M'
+
+
+CELERY_BROKER_URL = 'redis://localhost:6379'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379'
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_BEAT_SCHEDULE = {
+    'task-every-10-seconds-update-queue': {
+        'task': 'update_queue',
+        'schedule': 10.0,
+    }
+}
 
 
 if is_config_exists('djconfig_local.py'):
