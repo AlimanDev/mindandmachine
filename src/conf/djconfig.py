@@ -127,9 +127,9 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULE = {
-    'task-every-10-seconds-update-queue': {
+    'task-every-30-min-update-queue': {
         'task': 'update_queue',
-        'schedule': 10.0,
+        'schedule': 30 * 60,
     }
 }
 
