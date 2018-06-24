@@ -8,7 +8,7 @@ from dateutil.relativedelta import relativedelta
 
 from src.db.models import WorkerDay, User, Shop
 from src.util.collection import range_u, count
-from src.conf.djconfig import SHORT_TIME_FORMAT
+from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
 
 class Cell(object):
     def __init__(self, d, f=None):
@@ -125,7 +125,7 @@ class PrintHelper(object):
 
         if obj.type == WorkerDay.Type.TYPE_WORKDAY.value:
             return Cell(
-                '{}-{}'.format(obj.tm_work_start.strftime(SHORT_TIME_FORMAT), obj.tm_work_end.strftime(SHORT_TIME_FORMAT)),
+                '{}-{}'.format(obj.tm_work_start.strftime(QOS_SHORT_TIME_FORMAT), obj.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT)),
                 fmts['default']
             )
 
@@ -154,7 +154,7 @@ class PrintHelper(object):
             return __ret('')
 
         if obj.type == WorkerDay.Type.TYPE_WORKDAY.value:
-            key = '{}-{}'.format(obj.tm_work_start.strftime(SHORT_TIME_FORMAT), obj.tm_work_end.strftime(SHORT_TIME_FORMAT))
+            key = '{}-{}'.format(obj.tm_work_start.strftime(QOS_SHORT_TIME_FORMAT), obj.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT))
             value = timetable[key]
 
             __tt_add(value)
@@ -209,12 +209,12 @@ def common_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
     format_text = workbook.add_format(fmt(font_size=12, border=1, bold=True))
     format_holiday_debt = workbook.add_format(fmt(font_size=10, border=1, bg_color='#FEFF99'))
 
-    for worker in User.objects.qos_filter_active(dt_from, dt_to, shop_id=shop_id).order_by('id'):
+    for worker in User.objects.qos_filter_active(dt_from, dt_to, shop_id=shop_id).select_related('position').order_by('id'):
         worker_days = {x.dt: x for x in WorkerDay.objects.filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
         row = [
-            Cell('', format_text),
+            Cell(worker.tabel_code, format_text),
             Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_text),
-            Cell('кассир-консультант', format_text),
+            Cell(worker.position.title if worker.position else 'кассир-консультант', format_text),
             Cell('', format_holiday_debt)
         ] + [
             PrintHelper.common_get_worker_day_cell(worker_days.get(dttm.date()), format_days) for dttm in __dt_range()
@@ -384,9 +384,10 @@ def common_add_workers_two(workbook, shop_id, dt_from, dt_to):
     }
 
     prev_user_data = None
-    for i, worker in enumerate(User.objects.qos_filter_active(dt_from, dt_to, shop_id=shop_id).order_by('id')):
+    workers = User.objects.qos_filter_active(dt_to, dt_from, shop_id=shop_id).order_by('id')
+    last_worker = len(workers) - 1
+    for i, worker in enumerate(workers):
         worker_days = {x.dt: x for x in WorkerDay.objects.filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
-
         user_data = [weekdays]
         dt = dt_from - timedelta(days=dt_from.weekday())
         while dt <= dt_to:
@@ -433,7 +434,8 @@ def common_add_workers_two(workbook, shop_id, dt_from, dt_to):
 
         if i % 2 == 0:
             prev_user_data = user_data
-        else:
+
+        if (i % 2 == 1) or (last_worker == i):
             data += [row1 + row2 for row1, row2 in zip(prev_user_data, user_data)]
 
             if len(data_size['cols']) == 0:
@@ -499,7 +501,7 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
         for wd in worker_days.values():
             if wd.type != WorkerDay.Type.TYPE_WORKDAY.value:
                 continue
-            key = '{}-{}'.format(wd.tm_work_start.strftime(SHORT_TIME_FORMAT), wd.tm_work_end.strftime(SHORT_TIME_FORMAT))
+            key = '{}-{}'.format(wd.tm_work_start.strftime(QOS_SHORT_TIME_FORMAT), wd.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT))
             timetable_raw[key] = [wd.tm_work_start, wd.tm_work_end]
 
     timetable = {}

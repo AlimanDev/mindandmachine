@@ -111,10 +111,10 @@ STATIC_URL = '/_i/static/'
 MEDIA_URL = '/_i/media/'
 
 
-DATETIME_FORMAT = '%H:%M:%S %d.%m.%Y'
-DATE_FORMAT = '%d.%m.%Y'
-TIME_FORMAT = '%H:%M:%S'
-SHORT_TIME_FORMAT = '%H:%M'
+QOS_DATETIME_FORMAT = '%H:%M:%S %d.%m.%Y'
+QOS_DATE_FORMAT = '%d.%m.%Y'
+QOS_TIME_FORMAT = '%H:%M:%S'
+QOS_SHORT_TIME_FORMAT = '%H:%M'
 
 
 if is_config_exists('djconfig_local.py'):
