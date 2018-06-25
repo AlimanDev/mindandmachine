@@ -268,7 +268,7 @@ class Cashbox(models.Model):
         verbose_name_plural = 'Кассы'
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.type.name, self.type.shop.title, self.type.shop.super_shop.title, self.id)
+        return '{}, {}, {}, {}, {}'.format(self.type.name, self.type.shop.title, self.type.shop.super_shop.title, self.id, self.number)
         # return f'{self.type.name}, {self.type.shop.title}, {self.type.shop.super_shop.title}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
