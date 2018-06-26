@@ -138,15 +138,10 @@ def get_cashiers_info(request, form):
 
         if item.worker_day.worker_id not in response.keys():
             response[item.worker_day.worker_id] = {
+                                                      "worker_id": item.worker_day.worker_id,
                                                       "status": user_status,
-                                                      "worker_day": str(item.worker_day.dt),
-                                                      "first_name": str(item.worker_day.worker.first_name),
-                                                      "last_name": str(item.worker_day.worker.last_name),
-
-                                                      "tm_work_start": str(item.worker_day.tm_work_start),
-                                                      "tm_work_end": str(item.worker_day.tm_work_end),
+                                                      "worker_day": item.worker_day_id,
                                                       "break_triplets": triplets,
-                                                      "worker_day_id": str(item.worker_day_id),
 
                                                   },
         else:
@@ -169,7 +164,6 @@ def change_cashier_status(request, form):
             item.tm_to = dttm_now.time()
             item.save()
             pd = item
-            # pd.id = None
             pd.pk = None
             pd.tm_from = dttm_now.time()
             pd.tm_to = None
@@ -285,20 +279,9 @@ def change_cashier_status(request, form):
             user_status = 'H'
 
         response[item.worker_day.worker_id] = {
+                                                  "worker_id": item.worker_day.worker_id,
                                                   "status": user_status,
-                                                  "worker_day": str(item.worker_day.dt),
-                                                  "first_name": str(item.worker_day.worker.first_name),
-                                                  "last_name": str(item.worker_day.worker.last_name),
-
-                                                  "tm_work_start": str(item.tm_from),
-                                                  "tm_work_end": str(item.tm_to),
                                                   "cashbox_id": item.on_cashbox_id,
-                                                  "worker_day_id": str(item.worker_day_id),
-
-                                                  "type": item.worker_day.type,
-                                                  "break": item.is_break,
-                                                  "in_educ": item.on_education,
-
                                               },
 
     return JsonResponse.success(response)
