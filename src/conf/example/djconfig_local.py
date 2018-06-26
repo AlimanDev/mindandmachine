@@ -6,6 +6,10 @@ ALLOWED_HOSTS = [
     '*',
 ]
 
+# save logs to ordinary unix log directory
+from .djconfig import LOGGING
+LOGGING['handlers']['file']['filename'] = '/var/log/qos_backend/qos_backend.log'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
