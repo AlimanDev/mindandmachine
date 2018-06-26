@@ -15,3 +15,8 @@ class GetCashboxesInfo(forms.Form):
 class GetCashiersInfo(forms.Form):
     shop_id = forms.IntegerField()
     dttm = util_forms.DatetimeField()
+
+
+class ChangeCashierStatus(forms.Form):
+    worker_id = forms.IntegerField()
+    status = forms.IntegerField()

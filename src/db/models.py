@@ -469,10 +469,11 @@ class WorkerDayCashboxDetails(models.Model):
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT, null=True, blank=True)
 
     is_break = models.BooleanField(default=False)  # True if it is time for rest
-    on_education = models.BooleanField(default=False)  # True if it is time for rest
+    on_education = models.BooleanField(default=False)
+    is_tablet = models.BooleanField(default=False)
 
     tm_from = models.TimeField()
-    tm_to = models.TimeField()
+    tm_to = models.TimeField(null=True, blank=True)
 
 
 class WorkerDayChangeRequest(models.Model):
