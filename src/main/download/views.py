@@ -33,7 +33,7 @@ def get_tabel(request, workbook, form):
     ).select_related('position').order_by('position_id', 'last_name', 'first_name', 'tabel_code'))
 
     breaktimes = json.loads(shop.break_triplets)
-    breaktimes = list(map(lambda x: (x[0], x[1], sum(x[2]) / 60), breaktimes))
+    breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
     workdays = WorkerDay.objects.filter(
         worker__shop=shop,
         dt__gte=tabel.prod_days[0].dt,

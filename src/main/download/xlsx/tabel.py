@@ -25,6 +25,9 @@ class Tabel_xlsx(Xlsx_base):
         WorkerDay.Type.TYPE_GOVERNMENT.value: (COLOR_BLACK, COLOR_PINK3),
         WorkerDay.Type.TYPE_MATERNITY.value: (COLOR_BLACK, COLOR_GREEN2),
 
+        WorkerDay.Type.TYPE_ETC.value: (COLOR_GREY, COLOR_GREY),
+        WorkerDay.Type.TYPE_EMPTY.value: (COLOR_GREY, COLOR_GREY),
+
         'night_work': (COLOR_BLACK, COLOR_PINK2),
 
     }
@@ -42,6 +45,8 @@ class Tabel_xlsx(Xlsx_base):
         WorkerDay.Type.TYPE_SELF_VACATION_TRUE.value: 'ОЗ',
         WorkerDay.Type.TYPE_GOVERNMENT.value: 'Г',
         WorkerDay.Type.TYPE_MATERNITY.value: 'ОВ',
+        WorkerDay.Type.TYPE_ETC.value: '',
+        WorkerDay.Type.TYPE_EMPTY.value: '',
     }
 
 
@@ -263,6 +268,7 @@ class Tabel_xlsx(Xlsx_base):
             diff_h += 24
         if (breaks is not None) and len(breaks):
             i = 0
+            print(breaks, diff_h)
             while (len(breaks) > i) and not (breaks[i][0] <= diff_h < breaks[i][1]):
                 i += 1
             if len(breaks) == i:
@@ -316,7 +322,7 @@ class Tabel_xlsx(Xlsx_base):
                         else:
                             text = str(total_h)
                     elif wd.type == WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
-                        total_h = self.__time2hours(wd.tm_work_start, wd.tm_work_end, triplets)
+                        total_h = int(self.__time2hours(wd.tm_work_start, wd.tm_work_end, triplets))
                         text = 'В{}'.format(total_h)
                     else:
                         text = self.WORKERDAY_TYPE_VALUE[wd.type]
