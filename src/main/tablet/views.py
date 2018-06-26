@@ -196,10 +196,6 @@ def change_cashier_status(request, form):
     if status:
 
         for item in status:
-
-            # if item.worker_day.tm_work_start > dttm_now.time():
-            #     user_status = 'C'
-
             if (item.is_tablet is True) and not item.tm_to:
                 if new_user_status == 'W':
                     user_status = new_user_status
