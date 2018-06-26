@@ -19,4 +19,5 @@ class GetCashiersInfo(forms.Form):
 
 class ChangeCashierStatus(forms.Form):
     worker_id = forms.IntegerField()
-    status = forms.IntegerField()
+    status = forms.CharField()
+    cashbox_id = forms.IntegerField(required=False)

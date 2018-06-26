@@ -80,12 +80,30 @@ def get_cashiers_info(request, form):
         worker_day__tm_work_start__lte=(dttm + timedelta(seconds=1800)).time(),
         worker_day__tm_work_end__gt=dttm.time(),
         worker_day__dt=dttm.date(),
-        worker_day__worker_shop__id=shop_id
+        worker_day__worker_shop__id=shop_id,
+        # убрать
+        worker_day__worker_id=38,
+
     ).order_by('tm_from')
 
     for item in status:
+        triplets = []
         user_status = None
         real_break_time = None
+
+        tm_work_end = item.worker_day.tm_work_end
+        tm_work_start = item.worker_day.tm_work_start
+
+        duration_of_work = float(
+            tm_work_end.hour * 3600 + tm_work_end.minute * 60 + tm_work_end.second -
+            tm_work_start.hour * 3600 - tm_work_start.minute * 60 - tm_work_start.second) / 60
+        break_triplets = item.cashbox_type.shop.break_triplets
+        list_of_break_triplets = json.loads(break_triplets)
+
+        for triplet in list_of_break_triplets:
+            if float(triplet[0]) < duration_of_work <= float(triplet[1]):
+                for time_triplet in triplet[2]:
+                    triplets.append([time_triplet, 0])
 
         if item.worker_day.tm_work_start > dttm.time():
             user_status = 'C'
@@ -93,10 +111,25 @@ def get_cashiers_info(request, form):
             if item.is_tablet is True:
                 if item.is_break is True:
                     user_status = 'B'
-                    # if item.tm_to:
-                    real_break_time = float(item.tm_to.hour * 3600 + item.tm_to.minute * 60 + item.tm_to.second -
-                                            item.tm_from.hour * 3600 - item.tm_from.minute * 60 -
-                                            item.tm_from.second) / 60
+                    if item.tm_to:
+                        real_break_time = float(item.tm_to.hour * 3600 + item.tm_to.minute * 60 + item.tm_to.second -
+                                                item.tm_from.hour * 3600 - item.tm_from.minute * 60 -
+                                                item.tm_from.second) / 60
+
+                        for triplet in list_of_break_triplets:
+
+                            if float(triplet[0]) < duration_of_work <= float(triplet[1]):
+                                if response.get(item.worker_day.worker_id):
+                                    triplets = response[item.worker_day.worker_id][0]['break_triplets']
+                                    for it in triplets:
+                                        if it[1] == 0:
+                                            if real_break_time:
+                                                it[0] = real_break_time
+                                            it[1] = 1
+                                            break
+                                    else:
+                                        triplets.append([real_break_time, 1])
+                                break
                 elif item.on_education is True:
                     user_status = 'S'
                 elif (item.is_break is False) and item.tm_to:
@@ -105,35 +138,6 @@ def get_cashiers_info(request, form):
                     user_status = 'A'
                 else:
                     user_status = 'W'
-
-        tm_work_end = item.worker_day.tm_work_end
-        tm_work_start = item.worker_day.tm_work_start
-
-        duration_of_work = float(tm_work_end.hour * 3600 + tm_work_end.minute * 60 + tm_work_end.second -
-                                 tm_work_start.hour * 3600 - tm_work_start.minute * 60 - tm_work_start.second) / 60
-
-        break_triplets = item.cashbox_type.shop.break_triplets
-        list_of_break_triplets = json.loads(break_triplets)
-        triplets = []
-
-        for triplet in list_of_break_triplets:
-
-            if float(triplet[0]) < duration_of_work <= float(triplet[1]):
-                if not response.get(item.worker_day.worker_id):
-                    for time_triplet in triplet[2]:
-                        triplets.append([time_triplet, 0])
-                else:
-                    triplets = response[item.worker_day.worker_id][0]['break_triplets']
-
-                    for it in triplets:
-                        if it[1] == 0:
-                            if real_break_time:
-                                it[0] = real_break_time
-                            it[1] = 1
-                            break
-                    else:
-                        triplets.append([real_break_time, 1])
-                break
 
         if item.worker_day.worker_id not in response.keys():
             response[item.worker_day.worker_id] = {
@@ -148,6 +152,8 @@ def get_cashiers_info(request, form):
                                                       "worker_day_id": str(item.worker_day_id),
 
                                                   },
+        else:
+            response[item.worker_day.worker_id][0]["status"] = user_status
 
     return JsonResponse.success(response)
 
@@ -156,6 +162,8 @@ def get_cashiers_info(request, form):
 def change_cashier_status(request, form):
     worker_id = form['worker_id']
     new_user_status = form['status']
+    cashbox_id = form['cashbox_id']
+
     response = {}
     dttm_now = now()
 
@@ -180,8 +188,6 @@ def change_cashier_status(request, form):
             item.save()
 
     status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
-        # worker_day__tm_work_start__lte=(dttm_now + timedelta(seconds=1800)).time(),
-        # worker_day__tm_work_end__gt=dttm_now.time(),
         worker_day__dt=dttm_now.date(),
         worker_day__worker_id=worker_id
     ).order_by('tm_from')
@@ -190,106 +196,101 @@ def change_cashier_status(request, form):
     if status:
 
         for item in status:
-            real_break_time = None
 
             # if item.worker_day.tm_work_start > dttm_now.time():
             #     user_status = 'C'
 
-            if item.is_tablet is True and not item.tm_to:
-                # return JsonResponse.success({'Failed3': item.is_break})
-
-                if new_user_status == 1:
-                    user_status = 'W'
-
+            if (item.is_tablet is True) and not item.tm_to:
+                if new_user_status == 'W':
+                    user_status = new_user_status
+                    if cashbox_id:
+                        item.on_cashbox_id = cashbox_id
+                        item.save()
                     if item.is_break is True or item.on_education is True:
-                        return JsonResponse.success({'Failed3': item.is_break})
-                        # change_status(item)
+                        change_status(item)
                     break
 
-                elif new_user_status == 2:
-                    user_status = 'B'
-                    # return JsonResponse.success({'Failed1': item.is_break})
-
+                elif new_user_status == 'B':
+                    user_status = new_user_status
                     if item.is_break is False:
-                        # return JsonResponse.success({'Failed1': item.is_break})
-
                         change_status(item, is_break=True)
                     break
 
-                elif new_user_status == 3:
-                    # Exception
-                    pass
+                elif new_user_status == 'A':
+                    return JsonResponse.value_error(
+                        'can not change the status to {}'.format(new_user_status))
 
-                elif new_user_status == 4:
-                    # Exception
-                    pass
-
-                elif new_user_status == 5:
-                    user_status = 'S'
+                elif new_user_status == 'S':
+                    user_status = new_user_status
 
                     if item.on_education is False:
-
                         change_status(item, is_on_education=True)
                     break
 
-                elif new_user_status == 6:
+                elif new_user_status == 'H':
 
                     if (item.worker_day.type != WorkerDay.Type.TYPE_ABSENSE.value) and (user_status != 'C'):
 
                         item.tm_to = dttm_now.time()
+                        item.on_education = False
+                        item.is_break = False
                         item.save()
                         break
 
                     else:
-                        return JsonResponse.success({'Failed': item.is_break})
+                        return JsonResponse.value_error(
+                            'can not change the status to {}'.format(new_user_status))
+                else:
+                    return JsonResponse.value_error(
+                        'Invalid status {}'.format(new_user_status))
 
-                        # Exception
-                        # pass
-
-
-
-            elif item.is_tablet is False and item.tm_to:
-                # return JsonResponse.success({item.is_tablet: item.id})
-
-                # return JsonResponse.success()
-
-                if new_user_status == 1:
+            elif (item.is_tablet is False) and item.tm_to:
+                if new_user_status == 'W':
                     user_status = 'W'
-
+                    if cashbox_id:
+                        item.on_cashbox_id = cashbox_id
+                        item.save()
+                    if item.worker_day.type == WorkerDay.Type.TYPE_ABSENSE.value:
+                        # A если был не выходной....
+                        item.worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
+                        item.worker_day.save()
                     change_status(item, is_tablet=False)
                     break
 
-                #     точно ли можно сразу в перерыв?
-                elif new_user_status == 2:
-                    user_status = 'W'
-
+                elif new_user_status == 'B':
+                    user_status = 'B'
+                    if item.worker_day.type == WorkerDay.Type.TYPE_ABSENSE.value:
+                        # A если был не выходной....
+                        item.worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
+                        item.worker_day.save()
                     change_status(item, is_break=True, is_tablet=False)
                     break
 
-                elif new_user_status == 3:
-                    user_status = 'C'
-                    item.tm_from = (dttm_now + timedelta(seconds=1800)).time()
-                    # добавить, чтобы время tm_to было точное
-                    item.save()
+                elif new_user_status == 'A':
+                    user_status = 'A'
+                    item.worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
+                    item.worker_day.save()
                     break
 
-                elif new_user_status == 4:
-                    item.worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
-                    # Exception
-                    pass
-
-                elif new_user_status == 5:
+                elif new_user_status == 'S':
                     user_status = 'S'
+                    if item.worker_day.type == WorkerDay.Type.TYPE_ABSENSE.value:
+                        # A если был не выходной....
+                        item.worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
+                        item.worker_day.save()
                     change_status(item, is_on_education=True, is_tablet=False)
                     break
 
-
+                elif new_user_status == 'H':
+                    return JsonResponse.value_error(
+                        'can not change the status to {}'.format(new_user_status))
+                else:
+                    return JsonResponse.value_error(
+                        'Invalid status {}'.format(new_user_status))
 
         else:
-            return JsonResponse.success({'Failed': item.id})
+            user_status = 'H'
 
-            # Exception
-            pass
         response[item.worker_day.worker_id] = {
                                                   "status": user_status,
                                                   "worker_day": str(item.worker_day.dt),
@@ -301,15 +302,10 @@ def change_cashier_status(request, form):
                                                   "cashbox_id": item.on_cashbox_id,
                                                   "worker_day_id": str(item.worker_day_id),
 
-                                                  "break": str(item.is_break),
+                                                  "type": item.worker_day.type,
+                                                  "break": item.is_break,
                                                   "in_educ": item.on_education,
 
                                               },
-
-    # else:
-    #     x = WorkerDayCashboxDetails(
-    #         worker_day=dttm_now.date(),
-    #         on_cashbox=None
-    #     )
 
     return JsonResponse.success(response)
