@@ -1,7 +1,4 @@
-import json
-
 from django import forms
-from django.core.exceptions import ValidationError
 
 from src.util import forms as util_forms
 
@@ -11,6 +8,7 @@ class GetCashiersTimetableForm(forms.Form):
     to_dt = util_forms.DateField()
     cashbox_type_ids = util_forms.IntegersList()
     format = util_forms.ChoiceField(['raw', 'excel'], default='raw')
+    position_id = forms.IntegerField(required=False)
 
     def clean(self):
         if self.errors:

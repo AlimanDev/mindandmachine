@@ -12,6 +12,7 @@ from src.conf.djconfig import (
     QOS_TIME_FORMAT,
 )
 
+
 class DateField(forms.DateField):
     def __init__(self, **kwargs):
         super().__init__(
