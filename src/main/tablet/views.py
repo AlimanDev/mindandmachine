@@ -158,7 +158,7 @@ def get_cashiers_info(request, form):
     return JsonResponse.success(response)
 
 
-@api_method('GET', ChangeCashierStatus)
+@api_method('POST', ChangeCashierStatus)
 def change_cashier_status(request, form):
     worker_id = form['worker_id']
     new_user_status = form['status']
