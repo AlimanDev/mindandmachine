@@ -339,6 +339,7 @@ class WorkerCashboxInfo(models.Model):
 
     mean_speed = models.FloatField(default=1)
     bills_amount = models.PositiveIntegerField(default=0)
+    priority = models.IntegerField(default=0)
 
 
 class WorkerConstraint(models.Model):
