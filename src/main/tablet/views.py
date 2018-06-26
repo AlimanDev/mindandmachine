@@ -81,9 +81,6 @@ def get_cashiers_info(request, form):
         worker_day__tm_work_end__gt=dttm.time(),
         worker_day__dt=dttm.date(),
         worker_day__worker_shop__id=shop_id,
-        # убрать
-        worker_day__worker_id=38,
-
     ).order_by('tm_from')
 
     for item in status:
