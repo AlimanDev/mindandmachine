@@ -35,15 +35,13 @@ def get_cashboxes_info(request, form):
                 mean_queue = mean_queue['mean_queue']
 
         status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
-            on_cashbox_id=cashbox.id,
+            on_cashbox=cashbox,
             tm_from__lt=dttm_now.time(),
             tm_to__gte=dttm_now.time(),
-            on_cashbox=cashbox.id,
-            cashbox_type_id=cashbox.type.id,
+            cashbox_type_id=cashbox.type_id,
             worker_day__dt=dttm_now.date(),
             worker_day__worker_shop_id=shop_id
         )
-
         user_id = None
         if not status:
             status = 'C'
@@ -62,6 +60,7 @@ def get_cashboxes_info(request, form):
         response[cashbox.type.id]["cashbox"] += \
             {
                 "number": cashbox.number,
+                "cashbox_id": cashbox.id,
                 "status": status,
                 "queue": mean_queue,
                 "user_id": user_id,
@@ -135,12 +134,13 @@ def get_cashiers_info(request, form):
                     user_status = 'A'
                 else:
                     user_status = 'W'
-
         if item.worker_day.worker_id not in response.keys():
             response[item.worker_day.worker_id] = {
                                                       "worker_id": item.worker_day.worker_id,
                                                       "status": user_status,
-                                                      "worker_day": item.worker_day_id,
+                                                      "worker_day_id": item.worker_day_id,
+                                                      "tm_work_start": str(item.worker_day.tm_work_start),
+                                                      "tm_work_end": str(item.worker_day.tm_work_end),
                                                       "break_triplets": triplets,
 
                                                   },
