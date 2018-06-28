@@ -142,6 +142,11 @@ def get_cashiers_info(request, form):
                                                       "tm_work_start": str(item.worker_day.tm_work_start),
                                                       "tm_work_end": str(item.worker_day.tm_work_end),
                                                       "break_triplets": triplets,
+                                                      "cashbox_id": item.on_cashbox_id,
+                                                      "cashbox_dttm_added": str(item.on_cashbox.dttm_added),
+                                                      "cashbox_dttm_deleted": str(item.on_cashbox.dttm_deleted),
+                                                      "cashbox_type": item.on_cashbox.type_id,
+                                                      "cashbox_number": item.on_cashbox.number,
 
                                                   },
         else:
