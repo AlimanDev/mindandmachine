@@ -161,7 +161,7 @@ def get_cashiers_info(request, form):
 
         else:
             response[item.worker_day.worker_id][0]["status"] = user_status
-            response[item.worker_day.worker_id][0]["break_triplets"]: triplets
+            response[item.worker_day.worker_id][0]["break_triplets"] = triplets
 
             if item.on_cashbox_id:
                 response[item.worker_day.worker_id][0]["cashbox_id"] = item.on_cashbox_id
