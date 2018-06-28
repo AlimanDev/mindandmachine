@@ -134,6 +134,16 @@ def get_cashiers_info(request, form):
                     user_status = 'A'
                 else:
                     user_status = 'W'
+        cashbox_dttm_added = None
+        cashbox_dttm_deleted = None
+        cashbox_type = None
+        cashbox_number = None
+        if item.on_cashbox_id:
+            cashbox_dttm_added = str(item.on_cashbox.dttm_added)
+            cashbox_dttm_deleted = str(item.on_cashbox.dttm_deleted)
+            cashbox_type = item.on_cashbox.type_id
+            cashbox_number = item.on_cashbox.number
+
         if item.worker_day.worker_id not in response.keys():
             response[item.worker_day.worker_id] = {
                                                       "worker_id": item.worker_day.worker_id,
@@ -143,12 +153,12 @@ def get_cashiers_info(request, form):
                                                       "tm_work_end": str(item.worker_day.tm_work_end),
                                                       "break_triplets": triplets,
                                                       "cashbox_id": item.on_cashbox_id,
-                                                      "cashbox_dttm_added": str(item.on_cashbox.dttm_added),
-                                                      "cashbox_dttm_deleted": str(item.on_cashbox.dttm_deleted),
-                                                      "cashbox_type": item.on_cashbox.type_id,
-                                                      "cashbox_number": item.on_cashbox.number,
-
+                                                      "cashbox_dttm_added": cashbox_dttm_added,
+                                                      "cashbox_dttm_deleted": cashbox_dttm_deleted,
+                                                      "cashbox_type": cashbox_type,
+                                                      "cashbox_number": cashbox_number,
                                                   },
+
         else:
             response[item.worker_day.worker_id][0]["status"] = user_status
 
