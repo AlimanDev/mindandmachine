@@ -161,6 +161,14 @@ def get_cashiers_info(request, form):
 
         else:
             response[item.worker_day.worker_id][0]["status"] = user_status
+            response[item.worker_day.worker_id][0]["break_triplets"]: triplets
+
+            if item.on_cashbox_id:
+                response[item.worker_day.worker_id][0]["cashbox_id"] = item.on_cashbox_id
+                response[item.worker_day.worker_id][0]["cashbox_dttm_added"] = cashbox_dttm_added
+                response[item.worker_day.worker_id][0]["cashbox_dttm_deleted"] = cashbox_dttm_deleted
+                response[item.worker_day.worker_id][0]["cashbox_type"] = cashbox_type
+                response[item.worker_day.worker_id][0]["cashbox_number"] = cashbox_number
 
     return JsonResponse.success(response)
 
