@@ -18,7 +18,7 @@ def get_cashboxes_info(request, form):
     list_of_cashbox = Cashbox.objects.qos_filter_active(
         dttm_now,
         dttm_now,
-        type__shop_id=shop_id).order_by('number')
+        type__shop_id=shop_id).order_by('number').select_related('type')
 
     for cashbox in list_of_cashbox:
         mean_queue = None
@@ -36,18 +36,19 @@ def get_cashboxes_info(request, form):
 
         status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
             on_cashbox=cashbox,
-            tm_from__lt=dttm_now.time(),
-            tm_to__gte=dttm_now.time(),
-            cashbox_type_id=cashbox.type_id,
+            tm_from__lte=dttm_now.time(),
+            tm_to__isnull=True,
             worker_day__dt=dttm_now.date(),
-            worker_day__worker_shop_id=shop_id
+            worker_day__worker_shop=shop_id,
         )
+
         user_id = None
         if not status:
             status = 'C'
         else:
-            status = 'O'
             user_id = str(status[0].worker_day.worker_id)
+            status = 'O'
+
 
         if cashbox.type.id not in response:
             response[cashbox.type.id] = \
@@ -144,6 +145,7 @@ def get_cashiers_info(request, form):
             cashbox_type = item.on_cashbox.type_id
             cashbox_number = item.on_cashbox.number
 
+
         if item.worker_day.worker_id not in response.keys():
             response[item.worker_day.worker_id] = {
                                                       "worker_id": item.worker_day.worker_id,
@@ -161,19 +163,16 @@ def get_cashiers_info(request, form):
 
         else:
             response[item.worker_day.worker_id][0]["status"] = user_status
-            response[item.worker_day.worker_id][0]["break_triplets"] = triplets
-
-            if item.on_cashbox_id:
-                response[item.worker_day.worker_id][0]["cashbox_id"] = item.on_cashbox_id
-                response[item.worker_day.worker_id][0]["cashbox_dttm_added"] = cashbox_dttm_added
-                response[item.worker_day.worker_id][0]["cashbox_dttm_deleted"] = cashbox_dttm_deleted
-                response[item.worker_day.worker_id][0]["cashbox_type"] = cashbox_type
-                response[item.worker_day.worker_id][0]["cashbox_number"] = cashbox_number
+            response[item.worker_day.worker_id][0]["cashbox_id"] = item.on_cashbox_id
+            response[item.worker_day.worker_id][0]["cashbox_dttm_added"] = cashbox_dttm_added
+            response[item.worker_day.worker_id][0]["cashbox_dttm_deleted"] = cashbox_dttm_deleted
+            response[item.worker_day.worker_id][0]["cashbox_type"] = cashbox_type
+            response[item.worker_day.worker_id][0]["cashbox_number"] = cashbox_number
 
     return JsonResponse.success(response)
 
 
-@api_method('POST', ChangeCashierStatus)
+@api_method('GET', ChangeCashierStatus)
 def change_cashier_status(request, form):
     worker_id = form['worker_id']
     new_user_status = form['status']
@@ -182,7 +181,7 @@ def change_cashier_status(request, form):
     response = {}
     dttm_now = now()
 
-    def change_status(item, is_break=False, is_on_education=False, is_tablet=True):
+    def change_status(item, is_break=False, is_on_education=False, is_tablet=True, new_cashbox_id=False):
         if is_tablet is True:
             item.tm_to = dttm_now.time()
             item.save()
@@ -190,6 +189,8 @@ def change_cashier_status(request, form):
             pd.pk = None
             pd.tm_from = dttm_now.time()
             pd.tm_to = None
+            if new_user_status is not False:
+                pd.on_cashbox_id = new_cashbox_id
             pd.on_education = is_on_education
             pd.is_break = is_break
             pd.save()
@@ -213,17 +214,19 @@ def change_cashier_status(request, form):
             if (item.is_tablet is True) and not item.tm_to:
                 if new_user_status == 'W':
                     user_status = new_user_status
-                    if cashbox_id:
-                        item.on_cashbox_id = cashbox_id
-                        item.save()
                     if item.is_break is True or item.on_education is True:
-                        change_status(item)
+                        change_status(item, new_cashbox_id=cashbox_id)
+                    else:
+                        if cashbox_id and (cashbox_id != item.on_cashbox_id):
+
+                            change_status(item, new_cashbox_id=cashbox_id)
+
                     break
 
                 elif new_user_status == 'B':
                     user_status = new_user_status
                     if item.is_break is False:
-                        change_status(item, is_break=True)
+                        change_status(item, is_break=True, new_cashbox_id=None)
                     break
 
                 elif new_user_status == 'A':
@@ -232,15 +235,15 @@ def change_cashier_status(request, form):
 
                 elif new_user_status == 'S':
                     user_status = new_user_status
-
                     if item.on_education is False:
-                        change_status(item, is_on_education=True)
+                        change_status(item, is_on_education=True, new_cashbox_id=None)
                     break
 
                 elif new_user_status == 'H':
 
                     if (item.worker_day.type != WorkerDay.Type.TYPE_ABSENSE.value) and (user_status != 'C'):
-
+                        user_status = 'H'
+                        item.save()
                         item.tm_to = dttm_now.time()
                         item.on_education = False
                         item.is_break = False
@@ -256,7 +259,7 @@ def change_cashier_status(request, form):
 
             elif (item.is_tablet is False) and item.tm_to:
                 if new_user_status == 'W':
-                    user_status = 'W'
+                    user_status = new_user_status
                     if cashbox_id:
                         item.on_cashbox_id = cashbox_id
                         item.save()
@@ -268,7 +271,9 @@ def change_cashier_status(request, form):
                     break
 
                 elif new_user_status == 'B':
-                    user_status = 'B'
+                    user_status = new_user_status
+                    item.on_cashbox_id = None
+                    item.save()
                     if item.worker_day.type == WorkerDay.Type.TYPE_ABSENSE.value:
                         # A если был не выходной....
                         item.worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
@@ -277,13 +282,15 @@ def change_cashier_status(request, form):
                     break
 
                 elif new_user_status == 'A':
-                    user_status = 'A'
+                    user_status = new_user_status
                     item.worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
                     item.worker_day.save()
                     break
 
                 elif new_user_status == 'S':
-                    user_status = 'S'
+                    user_status = new_user_status
+                    item.on_cashbox_id = None
+                    item.save()
                     if item.worker_day.type == WorkerDay.Type.TYPE_ABSENSE.value:
                         # A если был не выходной....
                         item.worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
