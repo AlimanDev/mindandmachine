@@ -109,13 +109,13 @@ def get_cashiers_info(request, form):
                 if item.is_break is True:
                     user_status = 'B'
                     if item.tm_to:
-                        real_break_time = float(item.tm_to.hour * 3600 + item.tm_to.minute * 60 + item.tm_to.second -
+                        real_break_time = int(item.tm_to.hour * 3600 + item.tm_to.minute * 60 + item.tm_to.second -
                                                 item.tm_from.hour * 3600 - item.tm_from.minute * 60 -
                                                 item.tm_from.second) / 60
 
                         for triplet in list_of_break_triplets:
 
-                            if float(triplet[0]) < duration_of_work <= float(triplet[1]):
+                            if int(triplet[0]) < duration_of_work <= int(triplet[1]):
                                 if response.get(item.worker_day.worker_id):
                                     triplets = response[item.worker_day.worker_id][0]['break_triplets']
                                     for it in triplets:
