@@ -412,6 +412,8 @@ class WorkerDay(models.Model):
         TYPE_GOVERNMENT = 18
         TYPE_HOLIDAY_SPECIAL = 19
 
+        TYPE_MATERNITY_CARE = 20
+        TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE = 21
 
     TYPES_PAID = [
         Type.TYPE_WORKDAY.value,

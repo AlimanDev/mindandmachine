@@ -14,7 +14,7 @@ class Tabel_xlsx(Xlsx_base):
         WorkerDay.Type.TYPE_BUSINESS_TRIP.value: (COLOR_RED, COLOR_WHITE),
         WorkerDay.Type.TYPE_HOLIDAY.value: (COLOR_BLACK, COLOR_GREEN),
         WorkerDay.Type.TYPE_HOLIDAY_WORK.value: (COLOR_BLACK, COLOR_GREEN),
-        WorkerDay.Type.TYPE_ABSENSE.value: (COLOR_BLACK, COLOR_YELLOW_2),
+        WorkerDay.Type.TYPE_ABSENSE.value: (COLOR_BLACK, COLOR_YELLOW2),
         WorkerDay.Type.TYPE_REAL_ABSENCE.value: (COLOR_BLACK, COLOR_RED),
         WorkerDay.Type.TYPE_SICK.value: (COLOR_BLACK, COLOR_1),
         WorkerDay.Type.TYPE_VACATION.value: (COLOR_BLACK, COLOR_BLUE),
@@ -23,8 +23,9 @@ class Tabel_xlsx(Xlsx_base):
         WorkerDay.Type.TYPE_SELF_VACATION.value: (COLOR_BLACK, COLOR_BLUE2),
         WorkerDay.Type.TYPE_SELF_VACATION_TRUE.value: (COLOR_BLACK, COLOR_LITE_GREEN),
         WorkerDay.Type.TYPE_GOVERNMENT.value: (COLOR_BLACK, COLOR_PINK3),
-        WorkerDay.Type.TYPE_MATERNITY.value: (COLOR_BLACK, COLOR_GREEN2),
-
+        WorkerDay.Type.TYPE_MATERNITY.value: (COLOR_BLACK, COLOR_YELLOW3),
+        WorkerDay.Type.TYPE_MATERNITY_CARE.value: (COLOR_BLACK, COLOR_PURPLE),
+        WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value: (COLOR_BLACK, COLOR_GREEN2),
         WorkerDay.Type.TYPE_ETC.value: (COLOR_GREY, COLOR_GREY),
         WorkerDay.Type.TYPE_EMPTY.value: (COLOR_GREY, COLOR_GREY),
 
@@ -45,6 +46,8 @@ class Tabel_xlsx(Xlsx_base):
         WorkerDay.Type.TYPE_SELF_VACATION_TRUE.value: 'ОЗ',
         WorkerDay.Type.TYPE_GOVERNMENT.value: 'Г',
         WorkerDay.Type.TYPE_MATERNITY.value: 'ОВ',
+        WorkerDay.Type.TYPE_MATERNITY_CARE.value: 'ОЖ',
+        WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value: 'ОВ',
         WorkerDay.Type.TYPE_ETC.value: '',
         WorkerDay.Type.TYPE_EMPTY.value: '',
     }
@@ -223,12 +226,16 @@ class Tabel_xlsx(Xlsx_base):
             (WorkerDay.Type.TYPE_SELF_VACATION.value, 'ДО', ' - отпуск за свой счет'),
             (WorkerDay.Type.TYPE_SELF_VACATION_TRUE.value, 'ОЗ', ' - за свой счет по уважительной причине'),
             (WorkerDay.Type.TYPE_GOVERNMENT.value, 'Г', ' - гос. обязанности'),
-            (WorkerDay.Type.TYPE_MATERNITY.value, 'ОВ', ' - выходние дни по уходу'),
+            (WorkerDay.Type.TYPE_MATERNITY.value, 'Р', ' - б/л по беремености и родам'),
+            (WorkerDay.Type.TYPE_MATERNITY_CARE.value, 'ОЖ', ' - отпуск по уходу за ребенком до 3-х лет'),
+
+            (WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value, 'ОВ', ' - выходние дни по уходу'),
         )
         it_row = add_seria(seria_types, 20)
         self.worksheet.write_string(2 + it_row, 21, 'за детьми ивалидами,  дополнительный выходной доноров', day_text)
-        self.worksheet.write_string(3 + it_row, 21, ' - б/л по беремености и родам', day_text)
-        self.worksheet.write_string(4 + it_row, 21, ' - отпуск по уходу за ребенком до 3-х лет', day_text)
+
+        # self.worksheet.write_string(3 + it_row, 21, ' - б/л по беремености и родам', day_text)
+        # self.worksheet.write_string(4 + it_row, 21, ' - отпуск по уходу за ребенком до 3-х лет', day_text)
 
         #
         # add left info
@@ -309,7 +316,6 @@ class Tabel_xlsx(Xlsx_base):
         n_workdays = len(workdays)
         for row_shift, user in enumerate(users):
             night_hours = 0
-
             for day in range(len(self.prod_days)):
                 if (it < n_workdays) and (workdays[it].worker_id == user.id):
                     wd = workdays[it]
@@ -321,6 +327,7 @@ class Tabel_xlsx(Xlsx_base):
                             text = '{}_{}'.format(total_h, night_h)
                         else:
                             text = str(total_h)
+
                     elif wd.type == WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
                         total_h = int(self.__time2hours(wd.tm_work_start, wd.tm_work_end, triplets))
                         text = 'В{}'.format(total_h)

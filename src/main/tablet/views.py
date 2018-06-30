@@ -12,7 +12,11 @@ from django.utils.timezone import now
 @api_method('GET', GetCashboxesInfo)
 def get_cashboxes_info(request, form):
     response = {}
+    # для перевода в utc
+    # dttm_now = now() + timedelta(seconds=1080)
+
     dttm_now = now()
+
     shop_id = form['shop_id']
 
     list_of_cashbox = Cashbox.objects.qos_filter_active(
@@ -109,9 +113,9 @@ def get_cashiers_info(request, form):
                 if item.is_break is True:
                     user_status = 'B'
                     if item.tm_to:
-                        real_break_time = int(item.tm_to.hour * 3600 + item.tm_to.minute * 60 + item.tm_to.second -
+                        real_break_time = round(float(item.tm_to.hour * 3600 + item.tm_to.minute * 60 + item.tm_to.second -
                                                 item.tm_from.hour * 3600 - item.tm_from.minute * 60 -
-                                                item.tm_from.second) / 60
+                                                item.tm_from.second) / 60)
 
                         for triplet in list_of_break_triplets:
 
