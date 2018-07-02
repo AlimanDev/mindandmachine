@@ -45,13 +45,12 @@ class Tabel_xlsx(Xlsx_base):
         WorkerDay.Type.TYPE_SELF_VACATION.value: 'ДО',
         WorkerDay.Type.TYPE_SELF_VACATION_TRUE.value: 'ОЗ',
         WorkerDay.Type.TYPE_GOVERNMENT.value: 'Г',
-        WorkerDay.Type.TYPE_MATERNITY.value: 'ОВ',
+        WorkerDay.Type.TYPE_MATERNITY.value: 'Р',
         WorkerDay.Type.TYPE_MATERNITY_CARE.value: 'ОЖ',
         WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value: 'ОВ',
         WorkerDay.Type.TYPE_ETC.value: '',
         WorkerDay.Type.TYPE_EMPTY.value: '',
     }
-
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -91,7 +90,6 @@ class Tabel_xlsx(Xlsx_base):
         set_rows(15, 15, 40 / normalized_row)
         set_rows(16, 16 + users_len, 20 / normalized_row)
 
-
     def add_main_info(self):
         # top left info
         text_top = self.workbook.add_format({
@@ -110,12 +108,12 @@ class Tabel_xlsx(Xlsx_base):
         self.worksheet.write_string(1, 1, 'ООО "ЛЕРУА МЕРЛЕН ВОСТОК"', text_top)
         self.worksheet.write_string(2, 1, 'Магазин {}'.format(self.super_shop.title), text_top)
         self.worksheet.write_rich_string(3, 1,
-            text_top, 'ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ ',
-            text_top_red, '{}  {}г.'.format(
+                                         text_top, 'ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ ',
+                                         text_top_red, '{}  {}г.'.format(
                 self.MONTH_NAMES[self.month.month].upper(),
                 self.month.year
             )
-        )
+                                         )
         self.worksheet.write_string(5, 1, 'Отдел: ', text_top_red)
         self.worksheet.write_string(5, 2, self.shop.title, text_top)
 
@@ -149,7 +147,7 @@ class Tabel_xlsx(Xlsx_base):
         self.worksheet.write_string('C10', 'Вых/Празд дни', text_f)
         self.worksheet.write_number(
             'D10',
-            len(list(filter(lambda x: x.type==ProductionDay.TYPE_HOLIDAY, self.prod_days))),
+            len(list(filter(lambda x: x.type == ProductionDay.TYPE_HOLIDAY, self.prod_days))),
             number_f
         )
 
@@ -201,21 +199,22 @@ class Tabel_xlsx(Xlsx_base):
             return it_row
 
         seria_types = (
-             (WorkerDay.Type.TYPE_WORKDAY.value, '8', ' - явка'),
-             (WorkerDay.Type.TYPE_WORKDAY.value, '8_1', ' - явка с ночными часами'),
-             ('night_work', '7', ' - явка с ночными часами'),
-             (WorkerDay.Type.TYPE_BUSINESS_TRIP.value, 'К', ' - командировка'),
-             (WorkerDay.Type.TYPE_HOLIDAY.value, 'В', ' - выходной день'),
-             (WorkerDay.Type.TYPE_HOLIDAY_WORK.value, 'В8', ' - работа в выходной день'),
-             (WorkerDay.Type.TYPE_ABSENSE.value, 'Н', ' - неявки до выяснения обстоятельств'),
-             (WorkerDay.Type.TYPE_REAL_ABSENCE.value, 'ПР', ' - прогул на основании акта'),
-             (WorkerDay.Type.TYPE_SICK.value, 'Б', ' - больничный лист (при '),
+            (WorkerDay.Type.TYPE_WORKDAY.value, '8', ' - явка'),
+            (WorkerDay.Type.TYPE_WORKDAY.value, '8_1', ' - явка с ночными часами'),
+            ('night_work', '7', ' - явка с ночными часами'),
+            (WorkerDay.Type.TYPE_BUSINESS_TRIP.value, 'К', ' - командировка'),
+            (WorkerDay.Type.TYPE_HOLIDAY.value, 'В', ' - выходной день'),
+            (WorkerDay.Type.TYPE_HOLIDAY_WORK.value, 'В8', ' - работа в выходной день'),
+            (WorkerDay.Type.TYPE_ABSENSE.value, 'Н', ' - неявки до выяснения обстоятельств'),
+            (WorkerDay.Type.TYPE_REAL_ABSENCE.value, 'ПР', ' - прогул на основании акта'),
+            (WorkerDay.Type.TYPE_SICK.value, 'Б', ' - больничный лист (при '),
         )
 
         it_row = add_seria(seria_types, 8)
 
         day_text_d['font_color'] = COLOR_RED
-        self.worksheet.write_string(2 + it_row, 9, 'наличии его в службе персонала) ', self.workbook.add_format(day_text_d))
+        self.worksheet.write_string(2 + it_row, 9, 'наличии его в службе персонала) ',
+                                    self.workbook.add_format(day_text_d))
         day_text_d['font_color'] = COLOR_BLACK
         # add second seria
 
@@ -283,7 +282,6 @@ class Tabel_xlsx(Xlsx_base):
             diff_h -= breaks[i][2]
         return diff_h
 
-
     def __count_time(self, tm_start, tm_end, hours=None, breaks=None, night_edges=None):
         if (night_edges is None) and (hours is not None):
             night_edges = (
@@ -295,12 +293,10 @@ class Tabel_xlsx(Xlsx_base):
         night_hs = 'all'
         if night_edges[0] > tm_start:
             # day_hs = self.__time2hours(tm_start, night_edges[0])
-            night_hs = int(self.__time2hours(night_edges[0], tm_end) if (night_edges[0] < tm_end) or (night_edges[1] >= tm_end) else 0)
+            night_hs = int(self.__time2hours(night_edges[0], tm_end) if (night_edges[0] < tm_end) or (
+                        night_edges[1] >= tm_end) else 0)
             # print(night_hs, night_edges[0] < tm_end, night_edges[1] >= tm_end)
         return total, night_hs
-
-
-
 
     def fill_table(self, workdays, users, triplets, row_s, col_s):
         """
@@ -321,7 +317,7 @@ class Tabel_xlsx(Xlsx_base):
                     wd = workdays[it]
                     if wd.type == WorkerDay.Type.TYPE_WORKDAY.value:
                         total_h, night_h = self.__count_time(wd.tm_work_start, wd.tm_work_end, (0, 0), triplets)
-                        if night_h == 'all': # night_work
+                        if night_h == 'all':  # night_work
                             wd.type = 'night_work'
                         if (type(night_h) != str) and (night_h > 0):
                             text = '{}_{}'.format(total_h, night_h)
@@ -331,6 +327,22 @@ class Tabel_xlsx(Xlsx_base):
                     elif wd.type == WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
                         total_h = int(self.__time2hours(wd.tm_work_start, wd.tm_work_end, triplets))
                         text = 'В{}'.format(total_h)
+
+                    elif wd.type == WorkerDay.Type.TYPE_MATERNITY.value and \
+                            self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY:
+                        wd.type = WorkerDay.Type.TYPE_HOLIDAY.value
+                        text = 'В'
+
+                    elif wd.type == WorkerDay.Type.TYPE_MATERNITY_CARE.value and \
+                            self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY:
+                        wd.type = WorkerDay.Type.TYPE_HOLIDAY.value
+                        text = 'В'
+
+                    elif wd.type == WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value and \
+                            self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY:
+                        wd.type = WorkerDay.Type.TYPE_HOLIDAY.value
+                        text = 'В'
+
                     else:
                         text = self.WORKERDAY_TYPE_VALUE[wd.type]
                     cell_format.update({
@@ -340,7 +352,7 @@ class Tabel_xlsx(Xlsx_base):
 
                     it += 1
                 else:
-                    text=''
+                    text = ''
                     cell_format.update({
                         'font_color': COLOR_BLACK,
                         'bg_color': COLOR_GREY,
@@ -364,7 +376,6 @@ class Tabel_xlsx(Xlsx_base):
     def __write_names_in_row(self, row, col, names, cell_format):
         for col_offset in range(len(names)):
             self.worksheet.write_string(row, col + col_offset, names[col_offset], cell_format)
-
 
     def add_xlsx_functions(self, n_users, row, col):
         cell_format = dict(self.day_type)
@@ -417,10 +428,10 @@ class Tabel_xlsx(Xlsx_base):
         self.__write_formula(
             row + 4, n_users, col + 2,
             'SUM(COUNTIF(G{0}:AK{0},"В1"),COUNTIF(G{0}:AK{0},"В2"),COUNTIF(G{0}:AK{0},"В3"),COUNTIF(G{0}:AK{0},"В4"),'
-                'COUNTIF(G{0}:AK{0},"В5"),COUNTIF(G{0}:AK{0},"В6"),COUNTIF(G{0}:AK{0},"В7"),COUNTIF(G{0}:AK{0},"В8"),'
-                'COUNTIF(G{0}:AK{0},"7"),COUNTIF(G{0}:AK{0},"8"),COUNTIF(G{0}:AK{0},"9"),COUNTIF(G{0}:AK{0},"10"),'
-                'COUNTIF(G{0}:AK{0},"11"),COUNTIF(G{0}:AK{0},"12"),COUNTIF(G{0}:AK{0},"13"),COUNTIF(G{0}:AK{0},"14"),'
-                'COUNTIF(G{0}:AK{0},"К"))',
+            'COUNTIF(G{0}:AK{0},"В5"),COUNTIF(G{0}:AK{0},"В6"),COUNTIF(G{0}:AK{0},"В7"),COUNTIF(G{0}:AK{0},"В8"),'
+            'COUNTIF(G{0}:AK{0},"7"),COUNTIF(G{0}:AK{0},"8"),COUNTIF(G{0}:AK{0},"9"),COUNTIF(G{0}:AK{0},"10"),'
+            'COUNTIF(G{0}:AK{0},"11"),COUNTIF(G{0}:AK{0},"12"),COUNTIF(G{0}:AK{0},"13"),COUNTIF(G{0}:AK{0},"14"),'
+            'COUNTIF(G{0}:AK{0},"К"))',
             cell_f
         )
 
@@ -574,7 +585,6 @@ class Tabel_xlsx(Xlsx_base):
         cell_format['bg_color'] = COLOR_YELLOW
         cell_format['bold'] = True
         cell_format['align'] = 'center'
-
 
         cell_f = self.workbook.add_format(cell_format)
         cell_f.set_align('vjustify')
