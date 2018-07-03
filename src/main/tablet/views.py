@@ -13,9 +13,8 @@ from django.utils.timezone import now
 def get_cashboxes_info(request, form):
     response = {}
     # для перевода в utc
-    # dttm_now = now() + timedelta(seconds=1080)
-
-    dttm_now = now()
+    dttm_now = now() + timedelta(seconds=1080)
+    # dttm_now = now()
 
     shop_id = form['shop_id']
 
@@ -31,10 +30,11 @@ def get_cashboxes_info(request, form):
 
         else:
             with_queue = True
+            # супер костыль в dttm__gte, так как время с камер пишется в UTC+6
             mean_queue = CameraCashboxStat.objects.filter(
                 camera_cashbox__cashbox_id=cashbox.id,
-                dttm__gte=dttm_now - timedelta(seconds=60),
-                dttm__lt=dttm_now).aggregate(mean_queue=Avg('queue'))
+                dttm__gte=dttm_now - timedelta(seconds=60) + timedelta(seconds=1080),
+                dttm__lt=dttm_now + timedelta(seconds=1080)).aggregate(mean_queue=Avg('queue'))
             if mean_queue:
                 mean_queue = mean_queue['mean_queue']
 
@@ -53,7 +53,6 @@ def get_cashboxes_info(request, form):
             user_id = str(status[0].worker_day.worker_id)
             status = 'O'
 
-
         if cashbox.type.id not in response:
             response[cashbox.type.id] = \
                 {
@@ -67,6 +66,7 @@ def get_cashboxes_info(request, form):
                 "number": cashbox.number,
                 "cashbox_id": cashbox.id,
                 "status": status,
+
                 "queue": mean_queue,
                 "user_id": user_id,
             },
@@ -89,6 +89,8 @@ def get_cashiers_info(request, form):
 
     for item in status:
         triplets = []
+        default_break_triplets = []
+
         user_status = None
         real_break_time = None
 
@@ -105,6 +107,7 @@ def get_cashiers_info(request, form):
             if float(triplet[0]) < duration_of_work <= float(triplet[1]):
                 for time_triplet in triplet[2]:
                     triplets.append([time_triplet, 0])
+                    default_break_triplets.append(time_triplet)
 
         if item.worker_day.tm_work_start > dttm.time():
             user_status = 'C'
@@ -113,9 +116,10 @@ def get_cashiers_info(request, form):
                 if item.is_break is True:
                     user_status = 'B'
                     if item.tm_to:
-                        real_break_time = round(float(item.tm_to.hour * 3600 + item.tm_to.minute * 60 + item.tm_to.second -
-                                                item.tm_from.hour * 3600 - item.tm_from.minute * 60 -
-                                                item.tm_from.second) / 60)
+                        real_break_time = round(
+                            float(item.tm_to.hour * 3600 + item.tm_to.minute * 60 + item.tm_to.second -
+                                  item.tm_from.hour * 3600 - item.tm_from.minute * 60 -
+                                  item.tm_from.second) / 60)
 
                         for triplet in list_of_break_triplets:
 
@@ -149,7 +153,6 @@ def get_cashiers_info(request, form):
             cashbox_type = item.on_cashbox.type_id
             cashbox_number = item.on_cashbox.number
 
-
         if item.worker_day.worker_id not in response.keys():
             response[item.worker_day.worker_id] = {
                                                       "worker_id": item.worker_day.worker_id,
@@ -157,6 +160,7 @@ def get_cashiers_info(request, form):
                                                       "worker_day_id": item.worker_day_id,
                                                       "tm_work_start": str(item.worker_day.tm_work_start),
                                                       "tm_work_end": str(item.worker_day.tm_work_end),
+                                                      "default_break_triplets": str(default_break_triplets),
                                                       "break_triplets": triplets,
                                                       "cashbox_id": item.on_cashbox_id,
                                                       "cashbox_dttm_added": cashbox_dttm_added,
@@ -222,7 +226,6 @@ def change_cashier_status(request, form):
                         change_status(item, new_cashbox_id=cashbox_id)
                     else:
                         if cashbox_id and (cashbox_id != item.on_cashbox_id):
-
                             change_status(item, new_cashbox_id=cashbox_id)
 
                     break
