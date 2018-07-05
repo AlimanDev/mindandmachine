@@ -20,4 +20,9 @@ class Migration(migrations.Migration):
             name='on_education',
             field=models.BooleanField(default=False),
         ),
+        migrations.AddField(
+            model_name='workercashboxinfo',
+            name='priority',
+            field=models.IntegerField(default=0),
+        ),
     ]
