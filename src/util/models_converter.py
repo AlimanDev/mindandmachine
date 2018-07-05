@@ -7,6 +7,7 @@ from src.conf.djconfig import (
     QOS_TIME_FORMAT,
 )
 
+
 class BaseConverter(object):
     @classmethod
     def convert_date(cls, obj):
