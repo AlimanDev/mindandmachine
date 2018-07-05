@@ -146,7 +146,6 @@ def get_cashiers_info(request, form):
                     user_status = 'W'
 
                 if not item.tm_to:
-                    print(dttm.time(), item.tm_from)
                     time_without_rest = round(
                         (dttm.time().hour * 3600 + dttm.time().minute * 60 + dttm.time().second -
                          item.tm_from.hour * 3600 - item.tm_from.minute * 60 - item.tm_from.second) / 60)
