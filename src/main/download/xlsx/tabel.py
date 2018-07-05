@@ -563,19 +563,19 @@ class Tabel_xlsx(Xlsx_base):
 
         self.__write_formula(
             row + 4, n_users, col + 28,
-            'СЧЕТЕСЛИ(G{0}:AK{0},"ОД")',
+            'COUNTIF(G{0}:AK{0},"ОД")',
             cell_f
         )
 
         self.__write_formula(
             row + 4, n_users, col + 29,
-            'СЧЕТЕСЛИ(G{0}:AK{0},"ДО")',
+            'COUNTIF(G{0}:AK{0},"ДО")',
             cell_f
         )
 
         self.__write_formula(
             row + 4, n_users, col + 30,
-            'СЧЕТЕСЛИ(G{0}:AK{0},"У")',
+            'COUNTIF(G{0}:AK{0},"У")',
             cell_f
         )
 

@@ -296,7 +296,7 @@ class Cashbox(models.Model):
         verbose_name_plural = 'Кассы'
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.type.name, self.type.shop.title, self.type.shop.super_shop.title, self.id)
+        return '{}, {}, {}, {}, {}'.format(self.type.name, self.type.shop.title, self.type.shop.super_shop.title, self.id, self.number)
         # return f'{self.type.name}, {self.type.shop.title}, {self.type.shop.super_shop.title}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
@@ -368,6 +368,7 @@ class WorkerCashboxInfo(models.Model):
 
     mean_speed = models.FloatField(default=1)
     bills_amount = models.PositiveIntegerField(default=0)
+    priority = models.IntegerField(default=0)
 
 
 class WorkerConstraint(models.Model):
