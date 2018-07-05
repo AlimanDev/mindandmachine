@@ -93,6 +93,7 @@ def get_cashiers_info(request, form):
 
         user_status = None
         real_break_time = None
+        time_without_rest = None
 
         tm_work_end = item.worker_day.tm_work_end
         tm_work_start = item.worker_day.tm_work_start
@@ -143,14 +144,23 @@ def get_cashiers_info(request, form):
                     user_status = 'A'
                 else:
                     user_status = 'W'
+
+                if not item.tm_to:
+                    print(dttm.time(), item.tm_from)
+                    time_without_rest = round(
+                        (dttm.time().hour * 3600 + dttm.time().minute * 60 + dttm.time().second -
+                         item.tm_from.hour * 3600 - item.tm_from.minute * 60 - item.tm_from.second) / 60)
+            else:
+                user_status = 'T'
+
         cashbox_dttm_added = None
         cashbox_dttm_deleted = None
-        cashbox_type = None
         cashbox_number = None
+        cashbox_type = item.cashbox_type_id
+
         if item.on_cashbox_id:
             cashbox_dttm_added = str(item.on_cashbox.dttm_added)
             cashbox_dttm_deleted = str(item.on_cashbox.dttm_deleted)
-            cashbox_type = item.on_cashbox.type_id
             cashbox_number = item.on_cashbox.number
 
         if item.worker_day.worker_id not in response.keys():
@@ -167,6 +177,7 @@ def get_cashiers_info(request, form):
                                                       "cashbox_dttm_deleted": cashbox_dttm_deleted,
                                                       "cashbox_type": cashbox_type,
                                                       "cashbox_number": cashbox_number,
+                                                      "time_without_rest": time_without_rest,
                                                   },
 
         else:
@@ -174,9 +185,8 @@ def get_cashiers_info(request, form):
             response[item.worker_day.worker_id][0]["cashbox_id"] = item.on_cashbox_id
             response[item.worker_day.worker_id][0]["cashbox_dttm_added"] = cashbox_dttm_added
             response[item.worker_day.worker_id][0]["cashbox_dttm_deleted"] = cashbox_dttm_deleted
-            response[item.worker_day.worker_id][0]["cashbox_type"] = cashbox_type
             response[item.worker_day.worker_id][0]["cashbox_number"] = cashbox_number
-
+            response[item.worker_day.worker_id][0]["time_without_rest"] = time_without_rest
     return JsonResponse.success(response)
 
 
