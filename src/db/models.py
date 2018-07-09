@@ -362,7 +362,7 @@ class WorkerCashboxInfo(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    worker = models.OneToOneField(User, on_delete=models.PROTECT)
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
     is_active = models.BooleanField(default=True)
