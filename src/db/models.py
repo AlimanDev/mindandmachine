@@ -305,6 +305,7 @@ class Cashbox(models.Model):
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+
     number = models.CharField(max_length=6)
     bio = models.CharField(max_length=512, default='', blank=True)
     objects = CashboxManager()
@@ -359,7 +360,7 @@ class WorkerCashboxInfo(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    worker = models.ForeignKey(User, on_delete=models.PROTECT)
+    worker = models.OneToOneField(User, on_delete=models.PROTECT)
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
     is_active = models.BooleanField(default=True)
