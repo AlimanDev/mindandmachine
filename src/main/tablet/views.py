@@ -21,7 +21,7 @@ def get_cashboxes_info(request, form):
     list_of_cashbox = Cashbox.objects.qos_filter_active(
         dttm_now,
         dttm_now,
-        type__shop_id=shop_id).order_by('number').select_related('type')
+        type__shop_id=shop_id).order_by('number').select_related('type').filter(is_busy=False)
 
     for cashbox in list_of_cashbox:
         mean_queue = None
@@ -48,10 +48,10 @@ def get_cashboxes_info(request, form):
 
         user_id = None
         if not status:
-            status = 'C'
+            status = 'C'  # closed
         else:
             user_id = str(status[0].worker_day.worker_id)
-            status = 'O'
+            status = 'O'  # opened
 
         if cashbox.type.id not in response:
             response[cashbox.type.id] = \
