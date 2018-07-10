@@ -6,44 +6,42 @@ from django.db.models import Avg
 from django.utils.timezone import now
 
 
-def update_queue():
+def update_queue(till_dttm=None):
+    time_step = timedelta(seconds=1800)
+    if till_dttm is None:
+        till_dttm = now()
+
     cashbox_types = CashboxType.objects.filter(
-        dttm_last_update_queue__isnull=False)
-    for items in cashbox_types:
-        dif_time = (now() - items.dttm_last_update_queue).total_seconds()
-        while dif_time > 1800:
-
+        dttm_last_update_queue__isnull=False
+    )
+    for cashbox_type in cashbox_types:
+        dif_time = till_dttm - cashbox_type.dttm_last_update_queue
+        while dif_time > time_step:
             mean_queue = CameraCashboxStat.objects.filter(
-                camera_cashbox__cashbox__type__id=items.id,
-                dttm__gte=items.dttm_last_update_queue,
-                dttm__lt=items.dttm_last_update_queue + timedelta(seconds=1800)
-            ).aggregate(mean_queue=Avg('queue'))
+                camera_cashbox__cashbox__type__id=cashbox_type.id,
+                dttm__gte=cashbox_type.dttm_last_update_queue,
+                dttm__lt=cashbox_type.dttm_last_update_queue + time_step
+            ).values('camera_cashbox_id').annotate(mean_queue=Avg('queue')).filter(mean_queue__gte=0.6)
+        
+            if len(mean_queue):
+                mean_queue = sum([el['mean_queue'] for el in mean_queue])
 
-            period_demand = PeriodDemand.objects.filter(
-                dttm_forecast=items.dttm_last_update_queue,
-                cashbox_type_id=items.id,
-                type=PeriodDemand.Type.FACT.value
-            )
-
-            if mean_queue['mean_queue']:
-                if not period_demand:
+                changed_amount = PeriodDemand.objects.filter(
+                    dttm_forecast=cashbox_type.dttm_last_update_queue,
+                    cashbox_type_id=cashbox_type.id,
+                    type=PeriodDemand.Type.FACT.value
+                ).update(queue_wait_length=mean_queue)
+                if changed_amount == 0:
                     PeriodDemand.objects.create(
-                        dttm_forecast=items.dttm_last_update_queue,
+                        dttm_forecast=cashbox_type.dttm_last_update_queue,
                         clients=0,
                         products=0,
                         type=PeriodDemand.Type.FACT.value,
                         queue_wait_time=0,
-                        queue_wait_length=mean_queue['mean_queue'],
-                        cashbox_type_id=items.id
+                        queue_wait_length=mean_queue,
+                        cashbox_type_id=cashbox_type.id
                     )
-                else:
-                    pd = period_demand[0]
-                    pd.queue_wait_length = mean_queue['mean_queue']
-                    pd.save()
 
-            items.dttm_last_update_queue += timedelta(seconds=1800)
-            dif_time -= 1800
-
-        pd = items
-        pd.dttm_last_update_queue = items.dttm_last_update_queue + timedelta(seconds=1800)
-        pd.save()
+            cashbox_type.dttm_last_update_queue += time_step
+            dif_time -= time_step
+        cashbox_type.save()
