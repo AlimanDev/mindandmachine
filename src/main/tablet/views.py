@@ -327,8 +327,7 @@ def change_cashier_status(request, form):
         response[item.worker_day.worker_id] = {
                                                   "worker_id": item.worker_day.worker_id,
                                                   "status": user_status,
-                                                  "cashbox_id": item.on_cashbox_id,
-                                                    "item": item
+                                                  "cashbox_id": item.on_cashbox_id
                                               },
 
     return JsonResponse.success(response)
