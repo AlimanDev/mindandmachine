@@ -21,7 +21,7 @@ def get_cashboxes_info(request, form):
     list_of_cashbox = Cashbox.objects.qos_filter_active(
         dttm_now,
         dttm_now,
-        type__shop_id=shop_id).order_by('number').select_related('type')
+        type__shop_id=shop_id).order_by('type__priority').order_by('number').select_related('type')
 
     for cashbox in list_of_cashbox:
         mean_queue = None
