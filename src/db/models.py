@@ -306,7 +306,6 @@ class Cashbox(models.Model):
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
     is_busy = models.BooleanField(default=False)  # if someone working on this cashbox:True, else: False
-
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
     number = models.PositiveIntegerField(blank=True, null=True)

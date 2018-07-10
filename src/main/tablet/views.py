@@ -236,7 +236,6 @@ def change_cashier_status(request, form):
                     else:
                         if cashbox_id and (cashbox_id != item.on_cashbox_id):
                             change_status(item, new_cashbox_id=cashbox_id)
-
                     break
 
                 elif new_user_status == 'B':
