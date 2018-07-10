@@ -86,8 +86,6 @@ def get_cashiers_info(request, form):
         worker_day__dt=dttm.date(),
         worker_day__worker_shop__id=shop_id,
     ).order_by('tm_from')
-    import pdb
-    pdb.set_trace()
 
     for item in status:
         triplets = []
