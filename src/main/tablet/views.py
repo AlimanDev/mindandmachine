@@ -57,6 +57,7 @@ def get_cashboxes_info(request, form):
             response[cashbox.type.id] = \
                 {
                     "name": cashbox.type.name,
+                    "priority": cashbox.type.priority,
                     "with_queue": with_queue,
                     "cashbox": []
                 }
