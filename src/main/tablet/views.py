@@ -21,7 +21,7 @@ def get_cashboxes_info(request, form):
     list_of_cashbox = Cashbox.objects.qos_filter_active(
         dttm_now,
         dttm_now,
-        type__shop_id=shop_id).order_by('number').select_related('type').filter(is_busy=False)
+        type__shop_id=shop_id).order_by('number').select_related('type')
 
     for cashbox in list_of_cashbox:
         mean_queue = None
@@ -226,8 +226,8 @@ def change_cashier_status(request, form):
     user_status = None
 
     if status:
-
         for item in status:
+            print(item)
             if (item.is_tablet is True) and not item.tm_to:
                 if new_user_status == 'W':
                     user_status = new_user_status
