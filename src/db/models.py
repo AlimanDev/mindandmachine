@@ -309,7 +309,7 @@ class Cashbox(models.Model):
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
     number = models.PositiveIntegerField(blank=True, null=True)
-    priority = models.PositiveIntegerField(unique=True)  # priority of cashboxes(main cashbox-1,info-2,ord-3,expr-4)
+    priority = models.PositiveIntegerField()  # priority of cashboxes(main cashbox-1,info-2,ord-3,expr-4)
     bio = models.CharField(max_length=512, default='', blank=True)
     objects = CashboxManager()
 
