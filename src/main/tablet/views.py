@@ -150,7 +150,7 @@ def get_cashiers_info(request, form):
                     time_without_rest = round(
                         (dttm.time().hour * 3600 + dttm.time().minute * 60 + dttm.time().second -
                          item.tm_from.hour * 3600 - item.tm_from.minute * 60 - item.tm_from.second) / 60) - 180
-                    # костыль
+                    # todo: исправить костыль с -180 минут
             else:
                 user_status = 'T'
 
@@ -328,6 +328,7 @@ def change_cashier_status(request, form):
                                                   "worker_id": item.worker_day.worker_id,
                                                   "status": user_status,
                                                   "cashbox_id": item.on_cashbox_id,
+                                                    "item": item
                                               },
 
     return JsonResponse.success(response)
