@@ -213,6 +213,7 @@ class CashboxType(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
+    priority = models.PositiveIntegerField(default=100)  # 1--main, 2-ord, 3-express, etc
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
     dttm_last_update_queue = models.DateTimeField(null=True, blank=True)
@@ -309,7 +310,6 @@ class Cashbox(models.Model):
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
     number = models.PositiveIntegerField(blank=True, null=True)
-    priority = models.PositiveIntegerField()  # priority of cashboxes(main cashbox-1,info-2,ord-3,expr-4)
     bio = models.CharField(max_length=512, default='', blank=True)
     objects = CashboxManager()
 
