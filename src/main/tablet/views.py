@@ -13,7 +13,7 @@ from django.utils.timezone import now
 def get_cashboxes_info(request, form):
     response = {}
     # для перевода в utc
-    dttm_now = now() + timedelta(seconds=1080)
+    dttm_now = now() + timedelta(seconds=10800)
     # dttm_now = now()
 
     shop_id = form['shop_id']
