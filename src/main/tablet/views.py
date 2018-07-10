@@ -179,6 +179,12 @@ def get_cashiers_info(request, form):
                                                       "cashbox_type": cashbox_type,
                                                       "cashbox_number": cashbox_number,
                                                       "time_without_rest": time_without_rest,
+                                                      "dttm_hour": dttm.time().hour,
+                                                      "item_hour": item.tm_from.hour,
+                                                      "dttm_min": dttm.time().minute,
+                                                      "item_min": item.tm_from.minute,
+                                                      "dttm_sec": dttm.time().second,
+                                                      "item_sec": item.tm_from.second
                                                   },
 
         else:
