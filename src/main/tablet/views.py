@@ -178,7 +178,6 @@ def get_cashiers_info(request, form):
                                                       "cashbox_dttm_deleted": cashbox_dttm_deleted,
                                                       "cashbox_type": cashbox_type,
                                                       "cashbox_number": cashbox_number,
-                                                      "item": item
                                                   },
 
         else:
