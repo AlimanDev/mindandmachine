@@ -464,11 +464,6 @@ class WorkerDay(models.Model):
 
 
 class WorkerDayCashboxDetails(models.Model):
-    def __str__(self):
-        # return f'{self.worker_day.worker.last_name}, {self.worker_day.worker.shop.super_shop.title},' \
-        #        f' {self.worker_day.dt}, {self.on_cashbox.type.name}, {self.id}'
-        return '{}, {}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.cashbox_type.name, self.id)
-
     id = models.BigAutoField(primary_key=True)
 
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
@@ -481,6 +476,9 @@ class WorkerDayCashboxDetails(models.Model):
 
     tm_from = models.TimeField()
     tm_to = models.TimeField(null=True, blank=True)
+
+    def __str__(self):
+        return '{}, {}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.cashbox_type.name, self.id)
 
 
 class WorkerDayChangeRequest(models.Model):

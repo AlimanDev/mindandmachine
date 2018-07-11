@@ -6,15 +6,13 @@ from django.db.models import Avg
 
 from src.util.utils import api_method, JsonResponse
 from .forms import GetCashboxesInfo, GetCashiersInfo, ChangeCashierStatus
-from django.utils.timezone import now
+from django.utils import timezone
 
 
 @api_method('GET', GetCashboxesInfo)
 def get_cashboxes_info(request, form):
     response = {}
-    # для перевода в utc
-    dttm_now = now() + timedelta(seconds=10800)
-    # dttm_now = now()
+    dttm_now = timezone.localtime(timezone.now())
 
     shop_id = form['shop_id']
 
@@ -199,7 +197,7 @@ def change_cashier_status(request, form):
     change_time = form['change_time']
 
     response = {}
-    dttm_now = now()
+    dttm_now = timezone.localtime(timezone.now())
 
     def change_status(item, is_break=False, is_on_education=False, is_tablet=True, new_cashbox_id=False, change_time=dttm_now):
         if is_tablet is True:
