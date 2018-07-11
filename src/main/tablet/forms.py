@@ -21,3 +21,4 @@ class ChangeCashierStatus(forms.Form):
     worker_id = forms.IntegerField()
     status = forms.CharField()
     cashbox_id = forms.IntegerField(required=False)
+    change_time = forms.DateTimeField(required=False)

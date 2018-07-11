@@ -196,11 +196,12 @@ def change_cashier_status(request, form):
     worker_id = form['worker_id']
     new_user_status = form['status']
     cashbox_id = form['cashbox_id']
+    change_time = form['change_time']
 
     response = {}
     dttm_now = now()
 
-    def change_status(item, is_break=False, is_on_education=False, is_tablet=True, new_cashbox_id=False):
+    def change_status(item, is_break=False, is_on_education=False, is_tablet=True, new_cashbox_id=False, change_time=dttm_now):
         if is_tablet is True:
             item.tm_to = dttm_now.time()
             item.save()
