@@ -1,5 +1,6 @@
 from datetime import timedelta
 import json
+import datetime
 
 from src.db.models import CameraCashboxStat, Cashbox, WorkerDayCashboxDetails, User, PeriodDemand, WorkerDay
 from django.db.models import Avg
@@ -327,7 +328,7 @@ def change_cashier_status(request, form):
                                                   "worker_id": item.worker_day.worker_id,
                                                   "status": user_status,
                                                   "cashbox_id": item.on_cashbox_id,
-                                                  "change_time": change_time
+                                                  "change_time": change_time.strftime('%m/%d %H%M')
                                               },
 
     return JsonResponse.success(response)
