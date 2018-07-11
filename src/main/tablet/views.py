@@ -147,7 +147,7 @@ def get_cashiers_info(request, form):
                 if not item.tm_to:
                     time_without_rest = round(
                         (dttm.time().hour * 3600 + dttm.time().minute * 60 + dttm.time().second -
-                         item.tm_from.hour * 3600 - item.tm_from.minute * 60 - item.tm_from.second) / 60) - 180
+                         item.tm_from.hour * 3600 - item.tm_from.minute * 60 - item.tm_from.second) / 60)
                     # todo: исправить костыль с -180 минут
             else:
                 user_status = 'T'
