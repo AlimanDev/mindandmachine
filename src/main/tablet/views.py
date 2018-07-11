@@ -198,7 +198,7 @@ def change_cashier_status(request, form):
 
     response = {}
     dttm_now = timezone.localtime(timezone.now())
-    change_time = form['change_time'] if form['change_time'] is not None else dttm_now
+    change_time = form['change_time'] if form['change_time'] else dttm_now
 
     def change_status(item, is_break=False, is_on_education=False, is_tablet=True, new_cashbox_id=False):
         if is_tablet is True:
@@ -243,6 +243,7 @@ def change_cashier_status(request, form):
                     user_status = new_user_status
                     if item.is_break is False:
                         change_status(item, is_break=True, new_cashbox_id=None)
+                        item.update(worker_day__tm_break_start=dttm_now.time())
                     break
 
                 elif new_user_status == 'A':
@@ -328,7 +329,7 @@ def change_cashier_status(request, form):
                                                   "worker_id": item.worker_day.worker_id,
                                                   "status": user_status,
                                                   "cashbox_id": item.on_cashbox_id,
-                                                  "change_time": change_time.strftime('%m/%d %H%M')
+                                                  #"change_time": change_time.strftime('%m/%d %H:%M')
                                               },
 
     return JsonResponse.success(response)
