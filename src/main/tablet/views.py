@@ -126,7 +126,7 @@ def get_cashiers_info(request, form):
                                        item.tm_break_end.second -
                                        item.tm_break_start.hour * 3600 -
                                        item.tm_break_start.minute * 60 -
-                                       item.tm_break_start.second)  # из-за UTC
+                                       item.tm_break_start.second)
                     for triplet in list_of_break_triplets:
                         if int(triplet[0]) < duration_of_work <= int(triplet[1]):
                             if response.get(item.worker_day.worker_id):
@@ -339,6 +339,7 @@ def change_cashier_status(request, form):
                                                   "worker_id": item.worker_day.worker_id,
                                                   "status": user_status,
                                                   "cashbox_id": item.on_cashbox_id,
+                                                  "change_time": change_time.strftime('%m/%d %H:%M')
                                               },
 
     return JsonResponse.success(response)
