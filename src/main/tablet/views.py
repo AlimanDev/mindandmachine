@@ -7,13 +7,15 @@ from django.db.models import Avg
 
 from src.util.utils import api_method, JsonResponse
 from .forms import GetCashboxesInfo, GetCashiersInfo, ChangeCashierStatus
-from django.utils import timezone
+from django.utils.timezone import now
 
 
 @api_method('GET', GetCashboxesInfo)
 def get_cashboxes_info(request, form):
     response = {}
-    dttm_now = timezone.localtime(timezone.now())
+    dttm_now = now() + timedelta(seconds=10800)
+
+    # dttm_now = timezone.localtime(timezone.now()): использовать когда UZE_TZ будет установлен
 
     shop_id = form['shop_id']
 
@@ -84,7 +86,7 @@ def get_cashiers_info(request, form):
         worker_day__tm_work_start__lte=(dttm + timedelta(seconds=1800)).time(),
         worker_day__tm_work_end__gt=dttm.time(),
         worker_day__dt=dttm.date(),
-        worker_day__worker_shop__id=shop_id,
+        worker_day__worker_shop__id=shop_id
     ).order_by('tm_from')
 
     for item in status:
@@ -109,33 +111,35 @@ def get_cashiers_info(request, form):
                 for time_triplet in triplet[2]:
                     triplets.append([time_triplet, 0])
                     default_break_triplets.append(time_triplet)
-
         if item.worker_day.tm_work_start > dttm.time():
             user_status = 'C'
         else:
             if item.is_tablet is True:
                 if item.is_break is True:
                     user_status = 'B'
-                    if item.tm_to:
-                        real_break_time = round(
-                            float(item.tm_to.hour * 3600 + item.tm_to.minute * 60 + item.tm_to.second -
-                                  item.tm_from.hour * 3600 - item.tm_from.minute * 60 -
-                                  item.tm_from.second) / 60)
-
-                        for triplet in list_of_break_triplets:
-
-                            if int(triplet[0]) < duration_of_work <= int(triplet[1]):
-                                if response.get(item.worker_day.worker_id):
-                                    triplets = response[item.worker_day.worker_id][0]['break_triplets']
-                                    for it in triplets:
-                                        if it[1] == 0:
-                                            if real_break_time:
-                                                it[0] = real_break_time
-                                            it[1] = 1
-                                            break
-                                    else:
-                                        triplets.append([real_break_time, 1])
-                                break
+                    if item.tm_break_end is None:
+                        item.tm_break_end = dttm.time()
+                    if item.tm_break_start is None:  # kinda kostil'
+                        item.tm_break_start = dttm.time()
+                    real_break_time = (item.tm_break_end.hour * 3600 +
+                                       item.tm_break_end.minute * 60 +
+                                       item.tm_break_end.second -
+                                       item.tm_break_start.hour * 3600 -
+                                       item.tm_break_start.minute * 60 -
+                                       item.tm_break_start.second)  # из-за UTC
+                    for triplet in list_of_break_triplets:
+                        if int(triplet[0]) < duration_of_work <= int(triplet[1]):
+                            if response.get(item.worker_day.worker_id):
+                                triplets = response[item.worker_day.worker_id][0]['break_triplets']
+                                for it in triplets:
+                                    if it[1] == 0:
+                                        if real_break_time:
+                                            it[1] = round(float(real_break_time)/60)  # it[1],it[0] меняются местами
+                                        it[0] = 1                                     # чтобы не делать изм на фронте
+                                        break
+                                else:
+                                    triplets.append([real_break_time, 1])
+                            break
                 elif item.on_education is True:
                     user_status = 'S'
                 elif (item.is_break is False) and item.tm_to:
@@ -149,7 +153,6 @@ def get_cashiers_info(request, form):
                     time_without_rest = round(
                         (dttm.time().hour * 3600 + dttm.time().minute * 60 + dttm.time().second -
                          item.tm_from.hour * 3600 - item.tm_from.minute * 60 - item.tm_from.second) / 60)
-                    # todo: исправить костыль с -180 минут
             else:
                 user_status = 'T'
 
@@ -197,7 +200,8 @@ def change_cashier_status(request, form):
     cashbox_id = form['cashbox_id']
 
     response = {}
-    dttm_now = timezone.localtime(timezone.now())
+    # dttm_now = timezone.localtime(timezone.now())
+    dttm_now = now() + timedelta(seconds=10800)
     change_time = form['change_time'] if form['change_time'] else dttm_now
 
     def change_status(item, is_break=False, is_on_education=False, is_tablet=True, new_cashbox_id=False):
@@ -213,8 +217,9 @@ def change_cashier_status(request, form):
             pd.on_education = is_on_education
             pd.is_break = is_break
             pd.save()
+            return pd
         else:
-            item.tm_from = change_time
+            item.tm_from = change_time.time()
             item.is_tablet = True
             item.tm_to = None
             item.on_education = is_on_education
@@ -234,6 +239,9 @@ def change_cashier_status(request, form):
                     user_status = new_user_status
                     if item.is_break is True or item.on_education is True:
                         change_status(item, new_cashbox_id=cashbox_id)
+                        prev_item = item.__class__.objects.get(pk=item.id-1)
+                        prev_item.tm_break_end = dttm_now.time()
+                        prev_item.save()
                     else:
                         if cashbox_id and (cashbox_id != item.on_cashbox_id):
                             change_status(item, new_cashbox_id=cashbox_id)
@@ -242,8 +250,10 @@ def change_cashier_status(request, form):
                 elif new_user_status == 'B':
                     user_status = new_user_status
                     if item.is_break is False:
-                        change_status(item, is_break=True, new_cashbox_id=None)
-                        item.update(worker_day__tm_break_start=dttm_now.time())
+                        pd = change_status(item, is_break=True, new_cashbox_id=None)
+                        pd.tm_break_start = dttm_now.time()
+                        pd.tm_break_end = None
+                        pd.save()
                     break
 
                 elif new_user_status == 'A':
@@ -329,7 +339,6 @@ def change_cashier_status(request, form):
                                                   "worker_id": item.worker_day.worker_id,
                                                   "status": user_status,
                                                   "cashbox_id": item.on_cashbox_id,
-                                                  #"change_time": change_time.strftime('%m/%d %H:%M')
                                               },
 
     return JsonResponse.success(response)
