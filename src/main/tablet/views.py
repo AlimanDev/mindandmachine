@@ -87,9 +87,11 @@ def get_cashiers_info(request, form):
         worker_day__tm_work_end__gt=dttm.time(),
         worker_day__dt=dttm.date(),
         worker_day__worker_shop__id=shop_id,
+        worker_day__worker__last_name='Давлятова'
     ).order_by('tm_from')
 
     for item in status:
+        print(item)
         triplets = []
         default_break_triplets = []
 
@@ -199,11 +201,13 @@ def change_cashier_status(request, form):
     new_user_status = form['status']
     cashbox_id = form['cashbox_id']
 
+    #не работает из-за того что в 2х объектах workerdaycashboxinfo tm_from см.
+
     response = {}
     dttm_now = now() + timedelta(seconds=10800)
-    change_time = form['change_time'] if form['change_time'] \
-        else datetime.strptime(datetime.strftime(dttm_now, "%Y.%m.%d %H:%M:%S"), "%Y.%m.%d %H:%M:%S")
-        #  хз как еще избавиться от миллисекунд
+    dttm_now = datetime.strptime(datetime.strftime(dttm_now, "%Y.%m.%d %H:%M:%S"), "%Y.%m.%d %H:%M:%S")
+    #  хз как еще избавиться от миллисекунд
+    change_time = form['change_time'] if form['change_time'] else dttm_now
     tm_work_end = form['tm_work_end'] if form['tm_work_end'] else dt.time(hour=23, minute=59)
     # по стандрарту: леруа алтуфьево работает до 24:00
 
@@ -251,8 +255,11 @@ def change_cashier_status(request, form):
             worker_day__worker_id=worker_id
         ).order_by('tm_from')
 
+    print(status)
+
     if status:
         for item in status:
+            print(item.on_cashbox_id)
             if (item.is_tablet is True) and not item.tm_to:
                 if new_user_status == 'W':
                     user_status = new_user_status
