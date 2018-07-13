@@ -38,6 +38,23 @@ def get_cashiers_list(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
+@api_method('GET', GetCashiersListForm)
+def get_todays_cashiers_list(request, form):
+    users = []
+    dt_now = datetime.now() + timedelta(hours=3)
+    if form['shop_id']:
+        shop_id = form['shop_id']
+    else:
+        shop_id = request.user.shop_id
+    for u in WorkerDay.objects.select_related('worker').filter(worker__shop__id=shop_id, dt=dt_now.date()).order_by('worker__last_name', 'worker__first_name'):
+    # for u in User.objects.select_related('wo').filter(shop_id=shop_id).order_by('last_name', 'first_name'):
+        if u.worker.dt_hired is None or u.worker.dt_hired <= form['dt_hired_before']:
+            if u.worker.dt_fired is None or u.worker.dt_fired >= form['dt_fired_after']:
+                users.append(u.worker)
+
+    return JsonResponse.success([UserConverter.convert(x) for x in users])
+
+
 @api_method('GET', GetCashierTimetableForm)
 def get_cashier_timetable(request, form):
     if form['format'] == 'excel':

@@ -1,6 +1,6 @@
-from datetime import timedelta
+import datetime as dt
+from datetime import timedelta, datetime
 import json
-import datetime
 
 from src.db.models import CameraCashboxStat, Cashbox, WorkerDayCashboxDetails, User, PeriodDemand, WorkerDay
 from django.db.models import Avg
@@ -86,7 +86,7 @@ def get_cashiers_info(request, form):
         worker_day__tm_work_start__lte=(dttm + timedelta(seconds=1800)).time(),
         worker_day__tm_work_end__gt=dttm.time(),
         worker_day__dt=dttm.date(),
-        worker_day__worker_shop__id=shop_id
+        worker_day__worker_shop__id=shop_id,
     ).order_by('tm_from')
 
     for item in status:
@@ -200,9 +200,12 @@ def change_cashier_status(request, form):
     cashbox_id = form['cashbox_id']
 
     response = {}
-    # dttm_now = timezone.localtime(timezone.now())
     dttm_now = now() + timedelta(seconds=10800)
-    change_time = form['change_time'] if form['change_time'] else dttm_now
+    change_time = form['change_time'] if form['change_time'] \
+        else datetime.strptime(datetime.strftime(dttm_now, "%Y.%m.%d %H:%M:%S"), "%Y.%m.%d %H:%M:%S")
+        #  хз как еще избавиться от миллисекунд
+    tm_work_end = form['tm_work_end'] if form['tm_work_end'] else dt.time(hour=23, minute=59)
+    # по стандрарту: леруа алтуфьево работает до 24:00
 
     def change_status(item, is_break=False, is_on_education=False, is_tablet=True, new_cashbox_id=False):
         if is_tablet is True:
@@ -231,6 +234,22 @@ def change_cashier_status(request, form):
         worker_day__worker_id=worker_id
     ).order_by('tm_from')
     user_status = None
+
+    if not status:  # добавляем сотрудника, который по расписанию сег не работает
+                    # fix: при такое решении будет создано
+                    # фактически 2 одинаковые записи в бд из-за послед вызова change_status
+        WorkerDay.objects.filter(worker_id=worker_id, dt=dttm_now.date()).\
+            update(type=2, tm_work_start=change_time.time(), tm_work_end=tm_work_end)
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=WorkerDay.objects.get(worker_id=worker_id, dt=dttm_now.date()),
+            is_tablet=True,
+            tm_from=dttm_now.time(),
+            cashbox_type=Cashbox.objects.get(pk=cashbox_id).type
+        )
+        status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+            worker_day__dt=dttm_now.date(),
+            worker_day__worker_id=worker_id
+        ).order_by('tm_from')
 
     if status:
         for item in status:
@@ -276,7 +295,6 @@ def change_cashier_status(request, form):
                         item.is_break = False
                         item.save()
                         break
-
                     else:
                         return JsonResponse.value_error(
                             'can not change the status to {}'.format(new_user_status))
@@ -334,12 +352,11 @@ def change_cashier_status(request, form):
 
         else:
             user_status = 'H'
-
         response[item.worker_day.worker_id] = {
                                                   "worker_id": item.worker_day.worker_id,
                                                   "status": user_status,
                                                   "cashbox_id": item.on_cashbox_id,
-                                                  "change_time": change_time.strftime('%m/%d %H:%M')
+                                                  # "change_time": change_time.strftime('%H:%M'),
                                               },
 
     return JsonResponse.success(response)

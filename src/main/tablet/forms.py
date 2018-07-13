@@ -21,4 +21,10 @@ class ChangeCashierStatus(forms.Form):
     worker_id = forms.IntegerField()
     status = forms.CharField()
     cashbox_id = forms.IntegerField(required=False)
-    change_time = forms.DateTimeField(required=False)
+    change_time = util_forms.DatetimeField(required=False)
+
+    # случай когда сажаем человека не из расписания
+    # ситуация: заболел человек звонят рандомному сотруднику, просят выйти за место заболевшего
+    # но изначально неизвестно какое расписание было у заболевшего
+
+    tm_work_end = util_forms.DatetimeField(required=False)
