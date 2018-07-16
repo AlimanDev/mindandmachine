@@ -220,7 +220,7 @@ class WorkerConstraintAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerDay)
 class WorkerDayAdmin(admin.ModelAdmin):
-    list_display = ('worker_last_name', 'shop_title', 'super_shop_title', 'dt', 'type', 'id',)
+    list_display = ('worker_last_name', 'shop_title', 'super_shop_title', 'dt', 'type', 'id','tm_work_start', 'tm_work_end')
     search_fields = ('worker__last_name', 'worker__shop__title', 'worker__shop__super_shop__title', 'id', 'dt')
     list_filter = ('worker__shop',)
 

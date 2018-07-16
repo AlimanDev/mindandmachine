@@ -2,7 +2,8 @@ import datetime as dt
 from datetime import timedelta, datetime
 import json
 
-from src.db.models import CameraCashboxStat, Cashbox, WorkerDayCashboxDetails, User, PeriodDemand, WorkerDay, CashboxType
+from src.db.models import CameraCashboxStat, Cashbox, WorkerDayCashboxDetails, User, PeriodDemand, WorkerDay, \
+    CashboxType
 from django.db.models import Avg
 from src.conf.djconfig import QOS_TIME_FORMAT, QOS_DATETIME_FORMAT
 
@@ -133,8 +134,8 @@ def get_cashiers_info(request, form):
                                 triplets = response[item.worker_day.worker_id][0]['break_triplets']
                                 for it in triplets:
                                     if it[1] == 0:
-                                        if real_break_time:
-                                            it[1] = round(float(real_break_time)/60)
+                                        if real_break_time >= 0:
+                                            it[1] = round(float(real_break_time) / 60)
                                         it[0] = 1
                                         break
                                 else:
@@ -199,14 +200,18 @@ def change_cashier_status(request, form):
     cashbox_id = form['cashbox_id']
 
     response = {}
-    dttm_now = datetime.strptime(datetime.strftime(now() + timedelta(hours=3), QOS_DATETIME_FORMAT), QOS_DATETIME_FORMAT)
+    dttm_now = datetime.strptime(datetime.strftime(now() + timedelta(hours=3), QOS_DATETIME_FORMAT),
+                                 QOS_DATETIME_FORMAT)
 
     change_time = form['change_time'] if form['change_time'] else dttm_now.time()
-    tm_work_end = form['tm_work_end'] if form['tm_work_end'] else\
-        (dttm_now + timedelta(hours=9)).time() if\
-        (dttm_now + timedelta(hours=9)).time() < dt.time(hour=23, minute=59) and\
-        (dttm_now + timedelta(hours=9)).date() == dttm_now.date() else\
-        dt.time(hour=23, minute=59)  # либо стандартный 9-часовой день, либо до закрытия
+
+    regular_day = dttm_now + timedelta(hours=9)
+    time_shop_closes = dt.datetime(dttm_now.year, dttm_now.month, dttm_now.day + 1, 0, 30, 0)
+    tm_work_end = form['tm_work_end'] if form['tm_work_end'] else \
+        regular_day.time() if regular_day < time_shop_closes \
+            else time_shop_closes
+
+    # todo: подумать че делать если переход через месяц происходит
 
     def change_status(item, is_break=False, is_on_education=False, is_tablet=True, new_cashbox_id=False):
         if is_tablet is True:
@@ -236,7 +241,7 @@ def change_cashier_status(request, form):
     user_status = None
 
     if not status:
-        WorkerDay.objects.filter(worker_id=worker_id, dt=dttm_now.date()).\
+        WorkerDay.objects.filter(worker_id=worker_id, dt=dttm_now.date()). \
             update(type=WorkerDay.Type.TYPE_WORKDAY.value, tm_work_start=change_time, tm_work_end=tm_work_end)
 
         status = WorkerDayCashboxDetails.objects.create(
@@ -255,7 +260,7 @@ def change_cashier_status(request, form):
                     user_status = new_user_status
                     if item.is_break is True or item.on_education is True:
                         change_status(item, new_cashbox_id=cashbox_id)
-                        item.__class__.objects.filter(worker_day=item.worker_day).order_by('-id')[1].\
+                        item.__class__.objects.filter(worker_day=item.worker_day).order_by('-id')[1]. \
                             update(tm_to=dttm_now.time())
                     else:
                         if cashbox_id and (cashbox_id != item.on_cashbox_id):
