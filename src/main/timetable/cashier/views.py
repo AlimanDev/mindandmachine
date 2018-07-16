@@ -39,20 +39,22 @@ def get_cashiers_list(request, form):
 
 
 @api_method('GET', GetCashiersListForm)
-def get_todays_cashiers_list(request, form):
-    users = []
+def get_not_working_cashiers_list(request, form):
     dt_now = datetime.now() + timedelta(hours=3)
     if form['shop_id']:
         shop_id = form['shop_id']
     else:
         shop_id = request.user.shop_id
-    for u in WorkerDay.objects.select_related('worker').filter(worker__shop__id=shop_id, dt=dt_now.date()).order_by('worker__last_name', 'worker__first_name'):
-    # for u in User.objects.select_related('wo').filter(shop_id=shop_id).order_by('last_name', 'first_name'):
+
+    users_not_working_today = []
+    for u in WorkerDay.objects.filter(dt=dt_now.date(), worker__shop_id=shop_id).\
+            exclude(type=WorkerDay.Type.TYPE_WORKDAY.value).\
+            order_by('worker__last_name', 'worker__first_name'):
         if u.worker.dt_hired is None or u.worker.dt_hired <= form['dt_hired_before']:
             if u.worker.dt_fired is None or u.worker.dt_fired >= form['dt_fired_after']:
-                users.append(u.worker)
+                users_not_working_today.append(u.worker)
 
-    return JsonResponse.success([UserConverter.convert(x) for x in users])
+    return JsonResponse.success([UserConverter.convert(x) for x in users_not_working_today])
 
 
 @api_method('GET', GetCashierTimetableForm)

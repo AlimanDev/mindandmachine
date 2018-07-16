@@ -241,7 +241,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
 class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
     # todo: upd: сервак просто падает если туда зайти
-    list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_cashbox_type', 'id', 'tm_break_start', 'tm_break_end')
+    list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_cashbox_type', 'id', 'tm_from', 'tm_to')
     search_fields = ('worker_day__worker__last_name', 'worker_day__worker__shop__title', 'id')
     list_filter = ('worker_day__worker__shop',)
 

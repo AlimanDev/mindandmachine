@@ -476,8 +476,6 @@ class WorkerDayCashboxDetails(models.Model):
 
     tm_from = models.TimeField()
     tm_to = models.TimeField(null=True, blank=True)
-    tm_break_start = models.TimeField(null=True, blank=True)
-    tm_break_end = models.TimeField(null=True, blank=True)
 
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.cashbox_type.name, self.id)
