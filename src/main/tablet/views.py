@@ -90,7 +90,6 @@ def get_cashiers_info(request, form):
                                         else tm_to_show_all_workers,
         worker_day__dt=(dttm - timedelta(hours=2)).date(),
         worker_day__worker_shop__id=shop_id,
-        worker_day__worker__last_name='Довмат'
     ).order_by('id')
 
     for item in status:
@@ -285,8 +284,9 @@ def change_cashier_status(request, form):
                         item.tm_to = dttm_now.time()
                         item.on_education = False
                         item.is_break = False
-                        # if is_current_time:
-                        #     item.worker_day.tm_work_end = dttm_now.time()
+                        if is_current_time:
+                            item.worker_day.tm_work_end = dttm_now.time()
+                            item.worker_day.save()
                         item.save()
                         break
                     else:
