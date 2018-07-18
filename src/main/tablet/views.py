@@ -92,6 +92,8 @@ def get_cashiers_info(request, form):
         worker_day__worker_shop__id=shop_id,
     ).order_by('id')
 
+    print(status)
+
     for item in status:
         triplets = []
         default_break_triplets = []
@@ -173,7 +175,8 @@ def get_cashiers_info(request, form):
                                                       "cashbox_dttm_deleted": cashbox_dttm_deleted,
                                                       "cashbox_type": cashbox_type,
                                                       "cashbox_number": cashbox_number,
-                                                      "time_without_rest": time_without_rest
+                                                      "time_without_rest": time_without_rest,
+                                                      "tm_work_end": str(item.worker_day.tm_work_end)
                                                   },
 
         else:
