@@ -14,6 +14,10 @@ def time_diff(start, end):
         start, end = [datetime.combine(datetime.min, t) for t in [start, end]]
     if start <= end:
         return (end - start).total_seconds()
+    elif start > end and (start-end).seconds <= 5:  # костыль из-за того, что при вызове change_status,
+        return (start - end).total_seconds()             # get_cashiers_status заново не подгружается.
+                                                         # думал исправить в get_cashiers_status, но тогда будет неправильно
+                                                         # работать ползунок со временем.
     else:
         end += timedelta(1)
         assert end > start
