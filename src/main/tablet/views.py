@@ -140,6 +140,7 @@ def get_cashiers_info(request, form):
                                         break
                                 else:
                                     triplets.append([1, round(float(real_break_time)/60)])
+                                    default_break_triplets.append(15)
                             break
                 elif item.on_education is True:
                     user_status = 'S'
@@ -188,6 +189,7 @@ def get_cashiers_info(request, form):
             response[item.worker_day.worker_id][0]["cashbox_dttm_deleted"] = cashbox_dttm_deleted
             response[item.worker_day.worker_id][0]["cashbox_number"] = cashbox_number
             response[item.worker_day.worker_id][0]["time_without_rest"] = time_without_rest
+            response[item.worker_day.worker_id][0]["default_break_triplets"] = str(default_break_triplets)
             response[item.worker_day.worker_id][0]["tm_work_end"] = str(item.tm_to if user_status is 'H' else item.worker_day.tm_work_end)
     return JsonResponse.success(response)
 
