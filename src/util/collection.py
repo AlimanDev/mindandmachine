@@ -13,6 +13,14 @@ def group_by(collection, group_key, sort_key=None, sort_reverse=False):
 
     return result
 
+def group_by_object(collection, group_key):
+    result = {}
+    for obj in collection:
+        k = group_key(obj)
+        if k not in result:
+            result[k] = obj
+
+    return result
 
 def range_u(start, end, step, include_end=True):
     curr = start
