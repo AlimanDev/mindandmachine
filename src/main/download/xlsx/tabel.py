@@ -388,15 +388,6 @@ class Tabel_xlsx(Xlsx_base):
         self.worksheet.write_string(row + 2, col, '', cell_f)
         self.worksheet.write_string(row + 3, col, 'pl_days', cell_f)
 
-        self.__write_formula(
-            row + 4, n_users, col + 6,
-            '(COUNTIF(G{0}:AK{0},"В")+COUNTIF(G{0}:AK{0},"В1")+COUNTIF(G{0}:AK{0},"В2")+COUNTIF(G{0}:AK{0},"В3")+'
-            'COUNTIF(G{0}:AK{0},"В4")+COUNTIF(G{0}:AK{0},"В5")+COUNTIF(G{0}:AK{0},"В6")+COUNTIF(G{0}:AK{0},"В7")+'
-            'COUNTIF(G{0}:AK{0},"В8")+COUNTIF(G{0}:AK{0},"В9")+COUNTIF(G{0}:AK{0},"В10")+COUNTIF(G{0}:AK{0},"В11")+'
-            'COUNTIF(G{0}:AK{0},"В12")+COUNTIF(G{0}:AK{0},"В13")+COUNTIF(G{0}:AK{0},"В14")+COUNTIF(G{0}:AK{0},"В15"))',
-            cell_f
-        )
-
         self.__write_formula(row + 4, n_users, col, 'D8-AR{0}', cell_f)
 
         # other
@@ -456,6 +447,15 @@ class Tabel_xlsx(Xlsx_base):
         self.__write_formula(
             row + 4, n_users, col + 4,
             'AN{0}-AO{0}/8',
+            cell_f
+        )
+
+        self.__write_formula(
+            row + 4, n_users, col + 6,
+            '(COUNTIF(G{0}:AK{0},"В")+COUNTIF(G{0}:AK{0},"В1")+COUNTIF(G{0}:AK{0},"В2")+COUNTIF(G{0}:AK{0},"В3")+'
+            'COUNTIF(G{0}:AK{0},"В4")+COUNTIF(G{0}:AK{0},"В5")+COUNTIF(G{0}:AK{0},"В6")+COUNTIF(G{0}:AK{0},"В7")+'
+            'COUNTIF(G{0}:AK{0},"В8")+COUNTIF(G{0}:AK{0},"В9")+COUNTIF(G{0}:AK{0},"В10")+COUNTIF(G{0}:AK{0},"В11")+'
+            'COUNTIF(G{0}:AK{0},"В12")+COUNTIF(G{0}:AK{0},"В13")+COUNTIF(G{0}:AK{0},"В14")+COUNTIF(G{0}:AK{0},"В15"))',
             cell_f
         )
 
