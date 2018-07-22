@@ -22,7 +22,7 @@ from src.db.models import (
     ProductionMonth,
     WorkerMonthStat,
     CameraCashboxStat,
-    CameraCashbox
+    CameraCashbox,
 )
 
 
@@ -327,3 +327,8 @@ class WorkerMonthStatAdmin(admin.ModelAdmin):
 @admin.register(CameraCashboxStat)
 class CameraCashboxStatAdmin(admin.ModelAdmin):
     list_display = ('camera_cashbox', 'dttm', 'queue')
+
+
+@admin.register(CameraCashbox)
+class CameraCashboxStatAdmin(admin.ModelAdmin):
+    list_display = ('name', 'cashbox')

@@ -28,6 +28,17 @@ import io
 
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
+    test = WorkerDay.objects.filter(
+
+        dt=datetime(year=2018, month=6, day=2),
+        type=7
+    )
+    for item in test:
+        if (int(item.dt.strftime('%w'))) == 6 or (int(item.dt.strftime('%w')) == 0):
+            item.type = 1
+            item.save()
+
+    # return JsonResponse.success()
     def count_diff(dttm, period_demands, demand_ind, period_bills, mean_bills_per_step, cashbox_types):
         # fixme: aa: work only if all steps are 30 minutes
         # period_demand is sorted by dttm_forecast, so find the dttm
@@ -98,15 +109,21 @@ def get_cashiers_timetable(request, form):
 
     cashbox_types = group_by(cashbox_types, group_key=lambda x: x.id)
 
+    worker_day_cashbox_detail_filter = {
+        'worker_day__worker_shop_id': shop_id,
+        # worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
+        'worker_day__dt__gte': form['from_dt'],
+        'worker_day__dt__lte': form['to_dt'],
+        'is_break': False,
+        'cashbox_type_id__in': cashbox_types.keys(),
+    }
+    if form['position_id']:
+        worker_day_cashbox_detail_filter['worker_day__worker__position__id'] = form['position_id']
+
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
         'worker_day',
     ).filter(
-        worker_day__worker_shop_id=shop_id,
-        # worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
-        worker_day__dt__gte=form['from_dt'],
-        worker_day__dt__lte=form['to_dt'],
-        is_break=False,
-        cashbox_type_id__in=cashbox_types.keys(),
+        **worker_day_cashbox_detail_filter
     ).order_by(
         'worker_day__dt',
         'tm_from',

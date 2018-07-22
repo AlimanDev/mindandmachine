@@ -79,11 +79,6 @@ class SelectCashiersForm(forms.Form):
             raise ValidationError('workday_type have to be set')
 
 
-class GetTable(forms.Form):
-    shop_id = forms.IntegerField()
-    weekday = util_forms.DateField()
-
-
 class GetWorkerStatForm(forms.Form):
     shop_id = forms.IntegerField(required=False)
     dt = util_forms.DateField()

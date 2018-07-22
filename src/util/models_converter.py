@@ -7,6 +7,7 @@ from src.conf.djconfig import (
     QOS_TIME_FORMAT,
 )
 
+
 class BaseConverter(object):
     @classmethod
     def convert_date(cls, obj):
@@ -211,7 +212,8 @@ class WorkerCashboxInfoConverter(BaseConverter):
             'cashbox_type': obj.cashbox_type_id,
             'mean_speed': obj.mean_speed,
             'bills_amount': obj.bills_amount,
-            'period': obj.period
+            'period': obj.period,
+            'priority': obj.priority
         }
 
 

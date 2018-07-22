@@ -99,6 +99,52 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# emails for sending errors
+# TODO: its not working actually because we must deploy our SMTP server or use Google SMTP
+# https://stackoverflow.com/questions/6367014/how-to-send-email-via-django/6367458#6367458
+ADMINS = [('Name Surname', 'test@test.com'),]
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': '%(levelname)s %(asctime)s %(message)s'
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',  # use INFO for not logging sql queries
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': 'qos_backend.log',  # directory with logs must be already created
+            'maxBytes': 5 * 1024 * 1024,
+            'backupCount': 10,
+            'formatter': 'simple',
+        },
+        'mail_admins': {
+            'level': 'ERROR',
+            'class': 'django.utils.log.AdminEmailHandler',
+            'email_backend': 'django.core.mail.backends.filebased.EmailBackend',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
+
+# LOGGING USAGE:
+# import logging
+# log = logging.getLogger(__name__)
+# log.debug("Some debug message")
+# log.info("Some info message")
+# log.exception("Exception occurred") # for saving traceback
+
+
 LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'UTC'

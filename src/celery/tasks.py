@@ -7,37 +7,42 @@ from src.celery.celery import app
 
 
 @app.task(name="update_queue")
-def update_queue():
-    last_update_queue = CashboxType.objects.all().filter(dttm_last_update_queue__isnull=False) \
-        .values('id', 'dttm_last_update_queue')
-    for items in last_update_queue:
+def update_queue(till_dttm=None):
+    time_step = timedelta(seconds=1800)
+    if till_dttm is None:
+        till_dttm = now()
 
-        dif_time = (now() - items['dttm_last_update_queue'])
-        while (dif_time.seconds > 1800) and dif_time.days >= 0:
-            mean_queue = CameraCashboxStat.objects.all().filter(
-                camera_cashbox__cashbox__type__id=items['id'],
-                dttm__gte=items['dttm_last_update_queue'],
-                dttm__lt=items['dttm_last_update_queue'] + timedelta(seconds=1800)
-            ).values('queue') \
-                .aggregate(mean_queue=Avg('queue'))
-            period_demand = PeriodDemand.objects.all().filter(dttm_forecast=items['dttm_last_update_queue'],
-                                                              cashbox_type_id=items['id'], type=3).values()
-            if mean_queue['mean_queue']:
-                if not period_demand:
+    cashbox_types = CashboxType.objects.filter(
+        dttm_last_update_queue__isnull=False
+    )
+    for cashbox_type in cashbox_types:
+        dif_time = till_dttm - cashbox_type.dttm_last_update_queue
+        while dif_time > time_step:
+            mean_queue = CameraCashboxStat.objects.filter(
+                camera_cashbox__cashbox__type__id=cashbox_type.id,
+                dttm__gte=cashbox_type.dttm_last_update_queue,
+                dttm__lt=cashbox_type.dttm_last_update_queue + time_step
+            ).values('camera_cashbox_id').annotate(mean_queue=Avg('queue')).filter(mean_queue__gte=0.6)
+
+            if len(mean_queue):
+                mean_queue = sum([el['mean_queue'] for el in mean_queue])
+
+                changed_amount = PeriodDemand.objects.filter(
+                    dttm_forecast=cashbox_type.dttm_last_update_queue,
+                    cashbox_type_id=cashbox_type.id,
+                    type=PeriodDemand.Type.FACT.value
+                ).update(queue_wait_length=mean_queue)
+                if changed_amount == 0:
                     PeriodDemand.objects.create(
-                        dttm_forecast=items['dttm_last_update_queue'],
+                        dttm_forecast=cashbox_type.dttm_last_update_queue,
                         clients=0,
                         products=0,
-                        type=3,
+                        type=PeriodDemand.Type.FACT.value,
                         queue_wait_time=0,
-                        queue_wait_length=mean_queue['mean_queue'],
-                        cashbox_type_id=items['id']
+                        queue_wait_length=mean_queue,
+                        cashbox_type_id=cashbox_type.id
                     )
-                else:
-                    PeriodDemand.objects.filter(dttm_forecast=items['dttm_last_update_queue'],
-                                                cashbox_type_id=items['id']) \
-                        .update(queue_wait_length=mean_queue['mean_queue'])
-            CashboxType.objects.filter(id=items['id']) \
-                .update(dttm_last_update_queue=items['dttm_last_update_queue'] + timedelta(seconds=1800))
-            items['dttm_last_update_queue'] += timedelta(seconds=1800)
-            dif_time -= timedelta(seconds=1800)
+
+            cashbox_type.dttm_last_update_queue += time_step
+            dif_time -= time_step
+        cashbox_type.save()

@@ -12,6 +12,7 @@ Run tasks when system starts:
 https://medium.com/@yehandjoe/celery-4-periodic-task-in-django-9f6b5a8c21c7
 
 """
+
 import os
 
 from celery import Celery
