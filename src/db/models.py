@@ -118,6 +118,15 @@ class WorkerPosition(models.Model):
 
 class WorkerManager(UserManager):
     def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
+        """
+        hired earlier then dt_from, hired later then dt_to
+        :param dt_from:
+        :param dt_to:
+        :param args:
+        :param kwargs:
+        :return:
+        """
+
         return self.filter(
             models.Q(dt_hired__lte=dt_from) | models.Q(dt_hired__isnull=True)
         ).filter(
@@ -206,6 +215,7 @@ class CashboxType(models.Model):
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
+    dttm_last_update_queue = models.DateTimeField(null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     name = models.CharField(max_length=128)
     speed_coef = models.FloatField(default=1)
@@ -262,13 +272,31 @@ class Slot(models.Model):
     worker = models.ManyToManyField(User, through=UserWeekdaySlot)
 
 
+class CashboxManager(models.Manager):
+    def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
+        """
+        added earlier then dt_from, added later then dt_to
+        :param dt_from:
+        :param dt_to:
+        :param args:
+        :param kwargs:
+        :return:
+        """
+
+        return self.filter(
+            models.Q(dttm_added__lte=dt_from) | models.Q(dttm_added__isnull=True)
+        ).filter(
+            models.Q(dttm_deleted__gte=dt_to) | models.Q(dttm_deleted__isnull=True)
+        ).filter(*args, **kwargs)
+
+
 class Cashbox(models.Model):
     class Meta:
         verbose_name = 'Касса'
         verbose_name_plural = 'Кассы'
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.type.name, self.type.shop.title, self.type.shop.super_shop.title, self.id)
+        return '{}, {}, {}, {}, {}'.format(self.type.name, self.type.shop.title, self.type.shop.super_shop.title, self.id, self.number)
         # return f'{self.type.name}, {self.type.shop.title}, {self.type.shop.super_shop.title}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
@@ -279,6 +307,7 @@ class Cashbox(models.Model):
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
     number = models.CharField(max_length=6)
     bio = models.CharField(max_length=512, default='', blank=True)
+    objects = CashboxManager()
 
 
 class PeriodDemand(models.Model):
@@ -339,6 +368,7 @@ class WorkerCashboxInfo(models.Model):
 
     mean_speed = models.FloatField(default=1)
     bills_amount = models.PositiveIntegerField(default=0)
+    priority = models.IntegerField(default=0)
 
 
 class WorkerConstraint(models.Model):
@@ -369,9 +399,33 @@ class WorkerDay(models.Model):
         TYPE_ABSENSE = 6
         TYPE_MATERNITY = 7
         TYPE_BUSINESS_TRIP = 8
+
         TYPE_ETC = 9
         TYPE_DELETED = 10
         TYPE_EMPTY = 11
+
+        TYPE_HOLIDAY_WORK = 12
+        TYPE_REAL_ABSENCE = 13
+        TYPE_EXTRA_VACATION = 14
+        TYPE_TRAIN_VACATION = 15
+        TYPE_SELF_VACATION = 16
+        TYPE_SELF_VACATION_TRUE = 17
+        TYPE_GOVERNMENT = 18
+        TYPE_HOLIDAY_SPECIAL = 19
+
+        TYPE_MATERNITY_CARE = 20
+        TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE = 21
+
+    TYPES_PAID = [
+        Type.TYPE_WORKDAY.value,
+        Type.TYPE_QUALIFICATION.value,
+        Type.TYPE_VACATION.value,
+        Type.TYPE_BUSINESS_TRIP.value,
+        Type.TYPE_HOLIDAY_WORK.value,
+        Type.TYPE_EXTRA_VACATION.value,
+        Type.TYPE_TRAIN_VACATION.value,
+    ]
+
 
     def __str__(self):
         # return f'{self.worker.last_name}, {self.worker.shop.title}, {self.worker.shop.super_shop.title}, {self.dt},' \
@@ -416,10 +470,14 @@ class WorkerDayCashboxDetails(models.Model):
 
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
-    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT, null=True, blank=True)
+
+    is_break = models.BooleanField(default=False)  # True if it is time for rest
+    on_education = models.BooleanField(default=False)
+    is_tablet = models.BooleanField(default=False)
 
     tm_from = models.TimeField()
-    tm_to = models.TimeField()
+    tm_to = models.TimeField(null=True, blank=True)
 
 
 class WorkerDayChangeRequest(models.Model):
@@ -554,10 +612,13 @@ class ProductionMonth(models.Model):
 
     """
 
-    first_dt = models.DateField()
+    dt_first = models.DateField()
     total_days = models.SmallIntegerField()
     norm_work_days = models.SmallIntegerField()
     norm_work_hours = models.FloatField()
+
+    class Meta:
+        ordering = ('dt_first',)
 
 
 class ProductionDay(models.Model):
@@ -575,8 +636,20 @@ class ProductionDay(models.Model):
         (TYPE_SHORT_WORK, 'short workday')
     )
 
-    dt = models.DateField()
+    WORK_TYPES = [
+        TYPE_WORK,
+        TYPE_SHORT_WORK
+    ]
+
+    WORK_NORM_HOURS = {
+        TYPE_WORK: 8,
+        TYPE_SHORT_WORK: 7,
+        TYPE_HOLIDAY: 0
+    }
+
+    dt = models.DateField(unique=True)
     type = models.CharField(max_length=1, choices=TYPES)
+    is_celebration = models.BooleanField(default=False)
 
     def __str__(self):
         # return f'{self.worker.last_name}, {self.worker.shop.title}, {self.worker.shop.super_shop.title}, {self.dt},' \
@@ -588,7 +661,7 @@ class ProductionDay(models.Model):
         else:
             tp = ('', 'bad_bal')
 
-        return '{}, {}, {}'.format(self.dt, self.tp[1], self.id)
+        return '(dt {}, type {}, id {})'.format(self.dt, self.type, self.id)
 
     def __repr__(self):
         return self.__str__()

@@ -39,6 +39,10 @@ INSTALLED_APPS = [
     'src',
     'src.db',
     'src.main',
+    'django_celery_beat',
+    'django_celery_results',
+    'src.celery'
+    # 'rest_framework',
 ]
 
 MIDDLEWARE = [
@@ -95,6 +99,52 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# emails for sending errors
+# TODO: its not working actually because we must deploy our SMTP server or use Google SMTP
+# https://stackoverflow.com/questions/6367014/how-to-send-email-via-django/6367458#6367458
+ADMINS = [('Name Surname', 'test@test.com'),]
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': '%(levelname)s %(asctime)s %(message)s'
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',  # use INFO for not logging sql queries
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': 'qos_backend.log',  # directory with logs must be already created
+            'maxBytes': 5 * 1024 * 1024,
+            'backupCount': 10,
+            'formatter': 'simple',
+        },
+        'mail_admins': {
+            'level': 'ERROR',
+            'class': 'django.utils.log.AdminEmailHandler',
+            'email_backend': 'django.core.mail.backends.filebased.EmailBackend',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
+
+# LOGGING USAGE:
+# import logging
+# log = logging.getLogger(__name__)
+# log.debug("Some debug message")
+# log.info("Some info message")
+# log.exception("Exception occurred") # for saving traceback
+
+
 LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'UTC'
@@ -110,7 +160,25 @@ STATIC_URL = '/_i/static/'
 MEDIA_URL = '/_i/media/'
 
 
-DATETIME_FORMAT = '%H:%M:%S %d.%m.%Y'
+QOS_DATETIME_FORMAT = '%H:%M:%S %d.%m.%Y'
+QOS_DATE_FORMAT = '%d.%m.%Y'
+QOS_TIME_FORMAT = '%H:%M:%S'
+QOS_SHORT_TIME_FORMAT = '%H:%M'
+
+
+CELERY_BROKER_URL = 'redis://localhost:6379'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379'
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_BEAT_SCHEDULE = {
+    'task-every-30-min-update-queue': {
+        'task': 'update_queue',
+        'schedule': 30 * 60,
+    }
+}
+
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

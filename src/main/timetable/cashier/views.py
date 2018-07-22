@@ -64,7 +64,7 @@ def get_cashier_timetable(request, form):
         worker_days_db = WorkerDay.objects.filter(
             worker_id=worker_id,
             dt__gte=from_dt,
-            dt__lte=to_dt
+            dt__lte=to_dt,
         ).order_by(
             'dt'
         ).values(
@@ -158,7 +158,6 @@ def get_cashier_timetable(request, form):
             'days': days_response,
             'user': UserConverter.convert(user)
         }
-
     return JsonResponse.success(response)
 
 
@@ -448,18 +447,17 @@ def set_cashier_info(request, form):
         for obj in form['cashbox_info']:
             cb = cashbox_types.get(obj.get('cashbox_type_id'))
             if cb is not None:
-                new_active_cashboxes.append(cb)
+                new_active_cashboxes.append((cb, obj.get('priority')))
 
         worker_cashbox_info = []
         WorkerCashboxInfo.objects.filter(worker_id=worker.id).update(is_active=False)
-        for cashbox in new_active_cashboxes:
+        for cashbox, priority in new_active_cashboxes:
             cashboxtype_forecast = CashboxType.objects.get(id=cashbox.id)
             mean_speed = 1
             if cashboxtype_forecast.do_forecast == CashboxType.FORECAST_HARD:
                 mean_speed = WorkerCashboxInfo.objects\
                     .filter(cashbox_type__id=cashbox.id)\
                     .aggregate(Avg('mean_speed'))['mean_speed__avg']
-
             obj, created = WorkerCashboxInfo.objects.update_or_create(
                 worker_id=worker.id,
                 cashbox_type_id=cashbox.id,
@@ -467,6 +465,10 @@ def set_cashier_info(request, form):
                     'is_active': True,
                 },
             )
+            if priority is not None:
+                obj.priority = priority
+                obj.save()
+
             if created:
                 obj.mean_speed = mean_speed
                 obj.save()
