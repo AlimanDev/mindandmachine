@@ -464,6 +464,20 @@ class WorkerDay(models.Model):
 
 
 class WorkerDayCashboxDetails(models.Model):
+    TYPE_WORK = 'W'
+    TYPE_BREAK = 'B'
+    TYPE_STUDY = 'S'
+
+    TYPE_SOON = 'C'
+    TYPE_FINISH = 'H'
+    TYPE_ABSENCE = 'A'
+
+    DETAILS_TYPES = (
+            (TYPE_WORK, 'work period'),
+            (TYPE_BREAK, 'rest / break'),
+            (TYPE_STUDY, 'study period'),
+    )
+
     id = models.BigAutoField(primary_key=True)
 
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
@@ -472,6 +486,8 @@ class WorkerDayCashboxDetails(models.Model):
 
     is_break = models.BooleanField(default=False)  # True if it is time for rest
     on_education = models.BooleanField(default=False)
+    status = models.CharField(max_length=1, choices=DETAILS_TYPES, default=TYPE_WORK)
+
     is_tablet = models.BooleanField(default=False)
 
     tm_from = models.TimeField()

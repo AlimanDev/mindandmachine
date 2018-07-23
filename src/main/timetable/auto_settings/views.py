@@ -2,11 +2,13 @@ import json
 import urllib.request
 
 from datetime import datetime, timedelta
+import datetime as dt
 
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q
+from src.main.timetable.table.utils import count_work_month_stats
 
 from src.db.models import (
     Timetable,
@@ -43,6 +45,7 @@ from src.util.utils import api_method, JsonResponse
 from .forms import GetStatusForm, SetSelectedCashiersForm, CreateTimetableForm, DeleteTimetableForm, SetTimetableForm
 import requests
 from .utils import time2int
+from ..table.utils import count_difference_of_normal_days
 
 
 @api_method('GET', GetStatusForm)
@@ -64,7 +67,7 @@ def set_selected_cashiers(request, form):
     return JsonResponse.success()
 
 
-@api_method('POST', CreateTimetableForm)
+@api_method('POST', CreateTimetableForm, False)
 def create_timetable(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
@@ -196,6 +199,8 @@ def create_timetable(request, form):
         type__in=ProductionDay.WORK_TYPES,
     ).count()
 
+    user_info = count_difference_of_normal_days(dt_end=dt_from, usrs=users)
+
     data = {
         'start_dt': BaseConverter.convert_date(tt.dt),
         'IP': settings.HOST_IP,
@@ -212,7 +217,10 @@ def create_timetable(request, form):
                 'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(u.id, [])],
                 'workdays': [WorkerDayConverter.convert(x) for x in worker_day.get(u.id, [])],
                 'prev_data': [WorkerDayConverter.convert(x) for x in prev_data.get(u.id, [])],
-            } for u in users
+                'overworking_hours': user_info.get(u.id).get('diff_prev_paid_hours'),
+                'overworking_days': user_info.get(u.id).get('diff_prev_paid_days'),
+            }
+            for u in users
         ],
         'algo_params': {
             'cost_weights': json.loads(shop.cost_weights),

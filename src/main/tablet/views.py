@@ -85,7 +85,9 @@ def get_cashiers_info(request, form):
     tm_to_show_all_workers = dt.time(23, 59)  # в 23:59 уже можно показывать всех сотрудников
     # todo: сделать без привязки к времени
 
-    status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+    status = WorkerDayCashboxDetails.objects.select_related('worker_day', 'worker_day__worker__shop',
+                                                            'worker_day__worker__shop__super_shop').\
+        filter(
         worker_day__tm_work_start__lte=(dttm + timedelta(minutes=30)).time() if not is_midnight_period(dttm)
                                         else tm_to_show_all_workers,
         worker_day__dt=(dttm - timedelta(hours=2)).date(),

@@ -1,10 +1,13 @@
-from django.db.models import Q
 from src.db.models import (
     WorkerDay,
     ProductionDay,
+    User
 )
 from datetime import time
 from ..utils import timediff
+import datetime as dt
+from django.db.models import Sum, Q
+from django.db.models.functions import Coalesce
 
 # import time as time2
 # def check_time(t=None):
@@ -117,11 +120,11 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
                 if prod_days_list[dt.day - 1] == ProductionDay.TYPE_HOLIDAY:
                     worker['work_in_holidays'] += 1
 
-        if row['workerdaycashboxdetails__tm_from']:
-            worker['paid_hours'] += timediff(
+        if row['workerdaycashboxdetails__tm_from'] and row['workerdaycashboxdetails__tm_to']:
+            worker['paid_hours'] += round(timediff(
                 row['workerdaycashboxdetails__tm_from'],
                 row['workerdaycashboxdetails__tm_to'],
-            )
+            ))
 
     # t = check_time(t)
     workers_info[worker_id] = worker
@@ -169,3 +172,33 @@ def count_normal_days(dt_start, dt_end, usrs):
         ind_dt -= 1
     dts_start_count_dict[dts_start_count[ind]] = [sum_days, sum_hours]
     return dts_start_count_dict, year_days
+
+
+def count_difference_of_normal_days(dt_end, usrs, dt_start=None):
+    dt_start = dt_start if dt_start else dt.date(dt_end.year, 1, 1)
+    dts_start_count_dict, _ = count_normal_days(dt_start, dt_end, usrs)
+
+    usrs_ids = [u.id for u in usrs]
+
+    prev_info = list(User.objects.filter(
+        Q(workermonthstat__month__dt_first__gte=dt_start,
+          workermonthstat__month__dt_first__lt=dt_end) |
+        Q(workermonthstat=None), # for doing left join
+        id__in=usrs_ids,
+    ).values('id').annotate(
+        count_workdays=Coalesce(Sum('workermonthstat__work_days'), 0),
+        count_hours=Coalesce(Sum('workermonthstat__work_hours'), 0),
+    ).order_by('id'))
+
+    user_info_dict = {}
+
+    for u_it in range(len(usrs)):
+        dt_u_st = usrs[u_it].dt_hired if usrs[u_it].dt_hired and (usrs[u_it].dt_hired > dt_start) else dt_start
+        total_norm_days, total_norm_hours = dts_start_count_dict[dt_u_st]
+        diff_prev_days = prev_info[u_it]['count_workdays'] - total_norm_days
+        diff_prev_hours = prev_info[u_it]['count_hours'] - total_norm_hours
+
+        user_info_dict.update({usrs[u_it].id: {'diff_prev_paid_days': diff_prev_days,
+                                               'diff_prev_paid_hours': diff_prev_hours}})
+
+    return user_info_dict

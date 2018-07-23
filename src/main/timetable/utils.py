@@ -21,3 +21,24 @@ def dttm_combine(dt, tm, stop_hours=None):
     if tm.hour in stop_hours:
         dttm += datetime.timedelta(days=1)
     return dttm
+
+# from datetime import datetime, time as datetime_time, timedelta
+# import datetime as dt
+#
+#
+# def timediff(start, end):
+#     """
+#     difference between 2 times taking into account midnight switch
+#     :param start: start_time
+#     :param end: end_time
+#     :return: timedelta object in seconds
+#     """
+#     if isinstance(start, datetime_time):
+#         assert isinstance(end, datetime_time)
+#         start, end = [datetime.combine(datetime.min, t) for t in [start, end]]
+#     if start <= end:
+#         return (end - start).total_seconds()
+#     else:
+#         end += timedelta(1)
+#         assert end > start
+#         return round(float((end - start).total_seconds() / 3600))
