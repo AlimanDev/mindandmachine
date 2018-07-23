@@ -2,13 +2,11 @@ import json
 import urllib.request
 
 from datetime import datetime, timedelta
-import datetime as dt
 
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q
-from src.main.timetable.table.utils import count_work_month_stats
 
 from src.db.models import (
     Timetable,
@@ -38,6 +36,7 @@ from src.util.models_converter import (
     WorkerCashboxInfoConverter,
     WorkerDayConverter,
     BaseConverter,
+    ShopConverter,
 
     SlotConverter,
 )
@@ -114,6 +113,14 @@ def create_timetable(request, form):
     )
 
     shop = Shop.objects.get(id=shop_id)
+
+    shop_dict = {
+        'shop': ShopConverter.convert(shop),  # has full_interface in it
+        'mean_queue_length': shop.mean_queue_length,
+        'max_queue_length': shop.max_queue_length,
+        'dead_time_part': shop.dead_time_part
+    }
+
     cashboxes = [CashboxTypeConverter.convert(x, True) for x in CashboxType.objects.filter(shop_id=shop_id)]
 
 
@@ -208,7 +215,7 @@ def create_timetable(request, form):
         'forecast_step_minutes': shop.forecast_step_minutes.minute,
         'cashbox_types': cashboxes,
         # 'slots': slots_periods_dict,
-        'shop_type': shop.full_interface,
+        'shop': shop_dict,
         'demand': [PeriodDemandConverter.convert(x) for x in periods],
         'cashiers': [
             {
