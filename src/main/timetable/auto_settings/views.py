@@ -67,7 +67,7 @@ def set_selected_cashiers(request, form):
     return JsonResponse.success()
 
 
-@api_method('POST', CreateTimetableForm, False)
+@api_method('POST', CreateTimetableForm)
 def create_timetable(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
