@@ -248,7 +248,12 @@ def change_cashier_status(request, form):
         worker_day.type = WorkerDay.Type.TYPE_ABSENSE
         worker_day.save()
     elif new_user_status == WorkerDayCashboxDetails.TYPE_FINISH:
-        pass  # aa: already close workerday_detail
+        WorkerDayCashboxDetails.objects.filter(
+            worker_day__dt=dt,
+            worker_day__worker_id=worker_id,
+            is_tablet=False,
+        ).delete()
+        # aa: already close workerday_detail
         # workerday_detail_obj.status = WorkerDayCashboxDetails.TYPE_FINISH
         # workerday_detail_obj.on_cashbox = None
         # workerday_detail_obj.save()
