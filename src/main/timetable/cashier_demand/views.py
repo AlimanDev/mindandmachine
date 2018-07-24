@@ -190,9 +190,9 @@ def get_cashiers_timetable(request, form):
     predict_demand = period_demand[:edge_ind]
     fact_demand = period_demand[edge_ind:]
 
-
     wdcds = worker_day_cashbox_detail  # alias
     wdcds_len = len(wdcds)
+    print(wdcds)
     # for each period count:
     # import pdb
     # pdb.set_trace()
@@ -207,7 +207,7 @@ def get_cashiers_timetable(request, form):
             dttm_ind = dttm - PERIOD_STEP
 
             # shift to first model, which has intersection
-            while (ind_b < wdcds_len) and (dttm_ind <= dttm):
+            while (ind_b < wdcds_len) and (dttm_ind <= dttm) and wdcds[ind_b].tm_to:
                 dttm_ind = dttm_combine(wdcds[ind_b].worker_day.dt, wdcds[ind_b].tm_to)
                 ind_b += 1
             ind_b = ind_b - 1 if (dttm_ind > dttm) and ind_b else ind_b
@@ -215,7 +215,7 @@ def get_cashiers_timetable(request, form):
             ind_e = ind_b
             period_bills = {i: 0 for i in cashbox_types.keys()}
             period_cashiers = 0.0
-            if ind_e < wdcds_len:
+            if ind_e < wdcds_len and wdcds[ind_e].tm_to:
                 dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_from)
                 dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_to)
 
@@ -232,7 +232,7 @@ def get_cashiers_timetable(request, form):
 
                     period_cashiers += 1 * proportion
                 ind_e += 1
-                if ind_e < wdcds_len:
+                if ind_e < wdcds_len and wdcds[ind_e].tm_to:
                     dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_from)
                     dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_to)
 
