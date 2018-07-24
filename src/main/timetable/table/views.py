@@ -400,8 +400,10 @@ def get_month_stat(request, form):
         month_user_info_dict = month_info[usrs[u_it].id]
 
         user_info_dict.update({
-            'diff_total_paid_days': user_info_dict['diff_prev_paid_days'] + month_user_info_dict['diff_norm_days'],
-            'diff_total_paid_hours': user_info_dict['diff_prev_paid_days'] + month_user_info_dict['diff_norm_hours'],
+            usrs[u_it].id: {
+                'diff_total_paid_days': user_info_dict[usrs[u_it].id]['diff_prev_paid_days'] + month_user_info_dict['diff_norm_days'],
+                'diff_total_paid_hours': user_info_dict[usrs[u_it].id]['diff_prev_paid_days'] + month_user_info_dict['diff_norm_hours'],
+            }
         })
 
         month_info[usrs[u_it].id] = user_info_dict

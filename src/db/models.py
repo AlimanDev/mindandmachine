@@ -335,6 +335,7 @@ class PeriodDemand(models.Model):
 
     queue_wait_time = models.FloatField()  # in minutes
     queue_wait_length = models.FloatField()
+    lack_of_cashiers = models.IntegerField()  # can be both pos and neg
 
 
 class PeriodDemandChangeLog(models.Model):

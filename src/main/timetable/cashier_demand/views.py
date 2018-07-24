@@ -170,6 +170,7 @@ def get_cashiers_timetable(request, form):
     real_cashiers = []
     predict_cashier_needs = []
     fact_cashier_needs = []
+    lack_of_cashiers_on_period = []
     dttm_start = datetime.combine(form['from_dt'], time(3, 0))
     periods = 48
     # dttm_start = datetime.combine(form['from_dt'], supeshop.tm_start) - PERIOD_STEP
@@ -268,7 +269,8 @@ def get_cashiers_timetable(request, form):
             'real_cashiers': real_cashiers,
             'predict_cashier_needs': predict_cashier_needs,
             'fact_cashier_needs': fact_cashier_needs
-        }
+        },
+        # 'lack_of_cashiers_on_period': lack_of_cashiers_on_period
     }
     return JsonResponse.success(response)
 
