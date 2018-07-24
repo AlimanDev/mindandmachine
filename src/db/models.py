@@ -479,6 +479,10 @@ class WorkerDayCashboxDetails(models.Model):
         (TYPE_STUDY, 'study period'),
     )
 
+    WORK_TYPES_LIST = (
+        TYPE_WORK,
+        TYPE_STUDY
+    )
     DETAILS_TYPES_LIST = (
         TYPE_WORK,
         TYPE_BREAK,
