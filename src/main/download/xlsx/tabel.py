@@ -45,12 +45,19 @@ class Tabel_xlsx(Xlsx_base):
         WorkerDay.Type.TYPE_SELF_VACATION.value: 'ДО',
         WorkerDay.Type.TYPE_SELF_VACATION_TRUE.value: 'ОЗ',
         WorkerDay.Type.TYPE_GOVERNMENT.value: 'Г',
-        WorkerDay.Type.TYPE_MATERNITY.value: 'Р',
-        WorkerDay.Type.TYPE_MATERNITY_CARE.value: 'ОЖ',
+        # WorkerDay.Type.TYPE_MATERNITY.value: 'Р',
+        WorkerDay.Type.TYPE_MATERNITY.value: 'ОЖ',
+        WorkerDay.Type.TYPE_MATERNITY_CARE.value: 'Р',
         WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value: 'ОВ',
         WorkerDay.Type.TYPE_ETC.value: '',
         WorkerDay.Type.TYPE_EMPTY.value: '',
     }
+
+    WORKERDAY_TYPE_CHANGE2HOLIDAY = [
+        WorkerDay.Type.TYPE_MATERNITY.value,
+        WorkerDay.Type.TYPE_MATERNITY_CARE.value,
+        WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value
+    ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -307,13 +314,15 @@ class Tabel_xlsx(Xlsx_base):
         :return:
         """
 
+
+
         it = 0
         cell_format = dict(self.day_type)
         n_workdays = len(workdays)
         for row_shift, user in enumerate(users):
             night_hours = 0
             for day in range(len(self.prod_days)):
-                if (it < n_workdays) and (workdays[it].worker_id == user.id):
+                if (it < n_workdays) and (workdays[it].worker_id == user.id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
                     if wd.type == WorkerDay.Type.TYPE_WORKDAY.value:
                         total_h, night_h = self.__count_time(wd.tm_work_start, wd.tm_work_end, (0, 0), triplets)
@@ -328,20 +337,10 @@ class Tabel_xlsx(Xlsx_base):
                         total_h = int(self.__time2hours(wd.tm_work_start, wd.tm_work_end, triplets))
                         text = 'В{}'.format(total_h)
 
-                    elif wd.type == WorkerDay.Type.TYPE_MATERNITY.value and \
-                            self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY:
+                    elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
+                            and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
                         wd.type = WorkerDay.Type.TYPE_HOLIDAY.value
-                        text = 'В'
-
-                    elif wd.type == WorkerDay.Type.TYPE_MATERNITY_CARE.value and \
-                            self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY:
-                        wd.type = WorkerDay.Type.TYPE_HOLIDAY.value
-                        text = 'В'
-
-                    elif wd.type == WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value and \
-                            self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY:
-                        wd.type = WorkerDay.Type.TYPE_HOLIDAY.value
-                        text = 'В'
+                        text = self.WORKERDAY_TYPE_VALUE[wd.type]
 
                     else:
                         text = self.WORKERDAY_TYPE_VALUE[wd.type]
@@ -387,15 +386,6 @@ class Tabel_xlsx(Xlsx_base):
         self.worksheet.write_string(row + 1, col, '', cell_f)
         self.worksheet.write_string(row + 2, col, '', cell_f)
         self.worksheet.write_string(row + 3, col, 'pl_days', cell_f)
-
-        self.__write_formula(
-            row + 4, n_users, col + 6,
-            '(COUNTIF(G{0}:AK{0},"В")+COUNTIF(G{0}:AK{0},"В1")+COUNTIF(G{0}:AK{0},"В2")+COUNTIF(G{0}:AK{0},"В3")+'
-            'COUNTIF(G{0}:AK{0},"В4")+COUNTIF(G{0}:AK{0},"В5")+COUNTIF(G{0}:AK{0},"В6")+COUNTIF(G{0}:AK{0},"В7")+'
-            'COUNTIF(G{0}:AK{0},"В8")+COUNTIF(G{0}:AK{0},"В9")+COUNTIF(G{0}:AK{0},"В10")+COUNTIF(G{0}:AK{0},"В11")+'
-            'COUNTIF(G{0}:AK{0},"В12")+COUNTIF(G{0}:AK{0},"В13")+COUNTIF(G{0}:AK{0},"В14")+COUNTIF(G{0}:AK{0},"В15"))',
-            cell_f
-        )
 
         self.__write_formula(row + 4, n_users, col, 'D8-AR{0}', cell_f)
 
@@ -456,6 +446,15 @@ class Tabel_xlsx(Xlsx_base):
         self.__write_formula(
             row + 4, n_users, col + 4,
             '(AN{0}-AO{0})/8',
+            cell_f
+        )
+
+        self.__write_formula(
+            row + 4, n_users, col + 6,
+            '(COUNTIF(G{0}:AK{0},"В")+COUNTIF(G{0}:AK{0},"В1")+COUNTIF(G{0}:AK{0},"В2")+COUNTIF(G{0}:AK{0},"В3")+'
+            'COUNTIF(G{0}:AK{0},"В4")+COUNTIF(G{0}:AK{0},"В5")+COUNTIF(G{0}:AK{0},"В6")+COUNTIF(G{0}:AK{0},"В7")+'
+            'COUNTIF(G{0}:AK{0},"В8")+COUNTIF(G{0}:AK{0},"В9")+COUNTIF(G{0}:AK{0},"В10")+COUNTIF(G{0}:AK{0},"В11")+'
+            'COUNTIF(G{0}:AK{0},"В12")+COUNTIF(G{0}:AK{0},"В13")+COUNTIF(G{0}:AK{0},"В14")+COUNTIF(G{0}:AK{0},"В15"))',
             cell_f
         )
 

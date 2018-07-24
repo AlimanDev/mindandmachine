@@ -57,6 +57,4 @@ def get_tabel(request, workbook, form):
     tabel.add_xlsx_functions(len(users), 12, 37)
     tabel.add_sign(16 + len(users) + 2)
 
-    workbook.close()
-
     return workbook, 'Tabel'

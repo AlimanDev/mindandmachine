@@ -145,7 +145,7 @@ class UserWeekDaySlotAdmin(admin.ModelAdmin):
 
 @admin.register(Cashbox)
 class CashboxAdmin(admin.ModelAdmin):
-    list_display = ('type_name', 'shop_title', 'super_shop_title', 'id', 'number', 'is_busy')
+    list_display = ('type_name', 'shop_title', 'super_shop_title', 'id', 'number')
     search_fields = ('type__name', 'type__shop__title', 'type__shop__super_shop__title', 'id')
     list_filter = ('type__shop', )
 

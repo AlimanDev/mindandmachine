@@ -1,4 +1,4 @@
-import datetime as dt
+import datetime as datetime_module
 from datetime import timedelta, datetime
 import json
 
@@ -8,7 +8,7 @@ from django.db.models import Avg
 from src.conf.djconfig import QOS_DATETIME_FORMAT
 
 from src.util.utils import api_method, JsonResponse
-from .utils import time_diff, is_midnight_period
+from .utils import time_diff, is_midnight_period, get_status_and_details
 from .forms import GetCashboxesInfo, GetCashiersInfo, ChangeCashierStatus
 from django.utils.timezone import now
 
@@ -23,7 +23,8 @@ def get_cashboxes_info(request, form):
     list_of_cashbox = Cashbox.objects.qos_filter_active(
         dttm_now,
         dttm_now,
-        type__shop_id=shop_id).order_by('type__priority').order_by('number').select_related('type')
+        type__shop_id=shop_id
+    ).order_by('type__priority', 'number').select_related('type')
 
     for cashbox in list_of_cashbox:
         mean_queue = None
@@ -35,11 +36,12 @@ def get_cashboxes_info(request, form):
             # супер костыль в dttm__gte, так как время с камер пишется в UTC+6
             mean_queue = CameraCashboxStat.objects.filter(
                 camera_cashbox__cashbox_id=cashbox.id,
-                dttm__gte=dttm_now - timedelta(seconds=60) + timedelta(seconds=1080),
-                dttm__lt=dttm_now + timedelta(seconds=1080)).aggregate(mean_queue=Avg('queue'))
+                dttm__gte=dttm_now - timedelta(seconds=60) + timedelta(seconds=10800),
+                dttm__lt=dttm_now + timedelta(seconds=10800)).aggregate(mean_queue=Avg('queue'))
             if mean_queue:
                 mean_queue = mean_queue['mean_queue']
 
+        # todo: rewrite without 100500 requests to db (CameraCashboxStat also)
         status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
             on_cashbox=cashbox,
             tm_to__isnull=True,
@@ -82,7 +84,7 @@ def get_cashiers_info(request, form):
     dttm = form['dttm']
     response = {}
 
-    tm_to_show_all_workers = dt.time(23, 59)  # в 23:59 уже можно показывать всех сотрудников
+    tm_to_show_all_workers = datetime_module.time(23, 59)  # в 23:59 уже можно показывать всех сотрудников
     # todo: сделать без привязки к времени
 
     status = WorkerDayCashboxDetails.objects.select_related('worker_day', 'worker_day__worker__shop',
@@ -169,20 +171,20 @@ def get_cashiers_info(request, form):
 
         if item.worker_day.worker_id not in response.keys():
             response[item.worker_day.worker_id] = {
-                                                      "worker_id": item.worker_day.worker_id,
-                                                      "status": user_status,
-                                                      "worker_day_id": item.worker_day_id,
-                                                      "tm_work_start": str(item.tm_from),
-                                                      "tm_work_end": str(item.worker_day.tm_work_end),
-                                                      "default_break_triplets": str(default_break_triplets),
-                                                      "break_triplets": triplets,
-                                                      "cashbox_id": item.on_cashbox_id,
-                                                      "cashbox_dttm_added": cashbox_dttm_added,
-                                                      "cashbox_dttm_deleted": cashbox_dttm_deleted,
-                                                      "cashbox_type": cashbox_type,
-                                                      "cashbox_number": cashbox_number,
-                                                      "time_without_rest": time_without_rest,
-                                                  },
+                "worker_id": item.worker_day.worker_id,
+                "status": user_status,
+                "worker_day_id": item.worker_day_id,
+                "tm_work_start": str(item.tm_from),
+                "tm_work_end": str(item.worker_day.tm_work_end),
+                "default_break_triplets": str(default_break_triplets),
+                "break_triplets": triplets,
+                "cashbox_id": item.on_cashbox_id,
+                "cashbox_dttm_added": cashbox_dttm_added,
+                "cashbox_dttm_deleted": cashbox_dttm_deleted,
+                "cashbox_type": cashbox_type,
+                "cashbox_number": cashbox_number,
+                "time_without_rest": time_without_rest,
+            },
 
         else:
             response[item.worker_day.worker_id][0]["status"] = user_status
@@ -198,169 +200,80 @@ def get_cashiers_info(request, form):
 
 @api_method('POST', ChangeCashierStatus)
 def change_cashier_status(request, form):
+    """
+    change cashier status if possible
+
+    :param request:
+    :param form:
+    :return:
+    """
     worker_id = form['worker_id']
     new_user_status = form['status']
     cashbox_id = form['cashbox_id']
     is_current_time = form['is_current_time']
+    tm_work_end = form['tm_work_end']
 
-    response = {}
-    dttm_now = datetime.strptime(datetime.strftime(now() + timedelta(hours=3), QOS_DATETIME_FORMAT),
-                                 QOS_DATETIME_FORMAT)
+    dttm_now = (now() + timedelta(hours=3)).replace(microsecond=0)
+    dt = (dttm_now-timedelta(hours=3)).date()
+    time = dttm_now.time() if is_current_time else form['tm_changing']
+    tm_work_end = tm_work_end if tm_work_end else (datetime.combine(dt, time) + timedelta(hours=9)).time()
 
-    # для тестирования. потом вообще надо будет убрать
-    regular_day = dttm_now + timedelta(hours=9)
-    dttm_shop_closes = dt.datetime(dttm_now.year, dttm_now.month, dttm_now.day + 1, 1, 0, 0)\
-        if dttm_now.time().hour > 2 else dt.datetime(dttm_now.year, dttm_now.month, dttm_now.day, 1, 0, 0)
-    tm_work_end = form['tm_work_end'] if form['tm_work_end'] else \
-        regular_day.time() if regular_day < dttm_shop_closes \
-            else dttm_shop_closes.time()
-    # todo: upd: вообще убрать потом когда tm_work_end будет реализовано на фронте
+    cashbox_id = cashbox_id if new_user_status == WorkerDayCashboxDetails.TYPE_WORK else None
+    cashbox_type = None if cashbox_id is None else CashboxType.objects.get(cashbox__id=cashbox_id)
+    wdcd = None
 
-    def change_status(item, is_break=False, is_on_education=False, is_tablet=True, new_cashbox_id=False):
-        if is_tablet is True:
-            item.tm_to = dttm_now.time()
-            item.save()
-            pd = item
-            pd.pk = None
-            pd.tm_from = dttm_now.time()
-            pd.tm_to = None
-            if new_user_status is not False:
-                pd.on_cashbox_id = new_cashbox_id
-            pd.on_education = is_on_education
-            pd.is_break = is_break
-            pd.save()
-        else:
-            item.tm_from = dttm_now.time()
-            item.is_tablet = True
-            item.tm_to = None
-            item.on_education = is_on_education
-            item.is_break = is_break
-            item.save()
-
-    status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
-        worker_day__dt=(dttm_now-timedelta(hours=2)).date(),
+    workerday_detail = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+        worker_day__dt=dt,
         worker_day__worker_id=worker_id
-    ).order_by('id')
-    user_status = None
+    ).order_by('id').status()
+    if workerday_detail is None:
+        worker_day = WorkerDay.objects.get(worker_id=worker_id, dt=dt)
+    else:
+        worker_day = workerday_detail.worker_day
 
-    if not status:
-        WorkerDay.objects.filter(worker_id=worker_id, dt=dttm_now.date()). \
-            update(type=WorkerDay.Type.TYPE_WORKDAY.value, tm_work_start=dttm_now.time(), tm_work_end=tm_work_end)
+    # todo: add another checks for change statuses
+    if (new_user_status == WorkerDayCashboxDetails.TYPE_FINISH) and (worker_day.type == WorkerDay.Type.TYPE_ABSENSE):
+        return JsonResponse.value_error('can not change the status to {}'.format(new_user_status))
 
-        status = WorkerDayCashboxDetails.objects.create(
-            worker_day=WorkerDay.objects.get(worker_id=worker_id, dt=dttm_now.date()),
-            is_tablet=False,
-            tm_from=dttm_now.time(),
-            tm_to=tm_work_end,
-            cashbox_type=CashboxType.objects.get(cashbox__id=cashbox_id)
+    if new_user_status == WorkerDayCashboxDetails.TYPE_SOON:
+        return JsonResponse.value_error('can not change the status to {}'.format(new_user_status))
+
+    # if (new_user_status == WorkerDayCashboxDetails.TYPE_ABSENCE) and (workerday_detail.is_tablet == True):
+    #     return JsonResponse.value_error(
+    #         'can not change the status to {}'.format(new_user_status))
+
+    if (workerday_detail.is_tablet == True) and (workerday_detail.tm_to is None):
+        workerday_detail.tm_to = time
+        workerday_detail.save()
+
+    if new_user_status == WorkerDayCashboxDetails.TYPE_ABSENCE:
+        worker_day.type = WorkerDay.Type.TYPE_ABSENSE
+        worker_day.save()
+    elif new_user_status == WorkerDayCashboxDetails.TYPE_FINISH:
+        pass # already close workerday_detail
+    elif new_user_status in WorkerDayCashboxDetails.DETAILS_TYPES_LIST:
+        wdcd = WorkerDayCashboxDetails.objects.create(
+            worker_day=worker_day,
+            on_cashbox_id=cashbox_id,
+            cashbox_type=cashbox_type,
+            tm_from=time,
+            status = new_user_status,
+            is_tablet=True,
         )
-        status = [status]
 
-    if status:
-        for item in status:
-            if (item.is_tablet is True) and not item.tm_to:
-                if new_user_status == 'W':
-                    user_status = new_user_status
-                    if item.is_break is True or item.on_education is True:
-                        change_status(item, new_cashbox_id=cashbox_id)
-                        prev_item = item.__class__.objects.filter(worker_day=item.worker_day).order_by('-id')[1]
-                        prev_item.tm_to = dttm_now.time()
-                        prev_item.save()
-                    else:
-                        if cashbox_id and (cashbox_id != item.on_cashbox_id):
-                            change_status(item, new_cashbox_id=cashbox_id)
-                    break
+        if (new_user_status == WorkerDayCashboxDetails.TYPE_WORK) and (worker_day.type != WorkerDay.Type.TYPE_WORKDAY):
+            worker_day.type = WorkerDay.Type.TYPE_WORKDAY
+            worker_day.tm_work_start = time
+            worker_day.tm_work_end = tm_work_end
+            worker_day.save()
+    else:
+        return JsonResponse.value_error('can not change the status to {}'.format(new_user_status))
 
-                elif new_user_status == 'B':
-                    user_status = new_user_status
-                    if item.is_break is False:
-                        change_status(item, is_break=True, new_cashbox_id=None)
-                    break
+    return JsonResponse.success({
+        worker_day.worker_id: {
+            "worker_id": worker_day.worker_id,
+            "status": new_user_status,
+            "cashbox_id": None if wdcd is None else wdcd.on_cashbox_id
+        }
+    })
 
-                elif new_user_status == 'A':
-                    return JsonResponse.value_error(
-                        'can not change the status to {}'.format(new_user_status))
-
-                elif new_user_status == 'S':
-                    user_status = new_user_status
-                    if item.on_education is False:
-                        change_status(item, is_on_education=True, new_cashbox_id=None)
-                    break
-
-                elif new_user_status == 'H':
-                    if (item.worker_day.type != WorkerDay.Type.TYPE_ABSENSE.value) and (user_status != 'C'):
-                        user_status = 'H'
-                        item.save()
-                        item.tm_to = item.worker_day.tm_work_end if not is_current_time else dttm_now.time()
-                        item.on_education = False
-                        item.is_break = False
-                        item.save()
-                        break
-                    else:
-                        return JsonResponse.value_error(
-                            'can not change the status to {}'.format(new_user_status))
-                else:
-                    return JsonResponse.value_error(
-                        'Invalid status {}'.format(new_user_status))
-
-            elif (item.is_tablet is False) and item.tm_to:
-                if new_user_status == 'W':
-                    user_status = new_user_status
-                    if cashbox_id:
-                        item.on_cashbox_id = cashbox_id
-                        item.save()
-                    if item.worker_day.type == WorkerDay.Type.TYPE_ABSENSE.value:
-                        # A если был не выходной....
-                        item.worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
-                        item.worker_day.save()
-                    change_status(item, is_tablet=False)
-                    if not is_current_time:
-                        item.tm_from = item.worker_day.tm_work_start
-                        item.save()
-                    break
-
-                elif new_user_status == 'B':
-                    user_status = new_user_status
-                    item.on_cashbox_id = None
-                    item.save()
-                    if item.worker_day.type == WorkerDay.Type.TYPE_ABSENSE.value:
-                        # A если был не выходной....
-                        item.worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
-                        item.worker_day.save()
-                    change_status(item, is_break=True, is_tablet=False)
-                    break
-
-                elif new_user_status == 'A':
-                    user_status = new_user_status
-                    item.worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
-                    item.worker_day.save()
-                    break
-
-                elif new_user_status == 'S':
-                    user_status = new_user_status
-                    item.on_cashbox_id = None
-                    item.save()
-                    if item.worker_day.type == WorkerDay.Type.TYPE_ABSENSE.value:
-                        # A если был не выходной....
-                        item.worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
-                        item.worker_day.save()
-                    change_status(item, is_on_education=True, is_tablet=False)
-                    break
-
-                elif new_user_status == 'H':
-                    return JsonResponse.value_error(
-                        'can not change the status to {}'.format(new_user_status))
-                else:
-                    return JsonResponse.value_error(
-                        'Invalid status {}'.format(new_user_status))
-
-            else:
-                user_status = 'H'
-
-        response[item.worker_day.worker_id] = {
-                                                  "worker_id": item.worker_day.worker_id,
-                                                  "status": user_status,
-                                                  "cashbox_id": item.on_cashbox_id
-                                              },
-
-    return JsonResponse.success(response)

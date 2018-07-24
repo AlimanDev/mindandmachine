@@ -305,7 +305,6 @@ class Cashbox(models.Model):
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
-    is_busy = models.BooleanField(default=False)  # if someone working on this cashbox:True, else: False
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
     number = models.PositiveIntegerField(blank=True, null=True)
@@ -473,10 +472,25 @@ class WorkerDayCashboxDetails(models.Model):
     TYPE_FINISH = 'H'
     TYPE_ABSENCE = 'A'
 
+<<<<<<< HEAD
     DETAILS_TYPES = (
             (TYPE_WORK, 'work period'),
             (TYPE_BREAK, 'rest / break'),
             (TYPE_STUDY, 'study period'),
+=======
+    TYPE_T = 'T'
+
+    DETAILS_TYPES = (
+        (TYPE_WORK, 'work period'),
+        (TYPE_BREAK, 'rest / break'),
+        (TYPE_STUDY, 'study period'),
+    )
+
+    DETAILS_TYPES_LIST = (
+        TYPE_WORK,
+        TYPE_BREAK,
+        TYPE_STUDY
+>>>>>>> 5c667cf572306262cddb62d3c356026bd9d1b5f6
     )
 
     id = models.BigAutoField(primary_key=True)
@@ -485,8 +499,13 @@ class WorkerDayCashboxDetails(models.Model):
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT, null=True, blank=True)
 
+<<<<<<< HEAD
     is_break = models.BooleanField(default=False)  # True if it is time for rest
     on_education = models.BooleanField(default=False)
+=======
+    # is_break = models.BooleanField(default=False)  # True if it is time for rest
+    # on_education = models.BooleanField(default=False)
+>>>>>>> 5c667cf572306262cddb62d3c356026bd9d1b5f6
     status = models.CharField(max_length=1, choices=DETAILS_TYPES, default=TYPE_WORK)
 
     is_tablet = models.BooleanField(default=False)
