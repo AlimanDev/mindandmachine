@@ -12,7 +12,7 @@ from .camera import urls as camera_urls
 from .download import urls as download_urls
 from .tablet import urls as tablet_urls
 from django.conf.urls import include, url
-from src.conf.djconfig_local import DEBUG
+from src.conf.djconfig import DEBUG
 
 
 api_urlpatterns = [
