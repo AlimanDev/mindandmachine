@@ -213,6 +213,7 @@ class CashboxType(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
+    priority = models.PositiveIntegerField(default=100)  # 1--main, 2-ord, 3-express, etc
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
     dttm_last_update_queue = models.DateTimeField(null=True, blank=True)
@@ -305,7 +306,8 @@ class Cashbox(models.Model):
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
     type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
-    number = models.CharField(max_length=6)
+
+    number = models.PositiveIntegerField(blank=True, null=True)
     bio = models.CharField(max_length=512, default='', blank=True)
     objects = CashboxManager()
 
@@ -461,10 +463,31 @@ class WorkerDay(models.Model):
 
 
 class WorkerDayCashboxDetails(models.Model):
-    def __str__(self):
-        # return f'{self.worker_day.worker.last_name}, {self.worker_day.worker.shop.super_shop.title},' \
-        #        f' {self.worker_day.dt}, {self.on_cashbox.type.name}, {self.id}'
-        return '{}, {}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.cashbox_type.name, self.id)
+    TYPE_WORK = 'W'
+    TYPE_BREAK = 'B'
+    TYPE_STUDY = 'S'
+
+    TYPE_SOON = 'C'
+    TYPE_FINISH = 'H'
+    TYPE_ABSENCE = 'A'
+
+    TYPE_T = 'T'
+
+    DETAILS_TYPES = (
+        (TYPE_WORK, 'work period'),
+        (TYPE_BREAK, 'rest / break'),
+        (TYPE_STUDY, 'study period'),
+    )
+
+    WORK_TYPES_LIST = (
+        TYPE_WORK,
+        TYPE_STUDY
+    )
+    DETAILS_TYPES_LIST = (
+        TYPE_WORK,
+        TYPE_BREAK,
+        TYPE_STUDY
+    )
 
     id = models.BigAutoField(primary_key=True)
 
@@ -472,12 +495,17 @@ class WorkerDayCashboxDetails(models.Model):
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT, null=True, blank=True)
 
-    is_break = models.BooleanField(default=False)  # True if it is time for rest
-    on_education = models.BooleanField(default=False)
+    # is_break = models.BooleanField(default=False)  # True if it is time for rest
+    # on_education = models.BooleanField(default=False)
+    status = models.CharField(max_length=1, choices=DETAILS_TYPES, default=TYPE_WORK)
+
     is_tablet = models.BooleanField(default=False)
 
     tm_from = models.TimeField()
     tm_to = models.TimeField(null=True, blank=True)
+
+    def __str__(self):
+        return '{}, {}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.cashbox_type.name, self.id)
 
 
 class WorkerDayChangeRequest(models.Model):

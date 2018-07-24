@@ -17,3 +17,5 @@ etc/report/
 db.sqlite3
 
 qos_backend.log*
+
+venv/*

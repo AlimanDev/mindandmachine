@@ -4,9 +4,10 @@ from datetime import datetime, timedelta
 from django import forms
 from django.core.exceptions import ValidationError
 
-from src.db.models import WorkerDay
+from src.db.models import WorkerDay, User
 from src.util import forms as util_forms
 from src.util.models_converter import WorkerDayConverter, UserConverter, BaseConverter
+
 
 
 class GetCashiersListForm(forms.Form):
@@ -41,6 +42,34 @@ class GetCashierTimetableForm(forms.Form):
             raise forms.ValidationError('from_dt have to be less or equal than to_dt')
 
 
+class DublicateCashierTimetableForm(forms.Form):
+    main_worker_id = forms.IntegerField(required=True)
+    trainee_worker_id = forms.IntegerField(required=True)
+    dt_begin = util_forms.DateField()
+    dt_end = util_forms.DateField()
+
+    def clean_main_worker_id(self):
+        try:
+            main_worker = User.objects.get(id=self.cleaned_data['main_worker_id'])
+        except User.DoesNotExist:
+            raise forms.ValidationError('Invalid main_worker_id')
+        return main_worker
+
+    def clean_trainee_worker_id(self):
+        try:
+            trainee_worker = User.objects.get(id=self.cleaned_data['trainee_worker_id'])
+        except User.DoesNotExist:
+            raise forms.ValidationError('Invalid trainee_worker_id')
+        return trainee_worker
+
+    def clean(self):
+        if self.errors:
+            return
+
+        if self.cleaned_data['dt_begin'] > self.cleaned_data['dt_end']:
+            raise forms.ValidationError('dt_begin have to be less or equal than dt_end')
+
+
 class GetCashierInfoForm(forms.Form):
     worker_id = forms.IntegerField()
     info = util_forms.MultipleChoiceField(['general_info', 'cashbox_type_info', 'constraints_info', 'work_hours'])
@@ -49,6 +78,42 @@ class GetCashierInfoForm(forms.Form):
 class GetWorkerDayForm(forms.Form):
     worker_id = forms.IntegerField()
     dt = util_forms.DateField()
+
+
+class SetWorkerDaysForm(forms.Form):
+    worker_id = forms.IntegerField()
+    dt_begin = util_forms.DateField()
+    dt_end = util_forms.DateField()
+    type = forms.CharField()
+    tm_work_start = util_forms.TimeField(required=False)
+    tm_work_end = util_forms.TimeField(required=False)
+
+    cashbox_type = forms.IntegerField(required=False)
+    comment = forms.CharField(max_length=128, required=False)
+
+    def clean_worker_id(self):
+        try:
+            worker = User.objects.get(id=self.cleaned_data['worker_id'])
+        except User.DoesNotExist:
+            raise forms.ValidationError('Invalid worker_id')
+        return worker
+
+    def clean_type(self):
+        value = WorkerDayConverter.parse_type(self.cleaned_data['type'])
+        if value is None:
+            raise ValidationError('Invalid enum value')
+        return value
+
+    def clean(self):
+        if self.errors:
+            return
+
+        if WorkerDay.is_type_with_tm_range(self.cleaned_data['type']):
+            if self.cleaned_data.get('tm_work_start') is None or self.cleaned_data.get('tm_work_end') is None:
+                raise ValidationError('tm_work_start, tm_work_end required')
+
+        if self.cleaned_data['dt_begin'] > self.cleaned_data['dt_end']:
+            raise forms.ValidationError('dt_begin have to be less or equal than dt_end')
 
 
 class SetWorkerDayForm(forms.Form):
@@ -148,3 +213,4 @@ class CreateCashierForm(forms.Form):
 class DeleteCashierForm(forms.Form):
     user_id = forms.IntegerField()
     dt_fired = util_forms.DateField()
+
