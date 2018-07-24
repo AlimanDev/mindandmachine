@@ -236,6 +236,7 @@ class CashboxType(models.Model):
     )
     probability = models.FloatField(default=1.0)
     prior_weight = models.FloatField(default=1.0)
+    is_main_type = models.BooleanField(default=False)
 
 
 class UserWeekdaySlot(models.Model):

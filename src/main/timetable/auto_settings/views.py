@@ -115,7 +115,7 @@ def create_timetable(request, form):
     shop = Shop.objects.get(id=shop_id)
 
     shop_dict = {
-        'shop': ShopConverter.convert(shop),  # has full_interface in it
+        'shop_interface': shop.full_interface,
         'mean_queue_length': shop.mean_queue_length,
         'max_queue_length': shop.max_queue_length,
         'dead_time_part': shop.dead_time_part
