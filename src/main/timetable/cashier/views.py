@@ -296,7 +296,7 @@ def get_worker_day(request, form):
 
 @api_method('POST', SetWorkerDaysForm)
 def set_worker_days(request, form):
-    worker=form['worker_id']
+    worker = form['worker_id']
 
     # интервал дней из формы
     form_dates = []

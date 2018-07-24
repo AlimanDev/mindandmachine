@@ -256,6 +256,17 @@ def get_cashiers_timetable(request, form):
                 'amount': real_diff, # + period_cashiers,
             })
 
+    prev_one_period_demand = period_demand[0]  # for first iteration
+    total_lack_of_cashiers_on_period_demand = 0  # on all cashboxes types
+    for one_period_demand in period_demand:
+        if one_period_demand.dttm_forecast == prev_one_period_demand.dttm_forecast:
+            total_lack_of_cashiers_on_period_demand += one_period_demand.lack_of_cashiers
+        else:
+            lack_of_cashiers_on_period.append({'lack_of_cashiers': total_lack_of_cashiers_on_period_demand,
+                                               'dttm_start': str(one_period_demand.dttm_forecast), })
+            total_lack_of_cashiers_on_period_demand = one_period_demand.lack_of_cashiers
+        prev_one_period_demand = one_period_demand
+
     response = {
         'indicators': {
             'mean_notworking_persent': None,  # mean_notworking_present,
@@ -271,7 +282,7 @@ def get_cashiers_timetable(request, form):
             'predict_cashier_needs': predict_cashier_needs,
             'fact_cashier_needs': fact_cashier_needs
         },
-        # 'lack_of_cashiers_on_period': lack_of_cashiers_on_period
+        'lack_of_cashiers_on_period': lack_of_cashiers_on_period
     }
     return JsonResponse.success(response)
 

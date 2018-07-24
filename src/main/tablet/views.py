@@ -80,6 +80,14 @@ def get_cashboxes_info(request, form):
 
 @api_method('GET', GetCashiersInfo)
 def get_cashiers_info(request, form):
+    """
+    gets status of all cashiers, working today
+
+    :param request:
+    :param form:
+    :return: complicated dict (see the code below)
+    """
+
     shop_id = form['shop_id']
     dttm = form['dttm']
     response = {}
