@@ -387,7 +387,7 @@ class Tabel_xlsx(Xlsx_base):
         self.worksheet.write_string(row + 2, col, '', cell_f)
         self.worksheet.write_string(row + 3, col, 'pl_days', cell_f)
 
-        self.__write_formula(row + 4, n_users, col, '=D8−AR{0}', cell_f)
+        self.__write_formula(row + 4, n_users, col, 'D8-AR{0}', cell_f)
 
         # other
         cell_format['bg_color'] = COLOR_WHITE
@@ -445,7 +445,7 @@ class Tabel_xlsx(Xlsx_base):
 
         self.__write_formula(
             row + 4, n_users, col + 4,
-            'AN{0}−AO{0}÷8',
+            'AN{0}-AO{0}/8',
             cell_f
         )
 
@@ -484,7 +484,7 @@ class Tabel_xlsx(Xlsx_base):
 
         self.__write_formula(
             row + 4, n_users, col + 11,
-            'SUM(AO{0}:AV{0})−AQ{0}',
+            'SUM(AO{0}:AV{0})-AQ{0}',
             cell_f
         )
 
@@ -589,11 +589,11 @@ class Tabel_xlsx(Xlsx_base):
         cell_f.set_align('vjustify')
 
         self.worksheet.write_string('BW16', 'Текущий месяц', cell_f)
-        self.worksheet.write_string('BX16', 'Закрытий месяц', cell_f)
+        self.worksheet.write_string('BX16', 'Закрытый месяц', cell_f)
 
         self.__write_formula(
             row + 4, n_users, col + 37,
-            'AM{0}−D11',
+            'AM{0}-D11',
             cell_f
         )
 
@@ -607,7 +607,7 @@ class Tabel_xlsx(Xlsx_base):
         cell_f = self.workbook.add_format(cell_format)
         cell_f.set_align('vjustify')
 
-        self.worksheet.write_string('BY16', 'Закрытий месяц', cell_f)
+        self.worksheet.write_string('BY16', 'Закрытый месяц', cell_f)
         self.__write_formula(
             row + 4, n_users, col + 39,
             'BW{0}+BX{0}',

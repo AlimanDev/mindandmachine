@@ -114,7 +114,6 @@ def get_cashiers_timetable(request, form):
         # worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         'worker_day__dt__gte': form['from_dt'],
         'worker_day__dt__lte': form['to_dt'],
-        'is_break': False,
         'cashbox_type_id__in': cashbox_types.keys(),
     }
     if form['position_id']:
@@ -124,6 +123,8 @@ def get_cashiers_timetable(request, form):
         'worker_day',
     ).filter(
         **worker_day_cashbox_detail_filter
+    ).exclude(
+        status=WorkerDayCashboxDetails.TYPE_BREAK
     ).order_by(
         'worker_day__dt',
         'tm_from',

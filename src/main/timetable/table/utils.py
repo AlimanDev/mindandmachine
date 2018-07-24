@@ -1,6 +1,7 @@
 from django.db.models import Q
 from src.db.models import (
     WorkerDay,
+    WorkerDayCashboxDetails,
     ProductionDay,
 )
 from datetime import time
@@ -58,7 +59,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
     total_norm = get_norm_work_periods(prod_days_list, dt_start, dt_end)
 
     wdds = list(WorkerDay.objects.filter(
-        Q(workerdaycashboxdetails__is_break=False) | Q(workerdaycashboxdetails=None), # for doing left join
+        Q(workerdaycashboxdetails__status__in=WorkerDayCashboxDetails.WORK_TYPES_LIST) | Q(workerdaycashboxdetails=None), # for doing left join
         dt__gte=dt_start,
         dt__lte=dt_end,
         worker_id__in=users_ids.keys(),

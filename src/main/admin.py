@@ -145,7 +145,7 @@ class UserWeekDaySlotAdmin(admin.ModelAdmin):
 
 @admin.register(Cashbox)
 class CashboxAdmin(admin.ModelAdmin):
-    list_display = ('type_name', 'shop_title', 'super_shop_title', 'id')
+    list_display = ('type_name', 'shop_title', 'super_shop_title', 'id', 'number')
     search_fields = ('type__name', 'type__shop__title', 'type__shop__super_shop__title', 'id')
     list_filter = ('type__shop', )
 
@@ -220,8 +220,8 @@ class WorkerConstraintAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerDay)
 class WorkerDayAdmin(admin.ModelAdmin):
-    list_display = ('worker_last_name', 'shop_title', 'super_shop_title', 'dt', 'type', 'id')
-    search_fields = ('worker__last_name', 'worker__shop__title', 'worker__shop__super_shop__title', 'id')
+    list_display = ('worker_last_name', 'shop_title', 'super_shop_title', 'dt', 'type', 'id','tm_work_start', 'tm_work_end')
+    search_fields = ('worker__last_name', 'worker__shop__title', 'worker__shop__super_shop__title', 'id', 'dt')
     list_filter = ('worker__shop',)
 
     @staticmethod
@@ -239,7 +239,9 @@ class WorkerDayAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerDayCashboxDetails)
 class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
-    list_display = ('worker_last_name', 'super_shop_title', 'worker_day_dt', 'on_cashbox_type', 'id')
+    # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
+    # todo: upd: сервак просто падает если туда зайти
+    list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_cashbox_type', 'id', 'tm_from', 'tm_to')
     search_fields = ('worker_day__worker__last_name', 'worker_day__worker__shop__title', 'id')
     list_filter = ('worker_day__worker__shop',)
 
@@ -248,7 +250,7 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
         return instance.worker_day.worker.last_name
 
     @staticmethod
-    def super_shop_title(instance: WorkerDayCashboxDetails):
+    def shop_title(instance: WorkerDayCashboxDetails):
         return instance.worker_day.worker_shop.title
 
     @staticmethod
@@ -257,7 +259,7 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
 
     @staticmethod
     def on_cashbox_type(instance: WorkerDayCashboxDetails):
-        return instance.cashbox_type.name
+        return instance.cashbox_type.name if instance.cashbox_type else ''
 
 
 @admin.register(WorkerDayChangeLog)

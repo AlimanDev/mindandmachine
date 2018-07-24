@@ -379,7 +379,7 @@ def set_timetable(request, form):
                     if wdd['type'] > 0:
                         wdd_el.cashbox_type_id = wdd['type']
                     else:
-                        wdd_el.is_break = True
+                        wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
 
                     wdd_list.append(wdd_el)
                 WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
