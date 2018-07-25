@@ -36,6 +36,7 @@ from src.util.models_converter import (
     WorkerCashboxInfoConverter,
     WorkerDayConverter,
     BaseConverter,
+    ShopConverter,
 
     SlotConverter,
 )
@@ -43,6 +44,7 @@ from src.util.utils import api_method, JsonResponse
 from .forms import GetStatusForm, SetSelectedCashiersForm, CreateTimetableForm, DeleteTimetableForm, SetTimetableForm
 import requests
 from .utils import time2int
+from ..table.utils import count_difference_of_normal_days
 
 
 @api_method('GET', GetStatusForm)
@@ -111,6 +113,14 @@ def create_timetable(request, form):
     )
 
     shop = Shop.objects.get(id=shop_id)
+
+    shop_dict = {
+        'shop_interface': shop.full_interface,
+        'mean_queue_length': shop.mean_queue_length,
+        'max_queue_length': shop.max_queue_length,
+        'dead_time_part': shop.dead_time_part
+    }
+
     cashboxes = [CashboxTypeConverter.convert(x, True) for x in CashboxType.objects.filter(shop_id=shop_id)]
 
 
@@ -196,6 +206,8 @@ def create_timetable(request, form):
         type__in=ProductionDay.WORK_TYPES,
     ).count()
 
+    user_info = count_difference_of_normal_days(dt_end=dt_from, usrs=users)
+
     data = {
         'start_dt': BaseConverter.convert_date(tt.dt),
         'IP': settings.HOST_IP,
@@ -203,7 +215,8 @@ def create_timetable(request, form):
         'forecast_step_minutes': shop.forecast_step_minutes.minute,
         'cashbox_types': cashboxes,
         # 'slots': slots_periods_dict,
-        'shop_type': shop.full_interface,
+        'shop': shop_dict,
+        'shop_interface': shop.full_interface, # todo: remove when change in algo
         'demand': [PeriodDemandConverter.convert(x) for x in periods],
         'cashiers': [
             {
@@ -212,7 +225,10 @@ def create_timetable(request, form):
                 'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(u.id, [])],
                 'workdays': [WorkerDayConverter.convert(x) for x in worker_day.get(u.id, [])],
                 'prev_data': [WorkerDayConverter.convert(x) for x in prev_data.get(u.id, [])],
-            } for u in users
+                'overworking_hours': user_info[u.id].get('diff_prev_paid_hours', 0),
+                'overworking_days': user_info[u.id].get('diff_prev_paid_days', 0),
+            }
+            for u in users
         ],
         'algo_params': {
             'cost_weights': json.loads(shop.cost_weights),

@@ -445,7 +445,7 @@ class Tabel_xlsx(Xlsx_base):
 
         self.__write_formula(
             row + 4, n_users, col + 4,
-            'AN{0}-AO{0}/8',
+            '(AN{0}-AO{0})/8',
             cell_f
         )
 
