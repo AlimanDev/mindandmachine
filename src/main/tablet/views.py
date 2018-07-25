@@ -165,8 +165,7 @@ def get_cashiers_info(request, form):
                     tm_to = item.tm_to
                     if item.tm_to is None:
                         tm_to = dttm.time()
-                    tm_calculated = round(time_diff(item.tm_from, tm_to) / 60)
-                    time_without_rest[item.worker_day.worker_id] += tm_calculated
+                    time_without_rest[item.worker_day.worker_id] += round(time_diff(item.tm_from, tm_to) / 60)
             else:
                 item.status = WorkerDayCashboxDetails.TYPE_T
 
@@ -181,8 +180,6 @@ def get_cashiers_info(request, form):
             cashbox_number = item.on_cashbox.number
 
         if item.worker_day.worker_id not in response.keys():
-            if item.worker_day.worker_id not in time_without_rest.keys():
-                time_without_rest[item.worker_day.worker_id] = datetime_module.time(0, 0)
             response[item.worker_day.worker_id] = {
                 "worker_id": item.worker_day.worker_id,
                 "status": item.status,
