@@ -29,16 +29,10 @@ import io
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
     # return JsonResponse.success()
-    def count_diff(dttm, period_demands, demand_ind, period_bills, mean_bills_per_step, cashbox_types, hard=False,):
+    def count_diff(dttm, period_demands, demand_ind, period_bills, mean_bills_per_step, cashbox_types):
         # fixme: aa: work only if all steps are 30 minutes
         # todo: это не работает!!!!!!!!!!
         # period_demand is sorted by dttm_forecast, so find the dttm
-        cashbox_types_main = []
-        if hard:
-            for cashbox_type in cashbox_types.values():
-                if cashbox_type[0].do_forecast == CashboxType.FORECAST_HARD:
-                    cashbox_types_main.append(cashbox_type[0])
-            cashbox_types = group_by(cashbox_types_main, group_key=lambda x: x.id)
             # mean_bills_per_step = WorkerCashboxInfo.objects.filter(
             #     is_active=True,
             #     cashbox_type_id__in=cashbox_types.keys()
@@ -115,6 +109,15 @@ def get_cashiers_timetable(request, form):
             return JsonResponse.value_error('bad cashbox_type_ids')
 
     cashbox_types = group_by(cashbox_types, group_key=lambda x: x.id)
+
+    cashbox_types_main = []
+    for cashbox_type in cashbox_types.values():
+        print(cashbox_type)
+        if cashbox_type[0].is_main_type:
+            cashbox_types_main.append(cashbox_type[0])
+    cashbox_types_main = group_by(cashbox_types_main, group_key=lambda x: x.id)
+    for ind in range(1, len(cashbox_types) - len(cashbox_types_main) + 1):
+        cashbox_types_main[-ind] = None
 
     worker_day_cashbox_detail_filter = {
         'worker_day__worker_shop_id': shop_id,
@@ -224,6 +227,7 @@ def get_cashiers_timetable(request, form):
             ind_e = ind_b
             period_bills = {i: 0 for i in cashbox_types.keys()}
             period_cashiers = 0.0
+            period_cashiers_hard = 0.0
             if ind_e < wdcds_len and wdcds[ind_e].tm_to:
                 dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_from)
                 dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_to)
@@ -240,7 +244,8 @@ def get_cashiers_timetable(request, form):
                     #     (PERIOD_MINUTES / worker_cashbox_info[(wdcds[ind_e].worker_day.worker_id, wdcds[ind_e].cashbox_type_id)][0].mean_speed)
 
                     period_cashiers += 1 * proportion
-                    # if :
+                    if wdcds[ind_e].cashbox_type_id in cashbox_types_main.keys():
+                        period_cashiers_hard += 1 * proportion
 
                 ind_e += 1
                 if ind_e < wdcds_len and wdcds[ind_e].tm_to:
@@ -253,7 +258,7 @@ def get_cashiers_timetable(request, form):
                 'amount': period_cashiers
             })
 
-            predict_diff, demand_ind = count_diff(dttm, predict_demand, demand_ind, period_bills,  mean_bills_per_step, cashbox_types)
+            predict_diff, demand_ind_2 = count_diff(dttm, predict_demand, demand_ind, period_bills,  mean_bills_per_step, cashbox_types)
             if predict_diff > need_cashier_amount:
                 need_cashier_amount = predict_diff
             predict_cashier_needs.append({
@@ -267,14 +272,13 @@ def get_cashiers_timetable(request, form):
                 'amount': real_diff, # + period_cashiers,
             })
             # predict_diff_main, _ = count_diff(dttm, predict_demand, demand_ind, period_bills,  mean_bills_per_step, cashbox_types, True)
-            predict_diff_hard, _ = count_diff(dttm, predict_demand, demand_ind, period_bills, mean_bills_per_step,
-                                              cashbox_types, True)
-            if predict_diff_hard != predict_diff:
-                print(predict_diff, predict_diff_hard) #  тут вообще разницы между ними нету
-            if period_cashiers > predict_diff_hard:
-                idle_time_numerator += period_cashiers - predict_diff_hard
-            idle_time_denominator += period_cashiers
+            predict_diff_hard, _ = count_diff(dttm, predict_demand, demand_ind, period_bills, mean_bills_per_step, cashbox_types_main)
+            print(period_cashiers_hard, predict_diff, predict_diff_hard) #  тут вообще разницы между ними нету
+            if period_cashiers_hard > predict_diff_hard:
+                idle_time_numerator += period_cashiers_hard - predict_diff_hard
+            idle_time_denominator += period_cashiers_hard
 
+            demand_ind = demand_ind_2
     total_lack_of_cashiers_on_period_demand = 0  # on all cashboxes types
     if period_demand:
         prev_one_period_demand = period_demand[0]  # for first iteration
@@ -289,7 +293,7 @@ def get_cashiers_timetable(request, form):
 
     response = {
         'indicators': {
-            'deadtime_part': round(idle_time_numerator/idle_time_denominator*100, 1),
+            'deadtime_part': round(100 * idle_time_numerator / (idle_time_denominator + 1e-8) , 1),
             'big_demand_persent': 0,  # big_demand_persent,
             'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': None,
@@ -504,7 +508,6 @@ def get_timetable_xlsx(request, form):
             cell_2 = wd.worker_day.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT)
             cell_3 = wd.cashbox_type.name
 
-            # print(row, col + 3 * int(wd.worker_day.dt.day) - 3, cell_3, wd.cashbox_type.name,  wd.worker_day.type, WorkerDay.Type.TYPE_WORKDAY, wd.worker_day.type == WorkerDay.Type.TYPE_WORKDAY)
             worksheet.write_string(row, col + 3 * int(wd.worker_day.dt.day) - 3, cell_1)
             worksheet.write_string(row, col + 3 * int(wd.worker_day.dt.day) - 2, cell_2)
             worksheet.write_string(row, col + 3 * int(wd.worker_day.dt.day) - 1, cell_3)
