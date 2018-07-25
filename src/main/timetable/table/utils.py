@@ -176,6 +176,14 @@ def count_normal_days(dt_start, dt_end, usrs):
 
 
 def count_difference_of_normal_days(dt_end, usrs, dt_start=None):
+    """
+    return dict with user_ids as keys, and 'diff_prev_paid_days', 'diff_prev_paid_hours' as values
+    :param dt_end:
+    :param usrs:
+    :param dt_start:
+    :return:
+    """
+
     dt_start = dt_start if dt_start else dt.date(dt_end.year, 1, 1)
     dts_start_count_dict, _ = count_normal_days(dt_start, dt_end, usrs)
 
@@ -199,7 +207,9 @@ def count_difference_of_normal_days(dt_end, usrs, dt_start=None):
         diff_prev_days = prev_info[u_it]['count_workdays'] - total_norm_days
         diff_prev_hours = prev_info[u_it]['count_hours'] - total_norm_hours
 
-        user_info_dict.update({usrs[u_it].id: {'diff_prev_paid_days': diff_prev_days,
-                                               'diff_prev_paid_hours': diff_prev_hours}})
+        user_info_dict[usrs[u_it].id] = {
+            'diff_prev_paid_days': diff_prev_days,
+            'diff_prev_paid_hours': diff_prev_hours
+        }
 
     return user_info_dict

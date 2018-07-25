@@ -397,16 +397,12 @@ def get_month_stat(request, form):
     user_info_dict = count_difference_of_normal_days(dt_end=dt_start, usrs=usrs)
 
     for u_it in range(len(usrs)):
-        month_user_info_dict = month_info[usrs[u_it].id]
-
-        user_info_dict.update({
-            usrs[u_it].id: {
-                'diff_total_paid_days': user_info_dict[usrs[u_it].id]['diff_prev_paid_days'] + month_user_info_dict['diff_norm_days'],
-                'diff_total_paid_hours': user_info_dict[usrs[u_it].id]['diff_prev_paid_days'] + month_user_info_dict['diff_norm_hours'],
-            }
+        month_info[usrs[u_it].id].update({
+            'diff_prev_paid_days': user_info_dict[usrs[u_it].id]['diff_prev_paid_days'],
+            'diff_prev_paid_hours': user_info_dict[usrs[u_it].id]['diff_prev_paid_hours'],
+            'diff_total_paid_days': user_info_dict[usrs[u_it].id]['diff_prev_paid_days'] + month_info[usrs[u_it].id]['diff_norm_days'],
+            'diff_total_paid_hours': user_info_dict[usrs[u_it].id]['diff_prev_paid_hours'] + month_info[usrs[u_it].id]['diff_norm_hours'],
         })
-
-        month_info[usrs[u_it].id] = user_info_dict
     return JsonResponse.success({'users_info': month_info})
 
 

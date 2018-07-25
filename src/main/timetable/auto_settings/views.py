@@ -216,6 +216,7 @@ def create_timetable(request, form):
         'cashbox_types': cashboxes,
         # 'slots': slots_periods_dict,
         'shop': shop_dict,
+        'shop_interface': shop.full_interface, # todo: remove when change in algo
         'demand': [PeriodDemandConverter.convert(x) for x in periods],
         'cashiers': [
             {
@@ -224,8 +225,8 @@ def create_timetable(request, form):
                 'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(u.id, [])],
                 'workdays': [WorkerDayConverter.convert(x) for x in worker_day.get(u.id, [])],
                 'prev_data': [WorkerDayConverter.convert(x) for x in prev_data.get(u.id, [])],
-                'overworking_hours': user_info.get(u.id).get('diff_prev_paid_hours'),
-                'overworking_days': user_info.get(u.id).get('diff_prev_paid_days'),
+                'overworking_hours': user_info[u.id].get('diff_prev_paid_hours', 0),
+                'overworking_days': user_info[u.id].get('diff_prev_paid_days', 0),
             }
             for u in users
         ],

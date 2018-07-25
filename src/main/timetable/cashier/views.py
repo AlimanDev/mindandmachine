@@ -11,10 +11,8 @@ from src.db.models import (
     WorkerConstraint,
     CashboxType,
     WorkerDayCashboxDetails,
-    Cashbox,
     WorkerPosition,
     Shop,
-    PeriodDemand,
 )
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
