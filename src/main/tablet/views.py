@@ -106,6 +106,7 @@ def get_cashiers_info(request, form):
     shop = Shop.objects.get(id=shop_id)
     break_triplets = shop.break_triplets
     list_of_break_triplets = json.loads(break_triplets)
+    time_without_rest = {}
 
     status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
         worker_day__tm_work_start__lte=(dttm + timedelta(minutes=30)).time() if not is_midnight_period(dttm)
@@ -118,12 +119,13 @@ def get_cashiers_info(request, form):
         triplets = []
         default_break_triplets = []
 
-        time_without_rest = None
-
         tm_work_end = item.worker_day.tm_work_end
         tm_work_start = item.worker_day.tm_work_start
 
         duration_of_work = round(time_diff(tm_work_start, tm_work_end) / 60)
+
+        if item.worker_day.worker_id not in time_without_rest.keys():
+            time_without_rest[item.worker_day.worker_id] = 0
 
         for triplet in list_of_break_triplets:
             if float(triplet[0]) < duration_of_work <= float(triplet[1]):
@@ -158,8 +160,13 @@ def get_cashiers_info(request, form):
                                     triplets.append([1, round(float(real_break_time)/60)])
                                     default_break_triplets.append(15)
                             break
-                if not item.tm_to and item.on_cashbox:
-                    time_without_rest = round(time_diff(item.tm_from, dttm.time()) / 60)
+
+                if item.on_cashbox:
+                    tm_to = item.tm_to
+                    if item.tm_to is None:
+                        tm_to = dttm.time()
+                    tm_calculated = round(time_diff(item.tm_from, tm_to) / 60)
+                    time_without_rest[item.worker_day.worker_id] += tm_calculated
             else:
                 item.status = WorkerDayCashboxDetails.TYPE_T
 
@@ -174,6 +181,8 @@ def get_cashiers_info(request, form):
             cashbox_number = item.on_cashbox.number
 
         if item.worker_day.worker_id not in response.keys():
+            if item.worker_day.worker_id not in time_without_rest.keys():
+                time_without_rest[item.worker_day.worker_id] = datetime_module.time(0, 0)
             response[item.worker_day.worker_id] = {
                 "worker_id": item.worker_day.worker_id,
                 "status": item.status,
@@ -187,7 +196,6 @@ def get_cashiers_info(request, form):
                 "cashbox_dttm_deleted": cashbox_dttm_deleted,
                 "cashbox_type": cashbox_type,
                 "cashbox_number": cashbox_number,
-                "time_without_rest": time_without_rest,
             },
 
         else:
@@ -198,7 +206,7 @@ def get_cashiers_info(request, form):
                 "cashbox_id": item.on_cashbox_id,
                 "cashbox_dttm_added": cashbox_dttm_added,
                 "cashbox_number": cashbox_number,
-                "time_without_rest": time_without_rest,
+                "time_without_rest": time_without_rest[item.worker_day.worker_id],
                 "default_break_triplets": str(default_break_triplets),
                 "tm_work_end": str(tm_work_end),
             })

@@ -9,7 +9,7 @@ def time_diff(start, end):
     difference between 2 times taking into account midnight switch
     :param start: start_time
     :param end: end_time
-    :return: timedelta object in seconds
+    :return: int object in seconds
     """
     if isinstance(start, datetime_time):
         assert isinstance(end, datetime_time)
