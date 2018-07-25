@@ -261,8 +261,7 @@ def get_cashiers_timetable(request, form):
             })
 
             predict_diff, demand_ind_2 = count_diff(dttm, predict_demand, demand_ind, period_bills,  mean_bills_per_step, cashbox_types)
-            # if predict_diff > need_cashier_amount:
-            #     need_cashier_amount = predict_diff
+
             predict_cashier_needs.append({
                 'dttm': dttm_converted,
                 'amount': predict_diff, #+ period_cashiers,
@@ -273,19 +272,18 @@ def get_cashiers_timetable(request, form):
                 'dttm': dttm_converted,
                 'amount': real_diff, # + period_cashiers,
             })
-            # predict_diff_main, _ = count_diff(dttm, predict_demand, demand_ind, period_bills,  mean_bills_per_step, cashbox_types, True)
+
             predict_diff_hard, _ = count_diff(dttm, predict_demand, demand_ind, period_bills, mean_bills_per_step, cashbox_types_main)
             if period_cashiers_hard > predict_diff_hard:
                 idle_time_numerator += period_cashiers_hard - predict_diff_hard
             idle_time_denominator += period_cashiers_hard
-            # print(predict_diff, period_cashiers)
+
             if predict_diff > period_cashiers and (predict_diff > 0 and predict_diff > 0):
                 idle_time_numerator_anti = predict_diff - period_cashiers
                 idle_time_denominator_anti = predict_diff
                 idle_anti.append(idle_time_numerator_anti/idle_time_denominator_anti)
 
             demand_ind = demand_ind_2
-    # print(round(idle_time_numerator_anti / idle_time_denominator_anti, 1))
     total_lack_of_cashiers_on_period_demand = 0  # on all cashboxes types
     if period_demand:
         prev_one_period_demand = period_demand[0]  # for first iteration
@@ -297,8 +295,6 @@ def get_cashiers_timetable(request, form):
                                                    'dttm_start': str(one_period_demand.dttm_forecast), })
                 total_lack_of_cashiers_on_period_demand = one_period_demand.lack_of_cashiers
             prev_one_period_demand = one_period_demand
-    print(round_numpy(median(idle_anti), 1))
-    # print(type(median(idle_anti)))
 
     response = {
         'indicators': {
