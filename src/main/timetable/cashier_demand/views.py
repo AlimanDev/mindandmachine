@@ -25,6 +25,7 @@ from ..utils import dttm_combine
 import xlsxwriter
 import io
 
+from numpy import median, round as round_numpy
 
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
@@ -193,6 +194,9 @@ def get_cashiers_timetable(request, form):
     fact_ind = 0
     idle_time_numerator = 0
     idle_time_denominator = 0
+    idle_time_numerator_anti = 0
+    idle_time_denominator_anti = 0
+    idle_anti = []
 
     edge_ind = 0
     while (edge_ind < len(period_demand)) and (period_demand[edge_ind].type != PeriodDemand.Type.FACT.value):
@@ -257,8 +261,8 @@ def get_cashiers_timetable(request, form):
             })
 
             predict_diff, demand_ind_2 = count_diff(dttm, predict_demand, demand_ind, period_bills,  mean_bills_per_step, cashbox_types)
-            if predict_diff > need_cashier_amount:
-                need_cashier_amount = predict_diff
+            # if predict_diff > need_cashier_amount:
+            #     need_cashier_amount = predict_diff
             predict_cashier_needs.append({
                 'dttm': dttm_converted,
                 'amount': predict_diff, #+ period_cashiers,
@@ -274,8 +278,14 @@ def get_cashiers_timetable(request, form):
             if period_cashiers_hard > predict_diff_hard:
                 idle_time_numerator += period_cashiers_hard - predict_diff_hard
             idle_time_denominator += period_cashiers_hard
+            # print(predict_diff, period_cashiers)
+            if predict_diff > period_cashiers and (predict_diff > 0 and predict_diff > 0):
+                idle_time_numerator_anti = predict_diff - period_cashiers
+                idle_time_denominator_anti = predict_diff
+                idle_anti.append(idle_time_numerator_anti/idle_time_denominator_anti)
 
             demand_ind = demand_ind_2
+    # print(round(idle_time_numerator_anti / idle_time_denominator_anti, 1))
     total_lack_of_cashiers_on_period_demand = 0  # on all cashboxes types
     if period_demand:
         prev_one_period_demand = period_demand[0]  # for first iteration
@@ -287,6 +297,8 @@ def get_cashiers_timetable(request, form):
                                                    'dttm_start': str(one_period_demand.dttm_forecast), })
                 total_lack_of_cashiers_on_period_demand = one_period_demand.lack_of_cashiers
             prev_one_period_demand = one_period_demand
+    print(round_numpy(median(idle_anti), 1))
+    # print(type(median(idle_anti)))
 
     response = {
         'indicators': {
@@ -294,7 +306,7 @@ def get_cashiers_timetable(request, form):
             'big_demand_persent': 0,  # big_demand_persent,
             'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': None,
-            'need_cashier_amount': need_cashier_amount,
+            'need_cashier_amount': round(round_numpy(median(idle_anti), 1) * worker_amount),
             'change_amount': None,
         },
         'period_step': 30,
