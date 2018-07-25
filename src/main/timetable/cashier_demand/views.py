@@ -112,7 +112,6 @@ def get_cashiers_timetable(request, form):
 
     cashbox_types_main = []
     for cashbox_type in cashbox_types.values():
-        print(cashbox_type)
         if cashbox_type[0].is_main_type:
             cashbox_types_main.append(cashbox_type[0])
     cashbox_types_main = group_by(cashbox_types_main, group_key=lambda x: x.id)
@@ -203,7 +202,6 @@ def get_cashiers_timetable(request, form):
     fact_demand = period_demand[edge_ind:]
 
     wdcds = worker_day_cashbox_detail  # alias
-    print(wdcds)
     wdcds_len = len(wdcds)
     # for each period count:
     # import pdb
@@ -273,7 +271,6 @@ def get_cashiers_timetable(request, form):
             })
             # predict_diff_main, _ = count_diff(dttm, predict_demand, demand_ind, period_bills,  mean_bills_per_step, cashbox_types, True)
             predict_diff_hard, _ = count_diff(dttm, predict_demand, demand_ind, period_bills, mean_bills_per_step, cashbox_types_main)
-            print(period_cashiers_hard, predict_diff, predict_diff_hard) #  тут вообще разницы между ними нету
             if period_cashiers_hard > predict_diff_hard:
                 idle_time_numerator += period_cashiers_hard - predict_diff_hard
             idle_time_denominator += period_cashiers_hard
