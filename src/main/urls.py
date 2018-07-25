@@ -11,6 +11,8 @@ from .other import urls as other_urls
 from .camera import urls as camera_urls
 from .download import urls as download_urls
 from .tablet import urls as tablet_urls
+from django.conf.urls import include, url
+from src.conf.djconfig import DEBUG
 
 
 api_urlpatterns = [
@@ -33,3 +35,8 @@ urlpatterns = [
 if settings.QOS_DEV_STATIC_ENABLED:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
+if DEBUG:
+    import debug_toolbar
+    urlpatterns = [
+        path(r'^__debug__/', include(debug_toolbar.urls)),
+    ] + urlpatterns

@@ -1,6 +1,8 @@
 import xlsxwriter
 import datetime
 import io
+import calendar
+from dateutil.relativedelta import relativedelta
 
 from django.http import HttpResponse
 from django.db.models.functions import Coalesce
@@ -31,6 +33,7 @@ from .utils import (
 )
 
 from src.main.download.forms import GetTable
+from .utils import count_difference_of_normal_days
 
 
 @api_method('GET', SelectCashiersForm)
@@ -373,9 +376,7 @@ def get_month_stat(request, form):
     # prepare data
     dt_start = datetime.date(form['dt'].year, form['dt'].month, 1)
     dt_start_year = datetime.date(dt_start.year, 1, 1)
-    dt_tmp = (dt_start + datetime.timedelta(days=31))
-    dt_end = datetime.date(dt_tmp.year, dt_tmp.month, 1) - datetime.timedelta(days=1)
-
+    dt_end = dt_start + relativedelta(months=+1)
     usrs = User.objects.qos_filter_active(dt_start, dt_end)
     # todo: add code for permissions check (check stat of workers from another shops)
     worker_ids = form['worker_ids']
@@ -390,45 +391,18 @@ def get_month_stat(request, form):
         usrs = usrs.filter(id__in=worker_ids)
     usrs = usrs.order_by('id')
 
-    usrs_ids = [u.id for u in usrs]
-
     # count info of current month
     month_info = count_work_month_stats(dt_start, dt_end, usrs)
 
-    # block for count normal amount of working days and working hours
-    dts_start_count_dict, _ = count_normal_days(dt_start_year, dt_start, usrs)
-
-    priv_info = list(User.objects.filter(
-        Q(workermonthstat__month__dt_first__gte=dt_start_year,
-          workermonthstat__month__dt_first__lt=dt_start) |
-        Q(workermonthstat=None), # for doing left join
-        id__in=usrs_ids,
-    ).values('id').annotate(
-        count_workdays=Coalesce(Sum('workermonthstat__work_days'), 0),
-        count_hours=Coalesce(Sum('workermonthstat__work_hours'), 0),
-    ).order_by('id'))
-
-    # add priv_info to user + convert types (fucking idiotism!)
+    user_info_dict = count_difference_of_normal_days(dt_end=dt_start, usrs=usrs)
 
     for u_it in range(len(usrs)):
-        dt_u_st = usrs[u_it].dt_hired if usrs[u_it].dt_hired and (usrs[u_it].dt_hired > dt_start_year) else dt_start_year
-        total_norm_days, total_norm_hours = dts_start_count_dict[dt_u_st]
-        diff_priv_days = priv_info[u_it]['count_workdays'] - total_norm_days
-        diff_priv_hours = priv_info[u_it]['count_hours'] - total_norm_hours
-    #
-        user_info_dict = month_info[usrs[u_it].id]
-
-        user_info_dict.update({
-            'diff_priv_paid_days': diff_priv_days,
-            'diff_priv_paid_hours': diff_priv_hours,
-            'diff_total_paid_days': diff_priv_days + user_info_dict['diff_norm_days'],
-            'diff_total_paid_hours': diff_priv_hours + user_info_dict['diff_norm_hours'],
+        month_info[usrs[u_it].id].update({
+            'diff_prev_paid_days': user_info_dict[usrs[u_it].id]['diff_prev_paid_days'],
+            'diff_prev_paid_hours': user_info_dict[usrs[u_it].id]['diff_prev_paid_hours'],
+            'diff_total_paid_days': user_info_dict[usrs[u_it].id]['diff_prev_paid_days'] + month_info[usrs[u_it].id]['diff_norm_days'],
+            'diff_total_paid_hours': user_info_dict[usrs[u_it].id]['diff_prev_paid_hours'] + month_info[usrs[u_it].id]['diff_norm_hours'],
         })
-
-        for day_type in WorkerDay.Type:
-            user_info_dict[WorkerDayConverter.convert_type(day_type.value)] = user_info_dict.pop(day_type.value)
-
-        month_info[usrs[u_it].id] = user_info_dict
     return JsonResponse.success({'users_info': month_info})
 
 

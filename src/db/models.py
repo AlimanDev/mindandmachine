@@ -236,6 +236,7 @@ class CashboxType(models.Model):
     )
     probability = models.FloatField(default=1.0)
     prior_weight = models.FloatField(default=1.0)
+    is_main_type = models.BooleanField(default=False)
 
 
 class UserWeekdaySlot(models.Model):
@@ -334,6 +335,7 @@ class PeriodDemand(models.Model):
 
     queue_wait_time = models.FloatField()  # in minutes
     queue_wait_length = models.FloatField()
+    lack_of_cashiers = models.IntegerField()  # can be both pos and neg
 
 
 class PeriodDemandChangeLog(models.Model):
@@ -471,18 +473,19 @@ class WorkerDayCashboxDetails(models.Model):
     TYPE_FINISH = 'H'
     TYPE_ABSENCE = 'A'
 
-    TYPE_T = 'T'
-
     DETAILS_TYPES = (
-        (TYPE_WORK, 'work period'),
-        (TYPE_BREAK, 'rest / break'),
-        (TYPE_STUDY, 'study period'),
+            (TYPE_WORK, 'work period'),
+            (TYPE_BREAK, 'rest / break'),
+            (TYPE_STUDY, 'study period'),
     )
+
+    TYPE_T = 'T'
 
     WORK_TYPES_LIST = (
         TYPE_WORK,
         TYPE_STUDY
     )
+
     DETAILS_TYPES_LIST = (
         TYPE_WORK,
         TYPE_BREAK,
@@ -495,8 +498,6 @@ class WorkerDayCashboxDetails(models.Model):
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT, null=True, blank=True)
 
-    # is_break = models.BooleanField(default=False)  # True if it is time for rest
-    # on_education = models.BooleanField(default=False)
     status = models.CharField(max_length=1, choices=DETAILS_TYPES, default=TYPE_WORK)
 
     is_tablet = models.BooleanField(default=False)

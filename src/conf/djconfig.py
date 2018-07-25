@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'src.main',
     'django_celery_beat',
     'django_celery_results',
-    'src.celery'
+    'src.celery',
     # 'rest_framework',
 ]
 

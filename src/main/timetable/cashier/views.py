@@ -11,7 +11,6 @@ from src.db.models import (
     WorkerConstraint,
     CashboxType,
     WorkerDayCashboxDetails,
-    Cashbox,
     WorkerPosition,
     Shop,
 )
@@ -42,6 +41,7 @@ def get_cashiers_list(request, form):
         shop_id = form['shop_id']
     else:
         shop_id = request.user.shop_id
+    # todo: прочекать что все ок
     for u in User.objects.filter(shop_id=shop_id).order_by('last_name', 'first_name'):
         if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
             if u.dt_fired is None or u.dt_fired >= form['dt_fired_after']:
@@ -59,7 +59,7 @@ def get_not_working_cashiers_list(request, form):
         shop_id = request.user.shop_id
 
     users_not_working_today = []
-    for u in WorkerDay.objects.filter(dt=dt_now.date(), worker__shop_id=shop_id).\
+    for u in WorkerDay.objects.select_related('worker').filter(dt=dt_now.date(), worker__shop_id=shop_id).\
             exclude(type=WorkerDay.Type.TYPE_WORKDAY.value).\
             order_by('worker__last_name', 'worker__first_name'):
         if u.worker.dt_hired is None or u.worker.dt_hired <= form['dt_hired_before']:
@@ -294,7 +294,7 @@ def get_worker_day(request, form):
 
 @api_method('POST', SetWorkerDaysForm)
 def set_worker_days(request, form):
-    worker=form['worker_id']
+    worker = form['worker_id']
 
     # интервал дней из формы
     form_dates = []
