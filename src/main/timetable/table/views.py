@@ -224,7 +224,8 @@ def get_table(request):
             try:
                 workerday_cashbox_details_first = workerday_cashbox_details_objects.first()
                 if workerday_cashbox_details_first is None:
-                    # worksheet.write_blank(row, 1, '', mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
+                    worksheet.write_blank(row, 1, '', mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
+                    worksheet.write_blank(row, 2, '', mix_formats(workbook, bold_right_cell_format, bold_format, bg_color_format, size_format))
                     raise WorkerDayCashboxDetails.DoesNotExist
                 worksheet.write(row, 1, workerday_cashbox_details_first.cashbox_type.name, mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
                 worksheet.write_blank(row, 2, '', mix_formats(workbook, bold_right_cell_format, bg_color_format, size_format))
