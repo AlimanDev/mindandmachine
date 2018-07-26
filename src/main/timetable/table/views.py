@@ -128,7 +128,7 @@ def get_table(request):
     def write_workers_header(workbook, worksheet):
         long_column_width = 24
         short_column_width = long_column_width/2
-        centred_bold_border = workbook.add_format({'border': 2, 'text_wrap': True, 'bold': True, 'align': 'center', 'font_size': font_size, 'shrink': True})
+        centred_bold_border = workbook.add_format({'border': 2, 'text_wrap': True, 'bold': True, 'align': 'center', 'font_size': font_size})
         worksheet.set_row(2, 95)
         worksheet.write('A3', 'Фамилия', centred_bold_border)
         worksheet.set_column('A:A', long_column_width)
@@ -217,7 +217,8 @@ def get_table(request):
                     bold_left_cell_format,
                     bold_format,
                     bg_color_format,
-                    to_align_right
+                    to_align_right,
+                    size_format
                 )
             )
             # specialization
