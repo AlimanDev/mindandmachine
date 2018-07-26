@@ -194,13 +194,13 @@ def get_table(request):
         )
 
         for workerday in workerdays:
-            workerday_cashbox_details_objects = WorkerDayCashboxDetails.objects.select_related(
+            workerday_cashbox_details_object = WorkerDayCashboxDetails.objects.select_related(
                     'cashbox_type'
                 ).filter(
                     worker_day=workerday
-                )
-            is_working_or_main_type = True if not workerday_cashbox_details_objects\
-                                           or not workerday_cashbox_details_objects.first().cashbox_type.is_main_type\
+                ).first()
+            is_working_or_main_type = True if workerday_cashbox_details_object is None \
+                                           or not workerday_cashbox_details_object.cashbox_type.is_main_type\
                                            else False
             bg_color_format = {'bg_color': 'gray'} if is_working_or_main_type else None
             to_align_right = align_right if is_working_or_main_type else None
@@ -223,7 +223,7 @@ def get_table(request):
             )
             # specialization
             try:
-                workerday_cashbox_details_first = workerday_cashbox_details_objects.first()
+                workerday_cashbox_details_first = workerday_cashbox_details_object
                 if workerday_cashbox_details_first is None:
                     worksheet.write_blank(row, 1, '', mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
                     worksheet.write_blank(row, 2, '', mix_formats(workbook, bold_right_cell_format, bold_format, bg_color_format, size_format))
