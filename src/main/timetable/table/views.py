@@ -59,7 +59,7 @@ def select_cashiers(request, form):
     if len(work_types) > 0:
         users = [x for x in users if x.work_type in work_types]
 
-    worker_days = WorkerDay.objects.filter(worker_shop_id=shop_id)
+    worker_days = WorkerDay.objects.filter(worker_shop_id=shop_id) # todo: change worker_shop to worker__shop
 
     workday_type = form.get('workday_type')
     if workday_type is not None:
@@ -188,7 +188,8 @@ def get_table(request):
         for workerday in workerdays:
             bg_color_format = {'bg_color': 'gray'} if (row - start_row) % 5 == 0 else None
             if workerday.tm_work_start is None\
-                or workerday.tm_work_end is None:
+                or workerday.tm_work_end is None\
+                or workerday.type != WorkerDay.Type.TYPE_WORKDAY:
                 continue
             # user data
             worksheet.write(
