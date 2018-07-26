@@ -206,7 +206,7 @@ def get_table(request):
             to_align_right = align_right if is_working_or_main_type else None
             if workerday.tm_work_start is None\
                 or workerday.tm_work_end is None\
-                or workerday.type != WorkerDay.Type.TYPE_WORKDAY:
+                or workerday.type != WorkerDay.Type.TYPE_WORKDAY.value:
                 continue
             # user data
             worksheet.write(
