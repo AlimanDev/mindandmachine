@@ -1,0 +1,1688 @@
+----2018-07-01 03:00:00------
+
+period_cashiers: 0.0
+----2018-07-01 03:30:00------
+
+period_cashiers: 0.0
+----2018-07-01 04:00:00------
+
+period_cashiers: 0.0
+----2018-07-01 04:30:00------
+
+period_cashiers: 0.0
+----2018-07-01 05:00:00------
+
+period_cashiers: 0.0
+----2018-07-01 05:30:00------
+
+period_cashiers: 0.0
+----2018-07-01 06:00:00------
+
+period_cashiers: 0.0
+----2018-07-01 06:30:00------
+
+period_cashiers: 3.0
+ct id:13
+speed coef:0.8
+clients: 1.53611183166504
+mean bills: 1.60129974005199
+need amount: 0.10249064486400061
+ct id:14
+speed coef:0.85
+clients: 23.8455448150635
+mean bills: 2.20972035579446
+need amount: 2.168843028113211
+ct id:15
+speed coef:0.6
+clients: 2.66092014312744
+mean bills: 2.91060959792477
+need amount: 2.599115234107549
+ct id:16
+speed coef:0.8
+clients: 1.68658351898193
+mean bills: 3.83449709060682
+need amount: 2.86858188396595
+----2018-07-01 07:00:00------
+
+period_cashiers: 8.0
+ct id:13
+speed coef:0.8
+clients: 1.53425943851471
+mean bills: 1.60129974005199
+need amount: 0.1023670516694132
+ct id:14
+speed coef:0.85
+clients: 45.9075729370117
+mean bills: 2.20972035579446
+need amount: 4.0805199302589665
+ct id:15
+speed coef:0.6
+clients: 2.71178216934204
+mean bills: 2.91060959792477
+need amount: 4.519016553012755
+ct id:16
+speed coef:0.8
+clients: 2.15363073348999
+mean bills: 3.83449709060682
+need amount: 4.863103668921455
+----2018-07-01 07:30:00------
+
+period_cashiers: 12.0
+ct id:13
+speed coef:0.8
+clients: 2.31499733924866
+mean bills: 1.60129974005199
+need amount: 0.15445852656499698
+ct id:14
+speed coef:0.85
+clients: 77.7649963378906
+mean bills: 2.20972035579446
+need amount: 6.893238737393173
+ct id:15
+speed coef:0.6
+clients: 4.72887907028198
+mean bills: 2.91060959792477
+need amount: 7.657901004581412
+ct id:16
+speed coef:0.8
+clients: 2.74677729606628
+mean bills: 3.83449709060682
+need amount: 8.096755569177704
+----2018-07-01 08:00:00------
+
+period_cashiers: 14.0
+ct id:13
+speed coef:0.8
+clients: 2.734064245224
+mean bills: 1.60129974005199
+need amount: 0.18241901521510964
+ct id:14
+speed coef:0.85
+clients: 123.126530456543
+mean bills: 2.20972035579446
+need amount: 10.852034728476662
+ct id:15
+speed coef:0.6
+clients: 6.46193971633911
+mean bills: 2.91060959792477
+need amount: 11.896933826231544
+ct id:16
+speed coef:0.8
+clients: 3.34500756263733
+mean bills: 3.83449709060682
+need amount: 12.431368066522822
+----2018-07-01 08:30:00------
+
+period_cashiers: 14.0
+ct id:13
+speed coef:0.8
+clients: 4.23599047660828
+mean bills: 1.60129974005199
+need amount: 0.2826287687106477
+ct id:14
+speed coef:0.85
+clients: 156.502407836914
+mean bills: 2.20972035579446
+need amount: 13.844454507066542
+ct id:15
+speed coef:0.6
+clients: 8.00084009170532
+mean bills: 2.91060959792477
+need amount: 15.138194616087587
+ct id:16
+speed coef:0.8
+clients: 3.9005232334137
+mean bills: 3.83449709060682
+need amount: 15.761383990686301
+----2018-07-01 09:00:00------
+
+period_cashiers: 18.0
+ct id:13
+speed coef:0.8
+clients: 3.93599047660828
+mean bills: 1.60129974005199
+need amount: 0.2626125219599978
+ct id:14
+speed coef:0.85
+clients: 192.357073974609
+mean bills: 2.20972035579446
+need amount: 16.931449460891535
+ct id:15
+speed coef:0.6
+clients: 8.55007257461548
+mean bills: 2.91060959792477
+need amount: 18.314000755259823
+ct id:16
+speed coef:0.8
+clients: 5.02706680297851
+mean bills: 3.83449709060682
+need amount: 19.11717879818929
+----2018-07-01 09:30:00------
+
+period_cashiers: 20.0
+ct id:13
+speed coef:0.8
+clients: 5.38339242935181
+mean bills: 1.60129974005199
+need amount: 0.35918437073828763
+ct id:14
+speed coef:0.85
+clients: 229.693768310547
+mean bills: 2.20972035579446
+need amount: 20.263458701520726
+ct id:15
+speed coef:0.6
+clients: 9.82687187194824
+mean bills: 2.91060959792477
+need amount: 21.852469123080144
+ct id:16
+speed coef:0.8
+clients: 7.26584749221802
+mean bills: 3.83449709060682
+need amount: 23.01333875098443
+----2018-07-01 10:00:00------
+
+period_cashiers: 22.0
+ct id:13
+speed coef:0.8
+clients: 5.08339242935181
+mean bills: 1.60129974005199
+need amount: 0.3391681239876378
+ct id:14
+speed coef:0.85
+clients: 268.971243286133
+mean bills: 2.20972035579446
+need amount: 23.647059551937133
+ct id:15
+speed coef:0.6
+clients: 10.8758274078369
+mean bills: 2.91060959792477
+need amount: 25.405686642971762
+ct id:16
+speed coef:0.8
+clients: 8.1581955909729
+mean bills: 3.83449709060682
+need amount: 26.709127362062887
+----2018-07-01 10:30:00------
+
+period_cashiers: 24.0
+ct id:13
+speed coef:0.8
+clients: 6.26693115234375
+mean bills: 1.60129974005199
+need amount: 0.4181348010488235
+ct id:14
+speed coef:0.85
+clients: 289.346252441406
+mean bills: 2.20972035579446
+need amount: 25.491636914484797
+ct id:15
+speed coef:0.6
+clients: 12.4957706451416
+mean bills: 2.91060959792477
+need amount: 27.51220969077456
+ct id:16
+speed coef:0.8
+clients: 9.53152332305908
+mean bills: 3.83449709060682
+need amount: 29.035067959579607
+----2018-07-01 11:00:00------
+
+period_cashiers: 28.0
+ct id:13
+speed coef:0.8
+clients: 6.63189888000488
+mean bills: 1.60129974005199
+need amount: 0.44248574802512075
+ct id:14
+speed coef:0.85
+clients: 298.014624023437
+mean bills: 2.20972035579446
+need amount: 26.267151670731845
+ct id:15
+speed coef:0.6
+clients: 13.6215167999268
+mean bills: 2.91060959792477
+need amount: 28.469758200518537
+ct id:16
+speed coef:0.8
+clients: 11.2602588653564
+mean bills: 3.83449709060682
+need amount: 30.268817777963903
+----2018-07-01 11:30:00------
+
+period_cashiers: 28.0
+ct id:13
+speed coef:0.8
+clients: 7.58983345031738
+mean bills: 1.60129974005199
+need amount: 0.5063999304596299
+ct id:14
+speed coef:0.85
+clients: 334.808728027344
+mean bills: 2.20972035579446
+need amount: 29.519484699858577
+ct id:15
+speed coef:0.6
+clients: 15.7492952346802
+mean bills: 2.91060959792477
+need amount: 32.066154137114744
+ct id:16
+speed coef:0.8
+clients: 13.9219051361084
+mean bills: 3.83449709060682
+need amount: 34.2904668346194
+----2018-07-01 12:00:00------
+
+period_cashiers: 28.5
+ct id:13
+speed coef:0.8
+clients: 6.83983345031738
+mean bills: 1.60129974005199
+need amount: 0.4563593135830053
+ct id:14
+speed coef:0.85
+clients: 343.058728027344
+mean bills: 2.20972035579446
+need amount: 30.184353609856633
+ct id:15
+speed coef:0.6
+clients: 14.6992952346802
+mean bills: 2.91060959792477
+need amount: 32.56123748723385
+ct id:16
+speed coef:0.8
+clients: 12.8719051361084
+mean bills: 3.83449709060682
+need amount: 34.617790937024466
+----2018-07-01 12:30:00------
+
+period_cashiers: 29.0
+ct id:13
+speed coef:0.8
+clients: 6.22614402770996
+mean bills: 1.60129974005199
+need amount: 0.41541345054575873
+ct id:14
+speed coef:0.85
+clients: 339.308728027344
+mean bills: 2.20972035579446
+need amount: 29.81844887096726
+ct id:15
+speed coef:0.6
+clients: 16.1992952346802
+mean bills: 2.91060959792477
+need amount: 32.43788354817155
+ct id:16
+speed coef:0.8
+clients: 13.9219051361084
+mean bills: 3.83449709060682
+need amount: 34.662196245676206
+----2018-07-01 13:00:00------
+
+period_cashiers: 30.0
+ct id:13
+speed coef:0.8
+clients: 6.67614402770996
+mean bills: 1.60129974005199
+need amount: 0.4454378206717335
+ct id:14
+speed coef:0.85
+clients: 329.708728027344
+mean bills: 2.20972035579446
+need amount: 29.016578518911793
+ct id:15
+speed coef:0.6
+clients: 15.2992952346802
+mean bills: 2.91060959792477
+need amount: 31.49048271621984
+ct id:16
+speed coef:0.8
+clients: 12.2719051361084
+mean bills: 3.83449709060682
+need amount: 33.45117373874528
+----2018-07-01 13:30:00------
+
+period_cashiers: 30.0
+ct id:13
+speed coef:0.8
+clients: 6.97614402770996
+mean bills: 1.60129974005199
+need amount: 0.4654540674223834
+ct id:14
+speed coef:0.85
+clients: 332.160119628906
+mean bills: 2.20972035579446
+need amount: 29.249021821426954
+ct id:15
+speed coef:0.6
+clients: 15.4492952346802
+mean bills: 2.91060959792477
+need amount: 31.74718109871771
+ct id:16
+speed coef:0.8
+clients: 14.0719051361084
+mean bills: 3.83449709060682
+need amount: 33.99545940303866
+----2018-07-01 14:00:00------
+
+period_cashiers: 31.0
+ct id:13
+speed coef:0.8
+clients: 6.37614402770996
+mean bills: 1.60129974005199
+need amount: 0.42542157392108365
+ct id:14
+speed coef:0.85
+clients: 330.510119628906
+mean bills: 2.20972035579446
+need amount: 29.066007422550722
+ct id:15
+speed coef:0.6
+clients: 13.6492952346802
+mean bills: 2.91060959792477
+need amount: 31.273105740049
+ct id:16
+speed coef:0.8
+clients: 13.0219051361084
+mean bills: 3.83449709060682
+need amount: 33.3536247966559
+----2018-07-01 14:30:00------
+
+period_cashiers: 31.0
+ct id:13
+speed coef:0.8
+clients: 6.60977964401245
+mean bills: 1.60129974005199
+need amount: 0.4410099344065863
+ct id:14
+speed coef:0.85
+clients: 323.708898925781
+mean bills: 2.20972035579446
+need amount: 28.492231240606966
+ct id:15
+speed coef:0.6
+clients: 14.8065843582153
+mean bills: 2.91060959792477
+need amount: 30.88646382646831
+ct id:16
+speed coef:0.8
+clients: 12.8719051361084
+mean bills: 3.83449709060682
+need amount: 32.94301727625892
+----2018-07-01 15:00:00------
+
+period_cashiers: 37.0
+ct id:13
+speed coef:0.8
+clients: 6.15977964401245
+mean bills: 1.60129974005199
+need amount: 0.4109855642806115
+ct id:14
+speed coef:0.85
+clients: 325.058898925781
+mean bills: 2.20972035579446
+need amount: 28.57919206578776
+ct id:15
+speed coef:0.6
+clients: 13.9065843582153
+mean bills: 2.91060959792477
+need amount: 30.827894171752867
+ct id:16
+speed coef:0.8
+clients: 12.7219051361084
+mean bills: 3.83449709060682
+need amount: 32.86048201472718
+----2018-07-01 15:30:00------
+
+period_cashiers: 37.0
+ct id:13
+speed coef:0.8
+clients: 6.03094711303711
+mean bills: 1.60129974005199
+need amount: 0.40238975184890097
+ct id:14
+speed coef:0.85
+clients: 306.589593505859
+mean bills: 2.20972035579446
+need amount: 26.97012565948206
+ct id:15
+speed coef:0.6
+clients: 13.9065843582153
+mean bills: 2.91060959792477
+need amount: 29.21882776544717
+ct id:16
+speed coef:0.8
+clients: 12.6613080978394
+mean bills: 3.83449709060682
+need amount: 31.241733976465575
+----2018-07-01 16:00:00------
+
+period_cashiers: 33.0
+ct id:13
+speed coef:0.8
+clients: 5.73094711303711
+mean bills: 1.60129974005199
+need amount: 0.3823735050982511
+ct id:14
+speed coef:0.85
+clients: 299.384173583984
+mean bills: 2.20972035579446
+need amount: 26.325718703970075
+ct id:15
+speed coef:0.6
+clients: 15.1065843582153
+mean bills: 2.91060959792477
+need amount: 28.768461449796835
+ct id:16
+speed coef:0.8
+clients: 12.5113080978394
+mean bills: 3.83449709060682
+need amount: 30.76740205399895
+----2018-07-01 16:30:00------
+
+period_cashiers: 32.0
+ct id:13
+speed coef:0.8
+clients: 5.56269302368164
+mean bills: 1.60129974005199
+need amount: 0.3711474538671012
+ct id:14
+speed coef:0.85
+clients: 282.98747253418
+mean bills: 2.20972035579446
+need amount: 24.89362504185154
+ct id:15
+speed coef:0.6
+clients: 12.5627313613892
+mean bills: 2.91060959792477
+need amount: 26.925025401663202
+ct id:16
+speed coef:0.8
+clients: 10.3523145675659
+mean bills: 3.83449709060682
+need amount: 28.579022072095622
+----2018-07-01 17:00:00------
+
+period_cashiers: 31.0
+ct id:13
+speed coef:0.8
+clients: 5.41269302368164
+mean bills: 1.60129974005199
+need amount: 0.3611393304917762
+ct id:14
+speed coef:0.85
+clients: 272.888909912109
+mean bills: 2.20972035579446
+need amount: 24.008518903172085
+ct id:15
+speed coef:0.6
+clients: 13.1627313613892
+mean bills: 2.91060959792477
+need amount: 26.13693958291457
+ct id:16
+speed coef:0.8
+clients: 12.0023145675659
+mean bills: 3.83449709060682
+need amount: 28.054557928326208
+----2018-07-01 17:30:00------
+
+period_cashiers: 30.0
+ct id:13
+speed coef:0.8
+clients: 5.56269302368164
+mean bills: 1.60129974005199
+need amount: 0.3711474538671012
+ct id:14
+speed coef:0.85
+clients: 252.473083496094
+mean bills: 2.20972035579446
+need amount: 22.24937929274998
+ct id:15
+speed coef:0.6
+clients: 13.2241302490234
+mean bills: 2.91060959792477
+need amount: 24.38772820536191
+ct id:16
+speed coef:0.8
+clients: 12.4838724136353
+mean bills: 3.83449709060682
+need amount: 26.382285390761545
+----2018-07-01 18:00:00------
+
+period_cashiers: 28.0
+ct id:13
+speed coef:0.8
+clients: 5.11269302368164
+mean bills: 1.60129974005199
+need amount: 0.3411230837411264
+ct id:14
+speed coef:0.85
+clients: 235.738186645508
+mean bills: 2.20972035579446
+need amount: 20.76918071780594
+ct id:15
+speed coef:0.6
+clients: 13.0741302490234
+mean bills: 2.91060959792477
+need amount: 22.883274550435168
+ct id:16
+speed coef:0.8
+clients: 11.5838724136353
+mean bills: 3.83449709060682
+need amount: 24.73403809493705
+----2018-07-01 18:30:00------
+
+period_cashiers: 25.0
+ct id:13
+speed coef:0.8
+clients: 4.75934476852417
+mean bills: 1.60129974005199
+need amount: 0.31754739752731465
+ct id:14
+speed coef:0.85
+clients: 225.545623779297
+mean bills: 2.20972035579446
+need amount: 19.862361359310515
+ct id:15
+speed coef:0.6
+clients: 10.6747995376587
+mean bills: 2.91060959792477
+need amount: 21.588482136545643
+ct id:16
+speed coef:0.8
+clients: 10.4506614685059
+mean bills: 3.83449709060682
+need amount: 23.25819176137492
+----2018-07-01 19:00:00------
+
+period_cashiers: 22.0
+ct id:13
+speed coef:0.8
+clients: 5.05934476852417
+mean bills: 1.60129974005199
+need amount: 0.33756364427796454
+ct id:14
+speed coef:0.85
+clients: 206.389721679688
+mean bills: 2.20972035579446
+need amount: 18.22240949613521
+ct id:15
+speed coef:0.6
+clients: 12.6247995376587
+mean bills: 2.91060959792477
+need amount: 20.26384631314552
+ct id:16
+speed coef:0.8
+clients: 9.27524089813232
+mean bills: 3.83449709060682
+need amount: 21.745758156419093
+----2018-07-01 19:30:00------
+
+period_cashiers: 19.0
+ct id:13
+speed coef:0.8
+clients: 4.16318092346191
+mean bills: 1.60129974005199
+need amount: 0.27777085543870667
+ct id:14
+speed coef:0.85
+clients: 188.977975463867
+mean bills: 2.20972035579446
+need amount: 16.653789646785096
+ct id:15
+speed coef:0.6
+clients: 10.7613176345825
+mean bills: 2.91060959792477
+need amount: 18.393900446425814
+ct id:16
+speed coef:0.8
+clients: 8.68073425292969
+mean bills: 3.83449709060682
+need amount: 19.780827539642058
+----2018-07-01 20:00:00------
+
+period_cashiers: 17.0
+ct id:13
+speed coef:0.8
+clients: 3.86318092346191
+mean bills: 1.60129974005199
+need amount: 0.2577546086880568
+ct id:14
+speed coef:0.85
+clients: 170.781900024414
+mean bills: 2.20972035579446
+need amount: 15.056979741441078
+ct id:15
+speed coef:0.6
+clients: 11.5113176345825
+mean bills: 2.91060959792477
+need amount: 16.918365940995326
+ct id:16
+speed coef:0.8
+clients: 9.29223966598511
+mean bills: 3.83449709060682
+need amount: 18.402993689513707
+----2018-07-01 20:30:00------
+
+period_cashiers: 17.0
+ct id:13
+speed coef:0.8
+clients: 3.98245024681091
+mean bills: 1.60129974005199
+need amount: 0.2657123560411789
+ct id:14
+speed coef:0.85
+clients: 149.137139892578
+mean bills: 2.20972035579446
+need amount: 13.189295643319438
+ct id:15
+speed coef:0.6
+clients: 8.85470952987671
+mean bills: 2.91060959792477
+need amount: 14.621106895791387
+ct id:16
+speed coef:0.8
+clients: 7.52022638320923
+mean bills: 3.83449709060682
+need amount: 15.822618820254739
+----2018-07-01 21:00:00------
+
+period_cashiers: 15.0
+ct id:13
+speed coef:0.8
+clients: 3.38245024681091
+mean bills: 1.60129974005199
+need amount: 0.22567986253987912
+ct id:14
+speed coef:0.85
+clients: 135.302102661133
+mean bills: 2.20972035579446
+need amount: 11.950378310857424
+ct id:15
+speed coef:0.6
+clients: 6.72301368713379
+mean bills: 2.91060959792477
+need amount: 13.037493208899157
+ct id:16
+speed coef:0.8
+clients: 7.85757246017456
+mean bills: 3.83449709060682
+need amount: 14.292903156306307
+----2018-07-01 21:30:00------
+
+period_cashiers: 15.0
+ct id:13
+speed coef:0.8
+clients: 2.01646208763123
+mean bills: 1.60129974005199
+need amount: 0.1345400090311909
+ct id:14
+speed coef:0.85
+clients: 96.3372360229492
+mean bills: 2.20972035579446
+need amount: 8.48271065455614
+ct id:15
+speed coef:0.6
+clients: 6.17738571166992
+mean bills: 2.91060959792477
+need amount: 9.481597218026685
+ct id:16
+speed coef:0.8
+clients: 4.45062537193298
+mean bills: 3.83449709060682
+need amount: 10.192676803029098
+----2018-07-01 22:00:00------
+
+period_cashiers: 15.0
+ct id:13
+speed coef:0.8
+clients: 2.01399283409119
+mean bills: 1.60129974005199
+need amount: 0.13437525840403303
+ct id:14
+speed coef:0.85
+clients: 76.2016357421875
+mean bills: 2.20972035579446
+need amount: 6.737681362103893
+ct id:15
+speed coef:0.6
+clients: 5.40465793609619
+mean bills: 2.91060959792477
+need amount: 7.611617432231774
+ct id:16
+speed coef:0.8
+clients: 3.04587831497192
+mean bills: 3.83449709060682
+need amount: 8.098259579611033
+----2018-07-01 22:30:00------
+
+period_cashiers: 15.0
+ct id:13
+speed coef:0.8
+clients: 1.75241780281067
+mean bills: 1.60129974005199
+need amount: 0.1169227571709669
+ct id:14
+speed coef:0.85
+clients: 57.0441482543945
+mean bills: 2.20972035579446
+need amount: 5.060123368021655
+ct id:15
+speed coef:0.6
+clients: 3.05619506835937
+mean bills: 2.91060959792477
+need amount: 5.554311740193718
+ct id:16
+speed coef:0.8
+clients: 3.432319688797
+mean bills: 3.83449709060682
+need amount: 6.102695901057244
+----2018-07-01 23:00:00------
+
+period_cashiers: 13.0
+ct id:13
+speed coef:0.8
+clients: 1.75241780281067
+mean bills: 1.60129974005199
+need amount: 0.1169227571709669
+ct id:14
+speed coef:0.85
+clients: 46.6033645629883
+mean bills: 2.20972035579446
+need amount: 4.155369946321768
+ct id:15
+speed coef:0.6
+clients: 2.06661653518677
+mean bills: 2.91060959792477
+need amount: 4.4895429420186925
+ct id:16
+speed coef:0.8
+clients: 3.19609713554382
+mean bills: 3.83449709060682
+need amount: 5.000185657332842
+----2018-07-01 23:30:00------
+
+period_cashiers: 13.0
+ct id:13
+speed coef:0.8
+clients: 1.53611183166504
+mean bills: 1.60129974005199
+need amount: 0.10249064486400061
+ct id:14
+speed coef:0.85
+clients: 4.06066513061523
+mean bills: 2.20972035579446
+need amount: 0.45437042514577486
+ct id:15
+speed coef:0.6
+clients: 2.33299350738525
+mean bills: 2.91060959792477
+need amount: 0.8316167192842017
+ct id:16
+speed coef:0.8
+clients: 1.68658351898193
+mean bills: 3.83449709060682
+need amount: 1.1010833691426027
+----2018-07-02 00:00:00------
+
+period_cashiers: 3.5
+----2018-07-02 00:30:00------
+
+period_cashiers: 0.0
+----2018-07-02 01:00:00------
+
+period_cashiers: 0.0
+----2018-07-02 01:30:00------
+
+period_cashiers: 0.0
+----2018-07-02 02:00:00------
+
+period_cashiers: 0.0
+----2018-07-02 02:30:00------
+
+period_cashiers: 0.0
+----2018-07-02 03:00:00------
+
+period_cashiers: 0.0
+----2018-07-02 03:30:00------
+
+period_cashiers: 0.0
+----2018-07-02 04:00:00------
+
+period_cashiers: 0.0
+----2018-07-02 04:30:00------
+
+period_cashiers: 0.0
+----2018-07-02 05:00:00------
+
+period_cashiers: 0.0
+----2018-07-02 05:30:00------
+
+period_cashiers: 0.0
+----2018-07-02 06:00:00------
+
+period_cashiers: 0.0
+----2018-07-02 06:30:00------
+
+period_cashiers: 4.0
+ct id:13
+speed coef:0.8
+clients: 1.53611183166504
+mean bills: 1.60129974005199
+need amount: 0.10249064486400061
+ct id:14
+speed coef:0.85
+clients: 27.2753368377686
+mean bills: 2.20972035579446
+need amount: 2.4660540574745013
+ct id:15
+speed coef:0.6
+clients: 2.56088376045227
+mean bills: 2.91060959792477
+need amount: 2.88015032704906
+ct id:16
+speed coef:0.8
+clients: 1.68658351898193
+mean bills: 3.83449709060682
+need amount: 3.1496169769074607
+----2018-07-02 07:00:00------
+
+period_cashiers: 9.0
+ct id:13
+speed coef:0.8
+clients: 1.46502876281738
+mean bills: 1.60129974005199
+need amount: 0.09774792404450662
+ct id:14
+speed coef:0.85
+clients: 49.9480575561523
+mean bills: 2.20972035579446
+need amount: 4.426031826563057
+ct id:15
+speed coef:0.6
+clients: 2.56088376045227
+mean bills: 2.91060959792477
+need amount: 4.840128096137616
+ct id:16
+speed coef:0.8
+clients: 2.15363073348999
+mean bills: 3.83449709060682
+need amount: 5.184215212046316
+----2018-07-02 07:30:00------
+
+period_cashiers: 10.0
+ct id:13
+speed coef:0.8
+clients: 2.54705572128296
+mean bills: 1.60129974005199
+need amount: 0.1699416526828474
+ct id:14
+speed coef:0.85
+clients: 79.7438430786133
+mean bills: 2.20972035579446
+need amount: 7.080200213470728
+ct id:15
+speed coef:0.6
+clients: 4.33420453071594
+mean bills: 2.91060959792477
+need amount: 7.781043397163552
+ct id:16
+speed coef:0.8
+clients: 2.74677729606628
+mean bills: 3.83449709060682
+need amount: 8.219897961759845
+----2018-07-02 08:00:00------
+
+period_cashiers: 12.0
+ct id:13
+speed coef:0.8
+clients: 2.76775979995728
+mean bills: 1.60129974005199
+need amount: 0.18466721034158082
+ct id:14
+speed coef:0.85
+clients: 100.680645751953
+mean bills: 2.20972035579446
+need amount: 8.909219067307133
+ct id:15
+speed coef:0.6
+clients: 5.11493520736694
+mean bills: 2.91060959792477
+need amount: 9.736306817714107
+ct id:16
+speed coef:0.8
+clients: 3.53371644020081
+mean bills: 3.83449709060682
+need amount: 10.30089120975492
+----2018-07-02 08:30:00------
+
+period_cashiers: 14.0
+ct id:13
+speed coef:0.8
+clients: 2.86846566200256
+mean bills: 1.60129974005199
+need amount: 0.19138638828803162
+ct id:14
+speed coef:0.85
+clients: 120.260781860352
+mean bills: 2.20972035579446
+need amount: 10.612668650271443
+ct id:15
+speed coef:0.6
+clients: 5.93440780639648
+mean bills: 2.91060959792477
+need amount: 11.572265556899069
+ct id:16
+speed coef:0.8
+clients: 4.20279102325439
+mean bills: 3.83449709060682
+need amount: 12.243748471528129
+----2018-07-02 09:00:00------
+
+period_cashiers: 17.0
+ct id:13
+speed coef:0.8
+clients: 2.97210788726807
+mean bills: 1.60129974005199
+need amount: 0.19830148280370125
+ct id:14
+speed coef:0.85
+clients: 149.666586303711
+mean bills: 2.20972035579446
+need amount: 13.167764319571488
+ct id:15
+speed coef:0.6
+clients: 7.12438011169434
+mean bills: 2.91060959792477
+need amount: 14.31978038248048
+ct id:16
+speed coef:0.8
+clients: 5.78035392761231
+mean bills: 3.83449709060682
+need amount: 15.243311645734943
+----2018-07-02 09:30:00------
+
+period_cashiers: 20.0
+ct id:13
+speed coef:0.8
+clients: 3.5796844959259
+mean bills: 1.60129974005199
+need amount: 0.23883949386642844
+ct id:14
+speed coef:0.85
+clients: 166.38971862793
+mean bills: 2.20972035579446
+need amount: 14.6574570721821
+ct id:15
+speed coef:0.6
+clients: 10.0424103736877
+mean bills: 2.91060959792477
+need amount: 16.281320184401807
+ct id:16
+speed coef:0.8
+clients: 6.55359125137329
+mean bills: 3.83449709060682
+need amount: 17.32839212550252
+----2018-07-02 10:00:00------
+
+period_cashiers: 22.0
+ct id:13
+speed coef:0.8
+clients: 3.68332672119141
+mean bills: 1.60129974005199
+need amount: 0.24575458838209804
+ct id:14
+speed coef:0.85
+clients: 191.269653320312
+mean bills: 2.20972035579446
+need amount: 16.820360329073974
+ct id:15
+speed coef:0.6
+clients: 10.2956169128418
+mean bills: 2.91060959792477
+need amount: 18.485167073689194
+ct id:16
+speed coef:0.8
+clients: 6.74130640029907
+mean bills: 3.83449709060682
+need amount: 19.562230397807358
+----2018-07-02 10:30:00------
+
+period_cashiers: 22.0
+ct id:13
+speed coef:0.8
+clients: 4.43439407348633
+mean bills: 1.60129974005199
+need amount: 0.29586641988173934
+ct id:14
+speed coef:0.85
+clients: 210.871109008789
+mean bills: 2.20972035579446
+need amount: 18.569050028731688
+ct id:15
+speed coef:0.6
+clients: 10.0285264968872
+mean bills: 2.91060959792477
+need amount: 20.19066811066962
+ct id:16
+speed coef:0.8
+clients: 9.37181978225708
+mean bills: 3.83449709060682
+need amount: 21.688010431034463
+----2018-07-02 11:00:00------
+
+period_cashiers: 24.0
+ct id:13
+speed coef:0.8
+clients: 4.43439407348633
+mean bills: 1.60129974005199
+need amount: 0.29586641988173934
+ct id:14
+speed coef:0.85
+clients: 231.425192260742
+mean bills: 2.20972035579446
+need amount: 20.35017850545853
+ct id:15
+speed coef:0.6
+clients: 10.1785264968872
+mean bills: 2.91060959792477
+need amount: 21.996051667379167
+ct id:16
+speed coef:0.8
+clients: 9.86479825973511
+mean bills: 3.83449709060682
+need amount: 23.572157510144898
+----2018-07-02 11:30:00------
+
+period_cashiers: 26.0
+ct id:13
+speed coef:0.8
+clients: 4.43439407348633
+mean bills: 1.60129974005199
+need amount: 0.29586641988173934
+ct id:14
+speed coef:0.85
+clients: 243.375604248047
+mean bills: 2.20972035579446
+need amount: 21.385749824222376
+ct id:15
+speed coef:0.6
+clients: 11.0785264968872
+mean bills: 2.91060959792477
+need amount: 23.17715346603925
+ct id:16
+speed coef:0.8
+clients: 10.5932985305786
+mean bills: 3.83449709060682
+need amount: 24.869652315848963
+----2018-07-02 12:00:00------
+
+period_cashiers: 27.0
+ct id:13
+speed coef:0.8
+clients: 4.58439407348633
+mean bills: 1.60129974005199
+need amount: 0.30587454325706437
+ct id:14
+speed coef:0.85
+clients: 249.825604248047
+mean bills: 2.20972035579446
+need amount: 21.954687214063355
+ct id:15
+speed coef:0.6
+clients: 11.0785264968872
+mean bills: 2.91060959792477
+need amount: 23.746090855880233
+ct id:16
+speed coef:0.8
+clients: 9.99329853057861
+mean bills: 3.83449709060682
+need amount: 25.34272727842478
+----2018-07-02 12:30:00------
+
+period_cashiers: 27.0
+ct id:13
+speed coef:0.8
+clients: 4.88439407348633
+mean bills: 1.60129974005199
+need amount: 0.3258907900077142
+ct id:14
+speed coef:0.85
+clients: 245.025604248047
+mean bills: 2.20972035579446
+need amount: 21.558756099723283
+ct id:15
+speed coef:0.6
+clients: 10.1785264968872
+mean bills: 2.91060959792477
+need amount: 23.20462926164392
+ct id:16
+speed coef:0.8
+clients: 9.39329853057861
+mean bills: 3.83449709060682
+need amount: 24.705403256923294
+----2018-07-02 13:00:00------
+
+period_cashiers: 27.0
+ct id:13
+speed coef:0.8
+clients: 4.43439407348633
+mean bills: 1.60129974005199
+need amount: 0.29586641988173934
+ct id:14
+speed coef:0.85
+clients: 251.925604248047
+mean bills: 2.20972035579446
+need amount: 22.12665606116522
+ct id:15
+speed coef:0.6
+clients: 11.5285264968872
+mean bills: 2.91060959792477
+need amount: 23.990824942930217
+ct id:16
+speed coef:0.8
+clients: 10.5932985305786
+mean bills: 3.83449709060682
+need amount: 25.68332379273993
+----2018-07-02 13:30:00------
+
+period_cashiers: 27.0
+ct id:13
+speed coef:0.8
+clients: 4.58282661437988
+mean bills: 1.60129974005199
+need amount: 0.3057699610962435
+ct id:14
+speed coef:0.85
+clients: 247.405145263672
+mean bills: 2.20972035579446
+need amount: 21.744836063740216
+ct id:15
+speed coef:0.6
+clients: 11.9785264968872
+mean bills: 2.91060959792477
+need amount: 23.68177018545333
+ct id:16
+speed coef:0.8
+clients: 10.8932985305786
+mean bills: 3.83449709060682
+need amount: 25.42220024889563
+----2018-07-02 14:00:00------
+
+period_cashiers: 29.0
+ct id:13
+speed coef:0.8
+clients: 4.13282661437988
+mean bills: 1.60129974005199
+need amount: 0.2757455909702687
+ct id:14
+speed coef:0.85
+clients: 245.005145263672
+mean bills: 2.20972035579446
+need amount: 21.506838013068883
+ct id:15
+speed coef:0.6
+clients: 11.9785264968872
+mean bills: 2.91060959792477
+need amount: 23.443772134781998
+ct id:16
+speed coef:0.8
+clients: 10.4432985305786
+mean bills: 3.83449709060682
+need amount: 25.11230537777542
+----2018-07-02 14:30:00------
+
+period_cashiers: 29.0
+ct id:13
+speed coef:0.8
+clients: 4.5470757484436
+mean bills: 1.60129974005199
+need amount: 0.3033846339158102
+ct id:14
+speed coef:0.85
+clients: 248.777932739258
+mean bills: 2.20972035579446
+need amount: 21.861410596519868
+ct id:15
+speed coef:0.6
+clients: 10.9285264968872
+mean bills: 2.91060959792477
+need amount: 23.628559158354037
+ct id:16
+speed coef:0.8
+clients: 11.4932985305786
+mean bills: 3.83449709060682
+need amount: 25.464851649061508
+----2018-07-02 15:00:00------
+
+period_cashiers: 38.5
+ct id:13
+speed coef:0.8
+clients: 5.2970757484436
+mean bills: 1.60129974005199
+need amount: 0.35342525079243486
+ct id:14
+speed coef:0.85
+clients: 243.677932739258
+mean bills: 2.20972035579446
+need amount: 21.4695071422376
+ct id:15
+speed coef:0.6
+clients: 10.7785264968872
+mean bills: 2.91060959792477
+need amount: 23.212400624089064
+ct id:16
+speed coef:0.8
+clients: 9.99329853057861
+mean bills: 3.83449709060682
+need amount: 24.80903704663361
+----2018-07-02 15:30:00------
+
+period_cashiers: 39.0
+ct id:13
+speed coef:0.8
+clients: 4.08367738723755
+mean bills: 1.60129974005199
+need amount: 0.2724663141099866
+ct id:14
+speed coef:0.85
+clients: 244.508569335937
+mean bills: 2.20972035579446
+need amount: 21.460527601474737
+ct id:15
+speed coef:0.6
+clients: 11.5477024078369
+mean bills: 2.91060959792477
+need amount: 23.32779723826524
+ct id:16
+speed coef:0.8
+clients: 11.0705745697022
+mean bills: 3.83449709060682
+need amount: 25.096550820718114
+----2018-07-02 16:00:00------
+
+period_cashiers: 34.0
+ct id:13
+speed coef:0.8
+clients: 4.23367738723755
+mean bills: 1.60129974005199
+need amount: 0.28247443748531154
+ct id:14
+speed coef:0.85
+clients: 236.323104858398
+mean bills: 2.20972035579446
+need amount: 20.761218568863775
+ct id:15
+speed coef:0.6
+clients: 11.8477024078369
+mean bills: 2.91060959792477
+need amount: 22.676998365619692
+ct id:16
+speed coef:0.8
+clients: 11.3705745697021
+mean bills: 3.83449709060682
+need amount: 24.493683161705135
+----2018-07-02 16:30:00------
+
+period_cashiers: 34.0
+ct id:13
+speed coef:0.8
+clients: 3.78367738723755
+mean bills: 1.60129974005199
+need amount: 0.2524500673593367
+ct id:14
+speed coef:0.85
+clients: 238.970758056641
+mean bills: 2.20972035579446
+need amount: 20.96062844059042
+ct id:15
+speed coef:0.6
+clients: 12.1445213317871
+mean bills: 2.91060959792477
+need amount: 22.92440401561829
+ct id:16
+speed coef:0.8
+clients: 9.92708930969238
+mean bills: 3.83449709060682
+need amount: 24.510462143793685
+----2018-07-02 17:00:00------
+
+period_cashiers: 32.0
+ct id:13
+speed coef:0.8
+clients: 4.08367738723755
+mean bills: 1.60129974005199
+need amount: 0.2724663141099866
+ct id:14
+speed coef:0.85
+clients: 234.39885559082
+mean bills: 2.20972035579446
+need amount: 20.584463277794733
+ct id:15
+speed coef:0.6
+clients: 11.3945213317871
+mean bills: 2.91060959792477
+need amount: 22.42696345290907
+ct id:16
+speed coef:0.8
+clients: 9.62708930969238
+mean bills: 3.83449709060682
+need amount: 23.965090367451882
+----2018-07-02 17:30:00------
+
+period_cashiers: 30.0
+ct id:13
+speed coef:0.8
+clients: 4.38367738723755
+mean bills: 1.60129974005199
+need amount: 0.29248256086063645
+ct id:14
+speed coef:0.85
+clients: 236.437435913086
+mean bills: 2.20972035579446
+need amount: 20.781134129840805
+ct id:15
+speed coef:0.6
+clients: 10.3445213317871
+mean bills: 2.91060959792477
+need amount: 22.453848745076197
+ct id:16
+speed coef:0.8
+clients: 10.7127902984619
+mean bills: 3.83449709060682
+need amount: 24.165438879731745
+----2018-07-02 18:00:00------
+
+period_cashiers: 28.0
+ct id:13
+speed coef:0.8
+clients: 3.93367738723755
+mean bills: 1.60129974005199
+need amount: 0.26245819073466164
+ct id:14
+speed coef:0.85
+clients: 234.706951904297
+mean bills: 2.20972035579446
+need amount: 20.60115345620119
+ct id:15
+speed coef:0.6
+clients: 11.6945213317871
+mean bills: 2.91060959792477
+need amount: 22.49216379128094
+ct id:16
+speed coef:0.8
+clients: 10.4127902984619
+mean bills: 3.83449709060682
+need amount: 24.1558227123039
+----2018-07-02 18:30:00------
+
+period_cashiers: 24.0
+ct id:13
+speed coef:0.8
+clients: 5.49517931938171
+mean bills: 1.60129974005199
+need amount: 0.3666428839860418
+ct id:14
+speed coef:0.85
+clients: 233.764569091797
+mean bills: 2.20972035579446
+need amount: 20.623675306953267
+ct id:15
+speed coef:0.6
+clients: 10.7945213317871
+mean bills: 2.91060959792477
+need amount: 22.369155162136778
+ct id:16
+speed coef:0.8
+clients: 11.0127902984619
+mean bills: 3.83449709060682
+need amount: 24.12867651042491
+----2018-07-02 19:00:00------
+
+period_cashiers: 22.0
+ct id:13
+speed coef:0.8
+clients: 4.29517931938171
+mean bills: 1.60129974005199
+need amount: 0.28657789698344227
+ct id:14
+speed coef:0.85
+clients: 221.325970458984
+mean bills: 2.20972035579446
+need amount: 19.465734845578744
+ct id:15
+speed coef:0.6
+clients: 11.5445213317871
+mean bills: 2.91060959792477
+need amount: 21.332490100675788
+ct id:16
+speed coef:0.8
+clients: 9.81279029846191
+mean bills: 3.83449709060682
+need amount: 22.90028659443358
+----2018-07-02 19:30:00------
+
+period_cashiers: 22.0
+ct id:13
+speed coef:0.8
+clients: 6.24977645874023
+mean bills: 1.60129974005199
+need amount: 0.416990225781824
+ct id:14
+speed coef:0.85
+clients: 225.872549438477
+mean bills: 2.20972035579446
+need amount: 19.990134159483517
+ct id:15
+speed coef:0.6
+clients: 11.0405647277832
+mean bills: 2.91060959792477
+need amount: 21.775399362994378
+ct id:16
+speed coef:0.8
+clients: 10.5982593536377
+mean bills: 3.83449709060682
+need amount: 23.46869080703689
+----2018-07-02 20:00:00------
+
+period_cashiers: 20.0
+ct id:13
+speed coef:0.8
+clients: 6.54977645874024
+mean bills: 1.60129974005199
+need amount: 0.4370064725324746
+ct id:14
+speed coef:0.85
+clients: 218.672290039062
+mean bills: 2.20972035579446
+need amount: 19.38620688616014
+ct id:15
+speed coef:0.6
+clients: 10.8905647277832
+mean bills: 2.91060959792477
+need amount: 21.14721700968829
+ct id:16
+speed coef:0.8
+clients: 10.8982593536377
+mean bills: 3.83449709060682
+need amount: 22.888439667363386
+----2018-07-02 20:30:00------
+
+period_cashiers: 18.0
+ct id:13
+speed coef:0.8
+clients: 5.85303859710693
+mean bills: 1.60129974005199
+need amount: 0.3905195493358996
+ct id:14
+speed coef:0.85
+clients: 196.959320068359
+mean bills: 2.20972035579446
+need amount: 17.458167346139398
+ct id:15
+speed coef:0.6
+clients: 10.4265649795532
+mean bills: 2.91060959792477
+need amount: 19.14414846296572
+ct id:16
+speed coef:0.8
+clients: 9.58557109832764
+mean bills: 3.83449709060682
+need amount: 20.67564198331331
+----2018-07-02 21:00:00------
+
+period_cashiers: 16.0
+ct id:13
+speed coef:0.8
+clients: 6.60303859710693
+mean bills: 1.60129974005199
+need amount: 0.4405601662125243
+ct id:14
+speed coef:0.85
+clients: 188.527426147461
+mean bills: 2.20972035579446
+need amount: 16.77753629105885
+ct id:15
+speed coef:0.6
+clients: 10.0355108261108
+mean bills: 2.91060959792477
+need amount: 18.400283742756407
+ct id:16
+speed coef:0.8
+clients: 9.58557109832764
+mean bills: 3.83449709060682
+need amount: 19.931777263103996
+----2018-07-02 21:30:00------
+
+period_cashiers: 16.0
+ct id:13
+speed coef:0.8
+clients: 3.64987335205078
+mean bills: 1.60129974005199
+need amount: 0.24352255207756662
+ct id:14
+speed coef:0.85
+clients: 159.011071777344
+mean bills: 2.20972035579446
+need amount: 14.022738320826234
+ct id:15
+speed coef:0.6
+clients: 8.84469404220581
+mean bills: 2.91060959792477
+need amount: 15.45293006360136
+ct id:16
+speed coef:0.8
+clients: 6.77674837112427
+mean bills: 3.83449709060682
+need amount: 16.535655976636797
+----2018-07-02 22:00:00------
+
+period_cashiers: 16.0
+ct id:13
+speed coef:0.8
+clients: 3.49987335205078
+mean bills: 1.60129974005199
+need amount: 0.2335144287022417
+ct id:14
+speed coef:0.85
+clients: 128.521229553223
+mean bills: 2.20972035579446
+need amount: 11.370611569701827
+ct id:15
+speed coef:0.6
+clients: 6.67936725616455
+mean bills: 2.91060959792477
+need amount: 12.45066881658277
+ct id:16
+speed coef:0.8
+clients: 6.94116115570068
+mean bills: 3.83449709060682
+need amount: 13.559663077289741
+----2018-07-02 22:30:00------
+
+period_cashiers: 16.0
+ct id:13
+speed coef:0.8
+clients: 2.15192697048187
+mean bills: 1.60129974005199
+need amount: 0.1435783374351452
+ct id:14
+speed coef:0.85
+clients: 95.7919616699219
+mean bills: 2.20972035579446
+need amount: 8.444497852082561
+ct id:15
+speed coef:0.6
+clients: 4.97784566879272
+mean bills: 2.91060959792477
+need amount: 9.24941815100347
+ct id:16
+speed coef:0.8
+clients: 5.83456363677979
+mean bills: 3.83449709060682
+need amount: 10.181610538094821
+----2018-07-02 23:00:00------
+
+period_cashiers: 13.0
+ct id:13
+speed coef:0.8
+clients: 2.45192697048187
+mean bills: 1.60129974005199
+need amount: 0.16359458418579506
+ct id:14
+speed coef:0.85
+clients: 65.964323425293
+mean bills: 2.20972035579446
+need amount: 5.879779220620276
+ct id:15
+speed coef:0.6
+clients: 2.33542418479919
+mean bills: 2.91060959792477
+need amount: 6.257418556592618
+ct id:16
+speed coef:0.8
+clients: 5.6861946105957
+mean bills: 3.83449709060682
+need amount: 7.1659059187156755
+----2018-07-02 23:30:00------
+
+period_cashiers: 13.0
+ct id:13
+speed coef:0.8
+clients: 1.53611183166504
+mean bills: 1.60129974005199
+need amount: 0.10249064486400061
+ct id:14
+speed coef:0.85
+clients: 8.38844757080078
+mean bills: 2.20972035579446
+need amount: 0.82939744293118
+ct id:15
+speed coef:0.6
+clients: 2.33299350738525
+mean bills: 2.91060959792477
+need amount: 1.2066437370696068
+ct id:16
+speed coef:0.8
+clients: 1.68658351898193
+mean bills: 3.83449709060682
+need amount: 1.4761103869280077
+----2018-07-03 00:00:00------
+
+period_cashiers: 4.5
+----2018-07-03 00:30:00------
+
+period_cashiers: 0.0
+----2018-07-03 01:00:00------
+
+period_cashiers: 0.0
+----2018-07-03 01:30:00------
+
+period_cashiers: 0.0
+----2018-07-03 02:00:00------
+
+period_cashiers: 0.0
+----2018-07-03 02:30:00------
+
+period_cashiers: 0.0

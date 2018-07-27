@@ -1,0 +1,638 @@
+----2018-07-01 03:00:00------
+
+period_cashiers: 0.0
+----2018-07-01 03:30:00------
+
+period_cashiers: 0.0
+----2018-07-01 04:00:00------
+
+period_cashiers: 0.0
+----2018-07-01 04:30:00------
+
+period_cashiers: 0.0
+----2018-07-01 05:00:00------
+
+period_cashiers: 0.0
+----2018-07-01 05:30:00------
+
+period_cashiers: 0.0
+----2018-07-01 06:00:00------
+
+period_cashiers: 0.0
+----2018-07-01 06:30:00------
+
+period_cashiers: 0.5
+ct id:14
+speed coef:0.85
+clients: 23.8455448150635
+mean bills: 2.20972035579446
+need amount: 2.0663523832492103
+----2018-07-01 07:00:00------
+
+period_cashiers: 3.0
+ct id:14
+speed coef:0.85
+clients: 45.9075729370117
+mean bills: 2.20972035579446
+need amount: 3.9781528785895537
+----2018-07-01 07:30:00------
+
+period_cashiers: 6.0
+ct id:14
+speed coef:0.85
+clients: 77.7649963378906
+mean bills: 2.20972035579446
+need amount: 6.7387802108281765
+----2018-07-01 08:00:00------
+
+period_cashiers: 8.0
+ct id:14
+speed coef:0.85
+clients: 123.126530456543
+mean bills: 2.20972035579446
+need amount: 10.669615713261551
+----2018-07-01 08:30:00------
+
+period_cashiers: 8.0
+ct id:14
+speed coef:0.85
+clients: 156.502407836914
+mean bills: 2.20972035579446
+need amount: 13.561825738355894
+----2018-07-01 09:00:00------
+
+period_cashiers: 11.0
+ct id:14
+speed coef:0.85
+clients: 192.357073974609
+mean bills: 2.20972035579446
+need amount: 16.668836938931538
+----2018-07-01 09:30:00------
+
+period_cashiers: 13.0
+ct id:14
+speed coef:0.85
+clients: 229.693768310547
+mean bills: 2.20972035579446
+need amount: 19.90427433078244
+----2018-07-01 10:00:00------
+
+period_cashiers: 14.0
+ct id:14
+speed coef:0.85
+clients: 268.971243286133
+mean bills: 2.20972035579446
+need amount: 23.307891427949496
+----2018-07-01 10:30:00------
+
+period_cashiers: 16.0
+ct id:14
+speed coef:0.85
+clients: 289.346252441406
+mean bills: 2.20972035579446
+need amount: 25.073502113435975
+----2018-07-01 11:00:00------
+
+period_cashiers: 19.0
+ct id:14
+speed coef:0.85
+clients: 298.014624023437
+mean bills: 2.20972035579446
+need amount: 25.824665922706725
+----2018-07-01 11:30:00------
+
+period_cashiers: 19.0
+ct id:14
+speed coef:0.85
+clients: 334.808728027344
+mean bills: 2.20972035579446
+need amount: 29.013084769398947
+----2018-07-01 12:00:00------
+
+period_cashiers: 19.0
+ct id:14
+speed coef:0.85
+clients: 343.058728027344
+mean bills: 2.20972035579446
+need amount: 29.72799429627363
+----2018-07-01 12:30:00------
+
+period_cashiers: 19.0
+ct id:14
+speed coef:0.85
+clients: 339.308728027344
+mean bills: 2.20972035579446
+need amount: 29.4030354204215
+----2018-07-01 13:00:00------
+
+period_cashiers: 20.0
+ct id:14
+speed coef:0.85
+clients: 329.708728027344
+mean bills: 2.20972035579446
+need amount: 28.571140698240058
+----2018-07-01 13:30:00------
+
+period_cashiers: 20.0
+ct id:14
+speed coef:0.85
+clients: 332.160119628906
+mean bills: 2.20972035579446
+need amount: 28.783567754004572
+----2018-07-01 14:00:00------
+
+period_cashiers: 21.0
+ct id:14
+speed coef:0.85
+clients: 330.510119628906
+mean bills: 2.20972035579446
+need amount: 28.640585848629637
+----2018-07-01 14:30:00------
+
+period_cashiers: 21.0
+ct id:14
+speed coef:0.85
+clients: 323.708898925781
+mean bills: 2.20972035579446
+need amount: 28.05122130620038
+----2018-07-01 15:00:00------
+
+period_cashiers: 25.0
+ct id:14
+speed coef:0.85
+clients: 325.058898925781
+mean bills: 2.20972035579446
+need amount: 28.168206501507147
+----2018-07-01 15:30:00------
+
+period_cashiers: 25.5
+ct id:14
+speed coef:0.85
+clients: 306.589593505859
+mean bills: 2.20972035579446
+need amount: 26.56773590763316
+----2018-07-01 16:00:00------
+
+period_cashiers: 24.0
+ct id:14
+speed coef:0.85
+clients: 299.384173583984
+mean bills: 2.20972035579446
+need amount: 25.943345198871825
+----2018-07-01 16:30:00------
+
+period_cashiers: 24.0
+ct id:14
+speed coef:0.85
+clients: 282.98747253418
+mean bills: 2.20972035579446
+need amount: 24.522477587984437
+----2018-07-01 17:00:00------
+
+period_cashiers: 23.0
+ct id:14
+speed coef:0.85
+clients: 272.888909912109
+mean bills: 2.20972035579446
+need amount: 23.647379572680308
+----2018-07-01 17:30:00------
+
+period_cashiers: 22.0
+ct id:14
+speed coef:0.85
+clients: 252.473083496094
+mean bills: 2.20972035579446
+need amount: 21.878231838882876
+----2018-07-01 18:00:00------
+
+period_cashiers: 21.0
+ct id:14
+speed coef:0.85
+clients: 235.738186645508
+mean bills: 2.20972035579446
+need amount: 20.428057634064814
+----2018-07-01 18:30:00------
+
+period_cashiers: 18.0
+ct id:14
+speed coef:0.85
+clients: 225.545623779297
+mean bills: 2.20972035579446
+need amount: 19.544813961783202
+----2018-07-01 19:00:00------
+
+period_cashiers: 16.0
+ct id:14
+speed coef:0.85
+clients: 206.389721679688
+mean bills: 2.20972035579446
+need amount: 17.884845851857246
+----2018-07-01 19:30:00------
+
+period_cashiers: 13.0
+ct id:14
+speed coef:0.85
+clients: 188.977975463867
+mean bills: 2.20972035579446
+need amount: 16.37601879134639
+----2018-07-01 20:00:00------
+
+period_cashiers: 11.0
+ct id:14
+speed coef:0.85
+clients: 170.781900024414
+mean bills: 2.20972035579446
+need amount: 14.79922513275302
+----2018-07-01 20:30:00------
+
+period_cashiers: 11.0
+ct id:14
+speed coef:0.85
+clients: 149.137139892578
+mean bills: 2.20972035579446
+need amount: 12.923583287278259
+----2018-07-01 21:00:00------
+
+period_cashiers: 9.0
+ct id:14
+speed coef:0.85
+clients: 135.302102661133
+mean bills: 2.20972035579446
+need amount: 11.724698448317545
+----2018-07-01 21:30:00------
+
+period_cashiers: 9.0
+ct id:14
+speed coef:0.85
+clients: 96.3372360229492
+mean bills: 2.20972035579446
+need amount: 8.348170645524949
+----2018-07-01 22:00:00------
+
+period_cashiers: 9.0
+ct id:14
+speed coef:0.85
+clients: 76.2016357421875
+mean bills: 2.20972035579446
+need amount: 6.60330610369986
+----2018-07-01 22:30:00------
+
+period_cashiers: 9.0
+ct id:14
+speed coef:0.85
+clients: 57.0441482543945
+mean bills: 2.20972035579446
+need amount: 4.943200610850688
+----2018-07-01 23:00:00------
+
+period_cashiers: 7.0
+ct id:14
+speed coef:0.85
+clients: 46.6033645629883
+mean bills: 2.20972035579446
+need amount: 4.038447189150801
+----2018-07-01 23:30:00------
+
+period_cashiers: 7.0
+ct id:14
+speed coef:0.85
+clients: 4.06066513061523
+mean bills: 2.20972035579446
+need amount: 0.35187978028177425
+----2018-07-02 00:00:00------
+
+period_cashiers: 1.0
+----2018-07-02 00:30:00------
+
+period_cashiers: 0.0
+----2018-07-02 01:00:00------
+
+period_cashiers: 0.0
+----2018-07-02 01:30:00------
+
+period_cashiers: 0.0
+----2018-07-02 02:00:00------
+
+period_cashiers: 0.0
+----2018-07-02 02:30:00------
+
+period_cashiers: 0.0
+----2018-07-02 03:00:00------
+
+period_cashiers: 0.0
+----2018-07-02 03:30:00------
+
+period_cashiers: 0.0
+----2018-07-02 04:00:00------
+
+period_cashiers: 0.0
+----2018-07-02 04:30:00------
+
+period_cashiers: 0.0
+----2018-07-02 05:00:00------
+
+period_cashiers: 0.0
+----2018-07-02 05:30:00------
+
+period_cashiers: 0.0
+----2018-07-02 06:00:00------
+
+period_cashiers: 0.0
+----2018-07-02 06:30:00------
+
+period_cashiers: 1.5
+ct id:14
+speed coef:0.85
+clients: 27.2753368377686
+mean bills: 2.20972035579446
+need amount: 2.363563412610501
+----2018-07-02 07:00:00------
+
+period_cashiers: 4.0
+ct id:14
+speed coef:0.85
+clients: 49.9480575561523
+mean bills: 2.20972035579446
+need amount: 4.32828390251855
+----2018-07-02 07:30:00------
+
+period_cashiers: 5.0
+ct id:14
+speed coef:0.85
+clients: 79.7438430786133
+mean bills: 2.20972035579446
+need amount: 6.910258560787881
+----2018-07-02 08:00:00------
+
+period_cashiers: 6.0
+ct id:14
+speed coef:0.85
+clients: 100.680645751953
+mean bills: 2.20972035579446
+need amount: 8.724551856965551
+----2018-07-02 08:30:00------
+
+period_cashiers: 8.0
+ct id:14
+speed coef:0.85
+clients: 120.260781860352
+mean bills: 2.20972035579446
+need amount: 10.42128226198341
+----2018-07-02 09:00:00------
+
+period_cashiers: 10.0
+ct id:14
+speed coef:0.85
+clients: 149.666586303711
+mean bills: 2.20972035579446
+need amount: 12.969462836767786
+----2018-07-02 09:30:00------
+
+period_cashiers: 13.0
+ct id:14
+speed coef:0.85
+clients: 166.38971862793
+mean bills: 2.20972035579446
+need amount: 14.41861757831567
+----2018-07-02 10:00:00------
+
+period_cashiers: 14.0
+ct id:14
+speed coef:0.85
+clients: 191.269653320312
+mean bills: 2.20972035579446
+need amount: 16.574605740691876
+----2018-07-02 10:30:00------
+
+period_cashiers: 14.0
+ct id:14
+speed coef:0.85
+clients: 210.871109008789
+mean bills: 2.20972035579446
+need amount: 18.273183608849948
+----2018-07-02 11:00:00------
+
+period_cashiers: 15.0
+ct id:14
+speed coef:0.85
+clients: 231.425192260742
+mean bills: 2.20972035579446
+need amount: 20.05431208557679
+----2018-07-02 11:30:00------
+
+period_cashiers: 17.0
+ct id:14
+speed coef:0.85
+clients: 243.375604248047
+mean bills: 2.20972035579446
+need amount: 21.089883404340636
+----2018-07-02 12:00:00------
+
+period_cashiers: 18.0
+ct id:14
+speed coef:0.85
+clients: 249.825604248047
+mean bills: 2.20972035579446
+need amount: 21.64881267080629
+----2018-07-02 12:30:00------
+
+period_cashiers: 18.0
+ct id:14
+speed coef:0.85
+clients: 245.025604248047
+mean bills: 2.20972035579446
+need amount: 21.232865309715567
+----2018-07-02 13:00:00------
+
+period_cashiers: 18.0
+ct id:14
+speed coef:0.85
+clients: 251.925604248047
+mean bills: 2.20972035579446
+need amount: 21.83078964128348
+----2018-07-02 13:30:00------
+
+period_cashiers: 18.0
+ct id:14
+speed coef:0.85
+clients: 247.405145263672
+mean bills: 2.20972035579446
+need amount: 21.439066102643974
+----2018-07-02 14:00:00------
+
+period_cashiers: 19.0
+ct id:14
+speed coef:0.85
+clients: 245.005145263672
+mean bills: 2.20972035579446
+need amount: 21.231092422098616
+----2018-07-02 14:30:00------
+
+period_cashiers: 19.0
+ct id:14
+speed coef:0.85
+clients: 248.777932739258
+mean bills: 2.20972035579446
+need amount: 21.558025962604056
+----2018-07-02 15:00:00------
+
+period_cashiers: 25.5
+ct id:14
+speed coef:0.85
+clients: 243.677932739258
+mean bills: 2.20972035579446
+need amount: 21.116081891445166
+----2018-07-02 15:30:00------
+
+period_cashiers: 25.5
+ct id:14
+speed coef:0.85
+clients: 244.508569335937
+mean bills: 2.20972035579446
+need amount: 21.18806128736475
+----2018-07-02 16:00:00------
+
+period_cashiers: 23.0
+ct id:14
+speed coef:0.85
+clients: 236.323104858398
+mean bills: 2.20972035579446
+need amount: 20.478744131378463
+----2018-07-02 16:30:00------
+
+period_cashiers: 23.0
+ct id:14
+speed coef:0.85
+clients: 238.970758056641
+mean bills: 2.20972035579446
+need amount: 20.708178373231082
+----2018-07-02 17:00:00------
+
+period_cashiers: 22.0
+ct id:14
+speed coef:0.85
+clients: 234.39885559082
+mean bills: 2.20972035579446
+need amount: 20.311996963684745
+----2018-07-02 17:30:00------
+
+period_cashiers: 20.0
+ct id:14
+speed coef:0.85
+clients: 236.437435913086
+mean bills: 2.20972035579446
+need amount: 20.488651568980167
+----2018-07-02 18:00:00------
+
+period_cashiers: 19.0
+ct id:14
+speed coef:0.85
+clients: 234.706951904297
+mean bills: 2.20972035579446
+need amount: 20.338695265466527
+----2018-07-02 18:30:00------
+
+period_cashiers: 15.0
+ct id:14
+speed coef:0.85
+clients: 233.764569091797
+mean bills: 2.20972035579446
+need amount: 20.257032422967225
+----2018-07-02 19:00:00------
+
+period_cashiers: 14.0
+ct id:14
+speed coef:0.85
+clients: 221.325970458984
+mean bills: 2.20972035579446
+need amount: 19.179156948595303
+----2018-07-02 19:30:00------
+
+period_cashiers: 14.0
+ct id:14
+speed coef:0.85
+clients: 225.872549438477
+mean bills: 2.20972035579446
+need amount: 19.573143933701694
+----2018-07-02 20:00:00------
+
+period_cashiers: 13.0
+ct id:14
+speed coef:0.85
+clients: 218.672290039062
+mean bills: 2.20972035579446
+need amount: 18.949200413627665
+----2018-07-02 20:30:00------
+
+period_cashiers: 11.0
+ct id:14
+speed coef:0.85
+clients: 196.959320068359
+mean bills: 2.20972035579446
+need amount: 17.0676477968035
+----2018-07-02 21:00:00------
+
+period_cashiers: 9.0
+ct id:14
+speed coef:0.85
+clients: 188.527426147461
+mean bills: 2.20972035579446
+need amount: 16.336976124846327
+----2018-07-02 21:30:00------
+
+period_cashiers: 9.0
+ct id:14
+speed coef:0.85
+clients: 159.011071777344
+mean bills: 2.20972035579446
+need amount: 13.779215768748667
+----2018-07-02 22:00:00------
+
+period_cashiers: 9.0
+ct id:14
+speed coef:0.85
+clients: 128.521229553223
+mean bills: 2.20972035579446
+need amount: 11.137097140999586
+----2018-07-02 22:30:00------
+
+period_cashiers: 9.0
+ct id:14
+speed coef:0.85
+clients: 95.7919616699219
+mean bills: 2.20972035579446
+need amount: 8.300919514647417
+----2018-07-02 23:00:00------
+
+period_cashiers: 7.0
+ct id:14
+speed coef:0.85
+clients: 65.964323425293
+mean bills: 2.20972035579446
+need amount: 5.716184636434481
+----2018-07-02 23:30:00------
+
+period_cashiers: 7.0
+ct id:14
+speed coef:0.85
+clients: 8.38844757080078
+mean bills: 2.20972035579446
+need amount: 0.7269067980671794
+----2018-07-03 00:00:00------
+
+period_cashiers: 1.5
+----2018-07-03 00:30:00------
+
+period_cashiers: 0.0
+----2018-07-03 01:00:00------
+
+period_cashiers: 0.0
+----2018-07-03 01:30:00------
+
+period_cashiers: 0.0
+----2018-07-03 02:00:00------
+
+period_cashiers: 0.0
+----2018-07-03 02:30:00------
+
+period_cashiers: 0.0

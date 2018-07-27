@@ -1,4 +1,5 @@
 from datetime import datetime, time, timedelta
+from collections import defaultdict
 
 from django.http import HttpResponse
 from django.db.models import Avg, Max
@@ -22,38 +23,33 @@ from src.db.works.printer.run import run as get_xlsx
 from dateutil.relativedelta import relativedelta
 
 from ..utils import dttm_combine
+from .utils import check_time_is_between_boarders
 import xlsxwriter
 import io
 
-from numpy import median, round as round_numpy
 
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
-    # return JsonResponse.success()
     def count_diff(dttm, period_demands, demand_ind, period_bills, mean_bills_per_step, cashbox_types):
         # fixme: aa: work only if all steps are 30 minutes
-        # todo: это не работает!!!!!!!!!!
         # period_demand is sorted by dttm_forecast, so find the dttm
-            # mean_bills_per_step = WorkerCashboxInfo.objects.filter(
-            #     is_active=True,
-            #     cashbox_type_id__in=cashbox_types.keys()
-            # ).values('cashbox_type_id').annotate(speed_usual=Max('mean_speed'))
-            # mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
-            # edge_ind = 0
-            # while (edge_ind < len(period_demand)) and (period_demand[edge_ind].type != PeriodDemand.Type.FACT.value):
-            #     edge_ind += 1
-            #
-            # period_demands = period_demand[:edge_ind]
+        # mean_bills_per_step = WorkerCashboxInfo.objects.filter(
+        #     is_active=True,
+        #     cashbox_type_id__in=cashbox_types.keys()
+        # ).values('cashbox_type_id').annotate(speed_usual=Max('mean_speed'))
+        # mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
+        # edge_ind = 0
+        # while (edge_ind < len(period_demand)) and (period_demand[edge_ind].type != PeriodDemand.Type.FACT.value):
+        #     edge_ind += 1
+        #
+        # period_demands = period_demand[:edge_ind]
+        need_amount_dict = {}
 
         dem_len = len(period_demands)
         while (demand_ind < dem_len) and (period_demands[demand_ind].dttm_forecast < dttm):
             demand_ind += 1
 
-        need_amount = 0
         ct_ids = []
-        # if dttm.time() == time(6, 30):
-        #     import pdb
-        #     pdb.set_trace()
         if demand_ind < dem_len:
             for ind_shift in range(len(cashbox_types)):
                 ind = demand_ind + ind_shift
@@ -61,13 +57,10 @@ def get_cashiers_timetable(request, form):
                     ct_id = period_demands[ind].cashbox_type_id
                     ct_ids.append(ct_id)
                     if ct_id in cashbox_types.keys():
-                        need_amount += period_demands[ind].clients / cashbox_types[ct_id][0].speed_coef \
+                        need_amount_dict[ct_id] = period_demands[ind].clients / cashbox_types[ct_id][0].speed_coef \
                                    / (PERIOD_MINUTES / mean_bills_per_step[ct_id])
-        # if len(ct_ids) == 0:
-        #     ct_ids = cashbox_types.keys()
-        # for ct_id in ct_ids:
-        #     need_amount -= period_bills[ct_id] / (PERIOD_MINUTES / mean_bills_per_step[ct_id])
-        return need_amount, demand_ind
+
+        return need_amount_dict, demand_ind
 
     shop_id = request.user.shop_id
 
@@ -187,16 +180,18 @@ def get_cashiers_timetable(request, form):
     # dttm_start = datetime.combine(form['from_dt'], supeshop.tm_start) - PERIOD_STEP
     # periods = int(timediff(supeshop.tm_start, supeshop.tm_end) * 2 + 0.99999) + 5 # period 30 minutes
 
-    need_cashier_amount = 0
+    time_borders = [
+        [time(6, 30), time(10, 30), 'morning'],
+        [time(18, 30), time(22, 30), 'evening'],
+    ]
 
     ind_b = 0
     demand_ind = 0
     fact_ind = 0
     idle_time_numerator = 0
     idle_time_denominator = 0
-    idle_time_numerator_anti = 0
-    idle_time_denominator_anti = 0
-    idle_anti = []
+    cashiers_lack_on_period_morning = []
+    cashiers_lack_on_period_evening = []
 
     edge_ind = 0
     while (edge_ind < len(period_demand)) and (period_demand[edge_ind].type != PeriodDemand.Type.FACT.value):
@@ -207,20 +202,31 @@ def get_cashiers_timetable(request, form):
 
     wdcds = worker_day_cashbox_detail  # alias
     wdcds_len = len(wdcds)
-    # for each period count:
-    # import pdb
-    # pdb.set_trace()
 
     for day_ind in range((form['to_dt'] - form['from_dt']).days):
+        each_day_morning = []
+        each_day_evening = []
+        cashiers_working_today = wdcds.filter(worker_day__dt=form['from_dt'] + timedelta(days=day_ind))
         for time_ind in range(periods):
             dttm = dttm_start + timedelta(days=day_ind) + time_ind * PERIOD_STEP
-            # if dttm.hour > 22:
-            #     pdb.set_trace()
 
             dttm_end = dttm + PERIOD_STEP
             dttm_ind = dttm - PERIOD_STEP
 
-            # shift to first model, which has intersection
+            cashiers_on_cashbox_type = defaultdict(int)
+
+            cashier_working_now = []
+            for cashier in cashiers_working_today:
+                if cashier.worker_day.tm_work_end > cashier.worker_day.tm_work_start:
+                    if cashier.worker_day.tm_work_start <= dttm.time() and cashier.worker_day.tm_work_end >= dttm_end.time():
+                        cashier_working_now.append(cashier)
+                else:
+                    if cashier.worker_day.tm_work_start <= dttm.time():
+                        cashier_working_now.append(cashier)
+            # todo: неправильно учитывается время от 23:30
+            for cashier in cashier_working_now:
+                if cashier.cashbox_type is not None:
+                    cashiers_on_cashbox_type[cashier.cashbox_type.id] += 1  # shift to first model, which has intersection
             while (ind_b < wdcds_len) and (dttm_ind <= dttm) and wdcds[ind_b].tm_to:
                 dttm_ind = dttm_combine(wdcds[ind_b].worker_day.dt, wdcds[ind_b].tm_to)
                 ind_b += 1
@@ -241,10 +247,9 @@ def get_cashiers_timetable(request, form):
                         (dttm_end - dttm_ind).total_seconds(),
                         TOTAL_PERIOD_SECONDS
                     ) / TOTAL_PERIOD_SECONDS
-
-                    # period_bills[wdcds[ind_e].cashbox_type_id] += proportion *  \
-                    #     (PERIOD_MINUTES / worker_cashbox_info[(wdcds[ind_e].worker_day.worker_id, wdcds[ind_e].cashbox_type_id)][0].mean_speed)
-
+                    if wdcds[ind_e].worker_day.worker_id in worker_cashbox_info.keys():
+                        period_bills[wdcds[ind_e].cashbox_type_id] += proportion *  \
+                            (PERIOD_MINUTES / worker_cashbox_info[(wdcds[ind_e].worker_day.worker_id, wdcds[ind_e].cashbox_type_id)][0].mean_speed)
                     period_cashiers += 1 * proportion
                     if wdcds[ind_e].cashbox_type_id in cashbox_types_main.keys():
                         period_cashiers_hard += 1 * proportion
@@ -260,30 +265,49 @@ def get_cashiers_timetable(request, form):
                 'amount': period_cashiers
             })
 
-            predict_diff, demand_ind_2 = count_diff(dttm, predict_demand, demand_ind, period_bills,  mean_bills_per_step, cashbox_types)
-
+            predict_diff_dict, demand_ind_2 = count_diff(dttm, predict_demand, demand_ind, period_bills,  mean_bills_per_step, cashbox_types)
             predict_cashier_needs.append({
                 'dttm': dttm_converted,
-                'amount': predict_diff, #+ period_cashiers,
+                'amount': sum(predict_diff_dict.values()), #+ period_cashiers,
             })
 
-            real_diff, fact_ind = count_diff(dttm, fact_demand, fact_ind, period_bills,  mean_bills_per_step, cashbox_types)
+            real_diff_dict, fact_ind = count_diff(dttm, fact_demand, fact_ind, period_bills,  mean_bills_per_step, cashbox_types)
             fact_cashier_needs.append({
                 'dttm': dttm_converted,
-                'amount': real_diff, # + period_cashiers,
+                'amount': sum(real_diff_dict.values()), # + period_cashiers,
             })
 
-            predict_diff_hard, _ = count_diff(dttm, predict_demand, demand_ind, period_bills, mean_bills_per_step, cashbox_types_main)
-            if period_cashiers_hard > predict_diff_hard:
-                idle_time_numerator += period_cashiers_hard - predict_diff_hard
+            predict_diff_hard_dict, _ = count_diff(dttm, predict_demand, demand_ind, period_bills, mean_bills_per_step, cashbox_types_main)
+            if period_cashiers_hard > sum(predict_diff_hard_dict.values()):
+                idle_time_numerator += period_cashiers_hard - sum(predict_diff_hard_dict.values())
             idle_time_denominator += period_cashiers_hard
-
-            if predict_diff > period_cashiers and (predict_diff > 0 and predict_diff > 0):
-                idle_time_numerator_anti = predict_diff - period_cashiers
-                idle_time_denominator_anti = predict_diff
-                idle_anti.append(idle_time_numerator_anti/idle_time_denominator_anti)
-
             demand_ind = demand_ind_2
+
+            need_amount_morning = 0
+            need_amount_evening = 0
+
+            for cashbox_type in cashbox_types:
+                check_time = check_time_is_between_boarders(dttm.time(), time_borders)
+                if check_time == 'morning' or check_time == 'evening':
+                    if cashbox_type in predict_diff_dict.keys() \
+                            and cashbox_type in cashiers_on_cashbox_type.keys()\
+                            and predict_diff_dict[cashbox_type] > cashiers_on_cashbox_type.get(cashbox_type) \
+                            and predict_diff_dict[cashbox_type] > 0:
+                        if check_time == 'morning':
+                            need_amount_morning += predict_diff_dict[cashbox_type] - cashiers_on_cashbox_type.get(cashbox_type)
+                        elif check_time == 'evening':
+                            need_amount_evening += predict_diff_dict[cashbox_type] - cashiers_on_cashbox_type.get(cashbox_type)
+                        else:
+                            pass
+            each_day_morning.append(need_amount_morning)
+            each_day_evening.append(need_amount_evening)
+
+        cashiers_lack_on_period_morning.append(max(each_day_morning))
+        cashiers_lack_on_period_evening.append(max(each_day_evening))
+
+    max_of_cashiers_lack_morning = max(cashiers_lack_on_period_morning)
+    max_of_cashiers_lack_evening = max(cashiers_lack_on_period_evening)
+
     total_lack_of_cashiers_on_period_demand = 0  # on all cashboxes types
     if period_demand:
         prev_one_period_demand = period_demand[0]  # for first iteration
@@ -302,7 +326,7 @@ def get_cashiers_timetable(request, form):
             'big_demand_persent': 0,  # big_demand_persent,
             'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': None,
-            'need_cashier_amount': round(round_numpy(median(idle_anti), 1) * worker_amount),
+            'need_cashier_amount': round((max_of_cashiers_lack_morning + max_of_cashiers_lack_evening) * 1.4),
             'change_amount': None,
         },
         'period_step': 30,
