@@ -7,6 +7,7 @@ config importance
 """
 
 import os
+from celery.schedules import crontab
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,6 +43,7 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'django_celery_results',
     'src.celery',
+    'celerybeat_status'
     # 'rest_framework',
 ]
 
@@ -176,6 +178,10 @@ CELERY_BEAT_SCHEDULE = {
     'task-every-30-min-update-queue': {
         'task': 'update_queue',
         'schedule': 30 * 60,
+    },
+    'task-free-all-workers-after-shop-closes': {
+        'task': 'release_all_workers',
+        'schedule': crontab(hour=2, minute=0)
     }
 }
 
