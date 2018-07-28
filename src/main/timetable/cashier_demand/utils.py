@@ -1,4 +1,5 @@
 from src.db.models import WorkerDay
+from datetime import time, timedelta
 
 
 def filter_worker_day_by_dttm(shop_id, day_type, dttm_from, dttm_to):
@@ -24,3 +25,16 @@ def filter_worker_day_by_dttm(shop_id, day_type, dttm_from, dttm_to):
         days.append(d)
 
     return days
+
+
+def check_time_is_between_boarders(tm, borders):
+    """
+    checks if time is in allowed boarders
+    :param tm: datetime.time obj
+    :param borders: [datetime.time(), datetime.time(), 'day type'] : 'day type': 'morning', 'evening'
+    :return: day type if in borders else False
+    """
+    for border in borders:
+        if border[0] < tm < border[1]:
+            return border[2]
+    return False
