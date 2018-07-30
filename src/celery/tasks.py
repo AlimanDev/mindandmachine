@@ -2,8 +2,9 @@ from datetime import timedelta
 from django.db.models import Avg
 from django.utils.timezone import now
 
-from src.db.models import PeriodDemand, CashboxType, CameraCashboxStat
+from src.db.models import PeriodDemand, CashboxType, CameraCashboxStat, WorkerDayCashboxDetails
 from src.celery.celery import app
+from celery import crontab
 
 
 @app.task(name="update_queue")
@@ -46,3 +47,18 @@ def update_queue(till_dttm=None):
             cashbox_type.dttm_last_update_queue += time_step
             dif_time -= time_step
         cashbox_type.save()
+
+
+@app.task
+def release_all_workers():
+    dttm_now = now() + timedelta(hours=3)
+    worker_day_cashbox_objs = \
+        WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+            worker_day__dt=dttm_now.date() - timedelta(days=1),
+            tm_to__is_null=True
+            )
+
+    for obj in worker_day_cashbox_objs:
+        obj.on_cashbox = None
+        obj.tm_to = obj.worker_day.tm_work_end
+        obj.save()
