@@ -161,7 +161,9 @@ def create_timetable(request, form):
             if int_s < int_e:
                 slots_periods_dict[key].append([
                     time2int(slot.tm_start),
+                    # BaseConverter.convert_time(slot.tm_start),
                     time2int(slot.tm_end),
+                    # BaseConverter.convert_time(slot.tm_end),
                 ])
 
     for cashbox in cashboxes:
