@@ -161,7 +161,7 @@ def get_cashiers_info(request, form):
                                     default_break_triplets.append(15)
                             break
 
-                if item.on_cashbox:
+                if item.status == WorkerDayCashboxDetails.TYPE_WORK:
                     tm_to = item.tm_to
                     if item.tm_to is None:
                         tm_to = dttm.time()
