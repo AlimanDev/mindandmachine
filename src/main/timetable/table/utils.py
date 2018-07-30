@@ -10,6 +10,8 @@ import datetime as dt
 from django.db.models import Sum, Q
 from django.db.models.functions import Coalesce
 
+from src.util.models_converter import WorkerDayConverter
+
 # import time as time2
 # def check_time(t=None):
 #     t2 = time2.time()
@@ -43,7 +45,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
             '{}_days_periods'.format(i[1]): 0 for i in times_borders  # days periods counts
         })
         dict.update({
-             i.value: 0 for i in WorkerDay.Type  # days types
+            WorkerDayConverter.convert_type(i.value): 0 for i in WorkerDay.Type  # days types
         })
         return dict
 
@@ -105,7 +107,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
         if dt != row['dt']:
             dt = row['dt']
 
-            worker[row['type']] += 1
+            worker[ WorkerDayConverter.convert_type(row['type'])] += 1
 
             if row['type'] in WorkerDay.TYPES_PAID:
                 worker['paid_days'] += 1
