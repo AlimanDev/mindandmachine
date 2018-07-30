@@ -4,7 +4,6 @@ from django.utils.timezone import now
 
 from src.db.models import PeriodDemand, CashboxType, CameraCashboxStat, WorkerDayCashboxDetails
 from src.celery.celery import app
-from celery import crontab
 
 
 @app.task(name="update_queue")
