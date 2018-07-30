@@ -115,7 +115,7 @@ def create_timetable(request, form):
     shop = Shop.objects.get(id=shop_id)
 
     shop_dict = {
-        'shop_interface': shop.full_interface,
+        'shop_type': shop.full_interface,
         'mean_queue_length': shop.mean_queue_length,
         'max_queue_length': shop.max_queue_length,
         'dead_time_part': shop.dead_time_part
@@ -218,7 +218,7 @@ def create_timetable(request, form):
         'cashbox_types': cashboxes,
         # 'slots': slots_periods_dict,
         'shop': shop_dict,
-        'shop_interface': shop.full_interface, # todo: remove when change in algo
+        'shop_type': shop.full_interface, # todo: remove when change in algo
         'demand': [PeriodDemandConverter.convert(x) for x in periods],
         'cashiers': [
             {
