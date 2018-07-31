@@ -8,6 +8,7 @@ from src.celery.celery import app
 
 @app.task
 def update_queue(till_dttm=None):
+    print('НАЧАЛ РАБОТУ')
     time_step = timedelta(seconds=1800)
     if till_dttm is None:
         till_dttm = now()
@@ -46,6 +47,7 @@ def update_queue(till_dttm=None):
             cashbox_type.dttm_last_update_queue += time_step
             dif_time -= time_step
         cashbox_type.save()
+    print('ЗАКОНЧИЛ РАБОТУ')
 
 
 @app.task
