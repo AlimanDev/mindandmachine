@@ -67,20 +67,17 @@ def get_workers_to_exchange(request, form):
         predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types_hard)
         for cashbox_type in predict_diff_dict.keys():
             users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, hard_cts_in_shop)  # dict {ct_id: users}
-
             number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
-            if cashbox_type == 15:
-                print(users_working_on_hard_cts_at_dttm[cashbox_type], dttm)
-            # print(dttm, ': ', cashbox_type, ': ', predict_diff_dict[cashbox_type], len(users_working_on_hard_cts_at_dttm[cashbox_type]))
+            # print(dttm, ': ', cashbox_type, ': ', int(predict_diff_dict[cashbox_type]) + 1, len(users_working_on_hard_cts_at_dttm[cashbox_type]))
             if int(predict_diff_dict[cashbox_type]) + 1 < number_of_workers != 1:
                 for user in users_working_on_hard_cts_at_dttm[cashbox_type]:
-                    if user not in users_for_exchange.keys():
+                    if user in users_who_can_work_on_ct and user not in users_for_exchange.keys():
                         users_for_exchange[user] = []
                         users_for_exchange[user].append(get_key_by_value(CHANGE_TYPE_CHOICES, 'FROM OTHERSPEC'))
                         users_for_exchange[user].append(cashbox_type)
             else:
                 users_for_exchange = {k: v for k, v in users_for_exchange.items() if v[1] != cashbox_type}
 
-    # print(users_for_exchange)
+    print(users_for_exchange)
 
     return JsonResponse.success()
