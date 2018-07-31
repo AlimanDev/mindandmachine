@@ -25,7 +25,7 @@ def update_queue(till_dttm=None):
             ).values('camera_cashbox_id').annotate(mean_queue=Avg('queue')).filter(mean_queue__gte=0.6)
 
             if len(mean_queue):
-                mean_queue = sum([el['mean_queue'] for el in mean_queue])
+                mean_queue = sum([el['mean_queue'] for el in mean_queue]) / len(mean_queue)
 
                 changed_amount = PeriodDemand.objects.filter(
                     dttm_forecast=cashbox_type.dttm_last_update_queue,
