@@ -63,3 +63,6 @@ def release_all_workers():
         obj.on_cashbox = None
         obj.tm_to = obj.worker_day.tm_work_end
         obj.save()
+
+
+app.tasks.register(update_queue)
