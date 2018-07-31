@@ -176,15 +176,15 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULE = {
     'task-every-30-min-update-queue': {
-        'task': 'update_queue',
-        'schedule': 30 * 60,
+        'task': 'src.celery.tasks.update_queue',
+        'schedule': 30.0 * 60,
     },
     'task-free-all-workers-after-shop-closes': {
-        'task': 'release_all_workers',
+        'task': 'src.celery.tasks.release_all_workers',
         'schedule': crontab(hour=2, minute=0)
     },
     'test-task-every-30-secs': {
-        'task': 'src.tasks.test_task',
+        'task': 'src.celery.tasks.test_task',
         'schedule': 30.0
     }
 }

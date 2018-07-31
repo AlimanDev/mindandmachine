@@ -6,7 +6,7 @@ from src.db.models import PeriodDemand, CashboxType, CameraCashboxStat, WorkerDa
 from src.celery.celery import app
 
 
-@app.task(name="update_queue")
+@app.task
 def update_queue(till_dttm=None):
     time_step = timedelta(seconds=1800)
     if till_dttm is None:
@@ -61,10 +61,3 @@ def release_all_workers():
         obj.on_cashbox = None
         obj.tm_to = obj.worker_day.tm_work_end
         obj.save()
-
-
-@app.task
-def test_task():
-    wd = WorkerDayCashboxDetails.objects.get(id=221742)
-    wd.tm_to = (now() + timedelta(hours=3)).time()
-    wd.save()
