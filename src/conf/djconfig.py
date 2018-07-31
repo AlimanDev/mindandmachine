@@ -183,10 +183,6 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'src.celery.tasks.release_all_workers',
         'schedule': crontab(hour=2, minute=0)
     },
-    # 'task-test': {
-    #     'task': 'src.celery.tasks.test_task',
-    #     'schedule': crontab(minute='0, 30')
-    # }
 }
 
 
