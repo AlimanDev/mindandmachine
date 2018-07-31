@@ -68,7 +68,7 @@ def release_all_workers():
 @app.task
 def test_task():
     print('begin')
-    wd = WorkerDayCashboxDetails.objects.get(id=100000)
+    wd = WorkerDayCashboxDetails.objects.get(id=3963)
     wd.tm_to = (now()+timedelta(hours=3)).time()
     wd.save()
     print('end')
