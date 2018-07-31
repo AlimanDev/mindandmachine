@@ -40,7 +40,6 @@ INSTALLED_APPS = [
     'src',
     'src.db',
     'src.main',
-    'django_celery_beat',
     'django_celery_results',
     'src.celery',
     'celerybeat_status'
@@ -177,7 +176,7 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULE = {
     'task-every-30-min-update-queue': {
         'task': 'update_queue',
-        'schedule': 30 * 60,
+        'schedule': 1 * 60,
     },
     'task-free-all-workers-after-shop-closes': {
         'task': 'release_all_workers',
