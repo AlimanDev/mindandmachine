@@ -184,8 +184,8 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=2, minute=0)
     },
     'test-task-every-30-secs': {
-        'task': 'test_task',
-        'schedule': 30
+        'task': 'src.tasks.test_task',
+        'schedule': crontab(seconds=30)
     }
 }
 
