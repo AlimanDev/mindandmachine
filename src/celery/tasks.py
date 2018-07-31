@@ -65,4 +65,11 @@ def release_all_workers():
         obj.save()
 
 
+# @app.task
+# def test_task():
+#     wd = WorkerDayCashboxDetails.objects.get(id=3743)
+#     wd.tm = (now() + timedelta(hours=3)).time()
+#     wd.save()
+
+
 app.tasks.register(update_queue)

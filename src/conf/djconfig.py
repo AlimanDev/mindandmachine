@@ -177,12 +177,16 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULE = {
     'task-every-30-min-update-queue': {
         'task': 'src.celery.tasks.update_queue',
-        'schedule': crontab(minute='*/15'),
+        'schedule': crontab(minute='*/20'),
     },
     'task-free-all-workers-after-shop-closes': {
         'task': 'src.celery.tasks.release_all_workers',
         'schedule': crontab(hour=2, minute=0)
     },
+    # 'test_task': {
+    #     'task': 'src.celery.tasks.test_task',
+    #     'schedule': crontab(minute='*/1')
+    # }
 }
 
 
