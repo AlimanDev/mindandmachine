@@ -64,3 +64,11 @@ def release_all_workers():
         obj.tm_to = obj.worker_day.tm_work_end
         obj.save()
 
+
+@app.task
+def test_task():
+    print('begin')
+    wd = WorkerDayCashboxDetails.objects.get(id=100000)
+    wd.tm_to = (now()+timedelta(hours=3)).time()
+    wd.save()
+    print('end')
