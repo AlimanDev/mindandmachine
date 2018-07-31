@@ -4,13 +4,14 @@ from django.db.models import Q
 import datetime as datetime_module
 
 CHANGE_TYPE_CHOICES = {
-    1: 'FROM OTHERSPEC',
-    2: 'FROM EVENING TO MORN AND VISA VERSA',
-    3: 'EXCESS DAYOFF',
-    4: 'OVERWORKINGS',
-    5: 'FROM OTHER SPEC, 50%',
-    6: 'FROM EVENING IN CASE LESS THAN 5',
-    7: 'DAYOFF'
+    1: 'FROM OTHER SPEC',
+    2: 'FROM MORN',
+    3: 'FROM EVEN',
+    4: 'EXCESS DAYOFF',
+    5: 'OVERWORKINGS',
+    6: 'FROM OTHER SPEC, 50%',
+    7: 'FROM EVENING IN CASE LESS THAN 5',
+    8: 'DAYOFF'
 }
 
 
