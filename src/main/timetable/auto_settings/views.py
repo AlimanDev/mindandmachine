@@ -118,7 +118,8 @@ def create_timetable(request, form):
         'shop_type': shop.full_interface,
         'mean_queue_length': shop.mean_queue_length,
         'max_queue_length': shop.max_queue_length,
-        'dead_time_part': shop.dead_time_part
+        'dead_time_part': shop.dead_time_part,
+        'shop_count_lack': shop.count_lack,
     }
 
     cashboxes = [CashboxTypeConverter.convert(x, True) for x in CashboxType.objects.filter(shop_id=shop_id)]
@@ -219,6 +220,7 @@ def create_timetable(request, form):
         # 'slots': slots_periods_dict,
         'shop': shop_dict,
         'shop_type': shop.full_interface, # todo: remove when change in algo
+        'shop_count_lack': shop.count_lack, # todo: remove when change in algo
         'demand': [PeriodDemandConverter.convert(x) for x in periods],
         'cashiers': [
             {
@@ -404,4 +406,17 @@ def set_timetable(request, form):
 
             else:
                 wd_obj.save()
+
+    # update lack
+    line = CashboxType.objects.filter(is_main_type=True, shop=timetable.shop_id)
+    for str_dttm, lack in data['lack']:
+        dttm = BaseConverter.convert_datetime(str_dttm)
+        PeriodDemand.objects.update_or_create(
+            lack_of_cashiers=lack,
+            defaults={
+                'dttm_forecast': dttm,
+                'cashbox_type': line,
+                'type': PeriodDemand.Type.LONG_FORECAST.value,
+            })
+
     return JsonResponse.success()
