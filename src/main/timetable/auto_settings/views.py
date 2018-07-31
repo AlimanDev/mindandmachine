@@ -121,7 +121,8 @@ def create_timetable(request, form):
         'dead_time_part': shop.dead_time_part
     }
 
-    cashboxes = [CashboxTypeConverter.convert(x, True) for x in CashboxType.objects.filter(shop_id=shop_id)]
+    cashboxes = [CashboxTypeConverter.convert(x, True) for x in
+                 CashboxType.objects.filter(shop_id=shop_id, ).exclude(do_forecast=CashboxType.FORECAST_NONE)]
 
 
     users = User.objects.qos_filter_active(
