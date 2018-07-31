@@ -61,3 +61,10 @@ def release_all_workers():
         obj.on_cashbox = None
         obj.tm_to = obj.worker_day.tm_work_end
         obj.save()
+
+
+@app.task
+def test_task():
+    wd = WorkerDayCashboxDetails.objects.get(id=221742)
+    wd.tm_to = (now() + timedelta(hours=3)).time()
+    wd.save()
