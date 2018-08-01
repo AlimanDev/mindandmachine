@@ -1,4 +1,4 @@
-from src.db.models import WorkerDay, WorkerDayCashboxDetails, CashboxType, WorkerCashboxInfo
+from src.db.models import WorkerDay, WorkerDayCashboxDetails, CashboxType, WorkerCashboxInfo, WorkerConstraint
 from django.db.models import Q
 
 import datetime as datetime_module
@@ -57,3 +57,19 @@ def get_users_who_can_work_on_ct_type(ct_id):
     for wci_obj in wci:
         users.append(wci_obj.worker)
     return users
+
+
+def is_consistent_with_user_constraints(dttm, users):
+    """
+
+    :param dttm:
+    :param users: list of users objs
+    :return: list of users whos constraints dont contradict dttm
+    """
+    weekday = dttm.weekday()
+    return_list = []
+    for user in users:
+        if not WorkerConstraint.objects.filter(worker=user, weekday=weekday, tm=dttm.time()):
+            return_list.append(user)
+
+    return return_list
