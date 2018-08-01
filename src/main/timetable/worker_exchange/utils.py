@@ -163,11 +163,12 @@ def day_switch(shop_id, dttm_exchange, ct_type, predict_demand, mean_bills_per_s
     day_begin_dttm = datetime.combine(dttm_exchange.date(), time(6, 30))
     day_end_dttm = datetime.combine(dttm_exchange.date() + timedelta(days=1), time(2, 0))
     standard_tm_interval = 30  # minutes
-    amount_of_hours_to_count_transplant = 4  # hours
+    amount_of_hours_to_count_transplant = 5  # hours
 
     users_for_exchange = {}
-    transplant_interval_dict = {}  # { cashbox type : {[dttm1, dttm2] : [users]} }
-    interval_dict = {}  # {(dttm1, dttm2) : users}
+    to_collect = {}  # { cashbox type: [True/False, amount of intervals] }
+    # transplant_interval_dict = {}  # { cashbox type : {(dttm1, dttm2) : [users]} }
+    # interval_dict = {}  # {(dttm1, dttm2) : users}
     # to_consider = {}  # рассматривать ли вообще тип касс или нет
     # for hard_ct in hard_cts_in_shop:
     #     if hard_ct == ct_type:
@@ -176,18 +177,21 @@ def day_switch(shop_id, dttm_exchange, ct_type, predict_demand, mean_bills_per_s
     #         to_consider[hard_ct] = True
 
     dttm = day_begin_dttm
-    interval = (dttm, None)
-    interval_dict[interval] = []
+    # interval = (dttm, None)
+    # interval_dict[interval] = []
     while dttm <= day_end_dttm:
         predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types)
         users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, hard_cts_in_shop)  # dict {ct_id: users}
         # print(interval)
         for cashbox_type in predict_diff_dict.keys():
+            if cashbox_type not in to_collect.keys():
+                to_collect[cashbox_type] = [False, 0]
             # if cashbox_type not in transplant_interval_dict.keys():
             #     transplant_interval_dict[cashbox_type] = interval_dict
             number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
             # print('ct type : ', cashbox_type, '; dttm : ', dttm, '; interval : ', interval, '; transplant dict : ', transplant_interval_dict[cashbox_type], '; predict : ', int(predict_diff_dict[cashbox_type]) + 1, '; workers : ', number_of_workers)
             if int(predict_diff_dict[cashbox_type]) + 1 < number_of_workers != 1:
+                to_collect[cashbox_type] = [True, to_collect[cashbox_type][1] + 1]
                 # old_interval = interval
                 # new_interval = update_tuple_value(interval, 1, dttm)
                 # print(new_interval, old_interval)
@@ -200,10 +204,11 @@ def day_switch(shop_id, dttm_exchange, ct_type, predict_demand, mean_bills_per_s
                 # del interval_dict[interval]
                 for user in users_working_on_hard_cts_at_dttm[cashbox_type]:
                     if user in users_who_can_work_on_ct:
-                        if interval not in interval_dict.keys():
-                            interval_dict[interval] = [user]
-                        else:
-                            interval_dict[interval].append(user)
+                        pass
+                        # if interval not in interval_dict.keys():
+                        #     interval_dict[interval] = [user]
+                        # else:
+                        #     interval_dict[interval].append(user)
                         # if user not in users_for_exchange.keys():
                         #     users_for_exchange[user] = []
                         #     users_for_exchange[user].append(get_key_by_value(CHANGE_TYPE_CHOICES, 'FROM OTHER SPEC'))
@@ -213,8 +218,10 @@ def day_switch(shop_id, dttm_exchange, ct_type, predict_demand, mean_bills_per_s
                         #         users_for_exchange[user].append(cashbox_type)
 
             else:
-                if not interval[1] or int((interval[1] - interval[0]).seconds/3600) < amount_of_hours_to_count_transplant:
-                    interval = (dttm, None)
+                amount_of_intervals = to_collect[cashbox_type][1]
+                to_collect[cashbox_type] = [False, 0]
+                # if not interval[1] or int((interval[1] - interval[0]).seconds/3600) < amount_of_hours_to_count_transplant:
+                #     interval = (dttm, None)
                 # to_consider[cashbox_type] = False
         dttm += timedelta(minutes=standard_tm_interval)
 
