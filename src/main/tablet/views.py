@@ -258,7 +258,7 @@ def change_cashier_status(request, form):
         workerday_detail_obj.save()
 
     if new_user_status == WorkerDayCashboxDetails.TYPE_ABSENCE:
-        worker_day.type = WorkerDay.Type.TYPE_ABSENSE
+        worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
         worker_day.save()
     elif new_user_status == WorkerDayCashboxDetails.TYPE_FINISH:
         WorkerDayCashboxDetails.objects.filter(
