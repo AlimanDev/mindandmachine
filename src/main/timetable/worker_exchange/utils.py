@@ -123,7 +123,8 @@ def from_other_spec(arguments_dict):
     """
 
     :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': dict = {cashbox_type_id : cashbox_type obj} }
+                             'mean_bills_per_step': list, 'cashbox_types': dict = {cashbox_type_id : cashbox_type obj}
+                             'users_who_can_work: list of users who can work on ct_type }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id] }
     """
     #presets
@@ -173,11 +174,13 @@ def day_switch(arguments_dict):
     """
 
     :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': dict = {cashbox_type_id : cashbox_type obj} }
+                             'mean_bills_per_step': list, 'cashbox_types': dict = {cashbox_type_id : cashbox_type obj}
+                             'users_who_can_work: list of users who can work on ct_type }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id] }
     """
     #presets
     users_for_exchange = {}
+    dttm_exchange = arguments_dict['dttm_exchange']
 
     #tm settings
     standard_tm_interval = 30  # minutes
@@ -198,8 +201,8 @@ def day_switch(arguments_dict):
             while dttm <= dttm_end[i]:
                 users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, cashbox_type)  # dict {ct_id: users}
                 for user in users_working_on_hard_cts_at_dttm[cashbox_type]:
-                    if user in arguments_dict['users_who_can_work'] and is_consistent_with_user_constraints(arguments_dict['dttm_exchange'], user):
-                        users_for_exchange[user.id] = {'type': ChangeType.day_switch.value }
+                    if user in arguments_dict['users_who_can_work'] and is_consistent_with_user_constraints(dttm_exchange, user):
+                        users_for_exchange[user.id] = {'type': ChangeType.day_switch.value}
                 dttm += timedelta(minutes=standard_tm_interval)
 
     return users_for_exchange
@@ -211,7 +214,8 @@ def excess_dayoff(arguments_dict):
     которые могут работать в это время и при этом не будут работать 6 дней подряд
     Например: dttm_exchange=15 июня. Пользователь отдыхает 15, 16 и 17. Можно попросить его выйти 15, за место 17.
     :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': dict = {cashbox_type_id : cashbox_type obj} }
+                             'mean_bills_per_step': list, 'cashbox_types': dict = {cashbox_type_id : cashbox_type obj}
+                             'users_who_can_work: list of users who can work on ct_type }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
     #presets
@@ -271,7 +275,6 @@ def overworking(arguments_dict):
         worker_shop=shop_id,
         type=WorkerDay.Type.TYPE_WORKDAY.value
         )
-    print(users_not_working_wds)
 
     for user_wd in users_not_working_wds:
         dttm_exchange_minus = datetime.combine(dttm_exchange.date(), user_wd.tm_work_start) - timedelta(hours=3)
@@ -285,3 +288,29 @@ def overworking(arguments_dict):
                 users_for_exchange[worker.id].update({'type': ChangeType.overworking.value})
 
     return users_for_exchange
+
+def dayoff(arguments_dict):
+    """
+    у кого выходной
+    :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
+                             'mean_bills_per_step': list, 'cashbox_types': dict = {cashbox_type_id : cashbox_type obj},
+                             'users_who_can_work: list of users who can work on ct_type}
+    :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
+    """
+    #presets
+    dttm_exchange = arguments_dict['dttm_exchange']
+    shop_id = arguments_dict['shop_id']
+    users_for_exchange = {}
+
+    dayoff_users_wds = WorkerDay.objects.filter(dt=dttm_exchange.date(), type=WorkerDay.Type.TYPE_HOLIDAY.value,
+                                                worker_shop=shop_id)
+
+    for user_wd in dayoff_users_wds:
+        worker = user_wd.worker
+        if is_consistent_with_user_constraints(dttm_exchange, worker) and worker in arguments_dict['users_who_can_work']:
+            users_for_exchange[worker.id] = {}
+            users_for_exchange[worker.id].update({'type': ChangeType.dayoff.value})
+
+    return users_for_exchange
+
+
