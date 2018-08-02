@@ -1,5 +1,6 @@
 from src.db.models import (
     PeriodDemand,
+    User
 )
 from .forms import GetWorkersToExchange
 from .utils import *
@@ -7,6 +8,7 @@ from src.util.utils import api_method, JsonResponse
 from django.db.models import Max
 
 from src.util.collection import group_by
+from src.util.models_converter import UserConverter
 
 
 @api_method('GET', GetWorkersToExchange)
@@ -54,12 +56,13 @@ def get_workers_to_exchange(request, form):
                              'predict_demand': predict_demand, 'mean_bills_per_step': mean_bills_per_step,
                              'cashbox_types': cashbox_types_hard_dict, 'users_who_can_work': users_who_can_work_on_ct}
 
-    
+    # print(overworking(default_function_dict))
+    result_dict = overworking(default_function_dict)
+    # result_dict = from_other_spec(default_function_dict)
+    # result_dict.update(day_switch(default_function_dict))
+    # result_dict.update(excess_dayoff(default_function_dict))
 
-    # from_other_spec(default_function_dict)
-    # print(len(day_switch(default_function_dict)))
-    # excess_dayoff(default_function_dict)
-    # print(get_intervals_with_deficiency(default_function_dict))
-    # print(get_cashiers_working_at_time_on(datetime_module.datetime(2018,7,30,18,30), 16))
+    for k in result_dict.keys():
+        result_dict[k].update({'user_info': UserConverter.convert(User.objects.get(id=k))})
 
-    return JsonResponse.success()
+    return JsonResponse.success(result_dict)
