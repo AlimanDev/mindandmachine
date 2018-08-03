@@ -56,19 +56,16 @@ def get_workers_to_exchange(request, form):
                              'predict_demand': predict_demand, 'mean_bills_per_step': mean_bills_per_step,
                              'cashbox_types': cashbox_types_hard_dict, 'users_who_can_work': users_who_can_work_on_ct}
 
-    # result_dict = from_other_spec(default_function_dict)
-    # result_dict.update(day_switch(default_function_dict))
-    # result_dict.update(excess_dayoff(default_function_dict))
-    # result_dict.update(overworking(default_function_dict))
-    # result_dict.update(from_evening_line(default_function_dict))
-    # result_dict.update(dayoff(default_function_dict))
-
-    result_dict = dayoff(default_function_dict)
-    result_dict.update(from_evening_line(default_function_dict))
-    result_dict.update(overworking(default_function_dict))
-    result_dict.update(excess_dayoff(default_function_dict))
-    result_dict.update(day_switch(default_function_dict))
-    result_dict.update(from_other_spec(default_function_dict))
+    result_dict = {}
+    for f in ChangeTypeFunctions:
+        func_result_dict = f(default_function_dict)
+        for user_id in func_result_dict:
+            if user_id in result_dict.keys():
+                if func_result_dict[user_id]['type'] < result_dict[user_id]['type']:
+                    result_dict[user_id]['type'] = func_result_dict[user_id]['type']
+            else:
+                result_dict[user_id] = {}
+                result_dict[user_id].update(func_result_dict[user_id])
 
     for k in result_dict.keys():
         result_dict[k].update({'user_info': UserConverter.convert(User.objects.get(id=k))})

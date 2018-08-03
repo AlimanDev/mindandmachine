@@ -13,6 +13,8 @@ from enum import Enum
 
 
 class ChangeType(Enum):
+    #  не забудь добавить новую функция в ChangeTypeFunctions в конце файла
+    #  число -- приоритет: чем ниже -- тем важнее
     from_other_spec = 1
     day_switch = 2
     excess_dayoff = 3
@@ -367,3 +369,4 @@ def dayoff(arguments_dict):
     return users_for_exchange
 
 
+ChangeTypeFunctions = [from_other_spec, day_switch, excess_dayoff, overworking, from_evening_line, dayoff]
