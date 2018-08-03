@@ -77,7 +77,7 @@ def get_intervals_with_excess(arguments_dict):
     """
     returns intervals with excess of workers for each cashbox type
     :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : cashbox_type obj} }
+                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]} }
     :return: { cashbox type: [dttm_start, dttm_end, dttm_start2, dttm_end2, ..] }
     """
     to_collect = {}  # { cashbox type: [amount of intervals] }
@@ -100,7 +100,7 @@ def get_intervals_with_excess(arguments_dict):
             if cashbox_type not in dttm_to_collect.keys():
                 dttm_to_collect[cashbox_type] = [None]
             number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
-            if int(predict_diff_dict[cashbox_type]) + 1 < number_of_workers != 1:
+            if int(predict_diff_dict[cashbox_type]) + 1 < number_of_workers and number_of_workers > 1:
                 if to_collect[cashbox_type][-1] == 0:
                     dttm_to_collect[cashbox_type][-1] = dttm
                 to_collect[cashbox_type][-1] += 1
@@ -121,9 +121,9 @@ def get_intervals_with_excess(arguments_dict):
 
 def from_other_spec(arguments_dict):
     """
-
+    с другой специлизации + с другой специлизации если там частичные излишки(не менее чем excess_percent * 100%)
     :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': dict = {cashbox_type_id : cashbox_type obj}
+                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
                              'users_who_can_work: list of users who can work on ct_type }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id] }
     """
@@ -133,7 +133,9 @@ def from_other_spec(arguments_dict):
     mean_bills_per_step = arguments_dict['mean_bills_per_step']
     cashbox_types = arguments_dict['cashbox_types']
     list_of_cashbox_type = sorted(list(cashbox_types.keys()))
+    excess_percent = 0.5
     users_for_exchange = {}
+
 
     #tm settings
     tm_interval = 60  # minutes
@@ -157,10 +159,13 @@ def from_other_spec(arguments_dict):
         users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list_of_cashbox_type)  # dict {ct_id: users}
         for cashbox_type in predict_diff_dict.keys():
             number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
-            if int(predict_diff_dict[cashbox_type]) + 1 < number_of_workers != 1 and to_consider[cashbox_type]:
+            if int(predict_diff_dict[cashbox_type]) + 1 < number_of_workers and number_of_workers > 1 and to_consider[cashbox_type]:
                 for user in users_working_on_hard_cts_at_dttm[cashbox_type]:
                     if user in arguments_dict['users_who_can_work']:
-                        if user not in users_for_exchange.keys():
+                        if (number_of_workers - int(predict_diff_dict[cashbox_type])) / number_of_workers > excess_percent:
+                            users_for_exchange[user.id] = {}
+                            users_for_exchange[user.id].update({'type': ChangeType.from_other_spec_part.value})
+                        else:
                             users_for_exchange[user.id] = {}
                             users_for_exchange[user.id].update({'type': ChangeType.from_other_spec.value})
 
@@ -174,7 +179,7 @@ def day_switch(arguments_dict):
     """
 
     :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': dict = {cashbox_type_id : cashbox_type obj}
+                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]} ,
                              'users_who_can_work: list of users who can work on ct_type }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id] }
     """
@@ -214,7 +219,7 @@ def excess_dayoff(arguments_dict):
     которые могут работать в это время и при этом не будут работать 6 дней подряд
     Например: dttm_exchange=15 июня. Пользователь отдыхает 15, 16 и 17. Можно попросить его выйти 15, за место 17.
     :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': dict = {cashbox_type_id : cashbox_type obj}
+                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
                              'users_who_can_work: list of users who can work on ct_type }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
@@ -259,7 +264,7 @@ def overworking(arguments_dict):
     """
     подработки
     :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': dict = {cashbox_type_id : cashbox_type obj},
+                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
                              'users_who_can_work: list of users who can work on ct_type}
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
@@ -289,11 +294,59 @@ def overworking(arguments_dict):
 
     return users_for_exchange
 
+
+def from_evening_line(arguments_dict):
+    """
+    c вечера (если частичные излишки, или нехватка вечером менее 5 человек(для линии))
+    :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
+                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
+                             'users_who_can_work: list of users who can work on ct_type}
+    :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
+    """
+    # presets
+    dttm_exchange = arguments_dict['dttm_exchange']
+    excess_percent = 0.5
+    deficit_threshold = 5
+    demand_ind = 0
+    predict_demand = arguments_dict['predict_demand']
+    mean_bills_per_step = arguments_dict['mean_bills_per_step']
+    cashbox_types = arguments_dict['cashbox_types']
+    list_of_cashbox_type = sorted(list(cashbox_types.keys()))
+    users_for_exchange = {}
+
+    #tm settings
+    evening_period = [datetime.combine(dttm_exchange.date(), datetime_module.time(17, 0)),
+                      datetime.combine(dttm_exchange.date(), datetime_module.time(23, 0))]
+
+    dttm = evening_period[0]
+    while dttm <= evening_period[1]:
+        predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types)
+        users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list_of_cashbox_type)  # dict {ct_id: users}
+        for cashbox_type in predict_diff_dict.keys():
+            number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
+            if cashbox_types[cashbox_type][0].is_main_type:
+                if 0 < int(predict_diff_dict[cashbox_type]) - number_of_workers < deficit_threshold:
+                    for user in users_working_on_hard_cts_at_dttm[cashbox_type]:
+                        if user in arguments_dict['users_who_can_work']:
+                            users_for_exchange[user.id] = {}
+                            users_for_exchange[user.id].update({'type': ChangeType.from_evening_line.value})
+            else:
+                if number_of_workers > 1 and (number_of_workers - int(predict_diff_dict[cashbox_type])) / number_of_workers > excess_percent:
+                    for user in users_working_on_hard_cts_at_dttm[cashbox_type]:
+                        if user in arguments_dict['users_who_can_work']:
+                            users_for_exchange[user.id] = {}
+                            users_for_exchange[user.id].update({'type': ChangeType.from_evening_line.value})
+
+        dttm += timedelta(minutes=30)
+
+    return users_for_exchange
+
+
 def dayoff(arguments_dict):
     """
     у кого выходной
     :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': dict = {cashbox_type_id : cashbox_type obj},
+                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
                              'users_who_can_work: list of users who can work on ct_type}
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
