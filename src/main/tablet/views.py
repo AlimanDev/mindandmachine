@@ -1,5 +1,6 @@
 import datetime as datetime_module
 from datetime import timedelta, datetime
+from django.db.models import Q
 import json
 
 from src.db.models import (
@@ -241,6 +242,15 @@ def change_cashier_status(request, form):
     ).order_by('id').last()
 
     worker_day = WorkerDay.objects.get(worker__id=worker_id, dt=dt)
+
+    cashbox_worked = WorkerDayCashboxDetails.objects.filter(
+        Q(tm_to__isnull=True) | Q(tm_to__gt=dttm_now.time()),
+        worker_day__dt=dt,
+        is_tablet=True,
+        tm_from__lte=dttm_now.time(),
+    ).count()
+    if cashbox_worked:
+        return JsonResponse.value_error('cashbox {} already opened'.format(cashbox_id))
 
     # todo: add other checks for change statuses
     if (new_user_status == WorkerDayCashboxDetails.TYPE_FINISH) and (worker_day.type == WorkerDay.Type.TYPE_ABSENSE):
