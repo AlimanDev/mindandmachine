@@ -1,6 +1,11 @@
-from src.db.models import (WorkerDay, WorkerDayCashboxDetails,
-                           CashboxType, WorkerCashboxInfo,
-                           WorkerConstraint, User)
+from src.db.models import (
+    WorkerDay,
+    WorkerDayCashboxDetails,
+    CashboxType,
+    WorkerCashboxInfo,
+    WorkerConstraint,
+    User
+)
 
 from django.db.models import Q
 
@@ -457,17 +462,21 @@ def dayoff(arguments_dict):
     shop_id = arguments_dict['shop_id']
     users_for_exchange = {}
 
-    dayoff_users_wds = WorkerDay.objects.filter(dt=dttm_exchange.date(), type=WorkerDay.Type.TYPE_HOLIDAY.value,
-                                                worker_shop=shop_id)
+    dayoff_users_wds = WorkerDay.objects.filter(
+        dt=dttm_exchange.date(),
+        type=WorkerDay.Type.TYPE_HOLIDAY.value,
+        worker_shop=shop_id
+    )
 
     for user_wd in dayoff_users_wds:
         worker = user_wd.worker
         user_new_tm_work_start, user_new_tm_work_end = shift_user_times(dttm_exchange, worker)
         if user_new_tm_work_start and user_new_tm_work_end and worker in arguments_dict['users_who_can_work']:
-            users_for_exchange[worker.id] = {'type': ChangeType.dayoff.value,
-                                             'tm_work_start': BaseConverter.convert_time(user_new_tm_work_start),
-                                             'tm_work_end': BaseConverter.convert_time(user_new_tm_work_end)
-                   }
+            users_for_exchange[worker.id] = {
+                'type': ChangeType.dayoff.value,
+                'tm_work_start': BaseConverter.convert_time(user_new_tm_work_start),
+                'tm_work_end': BaseConverter.convert_time(user_new_tm_work_end)
+            }
 
     return users_for_exchange
 

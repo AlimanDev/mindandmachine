@@ -1,9 +1,15 @@
 from src.db.models import (
     PeriodDemand,
+    WorkerCashboxInfo,
+    CashboxType,
     User
 )
+from datetime import datetime, time, timedelta
 from .forms import GetWorkersToExchange
-from .utils import *
+from .utils import (
+    get_users_who_can_work_on_ct_type,
+    ChangeTypeFunctions,
+)
 from src.util.utils import api_method, JsonResponse
 from django.db.models import Max
 
@@ -22,16 +28,14 @@ def get_workers_to_exchange(request, form):
 
     cashbox_types_hard_dict = group_by(
         CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD).order_by('id'),
-        group_key=lambda x: x.id)
+        group_key=lambda x: x.id
+    )
 
     period_demand = PeriodDemand.objects.filter(
         cashbox_type__shop_id=shop_id,
         dttm_forecast__gte=day_begin_dttm,
         dttm_forecast__lte=day_end_dttm,
-        type__in=[
-            PeriodDemand.Type.LONG_FORECAST.value,
-            PeriodDemand.Type.FACT.value,
-        ],
+        type=PeriodDemand.Type.LONG_FORECAST.value,
         cashbox_type_id__in=list(cashbox_types_hard_dict.keys())
     ).order_by(
         'type',
@@ -45,16 +49,19 @@ def get_workers_to_exchange(request, form):
     ).values('cashbox_type_id').annotate(speed_usual=Max('mean_speed'))
     mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
 
-    edge_ind = 0
-    while (edge_ind < len(period_demand)) and (period_demand[edge_ind].type != PeriodDemand.Type.FACT.value):
-        edge_ind += 1
-    predict_demand = period_demand[:edge_ind]
+    predict_demand = period_demand
 
     users_who_can_work_on_ct = get_users_who_can_work_on_ct_type(ct_type)
 
-    default_function_dict = {'shop_id': shop_id, 'dttm_exchange': dttm_exchange, 'ct_type': ct_type,
-                             'predict_demand': predict_demand, 'mean_bills_per_step': mean_bills_per_step,
-                             'cashbox_types': cashbox_types_hard_dict, 'users_who_can_work': users_who_can_work_on_ct}
+    default_function_dict = {
+        'shop_id': shop_id,
+        'dttm_exchange': dttm_exchange,
+        'ct_type': ct_type,
+        'predict_demand': predict_demand,
+        'mean_bills_per_step': mean_bills_per_step,
+        'cashbox_types': cashbox_types_hard_dict,
+        'users_who_can_work': users_who_can_work_on_ct
+    }
 
     result_dict = {}
     for f in ChangeTypeFunctions:
