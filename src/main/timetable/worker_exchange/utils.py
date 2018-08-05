@@ -227,15 +227,15 @@ def from_other_spec(arguments_dict):
                             users_for_exchange[user.id] = {}
                             users_for_exchange[user.id].update({
                                 'type': ChangeType.from_other_spec_part.value,
-                                'tm_work_start': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start),
-                                'tm_work_end': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end)
+                                'tm_start': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start),
+                                'tm_end': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end)
                             })
                         else:
                             users_for_exchange[user.id] = {}
                             users_for_exchange[user.id].update({
                                 'type': ChangeType.from_other_spec.value,
-                                'tm_work_start': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start),
-                                'tm_work_end': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end)
+                                'tm_start': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start),
+                                'tm_end': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end)
                             })
 
             else:
@@ -278,8 +278,8 @@ def day_switch(arguments_dict):
                             users_for_exchange[user.id] = {}
                             users_for_exchange[user.id].update({
                                 'type': ChangeType.day_switch.value,
-                                'tm_work_start': BaseConverter.convert_time(user_new_tm_work_start),
-                                'tm_work_end': BaseConverter.convert_time(user_new_tm_work_end)
+                                'tm_start': BaseConverter.convert_time(user_new_tm_work_start),
+                                'tm_end': BaseConverter.convert_time(user_new_tm_work_end)
                             })
                 dttm += timedelta(minutes=standard_tm_interval)
 
@@ -307,8 +307,8 @@ def excess_dayoff(arguments_dict):
         dttm_to_start_check += timedelta(days=1)
 
     update_dict = {'type': ChangeType.excess_dayoff.value,
-                   'tm_work_start': BaseConverter.convert_time((dttm_exchange - timedelta(hours=4)).time()),
-                   'tm_work_end': BaseConverter.convert_time((dttm_exchange + timedelta(hours=4)).time())
+                   'tm_start': BaseConverter.convert_time((dttm_exchange - timedelta(hours=4)).time()),
+                   'tm_end': BaseConverter.convert_time((dttm_exchange + timedelta(hours=4)).time())
                    }
 
     users_with_holiday_on_dttm_exchange = WorkerDay.objects.filter(dt=dttm_exchange.date(), type=WorkerDay.Type.TYPE_HOLIDAY.value, worker_shop=arguments_dict['shop_id'])
@@ -374,8 +374,8 @@ def overworking(arguments_dict):
                 users_for_exchange[worker.id] = {}
                 users_for_exchange[worker.id].update({
                     'type': ChangeType.overworking.value,
-                    'tm_work_start': BaseConverter.convert_time(dttm_exchange_minus.time()),
-                    'tm_work_end': BaseConverter.convert_time(user_wd.tm_work_end)
+                    'tm_start': BaseConverter.convert_time(dttm_exchange_minus.time()),
+                    'tm_end': BaseConverter.convert_time(user_wd.tm_work_end)
                 })
         elif dttm_exchange_plus >= dttm_exchange >= user_wd_dttm_word_start and is_consistent_with_user_constraints(worker, dttm_exchange, dttm_exchange_plus):
             if worker in arguments_dict['users_who_can_work'] and worker.is_ready_for_overworkings and\
@@ -383,8 +383,8 @@ def overworking(arguments_dict):
                 users_for_exchange[worker.id] = {}
                 users_for_exchange[worker.id].update({
                     'type': ChangeType.overworking.value,
-                    'tm_work_start': BaseConverter.convert_time(user_wd.tm_work_start),
-                    'tm_work_end': BaseConverter.convert_time(dttm_exchange_plus.time())
+                    'tm_start': BaseConverter.convert_time(user_wd.tm_work_start),
+                    'tm_end': BaseConverter.convert_time(dttm_exchange_plus.time())
                 })
 
     return users_for_exchange
@@ -428,8 +428,8 @@ def from_evening_line(arguments_dict):
                                 users_for_exchange[user.id] = {}
                                 users_for_exchange[user.id].update({
                                     'type': ChangeType.from_evening_line.value,
-                                    'tm_work_start': BaseConverter.convert_time(user_new_tm_work_start),
-                                    'tm_work_end': BaseConverter.convert_time(user_new_tm_work_end)
+                                    'tm_start': BaseConverter.convert_time(user_new_tm_work_start),
+                                    'tm_end': BaseConverter.convert_time(user_new_tm_work_end)
                                 })
             else:
                 if number_of_workers > 1 and (number_of_workers - int(predict_diff_dict[cashbox_type])) / number_of_workers > excess_percent:
@@ -440,8 +440,8 @@ def from_evening_line(arguments_dict):
                                 users_for_exchange[user.id] = {}
                                 users_for_exchange[user.id].update({
                                     'type': ChangeType.from_evening_line.value,
-                                    'tm_work_start': BaseConverter.convert_time(user_new_tm_work_start),
-                                    'tm_work_end': BaseConverter.convert_time(user_new_tm_work_end)
+                                    'tm_start': BaseConverter.convert_time(user_new_tm_work_start),
+                                    'tm_end': BaseConverter.convert_time(user_new_tm_work_end)
                                 })
 
         dttm += timedelta(minutes=30)
@@ -474,8 +474,8 @@ def dayoff(arguments_dict):
         if user_new_tm_work_start and user_new_tm_work_end and worker in arguments_dict['users_who_can_work']:
             users_for_exchange[worker.id] = {
                 'type': ChangeType.dayoff.value,
-                'tm_work_start': BaseConverter.convert_time(user_new_tm_work_start),
-                'tm_work_end': BaseConverter.convert_time(user_new_tm_work_end)
+                'tm_start': BaseConverter.convert_time(user_new_tm_work_start),
+                'tm_end': BaseConverter.convert_time(user_new_tm_work_end)
             }
 
     return users_for_exchange
@@ -504,8 +504,8 @@ def sos_group(arguments_dict):
                 users_for_exchange[user.id] = {}
                 users_for_exchange[user.id].update({
                     'type': ChangeType.sos_group.value,
-                    'tm_work_start': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start),
-                    'tm_work_end': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end)
+                    'tm_start': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start),
+                    'tm_end': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end)
                 })
 
     return users_for_exchange
