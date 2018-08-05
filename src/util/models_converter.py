@@ -256,7 +256,8 @@ class PeriodDemandConverter(BaseConverter):
             'type': cls.convert_forecast_type(obj.type),
             'cashbox_type': obj.cashbox_type_id,
             'queue_wait_time': obj.queue_wait_time,
-            'queue_wait_length': obj.queue_wait_length
+            'queue_wait_length': obj.queue_wait_length,
+            'lack': obj.lack_of_cashiers,
         }
 
 

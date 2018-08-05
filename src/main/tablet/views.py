@@ -1,13 +1,13 @@
 import datetime as datetime_module
 from datetime import timedelta, datetime
+from django.db.models import Q
 import json
 
 from src.db.models import (
     CameraCashboxStat,
     Cashbox,
     WorkerDayCashboxDetails,
-    User,
-    PeriodDemand,
+    WorkerCashboxInfo,
     WorkerDay,
     CashboxType,
     Shop
@@ -19,7 +19,8 @@ from src.util.utils import api_method, JsonResponse
 from .utils import time_diff, is_midnight_period, get_status_and_details
 from .forms import GetCashboxesInfo, GetCashiersInfo, ChangeCashierStatus
 from django.utils.timezone import now
-
+from src.util.models_converter import WorkerCashboxInfoConverter
+from src.util.collection import group_by
 
 @api_method('GET', GetCashboxesInfo)
 def get_cashboxes_info(request, form):
@@ -130,7 +131,7 @@ def get_cashiers_info(request, form):
         for triplet in list_of_break_triplets:
             if float(triplet[0]) < duration_of_work <= float(triplet[1]):
                 for time_triplet in triplet[2]:
-                    triplets.append([time_triplet, 0])
+                    triplets.append([0, 0])
                     default_break_triplets.append(time_triplet)
 
         if item.worker_day.tm_work_start > dttm.time() and item.worker_day.dt == dttm.date() and not item.is_tablet:
@@ -138,6 +139,7 @@ def get_cashiers_info(request, form):
         else:
             if item.is_tablet is True:
                 if item.status == WorkerDayCashboxDetails.TYPE_BREAK:
+                    time_without_rest[item.worker_day.worker_id] = 0
                     break_end = item.tm_to
 
                     if item.tm_to is None:
@@ -149,23 +151,26 @@ def get_cashiers_info(request, form):
                     for triplet in list_of_break_triplets:
                         if int(triplet[0]) < duration_of_work <= int(triplet[1]):
                             if response.get(item.worker_day.worker_id):
-                                triplets = response[item.worker_day.worker_id][0]['break_triplets']
+                                triplets = response[item.worker_day.worker_id]['break_triplets']
                                 for it in triplets:
                                     if it[1] == 0:
                                         if real_break_time >= 0:
-                                            it[1] = round(float(real_break_time) / 60)
-                                        it[0] = 1
+                                            it[0] = round(float(real_break_time) / 60)
+                                        it[1] = 1
                                         break
                                 else:
-                                    triplets.append([1, round(float(real_break_time)/60)])
+                                    triplets.append([round(float(real_break_time)/60), 1])
                                     default_break_triplets.append(15)
                             break
 
-                if item.status == WorkerDayCashboxDetails.TYPE_WORK:
+                elif item.status == WorkerDayCashboxDetails.TYPE_WORK:
                     tm_to = item.tm_to
                     if item.tm_to is None:
                         tm_to = dttm.time()
                     time_without_rest[item.worker_day.worker_id] += round(time_diff(item.tm_from, tm_to) / 60)
+
+                if not item.tm_to is None:
+                    item.status = WorkerDayCashboxDetails.TYPE_FINISH
             else:
                 item.status = WorkerDayCashboxDetails.TYPE_T
 
@@ -193,12 +198,16 @@ def get_cashiers_info(request, form):
                 "cashbox_dttm_deleted": cashbox_dttm_deleted,
                 "cashbox_type": cashbox_type,
                 "cashbox_number": cashbox_number,
-            },
+            }
 
         else:
             tm_work_end = item.tm_to if item.status == WorkerDayCashboxDetails.TYPE_FINISH else item.worker_day.tm_work_end
+            if not item.on_cashbox_id is None:
+                cashbox_type = item.cashbox_type_id
+            else:
+                cashbox_type = response[item.worker_day.worker_id]["cashbox_type"]
 
-            response[item.worker_day.worker_id][0].update({
+            response[item.worker_day.worker_id].update({
                 "status": item.status,
                 "cashbox_id": item.on_cashbox_id,
                 "cashbox_dttm_added": cashbox_dttm_added,
@@ -206,7 +215,14 @@ def get_cashiers_info(request, form):
                 "time_without_rest": time_without_rest[item.worker_day.worker_id],
                 "default_break_triplets": str(default_break_triplets),
                 "tm_work_end": str(tm_work_end),
+                "cashbox_type": cashbox_type,
             })
+
+    user_ids = response.keys()
+    worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('cashbox_type').filter(worker_id__in=user_ids, is_active=True)
+    worker_cashboxes_types = group_by(list(worker_cashboxes_types), group_key=lambda _: _.worker_id,)
+    for user_id in response.keys():
+        response[user_id]['cashbox_types'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashboxes_types[user_id]]
     return JsonResponse.success(response)
 
 
@@ -242,6 +258,16 @@ def change_cashier_status(request, form):
 
     worker_day = WorkerDay.objects.get(worker__id=worker_id, dt=dt)
 
+    cashbox_worked = WorkerDayCashboxDetails.objects.filter(
+        Q(tm_to__isnull=True) | Q(tm_to__gt=dttm_now.time()),
+        worker_day__dt=dt,
+        is_tablet=True,
+        tm_from__lte=dttm_now.time(),
+        on_cashbox_id=cashbox_id,
+    ).count()
+    if cashbox_worked:
+        return JsonResponse.value_error('cashbox {} already opened'.format(cashbox_id))
+
     # todo: add other checks for change statuses
     if (new_user_status == WorkerDayCashboxDetails.TYPE_FINISH) and (worker_day.type == WorkerDay.Type.TYPE_ABSENSE):
         return JsonResponse.value_error('can not change the status to {}'.format(new_user_status))
@@ -258,7 +284,7 @@ def change_cashier_status(request, form):
         workerday_detail_obj.save()
 
     if new_user_status == WorkerDayCashboxDetails.TYPE_ABSENCE:
-        worker_day.type = WorkerDay.Type.TYPE_ABSENSE
+        worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
         worker_day.save()
     elif new_user_status == WorkerDayCashboxDetails.TYPE_FINISH:
         WorkerDayCashboxDetails.objects.filter(

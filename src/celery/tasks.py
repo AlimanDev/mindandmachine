@@ -6,7 +6,7 @@ from src.db.models import PeriodDemand, CashboxType, CameraCashboxStat, WorkerDa
 from src.celery.celery import app
 
 
-@app.task(name="update_queue")
+@app.task
 def update_queue(till_dttm=None):
     time_step = timedelta(seconds=1800)
     if till_dttm is None:
@@ -25,7 +25,7 @@ def update_queue(till_dttm=None):
             ).values('camera_cashbox_id').annotate(mean_queue=Avg('queue')).filter(mean_queue__gte=0.6)
 
             if len(mean_queue):
-                mean_queue = sum([el['mean_queue'] for el in mean_queue])
+                mean_queue = sum([el['mean_queue'] for el in mean_queue]) / len(mean_queue) * 1.4
 
                 changed_amount = PeriodDemand.objects.filter(
                     dttm_forecast=cashbox_type.dttm_last_update_queue,

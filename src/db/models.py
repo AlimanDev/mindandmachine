@@ -84,6 +84,7 @@ class Shop(models.Model):
     forecast_step_minutes = models.TimeField(default=datetime.time(minute=15))
     # man_presence = models.FloatField(default=0)
 
+    count_lack = models.BooleanField(default=False)
 
     # json fields
     method_params  = models.CharField(max_length=4096, default='[]')
