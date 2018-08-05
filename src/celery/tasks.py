@@ -6,7 +6,7 @@ from src.db.models import PeriodDemand, CashboxType, CameraCashboxStat, WorkerDa
 from src.celery.celery import app
 
 
-@app.task(name="update_queue")
+@app.task
 def update_queue(till_dttm=None):
     time_step = timedelta(seconds=1800)
     if till_dttm is None:
