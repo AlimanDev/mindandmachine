@@ -508,6 +508,18 @@ def set_cashier_info(request, form):
         worker.is_fixed_days = form['is_fixed_days']
         response['is_fixed_days'] = worker.is_fixed_days
 
+    if form.get('phone_number') is not None:
+        worker.phone_number = form['phone_number']
+        response['phone_number'] = worker.phone_number
+
+    if form.get('is_ready_for_overworkings') is not None:
+        worker.is_ready_for_overworkings = form['is_ready_for_overworkings']
+        response['is_ready_for_overworkings'] = worker.is_ready_for_overworkings
+
+    if form.get('tabel_code') is not None:
+        worker.tabel_code = form['tabel_code']
+        response['tabel_code'] = worker.tabel_code
+
     if form.get('position_title') is not None\
         and form.get('position_department') is not None:
         department = Shop.objects.get(id=form['position_department'])

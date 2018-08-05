@@ -199,6 +199,8 @@ class User(DjangoAbstractUser):
     auto_timetable = models.BooleanField(default=True)
 
     tabel_code = models.CharField(max_length=15, null=True, blank=True)
+    phone_number = models.CharField(max_length=32, null=True, blank=True)
+    is_ready_for_overworkings = models.BooleanField(default=False)
 
     objects = WorkerManager()
 

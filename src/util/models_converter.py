@@ -66,6 +66,10 @@ class UserConverter(BaseConverter):
             'sex': obj.sex,
             'is_fixed_hours': obj.is_fixed_hours,
             'is_fixed_days': obj.is_fixed_days,
+            'phone_number': obj.phone_number,
+            'is_ready_for_overworkings': obj.is_ready_for_overworkings,
+            'tabel_code': obj.tabel_code,
+
         }
 
 
