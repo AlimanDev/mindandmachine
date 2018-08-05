@@ -131,7 +131,7 @@ def get_cashiers_info(request, form):
         for triplet in list_of_break_triplets:
             if float(triplet[0]) < duration_of_work <= float(triplet[1]):
                 for time_triplet in triplet[2]:
-                    triplets.append([time_triplet, 0])
+                    triplets.append([0, 0])
                     default_break_triplets.append(time_triplet)
 
         if item.worker_day.tm_work_start > dttm.time() and item.worker_day.dt == dttm.date() and not item.is_tablet:
