@@ -151,6 +151,9 @@ class SetCashierInfoForm(forms.Form):
     sex = forms.CharField(required=False)
     is_fixed_hours = forms.BooleanField(required=False)
     is_fixed_days = forms.BooleanField(required=False)
+    phone_number = forms.CharField(required=False),
+    is_ready_for_overworkings = forms.BooleanField(required=False)
+    tabel_code = forms.CharField(required=False)
     position_department = forms.IntegerField(required=False)
     position_title = forms.CharField(max_length=64, required=False)
 
