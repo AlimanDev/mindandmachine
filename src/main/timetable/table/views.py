@@ -202,7 +202,7 @@ def get_table(request):
             is_working_or_main_type = True if workerday_cashbox_details_object is None \
                                            or not workerday_cashbox_details_object.cashbox_type.is_main_type\
                                            else False
-            bg_color_format = {'bg_color': 'gray'} if is_working_or_main_type else None
+            bg_color_format = {'bg_color': '#D9D9D9'} if is_working_or_main_type else None
             to_align_right = align_right if is_working_or_main_type else None
             if workerday.tm_work_start is None\
                 or workerday.tm_work_end is None\
@@ -337,7 +337,7 @@ def get_table(request):
 
     def write_overtime(workbook, worksheet, last_row):
         size_format = {'font_size': font_size}
-        bg_color_format = {'bg_color': 'gray'}
+        bg_color_format = {'bg_color': '#D9D9D9'}
         border = {'border': boarder_size}
         row = last_row + 4
         worksheet.write(row, 0, 'Подработка, выход в выходной', mix_formats(workbook, size_format, bg_color_format))
