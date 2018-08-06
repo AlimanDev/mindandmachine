@@ -88,16 +88,6 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
-            name='Notifications',
-            fields=[
-                ('id', models.BigAutoField(primary_key=True, serialize=False)),
-                ('dttm_added', models.DateTimeField(auto_now_add=True)),
-                ('was_read', models.BooleanField(default=False)),
-                ('text', models.CharField(max_length=512)),
-                ('type', src.db.utils.EnumField(to_enum=src.db.models.Notifications.Type)),
-            ],
-        ),
-        migrations.CreateModel(
             name='OfficialHolidays',
             fields=[
                 ('id', models.BigAutoField(primary_key=True, serialize=False)),
@@ -261,26 +251,6 @@ class Migration(migrations.Migration):
             model_name='shop',
             name='super_shop',
             field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='db.SuperShop'),
-        ),
-        migrations.AddField(
-            model_name='notifications',
-            name='period_demand_log',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='db.PeriodDemandChangeLog'),
-        ),
-        migrations.AddField(
-            model_name='notifications',
-            name='to_worker',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
-        ),
-        migrations.AddField(
-            model_name='notifications',
-            name='worker_day_change_log',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='db.WorkerDayChangeLog'),
-        ),
-        migrations.AddField(
-            model_name='notifications',
-            name='worker_day_change_request',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='db.WorkerDayChangeRequest'),
         ),
         migrations.AddField(
             model_name='leveltype',

@@ -563,30 +563,37 @@ class WorkerDayChangeLog(models.Model):
 
 
 class NotificationsQuerySet(models.query.QuerySet):
-    def active(self):
+    def qos_active(self, recipient):
         """
         :return: not expired notificiations (notifications is not expited if it appeared less than 7 days ago
         """
         return self.filter(
             dttm_added__gt=datetime.datetime.now() -
-            datetime.timedelta(days=7)
+            datetime.timedelta(days=7),
+            to_worker=recipient
         )
 
-    def unread(self):
+    def qos_unread(self, recipient):
         """
 
         :return: unread and not expired notifications
         """
 
-        return self.active().filter(was_read=False)
+        return self.qos_active(recipient).filter(was_read=False)
 
 
 class Notifications(models.Model):
-    class Type(utils.Enum):
-        success = 1
-        info = 2
-        warning = 3
-        error = 4
+    TYPE_SUCCESS = 'S'
+    TYPE_INFO = 'I'
+    TYPE_WARNING = 'W'
+    TYPE_ERROR = 'E'
+
+    TYPES = (
+        (TYPE_SUCCESS, 'success'),
+        (TYPE_INFO, 'info'),
+        (TYPE_WARNING, 'warning'),
+        (TYPE_ERROR, 'error')
+    )
 
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(self.to_worker.last_name, self.to_worker.shop.title, self.to_worker.shop.super_shop.title, self.dttm_added, self.id)
@@ -601,14 +608,14 @@ class Notifications(models.Model):
     was_read = models.BooleanField(default=False)
 
     text = models.CharField(max_length=512)
-    type = utils.EnumField(Type)
+    type = models.CharField(max_length=1, choices=TYPES, default=TYPE_SUCCESS)
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, blank=True, null=True)
     object_id = models.PositiveIntegerField(blank=True, null=True)
     object = GenericForeignKey(ct_field='content_type', fk_field='object_id')
 
-    def timesince(self, now=datetime.datetime.now()):
-        return int((now - self.dttm_added).total_seconds()/60)
+    def timesince(self, dttm_now=datetime.datetime.now()):
+        return int((dttm_now - self.dttm_added).total_seconds()/60)
 
     objects = NotificationsQuerySet.as_manager()
 

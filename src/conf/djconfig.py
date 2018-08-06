@@ -184,9 +184,9 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'src.celery.tasks.release_all_workers',
         'schedule': crontab(hour=2, minute=0)
     },
-    'task-delete-old-notifications': {
-        'task': 'src.celery.tasks.delete_old_notifications',
-        'schedule': crontab(hour=2, minute=0)
+    'task-notify-cashiers-lack': {
+        'task': 'src.celery.tasks.notify_cashiers_lack',
+        'schedule': crontab(hour='*/1')
     }
 }
 

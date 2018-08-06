@@ -8,10 +8,5 @@ class GetWorkersToExchange(forms.Form):
     shop_id = forms.IntegerField(required=False)
 
 
-class GetWorkersLack(forms.Form):
-    dttm = util_forms.DatetimeField(required=False)
-    shop_id = forms.IntegerField(required=False)
-
-
 
 
