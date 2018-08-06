@@ -11,7 +11,7 @@ from src.db.models import (
     WorkerCashboxInfo,
     WorkerDayCashboxDetails,
     PeriodDemand,
-    SuperShop,
+    WorkerDayChangeLog,
 )
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
 from src.util.collection import range_u, group_by
@@ -86,6 +86,7 @@ def get_cashiers_timetable(request, form):
         'worker_day__dt__gte': form['from_dt'],
         'worker_day__dt__lte': form['to_dt'],
         'cashbox_type_id__in': cashbox_types.keys(),
+        'tm_to__isnull': False,
     }
     if form['position_id']:
         worker_day_cashbox_detail_filter['worker_day__worker__position__id'] = form['position_id']
@@ -149,8 +150,8 @@ def get_cashiers_timetable(request, form):
     # periods = int(timediff(supershop.tm_start, supershop.tm_end) * 2 + 0.99999) + 5 # period 30 minutes
 
     time_borders = [
-        [time(6, 30), time(10, 30), 'morning'],
-        [time(18, 30), time(22, 30), 'evening'],
+        [time(6, 30), time(12, 00), 'morning'],
+        [time(18, 00), time(22, 30), 'evening'],
     ]
 
     ind_b = 0
@@ -174,7 +175,7 @@ def get_cashiers_timetable(request, form):
     for day_ind in range((form['to_dt'] - form['from_dt']).days):
         each_day_morning = []
         each_day_evening = []
-        cashiers_working_today = wdcds.filter(worker_day__dt=form['from_dt'] + timedelta(days=day_ind))
+        # cashiers_working_today = wdcds.filter(worker_day__dt=form['from_dt'] + timedelta(days=day_ind))
         for time_ind in range(periods):
             dttm = dttm_start + timedelta(days=day_ind) + time_ind * PERIOD_STEP
 
@@ -183,18 +184,18 @@ def get_cashiers_timetable(request, form):
 
             cashiers_on_cashbox_type = defaultdict(int)
 
-            cashier_working_now = []
-            for cashier in cashiers_working_today:
-                if cashier.worker_day.tm_work_end > cashier.worker_day.tm_work_start:
-                    if cashier.worker_day.tm_work_start <= dttm.time() and cashier.worker_day.tm_work_end >= dttm_end.time():
-                        cashier_working_now.append(cashier)
-                else:
-                    if cashier.worker_day.tm_work_start <= dttm.time():
-                        cashier_working_now.append(cashier)
+            # cashier_working_now = []
+            # for cashier in cashiers_working_today:
+            #     if cashier.worker_day.tm_work_end > cashier.worker_day.tm_work_start:
+            #         if cashier.worker_day.tm_work_start <= dttm.time() and cashier.worker_day.tm_work_end >= dttm_end.time():
+            #             cashier_working_now.append(cashier)
+            #     else:
+            #         if cashier.worker_day.tm_work_start <= dttm.time():
+            #             cashier_working_now.append(cashier)
             # todo: неправильно учитывается время от 23:30
-            for cashier in cashier_working_now:
-                if cashier.cashbox_type is not None:
-                    cashiers_on_cashbox_type[cashier.cashbox_type.id] += 1  # shift to first model, which has intersection
+            # for cashier in cashier_working_now:
+            #     if cashier.cashbox_type is not None:
+            #         cashiers_on_cashbox_type[cashier.cashbox_type.id] += 1  # shift to first model, which has intersection
             while (ind_b < wdcds_len) and (dttm_ind <= dttm) and wdcds[ind_b].tm_to:
                 dttm_ind = dttm_combine(wdcds[ind_b].worker_day.dt, wdcds[ind_b].tm_to)
                 ind_b += 1
@@ -257,16 +258,24 @@ def get_cashiers_timetable(request, form):
             for cashbox_type in cashbox_types:
                 check_time = check_time_is_between_boarders(dttm.time(), time_borders)
                 if check_time == 'morning' or check_time == 'evening':
-                    if cashbox_type in predict_diff_dict.keys() \
-                            and cashbox_type in cashiers_on_cashbox_type.keys()\
-                            and predict_diff_dict[cashbox_type] > cashiers_on_cashbox_type.get(cashbox_type) \
-                            and predict_diff_dict[cashbox_type] > 0:
+                    # if cashbox_type in predict_diff_dict.keys() \
+                    #         and cashbox_type in cashiers_on_cashbox_type.keys()\
+                    #         and predict_diff_dict[cashbox_type] > cashiers_on_cashbox_type.get(cashbox_type) \
+                    #         and predict_diff_dict[cashbox_type] > 0:
+                    #     if check_time == 'morning':
+                    #         need_amount_morning += predict_diff_dict[cashbox_type] - cashiers_on_cashbox_type.get(cashbox_type)
+                    #     elif check_time == 'evening':
+                    #         need_amount_evening += predict_diff_dict[cashbox_type] - cashiers_on_cashbox_type.get(cashbox_type)
+                    #     else:
+                    #         pass
+                    if cashbox_type in cashbox_types_main.keys():
                         if check_time == 'morning':
-                            need_amount_morning += predict_diff_dict[cashbox_type] - cashiers_on_cashbox_type.get(cashbox_type)
+                            need_amount_morning += predict_diff_dict[cashbox_type]
                         elif check_time == 'evening':
-                            need_amount_evening += predict_diff_dict[cashbox_type] - cashiers_on_cashbox_type.get(cashbox_type)
-                        else:
-                            pass
+                            need_amount_evening += predict_diff_dict[cashbox_type]
+            need_amount_morning = max(0, need_amount_morning - period_cashiers_hard)
+            need_amount_evening = max(0, need_amount_evening - period_cashiers_hard)
+
             each_day_morning.append(need_amount_morning)
             each_day_evening.append(need_amount_evening)
 
@@ -283,10 +292,18 @@ def get_cashiers_timetable(request, form):
             if one_period_demand.dttm_forecast == prev_one_period_demand.dttm_forecast:
                 total_lack_of_cashiers_on_period_demand += one_period_demand.lack_of_cashiers
             else:
-                lack_of_cashiers_on_period.append({'lack_of_cashiers': total_lack_of_cashiers_on_period_demand,
-                                                   'dttm_start': str(one_period_demand.dttm_forecast), })
+                lack_of_cashiers_on_period.append({
+                    'lack_of_cashiers': total_lack_of_cashiers_on_period_demand,
+                    'dttm_start': str(one_period_demand.dttm_forecast),
+                })
                 total_lack_of_cashiers_on_period_demand = one_period_demand.lack_of_cashiers
             prev_one_period_demand = one_period_demand
+
+    changed_amount = WorkerDayChangeLog.objects.filter(
+        worker_day__dt__gte = form['from_dt'],
+        worker_day__dt__lte = form['to_dt'],
+        worker_day__worker_shop_id=shop_id,
+    ).count() // 11
 
     response = {
         'indicators': {
@@ -294,8 +311,8 @@ def get_cashiers_timetable(request, form):
             'big_demand_persent': 0,  # big_demand_persent,
             'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': None,
-            'need_cashier_amount': round((max_of_cashiers_lack_morning + max_of_cashiers_lack_evening) * 1.4),
-            'change_amount': None,
+            'need_cashier_amount': round((max_of_cashiers_lack_morning + max_of_cashiers_lack_evening)), # * 1.4
+            'change_amount': changed_amount,
         },
         'period_step': PERIOD_MINUTES,
         'tt_periods': {
