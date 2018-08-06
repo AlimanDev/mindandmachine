@@ -133,6 +133,7 @@ def notify_workers_lack(request, form):
             text=notification_text,
             dttm_added__lt=datetime.now() + timedelta(hours=2, minutes=30)  # повторить уведомление раз в полчаса
             ):
+        # todo: указать кому еще отправлять уведомления, кроме Донкаревой
         Notifications.objects.create(type=Notifications.Type.info.value,
                                      to_worker=User.objects.filter(last_name='Донкарева').first(),
                                      text=notification_text)
