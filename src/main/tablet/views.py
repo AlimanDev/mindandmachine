@@ -45,8 +45,9 @@ def get_cashboxes_info(request, form):
             # супер костыль в dttm__gte, так как время с камер пишется в UTC+6
             mean_queue = CameraCashboxStat.objects.filter(
                 camera_cashbox__cashbox_id=cashbox.id,
-                dttm__gte=dttm_now - timedelta(seconds=60) + timedelta(seconds=10800),
-                dttm__lt=dttm_now + timedelta(seconds=10800)).aggregate(mean_queue=Avg('queue'))
+                dttm__gte=dttm_now - timedelta(seconds=60),
+                dttm__lte=dttm_now + timedelta(seconds=60)
+            ).aggregate(mean_queue=Avg('queue'))
             if mean_queue:
                 mean_queue = mean_queue['mean_queue']
 
@@ -66,23 +67,21 @@ def get_cashboxes_info(request, form):
             status = 'O'
 
         if cashbox.type.id not in response:
-            response[cashbox.type.id] = \
-                {
-                    "name": cashbox.type.name,
-                    "priority": cashbox.type.priority,
-                    "with_queue": with_queue,
-                    "cashbox": []
-                }
+            response[cashbox.type.id] = {
+                "name": cashbox.type.name,
+                "priority": cashbox.type.priority,
+                "with_queue": with_queue,
+                "cashbox": []
+            }
 
-        response[cashbox.type.id]["cashbox"] += \
-            {
-                "number": cashbox.number,
-                "cashbox_id": cashbox.id,
-                "status": status,
+        response[cashbox.type.id]["cashbox"] += {
+            "number": cashbox.number,
+            "cashbox_id": cashbox.id,
+            "status": status,
 
-                "queue": mean_queue,
-                "user_id": user_id,
-            },
+            "queue": mean_queue,
+            "user_id": user_id,
+        },
 
     return JsonResponse.success(response)
 
