@@ -264,6 +264,7 @@ def change_cashier_status(request, form):
         is_tablet=True,
         tm_from__lte=dttm_now.time(),
         on_cashbox_id=cashbox_id,
+        status=WorkerDayCashboxDetails.TYPE_WORK,
     ).count()
     if cashbox_worked:
         return JsonResponse.value_error('cashbox {} already opened'.format(cashbox_id))
