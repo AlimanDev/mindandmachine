@@ -49,7 +49,11 @@ def get_cashboxes_info(request, form):
                 dttm__lte=dttm_now + timedelta(seconds=60)
             ).aggregate(mean_queue=Avg('queue'))
             if mean_queue:
-                mean_queue = round(mean_queue['mean_queue'], 1)
+                try:
+                    # todo fix this
+                    mean_queue = round(mean_queue['mean_queue'], 1)
+                except:
+                    mean_queue = mean_queue['mean_queue']
 
         # todo: rewrite without 100500 requests to db (CameraCashboxStat also)
         status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
