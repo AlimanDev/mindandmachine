@@ -83,9 +83,9 @@ def get_init_params(dttm_exchange, shop_id):
     }
 
 
-def set_response_dict(type, tm_start, tm_end):
+def set_response_dict(_type, tm_start, tm_end):
     return {
-        'type': type,
+        'type': _type,
         'tm_start': tm_start,
         'tm_end': tm_end
     }
