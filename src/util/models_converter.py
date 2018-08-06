@@ -329,23 +329,6 @@ class TimetableConverter(BaseConverter):
 
 
 class NotificationConverter(BaseConverter):
-    # __TYPES = {
-    #     Notifications.type.success.value: 'success',
-    #     Notifications.Type.info.value: 'info',
-    #     Notifications.Type.warning.value: 'warning',
-    #     Notifications.Type.error.value: 'error'
-    # }
-
-    # __TYPES_REVERSED = {v: k for k, v in __TYPES.items()}
-
-    # @classmethod
-    # def convert_type(cls, type_obj):
-    #     return cls.__TYPES.get(type_obj, '')
-
-    # @classmethod
-    # def parse_type(cls, type_obj):
-    #     return cls.__TYPES_REVERSED.get(type_obj)
-
     @classmethod
     def convert(cls, obj):
         return {
