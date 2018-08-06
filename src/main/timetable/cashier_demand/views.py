@@ -254,10 +254,11 @@ def get_cashiers_timetable(request, form):
 
             need_amount_morning = 0
             need_amount_evening = 0
+            need_total = 0
 
             for cashbox_type in cashbox_types:
                 check_time = check_time_is_between_boarders(dttm.time(), time_borders)
-                if check_time == 'morning' or check_time == 'evening':
+                # if check_time == 'morning' or check_time == 'evening':
                     # if cashbox_type in predict_diff_dict.keys() \
                     #         and cashbox_type in cashiers_on_cashbox_type.keys()\
                     #         and predict_diff_dict[cashbox_type] > cashiers_on_cashbox_type.get(cashbox_type) \
@@ -268,11 +269,19 @@ def get_cashiers_timetable(request, form):
                     #         need_amount_evening += predict_diff_dict[cashbox_type] - cashiers_on_cashbox_type.get(cashbox_type)
                     #     else:
                     #         pass
-                    if cashbox_type in cashbox_types_main.keys():
-                        if check_time == 'morning':
-                            need_amount_morning += predict_diff_dict[cashbox_type]
-                        elif check_time == 'evening':
-                            need_amount_evening += predict_diff_dict[cashbox_type]
+                if cashbox_type in cashbox_types_main.keys():
+                    if check_time == 'morning':
+                        need_amount_morning += predict_diff_dict.get(cashbox_type, 0)
+                    elif check_time == 'evening':
+                        need_amount_evening += predict_diff_dict.get(cashbox_type, 0)
+
+                    need_total += predict_diff_dict.get(cashbox_type, 0)
+
+            lack_of_cashiers_on_period.append({
+                'lack_of_cashiers': max(0, need_total - period_cashiers_hard),
+                'dttm_start': dttm_converted,
+            })
+
             need_amount_morning = max(0, need_amount_morning - period_cashiers_hard)
             need_amount_evening = max(0, need_amount_evening - period_cashiers_hard)
 
@@ -285,19 +294,19 @@ def get_cashiers_timetable(request, form):
     max_of_cashiers_lack_morning = max(cashiers_lack_on_period_morning)
     max_of_cashiers_lack_evening = max(cashiers_lack_on_period_evening)
 
-    total_lack_of_cashiers_on_period_demand = 0  # on all cashboxes types
-    if period_demand:
-        prev_one_period_demand = period_demand[0]  # for first iteration
-        for one_period_demand in period_demand:
-            if one_period_demand.dttm_forecast == prev_one_period_demand.dttm_forecast:
-                total_lack_of_cashiers_on_period_demand += one_period_demand.lack_of_cashiers
-            else:
-                lack_of_cashiers_on_period.append({
-                    'lack_of_cashiers': total_lack_of_cashiers_on_period_demand,
-                    'dttm_start': str(one_period_demand.dttm_forecast),
-                })
-                total_lack_of_cashiers_on_period_demand = one_period_demand.lack_of_cashiers
-            prev_one_period_demand = one_period_demand
+    # total_lack_of_cashiers_on_period_demand = 0  # on all cashboxes types
+    # if period_demand:
+    #     prev_one_period_demand = period_demand[0]  # for first iteration
+    #     for one_period_demand in period_demand:
+    #         if one_period_demand.dttm_forecast == prev_one_period_demand.dttm_forecast:
+    #             total_lack_of_cashiers_on_period_demand += one_period_demand.lack_of_cashiers
+    #         else:
+    #             lack_of_cashiers_on_period.append({
+    #                 'lack_of_cashiers': total_lack_of_cashiers_on_period_demand,
+    #                 'dttm_start': str(one_period_demand.dttm_forecast),
+    #             })
+    #             total_lack_of_cashiers_on_period_demand = one_period_demand.lack_of_cashiers
+    #         prev_one_period_demand = one_period_demand
 
     changed_amount = WorkerDayChangeLog.objects.filter(
         worker_day__dt__gte = form['from_dt'],
