@@ -140,6 +140,30 @@ def get_intervals_with_excess(arguments_dict):
     return dttm_to_collect
 
 
+def has_deficiency(predict_demand, mean_bills_per_step, cashbox_types, dttm):
+    """
+
+    :return: { cashbox type: True/False }
+    True -- if there is deficiency behind cashbox type, False -- if other case
+    """
+    ct_deficieny_dict = {}
+
+    demand_ind = 0
+    predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types)
+
+    users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list(cashbox_types.keys()))
+    for cashbox_type in predict_diff_dict.keys():
+        if cashbox_type not in ct_deficieny_dict.keys():
+            ct_deficieny_dict[cashbox_type] = False
+        number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
+        if int(predict_diff_dict[cashbox_type]) > number_of_workers:
+            ct_deficieny_dict[cashbox_type] = True
+        else:
+            ct_deficieny_dict[cashbox_type] = False
+
+    return ct_deficieny_dict
+
+
 def shift_user_times(dttm_exchange, user):
     threshold_time = datetime_module.time(0, 30)
     tm_start_case_threshold = datetime_module.time(15, 30)

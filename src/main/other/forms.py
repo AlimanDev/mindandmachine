@@ -20,20 +20,6 @@ class GetSuperShopListForm(forms.Form):
     max_worker_amount = forms.IntegerField(required=False)
 
 
-class GetNotificationsForm(forms.Form):
-    pointer = forms.IntegerField(required=False)
-    count = forms.IntegerField()
-
-
-class GetNewNotificationsForm(forms.Form):
-    pointer = forms.IntegerField()
-    count = forms.IntegerField()
-
-
-class SetNotificationsReadForm(forms.Form):
-    ids = util_forms.IntegersList(required=True)
-
-
 class GetSlots(forms.Form):
     user_id = forms.IntegerField(required=True)
 

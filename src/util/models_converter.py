@@ -330,10 +330,10 @@ class TimetableConverter(BaseConverter):
 
 class NotificationConverter(BaseConverter):
     __TYPES = {
-        Notifications.Type.SYSTEM_NOTICE.value: 'S',
-        Notifications.Type.CHANGE_REQUEST_NOTICE.value: 'R',
-        Notifications.Type.CHANGE_TIMETABLE_NOTICE.value: 'T',
-        Notifications.Type.CHANGE_WORKER_INFO.value: 'I'
+        Notifications.Type.success.value: 'success',
+        Notifications.Type.info.value: 'info',
+        Notifications.Type.warning.value: 'warning',
+        Notifications.Type.error.value: 'error'
     }
 
     __TYPES_REVERSED = {v: k for k, v in __TYPES.items()}
@@ -353,7 +353,8 @@ class NotificationConverter(BaseConverter):
             'type': cls.convert_type(obj.type),
             'text': obj.text,
             'was_read': obj.was_read,
-            'to_worker': obj.to_worker_id
+            'to_worker': obj.to_worker_id,
+            'timesince': obj.timesince()
         }
 
 

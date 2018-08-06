@@ -3,6 +3,8 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
     UserManager
 )
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 from . import utils
 import datetime
 
@@ -560,12 +562,31 @@ class WorkerDayChangeLog(models.Model):
     comment = models.CharField(max_length=128, default='', blank=True)
 
 
+class NotificationsQuerySet(models.query.QuerySet):
+    def active(self):
+        """
+        :return: not expired notificiations (notifications is not expited if it appeared less than 7 days ago
+        """
+        return self.filter(
+            dttm_added__gt=datetime.datetime.now() -
+            datetime.timedelta(days=7)
+        )
+
+    def unread(self):
+        """
+
+        :return: unread and not expired notifications
+        """
+
+        return self.active().filter(was_read=False)
+
+
 class Notifications(models.Model):
     class Type(utils.Enum):
-        SYSTEM_NOTICE = 1
-        CHANGE_REQUEST_NOTICE = 2
-        CHANGE_TIMETABLE_NOTICE = 3
-        CHANGE_WORKER_INFO = 4
+        success = 1
+        info = 2
+        warning = 3
+        error = 4
 
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(self.to_worker.last_name, self.to_worker.shop.title, self.to_worker.shop.super_shop.title, self.dttm_added, self.id)
@@ -582,9 +603,14 @@ class Notifications(models.Model):
     text = models.CharField(max_length=512)
     type = utils.EnumField(Type)
 
-    worker_day_change_request = models.ForeignKey(WorkerDayChangeRequest, on_delete=models.PROTECT, null=True, blank=True)
-    worker_day_change_log = models.ForeignKey(WorkerDayChangeLog, on_delete=models.PROTECT, null=True, blank=True)
-    period_demand_log = models.ForeignKey(PeriodDemandChangeLog, on_delete=models.PROTECT, null=True, blank=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, blank=True, null=True)
+    object_id = models.PositiveIntegerField(blank=True, null=True)
+    object = GenericForeignKey(ct_field='content_type', fk_field='object_id')
+
+    def timesince(self, now=datetime.datetime.now()):
+        return int((now - self.dttm_added).total_seconds()/60)
+
+    objects = NotificationsQuerySet.as_manager()
 
 
 class OfficialHolidays(models.Model):
