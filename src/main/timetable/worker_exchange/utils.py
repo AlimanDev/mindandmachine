@@ -416,21 +416,18 @@ def excess_dayoff(arguments_dict):
             )
             if WorkerDay.objects.get(worker=worker, dt=(dttm_exchange - timedelta(1)).date()).type == WorkerDay.Type.TYPE_HOLIDAY.value:
                 if WorkerDay.objects.get(worker=worker, dt=(dttm_exchange - timedelta(2)).date()).type == WorkerDay.Type.TYPE_HOLIDAY.value:
-                    user_new_tm_work_start, user_new_tm_work_end = shift_user_times(dttm_exchange, worker)
-                    if user_new_tm_work_start and user_new_tm_work_end and worker in arguments_dict['users_who_can_work']:
+                    if update_dict and worker in arguments_dict['users_who_can_work']:
                         users_for_exchange[worker.id] = update_dict
                         continue
                 elif WorkerDay.objects.get(worker=worker, dt=(dttm_exchange + timedelta(1)).date()).type == WorkerDay.Type.TYPE_HOLIDAY.value:
-                    user_new_tm_work_start, user_new_tm_work_end = shift_user_times(dttm_exchange, worker)
-                    if user_new_tm_work_start and user_new_tm_work_end and worker in arguments_dict['users_who_can_work']:
+                    if update_dict and worker in arguments_dict['users_who_can_work']:
                         users_for_exchange[worker.id] = update_dict
                         continue
             else:
                 if WorkerDay.objects.get(worker=worker, dt=(dttm_exchange + timedelta(1)).date()).type == WorkerDay.Type.TYPE_HOLIDAY.value:
                     if WorkerDay.objects.get(worker=worker, dt=(dttm_exchange + timedelta(2)).date()).type == WorkerDay.Type.TYPE_HOLIDAY.value:
                         if len(WorkerDay.objects.filter(worker=worker, dt__in=days_list_to_check_for_6_days_constraint, type=WorkerDay.Type.TYPE_WORKDAY.value)) < 5:
-                            user_new_tm_work_start, user_new_tm_work_end = shift_user_times(dttm_exchange, worker)
-                            if user_new_tm_work_start and user_new_tm_work_end and worker in arguments_dict['users_who_can_work']:
+                            if update_dict and worker in arguments_dict['users_who_can_work']:
                                 users_for_exchange[worker.id] = update_dict
                                 continue
     except ObjectDoesNotExist:
