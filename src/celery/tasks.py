@@ -1,8 +1,15 @@
 from datetime import timedelta
 from django.db.models import Avg
 from django.utils.timezone import now
+from datetime import timedelta
 
-from src.db.models import PeriodDemand, CashboxType, CameraCashboxStat, WorkerDayCashboxDetails
+from src.db.models import (
+    PeriodDemand,
+    CashboxType,
+    CameraCashboxStat,
+    WorkerDayCashboxDetails,
+    Notifications,
+    )
 from src.celery.celery import app
 
 
@@ -61,3 +68,9 @@ def release_all_workers():
         obj.on_cashbox = None
         obj.tm_to = obj.worker_day.tm_work_end
         obj.save()
+
+
+@app.task
+def delete_old_notifications():
+    dttm_now = now() + timedelta(hours=3)
+    Notifications.objects.filter(dttm_added__lt=dttm_now - timedelta(days=7)).delete()
