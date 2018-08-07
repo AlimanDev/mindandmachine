@@ -3,6 +3,7 @@ import json
 from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.http import HttpResponse
+from src.db.models import User
 
 
 class JsonResponse(object):
@@ -36,11 +37,15 @@ class JsonResponse(object):
 
     @classmethod
     def auth_required(cls):
-        return cls.__base_error_response(403, 'AuthRequired')
+        return cls.__base_error_response(401, 'AuthRequired')
 
     @classmethod
     def csrf_required(cls):
-        return cls.__base_error_response(403, 'CsrfTokenRequired')
+        return cls.__base_error_response(401, 'CsrfTokenRequired')
+
+    @classmethod
+    def access_forbidden(cls):
+        return cls.__base_error_response(403, 'Access forbidden')
 
     @classmethod
     def internal_error(cls, msg=''):
@@ -63,7 +68,7 @@ class JsonResponse(object):
         return HttpResponse(json.dumps(response_data, separators=(',', ':')), content_type='application/json')
 
 
-def api_method(method, form_cls=None, auth_required=True):
+def api_method(method, form_cls=None, auth_required=True, groups=None, lambda_func=None):
     def decor(func):
         def wrapper(request, *args, **kwargs):
             if auth_required and not request.user.is_authenticated and settings.QOS_DEV_AUTOLOGIN_ENABLED:
@@ -93,6 +98,18 @@ def api_method(method, form_cls=None, auth_required=True):
                 kwargs['form'] = form.cleaned_data
             else:
                 kwargs.pop('form', None)
+
+            if request.user.is_authenticated:
+                user_group = request.user.group
+                if groups and user_group in groups:
+                    if lambda_func is not None:
+                        if user_group == User.GROUP_CASHIER:
+                            print(request.user.id)
+                            if request.user.id == lambda_func(form.cleaned_data):
+                                pass
+
+                else:
+                    return JsonResponse.access_forbidden()
 
             try:
                 return func(request, *args, **kwargs)

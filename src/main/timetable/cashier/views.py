@@ -180,7 +180,12 @@ def get_cashier_timetable(request, form):
     return JsonResponse.success(response)
 
 
-@api_method('GET', GetCashierInfoForm)
+@api_method(
+    'GET',
+    GetCashierInfoForm,
+    # groups=PermissionGroups.objects.all(),
+    lambda_func=lambda x: User.objects.filter(id=x['worker_id'].id)
+)
 def get_cashier_info(request, form):
     response = {}
 
@@ -375,7 +380,6 @@ def set_worker_days(request, form):
     ])
 
     return JsonResponse.success({})
-
 
 
 @api_method('POST', SetWorkerDayForm)
