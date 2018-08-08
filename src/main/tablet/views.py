@@ -10,7 +10,8 @@ from src.db.models import (
     WorkerCashboxInfo,
     WorkerDay,
     CashboxType,
-    Shop
+    Shop,
+    User
 )
 from django.db.models import Avg
 from src.conf.djconfig import QOS_DATETIME_FORMAT
@@ -23,7 +24,12 @@ from src.util.models_converter import WorkerCashboxInfoConverter
 from src.util.collection import group_by
 
 
-@api_method('GET', GetCashboxesInfo)
+@api_method(
+    'GET',
+    GetCashboxesInfo,
+    groups=User.__except_cashiers__,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def get_cashboxes_info(request, form):
     response = {}
     dttm_now = now() + timedelta(hours=3)
@@ -91,7 +97,12 @@ def get_cashboxes_info(request, form):
     return JsonResponse.success(response)
 
 
-@api_method('GET', GetCashiersInfo)
+@api_method(
+    'GET',
+    GetCashiersInfo,
+    groups=User.__except_cashiers__,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def get_cashiers_info(request, form):
     """
     gets status of all cashiers, working today
@@ -230,7 +241,12 @@ def get_cashiers_info(request, form):
     return JsonResponse.success(response)
 
 
-@api_method('POST', ChangeCashierStatus)
+@api_method(
+    'POST',
+    ChangeCashierStatus,
+    groups=[User.GROUP_MANAGER, User.GROUP_SUPERVISOR, User.GROUP_DIRECTOR],
+    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+)
 def change_cashier_status(request, form):
     """
     change cashier status if possible

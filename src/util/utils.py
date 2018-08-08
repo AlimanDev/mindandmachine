@@ -3,7 +3,10 @@ import json
 from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.http import HttpResponse
-from src.db.models import User
+from src.db.models import (
+    User,
+    Shop
+)
 
 
 class JsonResponse(object):
@@ -44,8 +47,8 @@ class JsonResponse(object):
         return cls.__base_error_response(401, 'CsrfTokenRequired')
 
     @classmethod
-    def access_forbidden(cls):
-        return cls.__base_error_response(403, 'Access forbidden')
+    def access_forbidden(cls, msg=''):
+        return cls.__base_error_response(403, 'AccessForbidden', msg)
 
     @classmethod
     def internal_error(cls, msg=''):
@@ -69,6 +72,15 @@ class JsonResponse(object):
 
 
 def api_method(method, form_cls=None, auth_required=True, groups=None, lambda_func=None):
+    """
+
+    :param method:
+    :param form_cls:
+    :param auth_required:
+    :param groups: User.group_type list
+    :param lambda_func: False -- on object creation
+    :return:
+    """
     def decor(func):
         def wrapper(request, *args, **kwargs):
             if auth_required and not request.user.is_authenticated and settings.QOS_DEV_AUTOLOGIN_ENABLED:
@@ -99,17 +111,67 @@ def api_method(method, form_cls=None, auth_required=True, groups=None, lambda_fu
             else:
                 kwargs.pop('form', None)
 
-            if request.user.is_authenticated:
+            if request.user.is_authenticated and auth_required:
                 user_group = request.user.group
-                if groups and user_group in groups:
-                    if lambda_func is not None:
-                        if user_group == User.GROUP_CASHIER:
-                            print(request.user.id)
-                            if request.user.id == lambda_func(form.cleaned_data):
-                                pass
+                if lambda_func is not None:
+                    cleaned_data = lambda_func(form.cleaned_data)
 
-                else:
-                    return JsonResponse.access_forbidden()
+                    if groups:
+                        if user_group in groups:
+                            if user_group == User.GROUP_CASHIER:
+                                if request.user.id != cleaned_data.id:
+                                    return JsonResponse.access_forbidden(
+                                        'You are not allowed to get other cashiers information'
+                                    )
+                            elif user_group == User.GROUP_MANAGER:
+                                if isinstance(cleaned_data, User):
+                                    if request.user.shop != cleaned_data.shop:
+                                        return JsonResponse.access_forbidden(
+                                            'You are not allowed to modify outside of your shop'
+                                        )
+                                elif isinstance(cleaned_data, Shop):
+                                    if request.user.shop != cleaned_data:
+                                        return JsonResponse.access_forbidden(
+                                            'You are not allowed to modify outside of your shop'
+                                        )
+                            elif user_group == User.GROUP_DIRECTOR or user_group == User.GROUP_SUPERVISOR:
+                                if isinstance(cleaned_data, User):
+                                    if request.user.shop.super_shop != cleaned_data.shop.super_shop:
+                                        return JsonResponse.access_forbidden(
+                                            'You are not allowed to modify outside of your super_shop'
+                                        )
+                                elif isinstance(cleaned_data, Shop):
+                                    if request.user.shop.super_shop != cleaned_data.super_shop:
+                                        return JsonResponse.access_forbidden(
+                                            'You are not allowed to modify outside of your super_shop'
+                                        )
+                            elif user_group == User.GROUP_HQ:
+                                if request.method != 'GET':
+                                    JsonResponse.access_forbidden(
+                                        'You are not allowed to modify any information'
+                                    )
+
+                        else:
+                            return JsonResponse.access_forbidden(user_group)
+
+                    if method == 'POST':
+                        if user_group not in User.__allowed_to_modify__:
+                            return JsonResponse.access_forbidden(
+                                'You are not allowed to modify any information'
+                            )
+                        else:
+                            if isinstance(cleaned_data, User):
+                                if request.user.shop.super_shop != cleaned_data.shop.super_shop:
+                                    return JsonResponse.access_forbidden(
+                                        'You are not allowed to modify outside of your super_shop'
+                                    )
+                            elif isinstance(cleaned_data, Shop):
+                                if request.user.shop.super_shop != cleaned_data.super_shop:
+                                    return JsonResponse.access_forbidden(
+                                        'You are not allowed to modify outside of your super_shop'
+                                    )
+                            elif cleaned_data is False:  # object creation
+                                pass
 
             try:
                 return func(request, *args, **kwargs)

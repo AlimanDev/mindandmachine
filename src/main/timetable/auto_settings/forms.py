@@ -6,7 +6,7 @@ from src.util import forms as util_forms
 
 
 class GetStatusForm(forms.Form):
-    shop_id = forms.IntegerField(required=False)
+    shop_id = forms.IntegerField(required=True)
     dt = util_forms.DateField()
 
     def clean_dt(self):
@@ -16,11 +16,12 @@ class GetStatusForm(forms.Form):
 
 class SetSelectedCashiersForm(forms.Form):
     cashier_ids = util_forms.IntegersList(required=True)
+    shop_id = forms.IntegerField(required=True)
     value = util_forms.BooleanField(required=True)
 
 
 class CreateTimetableForm(forms.Form):
-    shop_id = forms.IntegerField(required=False)
+    shop_id = forms.IntegerField(required=True)
     dt = util_forms.DateField()
 
     def clean_dt(self):
@@ -29,7 +30,7 @@ class CreateTimetableForm(forms.Form):
 
 
 class DeleteTimetableForm(forms.Form):
-    shop_id = forms.IntegerField(required=False)
+    shop_id = forms.IntegerField(required=True)
     dt = util_forms.DateField()
 
     def clean_dt(self):

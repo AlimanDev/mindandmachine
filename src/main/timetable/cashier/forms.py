@@ -9,7 +9,6 @@ from src.util import forms as util_forms
 from src.util.models_converter import WorkerDayConverter, UserConverter, BaseConverter
 
 
-
 class GetCashiersListForm(forms.Form):
     dt_hired_before = util_forms.DateField(required=False)
     dt_fired_after = util_forms.DateField(required=False)

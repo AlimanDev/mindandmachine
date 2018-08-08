@@ -12,6 +12,7 @@ from src.db.models import (
     WorkerDayCashboxDetails,
     PeriodDemand,
     WorkerDayChangeLog,
+    Shop
 )
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
 from src.util.collection import range_u, group_by
@@ -28,9 +29,14 @@ import xlsxwriter
 import io
 
 
-@api_method('GET', GetCashiersTimetableForm)
+@api_method(
+    'GET',
+    GetCashiersTimetableForm,
+    groups=User.__except_cashiers__,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def get_cashiers_timetable(request, form):
-    shop_id = request.user.shop_id
+    shop_id = form['shop_id']
 
     if form['format'] == 'excel':
         def __file_name(__dt):

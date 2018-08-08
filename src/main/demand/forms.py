@@ -12,6 +12,7 @@ class GetIndicatorsForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
     type = util_forms.PeriodDemandForecastType()
+    shop_id = forms.IntegerField(required=False)
 
 
 class GetForecastForm(forms.Form):
@@ -43,6 +44,7 @@ class SetDemandForm(forms.Form):
     cashbox_type_ids = util_forms.IntegersList()
     multiply_coef = forms.FloatField(required=False)
     set_value = forms.FloatField(required=False)
+    # shop_id = forms.IntegerField(requ)
 
     def clean(self):
         if self.errors:

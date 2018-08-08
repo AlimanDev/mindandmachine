@@ -10,7 +10,13 @@ from src.db.models import (
 from .xlsx.tabel import Tabel_xlsx
 import json
 
-@api_method('GET', GetTable)
+
+@api_method(
+    'GET',
+    GetTable,
+    groups=User.__except_cashiers__,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 @xlsx_method
 def get_tabel(request, workbook, form):
     ws = workbook.add_worksheet(Tabel_xlsx.MONTH_NAMES[form['weekday'].month])

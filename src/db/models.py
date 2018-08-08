@@ -175,6 +175,10 @@ class User(DjangoAbstractUser):
         (GROUP_HQ, 'headquarter')
     )
 
+    __all_groups__ = [x[0] for x in GROUP_TYPE]
+    __except_cashiers__ = [x[0] for x in GROUP_TYPE if x[1] != 'cashiers']
+    __allowed_to_modify__ = [GROUP_SUPERVISOR, GROUP_DIRECTOR]
+
     id = models.BigAutoField(primary_key=True)
 
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable

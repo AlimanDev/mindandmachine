@@ -1,13 +1,25 @@
 from datetime import datetime, timedelta, time
 
-from src.db.models import PeriodDemand, WorkerCashboxInfo, WorkerDayCashboxDetails, WorkerDay, PeriodDemandChangeLog
+from src.db.models import (
+    PeriodDemand,
+    WorkerDay,
+    PeriodDemandChangeLog,
+    User,
+    Shop
+)
 from src.util.collection import range_u
+from src.util.forms import FormUtil
 from src.util.models_converter import BaseConverter, PeriodDemandConverter, PeriodDemandChangeLogConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import GetForecastForm, SetDemandForm, GetIndicatorsForm
 
 
-@api_method('GET', GetIndicatorsForm)
+@api_method(
+    'GET',
+    GetIndicatorsForm,
+    groups=User.__except_cashiers__,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def get_indicators(request, form):
     dt_from = form['from_dt']
     dt_to = form['to_dt']
@@ -15,7 +27,7 @@ def get_indicators(request, form):
 
     forecast_type = form['type']
 
-    shop_id = request.user.shop_id
+    shop_id = FormUtil.get_shop_id(request, form)
 
     period_demands = PeriodDemand.objects.select_related(
         'cashbox_type'
@@ -81,21 +93,27 @@ def get_indicators(request, form):
     })
 
 
-@api_method('GET', GetForecastForm)
+@api_method(
+    'GET',
+    GetForecastForm,
+    groups=User.__except_cashiers__,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def get_forecast(request, form):
     if form['format'] == 'excel':
         return JsonResponse.value_error('Excel is not supported yet')
-
-    shop = request.user.shop
 
     # data_types = form['data_type']
     data_types = PeriodDemand.Type.values()
     cashbox_type_ids = form['cashbox_type_ids']
 
+    shop_id = cashbox_type_ids[0].shop.id
+
+
     period_demand = PeriodDemand.objects.select_related(
         'cashbox_type'
     ).filter(
-        cashbox_type__shop_id=shop.id
+        cashbox_type__shop_id=shop_id
     )
 
     if len(cashbox_type_ids) > 0:
@@ -150,7 +168,7 @@ def get_forecast(request, form):
     period_demand_change_log = PeriodDemandChangeLog.objects.select_related(
         'cashbox_type'
     ).filter(
-        cashbox_type__shop_id=shop.id
+        cashbox_type__shop_id=shop_id
     )
 
     if len(cashbox_type_ids) > 0:
@@ -167,7 +185,11 @@ def get_forecast(request, form):
     return JsonResponse.success(response)
 
 
-@api_method('POST', SetDemandForm)
+@api_method(
+    'POST',
+    SetDemandForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def set_demand(request, form):
     cashbox_type_ids = form['cashbox_type_ids']
 
@@ -177,7 +199,7 @@ def set_demand(request, form):
     dttm_from = form['from_dttm']
     dttm_to = form['to_dttm']
 
-    shop_id = request.user.shop_id
+    shop_id = form['shop_id']
 
     period_demands = PeriodDemand.objects.select_related(
         'cashbox_type'
