@@ -31,7 +31,7 @@ def get_notifications(request, form):
 
 @api_method('POST', SetNotificationsReadForm)
 def set_notifications_read(request, form):
-    count = Notifications.objects.filter(user=request.user, id__in=form['ids']).update(was_read=True)
+    count = Notifications.objects.filter(to_worker=request.user, id__in=form['ids']).update(was_read=True)
     return JsonResponse.success({
         'updated_count': count
     })

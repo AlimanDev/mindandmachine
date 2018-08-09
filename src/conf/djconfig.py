@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'src',
     'src.db',
     'src.main',
+    'src.main.other.notification.apps.NotificationConfig',
     'django_celery_beat',
     'django_celery_results',
     'src.celery',

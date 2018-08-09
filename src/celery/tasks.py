@@ -12,10 +12,11 @@ from src.db.models import (
     CashboxType,
     CameraCashboxStat,
     WorkerDayCashboxDetails,
-    Notifications,
     Shop,
-    User
+    User,
+    Notifications
     )
+from src.main.other.notification.utils import send_notification
 from src.celery.celery import app
 
 
@@ -63,6 +64,10 @@ def update_queue(till_dttm=None):
 
 @app.task
 def release_all_workers():
+    """
+    отпускает всех работников с касс
+    :return:
+    """
     dttm_now = now() + timedelta(hours=3)
     worker_day_cashbox_objs = \
         WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
@@ -78,6 +83,10 @@ def release_all_workers():
 
 @app.task
 def notify_cashiers_lack():
+    """
+    creates notification if there's deficiency of cashiers for each shop
+    :return:
+    """
     for shop in Shop.objects.all():
         dttm_now = now()
         shop_id = shop.id
@@ -96,27 +105,16 @@ def notify_cashiers_lack():
         for cashbox_type in return_dict.keys():
             if return_dict[cashbox_type]:
                 to_notify = True
-                notification_text =\
-                'За типом кассы {} не хватает кассиров: {}. '.\
-                format(
+                notification_text = 'За типом кассы {} не хватает кассиров: {}. '.format(
                     CashboxType.objects.get(id=cashbox_type).name,
                     return_dict[cashbox_type]
                 )
 
-        managers_lists = User.objects.filter(shop_id=shop_id, work_type=User.WorkType.TYPE_MANAGER.value)
-        # если такого уведомления еще нет
+        managers_dir_list = User.objects.filter(shop_id=shop_id, work_type=User.WorkType.TYPE_MANAGER.value)
+        # todo: после merge'a с permissions заменить на filter(Q(type='M' | Q(type='D", shop_id=shop_id)
+
         if to_notify:
-            for manager in managers_lists:
-                if not Notifications.objects.filter(
-                        type=Notifications.TYPE_INFO,
-                        to_worker=manager,
-                        text=notification_text,
-                        dttm_added__lt=now() + timedelta(hours=2)):  # повторить уведомление раз в час
-                    Notifications.objects.create(
-                        type=Notifications.TYPE_INFO,
-                        to_worker=manager,
-                        text=notification_text
-                    )
+            send_notification(managers_dir_list, notification_text, Notifications.TYPE_INFO)
 
 
 
