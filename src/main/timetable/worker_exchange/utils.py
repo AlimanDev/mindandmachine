@@ -4,7 +4,8 @@ from src.db.models import (
     CashboxType,
     WorkerCashboxInfo,
     WorkerConstraint,
-    User
+    User,
+    PeriodDemand
 )
 
 from django.db.models import Q
@@ -12,6 +13,8 @@ from django.db.models import Q
 import datetime as datetime_module
 from datetime import timedelta, time, datetime
 
+from src.util.collection import group_by
+from django.db.models import Max
 from ..cashier_demand.utils import count_diff
 from src.main.tablet.utils import time_diff
 from django.core.exceptions import ObjectDoesNotExist
@@ -35,6 +38,57 @@ class ChangeType(Enum):
 
 
 standard_tm_interval = 30  # minutes
+
+
+def get_init_params(dttm_exchange, shop_id):
+    """
+    чтобы получить необходимые данные для работы функций
+    :param dttm_exchange:
+    :param shop_id:
+    :return:
+    """
+
+    day_begin_dttm = datetime.combine(dttm_exchange.date(), time(6, 30))
+    day_end_dttm = datetime.combine(dttm_exchange.date() + timedelta(days=1), time(2, 0))
+
+    cashbox_types_hard_dict = group_by(
+        CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD).order_by('id'),
+        group_key=lambda x: x.id
+    )
+
+    period_demand = PeriodDemand.objects.filter(
+        cashbox_type__shop_id=shop_id,
+        dttm_forecast__gte=day_begin_dttm,
+        dttm_forecast__lte=day_end_dttm,
+        type=PeriodDemand.Type.LONG_FORECAST.value,
+        cashbox_type_id__in=list(cashbox_types_hard_dict.keys())
+    ).order_by(
+        'type',
+        'dttm_forecast',
+        'cashbox_type_id'
+    )
+
+    mean_bills_per_step = WorkerCashboxInfo.objects.filter(
+        is_active=True,
+        cashbox_type_id__in=list(cashbox_types_hard_dict.keys())
+    ).values('cashbox_type_id').annotate(speed_usual=Max('mean_speed'))
+    mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
+
+    predict_demand = period_demand
+
+    return {
+        'predict_demand': predict_demand,
+        'mean_bills_per_step': mean_bills_per_step,
+        'cashbox_types_hard_dict': cashbox_types_hard_dict
+    }
+
+
+def set_response_dict(_type, tm_start, tm_end):
+    return {
+        'type': _type,
+        'tm_start': BaseConverter.convert_time(tm_start),
+        'tm_end': BaseConverter.convert_time(tm_end)
+    }
 
 
 def get_cashiers_working_at_time_on(dttm, ct_ids):
@@ -140,6 +194,30 @@ def get_intervals_with_excess(arguments_dict):
     return dttm_to_collect
 
 
+def has_deficiency(predict_demand, mean_bills_per_step, cashbox_types, dttm):
+    """
+
+    :return: { cashbox type: lack of workers/False }
+    lack of workers -- if there is deficiency behind cashbox type, False -- in other case
+    """
+    ct_deficieny_dict = {}
+
+    demand_ind = 0
+    predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types)
+
+    users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list(cashbox_types.keys()))
+    for cashbox_type in predict_diff_dict.keys():
+        if cashbox_type not in ct_deficieny_dict.keys():
+            ct_deficieny_dict[cashbox_type] = False
+        number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
+        if int(predict_diff_dict[cashbox_type]) > number_of_workers:
+            ct_deficieny_dict[cashbox_type] = int(predict_diff_dict[cashbox_type]) - number_of_workers
+        else:
+            ct_deficieny_dict[cashbox_type] = False
+
+    return ct_deficieny_dict
+
+
 def shift_user_times(dttm_exchange, user):
     threshold_time = datetime_module.time(0, 30)
     tm_start_case_threshold = datetime_module.time(15, 30)
@@ -183,9 +261,15 @@ def shift_user_times(dttm_exchange, user):
 def from_other_spec(arguments_dict):
     """
     с другой специлизации + с другой специлизации если там частичные излишки(не менее чем excess_percent * 100%)
-    :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                             'users_who_can_work: list of users who can work on ct_type }
+    :param arguments_dict: {
+                            'shop_id': int,
+                            'dttm_exchange: dttm obj,
+                            'ct_type': int,
+                            'predict_demand': list,
+                            'mean_bills_per_step': list,
+                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
+                            'users_who_can_work: list of users who can work on ct_type
+                            }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id] }
     """
     #presets
@@ -223,20 +307,19 @@ def from_other_spec(arguments_dict):
             if int(predict_diff_dict[cashbox_type]) + 1 < number_of_workers and number_of_workers > 1 and to_consider[cashbox_type]:
                 for user in users_working_on_hard_cts_at_dttm[cashbox_type]:
                     if user in arguments_dict['users_who_can_work']:
+                        worker_day_obj = WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user)
                         if (number_of_workers - int(predict_diff_dict[cashbox_type])) / number_of_workers > excess_percent:
-                            users_for_exchange[user.id] = {}
-                            users_for_exchange[user.id].update({
-                                'type': ChangeType.from_other_spec_part.value,
-                                'tm_start': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start),
-                                'tm_end': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end)
-                            })
+                            users_for_exchange[user.id] = set_response_dict(
+                                ChangeType.from_other_spec_part.value,
+                                worker_day_obj.tm_work_start,
+                                worker_day_obj.tm_work_end
+                            )
                         else:
-                            users_for_exchange[user.id] = {}
-                            users_for_exchange[user.id].update({
-                                'type': ChangeType.from_other_spec.value,
-                                'tm_start': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start),
-                                'tm_end': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end)
-                            })
+                            users_for_exchange[user.id] = set_response_dict(
+                                ChangeType.from_other_spec.value,
+                                worker_day_obj.tm_work_start,
+                                worker_day_obj.tm_work_end
+                            )
 
             else:
                 to_consider[cashbox_type] = False
@@ -247,9 +330,15 @@ def from_other_spec(arguments_dict):
 def day_switch(arguments_dict):
     """
 
-    :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]} ,
-                             'users_who_can_work: list of users who can work on ct_type }
+    :param arguments_dict: {
+                            'shop_id': int,
+                            'dttm_exchange: dttm obj,
+                            'ct_type': int,
+                            'predict_demand': list,
+                            'mean_bills_per_step': list,
+                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
+                            'users_who_can_work: list of users who can work on ct_type
+                            }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id] }
     """
     #presets
@@ -275,12 +364,11 @@ def day_switch(arguments_dict):
                     if user in arguments_dict['users_who_can_work']:
                         user_new_tm_work_start, user_new_tm_work_end = shift_user_times(dttm_exchange, user)
                         if user_new_tm_work_start is not None and user_new_tm_work_end is not None:
-                            users_for_exchange[user.id] = {}
-                            users_for_exchange[user.id].update({
-                                'type': ChangeType.day_switch.value,
-                                'tm_start': BaseConverter.convert_time(user_new_tm_work_start),
-                                'tm_end': BaseConverter.convert_time(user_new_tm_work_end)
-                            })
+                            users_for_exchange[user.id] = set_response_dict(
+                                ChangeType.day_switch.value,
+                                user_new_tm_work_start,
+                                user_new_tm_work_end
+                            )
                 dttm += timedelta(minutes=standard_tm_interval)
 
     return users_for_exchange
@@ -291,9 +379,15 @@ def excess_dayoff(arguments_dict):
     показываем пользователей у которых выходной в последний день из трехдневного периода, в котором есть dttm_exchange,
     которые могут работать в это время и при этом не будут работать 6 дней подряд
     Например: dttm_exchange=15 июня. Пользователь отдыхает 15, 16 и 17. Можно попросить его выйти 15, за место 17.
-    :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                             'users_who_can_work: list of users who can work on ct_type }
+    :param arguments_dict: {
+                            'shop_id': int,
+                            'dttm_exchange: dttm obj,
+                            'ct_type': int,
+                            'predict_demand': list,
+                            'mean_bills_per_step': list,
+                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
+                            'users_who_can_work: list of users who can work on ct_type
+                            }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
     #presets
@@ -306,32 +400,31 @@ def excess_dayoff(arguments_dict):
         days_list_to_check_for_6_days_constraint.append(dttm_to_start_check.date())
         dttm_to_start_check += timedelta(days=1)
 
-    update_dict = {'type': ChangeType.excess_dayoff.value,
-                   'tm_start': BaseConverter.convert_time((dttm_exchange - timedelta(hours=4)).time()),
-                   'tm_end': BaseConverter.convert_time((dttm_exchange + timedelta(hours=4)).time())
-                   }
-
     users_with_holiday_on_dttm_exchange = WorkerDay.objects.filter(dt=dttm_exchange.date(), type=WorkerDay.Type.TYPE_HOLIDAY.value, worker_shop=arguments_dict['shop_id'])
     try:
         for worker_day_of_user in users_with_holiday_on_dttm_exchange:
             worker = worker_day_of_user.worker
+            user_new_tm_work_start, user_new_tm_work_end = shift_user_times(dttm_exchange, worker)
+            if user_new_tm_work_start and user_new_tm_work_end:
+                update_dict = set_response_dict(
+                    ChangeType.excess_dayoff.value,
+                    user_new_tm_work_start,
+                    user_new_tm_work_end
+            )
             if WorkerDay.objects.get(worker=worker, dt=(dttm_exchange - timedelta(1)).date()).type == WorkerDay.Type.TYPE_HOLIDAY.value:
                 if WorkerDay.objects.get(worker=worker, dt=(dttm_exchange - timedelta(2)).date()).type == WorkerDay.Type.TYPE_HOLIDAY.value:
-                    user_new_tm_work_start, user_new_tm_work_end = shift_user_times(dttm_exchange, worker)
-                    if user_new_tm_work_start and user_new_tm_work_end and worker in arguments_dict['users_who_can_work']:
+                    if update_dict and worker in arguments_dict['users_who_can_work']:
                         users_for_exchange[worker.id] = update_dict
                         continue
                 elif WorkerDay.objects.get(worker=worker, dt=(dttm_exchange + timedelta(1)).date()).type == WorkerDay.Type.TYPE_HOLIDAY.value:
-                    user_new_tm_work_start, user_new_tm_work_end = shift_user_times(dttm_exchange, worker)
-                    if user_new_tm_work_start and user_new_tm_work_end and worker in arguments_dict['users_who_can_work']:
+                    if update_dict and worker in arguments_dict['users_who_can_work']:
                         users_for_exchange[worker.id] = update_dict
                         continue
             else:
                 if WorkerDay.objects.get(worker=worker, dt=(dttm_exchange + timedelta(1)).date()).type == WorkerDay.Type.TYPE_HOLIDAY.value:
                     if WorkerDay.objects.get(worker=worker, dt=(dttm_exchange + timedelta(2)).date()).type == WorkerDay.Type.TYPE_HOLIDAY.value:
                         if len(WorkerDay.objects.filter(worker=worker, dt__in=days_list_to_check_for_6_days_constraint, type=WorkerDay.Type.TYPE_WORKDAY.value)) < 5:
-                            user_new_tm_work_start, user_new_tm_work_end = shift_user_times(dttm_exchange, worker)
-                            if user_new_tm_work_start and user_new_tm_work_end and worker in arguments_dict['users_who_can_work']:
+                            if update_dict and worker in arguments_dict['users_who_can_work']:
                                 users_for_exchange[worker.id] = update_dict
                                 continue
     except ObjectDoesNotExist:
@@ -343,9 +436,15 @@ def excess_dayoff(arguments_dict):
 def overworking(arguments_dict):
     """
     подработки
-    :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                             'users_who_can_work: list of users who can work on ct_type}
+    :param arguments_dict: {
+                            'shop_id': int,
+                            'dttm_exchange: dttm obj,
+                            'ct_type': int,
+                            'predict_demand': list,
+                            'mean_bills_per_step': list,
+                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
+                            'users_who_can_work: list of users who can work on ct_type
+                            }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
     # presets
@@ -371,21 +470,19 @@ def overworking(arguments_dict):
         if dttm_exchange_minus <= dttm_exchange <= user_wd_dttm_work_end and is_consistent_with_user_constraints(worker, dttm_exchange_minus, dttm_exchange):
             if worker in arguments_dict['users_who_can_work'] and worker.is_ready_for_overworkings and\
                 time_diff(user_wd.tm_work_start, user_wd.tm_work_end)/3600 <= 9:
-                users_for_exchange[worker.id] = {}
-                users_for_exchange[worker.id].update({
-                    'type': ChangeType.overworking.value,
-                    'tm_start': BaseConverter.convert_time(dttm_exchange_minus.time()),
-                    'tm_end': BaseConverter.convert_time(user_wd.tm_work_end)
-                })
+                users_for_exchange[worker.id] = set_response_dict(
+                    ChangeType.overworking.value,
+                    dttm_exchange_minus.time(),
+                    user_wd.tm_work_end
+                )
         elif dttm_exchange_plus >= dttm_exchange >= user_wd_dttm_word_start and is_consistent_with_user_constraints(worker, dttm_exchange, dttm_exchange_plus):
             if worker in arguments_dict['users_who_can_work'] and worker.is_ready_for_overworkings and\
                 time_diff(user_wd.tm_work_start, user_wd.tm_work_end)/3600 <= 9 and user_wd_dttm_work_end.time() > datetime_module.time(2, 0):
-                users_for_exchange[worker.id] = {}
-                users_for_exchange[worker.id].update({
-                    'type': ChangeType.overworking.value,
-                    'tm_start': BaseConverter.convert_time(user_wd.tm_work_start),
-                    'tm_end': BaseConverter.convert_time(dttm_exchange_plus.time())
-                })
+                users_for_exchange[worker.id] = set_response_dict(
+                    ChangeType.overworking.value,
+                    user_wd.tm_work_start,
+                    dttm_exchange_plus.time()
+                )
 
     return users_for_exchange
 
@@ -393,9 +490,15 @@ def overworking(arguments_dict):
 def from_evening_line(arguments_dict):
     """
     c вечера (если частичные излишки, или нехватка вечером менее 5 человек(для линии))
-    :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                             'users_who_can_work: list of users who can work on ct_type}
+    :param arguments_dict: {
+                            'shop_id': int,
+                            'dttm_exchange: dttm obj,
+                            'ct_type': int,
+                            'predict_demand': list,
+                            'mean_bills_per_step': list,
+                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
+                            'users_who_can_work: list of users who can work on ct_type
+                            }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
     # presets
@@ -410,8 +513,10 @@ def from_evening_line(arguments_dict):
     users_for_exchange = {}
 
     #tm settings
-    evening_period = [datetime.combine(dttm_exchange.date(), datetime_module.time(17, 0)),
-                      datetime.combine(dttm_exchange.date(), datetime_module.time(23, 0))]
+    evening_period = [
+        datetime.combine(dttm_exchange.date(), datetime_module.time(17, 0)),
+        datetime.combine(dttm_exchange.date(), datetime_module.time(23, 0))
+    ]
 
     dttm = evening_period[0]
     while dttm <= evening_period[1]:
@@ -425,24 +530,22 @@ def from_evening_line(arguments_dict):
                         if user in arguments_dict['users_who_can_work']:
                             user_new_tm_work_start, user_new_tm_work_end = shift_user_times(dttm_exchange, user)
                             if user_new_tm_work_start is not None and user_new_tm_work_end is not None:
-                                users_for_exchange[user.id] = {}
-                                users_for_exchange[user.id].update({
-                                    'type': ChangeType.from_evening_line.value,
-                                    'tm_start': BaseConverter.convert_time(user_new_tm_work_start),
-                                    'tm_end': BaseConverter.convert_time(user_new_tm_work_end)
-                                })
+                                users_for_exchange[user.id] = set_response_dict(
+                                    ChangeType.from_evening_line.value,
+                                    user_new_tm_work_start,
+                                    user_new_tm_work_end
+                                )
             else:
                 if number_of_workers > 1 and (number_of_workers - int(predict_diff_dict[cashbox_type])) / number_of_workers > excess_percent:
                     for user in users_working_on_hard_cts_at_dttm[cashbox_type]:
                         if user in arguments_dict['users_who_can_work']:
                             user_new_tm_work_start, user_new_tm_work_end = shift_user_times(dttm_exchange, user)
                             if user_new_tm_work_start is not None and user_new_tm_work_end is not None:
-                                users_for_exchange[user.id] = {}
-                                users_for_exchange[user.id].update({
-                                    'type': ChangeType.from_evening_line.value,
-                                    'tm_start': BaseConverter.convert_time(user_new_tm_work_start),
-                                    'tm_end': BaseConverter.convert_time(user_new_tm_work_end)
-                                })
+                                users_for_exchange[user.id] = set_response_dict(
+                                    ChangeType.from_evening_line.value,
+                                    user_new_tm_work_start,
+                                    user_new_tm_work_end
+                                )
 
         dttm += timedelta(minutes=30)
 
@@ -452,9 +555,15 @@ def from_evening_line(arguments_dict):
 def dayoff(arguments_dict):
     """
     у кого выходной
-    :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                             'users_who_can_work: list of users who can work on ct_type}
+    :param arguments_dict: {
+                            'shop_id': int,
+                            'dttm_exchange: dttm obj,
+                            'ct_type': int,
+                            'predict_demand': list,
+                            'mean_bills_per_step': list,
+                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
+                            'users_who_can_work: list of users who can work on ct_type
+                            }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
     #presets
@@ -472,11 +581,11 @@ def dayoff(arguments_dict):
         worker = user_wd.worker
         user_new_tm_work_start, user_new_tm_work_end = shift_user_times(dttm_exchange, worker)
         if user_new_tm_work_start and user_new_tm_work_end and worker in arguments_dict['users_who_can_work']:
-            users_for_exchange[worker.id] = {
-                'type': ChangeType.dayoff.value,
-                'tm_start': BaseConverter.convert_time(user_new_tm_work_start),
-                'tm_end': BaseConverter.convert_time(user_new_tm_work_end)
-            }
+            users_for_exchange[worker.id] = set_response_dict(
+                ChangeType.dayoff.value,
+                user_new_tm_work_start,
+                user_new_tm_work_end
+            )
 
     return users_for_exchange
 
@@ -485,9 +594,15 @@ def sos_group(arguments_dict):
     """
     если пришел тип касс -- линия, то берем работников, которые работают в это время на линии, и если у них тип
     SOS, то выбираем их
-    :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                             'users_who_can_work: list of users who can work on ct_type}
+    :param arguments_dict: {
+                            'shop_id': int,
+                            'dttm_exchange: dttm obj,
+                            'ct_type': int,
+                            'predict_demand': list,
+                            'mean_bills_per_step': list,
+                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
+                            'users_who_can_work: list of users who can work on ct_type
+                            }
     :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
     #presets
@@ -501,12 +616,12 @@ def sos_group(arguments_dict):
         users_working_on_lines = get_cashiers_working_at_time_on(dttm_exchange, line_ct_id)  # dict {ct_id: users}
         for user in users_working_on_lines[line_ct_id]:
             if user.work_type == User.WorkType.TYPE_SOS.value:
-                users_for_exchange[user.id] = {}
-                users_for_exchange[user.id].update({
-                    'type': ChangeType.sos_group.value,
-                    'tm_start': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start),
-                    'tm_end': BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end)
-                })
+                worker_day_obj = WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user)
+                users_for_exchange[user.id] = set_response_dict(
+                    ChangeType.sos_group.value,
+                    worker_day_obj.tm_work_start,
+                    worker_day_obj.tm_work_end
+                )
 
     return users_for_exchange
 
