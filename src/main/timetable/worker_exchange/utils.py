@@ -86,8 +86,8 @@ def get_init_params(dttm_exchange, shop_id):
 def set_response_dict(_type, tm_start, tm_end):
     return {
         'type': _type,
-        'tm_start': tm_start,
-        'tm_end': tm_end
+        'tm_start': BaseConverter.convert_time(tm_start),
+        'tm_end': BaseConverter.convert_time(tm_end)
     }
 
 
@@ -310,18 +310,14 @@ def from_other_spec(arguments_dict):
                         if (number_of_workers - int(predict_diff_dict[cashbox_type])) / number_of_workers > excess_percent:
                             users_for_exchange[user.id] = set_response_dict(
                                 ChangeType.from_other_spec_part.value,
-                                BaseConverter.convert_time(
-                                    WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start),
-                                BaseConverter.convert_time(
-                                    WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end)
+                                WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start,
+                                WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end
                             )
                         else:
                             users_for_exchange[user.id] = set_response_dict(
                                 ChangeType.from_other_spec.value,
-                                BaseConverter.convert_time(
-                                    WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start),
-                                BaseConverter.convert_time(
-                                    WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end)
+                                WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start,
+                                WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end
                             )
 
             else:
@@ -369,8 +365,8 @@ def day_switch(arguments_dict):
                         if user_new_tm_work_start is not None and user_new_tm_work_end is not None:
                             users_for_exchange[user.id] = set_response_dict(
                                 ChangeType.day_switch.value,
-                                BaseConverter.convert_time(user_new_tm_work_start),
-                                BaseConverter.convert_time(user_new_tm_work_end)
+                                user_new_tm_work_start,
+                                user_new_tm_work_end
                             )
                 dttm += timedelta(minutes=standard_tm_interval)
 
@@ -411,8 +407,8 @@ def excess_dayoff(arguments_dict):
             if user_new_tm_work_start and user_new_tm_work_end:
                 update_dict = set_response_dict(
                     ChangeType.excess_dayoff.value,
-                    BaseConverter.convert_time(user_new_tm_work_start),
-                    BaseConverter.convert_time(user_new_tm_work_end)
+                    user_new_tm_work_start,
+                    user_new_tm_work_end
             )
             if WorkerDay.objects.get(worker=worker, dt=(dttm_exchange - timedelta(1)).date()).type == WorkerDay.Type.TYPE_HOLIDAY.value:
                 if WorkerDay.objects.get(worker=worker, dt=(dttm_exchange - timedelta(2)).date()).type == WorkerDay.Type.TYPE_HOLIDAY.value:
@@ -475,16 +471,16 @@ def overworking(arguments_dict):
                 time_diff(user_wd.tm_work_start, user_wd.tm_work_end)/3600 <= 9:
                 users_for_exchange[worker.id] = set_response_dict(
                     ChangeType.overworking.value,
-                    BaseConverter.convert_time(dttm_exchange_minus.time()),
-                    BaseConverter.convert_time(user_wd.tm_work_end)
+                    dttm_exchange_minus.time(),
+                    user_wd.tm_work_end
                 )
         elif dttm_exchange_plus >= dttm_exchange >= user_wd_dttm_word_start and is_consistent_with_user_constraints(worker, dttm_exchange, dttm_exchange_plus):
             if worker in arguments_dict['users_who_can_work'] and worker.is_ready_for_overworkings and\
                 time_diff(user_wd.tm_work_start, user_wd.tm_work_end)/3600 <= 9 and user_wd_dttm_work_end.time() > datetime_module.time(2, 0):
                 users_for_exchange[worker.id] = set_response_dict(
                     ChangeType.overworking.value,
-                    BaseConverter.convert_time(user_wd.tm_work_start),
-                    BaseConverter.convert_time(dttm_exchange_plus.time())
+                    user_wd.tm_work_start,
+                    dttm_exchange_plus.time()
                 )
 
     return users_for_exchange
@@ -535,8 +531,8 @@ def from_evening_line(arguments_dict):
                             if user_new_tm_work_start is not None and user_new_tm_work_end is not None:
                                 users_for_exchange[user.id] = set_response_dict(
                                     ChangeType.from_evening_line.value,
-                                    BaseConverter.convert_time(user_new_tm_work_start),
-                                    BaseConverter.convert_time(user_new_tm_work_end)
+                                    user_new_tm_work_start,
+                                    user_new_tm_work_end
                                 )
             else:
                 if number_of_workers > 1 and (number_of_workers - int(predict_diff_dict[cashbox_type])) / number_of_workers > excess_percent:
@@ -546,8 +542,8 @@ def from_evening_line(arguments_dict):
                             if user_new_tm_work_start is not None and user_new_tm_work_end is not None:
                                 users_for_exchange[user.id] = set_response_dict(
                                     ChangeType.from_evening_line.value,
-                                    BaseConverter.convert_time(user_new_tm_work_start),
-                                    BaseConverter.convert_time(user_new_tm_work_end)
+                                    user_new_tm_work_start,
+                                    user_new_tm_work_end
                                 )
 
         dttm += timedelta(minutes=30)
@@ -586,8 +582,8 @@ def dayoff(arguments_dict):
         if user_new_tm_work_start and user_new_tm_work_end and worker in arguments_dict['users_who_can_work']:
             users_for_exchange[worker.id] = set_response_dict(
                 ChangeType.dayoff.value,
-                BaseConverter.convert_time(user_new_tm_work_start),
-                BaseConverter.convert_time(user_new_tm_work_end)
+                user_new_tm_work_start,
+                user_new_tm_work_end
             )
 
     return users_for_exchange
@@ -621,8 +617,8 @@ def sos_group(arguments_dict):
             if user.work_type == User.WorkType.TYPE_SOS.value:
                 users_for_exchange[user.id] = set_response_dict(
                     ChangeType.sos_group.value,
-                    BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start),
-                    BaseConverter.convert_time(WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end)
+                    WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start,
+                    WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end
                 )
 
     return users_for_exchange

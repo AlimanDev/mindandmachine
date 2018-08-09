@@ -15,17 +15,16 @@ def get_notifications(request, form):
     if pointer is not None:
         notifications = notifications.filter(id__lt=pointer)
     notifications = list(notifications[:count])
-    result = {'get_noty_pointer': notifications[-1].id if len(notifications) > 0 else None, 'notifications': []}
 
-    for notification in notifications:
-        result['notifications'].append({
-            'notification': NotificationConverter.convert(notification),
-            'timesince': notification.timesince(),
-            })
-        
+    result = {
+        'get_noty_pointer': notifications[-1].id if len(notifications) > 0 else None,
+        'notifications': [
+            NotificationConverter.convert(notification) for notification in notifications
+    ]}
+
     if pointer is None:
         result['get_new_noty_pointer'] = notifications[0].id if len(notifications) > 0 else -1
-        result['unread_count'] = Notifications.objects.qos_unread(user).count()
+        result['unread_count'] = Notifications.objects.filter(to_worker=user, was_read=False).count()
 
     return JsonResponse.success(result)
 

@@ -171,7 +171,7 @@ class User(DjangoAbstractUser):
     work_type = utils.EnumField(WorkType, null=True, blank=True)
     is_fixed_hours = models.BooleanField(default=False)
     is_fixed_days = models.BooleanField(default=False)
-    permissions = models.BigIntegerField(default=0)
+    # permissions = models.BigIntegerField(default=0)
 
     middle_name = models.CharField(max_length=64, blank=True, null=True)
 
@@ -562,26 +562,6 @@ class WorkerDayChangeLog(models.Model):
     comment = models.CharField(max_length=128, default='', blank=True)
 
 
-class NotificationsQuerySet(models.query.QuerySet):
-    def qos_active(self, recipient):
-        """
-        :return: not expired notificiations (notifications is not expited if it appeared less than 7 days ago
-        """
-        return self.filter(
-            dttm_added__gt=datetime.datetime.now() -
-            datetime.timedelta(days=7),
-            to_worker=recipient
-        )
-
-    def qos_unread(self, recipient):
-        """
-
-        :return: unread and not expired notifications
-        """
-
-        return self.qos_active(recipient).filter(was_read=False)
-
-
 class Notifications(models.Model):
     TYPE_SUCCESS = 'S'
     TYPE_INFO = 'I'
@@ -613,11 +593,6 @@ class Notifications(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, blank=True, null=True)
     object_id = models.PositiveIntegerField(blank=True, null=True)
     object = GenericForeignKey(ct_field='content_type', fk_field='object_id')
-
-    def timesince(self, dttm_now=datetime.datetime.now()):
-        return int((dttm_now - self.dttm_added).total_seconds()/60)
-
-    objects = NotificationsQuerySet.as_manager()
 
 
 class OfficialHolidays(models.Model):
