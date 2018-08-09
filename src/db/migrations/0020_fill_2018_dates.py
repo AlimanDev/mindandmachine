@@ -22,7 +22,7 @@ def fill_days(apps, schema_editor):
     # import pdb
     # pdb.set_trace()
 
-    months['months'] = pd.to_datetime(months['months'])
+    months['months'] = pd.to_datetime(months['months'], format=QOS_DATE_FORMAT)
     for row in months.iterrows():
         el = row[1]
         ProductionMonth.objects.get_or_create(
