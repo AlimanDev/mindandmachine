@@ -15,7 +15,9 @@ from src.db.models import (
     WorkerDayCashboxDetails,
     PeriodDemand,
     CashboxType,
+    Shop
 )
+from src.util.forms import FormUtil
 from src.util.models_converter import (
     UserConverter,
     BaseConverter,
@@ -36,9 +38,14 @@ from src.main.download.forms import GetTable
 from .utils import count_difference_of_normal_days
 
 
-@api_method('GET', SelectCashiersForm)
+@api_method(
+    'GET',
+    SelectCashiersForm,
+    groups=User.__except_cashiers__,
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
+)
 def select_cashiers(request, form):
-    shop_id = request.user.shop_id
+    shop_id = FormUtil.get_shop_id(request, form)
 
     users = User.objects.filter(shop_id=shop_id)
 
@@ -390,7 +397,12 @@ def get_table(request):
     return response
 
 
-@api_method('GET', GetWorkerStatForm)
+@api_method(
+    'GET',
+    GetWorkerStatForm,
+    groups=User.__except_cashiers__,
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
+)
 def get_month_stat(request, form):
     # prepare data
     dt_start = datetime.date(form['dt'].year, form['dt'].month, 1)
@@ -401,9 +413,7 @@ def get_month_stat(request, form):
     worker_ids = form['worker_ids']
 
     if (worker_ids is None) or (len(worker_ids) == 0):
-        shop_id = form['shop_id']
-        if not shop_id:
-            shop_id = request.user.shop_id
+        shop_id = FormUtil.get_shop_id(request, form)
 
         usrs = usrs.filter(shop_id=shop_id)
     else:

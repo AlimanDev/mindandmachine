@@ -16,7 +16,10 @@ from collections import defaultdict
 import datetime
 
 
-@api_method('GET', GetDepartmentForm)
+@api_method(
+    'GET',
+    GetDepartmentForm,
+)
 def get_department(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
 

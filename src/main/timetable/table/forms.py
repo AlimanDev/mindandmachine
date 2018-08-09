@@ -13,6 +13,7 @@ class SelectCashiersForm(forms.Form):
     work_types = forms.CharField(required=False)
     workday_type = forms.CharField(required=False)
     workdays = forms.CharField(required=False)
+    shop_id = forms.IntegerField(required=False)
 
     work_workdays = forms.CharField(required=False)
     from_tm = util_forms.TimeField(required=False)

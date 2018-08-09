@@ -17,6 +17,7 @@ from django.db.models import Avg
 from src.conf.djconfig import QOS_DATETIME_FORMAT
 
 from src.util.utils import api_method, JsonResponse
+from src.util.forms import FormUtil
 from .utils import time_diff, is_midnight_period, get_status_and_details
 from .forms import GetCashboxesInfo, GetCashiersInfo, ChangeCashierStatus
 from django.utils.timezone import now
@@ -28,13 +29,13 @@ from src.util.collection import group_by
     'GET',
     GetCashboxesInfo,
     groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
 )
 def get_cashboxes_info(request, form):
     response = {}
     dttm_now = now() + timedelta(hours=3)
 
-    shop_id = form['shop_id']
+    shop_id = FormUtil.get_shop_id(request, form)
 
     list_of_cashbox = Cashbox.objects.qos_filter_active(
         dttm_now,
@@ -101,7 +102,7 @@ def get_cashboxes_info(request, form):
     'GET',
     GetCashiersInfo,
     groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
 )
 def get_cashiers_info(request, form):
     """
@@ -112,7 +113,7 @@ def get_cashiers_info(request, form):
     :return: complicated dict (see the code below)
     """
 
-    shop_id = form['shop_id']
+    shop_id = FormUtil.get_shop_id(request, form)
     dttm = form['dttm']
     response = {}
 

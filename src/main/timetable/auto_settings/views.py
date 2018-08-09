@@ -51,10 +51,10 @@ from ..table.utils import count_difference_of_normal_days
     'GET',
     GetStatusForm,
     groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
 )
 def get_status(request, form):
-    shop_id = form['shop_id']
+    shop_id = FormUtil.get_shop_id(request, form)
     try:
         tt = Timetable.objects.get(shop_id=shop_id, dt=form['dt'])
     except Timetable.DoesNotExist:

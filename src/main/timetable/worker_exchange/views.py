@@ -2,7 +2,8 @@ from src.db.models import (
     PeriodDemand,
     WorkerCashboxInfo,
     CashboxType,
-    User
+    User,
+    Shop
 )
 from datetime import datetime, time, timedelta
 from .forms import GetWorkersToExchange
@@ -17,11 +18,19 @@ from src.util.collection import group_by
 from src.util.models_converter import UserConverter
 
 
-@api_method('GET', GetWorkersToExchange)
+@api_method(
+    'GET',
+    GetWorkersToExchange,
+    groups=User.__except_cashiers__,
+    lambda_func=lambda x: CashboxType.objects.get(id=x['specialization']).shop
+)
 def get_workers_to_exchange(request, form):
     ct_type = form['specialization']
     dttm_exchange = form['dttm']
-    shop_id = form['shop_id'] if form['shop_id'] else request.user.shop_id
+    try:
+        shop_id = CashboxType.objects.get(id=ct_type).shop.id
+    except Shop.DoesNotExist:
+        shop_id = request.user.shop_id
 
     day_begin_dttm = datetime.combine(dttm_exchange.date(), time(6, 30))
     day_end_dttm = datetime.combine(dttm_exchange.date() + timedelta(days=1), time(2, 0))

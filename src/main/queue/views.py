@@ -18,7 +18,7 @@ from .forms import GetTimeDistributionForm, GetIndicatorsForm, GetParametersForm
     'GET',
     GetIndicatorsForm,
     groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
 )
 def get_indicators(request, form):
     dt_from = form['from_dt']
@@ -26,10 +26,10 @@ def get_indicators(request, form):
 
     forecast_type = form['type']
 
-    shop_id = form['shop_id']
+    shop_id = FormUtil.get_shop_id(request, form)
 
     try:
-        linear_cashbox_type = CashboxType.objects.get(shop_id=shop_id, name='Линия')
+        linear_cashbox_type = CashboxType.objects.get(shop_id=shop_id, is_main_type=True)
     except:
         return JsonResponse.internal_error('Cannot get linear cashbox')
 
@@ -91,7 +91,7 @@ def get_indicators(request, form):
     'GET',
     GetTimeDistributionForm,
     groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
 )
 def get_time_distribution(request, form):
     cashbox_type_ids = form['cashbox_type_ids']
@@ -146,10 +146,7 @@ def get_time_distribution(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def get_parameters(request, form):
-    try:
-        shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
-    except:
-        return JsonResponse.value_error('Cannot get shop')
+    shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
 
     return JsonResponse.success({
         'mean_queue_length': shop.mean_queue_length,
@@ -164,10 +161,7 @@ def get_parameters(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def set_parameters(request, form):
-    try:
-        shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
-    except:
-        return JsonResponse.value_error('Cannot get shop')
+    shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
 
     shop.mean_queue_length = form['mean_queue_length']
     shop.max_queue_length = form['max_queue_length']

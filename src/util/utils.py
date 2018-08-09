@@ -113,9 +113,9 @@ def api_method(method, form_cls=None, auth_required=True, groups=None, lambda_fu
 
             if request.user.is_authenticated and auth_required:
                 user_group = request.user.group
+
                 if lambda_func is not None:
                     cleaned_data = lambda_func(form.cleaned_data)
-
                     if groups:
                         if user_group in groups:
                             if user_group == User.GROUP_CASHIER:

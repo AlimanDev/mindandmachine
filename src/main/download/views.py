@@ -8,6 +8,7 @@ from src.db.models import (
 )
 
 from .xlsx.tabel import Tabel_xlsx
+from src.util.forms import FormUtil
 import json
 
 
@@ -15,13 +16,14 @@ import json
     'GET',
     GetTable,
     groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
 )
 @xlsx_method
 def get_tabel(request, workbook, form):
     ws = workbook.add_worksheet(Tabel_xlsx.MONTH_NAMES[form['weekday'].month])
 
-    shop = Shop.objects.get(id=form['shop_id'])
+    shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
+
     tabel = Tabel_xlsx(
         workbook,
         shop,

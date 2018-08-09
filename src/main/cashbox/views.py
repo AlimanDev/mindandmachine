@@ -12,7 +12,7 @@ from .forms import GetTypesForm, GetCashboxesForm, CreateCashboxForm, DeleteCash
     'GET',
     GetTypesForm,
     groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
 )
 def get_types(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
@@ -32,7 +32,7 @@ def get_types(request, form):
     'GET',
     GetCashboxesForm,
     groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
 )
 def get_cashboxes(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
@@ -60,7 +60,7 @@ def get_cashboxes(request, form):
 
 
 @api_method(
-    'POST',
+    'GET',
     CreateCashboxForm,
     lambda_func=lambda x: CashboxType.objects.get(id=x['cashbox_type_id']).shop
 )
@@ -93,7 +93,7 @@ def create_cashbox(request, form):
 
 
 @api_method(
-    'POST',
+    'GET',
     DeleteCashboxForm,
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )

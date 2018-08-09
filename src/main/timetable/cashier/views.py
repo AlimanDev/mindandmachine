@@ -15,6 +15,7 @@ from src.db.models import (
     Shop,
 )
 from src.util.utils import JsonResponse, api_method
+from src.util.forms import FormUtil
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
 from src.util.collection import group_by, count, range_u, group_by_object
@@ -38,14 +39,11 @@ from . import utils
     'GET',
     GetCashiersListForm,
     groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
 )
 def get_cashiers_list(request, form):
     users = []
-    if form['shop_id']:
-        shop_id = form['shop_id']
-    else:
-        shop_id = request.user.shop_id
+    shop_id = FormUtil.get_shop_id(request, form)
     # todo: прочекать что все ок
     for u in User.objects.filter(shop_id=shop_id).order_by('last_name', 'first_name'):
         if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
@@ -59,14 +57,11 @@ def get_cashiers_list(request, form):
     'GET',
     GetCashiersListForm,
     groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
 )
 def get_not_working_cashiers_list(request, form):
     dt_now = datetime.now() + timedelta(hours=3)
-    if form['shop_id']:
-        shop_id = form['shop_id']
-    else:
-        shop_id = request.user.shop_id
+    shop_id = FormUtil.get_shop_id(request, form)
 
     users_not_working_today = []
     for u in WorkerDay.objects.select_related('worker').filter(dt=dt_now.date(), worker__shop_id=shop_id).\
@@ -83,7 +78,7 @@ def get_not_working_cashiers_list(request, form):
     'GET',
     GetCashierTimetableForm,
     groups=User.__all_groups__,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id'][0])
+    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
 def get_cashier_timetable(request, form):
     if form['format'] == 'excel':

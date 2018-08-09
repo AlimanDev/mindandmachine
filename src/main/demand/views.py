@@ -18,7 +18,7 @@ from .forms import GetForecastForm, SetDemandForm, GetIndicatorsForm
     'GET',
     GetIndicatorsForm,
     groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
 )
 def get_indicators(request, form):
     dt_from = form['from_dt']
@@ -97,7 +97,7 @@ def get_indicators(request, form):
     'GET',
     GetForecastForm,
     groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
 )
 def get_forecast(request, form):
     if form['format'] == 'excel':
@@ -107,7 +107,7 @@ def get_forecast(request, form):
     data_types = PeriodDemand.Type.values()
     cashbox_type_ids = form['cashbox_type_ids']
 
-    shop_id = cashbox_type_ids[0].shop.id
+    shop_id = FormUtil.get_shop_id(request, form)
 
 
     period_demand = PeriodDemand.objects.select_related(
@@ -199,7 +199,7 @@ def set_demand(request, form):
     dttm_from = form['from_dttm']
     dttm_to = form['to_dttm']
 
-    shop_id = form['shop_id']
+    shop_id = FormUtil.get_shop_id(request, form)
 
     period_demands = PeriodDemand.objects.select_related(
         'cashbox_type'
