@@ -20,6 +20,7 @@ class TestTablet(LocalTestCase):
             super_shop=self.superShop,
             title='Shop1',
             hidden_title='Shop1',
+            break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]]
         )
         self.shop2 = Shop.objects.create(
             id=2,
@@ -27,7 +28,6 @@ class TestTablet(LocalTestCase):
             title='Shop2',
             hidden_title='Shop2',
         )
-
         self.user1 = create_user(user_id=1, shop_id=self.shop, username='user1')
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2')
         self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3')
@@ -111,6 +111,8 @@ class TestTablet(LocalTestCase):
             create_camera_cashbox_stat(self.cameracashbox, test_time, i)
             test_time -= datetime.timedelta(seconds=10)
 
+
+
     def test_get_cashboxes_info(self):
         self.auth()
         response = self.api_get('/api/tablet/get_cashboxes_info?shop_id=1')
@@ -192,3 +194,70 @@ class TestTablet(LocalTestCase):
         api_cashiers_inf(worker_id=self.cashbox2.id, status='H', shop_id=self.shop.id)
 
         # print('\n\n\n\n', response, response.json, '\n\n\n\n')
+
+
+
+
+
+    def test_aggr(self):
+        from src.db.models import User,WorkerDay, WorkerMonthStat, ProductionMonth
+        dt = now().date()
+        import json
+        from .utils import time_diff
+        # hours = time_diff(tm_from, tm_to)
+        last_user_id = ''
+        work_hours = 0
+        work_days = 0
+        # product_month = ProductionMonth.objects.filter(
+        #     # dt_first=datetime.date(year=dt.year, month=dt.month, day=1)
+        # )
+        product_month = ProductionMonth.objects.all().order_by('dt_first')
+        for i in product_month:
+            print(i.id, i.dt_first, i.total_days, i.norm_work_days, i.norm_work_hours)
+        # shops = Shop.objects.all()
+        # for shop in shops:
+        #     print(shop.title)
+        #
+        #     status = WorkerDay.objects.select_related('worker').filter(
+        #         worker_shop=shop,
+        #         dt__lt=datetime.date(year=dt.year, month=dt.month, day=1),
+        #         dt__gte=datetime.date(year=dt.year, month=dt.month-2, day=1),
+        #     ).order_by('worker')
+        #
+        #     break_triplets = shop.break_triplets
+        #     list_of_break_triplets = json.loads(break_triplets)
+        #     for item in status:
+        #         print(item.worker.username)
+        #         time_break_triplets = 0
+        #         duration_of_workerday = round(time_diff(item.tm_work_start, item.tm_work_end) / 60)
+        #
+        #         for triplet in list_of_break_triplets:
+        #             if float(triplet[0]) < duration_of_workerday <= float(triplet[1]):
+        #
+        #                 for time_triplet in triplet[2]:
+        #                     time_break_triplets += time_triplet
+        #         duration_of_workerday -= time_break_triplets
+        #         if last_user_id:
+        #             if last_user_id == item.worker.id:
+        #                 work_hours += duration_of_workerday
+        #                 work_days += 1
+        #                 print(duration_of_workerday)
+        #             else:
+        #                 print('===========', last_user_id, work_hours, work_days)
+        #                 # пишем в базу и обнуляем
+        #                 WorkerMonthStat.objects.update_or_create(
+        #                     worker=last_user_id,
+        #
+        #                 )
+        #                 work_hours = duration_of_workerday
+        #                 work_days = 1
+        #         else:
+        #             work_hours = duration_of_workerday
+        #             work_days = 1
+        #         # print('duration_of_work', duration_of_workerday,  time_break_triplets)
+        #         last_user_id = item.worker.id
+        #     print('===========', last_user_id, work_hours, work_days)
+        #     last_user_id = ''
+        #     work_hours = 0
+        #     work_days = 0
+        #     # пишем в базу

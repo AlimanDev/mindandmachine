@@ -1,6 +1,6 @@
 import json
 from django.test import TestCase
-from src.db.models import User, WorkerDay, CameraCashboxStat, CashboxType, PeriodDemand
+from src.db.models import User, WorkerDay, CameraCashboxStat, CashboxType, PeriodDemand, ProductionMonth
 import datetime
 
 
