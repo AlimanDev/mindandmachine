@@ -307,17 +307,18 @@ def from_other_spec(arguments_dict):
             if int(predict_diff_dict[cashbox_type]) + 1 < number_of_workers and number_of_workers > 1 and to_consider[cashbox_type]:
                 for user in users_working_on_hard_cts_at_dttm[cashbox_type]:
                     if user in arguments_dict['users_who_can_work']:
+                        worker_day_obj = WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user)
                         if (number_of_workers - int(predict_diff_dict[cashbox_type])) / number_of_workers > excess_percent:
                             users_for_exchange[user.id] = set_response_dict(
                                 ChangeType.from_other_spec_part.value,
-                                WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start,
-                                WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end
+                                worker_day_obj.tm_work_start,
+                                worker_day_obj.tm_work_end
                             )
                         else:
                             users_for_exchange[user.id] = set_response_dict(
                                 ChangeType.from_other_spec.value,
-                                WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start,
-                                WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end
+                                worker_day_obj.tm_work_start,
+                                worker_day_obj.tm_work_end
                             )
 
             else:
@@ -615,10 +616,11 @@ def sos_group(arguments_dict):
         users_working_on_lines = get_cashiers_working_at_time_on(dttm_exchange, line_ct_id)  # dict {ct_id: users}
         for user in users_working_on_lines[line_ct_id]:
             if user.work_type == User.WorkType.TYPE_SOS.value:
+                worker_day_obj = WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user)
                 users_for_exchange[user.id] = set_response_dict(
                     ChangeType.sos_group.value,
-                    WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_start,
-                    WorkerDay.objects.get(dt=dttm_exchange.date(), worker=user).tm_work_end
+                    worker_day_obj.tm_work_start,
+                    worker_day_obj.tm_work_end
                 )
 
     return users_for_exchange
