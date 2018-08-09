@@ -14,11 +14,11 @@ class AuthTestCase(LocalTestCase):
                 'password': LocalTestCase.USER_PASSWORD,
             }
         )
-        self.assertEqual(response.json['data']['id'], 11)
+        self.assertEqual(response.json['data']['id'], 1)
 
         response = self.api_get('/api/auth/is_signed')
         self.assertEqual(response.json['data']['is_signed'], True)
-        self.assertEqual(response.json['data']['user']['id'], 11)
+        self.assertEqual(response.json['data']['user']['id'], 1)
 
         response = self.api_post('/api/auth/signout')
         self.assertEqual(response.status_code, 200)
