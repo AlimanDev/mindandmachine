@@ -41,7 +41,14 @@ from src.util.models_converter import (
     SlotConverter,
 )
 from src.util.utils import api_method, JsonResponse
-from .forms import GetStatusForm, SetSelectedCashiersForm, CreateTimetableForm, DeleteTimetableForm, SetTimetableForm
+from .forms import (
+    GetStatusForm,
+    SetSelectedCashiersForm,
+    CreateTimetableForm,
+    DeleteTimetableForm,
+    SetTimetableForm,
+    CreatePredictBillsRequestForm,
+)
 import requests
 from .utils import time2int
 from ..table.utils import count_difference_of_normal_days
@@ -421,3 +428,21 @@ def set_timetable(request, form):
             })
 
     return JsonResponse.success()
+
+
+@api_method('POST', CreatePredictBillsRequestForm)
+def create_predbills_request(request, form):
+    shop_id = FormUtil.get_shop_id(request, form)
+    dt = form['dt']
+
+    period_demands = PeriodDemand.objects.filter(type=PeriodDemand.Type.LONG_FORECAST.value)
+
+    aggregation_dict = [
+        {
+            'cashbox_type_id': period_demand.cashbox_type.id,
+            'bills': period_demand.clients,
+            'hours': period_demand.dttm_forecast.hour,
+            'period': 0 if period_demand.dttm_forecast.minute < 30 else 1,
+            'date': BaseConverter.convert_date(period_demand.dttm_forecast.date)
+        } for period_demand in period_demands
+    ]
