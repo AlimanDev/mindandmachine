@@ -176,7 +176,7 @@ class User(DjangoAbstractUser):
     )
 
     __all_groups__ = [x[0] for x in GROUP_TYPE]
-    __except_cashiers__ = [x[0] for x in GROUP_TYPE if x[1] != 'cashiers']
+    __except_cashiers__ = [x[0] for x in GROUP_TYPE if x[0] != GROUP_CASHIER]
     __allowed_to_modify__ = [GROUP_SUPERVISOR, GROUP_DIRECTOR]
 
     id = models.BigAutoField(primary_key=True)
