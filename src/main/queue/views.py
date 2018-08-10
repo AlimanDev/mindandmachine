@@ -14,12 +14,7 @@ from src.util.utils import api_method, JsonResponse
 from .forms import GetTimeDistributionForm, GetIndicatorsForm, GetParametersForm, SetParametersForm
 
 
-@api_method(
-    'GET',
-    GetIndicatorsForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetIndicatorsForm)
 def get_indicators(request, form):
     dt_from = form['from_dt']
     dt_to = form['to_dt']
@@ -87,12 +82,7 @@ def get_indicators(request, form):
     })
 
 
-@api_method(
-    'GET',
-    GetTimeDistributionForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET',GetTimeDistributionForm)
 def get_time_distribution(request, form):
     cashbox_type_ids = form['cashbox_type_ids']
 
@@ -142,7 +132,6 @@ def get_time_distribution(request, form):
 @api_method(
     'GET',
     GetParametersForm,
-    groups=User.__except_cashiers__,
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def get_parameters(request, form):

@@ -19,3 +19,5 @@ db.sqlite3
 qos_backend.log*
 
 venv/*
+celerybeat-schedule
+celerybeat.pid

@@ -8,12 +8,7 @@ from src.util.models_converter import CashboxTypeConverter, CashboxConverter
 from .forms import GetTypesForm, GetCashboxesForm, CreateCashboxForm, DeleteCashboxForm, UpdateCashboxForm
 
 
-@api_method(
-    'GET',
-    GetTypesForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetTypesForm, groups=User.__all_groups__)
 def get_types(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
 
@@ -28,12 +23,7 @@ def get_types(request, form):
     )
 
 
-@api_method(
-    'GET',
-    GetCashboxesForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetCashboxesForm, groups=User.__all_groups__)
 def get_cashboxes(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     dt_from = FormUtil.get_dt_from(form)
@@ -60,7 +50,7 @@ def get_cashboxes(request, form):
 
 
 @api_method(
-    'GET',
+    'POST',
     CreateCashboxForm,
     lambda_func=lambda x: CashboxType.objects.get(id=x['cashbox_type_id']).shop
 )

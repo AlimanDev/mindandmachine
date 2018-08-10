@@ -71,13 +71,12 @@ class JsonResponse(object):
         return HttpResponse(json.dumps(response_data, separators=(',', ':')), content_type='application/json')
 
 
-def api_method(method, form_cls=None, auth_required=True, group_required=True, groups=None, lambda_func=None):
+def api_method(method, form_cls=None, auth_required=True, groups=None, lambda_func=None):
     """
 
     :param method:
     :param form_cls:
     :param auth_required:
-    :param group_required:
     :param groups: User.group_type list
     :param lambda_func: False -- on object creation
     :return:
@@ -96,6 +95,8 @@ def api_method(method, form_cls=None, auth_required=True, group_required=True, g
             if request.method != method:
                 return JsonResponse.method_error(request.method, method)
 
+            form = None
+
             if form_cls is not None:
                 if request.method == 'GET':
                     form_params = request.GET
@@ -112,20 +113,35 @@ def api_method(method, form_cls=None, auth_required=True, group_required=True, g
             else:
                 kwargs.pop('form', None)
 
-            # if request.user.is_authenticated and auth_required:
-            if group_required:
-                user_group = request.user.group
+            if form:  # for signout
+                if auth_required and request.user.is_authenticated:
+                    user_group = request.user.group
+                    # print(form.cleaned_data)
 
-                if lambda_func is not None:
-                    cleaned_data = lambda_func(form.cleaned_data)
+                    if lambda_func is None:
+                        cleaned_data = Shop.objects.filter(id=form.cleaned_data['shop_id']).first()
+                    else:
+                        cleaned_data = lambda_func(form.cleaned_data)
+
+                    # print(lambda_func)
+                    if groups is None:
+                        if method == 'GET':
+                            __groups = User.__except_cashiers__
+                        elif method == 'POST':
+                            __groups = User.__allowed_to_modify__
+                        else:
+                            return JsonResponse.method_error(method, '')
+                    else:
+                        __groups = groups
+
                     shop_id = None
                     super_shop_id = None
-                    # if not groups:
-                    #     groups = I
-                    if groups:
-                        if user_group in groups:
 
-                            if user_group == User.GROUP_CASHIER:
+                    if cleaned_data is not None:
+                        if user_group in __groups:
+                            if cleaned_data is False:
+                                pass
+                            elif user_group == User.GROUP_CASHIER:
                                 if request.user.id != cleaned_data.id:
                                     return JsonResponse.access_forbidden(
                                         'You are not allowed to get other cashiers information'
@@ -155,24 +171,7 @@ def api_method(method, form_cls=None, auth_required=True, group_required=True, g
                                     )
 
                         else:
-                            return JsonResponse.access_forbidden(user_group)
-
-                    if method == 'POST':
-                        if user_group not in User.__allowed_to_modify__:
-                            return JsonResponse.access_forbidden(
-                                'You are not allowed to modify any information'
-                            )
-                        else:
-                            if isinstance(cleaned_data, User):
-                                super_shop_id = cleaned_data.shop.super_shop_id
-                            elif isinstance(cleaned_data, Shop):
-                                super_shop_id = cleaned_data.super_shop_id
-                            if request.user.shop.super_shop_id != super_shop_id:
-                                return JsonResponse.access_forbidden(
-                                    'You are not allowed to modify outside of your super_shop'
-                                )
-                            elif cleaned_data is False:  # object creation
-                                pass
+                            return JsonResponse.access_forbidden('Your group is {}'.format(user_group))
 
             try:
                 return func(request, *args, **kwargs)

@@ -14,12 +14,7 @@ from src.util.utils import api_method, JsonResponse
 from .forms import GetForecastForm, SetDemandForm, GetIndicatorsForm
 
 
-@api_method(
-    'GET',
-    GetIndicatorsForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetIndicatorsForm)
 def get_indicators(request, form):
     dt_from = form['from_dt']
     dt_to = form['to_dt']
@@ -93,12 +88,7 @@ def get_indicators(request, form):
     })
 
 
-@api_method(
-    'GET',
-    GetForecastForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetForecastForm)
 def get_forecast(request, form):
     if form['format'] == 'excel':
         return JsonResponse.value_error('Excel is not supported yet')

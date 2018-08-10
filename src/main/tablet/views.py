@@ -25,12 +25,7 @@ from src.util.models_converter import WorkerCashboxInfoConverter
 from src.util.collection import group_by
 
 
-@api_method(
-    'GET',
-    GetCashboxesInfo,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetCashboxesInfo)
 def get_cashboxes_info(request, form):
     response = {}
     dttm_now = now() + timedelta(hours=3)
@@ -98,12 +93,7 @@ def get_cashboxes_info(request, form):
     return JsonResponse.success(response)
 
 
-@api_method(
-    'GET',
-    GetCashiersInfo,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetCashiersInfo)
 def get_cashiers_info(request, form):
     """
     gets status of all cashiers, working today

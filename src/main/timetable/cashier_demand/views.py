@@ -30,12 +30,7 @@ import xlsxwriter
 import io
 
 
-@api_method(
-    'GET',
-    GetCashiersTimetableForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
 
@@ -400,7 +395,6 @@ def get_cashiers_timetable(request, form):
 @api_method(
     'GET',
     GetWorkersForm,
-    groups=User.__except_cashiers__,
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def get_workers(request, form):
@@ -510,12 +504,7 @@ def get_workers(request, form):
     return JsonResponse.success(response)
 
 
-@api_method(
-    'GET',
-    GetCashiersTimetableForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetCashiersTimetableForm)
 def get_timetable_xlsx(request, form):
     shop = FormUtil.get_shop_id(request, form)
     dt_from = datetime(year=form['from_dt'].year, month=form['from_dt'].month, day=1)

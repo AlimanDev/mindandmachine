@@ -21,7 +21,6 @@ from src.util.models_converter import UserConverter
 @api_method(
     'GET',
     GetWorkersToExchange,
-    groups=User.__except_cashiers__,
     lambda_func=lambda x: CashboxType.objects.get(id=x['specialization']).shop
 )
 def get_workers_to_exchange(request, form):

@@ -38,12 +38,7 @@ from src.main.download.forms import GetTable
 from .utils import count_difference_of_normal_days
 
 
-@api_method(
-    'GET',
-    SelectCashiersForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', SelectCashiersForm)
 def select_cashiers(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
 
@@ -106,6 +101,7 @@ def select_cashiers(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
+@api_method('GET')
 def get_table(request):
     font_size = 12
     boarder_size = 1
@@ -397,12 +393,7 @@ def get_table(request):
     return response
 
 
-@api_method(
-    'GET',
-    GetWorkerStatForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetWorkerStatForm)
 def get_month_stat(request, form):
     # prepare data
     dt_start = datetime.date(form['dt'].year, form['dt'].month, 1)

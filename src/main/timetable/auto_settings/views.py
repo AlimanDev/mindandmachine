@@ -47,12 +47,7 @@ from .utils import time2int
 from ..table.utils import count_difference_of_normal_days
 
 
-@api_method(
-    'GET',
-    GetStatusForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetStatusForm)
 def get_status(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     try:

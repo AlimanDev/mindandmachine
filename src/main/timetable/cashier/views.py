@@ -35,12 +35,7 @@ from .forms import (
 from . import utils
 
 
-@api_method(
-    'GET',
-    GetCashiersListForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
     users = []
     shop_id = FormUtil.get_shop_id(request, form)
@@ -53,12 +48,7 @@ def get_cashiers_list(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
-@api_method(
-    'GET',
-    GetCashiersListForm,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetCashiersListForm)
 def get_not_working_cashiers_list(request, form):
     dt_now = datetime.now() + timedelta(hours=3)
     shop_id = FormUtil.get_shop_id(request, form)
@@ -78,7 +68,7 @@ def get_not_working_cashiers_list(request, form):
     'GET',
     GetCashierTimetableForm,
     groups=User.__all_groups__,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def get_cashier_timetable(request, form):
     if form['format'] == 'excel':

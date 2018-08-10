@@ -12,12 +12,7 @@ from src.util.forms import FormUtil
 import json
 
 
-@api_method(
-    'GET',
-    GetTable,
-    groups=User.__except_cashiers__,
-    lambda_func=lambda x: Shop.objects.filter(id=x['shop_id']).first()
-)
+@api_method('GET', GetTable)
 @xlsx_method
 def get_tabel(request, workbook, form):
     ws = workbook.add_worksheet(Tabel_xlsx.MONTH_NAMES[form['weekday'].month])
