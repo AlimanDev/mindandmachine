@@ -1,8 +1,6 @@
 import datetime
-
-from src.util.test import LocalTestCase, create_user, create_work_day, create_camera_cashbox_stat, create_cashbox_type, \
-    create_period_demand
-from src.db.models import Shop, SuperShop, Cashbox, CameraCashbox, WorkerDayCashboxDetails
+from src.util.test import LocalTestCase
+from src.db.models import WorkerDayCashboxDetails
 from src.util.models_converter import BaseConverter
 from django.utils.timezone import now
 

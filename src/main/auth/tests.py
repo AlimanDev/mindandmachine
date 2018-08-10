@@ -1,4 +1,3 @@
-from src.db.models import User
 from src.util.test import LocalTestCase
 
 

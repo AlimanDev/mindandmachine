@@ -1,7 +1,4 @@
-import datetime
-
 from src.util.test import LocalTestCase
-from src.db.models import User, Shop, SuperShop, Slot, WorkerConstraint, UserWeekdaySlot
 import json
 
 
