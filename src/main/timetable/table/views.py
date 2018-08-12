@@ -202,9 +202,12 @@ def get_table(request):
                 ).filter(
                     worker_day=workerday
                 ).first()
-            is_working_or_main_type = True if workerday_cashbox_details_object is None \
-                                           or not workerday_cashbox_details_object.cashbox_type.is_main_type\
-                                           else False
+
+            day_detail = workerday_cashbox_details_object  # alias
+            is_working_or_main_type = False
+            if day_detail is None or (day_detail.cashbox_type and not day_detail.cashbox_type.is_main_type):
+                is_working_or_main_type = True
+                
             bg_color_format = {'bg_color': '#D9D9D9'} if is_working_or_main_type else None
             to_align_right = align_right if is_working_or_main_type else None
             if workerday.tm_work_start is None\
