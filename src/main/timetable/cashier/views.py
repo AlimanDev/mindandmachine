@@ -82,6 +82,7 @@ def get_cashier_timetable(request, form):
     for worker_id in form['worker_id']:
         worker_days_db = WorkerDay.objects.filter(
             worker_id=worker_id,
+            worker__shop_id=form['shop_id'],
             dt__gte=from_dt,
             dt__lte=to_dt,
         ).order_by(

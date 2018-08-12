@@ -134,11 +134,12 @@ class PeriodDemandForecastType(forms.CharField):
 class FormUtil(object):
     @staticmethod
     def get_shop_id(request, form):
-        try:
-            shop_id = Shop.objects.get(id=form['shop_id']).id
-        except Shop.DoesNotExist:
-            shop_id = request.user.shop_id
-        return shop_id
+        return DictUtil.get_not_none(form, 'shop_id', request.user.shop_id)
+        # try:
+        #     shop_id = Shop.objects.get(id=form['shop_id']).id
+        # except Shop.DoesNotExist:
+        #     shop_id = request.user.shop_id
+        # return shop_id
 
     @staticmethod
     def get_dt_from(form):
