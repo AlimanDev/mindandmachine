@@ -2,16 +2,13 @@ from src.db.models import (
     Shop,
     SuperShop,
     User,
-    Notifications,
-    CashboxType,
     Slot,
-    WorkerConstraint,
     UserWeekdaySlot,
 )
 from src.util.forms import FormUtil
-from src.util.models_converter import ShopConverter, SuperShopConverter, NotificationConverter, BaseConverter
+from src.util.models_converter import ShopConverter, SuperShopConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
-from .forms import GetDepartmentForm, GetSuperShopForm, GetSuperShopListForm, GetNotificationsForm, GetNewNotificationsForm, SetNotificationsReadForm, GetSlots, GetAllSlots, SetSlot
+from .forms import GetDepartmentForm, GetSuperShopForm, GetSuperShopListForm, GetSlots, GetAllSlots, SetSlot
 from collections import defaultdict
 import datetime
 
@@ -81,55 +78,6 @@ def get_super_shop_list(request, form):
     return JsonResponse.success({
         'super_shops': [SuperShopConverter.convert(x) for x in super_shops.values()],
         'amount': len(super_shops)
-    })
-
-
-@api_method('GET', GetNotificationsForm)
-def get_notifications(request, form):
-    pointer = form.get('pointer')
-    count = form['count']
-
-    user = request.user
-
-    notifications = Notifications.objects.filter(to_worker=user).order_by('-id')
-    if pointer is not None:
-        notifications = notifications.filter(id__lt=pointer)
-    notifications = list(notifications[:count])
-
-    result = {
-        'get_noty_pointer': notifications[-1].id if len(notifications) > 0 else None,
-        'noty': [NotificationConverter.convert(x) for x in notifications]
-    }
-
-    if pointer is None:
-        result['get_new_noty_pointer'] = notifications[0].id if len(notifications) > 0 else -1
-        result['unread_count'] = Notifications.objects.filter(to_worker=user, was_read=False).count()
-
-    return JsonResponse.success(result)
-
-
-@api_method('GET', GetNewNotificationsForm)
-def get_new_notifications(request, form):
-    pointer = form['pointer']
-    count = form['count']
-
-    user = request.user
-
-    notifications = [x for x in reversed(Notifications.objects.filter(to_worker=user, id__gt=pointer).order_by('id')[:count])]
-    unread_count = Notifications.objects.filter(to_worker=user, was_read=False).count()
-
-    return JsonResponse.success({
-        'get_new_noty_pointer': notifications[0].id if len(notifications) > 0 else pointer,
-        'noty': [NotificationConverter.convert(x) for x in notifications],
-        'unread_count': unread_count
-    })
-
-
-@api_method('POST', SetNotificationsReadForm)
-def set_notifications_read(request, form):
-    count = Notifications.objects.filter(user=request.user, id__in=form['ids']).update(was_read=True)
-    return JsonResponse.success({
-        'updated_count': count
     })
 
 

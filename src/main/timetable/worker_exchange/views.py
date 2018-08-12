@@ -5,16 +5,15 @@ from src.db.models import (
     User,
     Shop
 )
-from datetime import datetime, time, timedelta
-from .forms import GetWorkersToExchange
+from .forms import (
+    GetWorkersToExchange
+)
 from .utils import (
     get_users_who_can_work_on_ct_type,
     ChangeTypeFunctions,
+    get_init_params
 )
 from src.util.utils import api_method, JsonResponse
-from django.db.models import Max
-
-from src.util.collection import group_by
 from src.util.models_converter import UserConverter
 
 
@@ -31,43 +30,17 @@ def get_workers_to_exchange(request, form):
     except Shop.DoesNotExist:
         shop_id = request.user.shop_id
 
-    day_begin_dttm = datetime.combine(dttm_exchange.date(), time(6, 30))
-    day_end_dttm = datetime.combine(dttm_exchange.date() + timedelta(days=1), time(2, 0))
-
-    cashbox_types_hard_dict = group_by(
-        CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD).order_by('id'),
-        group_key=lambda x: x.id
-    )
-
-    period_demand = PeriodDemand.objects.filter(
-        cashbox_type__shop_id=shop_id,
-        dttm_forecast__gte=day_begin_dttm,
-        dttm_forecast__lte=day_end_dttm,
-        type=PeriodDemand.Type.LONG_FORECAST.value,
-        cashbox_type_id__in=list(cashbox_types_hard_dict.keys())
-    ).order_by(
-        'type',
-        'dttm_forecast',
-        'cashbox_type_id'
-    )
-
-    mean_bills_per_step = WorkerCashboxInfo.objects.filter(
-        is_active=True,
-        cashbox_type_id__in=list(cashbox_types_hard_dict.keys())
-    ).values('cashbox_type_id').annotate(speed_usual=Max('mean_speed'))
-    mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
-
-    predict_demand = period_demand
-
     users_who_can_work_on_ct = get_users_who_can_work_on_ct_type(ct_type)
+
+    init_params_dict = get_init_params(dttm_exchange, shop_id)
 
     default_function_dict = {
         'shop_id': shop_id,
         'dttm_exchange': dttm_exchange,
         'ct_type': ct_type,
-        'predict_demand': predict_demand,
-        'mean_bills_per_step': mean_bills_per_step,
-        'cashbox_types': cashbox_types_hard_dict,
+        'predict_demand': init_params_dict['predict_demand'],
+        'mean_bills_per_step': init_params_dict['mean_bills_per_step'],
+        'cashbox_types': init_params_dict['cashbox_types_hard_dict'],
         'users_who_can_work': users_who_can_work_on_ct
     }
 

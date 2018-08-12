@@ -3,6 +3,8 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
     UserManager
 )
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 from . import utils
 import datetime
 
@@ -191,6 +193,7 @@ class User(DjangoAbstractUser):
         default=GROUP_CASHIER,
         choices=GROUP_TYPE
     )
+    # permissions = models.BigIntegerField(default=0)
 
     middle_name = models.CharField(max_length=64, blank=True, null=True)
 
@@ -582,11 +585,17 @@ class WorkerDayChangeLog(models.Model):
 
 
 class Notifications(models.Model):
-    class Type(utils.Enum):
-        SYSTEM_NOTICE = 1
-        CHANGE_REQUEST_NOTICE = 2
-        CHANGE_TIMETABLE_NOTICE = 3
-        CHANGE_WORKER_INFO = 4
+    TYPE_SUCCESS = 'S'
+    TYPE_INFO = 'I'
+    TYPE_WARNING = 'W'
+    TYPE_ERROR = 'E'
+
+    TYPES = (
+        (TYPE_SUCCESS, 'success'),
+        (TYPE_INFO, 'info'),
+        (TYPE_WARNING, 'warning'),
+        (TYPE_ERROR, 'error')
+    )
 
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(self.to_worker.last_name, self.to_worker.shop.title, self.to_worker.shop.super_shop.title, self.dttm_added, self.id)
@@ -601,11 +610,11 @@ class Notifications(models.Model):
     was_read = models.BooleanField(default=False)
 
     text = models.CharField(max_length=512)
-    type = utils.EnumField(Type)
+    type = models.CharField(max_length=1, choices=TYPES, default=TYPE_SUCCESS)
 
-    worker_day_change_request = models.ForeignKey(WorkerDayChangeRequest, on_delete=models.PROTECT, null=True, blank=True)
-    worker_day_change_log = models.ForeignKey(WorkerDayChangeLog, on_delete=models.PROTECT, null=True, blank=True)
-    period_demand_log = models.ForeignKey(PeriodDemandChangeLog, on_delete=models.PROTECT, null=True, blank=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, blank=True, null=True)
+    object_id = models.PositiveIntegerField(blank=True, null=True)
+    object = GenericForeignKey(ct_field='content_type', fk_field='object_id')
 
 
 class OfficialHolidays(models.Model):

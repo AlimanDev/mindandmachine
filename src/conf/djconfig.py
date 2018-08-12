@@ -184,6 +184,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'src.celery.tasks.release_all_workers',
         'schedule': crontab(hour=2, minute=0)
     },
+    'task-notify-cashiers-lack': {
+        'task': 'src.celery.tasks.notify_cashiers_lack',
+        'schedule': crontab(hour='*/1')
+    }
 }
 
 
