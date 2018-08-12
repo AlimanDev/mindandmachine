@@ -12,11 +12,13 @@ from src.db.models import (
     WorkerDayCashboxDetails,
     PeriodDemand,
     WorkerDayChangeLog,
+    Shop
 )
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
 from src.util.collection import range_u, group_by
 from src.util.models_converter import CashboxTypeConverter, UserConverter, WorkerDayConverter, WorkerCashboxInfoConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
+from src.util.forms import FormUtil
 from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
 
 from src.db.works.printer.run import run as get_xlsx
@@ -30,7 +32,7 @@ import io
 
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
-    shop_id = request.user.shop_id
+    shop_id = FormUtil.get_shop_id(request, form)
 
     if form['format'] == 'excel':
         def __file_name(__dt):
@@ -390,9 +392,13 @@ def get_cashiers_timetable(request, form):
 #
 #     return JsonResponse.success(response)
 
-@api_method('GET', GetWorkersForm)
+@api_method(
+    'GET',
+    GetWorkersForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def get_workers(request, form):
-    shop = request.user.shop
+    shop = form['shop_id']
 
     from_dt = form['from_dttm'].date()
     from_tm = form['from_dttm'].time()
@@ -500,7 +506,7 @@ def get_workers(request, form):
 
 @api_method('GET', GetCashiersTimetableForm)
 def get_timetable_xlsx(request, form):
-    shop = request.user.shop
+    shop = FormUtil.get_shop_id(request, form)
     dt_from = datetime(year=form['from_dt'].year, month=form['from_dt'].month, day=1)
     dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
     output = io.BytesIO()

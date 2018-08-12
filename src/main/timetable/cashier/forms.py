@@ -9,7 +9,6 @@ from src.util import forms as util_forms
 from src.util.models_converter import WorkerDayConverter, UserConverter, BaseConverter
 
 
-
 class GetCashiersListForm(forms.Form):
     dt_hired_before = util_forms.DateField(required=False)
     dt_fired_after = util_forms.DateField(required=False)
@@ -33,6 +32,7 @@ class GetCashierTimetableForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
     format = util_forms.ChoiceField(['raw', 'excel'], 'raw')
+    shop_id = forms.IntegerField()
 
     def clean(self):
         if self.errors:

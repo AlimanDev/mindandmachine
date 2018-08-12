@@ -15,6 +15,7 @@ from src.db.models import (
     Shop,
 )
 from src.util.utils import JsonResponse, api_method
+from src.util.forms import FormUtil
 from src.util.models_converter import UserConverter, WorkerDayConverter, WorkerDayChangeRequestConverter, WorkerDayChangeLogConverter, WorkerConstraintConverter, \
     WorkerCashboxInfoConverter, CashboxTypeConverter, BaseConverter
 from src.util.collection import group_by, count, range_u, group_by_object
@@ -37,10 +38,7 @@ from . import utils
 @api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
     users = []
-    if form['shop_id']:
-        shop_id = form['shop_id']
-    else:
-        shop_id = request.user.shop_id
+    shop_id = FormUtil.get_shop_id(request, form)
     # todo: прочекать что все ок
     for u in User.objects.filter(shop_id=shop_id).order_by('last_name', 'first_name'):
         if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
@@ -53,10 +51,7 @@ def get_cashiers_list(request, form):
 @api_method('GET', GetCashiersListForm)
 def get_not_working_cashiers_list(request, form):
     dt_now = datetime.now() + timedelta(hours=3)
-    if form['shop_id']:
-        shop_id = form['shop_id']
-    else:
-        shop_id = request.user.shop_id
+    shop_id = FormUtil.get_shop_id(request, form)
 
     users_not_working_today = []
     for u in WorkerDay.objects.select_related('worker').filter(dt=dt_now.date(), worker__shop_id=shop_id).\
@@ -69,7 +64,12 @@ def get_not_working_cashiers_list(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users_not_working_today])
 
 
-@api_method('GET', GetCashierTimetableForm)
+@api_method(
+    'GET',
+    GetCashierTimetableForm,
+    groups=User.__all_groups__,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def get_cashier_timetable(request, form):
     if form['format'] == 'excel':
         return JsonResponse.value_error('Excel is not supported yet')
@@ -82,6 +82,7 @@ def get_cashier_timetable(request, form):
     for worker_id in form['worker_id']:
         worker_days_db = WorkerDay.objects.filter(
             worker_id=worker_id,
+            worker__shop_id=form['shop_id'],
             dt__gte=from_dt,
             dt__lte=to_dt,
         ).order_by(
@@ -180,7 +181,12 @@ def get_cashier_timetable(request, form):
     return JsonResponse.success(response)
 
 
-@api_method('GET', GetCashierInfoForm)
+@api_method(
+    'GET',
+    GetCashierInfoForm,
+    groups=User.__all_groups__,
+    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+)
 def get_cashier_info(request, form):
     response = {}
 
@@ -240,7 +246,12 @@ def get_cashier_info(request, form):
     return JsonResponse.success(response)
 
 
-@api_method('GET', GetWorkerDayForm)
+@api_method(
+    'GET',
+    GetWorkerDayForm,
+    groups=User.__all_groups__,
+    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+)
 def get_worker_day(request, form):
     worker_id = form['worker_id']
     dt = form['dt']
@@ -292,7 +303,11 @@ def get_worker_day(request, form):
     })
 
 
-@api_method('POST', SetWorkerDaysForm)
+@api_method(
+    'POST',
+    SetWorkerDaysForm,
+    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+)
 def set_worker_days(request, form):
     worker = form['worker_id']
 
@@ -377,8 +392,11 @@ def set_worker_days(request, form):
     return JsonResponse.success({})
 
 
-
-@api_method('POST', SetWorkerDayForm)
+@api_method(
+    'POST',
+    SetWorkerDayForm,
+    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+)
 def set_worker_day(request, form):
     try:
         worker = User.objects.get(id=form['worker_id'])
@@ -425,7 +443,11 @@ def set_worker_day(request, form):
     return JsonResponse.success(response)
 
 
-@api_method('POST', SetCashierInfoForm)
+@api_method(
+    'POST',
+    SetCashierInfoForm,
+    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+)
 def set_cashier_info(request, form):
     try:
         worker = User.objects.get(id=form['worker_id'])
@@ -538,7 +560,11 @@ def set_cashier_info(request, form):
     return JsonResponse.success(response)
 
 
-@api_method('POST', CreateCashierForm)
+@api_method(
+    'POST',
+    CreateCashierForm,
+    lambda_func=lambda x: False
+)
 def create_cashier(request, form):
     try:
         user = User.objects.create_user(username=form['username'], password=form['password'], email='q@q.com')
@@ -555,7 +581,11 @@ def create_cashier(request, form):
     return JsonResponse.success(UserConverter.convert(user))
 
     
-@api_method('POST', DublicateCashierTimetableForm)
+@api_method(
+    'POST',
+    DublicateCashierTimetableForm,
+    lambda_func=lambda x: User.objects.get(id=x['main_worker_id'])
+)
 def dublicate_cashier_table(request, form):
 
     main_worker = form['main_worker_id']
@@ -661,7 +691,11 @@ def dublicate_cashier_table(request, form):
     return JsonResponse.success({})
 
 
-@api_method('POST', DeleteCashierForm)
+@api_method(
+    'POST',
+    DeleteCashierForm,
+    lambda_func=lambda x: User.objects.get(id=x['user_id'])
+)
 def delete_cashier(request, form):
     try:
         user = User.objects.get(id=form['user_id'])

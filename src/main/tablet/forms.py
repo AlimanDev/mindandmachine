@@ -9,11 +9,11 @@ from src.util.models_converter import PeriodDemandConverter
 
 
 class GetCashboxesInfo(forms.Form):
-    shop_id = forms.IntegerField()
+    shop_id = forms.IntegerField(required=False)
 
 
 class GetCashiersInfo(forms.Form):
-    shop_id = forms.IntegerField()
+    shop_id = forms.IntegerField(required=False)
     dttm = util_forms.DatetimeField()
 
 

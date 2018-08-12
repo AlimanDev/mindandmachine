@@ -3,6 +3,10 @@ import json
 from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.http import HttpResponse
+from src.db.models import (
+    User,
+    Shop
+)
 
 
 class JsonResponse(object):
@@ -36,11 +40,15 @@ class JsonResponse(object):
 
     @classmethod
     def auth_required(cls):
-        return cls.__base_error_response(403, 'AuthRequired')
+        return cls.__base_error_response(401, 'AuthRequired')
 
     @classmethod
     def csrf_required(cls):
-        return cls.__base_error_response(403, 'CsrfTokenRequired')
+        return cls.__base_error_response(401, 'CsrfTokenRequired')
+
+    @classmethod
+    def access_forbidden(cls, msg=''):
+        return cls.__base_error_response(403, 'AccessForbidden', msg)
 
     @classmethod
     def internal_error(cls, msg=''):
@@ -63,7 +71,16 @@ class JsonResponse(object):
         return HttpResponse(json.dumps(response_data, separators=(',', ':')), content_type='application/json')
 
 
-def api_method(method, form_cls=None, auth_required=True):
+def api_method(method, form_cls=None, auth_required=True, groups=None, lambda_func=None):
+    """
+
+    :param method:
+    :param form_cls:
+    :param auth_required:
+    :param groups: User.group_type list
+    :param lambda_func: False -- on object creation
+    :return:
+    """
     def decor(func):
         def wrapper(request, *args, **kwargs):
             if auth_required and not request.user.is_authenticated and settings.QOS_DEV_AUTOLOGIN_ENABLED:
@@ -77,6 +94,8 @@ def api_method(method, form_cls=None, auth_required=True):
 
             if request.method != method:
                 return JsonResponse.method_error(request.method, method)
+
+            form = None
 
             if form_cls is not None:
                 if request.method == 'GET':
@@ -93,6 +112,66 @@ def api_method(method, form_cls=None, auth_required=True):
                 kwargs['form'] = form.cleaned_data
             else:
                 kwargs.pop('form', None)
+
+            if form:  # for signout
+                if auth_required and request.user.is_authenticated:
+                    user_group = request.user.group
+                    # print(form.cleaned_data)
+
+                    if lambda_func is None:
+                        cleaned_data = Shop.objects.filter(id=form.cleaned_data['shop_id']).first()
+                    else:
+                        cleaned_data = lambda_func(form.cleaned_data)
+
+                    # print(lambda_func)
+                    if groups is None:
+                        if method == 'GET':
+                            __groups = User.__except_cashiers__
+                        elif method == 'POST':
+                            __groups = User.__allowed_to_modify__
+                        else:
+                            return JsonResponse.method_error(method, '')
+                    else:
+                        __groups = groups
+
+                    shop_id = None
+                    super_shop_id = None
+
+                    if cleaned_data is not None:
+                        if user_group in __groups:
+                            if cleaned_data is False:
+                                pass
+                            elif user_group == User.GROUP_CASHIER:
+                                if request.user.id != cleaned_data.id:
+                                    return JsonResponse.access_forbidden(
+                                        'You are not allowed to get other cashiers information'
+                                    )
+                            elif user_group == User.GROUP_MANAGER:
+                                if isinstance(cleaned_data, User):
+                                    shop_id = cleaned_data.shop_id
+                                elif isinstance(cleaned_data, Shop):
+                                    shop_id = cleaned_data.id
+                                if request.user.shop_id != shop_id:
+                                    return JsonResponse.access_forbidden(
+                                        'You are not allowed to modify outside of your shop'
+                                    )
+                            elif user_group == User.GROUP_DIRECTOR or user_group == User.GROUP_SUPERVISOR:
+                                if isinstance(cleaned_data, User):
+                                    super_shop_id = cleaned_data.shop.super_shop_id
+                                elif isinstance(cleaned_data, Shop):
+                                    super_shop_id = cleaned_data.super_shop_id
+                                if request.user.shop.super_shop_id != super_shop_id:
+                                    return JsonResponse.access_forbidden(
+                                        'You are not allowed to modify outside of your super_shop'
+                                    )
+                            elif user_group == User.GROUP_HQ:
+                                if request.method != 'GET':
+                                    JsonResponse.access_forbidden(
+                                        'You are not allowed to modify any information'
+                                    )
+
+                        else:
+                            return JsonResponse.access_forbidden('Your group is {}'.format(user_group))
 
             try:
                 return func(request, *args, **kwargs)

@@ -28,7 +28,7 @@ from src.db.models import (
 
 @admin.register(User)
 class QsUserAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'super_shop_title', 'cashbox_type_name', 'position_title', 'id')
+    list_display = ('first_name', 'last_name', 'super_shop_title', 'cashbox_type_name', 'position_title', 'id', 'group')
     search_fields = ('first_name', 'last_name', 'shop__super_shop__title', 'workercashboxinfo__cashbox_type__name', 'position__title', 'id')
     list_filter = ('shop', )
 

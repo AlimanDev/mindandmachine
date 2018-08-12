@@ -1,6 +1,6 @@
 import datetime
 
-from src.db.models import CashboxType, Cashbox
+from src.db.models import CashboxType, Cashbox, User, Shop
 from src.util.db import CashboxTypeUtil
 from src.util.forms import FormUtil
 from src.util.utils import JsonResponse, api_method
@@ -8,10 +8,9 @@ from src.util.models_converter import CashboxTypeConverter, CashboxConverter
 from .forms import GetTypesForm, GetCashboxesForm, CreateCashboxForm, DeleteCashboxForm, UpdateCashboxForm
 
 
-@api_method('GET', GetTypesForm)
+@api_method('GET', GetTypesForm, groups=User.__all_groups__)
 def get_types(request, form):
-    # shop_id = FormUtil.get_shop_id(request, form)
-    shop_id = form.get('shop_id', request.user.shop_id)
+    shop_id = FormUtil.get_shop_id(request, form)
 
     # todo: add selecting in time period
     types = CashboxType.objects.filter(
@@ -24,7 +23,7 @@ def get_types(request, form):
     )
 
 
-@api_method('GET', GetCashboxesForm)
+@api_method('GET', GetCashboxesForm, groups=User.__all_groups__)
 def get_cashboxes(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     dt_from = FormUtil.get_dt_from(form)
@@ -50,7 +49,11 @@ def get_cashboxes(request, form):
     })
 
 
-@api_method('POST', CreateCashboxForm)
+@api_method(
+    'POST',
+    CreateCashboxForm,
+    lambda_func=lambda x: CashboxType.objects.get(id=x['cashbox_type_id']).shop
+)
 def create_cashbox(request, form):
     cashbox_type_id = form['cashbox_type_id']
     cashbox_number = form['number']
@@ -79,7 +82,11 @@ def create_cashbox(request, form):
     })
 
 
-@api_method('POST', DeleteCashboxForm)
+@api_method(
+    'GET',
+    DeleteCashboxForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def delete_cashbox(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
 
@@ -105,7 +112,11 @@ def delete_cashbox(request, form):
     )
 
 
-@api_method('POST', UpdateCashboxForm)
+@api_method(
+    'POST',
+    UpdateCashboxForm,
+    lambda_func=lambda x: CashboxType.objects.get(id=x['to_cashbox_type_id'].shop)
+)
 def update_cashbox(request, form):
     cashbox_number = form['number']
 
