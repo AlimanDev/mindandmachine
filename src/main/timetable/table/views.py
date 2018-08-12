@@ -197,17 +197,16 @@ def get_table(request):
         )
 
         for workerday in workerdays:
-            workerday_cashbox_details_object = WorkerDayCashboxDetails.objects.select_related(
+            day_detail = WorkerDayCashboxDetails.objects.select_related(
                     'cashbox_type'
                 ).filter(
                     worker_day=workerday
                 ).first()
 
-            day_detail = workerday_cashbox_details_object  # alias
             is_working_or_main_type = False
             if day_detail is None or (day_detail.cashbox_type and not day_detail.cashbox_type.is_main_type):
                 is_working_or_main_type = True
-                
+
             bg_color_format = {'bg_color': '#D9D9D9'} if is_working_or_main_type else None
             to_align_right = align_right if is_working_or_main_type else None
             if workerday.tm_work_start is None\
@@ -230,12 +229,14 @@ def get_table(request):
             )
             # specialization
             try:
-                workerday_cashbox_details_first = workerday_cashbox_details_object
+                workerday_cashbox_details_first = day_detail
                 if workerday_cashbox_details_first is None:
                     worksheet.write_blank(row, 1, '', mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
                     worksheet.write_blank(row, 2, '', mix_formats(workbook, bold_right_cell_format, bold_format, bg_color_format, size_format))
                     raise WorkerDayCashboxDetails.DoesNotExist
-                worksheet.write(row, 1, workerday_cashbox_details_first.cashbox_type.name, mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
+
+                if workerday_cashbox_details_first.cashbox_type:
+                    worksheet.write(row, 1, workerday_cashbox_details_first.cashbox_type.name, mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
                 worksheet.write_blank(row, 2, '', mix_formats(workbook, bold_right_cell_format, bg_color_format, size_format))
             except WorkerDayCashboxDetails.DoesNotExist:
                 pass
