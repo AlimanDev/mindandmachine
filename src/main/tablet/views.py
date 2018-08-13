@@ -278,7 +278,7 @@ def change_cashier_status(request, form):
         status=WorkerDayCashboxDetails.TYPE_WORK,
     ).count()
     if cashbox_worked:
-        return JsonResponse.value_error('cashbox {} already opened'.format(cashbox_id))
+        return JsonResponse.value_error('cashbox already opened'.format(cashbox_id))
 
     # todo: add other checks for change statuses
     if (new_user_status == WorkerDayCashboxDetails.TYPE_FINISH) and (worker_day.type == WorkerDay.Type.TYPE_ABSENSE):
