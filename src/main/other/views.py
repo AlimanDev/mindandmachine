@@ -31,7 +31,7 @@ def get_department(request, form):
     })
 
 
-@api_method('GET', GetSuperShopForm)
+@api_method('GET', GetSuperShopForm, check_permissions=False)
 def get_super_shop(request, form):
     super_shop_id = form['super_shop_id']
 
@@ -48,7 +48,7 @@ def get_super_shop(request, form):
     })
 
 
-@api_method('GET', GetSuperShopListForm)
+@api_method('GET', GetSuperShopListForm, check_permissions=False)
 def get_super_shop_list(request, form):
     shops = Shop.objects.select_related('super_shop').all()
     super_shops = {}

@@ -4,7 +4,7 @@ from src.util.models_converter import NotificationConverter
 from.forms import SetNotificationsReadForm, GetNotificationsForm
 
 
-@api_method('GET', GetNotificationsForm)
+@api_method('GET', GetNotificationsForm, check_permissions=False)
 def get_notifications(request, form):
     pointer = form.get('pointer')
     count = form['count']
@@ -29,7 +29,7 @@ def get_notifications(request, form):
     return JsonResponse.success(result)
 
 
-@api_method('POST', SetNotificationsReadForm)
+@api_method('POST', SetNotificationsReadForm, check_permissions=False)
 def set_notifications_read(request, form):
     count = Notifications.objects.filter(to_worker=request.user, id__in=form['ids']).update(was_read=True)
     return JsonResponse.success({

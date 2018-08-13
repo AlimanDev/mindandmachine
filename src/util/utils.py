@@ -71,14 +71,22 @@ class JsonResponse(object):
         return HttpResponse(json.dumps(response_data, separators=(',', ':')), content_type='application/json')
 
 
-def api_method(method, form_cls=None, auth_required=True, groups=None, lambda_func=None):
+def api_method(
+        method,
+        form_cls=None,
+        auth_required=True,
+        check_permissions=True,
+        groups=None,
+        lambda_func=None
+    ):
     """
 
     :param method:
     :param form_cls:
     :param auth_required:
-    :param groups: User.group_type list
-    :param lambda_func: False -- on object creation
+    :param check_permissions: bool, отображает нужно ли делать проверку на доступ к функциям
+    :param groups: User.group_type list: группы доступа к функциям
+    :param lambda_func: False -- on object creation, функция которая исходя из данных формирует данные необходимые для проверки доступа
     :return:
     """
     def decor(func):
@@ -113,7 +121,7 @@ def api_method(method, form_cls=None, auth_required=True, groups=None, lambda_fu
             else:
                 kwargs.pop('form', None)
 
-            if form:  # for signout
+            if check_permissions:  # for signout
                 if auth_required and request.user.is_authenticated:
                     user_group = request.user.group
                     # print(form.cleaned_data)
