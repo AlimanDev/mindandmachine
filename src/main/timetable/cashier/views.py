@@ -160,8 +160,8 @@ def get_cashier_timetable(request, form):
             'holiday_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value),
             'sick_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_SICK.value),
             'vacation_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_VACATION.value),
-            'work_day_in_holidays_amount': count(worker_days, lambda
-                x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and x.dt in official_holidays),
+            'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and
+                                                 x.dt in official_holidays),
             'change_amount': len(worker_day_change_log)
         }
 
@@ -412,8 +412,8 @@ def set_worker_day(request, form):
     cashbox_updated = False
     try:
         WorkerDayCashboxDetails.objects.filter(worker_day=day).delete()
-        for item in details:
-            if day.type == WorkerDay.Type.TYPE_WORKDAY.value:
+        if day.type == WorkerDay.Type.TYPE_WORKDAY.value:
+            for item in details:
                 WorkerDayCashboxDetails.objects.create(
                     cashbox_type_id=item['cashBox_type'],
                     worker_day=day,
@@ -468,9 +468,9 @@ def set_cashier_info(request, form):
             cashboxtype_forecast = CashboxType.objects.get(id=cashbox.id)
             mean_speed = 1
             if cashboxtype_forecast.do_forecast == CashboxType.FORECAST_HARD:
-                mean_speed = WorkerCashboxInfo.objects \
-                    .filter(cashbox_type__id=cashbox.id) \
-                    .aggregate(Avg('mean_speed'))['mean_speed__avg']
+                mean_speed = WorkerCashboxInfo.objects.filter(
+                    cashbox_type__id=cashbox.id
+                ).aggregate(Avg('mean_speed'))['mean_speed__avg']
             obj, created = WorkerCashboxInfo.objects.update_or_create(
                 worker_id=worker.id,
                 cashbox_type_id=cashbox.id,
