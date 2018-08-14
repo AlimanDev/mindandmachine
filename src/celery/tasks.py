@@ -68,7 +68,7 @@ def release_all_workers():
 
 @app.task
 def update_worker_month_stat():
-    dt = now().date().replace(day=1)  # начало текущего месяца
+    dt = now().date().replace(day=1)
     delta = datetime.timedelta(days=20)
     dt1 = (dt - delta).replace(day=1)
     dt2 = (dt1 - delta).replace(day=1)
