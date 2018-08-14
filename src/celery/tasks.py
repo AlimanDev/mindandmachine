@@ -1,11 +1,29 @@
 import datetime
-from django.db.models import Avg
-from django.utils.timezone import now
 from src.main.tablet.utils import time_diff
 import json
 
-from src.db.models import PeriodDemand, CashboxType, CameraCashboxStat, WorkerDayCashboxDetails, WorkerDay, \
-    WorkerMonthStat, ProductionMonth, Shop
+from django.db.models import Avg
+from django.utils.timezone import now
+from datetime import timedelta
+
+from src.main.timetable.worker_exchange.utils import (
+    get_init_params,
+    has_deficiency
+)
+
+from src.db.models import (
+    PeriodDemand,
+    CashboxType,
+    CameraCashboxStat,
+    WorkerDayCashboxDetails,
+    WorkerMonthStat,
+    ProductionMonth,
+    WorkerDay,
+    Notifications,
+    Shop,
+    User
+)
+
 from src.celery.celery import app
 
 
@@ -160,3 +178,47 @@ def update_worker_month_stat():
         last_month_stat = ''
         work_hours = 0
         work_days = 0
+
+
+@app.task
+def notify_cashiers_lack():
+    for shop in Shop.objects.all():
+        dttm_now = now()
+        shop_id = shop.id
+
+        init_params_dict = get_init_params(dttm_now, shop_id)
+
+        return_dict = has_deficiency(
+            init_params_dict['predict_demand'],
+            init_params_dict['mean_bills_per_step'],
+            init_params_dict['cashbox_types_hard_dict'],
+            dttm_now
+        )
+
+        to_notify = False  # есть ли вообще нехватка
+        notification_text = None  # {ct type : 'notification_text' or False если нет нехватки }
+        for cashbox_type in return_dict.keys():
+            if return_dict[cashbox_type]:
+                to_notify = True
+                notification_text =\
+                'За типом кассы {} не хватает кассиров: {}. '.\
+                format(
+                    CashboxType.objects.get(id=cashbox_type).name,
+                    return_dict[cashbox_type]
+                )
+
+        managers_lists = User.objects.filter(shop_id=shop_id, work_type=User.WorkType.TYPE_MANAGER.value)
+        # если такого уведомления еще нет
+        if to_notify:
+            for manager in managers_lists:
+                if not Notifications.objects.filter(
+                        type=Notifications.TYPE_INFO,
+                        to_worker=manager,
+                        text=notification_text,
+                        dttm_added__lt=now() + timedelta(hours=2)):  # повторить уведомление раз в час
+                    Notifications.objects.create(
+                        type=Notifications.TYPE_INFO,
+                        to_worker=manager,
+                        text=notification_text
+                    )
+

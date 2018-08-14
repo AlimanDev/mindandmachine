@@ -15,7 +15,9 @@ from src.db.models import (
     WorkerDayCashboxDetails,
     PeriodDemand,
     CashboxType,
+    Shop
 )
+from src.util.forms import FormUtil
 from src.util.models_converter import (
     UserConverter,
     BaseConverter,
@@ -38,7 +40,7 @@ from .utils import count_difference_of_normal_days
 
 @api_method('GET', SelectCashiersForm)
 def select_cashiers(request, form):
-    shop_id = request.user.shop_id
+    shop_id = FormUtil.get_shop_id(request, form)
 
     users = User.objects.filter(shop_id=shop_id)
 
@@ -99,6 +101,7 @@ def select_cashiers(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
+@api_method('GET')
 def get_table(request):
     font_size = 12
     boarder_size = 1
@@ -194,14 +197,16 @@ def get_table(request):
         )
 
         for workerday in workerdays:
-            workerday_cashbox_details_object = WorkerDayCashboxDetails.objects.select_related(
+            day_detail = WorkerDayCashboxDetails.objects.select_related(
                     'cashbox_type'
                 ).filter(
                     worker_day=workerday
                 ).first()
-            is_working_or_main_type = True if workerday_cashbox_details_object is None \
-                                           or not workerday_cashbox_details_object.cashbox_type.is_main_type\
-                                           else False
+
+            is_working_or_main_type = False
+            if day_detail is None or (day_detail.cashbox_type and not day_detail.cashbox_type.is_main_type):
+                is_working_or_main_type = True
+
             bg_color_format = {'bg_color': '#D9D9D9'} if is_working_or_main_type else None
             to_align_right = align_right if is_working_or_main_type else None
             if workerday.tm_work_start is None\
@@ -224,12 +229,14 @@ def get_table(request):
             )
             # specialization
             try:
-                workerday_cashbox_details_first = workerday_cashbox_details_object
+                workerday_cashbox_details_first = day_detail
                 if workerday_cashbox_details_first is None:
                     worksheet.write_blank(row, 1, '', mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
                     worksheet.write_blank(row, 2, '', mix_formats(workbook, bold_right_cell_format, bold_format, bg_color_format, size_format))
                     raise WorkerDayCashboxDetails.DoesNotExist
-                worksheet.write(row, 1, workerday_cashbox_details_first.cashbox_type.name, mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
+
+                if workerday_cashbox_details_first.cashbox_type:
+                    worksheet.write(row, 1, workerday_cashbox_details_first.cashbox_type.name, mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
                 worksheet.write_blank(row, 2, '', mix_formats(workbook, bold_right_cell_format, bg_color_format, size_format))
             except WorkerDayCashboxDetails.DoesNotExist:
                 pass
@@ -401,9 +408,7 @@ def get_month_stat(request, form):
     worker_ids = form['worker_ids']
 
     if (worker_ids is None) or (len(worker_ids) == 0):
-        shop_id = form['shop_id']
-        if not shop_id:
-            shop_id = request.user.shop_id
+        shop_id = FormUtil.get_shop_id(request, form)
 
         usrs = usrs.filter(shop_id=shop_id)
     else:
