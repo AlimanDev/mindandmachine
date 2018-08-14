@@ -9,6 +9,7 @@ class GetCashiersTimetableForm(forms.Form):
     cashbox_type_ids = util_forms.IntegersList()
     format = util_forms.ChoiceField(['raw', 'excel'], default='raw')
     position_id = forms.IntegerField(required=False)
+    shop_id = forms.IntegerField(required=False)
 
     def clean(self):
         if self.errors:
@@ -22,6 +23,7 @@ class GetWorkersForm(forms.Form):
     from_dttm = util_forms.DatetimeField()
     to_dttm = util_forms.DatetimeField()
     cashbox_type_ids = util_forms.IntegersList()
+    shop_id = forms.IntegerField()
 
     def clean(self):
         if self.errors:

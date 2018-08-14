@@ -190,6 +190,10 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(day_of_month='1,15', hour=3, minute=0)
     },
 
+    'task-notify-cashiers-lack': {
+        'task': 'src.celery.tasks.notify_cashiers_lack',
+        'schedule': crontab(hour='*/1')
+    }
 }
 
 

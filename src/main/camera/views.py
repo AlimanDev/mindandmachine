@@ -8,7 +8,7 @@ from .forms import CameraStatFrom
 
 
 @csrf_exempt
-@api_method('POST', None, auth_required=False)
+@api_method('POST', None, auth_required=False, check_permissions=False)
 def set_queue(request):
     form = CamRequestForm(json.loads(request.body.decode('utf-8')))
     try:
