@@ -355,9 +355,7 @@ def get_table(request, form):
             for col in range(11):
                 worksheet.write_blank(row + i, col, '', mix_formats(workbook, size_format, border))
 
-
     output = io.BytesIO()
-    form = form.cleaned_data
     shop_id = FormUtil.get_shop_id(request, form)
     weekday = form['weekday']
 
