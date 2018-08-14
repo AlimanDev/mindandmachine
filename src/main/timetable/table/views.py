@@ -101,8 +101,8 @@ def select_cashiers(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
-@api_method('GET')
-def get_table(request):
+@api_method('GET', GetTable)
+def get_table(request, form):
     font_size = 12
     boarder_size = 1
     def mix_formats(workbook, *args):
@@ -357,11 +357,8 @@ def get_table(request):
 
 
     output = io.BytesIO()
-    form = GetTable(request.GET)
-    if not form.is_valid():
-        return JsonResponse.value_error(str(list(form.errors.items())))
     form = form.cleaned_data
-    shop_id = form['shop_id']
+    shop_id = FormUtil.get_shop_id(request, form)
     weekday = form['weekday']
 
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
