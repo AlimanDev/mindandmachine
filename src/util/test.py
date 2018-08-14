@@ -92,8 +92,7 @@ class LocalTestCase(TestCase):
             self.worker_day2 = create_work_day(self.shop.id, self.user2, dt=datetime.datetime(2018, 6, i))
             self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 6, i))
             if i < 10:
-                self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 7, i),
-                                                   tm_work_start=None, tm_work_end=None)
+                self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 7, i), type=5)
             else:
                 self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 7, i))
 
@@ -182,12 +181,12 @@ def create_user(user_id, shop_id, username, dt_hired=None,
     return user
 
 
-def create_work_day(worker_shop_id, worker, dt, tm_work_start=datetime.time(hour=12, minute=0, second=0),
+def create_work_day(worker_shop_id, worker, dt, type=2, tm_work_start=datetime.time(hour=12, minute=0, second=0),
                     tm_work_end=datetime.time(hour=23, minute=0, second=0)):
     worker_day = WorkerDay.objects.create(
         worker_shop_id=worker_shop_id,
         worker=worker,
-        type=2,
+        type=type,
         dt=dt,
         tm_work_start=tm_work_start,
         tm_work_end=tm_work_end,
