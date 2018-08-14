@@ -45,3 +45,8 @@ class SetTimetableForm(forms.Form):
 class CreatePredictBillsRequestForm(forms.Form):
     shop_id = forms.IntegerField()
     dt = util_forms.DateField()
+
+
+class SetPredictBillsForm(forms.Form):
+    key = forms.CharField()
+    data = forms.CharField()

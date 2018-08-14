@@ -7,4 +7,6 @@ urlpatterns = [
     path('create_timetable', views.create_timetable),
     path('delete_timetable', views.delete_timetable),
     path('set_timetable', views.set_timetable),
+    path('create_predbills', views.create_predbills_request),
+    path('set_predbills', views.set_pred_bills)
 ]

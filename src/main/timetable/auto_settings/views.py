@@ -48,6 +48,7 @@ from .forms import (
     DeleteTimetableForm,
     SetTimetableForm,
     CreatePredictBillsRequestForm,
+    SetPredictBillsForm
 )
 import requests
 from .utils import time2int
@@ -430,19 +431,74 @@ def set_timetable(request, form):
     return JsonResponse.success()
 
 
-@api_method('POST', CreatePredictBillsRequestForm)
+@api_method('GET', CreatePredictBillsRequestForm)
 def create_predbills_request(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     dt = form['dt']
+    years_to_collect = 2  # за последние years_to_collect года
+    from_dt_to_collect = datetime.now() - relativedelta(years=years_to_collect)
 
-    period_demands = PeriodDemand.objects.filter(type=PeriodDemand.Type.LONG_FORECAST.value)
+    period_demands = PeriodDemand.objects.select_related('cashbox_type').filter(
+        cashbox_type__shop_id=shop_id,
+        type=PeriodDemand.Type.LONG_FORECAST.value,
+        dttm_forecast__gt=from_dt_to_collect,
+        # id__gte=208000
+    )
 
-    aggregation_dict = [
-        {
-            'cashbox_type_id': period_demand.cashbox_type.id,
-            'bills': period_demand.clients,
-            'hours': period_demand.dttm_forecast.hour,
-            'period': 0 if period_demand.dttm_forecast.minute < 30 else 1,
-            'date': BaseConverter.convert_date(period_demand.dttm_forecast.date)
-        } for period_demand in period_demands
-    ]
+    aggregation_dict = {
+        'IP': settings.HOST_IP,
+        'dt': BaseConverter.convert_date(dt),
+        'period_demands': [
+            {
+                'CashType': period_demand.cashbox_type.id,
+                'products_amount': 0,
+                'positions': 0,
+                'bills': period_demand.clients,
+                'hours': period_demand.dttm_forecast.hour,
+                'period': 0 if period_demand.dttm_forecast.minute < 30 else 1,
+                'szDate': period_demand.dttm_forecast.date().strftime('%Y%m%d')
+            } for period_demand in period_demands
+        ]
+    }
+
+    try:
+        data = json.dumps(aggregation_dict).encode('ascii')
+        req = urllib.request.Request('http://{}/create_pred_bills'.format(settings.TIMETABLE_IP), data=data, headers={'content-type': 'application/json'})
+        with urllib.request.urlopen(req) as response:
+            res = response.read().decode('utf-8')
+        task_id = json.loads(res).get('task_id', '')
+        if task_id is None:
+            raise Exception('Error upon creating task')
+    except Exception as e:
+        print(e)
+        return JsonResponse.internal_error('Error sending data to server')
+
+    return JsonResponse.success()
+
+
+@csrf_exempt
+@api_method('POST', SetPredictBillsForm, auth_required=False)
+def set_pred_bills(request, form):
+    # if settings.QOS_SET_TIMETABLE_KEY is None:
+    #     return JsonResponse.internal_error('key is not configured')
+    #
+    # if form['key'] != settings.QOS_SET_TIMETABLE_KEY:
+    #     return JsonResponse.internal_error('invalid key')
+    print('зашел')
+    try:
+        data = json.loads(form['data'])
+    except:
+        return JsonResponse.internal_error('cannot parse json')
+    print('принял от qos_algo' + '\n')
+    print('on set pred bills' + 'data: ', data)
+    # try:
+    #     timetable = Timetable.objects.get(id=data['timetable_id'])
+    # except Timetable.DoesNotExist:
+    #     return JsonResponse.does_not_exists_error('timetable')
+
+    # timetable.status = TimetableConverter.parse_status(data['timetable_status'])
+    # timetable.save()
+    # if timetable.status != Timetable.Status.READY.value:
+    #     return JsonResponse.success()
+
+    return JsonResponse.success()
