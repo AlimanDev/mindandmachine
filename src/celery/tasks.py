@@ -80,8 +80,6 @@ def update_worker_month_stat():
     )
     shops = Shop.objects.all()
     for shop in shops:
-        product_month = None
-        last_month_stat = ''
         work_hours = 0
         work_days = 0
 
@@ -101,15 +99,16 @@ def update_worker_month_stat():
         ).order_by('worker', 'dt')
 
         last_user = worker_days[0].worker if len(worker_days) else None
+        last_month_stat = worker_days[0].dt.month if len(worker_days) else None
+        product_month = product_month_1 if last_month_stat == dt1.month else product_month_2
 
         for worker_day in worker_days:
             time_break_triplets = 0
+            duration_of_workerday = 0
 
             if worker_day.type in WorkerDay.TYPES_PAID:
-                work_days += 1
-
                 if worker_day.type != WorkerDay.Type.TYPE_WORKDAY.value and \
-                        worker_day.type != WorkerDay.Type.TYPE_WORKDAY.value:
+                        worker_day.type != WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
                     duration_of_workerday = ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK]
                 else:
                     duration_of_workerday = round(time_diff(worker_day.tm_work_start, worker_day.tm_work_end) / 3600, 3)
@@ -117,36 +116,28 @@ def update_worker_month_stat():
                     for triplet in list_of_break_triplets:
                         if float(triplet[0]) < duration_of_workerday * 60 <= float(triplet[1]):
                             time_break_triplets = triplet[2]
-
                     duration_of_workerday -= round(time_break_triplets / 60, 3)
 
-                if last_user.id == worker_day.worker.id and last_month_stat == worker_day.dt.month:
+            if last_user.id == worker_day.worker.id and last_month_stat == worker_day.dt.month:
+                if worker_day.type in WorkerDay.TYPES_PAID:
+                    work_days += 1
                     work_hours += duration_of_workerday
-                else:
-                    if last_month_stat == dt1.month:
-                        product_month = product_month_1
-                    else:
-                        product_month = product_month_2
-                    WorkerMonthStat.objects.update_or_create(
-                        worker=last_user,
-                        month=product_month,
-                        defaults={
-                            'work_days': work_days - 1,
-                            'work_hours': work_hours,
-                        })
+            else:
+                WorkerMonthStat.objects.update_or_create(
+                    worker=last_user,
+                    month=product_month,
+                    defaults={
+                        'work_days': work_days,
+                        'work_hours': work_hours,
+                    })
 
-                    work_hours = duration_of_workerday
-                    work_days = 1
-
+                work_hours = duration_of_workerday
+                work_days = 1 if worker_day.type in WorkerDay.TYPES_PAID else 0
                 last_user = worker_day.worker
                 last_month_stat = worker_day.dt.month
+                product_month = product_month_1 if last_month_stat == dt1.month else product_month_2
 
-                if last_month_stat == dt1.month:
-                    product_month = product_month_1
-                else:
-                    product_month = product_month_2
-
-        if last_user and product_month:
+        if last_user:
             WorkerMonthStat.objects.update_or_create(
                 worker=last_user,
                 month=product_month,
