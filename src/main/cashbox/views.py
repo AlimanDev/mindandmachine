@@ -1,11 +1,12 @@
 import datetime
 
-from src.db.models import CashboxType, Cashbox, User, Shop
+from src.db.models import CashboxType, Cashbox, User, Shop, WorkerDayCashboxDetails
 from src.util.db import CashboxTypeUtil
 from src.util.forms import FormUtil
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import CashboxTypeConverter, CashboxConverter
-from .forms import GetTypesForm, GetCashboxesForm, CreateCashboxForm, DeleteCashboxForm, UpdateCashboxForm
+from .forms import (GetTypesForm, GetCashboxesForm, CreateCashboxForm, DeleteCashboxForm, UpdateCashboxForm,
+                    CashboxesOpenTime)
 
 
 @api_method('GET', GetTypesForm, groups=User.__all_groups__)
@@ -151,3 +152,50 @@ def update_cashbox(request, form):
     return JsonResponse.success(
         CashboxConverter.convert(cashbox)
     )
+
+
+@api_method('GET', CashboxesOpenTime, groups=User.__all_groups__)
+def get_cashboxes_open_time(request, form):
+    from src.main.tablet.utils import time_diff
+    response = {}
+    shop_id = FormUtil.get_shop_id(request, form)
+    dt_from = FormUtil.get_dt_from(form)
+    dt_to = FormUtil.get_dt_to(form)
+    shop = Shop.objects.select_related('super_shop').filter(
+        id=shop_id,
+    ).first()
+
+    duration_of_the_shop = time_diff(shop.super_shop.tm_start, shop.super_shop.tm_end) * ((dt_to - dt_from).days + 1)
+    print(shop.super_shop.tm_start, shop.super_shop.tm_end, duration_of_the_shop)
+
+    worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related('cashbox_type', 'worker_day').filter(
+        status=WorkerDayCashboxDetails.TYPE_WORK,
+        cashbox_type__shop=shop,
+        on_cashbox__isnull=False,
+        # on_cashbox=14,
+        worker_day__dt__gte=dt_from,
+        worker_day__dt__lte=dt_to,
+    ).order_by('on_cashbox')
+    last_cashbox = worker_day_cashbox_details[0].on_cashbox if len(worker_day_cashbox_details) else None
+
+    share_of_open_time = 0
+    for detail in worker_day_cashbox_details:
+        if detail.on_cashbox == last_cashbox:
+            print('---------',share_of_open_time, duration_of_the_shop, detail.tm_from, detail.tm_to, detail.worker_day.worker_id, detail.worker_day.dt, detail.on_cashbox.id)
+
+            if detail.tm_from and detail.tm_to:
+                share_of_open_time += time_diff(detail.tm_from, detail.tm_to)
+        else:
+            response[last_cashbox.id] = {
+                'share_time': share_of_open_time * 100 / duration_of_the_shop
+            }
+            last_cashbox = detail.on_cashbox
+            share_of_open_time = 0
+
+    if last_cashbox:
+        response[last_cashbox.id] = {
+            'share_time': share_of_open_time * 100 / duration_of_the_shop
+        }
+
+    return JsonResponse.success(response)
+# http://127.0.0.1:8080/api/cashbox/get_cashboxes_open_time?shop_id=5&from_dt=02.5.2018&to_dt=4.5.2018
