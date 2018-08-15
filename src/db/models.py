@@ -333,13 +333,13 @@ class PeriodDemand(models.Model):
 
     dttm_forecast = models.DateTimeField()
     clients = models.FloatField()
-    products = models.FloatField()
+    products = models.FloatField(default=0)
 
     type = utils.EnumField(Type)
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
-    queue_wait_time = models.FloatField()  # in minutes
-    queue_wait_length = models.FloatField()
+    queue_wait_time = models.FloatField(default=0)  # in minutes
+    queue_wait_length = models.FloatField(default=0)
     lack_of_cashiers = models.IntegerField(default=0)  # can be both pos and neg
 
 

@@ -1,11 +1,9 @@
 import datetime
-import json
 
 from django import forms
 from django.core.exceptions import ValidationError
 
 from src.util import forms as util_forms
-from src.util.models_converter import PeriodDemandConverter
 
 
 class GetIndicatorsForm(forms.Form):
@@ -61,3 +59,13 @@ class SetDemandForm(forms.Form):
 
         if not m_exists and not v_exists:
             raise ValidationError('multiply or value have to be')
+
+
+class CreatePredictBillsRequestForm(forms.Form):
+    shop_id = forms.IntegerField()
+    dt = util_forms.DateField()
+
+
+class SetPredictBillsForm(forms.Form):
+    key = forms.CharField()
+    data = forms.CharField()

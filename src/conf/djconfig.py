@@ -187,6 +187,10 @@ CELERY_BEAT_SCHEDULE = {
     'task-notify-cashiers-lack': {
         'task': 'src.celery.tasks.notify_cashiers_lack',
         'schedule': crontab(hour='*/1')
+    },
+    'task-create-pred-bills': {
+        'task': 'src.celery.tasks.create_pred_bills',
+        'schedule': crontab(0, 0, day_of_month='1')
     }
 }
 
