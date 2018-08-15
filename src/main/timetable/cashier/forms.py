@@ -126,7 +126,7 @@ class SetWorkerDayForm(forms.Form):
 
     cashbox_type = forms.IntegerField(required=False)
     comment = forms.CharField(max_length=128, required=False)
-    details = forms.CharField()
+    details = forms.CharField(required=False)
 
     def clean_type(self):
         value = WorkerDayConverter.parse_type(self.cleaned_data['type'])
