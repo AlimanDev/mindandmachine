@@ -223,7 +223,7 @@ def set_demand(request, form):
     return JsonResponse.success()
 
 
-@api_method('POST', CreatePredictBillsRequestForm)
+@api_method('GET', CreatePredictBillsRequestForm)
 def create_predbills_request(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     dt = form['dt']
