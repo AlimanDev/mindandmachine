@@ -38,3 +38,8 @@ class CashboxesOpenTime(forms.Form):
     shop_id = forms.IntegerField(required=False)
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
+
+class CashboxesUsedResource(forms.Form):
+    shop_id = forms.IntegerField(required=False)
+    from_dt = util_forms.DateField()
+    to_dt = util_forms.DateField()
