@@ -105,7 +105,7 @@ def set_pred_bills_function(data, key):
     except ValueError as ve:
         return ve
 
-    period_demand_type = PeriodDemand.Type.FACT.value
+    period_demand_type = PeriodDemand.Type.LONG_FORECAST.value
 
     for period_demand_value in data.values():
         clients = period_demand_value['clients']

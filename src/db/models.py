@@ -639,6 +639,7 @@ class Timetable(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    status_message = models.CharField(max_length=256, null=True, blank=True)
     dt = models.DateField()
     status = utils.EnumField(Status)
     dttm_status_change = models.DateTimeField()
