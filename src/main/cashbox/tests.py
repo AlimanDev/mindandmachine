@@ -36,7 +36,6 @@ class TestCashbox(LocalTestCase):
     def test_get_cashboxes_used_resource(self):
         self.auth()
         response = self.api_get('/api/cashbox/get_cashboxes_used_resource?shop_id=1&from_dt=16.06.2018&to_dt=16.06.2018')
-        print(response.json['data'])
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data']['2']['100'], 35.29469435775095)
