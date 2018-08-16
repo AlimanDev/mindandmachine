@@ -411,7 +411,11 @@ def set_worker_days(request, form):
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
 def set_worker_day(request, form):
-    details = json.loads(form['details'])
+    if form['details']:
+        details = json.loads(form['details'])
+    else:
+        details = []
+
     try:
         worker = User.objects.get(id=form['worker_id'])
     except User.DoesNotExist:
@@ -439,14 +443,23 @@ def set_worker_day(request, form):
     try:
         WorkerDayCashboxDetails.objects.filter(worker_day=day).delete()
         if day.type == WorkerDay.Type.TYPE_WORKDAY.value:
-            for item in details:
+            if len(details):
+                for item in details:
+                    WorkerDayCashboxDetails.objects.create(
+                        cashbox_type_id=item['cashBox_type'],
+                        worker_day=day,
+                        tm_from=item['tm_from'],
+                        tm_to=item['tm_to']
+                    )
+            else:
+                cashbox_type_id = form.get('cashbox_type')
                 WorkerDayCashboxDetails.objects.create(
-                    cashbox_type_id=item['cashBox_type'],
+                    cashbox_type_id=cashbox_type_id,
                     worker_day=day,
-                    tm_from=item['tm_from'],
-                    tm_to=item['tm_to']
+                    tm_from=day.tm_work_start,
+                    tm_to=day.tm_work_end
                 )
-                cashbox_updated = True
+            cashbox_updated = True
     except:
         pass
 
