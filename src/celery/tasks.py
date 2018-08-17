@@ -181,13 +181,13 @@ def notify_cashiers_lack():
         shop_id = shop.id
         dttm = dttm_now
         while dttm <= notify_to:
-            init_params_dict = get_init_params(dttm_now, shop_id)
+            init_params_dict = get_init_params(dttm, shop_id)
 
             return_dict = has_deficiency(
                 init_params_dict['predict_demand'],
                 init_params_dict['mean_bills_per_step'],
                 init_params_dict['cashbox_types_hard_dict'],
-                dttm_now
+                dttm
             )
 
             to_notify = False  # есть ли вообще нехватка
