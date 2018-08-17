@@ -167,13 +167,13 @@ def update_cashbox(request, form):
 @api_method('GET', CashboxesOpenTime, groups=User.__all_groups__)
 def get_cashboxes_open_time(request, form):
     """
-    Receiving the percentage of cashboxes working hours
+    Receiving percentage of used time of cashboxes in relation to the selected period
 
     :param shop_id: id of the department
     :param dt_from: start date of the period
     :param dt_to: end date of the period
 
-    :return: dictionary with a list of cashboxes and percentages of open time
+    :return: dictionary with a list of cashboxes ids and shares of open time with respect to the selected period
     """
 
     response = {}
@@ -189,8 +189,7 @@ def get_cashboxes_open_time(request, form):
             'share_time': 0
         }
 
-    worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related('cashbox_type__shop',
-                                                                                'worker_day').filter(
+    worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related('cashbox_type__shop', 'worker_day').filter(
         status=WorkerDayCashboxDetails.TYPE_WORK,
         cashbox_type__shop=shop_id,
         on_cashbox__isnull=False,
@@ -199,6 +198,7 @@ def get_cashboxes_open_time(request, form):
         tm_to__isnull=False,
         is_tablet=True,
     ).order_by('on_cashbox')
+
     if len(worker_day_cashbox_details):
         share_of_open_time = 0
         last_cashbox = worker_day_cashbox_details[0].on_cashbox
@@ -227,13 +227,13 @@ def get_cashboxes_open_time(request, form):
 @api_method('GET', CashboxesUsedResource, groups=User.__all_groups__)
 def get_cashboxes_used_resource(request, form):
     """
-    Receipt of used cashboxes resource
+    Obtaining a share of time for different congestion of cash box types in relation to the selected period of work
 
     :param shop_id: id of the department
     :param dt_from: start date of the period
     :param dt_to: end date of the period
 
-    :return: dictionary with a list of cashboxes and share of time
+    :return: dictionary with a list of various congestion and share of time for cashbox type
     """
 
     def get_percent(response, cashbox_type_id, current_dttm, worker_day_cashbox_details, count_of_cashbox):
@@ -270,20 +270,26 @@ def get_cashboxes_used_resource(request, form):
     duration_of_the_shop = time_diff(super_shop.tm_start, super_shop.tm_end) * ((dt_to - dt_from).days + 1) \
         if super_shop else None
 
-    start_time = datetime.datetime(year=dt_from.year, month=dt_from.month, day=dt_from.day,
-                                   hour=super_shop.tm_start.hour, minute=super_shop.tm_start.minute,
-                                   second=super_shop.tm_start.second)
+    start_time = datetime.datetime(
+        year=dt_from.year,
+        month=dt_from.month,
+        day=dt_from.day,
+        hour=super_shop.tm_start.hour,
+        minute=super_shop.tm_start.minute,
+        second=super_shop.tm_start.second
+    )
     if duration_of_the_shop and start_time:
 
         for cashbox_type in cashbox_types:
             current_dttm = start_time
             count_of_cashbox = Cashbox.objects.filter(type=cashbox_type).count()
-            response[cashbox_type.id] = {'20': 0,
-                                         '40': 0,
-                                         '60': 0,
-                                         '80': 0,
-                                         '100': 0
-                                         }
+            response[cashbox_type.id] = {
+                '20': 0,
+                '40': 0,
+                '60': 0,
+                '80': 0,
+                '100': 0
+            }
 
             worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
                 status=WorkerDayCashboxDetails.TYPE_WORK,
@@ -301,6 +307,6 @@ def get_cashboxes_used_resource(request, form):
                     current_dttm += datetime.timedelta(seconds=time_delta)
 
                 for range_percentages in response[cashbox_type.id]:
-                    response[cashbox_type.id][range_percentages] /= duration_of_the_shop / time_delta / 100
+                    response[cashbox_type.id][range_percentages] /= (duration_of_the_shop / time_delta / 100)
 
     return JsonResponse.success(response)
