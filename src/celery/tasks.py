@@ -22,7 +22,8 @@ from src.db.models import (
     Notifications,
     Shop,
     User,
-    ProductionDay
+    ProductionDay,
+    WorkerCashboxInfo
 )
 
 from src.celery.celery import app
@@ -186,12 +187,12 @@ def notify_cashiers_lack():
         for cashbox_type in return_dict.keys():
             if return_dict[cashbox_type]:
                 to_notify = True
-                notification_text =\
-                'За типом кассы {} не хватает кассиров: {}. '.\
-                format(
-                    CashboxType.objects.get(id=cashbox_type).name,
-                    return_dict[cashbox_type]
-                )
+                notification_text = \
+                    'За типом кассы {} не хватает кассиров: {}. '. \
+                        format(
+                        CashboxType.objects.get(id=cashbox_type).name,
+                        return_dict[cashbox_type]
+                    )
 
         managers_lists = User.objects.filter(shop_id=shop_id, work_type=User.WorkType.TYPE_MANAGER.value)
         # если такого уведомления еще нет
@@ -208,3 +209,55 @@ def notify_cashiers_lack():
                         text=notification_text
                     )
 
+
+@app.task
+def allocation_of_time_for_work_on_cashbox():
+    dt = now().date().replace(day=1)
+    dt = now().date().replace(month=9, day=1)
+
+    delta = datetime.timedelta(days=20)
+    prev_month = (dt - delta).replace(day=1)
+    cashbox_types = CashboxType.objects.all()
+    last_user = None
+    last_cashbox_type = cashbox_types[0] if len(cashbox_types) else None
+    duration = 0
+    if len(cashbox_types):
+        for cashbox_type in cashbox_types:
+            print(cashbox_type)
+            worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related('cashbox_type__shop',
+                                                                                        'worker_day').filter(
+                status=WorkerDayCashboxDetails.TYPE_WORK,
+                cashbox_type=cashbox_type,
+                on_cashbox__isnull=False,
+                worker_day__dt__gte=prev_month,
+                worker_day__dt__lt=dt,
+                tm_to__isnull=False,
+                is_tablet=True,
+            ).order_by('worker_day__worker')
+
+            for detail in worker_day_cashbox_details:
+
+                if last_user is None:
+                    last_user = detail.worker_day.worker
+
+                if last_user != detail.worker_day.worker:
+                    print(last_user.id, cashbox_type.id, 'duration---------------', round(duration, 3))
+                    WorkerCashboxInfo.objects.filter(
+                        worker=last_user,
+                        cashbox_type=cashbox_type,
+                    ).update(duration=round(duration, 3))
+
+                    last_user = detail.worker_day.worker
+                    last_cashbox_type = cashbox_type
+                    duration = 0
+                print('prev', round(duration, 3), (time_diff(detail.tm_from, detail.tm_to) / 3600))
+
+                duration += time_diff(detail.tm_from, detail.tm_to) / 3600
+                print(detail.worker_day.worker_id, detail.tm_from, detail.tm_to,round(duration, 3) )
+
+        if last_user:
+            WorkerCashboxInfo.objects.filter(
+                worker=last_user,
+                cashbox_type=last_cashbox_type,
+            ).update(duration=round(duration, 3))
+            print('=============', round(duration, 3))

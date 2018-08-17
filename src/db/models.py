@@ -401,6 +401,9 @@ class WorkerCashboxInfo(models.Model):
     bills_amount = models.PositiveIntegerField(default=0)
     priority = models.IntegerField(default=0)
 
+    # how many hours did he work
+    duration = models.FloatField(default=0)
+
 
 class WorkerConstraint(models.Model):
     class Meta(object):
@@ -727,7 +730,7 @@ class ProductionDay(models.Model):
 
     def __repr__(self):
         return self.__str__()
-    
+
     # is it enough or work hours also needs?
 
 

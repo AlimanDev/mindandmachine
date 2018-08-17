@@ -2,7 +2,7 @@ import datetime
 
 from src.util.test import LocalTestCase
 from src.db.models import WorkerMonthStat
-from .tasks import update_worker_month_stat
+from .tasks import update_worker_month_stat, allocation_of_time_for_work_on_cashbox, WorkerCashboxInfo
 
 
 class TestCelery(LocalTestCase):
@@ -38,3 +38,8 @@ class TestCelery(LocalTestCase):
         self.assertEqual(worker_month_stat[4].work_days, 20)
         self.assertEqual(worker_month_stat[4].work_hours, 179.25)
 
+    def test_allocation_of_time_for_work_on_cashbox(self):
+        allocation_of_time_for_work_on_cashbox()
+        x = WorkerCashboxInfo.objects.all()
+        for item in x:
+            print(item.worker_id, item.duration, item.cashbox_type_id)

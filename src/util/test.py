@@ -87,7 +87,7 @@ class LocalTestCase(TestCase):
             create_period_demand(datetime.datetime(2018, 6, i, 7, 30), i * 2, i, 1, 4, 3, self.cashboxType)
             create_period_demand(datetime.datetime(2018, 6, 18, 7, 30), i, i * 3, 1, i * 4, i, self.cashboxType2)
 
-            self.worker_day1 = create_work_day(self.shop.id, self.user1, dt=datetime.datetime(2018, 7, i))
+            create_work_day(self.shop.id, self.user1, dt=datetime.datetime(2018, 7, i))
             self.worker_day1 = create_work_day(self.shop.id, self.user1, dt=datetime.datetime(2018, 6, i))
             self.worker_day2 = create_work_day(self.shop.id, self.user2, dt=datetime.datetime(2018, 6, i))
             self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 6, i))
