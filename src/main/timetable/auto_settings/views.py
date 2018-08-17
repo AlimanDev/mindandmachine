@@ -1,7 +1,7 @@
 import json
 import urllib.request
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
@@ -90,6 +90,8 @@ def create_timetable(request, form):
         shop_id=shop_id,
         auto_timetable=True,
     )
+    shop = Shop.objects.get(id=shop_id)
+    super_shop = shop.super_shop
 
     # проверка что у всех юзеров указаны специализации
     users_without_spec = []
@@ -105,7 +107,9 @@ def create_timetable(request, form):
 
     # проверка что есть спрос на период
     period_difference = {'cashbox_name': [], 'difference': []}
-    period_normal_count = ((24 - 7) * 2 + 1) * ((dt_to - dt_from).days + 1) - 1
+    period_normal_count = (round((datetime.combine(date.today(), super_shop.tm_end) -
+                                  datetime.combine(date.today(), super_shop.tm_start)).seconds/3600) * 2 + 1) * \
+                          ((dt_to - dt_from).days + 1)
     cashboxes = CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD)
     for cashbox in cashboxes:
         periods = PeriodDemand.objects.filter(
@@ -154,8 +158,6 @@ def create_timetable(request, form):
         collection=WorkerDay.objects.filter(worker_shop_id=shop_id, dt__gte=dt_from - timedelta(days=7), dt__lt=dt_from),
         group_key=lambda x: x.worker_id
     )
-
-    shop = Shop.objects.get(id=shop_id)
 
     shop_dict = {
         'shop_type': shop.full_interface,
@@ -307,8 +309,8 @@ def delete_timetable(request, form):
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
     dt_now = datetime.now().date()
 
-    if dt_from.date() < dt_now:
-        return JsonResponse.value_error('Cannot delete past month')
+    # if dt_from.date() < dt_now:
+    #     return JsonResponse.value_error('Cannot delete past month')
 
     tts = Timetable.objects.filter(shop_id=shop_id, dt=dt_from)
     for tt in tts:

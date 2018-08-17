@@ -243,6 +243,11 @@ class CashboxType(models.Model):
     prior_weight = models.FloatField(default=1.0)
     is_main_type = models.BooleanField(default=False)
 
+    period_demand_params = models.CharField(
+        max_length=1024,
+        default='{"max_depth":-1,"eta":-1,"min_split_loss":-1,"reg_lambda":-1,"silent":-1,"is_main_type":-1}'
+    )
+
 
 class UserWeekdaySlot(models.Model):
     def __str__(self):
