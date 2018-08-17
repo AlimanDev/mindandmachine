@@ -1,6 +1,12 @@
 from datetime import timedelta, datetime, time
 
-from src.db.models import WaitTimeInfo, PeriodDemand, CashboxType, Shop
+from src.db.models import (
+    WaitTimeInfo,
+    PeriodDemand,
+    CashboxType,
+    Shop,
+    User
+)
 from src.util.collection import range_u
 from src.util.forms import FormUtil
 from src.util.models_converter import PeriodDemandConverter
@@ -15,10 +21,10 @@ def get_indicators(request, form):
 
     forecast_type = form['type']
 
-    shop_id = request.user.shop_id
+    shop_id = FormUtil.get_shop_id(request, form)
 
     try:
-        linear_cashbox_type = CashboxType.objects.get(shop_id=shop_id, name='Линия')
+        linear_cashbox_type = CashboxType.objects.get(shop_id=shop_id, is_main_type=True)
     except:
         return JsonResponse.internal_error('Cannot get linear cashbox')
 
@@ -76,15 +82,11 @@ def get_indicators(request, form):
     })
 
 
-@api_method('GET', GetTimeDistributionForm)
+@api_method('GET',GetTimeDistributionForm)
 def get_time_distribution(request, form):
     cashbox_type_ids = form['cashbox_type_ids']
 
-    shop_id = request.user.shop_id
-
-    dt_from = form['from_dt']
-    dt_to = form['to_dt']
-    dt_step = timedelta(days=1)
+    shop_id = form['shop_id']
 
     wait_time_info = WaitTimeInfo.objects.select_related(
         'cashbox_type'
@@ -127,12 +129,13 @@ def get_time_distribution(request, form):
     return JsonResponse.success(result)
 
 
-@api_method('GET', GetParametersForm)
+@api_method(
+    'GET',
+    GetParametersForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def get_parameters(request, form):
-    try:
-        shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
-    except:
-        return JsonResponse.value_error('Cannot get shop')
+    shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
 
     return JsonResponse.success({
         'mean_queue_length': shop.mean_queue_length,
@@ -141,12 +144,13 @@ def get_parameters(request, form):
     })
 
 
-@api_method('POST', SetParametersForm)
+@api_method(
+    'POST',
+    SetParametersForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def set_parameters(request, form):
-    try:
-        shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
-    except:
-        return JsonResponse.value_error('Cannot get shop')
+    shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
 
     shop.mean_queue_length = form['mean_queue_length']
     shop.max_queue_length = form['max_queue_length']

@@ -8,14 +8,17 @@ from src.db.models import (
 )
 
 from .xlsx.tabel import Tabel_xlsx
+from src.util.forms import FormUtil
 import json
+
 
 @api_method('GET', GetTable)
 @xlsx_method
 def get_tabel(request, workbook, form):
     ws = workbook.add_worksheet(Tabel_xlsx.MONTH_NAMES[form['weekday'].month])
 
-    shop = Shop.objects.get(id=form['shop_id'])
+    shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
+
     tabel = Tabel_xlsx(
         workbook,
         shop,

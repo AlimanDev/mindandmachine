@@ -99,7 +99,6 @@ class Shop(models.Model):
         # return f'{self.title}, {self.super_shop.title}, {self.id}'
 
 
-
 class WorkerPosition(models.Model):
     """
     Describe employee's department and position
@@ -164,6 +163,24 @@ class User(DjangoAbstractUser):
         # TYPE_DISABLED = 7
         # TYPE_PREGNANT = 8
 
+    GROUP_CASHIER = 'C'
+    GROUP_MANAGER = 'M'
+    GROUP_SUPERVISOR = 'S'
+    GROUP_DIRECTOR = 'D'
+    GROUP_HQ = 'H'
+
+    GROUP_TYPE = (
+        (GROUP_CASHIER, 'cashiers'),
+        (GROUP_MANAGER, 'manager'),
+        (GROUP_SUPERVISOR, 'supervisor'),
+        (GROUP_DIRECTOR, 'director'),
+        (GROUP_HQ, 'headquarter')
+    )
+
+    __all_groups__ = [x[0] for x in GROUP_TYPE]
+    __except_cashiers__ = [GROUP_MANAGER, GROUP_SUPERVISOR, GROUP_DIRECTOR, GROUP_HQ]
+    __allowed_to_modify__ = [GROUP_SUPERVISOR, GROUP_DIRECTOR]
+
     id = models.BigAutoField(primary_key=True)
 
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable
@@ -171,6 +188,11 @@ class User(DjangoAbstractUser):
     work_type = utils.EnumField(WorkType, null=True, blank=True)
     is_fixed_hours = models.BooleanField(default=False)
     is_fixed_days = models.BooleanField(default=False)
+    group = models.CharField(
+        max_length=1,
+        default=GROUP_CASHIER,
+        choices=GROUP_TYPE
+    )
     # permissions = models.BigIntegerField(default=0)
 
     middle_name = models.CharField(max_length=64, blank=True, null=True)

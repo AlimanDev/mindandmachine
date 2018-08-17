@@ -10,24 +10,27 @@ from src.db.models import (
     WorkerCashboxInfo,
     WorkerDay,
     CashboxType,
-    Shop
+    Shop,
+    User
 )
 from django.db.models import Avg
 from src.conf.djconfig import QOS_DATETIME_FORMAT
 
 from src.util.utils import api_method, JsonResponse
+from src.util.forms import FormUtil
 from .utils import time_diff, is_midnight_period, get_status_and_details
 from .forms import GetCashboxesInfo, GetCashiersInfo, ChangeCashierStatus
 from django.utils.timezone import now
 from src.util.models_converter import WorkerCashboxInfoConverter
 from src.util.collection import group_by
 
+
 @api_method('GET', GetCashboxesInfo)
 def get_cashboxes_info(request, form):
     response = {}
     dttm_now = now() + timedelta(hours=3)
 
-    shop_id = form['shop_id']
+    shop_id = FormUtil.get_shop_id(request, form)
 
     list_of_cashbox = Cashbox.objects.qos_filter_active(
         dttm_now,
@@ -45,11 +48,15 @@ def get_cashboxes_info(request, form):
             # супер костыль в dttm__gte, так как время с камер пишется в UTC+6
             mean_queue = CameraCashboxStat.objects.filter(
                 camera_cashbox__cashbox_id=cashbox.id,
-                dttm__gte=dttm_now - timedelta(seconds=60),
+                dttm__gte=dttm_now - timedelta(seconds=100),
                 dttm__lte=dttm_now + timedelta(seconds=60)
             ).aggregate(mean_queue=Avg('queue'))
             if mean_queue:
-                mean_queue = round(mean_queue['mean_queue'], 1)
+                try:
+                    # todo fix this
+                    mean_queue = round(mean_queue['mean_queue'], 1)
+                except:
+                    mean_queue = mean_queue['mean_queue']
 
         # todo: rewrite without 100500 requests to db (CameraCashboxStat also)
         status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
@@ -96,7 +103,7 @@ def get_cashiers_info(request, form):
     :return: complicated dict (see the code below)
     """
 
-    shop_id = form['shop_id']
+    shop_id = FormUtil.get_shop_id(request, form)
     dttm = form['dttm']
     response = {}
 
@@ -221,11 +228,17 @@ def get_cashiers_info(request, form):
     worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('cashbox_type').filter(worker_id__in=user_ids, is_active=True)
     worker_cashboxes_types = group_by(list(worker_cashboxes_types), group_key=lambda _: _.worker_id,)
     for user_id in response.keys():
-        response[user_id]['cashbox_types'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashboxes_types[user_id]]
+        if worker_cashboxes_types:
+            response[user_id]['cashbox_types'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashboxes_types.get(user_id)]
     return JsonResponse.success(response)
 
 
-@api_method('POST', ChangeCashierStatus)
+@api_method(
+    'POST',
+    ChangeCashierStatus,
+    groups=[User.GROUP_MANAGER, User.GROUP_SUPERVISOR, User.GROUP_DIRECTOR],
+    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+)
 def change_cashier_status(request, form):
     """
     change cashier status if possible
@@ -266,7 +279,7 @@ def change_cashier_status(request, form):
         status=WorkerDayCashboxDetails.TYPE_WORK,
     ).count()
     if cashbox_worked:
-        return JsonResponse.value_error('cashbox {} already opened'.format(cashbox_id))
+        return JsonResponse.value_error('cashbox already opened'.format(cashbox_id))
 
     # todo: add other checks for change statuses
     if (new_user_status == WorkerDayCashboxDetails.TYPE_FINISH) and (worker_day.type == WorkerDay.Type.TYPE_ABSENSE):

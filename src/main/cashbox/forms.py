@@ -23,7 +23,7 @@ class CreateCashboxForm(forms.Form):
 
 
 class DeleteCashboxForm(forms.Form):
-    shop_id = forms.IntegerField(required=False)
+    shop_id = forms.IntegerField()
     number = forms.CharField(max_length=6)
     bio = forms.CharField(max_length=512)
 

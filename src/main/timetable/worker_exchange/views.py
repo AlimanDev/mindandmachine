@@ -1,5 +1,9 @@
 from src.db.models import (
+    PeriodDemand,
+    WorkerCashboxInfo,
+    CashboxType,
     User,
+    Shop
 )
 from .forms import (
     GetWorkersToExchange
@@ -13,11 +17,18 @@ from src.util.utils import api_method, JsonResponse
 from src.util.models_converter import UserConverter
 
 
-@api_method('GET', GetWorkersToExchange)
+@api_method(
+    'GET',
+    GetWorkersToExchange,
+    lambda_func=lambda x: CashboxType.objects.get(id=x['specialization']).shop
+)
 def get_workers_to_exchange(request, form):
     ct_type = form['specialization']
     dttm_exchange = form['dttm']
-    shop_id = form['shop_id'] if form['shop_id'] else request.user.shop_id
+    try:
+        shop_id = CashboxType.objects.get(id=ct_type).shop.id
+    except Shop.DoesNotExist:
+        shop_id = request.user.shop_id
 
     users_who_can_work_on_ct = get_users_who_can_work_on_ct_type(ct_type)
 
@@ -48,4 +59,3 @@ def get_workers_to_exchange(request, form):
         result_dict[k].update({'user_info': UserConverter.convert(User.objects.get(id=k))})
 
     return JsonResponse.success(result_dict)
-
