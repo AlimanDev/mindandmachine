@@ -297,6 +297,7 @@ def create_timetable(request, form):
     except Exception as e:
         print(e)
         tt.status = Timetable.Status.ERROR.value
+        tt.status_message = str(e)
         tt.save()
         JsonResponse.internal_error('Error sending data to server')
     return JsonResponse.success()

@@ -35,6 +35,12 @@ def set_param_list(shop_id):
 
 
 def create_predbills_request_function(shop_id, dt=None):
+    """
+    создает request на qos_algo с параметрами которые указаны в aggregation_dict
+    :param shop_id: для какого магаза
+    :param dt: с какой даты создавать объекты спроса
+    :return:
+    """
     if dt is None:
         dt = (PeriodDemand.objects.all().order_by('dttm_forecast').last().dttm_forecast + timedelta(hours=7)).date()
     YEARS_TO_COLLECT = 3  # за последние YEARS_TO_COLLECT года
@@ -77,6 +83,12 @@ def create_predbills_request_function(shop_id, dt=None):
 
 
 def set_pred_bills_function(data, key):
+    """
+    ждет request'a от qos_algo. когда получает, записывает данные из data в базу данных
+    :param data: json data от qos_algo
+    :param key: ключ
+    :return:
+    """
     if settings.QOS_SET_TIMETABLE_KEY is None:
         return SystemError('key is not configured')
 
@@ -87,8 +99,6 @@ def set_pred_bills_function(data, key):
     except ValueError as ve:
         return ve
 
-    period_demand_type = PeriodDemand.Type.LONG_FORECAST.value
-
     for period_demand_value in data.values():
         clients = period_demand_value['clients']
         if clients < 0:
@@ -96,7 +106,7 @@ def set_pred_bills_function(data, key):
         dttm_forecast = datetime.strptime(period_demand_value['datetime'], QOS_DATETIME_FORMAT)
         cashbox_type_id = period_demand_value['CashType']
         PeriodDemand.objects.update_or_create(
-            type=period_demand_type,
+            type=PeriodDemand.Type.LONG_FORECAST.value,
             dttm_forecast=dttm_forecast,
             cashbox_type_id=cashbox_type_id,
             defaults={
