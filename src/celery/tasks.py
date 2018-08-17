@@ -4,7 +4,7 @@ import json
 
 from django.db.models import Avg
 from django.utils.timezone import now
-from datetime import timedelta
+from django.db.models import Q
 
 from src.main.timetable.worker_exchange.utils import (
     get_init_params,
@@ -24,7 +24,6 @@ from src.db.models import (
     User,
     ProductionDay
 )
-from src.main.other.notification.utils import send_notification
 from src.celery.celery import app
 
 
@@ -178,30 +177,37 @@ def notify_cashiers_lack():
     """
     for shop in Shop.objects.all():
         dttm_now = now()
+        notify_to = dttm_now + datetime.timedelta(days=7)
         shop_id = shop.id
+        dttm = dttm_now
+        while dttm <= notify_to:
+            init_params_dict = get_init_params(dttm_now, shop_id)
 
-        init_params_dict = get_init_params(dttm_now, shop_id)
+            return_dict = has_deficiency(
+                init_params_dict['predict_demand'],
+                init_params_dict['mean_bills_per_step'],
+                init_params_dict['cashbox_types_hard_dict'],
+                dttm_now
+            )
 
-        return_dict = has_deficiency(
-            init_params_dict['predict_demand'],
-            init_params_dict['mean_bills_per_step'],
-            init_params_dict['cashbox_types_hard_dict'],
-            dttm_now
-        )
+            to_notify = False  # есть ли вообще нехватка
+            notification_text = None  # {ct type : 'notification_text' or False если нет нехватки }
+            for cashbox_type in return_dict.keys():
+                if return_dict[cashbox_type]:
+                    to_notify = True
+                    notification_text = '{}.{} в {}-{} за типом кассы {} не будет хватать кассиров: {}. '.format(
+                        dttm.day, dttm.month, dttm.hour, dttm.minute,
+                        CashboxType.objects.get(id=cashbox_type).name,
+                        return_dict[cashbox_type]
+                    )
 
-        to_notify = False  # есть ли вообще нехватка
-        notification_text = None  # {ct type : 'notification_text' or False если нет нехватки }
-        for cashbox_type in return_dict.keys():
-            if return_dict[cashbox_type]:
-                to_notify = True
-                notification_text = 'За типом кассы {} не хватает кассиров: {}. '.format(
-                    CashboxType.objects.get(id=cashbox_type).name,
-                    return_dict[cashbox_type]
-                )
+            managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop_id)
 
-        managers_dir_list = User.objects.filter(shop_id=shop_id, work_type=User.WorkType.TYPE_MANAGER.value)
-        # todo: после merge'a с permissions заменить на filter(Q(type='M' | Q(type='D", shop_id=shop_id)
-
-        if to_notify:
-            send_notification(managers_dir_list, notification_text, Notifications.TYPE_INFO)
-
+            if to_notify:
+                for recipient in managers_dir_list:
+                    Notifications.objects.create(
+                        type=Notifications.TYPE_INFO,
+                        to_worker=recipient,
+                        text=notification_text,
+                    )
+            dttm += datetime.timedelta(minutes=30)
