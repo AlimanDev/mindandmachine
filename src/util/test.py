@@ -14,7 +14,8 @@ from src.db.models import (
     WorkerDayCashboxDetails,
     Slot,
     UserWeekdaySlot,
-    WorkerCashboxInfo)
+    WorkerCashboxInfo
+)
 
 import datetime
 from django.utils.timezone import now

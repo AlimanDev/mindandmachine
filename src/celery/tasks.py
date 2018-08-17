@@ -187,12 +187,10 @@ def notify_cashiers_lack():
         for cashbox_type in return_dict.keys():
             if return_dict[cashbox_type]:
                 to_notify = True
-                notification_text = \
-                    'За типом кассы {} не хватает кассиров: {}. '. \
-                        format(
-                        CashboxType.objects.get(id=cashbox_type).name,
-                        return_dict[cashbox_type]
-                    )
+                notification_text = 'За типом кассы {} не хватает кассиров: {}. '.format(
+                    CashboxType.objects.get(id=cashbox_type).name,
+                    return_dict[cashbox_type]
+                )
 
         managers_lists = User.objects.filter(shop_id=shop_id, work_type=User.WorkType.TYPE_MANAGER.value)
         # если такого уведомления еще нет
