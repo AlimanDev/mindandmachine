@@ -212,8 +212,10 @@ def notify_cashiers_lack():
 
 @app.task
 def allocation_of_time_for_work_on_cashbox():
+    """
+    Update the number of worked hours last month for each user in WorkerCashboxInfo
+    """
     dt = now().date().replace(day=1)
-    dt = now().date().replace(month=9, day=1)
 
     delta = datetime.timedelta(days=20)
     prev_month = (dt - delta).replace(day=1)
@@ -223,9 +225,10 @@ def allocation_of_time_for_work_on_cashbox():
     duration = 0
     if len(cashbox_types):
         for cashbox_type in cashbox_types:
-            print(cashbox_type)
-            worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related('cashbox_type__shop',
-                                                                                        'worker_day').filter(
+            worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related(
+                'worker_day__worker',
+                'worker_day'
+            ).filter(
                 status=WorkerDayCashboxDetails.TYPE_WORK,
                 cashbox_type=cashbox_type,
                 on_cashbox__isnull=False,
@@ -241,23 +244,18 @@ def allocation_of_time_for_work_on_cashbox():
                     last_user = detail.worker_day.worker
 
                 if last_user != detail.worker_day.worker:
-                    print(last_user.id, cashbox_type.id, 'duration---------------', round(duration, 3))
                     WorkerCashboxInfo.objects.filter(
                         worker=last_user,
                         cashbox_type=cashbox_type,
                     ).update(duration=round(duration, 3))
-
                     last_user = detail.worker_day.worker
                     last_cashbox_type = cashbox_type
                     duration = 0
-                print('prev', round(duration, 3), (time_diff(detail.tm_from, detail.tm_to) / 3600))
 
                 duration += time_diff(detail.tm_from, detail.tm_to) / 3600
-                print(detail.worker_day.worker_id, detail.tm_from, detail.tm_to,round(duration, 3) )
 
         if last_user:
             WorkerCashboxInfo.objects.filter(
                 worker=last_user,
                 cashbox_type=last_cashbox_type,
             ).update(duration=round(duration, 3))
-            print('=============', round(duration, 3))
