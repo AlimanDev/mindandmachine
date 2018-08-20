@@ -23,7 +23,7 @@ from src.db.models import (
     Shop,
     User,
     ProductionDay,
-    WorkerCashboxInfo
+    WorkerCashboxInfo,
 )
 
 from src.celery.celery import app
@@ -36,7 +36,7 @@ def update_queue(till_dttm=None):
         till_dttm = now()
 
     cashbox_types = CashboxType.objects.filter(
-        dttm_last_update_queue__isnull=False
+        dttm_last_update_queue__isnull=False,
     )
     for cashbox_type in cashbox_types:
         dif_time = till_dttm - cashbox_type.dttm_last_update_queue
@@ -53,7 +53,7 @@ def update_queue(till_dttm=None):
                 changed_amount = PeriodDemand.objects.filter(
                     dttm_forecast=cashbox_type.dttm_last_update_queue,
                     cashbox_type_id=cashbox_type.id,
-                    type=PeriodDemand.Type.FACT.value
+                    type=PeriodDemand.Type.FACT.value,
                 ).update(queue_wait_length=mean_queue)
                 if changed_amount == 0:
                     PeriodDemand.objects.create(
@@ -63,7 +63,7 @@ def update_queue(till_dttm=None):
                         type=PeriodDemand.Type.FACT.value,
                         queue_wait_time=0,
                         queue_wait_length=mean_queue,
-                        cashbox_type_id=cashbox_type.id
+                        cashbox_type_id=cashbox_type.id,
                     )
 
             cashbox_type.dttm_last_update_queue += time_step
@@ -77,7 +77,7 @@ def release_all_workers():
     worker_day_cashbox_objs = \
         WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
             worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
-            tm_to__is_null=True
+            tm_to__is_null=True,
         )
 
     for obj in worker_day_cashbox_objs:
@@ -213,6 +213,13 @@ def allocation_of_time_for_work_on_cashbox():
     """
     Update the number of worked hours last month for each user in WorkerCashboxInfo
     """
+
+    def update_duration(last_user, last_cashbox_type, duration):
+        WorkerCashboxInfo.objects.filter(
+            worker=last_user,
+            cashbox_type=last_cashbox_type,
+        ).update(duration=round(duration, 3))
+
     dt = now().date().replace(day=1)
 
     delta = datetime.timedelta(days=20)
@@ -242,10 +249,7 @@ def allocation_of_time_for_work_on_cashbox():
                     last_user = detail.worker_day.worker
 
                 if last_user != detail.worker_day.worker:
-                    WorkerCashboxInfo.objects.filter(
-                        worker=last_user,
-                        cashbox_type=cashbox_type,
-                    ).update(duration=round(duration, 3))
+                    update_duration(last_user, last_cashbox_type, duration)
                     last_user = detail.worker_day.worker
                     last_cashbox_type = cashbox_type
                     duration = 0
@@ -253,7 +257,4 @@ def allocation_of_time_for_work_on_cashbox():
                 duration += time_diff(detail.tm_from, detail.tm_to) / 3600
 
         if last_user:
-            WorkerCashboxInfo.objects.filter(
-                worker=last_user,
-                cashbox_type=last_cashbox_type,
-            ).update(duration=round(duration, 3))
+            update_duration(last_user, last_cashbox_type, duration)
