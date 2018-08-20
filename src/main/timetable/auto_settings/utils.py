@@ -1,5 +1,3 @@
-
-
 # todo: fix this tresh func!!!
 def time2int(tm, minute_step=15, start_h=6):
     diff_h = tm.hour - start_h

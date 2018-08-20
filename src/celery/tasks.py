@@ -10,6 +10,7 @@ from src.main.timetable.worker_exchange.utils import (
     get_init_params,
     has_deficiency
 )
+from src.main.demand.utils import create_predbills_request_function
 
 from src.db.models import (
     PeriodDemand,
@@ -208,3 +209,9 @@ def notify_cashiers_lack():
                         text=notification_text
                     )
 
+
+@app.task
+def create_pred_bills():
+    # todo: подумать, мб есть более красивый способ, чем задавать default_dt
+    for shop in Shop.objects.all():
+        create_predbills_request_function(shop.id)
