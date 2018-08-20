@@ -301,7 +301,9 @@ def get_cashboxes_used_resource(request, form):
     dt_to = FormUtil.get_dt_to(form)
     time_delta = 300
 
-    cashbox_types = CashboxType.objects.filter(
+    cashbox_types = CashboxType.objects.qos_filter_active(
+        dttm_from=datetime.datetime(dt_from.year, dt_from.month, dt_from.day, 23, 59, 59),
+        dttm_to=datetime.datetime(dt_to.year, dt_to.month, dt_to.day, 0, 0, 0),
         shop=shop_id,
     )
     super_shop = cashbox_types[0].shop.super_shop if len(cashbox_types) else None
@@ -309,15 +311,16 @@ def get_cashboxes_used_resource(request, form):
     duration_of_the_shop = time_diff(super_shop.tm_start, super_shop.tm_end) * ((dt_to - dt_from).days + 1) \
         if super_shop else None
 
-    start_time = datetime.datetime(
-        year=dt_from.year,
-        month=dt_from.month,
-        day=dt_from.day,
-        hour=super_shop.tm_start.hour,
-        minute=super_shop.tm_start.minute,
-        second=super_shop.tm_start.second
-    )
-    if duration_of_the_shop and start_time:
+    if duration_of_the_shop:
+
+        start_time = datetime.datetime(
+            year=dt_from.year,
+            month=dt_from.month,
+            day=dt_from.day,
+            hour=super_shop.tm_start.hour,
+            minute=super_shop.tm_start.minute,
+            second=super_shop.tm_start.second
+        )
 
         for cashbox_type in cashbox_types:
             current_dttm = start_time
