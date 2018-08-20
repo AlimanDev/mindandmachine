@@ -10,10 +10,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='user',
-            name='permissions',
-        ),
+        # migrations.RemoveField(
+        #     model_name='user',
+        #     name='permissions',
+        # ),
         migrations.AlterField(
             model_name='perioddemand',
             name='products',

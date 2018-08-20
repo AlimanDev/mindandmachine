@@ -60,17 +60,25 @@ def get_status(request, form):
     return JsonResponse.success(TimetableConverter.convert(tt))
 
 
-@api_method('POST', SetSelectedCashiersForm)
+@api_method(
+    'POST',
+    SetSelectedCashiersForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def set_selected_cashiers(request, form):
-    shop = Shop.objects.get(user__id=form['cashier_ids'][0])
+    shop = Shop.objects.get(id=form['shop_id'])
     User.objects.filter(shop=shop).exclude(id__in=form['cashier_ids']).update(auto_timetable=False)
     User.objects.filter(id__in=form['cashier_ids']).update(auto_timetable=True)
     return JsonResponse.success()
 
 
-@api_method('POST', CreateTimetableForm)
+@api_method(
+    'POST',
+    CreateTimetableForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def create_timetable(request, form):
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
     dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
 
@@ -303,9 +311,13 @@ def create_timetable(request, form):
     return JsonResponse.success()
 
 
-@api_method('POST', DeleteTimetableForm)
+@api_method(
+    'POST',
+    DeleteTimetableForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def delete_timetable(request, form):
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
 
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
     dt_now = datetime.now().date()

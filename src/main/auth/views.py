@@ -7,13 +7,13 @@ from src.util.utils import JsonResponse, api_method
 from .forms import SigninForm
 
 
-@api_method('GET', auth_required=False)
+@api_method('GET', auth_required=False, check_permissions=False)
 def update_csrf(request):
     rotate_token(request)
     return JsonResponse.success()
 
 
-@api_method('POST', SigninForm, auth_required=False)
+@api_method('POST', SigninForm, auth_required=False, check_permissions=False)
 def signin(request, form):
     if not request.user.is_authenticated:
         user = authenticate(request, username=form['username'], password=form['password'])
@@ -28,7 +28,7 @@ def signin(request, form):
     return JsonResponse.success(data)
 
 
-@api_method('POST')
+@api_method('POST', check_permissions=False)
 def signout(request):
     logout(request)
     rotate_token(request)
@@ -36,7 +36,7 @@ def signout(request):
     return JsonResponse.success()
 
 
-@api_method('GET', auth_required=False)
+@api_method('GET', auth_required=False, check_permissions=False)
 def is_signed(request):
     data = {
         'is_signed': request.user.is_authenticated

@@ -1,7 +1,15 @@
 import json
 from datetime import datetime, timedelta, time
-from src.db.models import PeriodDemand, WorkerDay, PeriodDemandChangeLog
+
+from src.db.models import (
+    PeriodDemand,
+    WorkerDay,
+    PeriodDemandChangeLog,
+    User,
+    Shop
+)
 from src.util.collection import range_u
+from src.util.forms import FormUtil
 from src.util.models_converter import BaseConverter, PeriodDemandConverter, PeriodDemandChangeLogConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import (
@@ -25,7 +33,7 @@ def get_indicators(request, form):
 
     forecast_type = form['type']
 
-    shop_id = request.user.shop_id
+    shop_id = FormUtil.get_shop_id(request, form)
 
     period_demands = PeriodDemand.objects.select_related(
         'cashbox_type'
@@ -96,16 +104,17 @@ def get_forecast(request, form):
     if form['format'] == 'excel':
         return JsonResponse.value_error('Excel is not supported yet')
 
-    shop = request.user.shop
-
     # data_types = form['data_type']
     data_types = PeriodDemand.Type.values()
     cashbox_type_ids = form['cashbox_type_ids']
 
+    shop_id = FormUtil.get_shop_id(request, form)
+
+
     period_demand = PeriodDemand.objects.select_related(
         'cashbox_type'
     ).filter(
-        cashbox_type__shop_id=shop.id
+        cashbox_type__shop_id=shop_id
     )
 
     if len(cashbox_type_ids) > 0:
@@ -160,7 +169,7 @@ def get_forecast(request, form):
     period_demand_change_log = PeriodDemandChangeLog.objects.select_related(
         'cashbox_type'
     ).filter(
-        cashbox_type__shop_id=shop.id
+        cashbox_type__shop_id=shop_id
     )
 
     if len(cashbox_type_ids) > 0:
@@ -177,7 +186,11 @@ def get_forecast(request, form):
     return JsonResponse.success(response)
 
 
-@api_method('POST', SetDemandForm)
+@api_method(
+    'POST',
+    SetDemandForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
 def set_demand(request, form):
     cashbox_type_ids = form['cashbox_type_ids']
 
@@ -187,7 +200,7 @@ def set_demand(request, form):
     dttm_from = form['from_dttm']
     dttm_to = form['to_dttm']
 
-    shop_id = request.user.shop_id
+    shop_id = FormUtil.get_shop_id(request, form)
 
     period_demands = PeriodDemand.objects.select_related(
         'cashbox_type'
