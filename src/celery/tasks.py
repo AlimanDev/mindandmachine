@@ -202,12 +202,23 @@ def notify_cashiers_lack():
                     )
 
             managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop_id)
+            notifications_list = []
 
             if to_notify:
                 for recipient in managers_dir_list:
-                    Notifications.objects.create(
-                        type=Notifications.TYPE_INFO,
-                        to_worker=recipient,
-                        text=notification_text,
-                    )
+                    if not Notifications.objects.filter(
+                            type=Notifications.TYPE_INFO,
+                            to_worker=recipient,
+                            text=notification_text,
+                            dttm_added__lt=now() + datetime.timedelta(hours=2)
+                            # нет смысла слать уведомления больше чем раз в час
+                    ):
+                        notifications_list.append(
+                            Notifications(
+                                type=Notifications.TYPE_INFO,
+                                to_worker=recipient,
+                                text=notification_text,
+                            )
+                        )
             dttm += datetime.timedelta(minutes=30)
+            Notifications.objects.bulk_create(notifications_list)
