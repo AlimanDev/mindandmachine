@@ -224,37 +224,43 @@ def allocation_of_time_for_work_on_cashbox():
 
     delta = datetime.timedelta(days=20)
     prev_month = (dt - delta).replace(day=1)
-    cashbox_types = CashboxType.objects.all()
-    last_user = None
-    last_cashbox_type = cashbox_types[0] if len(cashbox_types) else None
-    duration = 0
-    if len(cashbox_types):
-        for cashbox_type in cashbox_types:
-            worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related(
-                'worker_day__worker',
-                'worker_day'
-            ).filter(
-                status=WorkerDayCashboxDetails.TYPE_WORK,
-                cashbox_type=cashbox_type,
-                on_cashbox__isnull=False,
-                worker_day__dt__gte=prev_month,
-                worker_day__dt__lt=dt,
-                tm_to__isnull=False,
-                is_tablet=True,
-            ).order_by('worker_day__worker')
+    shops = Shop.objects.all()
 
-            for detail in worker_day_cashbox_details:
+    for shop in shops:
+        # Todo: может нужно сделать qos_filter на типы касс?
+        cashbox_types = CashboxType.objects.filter(shop=shop)
+        last_user = None
+        last_cashbox_type = None
+        duration = 0
 
-                if last_user is None:
-                    last_user = detail.worker_day.worker
+        if len(cashbox_types):
+            for cashbox_type in cashbox_types:
+                worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related(
+                    'worker_day__worker',
+                    'worker_day'
+                ).filter(
+                    status=WorkerDayCashboxDetails.TYPE_WORK,
+                    cashbox_type=cashbox_type,
+                    on_cashbox__isnull=False,
+                    worker_day__dt__gte=prev_month,
+                    worker_day__dt__lt=dt,
+                    tm_to__isnull=False,
+                    is_tablet=True,
+                ).order_by('worker_day__worker')
 
-                if last_user != detail.worker_day.worker:
-                    update_duration(last_user, last_cashbox_type, duration)
-                    last_user = detail.worker_day.worker
-                    last_cashbox_type = cashbox_type
-                    duration = 0
+                for detail in worker_day_cashbox_details:
 
-                duration += time_diff(detail.tm_from, detail.tm_to) / 3600
+                    if last_user is None:
+                        last_cashbox_type = cashbox_type
+                        last_user = detail.worker_day.worker
 
-        if last_user:
-            update_duration(last_user, last_cashbox_type, duration)
+                    if last_user != detail.worker_day.worker:
+                        update_duration(last_user, last_cashbox_type, duration)
+                        last_user = detail.worker_day.worker
+                        last_cashbox_type = cashbox_type
+                        duration = 0
+
+                    duration += time_diff(detail.tm_from, detail.tm_to) / 3600
+
+            if last_user:
+                update_duration(last_user, last_cashbox_type, duration)
