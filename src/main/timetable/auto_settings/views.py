@@ -47,6 +47,7 @@ from .forms import (
 import requests
 from .utils import time2int
 from ..table.utils import count_difference_of_normal_days
+from src.main.other.notification.utils import send_notification
 
 
 @api_method('GET', GetStatusForm)
@@ -308,6 +309,8 @@ def create_timetable(request, form):
         tt.status_message = str(e)
         tt.save()
         JsonResponse.internal_error('Error sending data to server')
+
+    send_notification('C', tt, sender=request.user)
     return JsonResponse.success()
 
 
@@ -334,6 +337,7 @@ def delete_timetable(request, form):
                 )
             except (requests.ConnectionError, requests.ConnectTimeout):
                 pass
+            send_notification('D', tt, sender=request.user)
     tts.delete()
 
     WorkerDayChangeLog.objects.filter(
@@ -468,5 +472,6 @@ def set_timetable(request, form):
                 'cashbox_type': line,
                 'type': PeriodDemand.Type.LONG_FORECAST.value,
             })
+    send_notification('C', timetable)
 
     return JsonResponse.success()
