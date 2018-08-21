@@ -265,6 +265,11 @@ class CashboxType(models.Model):
     prior_weight = models.FloatField(default=1.0)
     is_main_type = models.BooleanField(default=False)
 
+    period_demand_params = models.CharField(
+        max_length=1024,
+        default='{"max_depth":-1,"eta":-1,"min_split_loss":-1,"reg_lambda":-1,"silent":-1,"is_main_type":-1}'
+    )
+
 
 class UserWeekdaySlot(models.Model):
     def __str__(self):
@@ -355,13 +360,13 @@ class PeriodDemand(models.Model):
 
     dttm_forecast = models.DateTimeField()
     clients = models.FloatField()
-    products = models.FloatField()
+    products = models.FloatField(default=0)
 
     type = utils.EnumField(Type)
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
-    queue_wait_time = models.FloatField()  # in minutes
-    queue_wait_length = models.FloatField()
+    queue_wait_time = models.FloatField(default=0)  # in minutes
+    queue_wait_length = models.FloatField(default=0)
     lack_of_cashiers = models.IntegerField(default=0)  # can be both pos and neg
 
 
@@ -661,6 +666,7 @@ class Timetable(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    status_message = models.CharField(max_length=256, null=True, blank=True)
     dt = models.DateField()
     status = utils.EnumField(Status)
     dttm_status_change = models.DateTimeField()

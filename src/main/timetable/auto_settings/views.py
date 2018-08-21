@@ -1,7 +1,7 @@
 import json
 import urllib.request
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
@@ -18,7 +18,6 @@ from src.db.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     Shop,
-
     WorkerDayChangeLog,
     WorkerDayChangeRequest,
     Slot,
@@ -36,12 +35,15 @@ from src.util.models_converter import (
     WorkerCashboxInfoConverter,
     WorkerDayConverter,
     BaseConverter,
-    ShopConverter,
-
-    SlotConverter,
 )
 from src.util.utils import api_method, JsonResponse
-from .forms import GetStatusForm, SetSelectedCashiersForm, CreateTimetableForm, DeleteTimetableForm, SetTimetableForm
+from .forms import (
+    GetStatusForm,
+    SetSelectedCashiersForm,
+    CreateTimetableForm,
+    DeleteTimetableForm,
+    SetTimetableForm,
+)
 import requests
 from .utils import time2int
 from ..table.utils import count_difference_of_normal_days
@@ -91,6 +93,51 @@ def create_timetable(request, form):
     except:
         return JsonResponse.already_exists_error()
 
+    users = User.objects.qos_filter_active(
+        dt_from,
+        dt_to,
+        shop_id=shop_id,
+        auto_timetable=True,
+    )
+    shop = Shop.objects.get(id=shop_id)
+    super_shop = shop.super_shop
+
+    # проверка что у всех юзеров указаны специализации
+    users_without_spec = []
+    for u in users:
+        worker_cashbox_info = WorkerCashboxInfo.objects.filter(worker=u).values_list('is_active')
+        if not [wci_obj for wci_obj in worker_cashbox_info if True in wci_obj]:
+            users_without_spec.append(u.first_name + ' ' + u.last_name)
+    if users_without_spec:
+        # tt.status = Timetable.Status.ERROR.value
+        status_message = 'У пользователей {} не проставлены специалации.'.format(', '.join(users_without_spec))
+        tt.delete()
+        return JsonResponse.value_error(status_message)
+
+    # проверка что есть спрос на период
+    period_difference = {'cashbox_name': [], 'difference': []}
+    period_normal_count = (round((datetime.combine(date.today(), super_shop.tm_end) -
+                                  datetime.combine(date.today(), super_shop.tm_start)).seconds/3600) * 2 + 1) * \
+                          ((dt_to - dt_from).days + 1)
+    cashboxes = CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD)
+    for cashbox in cashboxes:
+        periods = PeriodDemand.objects.filter(
+            cashbox_type=cashbox,
+            type=PeriodDemand.Type.LONG_FORECAST.value,
+            dttm_forecast__date__gte=dt_from,
+            dttm_forecast__date__lt=dt_to + timedelta(days=1)
+        )
+        if periods.count() != period_normal_count:
+            period_difference['cashbox_name'].append(cashbox.name)
+            period_difference['difference'].append(abs(period_normal_count - periods.count()))
+    if period_difference['cashbox_name']:
+        status_message = 'На типе касс {} не хватает объектов спроса {}.'.format(
+            ', '.join(period_difference['cashbox_name']),
+            ', '.join(str(x) for x in period_difference['difference'])
+        )
+        tt.delete()
+        return JsonResponse.value_error(status_message)
+
     periods = PeriodDemand.objects.select_related(
         'cashbox_type'
     ).filter(
@@ -121,8 +168,6 @@ def create_timetable(request, form):
         group_key=lambda x: x.worker_id
     )
 
-    shop = Shop.objects.get(id=shop_id)
-
     shop_dict = {
         'shop_type': shop.full_interface,
         'mean_queue_length': shop.mean_queue_length,
@@ -133,14 +178,6 @@ def create_timetable(request, form):
 
     cashboxes = [CashboxTypeConverter.convert(x, True) for x in
                  CashboxType.objects.filter(shop_id=shop_id, ).exclude(do_forecast=CashboxType.FORECAST_NONE)]
-
-
-    users = User.objects.qos_filter_active(
-        dt_from,
-        dt_to,
-        shop_id=shop_id,
-        auto_timetable=True,
-    )
 
     if shop.full_interface:
         lambda_func = lambda x: x.cashbox_type_id
@@ -269,6 +306,7 @@ def create_timetable(request, form):
     except Exception as e:
         print(e)
         tt.status = Timetable.Status.ERROR.value
+        tt.status_message = str(e)
         tt.save()
         JsonResponse.internal_error('Error sending data to server')
 
@@ -287,15 +325,15 @@ def delete_timetable(request, form):
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
     dt_now = datetime.now().date()
 
-    if dt_from.date() < dt_now:
-        return JsonResponse.value_error('Cannot delete past month')
+    # if dt_from.date() < dt_now:
+    #     return JsonResponse.value_error('Cannot delete past month')
 
     tts = Timetable.objects.filter(shop_id=shop_id, dt=dt_from)
     for tt in tts:
-        if (tt.status == Timetable.Status.PROCESSING) and (not tt.task_id is None):
+        if (tt.status == Timetable.Status.PROCESSING.value) and (not tt.task_id is None):
             try:
                 requests.post(
-                    'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id})
+                    'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
                 )
             except (requests.ConnectionError, requests.ConnectTimeout):
                 pass
@@ -368,12 +406,11 @@ def set_timetable(request, form):
         timetable = Timetable.objects.get(id=data['timetable_id'])
     except Timetable.DoesNotExist:
         return JsonResponse.does_not_exists_error('timetable')
-
     timetable.status = TimetableConverter.parse_status(data['timetable_status'])
+    timetable.status_message = data.get('status_message', False)
     timetable.save()
-    if timetable.status != Timetable.Status.READY.value:
-        return JsonResponse.success()
-
+    if timetable.status != Timetable.Status.READY.value and timetable.status_message:
+        return JsonResponse.success(timetable.status_message)
     users = {x.id: x for x in User.objects.filter(id__in=list(data['users']))}
 
     for uid, v in data['users'].items():
