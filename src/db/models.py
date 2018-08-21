@@ -417,9 +417,6 @@ class WorkerConstraint(models.Model):
 
 
 class WorkerDay(models.Model):
-    class Meta(object):
-        unique_together = (('worker', 'dt'),)
-
     class Type(utils.Enum):
         TYPE_HOLIDAY = 1
         TYPE_WORKDAY = 2
@@ -480,7 +477,7 @@ class WorkerDay(models.Model):
     cashbox_types = models.ManyToManyField(CashboxType, through='WorkerDayCashboxDetails')
 
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
-    child_worker_day = models.OneToOneField('self', on_delete=models.PROTECT, blank=True, null=True)
+    parent_worker_day = models.OneToOneField('self', on_delete=models.PROTECT, blank=True, null=True)
 
     @classmethod
     def is_type_with_tm_range(cls, t):
