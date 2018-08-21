@@ -276,9 +276,9 @@ def get_cashboxes_used_resource(request, form):
     def get_percent(response, cashbox_type_id, current_dttm, worker_day_cashbox_details, count_of_cashbox):
         count = 0
         for detail in worker_day_cashbox_details:
-            if detail.tm_from <= current_dttm.time() <= detail.tm_to and detail.worker_day.dt == current_dttm.date():
+            if (detail.tm_from <= current_dttm.time() <= detail.tm_to) and (detail.worker_day.dt == current_dttm.date()):
                 count += 1
-            if detail.tm_to < current_dttm.time() and detail.worker_day.dt == current_dttm.date():
+            if (detail.tm_to < current_dttm.time()) and (detail.worker_day.dt == current_dttm.date()):
                 worker_day_cashbox_details.remove(detail)
 
         percent = count / count_of_cashbox * 100 if count_of_cashbox > 0 else 0
