@@ -11,7 +11,6 @@ from src.db.models import (
     WorkerCashboxInfo,
     WorkerDayCashboxDetails,
     PeriodDemand,
-    WorkerDayChangeLog,
     Shop
 )
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
@@ -308,11 +307,11 @@ def get_cashiers_timetable(request, form):
     #             total_lack_of_cashiers_on_period_demand = one_period_demand.lack_of_cashiers
     #         prev_one_period_demand = one_period_demand
 
-    changed_amount = WorkerDayChangeLog.objects.filter(
-        worker_day__dt__gte = form['from_dt'],
-        worker_day__dt__lte = form['to_dt'],
-        worker_day__worker__shop_id=shop_id,
-    ).count() // 11
+    changed_amount = WorkerDay.objects.select_related('worker').filter(
+        dt__gte=form['from_dt'],
+        dt__lte=form['to_dt'],
+        worker__shop_id=shop_id,
+    ).count()
 
     response = {
         'indicators': {

@@ -24,7 +24,6 @@ import datetime
 #     'WorkerDay',
 #     'WorkerDayCashboxDetails',
 #     'WorkerDayChangeRequest',
-#     'WorkerDayChangeLog',
 #     'Notifications',
 #     'OfficialHolidays',
 #     'LevelType',
@@ -469,7 +468,7 @@ class WorkerDay(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
-    worker = models.ForeignKey(User, on_delete=models.PROTECT)  # todo: make immutable
+    worker = models.ForeignKey(User, on_delete=models.PROTECT, related_name='worker')  # todo: make immutable
     dt = models.DateField()  # todo: make immutable
     type = utils.EnumField(Type)
 
@@ -479,6 +478,9 @@ class WorkerDay(models.Model):
 
     is_manual_tuning = models.BooleanField(default=False)
     cashbox_types = models.ManyToManyField(CashboxType, through='WorkerDayCashboxDetails')
+
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
+    child_worker_day = models.OneToOneField('self', on_delete=models.PROTECT, blank=True, null=True)
 
     @classmethod
     def is_type_with_tm_range(cls, t):
@@ -546,36 +548,6 @@ class WorkerDayChangeRequest(models.Model):
     tm_work_start = models.TimeField(null=True, blank=True)
     tm_work_end = models.TimeField(null=True, blank=True)
     tm_break_start = models.TimeField(null=True, blank=True)
-
-
-class WorkerDayChangeLog(models.Model):
-    def __str__(self):
-        return '{}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.id)
-        # return f'{self.worker_day.worker.last_name}, {self.worker_day.worker.shop.super_shop.title},' \
-        #        f' {self.worker_day.dt}, {self.id}'
-
-    id = models.BigAutoField(primary_key=True)
-
-    dttm_changed = models.DateTimeField(auto_now_add=True)
-
-    worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
-
-    # extra fields for SQL SELECT performance
-    worker_day_dt = models.DateField()
-    worker_day_worker = models.ForeignKey(User, on_delete=models.PROTECT, related_name='+')
-
-    from_type = utils.EnumField(WorkerDay.Type)
-    from_tm_work_start = models.TimeField(null=True, blank=True)
-    from_tm_work_end = models.TimeField(null=True, blank=True)
-    from_tm_break_start = models.TimeField(null=True, blank=True)
-
-    to_type = utils.EnumField(WorkerDay.Type)
-    to_tm_work_start = models.TimeField(null=True, blank=True)
-    to_tm_work_end = models.TimeField(null=True, blank=True)
-    to_tm_break_start = models.TimeField(null=True, blank=True)
-
-    changed_by = models.ForeignKey(User, on_delete=models.PROTECT)
-    comment = models.CharField(max_length=128, default='', blank=True)
 
 
 class Notifications(models.Model):

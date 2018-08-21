@@ -208,7 +208,7 @@ def add_work_days(shop, cashboxes, dttm_start, dttm_end, work_days, changes=0.2,
             tm_work_end = __gen_tm_work_end(is_wk)
             tm_break_start = __gen_tm_break_start(is_wk)
 
-            wd = models.WorkerDay.objects.select_related('worker').create(
+            wd = models.WorkerDay.objects.create(
                 worker=user,
                 type=st,
                 dt=dttms[i],
@@ -229,26 +229,6 @@ def add_work_days(shop, cashboxes, dttm_start, dttm_end, work_days, changes=0.2,
             cr = random.random()
             if cr < changes:
                 tp = not_work_types[random.randint(0, max_ind)]
-                models.WorkerDayChangeLog.objects.create(
-                    worker_day=wd,
-                    worker_day_dt=wd.dt,
-                    worker_day_worker=wd.worker,
-                    from_type=tp,
-                    to_type=st,
-                    to_tm_work_start=tm_work_start,
-                    to_tm_work_end=tm_work_end,
-                    to_tm_break_start=tm_break_start,
-                    changed_by=user, # todo: only main users could do it
-                )
-                if cr < double_changes:
-                    models.WorkerDayChangeLog.objects.create(
-                        worker_day=wd,
-                        worker_day_dt=wd.dt,
-                        worker_day_worker=wd.worker,
-                        from_type=not_work_types[random.randint(0, max_ind)],
-                        to_type=tp,
-                        changed_by=user,  # todo: only main users could do it
-                    )
             cr = random.random()
             if cr < request_c:
                 models.WorkerDayChangeRequest.objects.create(

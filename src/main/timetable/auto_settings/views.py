@@ -18,8 +18,6 @@ from src.db.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     Shop,
-
-    WorkerDayChangeLog,
     WorkerDayChangeRequest,
     Slot,
     UserWeekdaySlot,
@@ -297,16 +295,6 @@ def delete_timetable(request, form):
             except (requests.ConnectionError, requests.ConnectTimeout):
                 pass
     tts.delete()
-
-    WorkerDayChangeLog.objects.select_related('worker_day', 'worker_day__worker').filter(
-        worker_day__worker__shop_id=shop_id,
-        worker_day__dt__month=dt_from.month,
-        worker_day__dt__year=dt_from.year,
-        worker_day__worker__auto_timetable=True,
-    ).filter(
-        Q(worker_day__is_manual_tuning=False) |
-        Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
-    ).delete()
 
     WorkerDayChangeRequest.objects.select_related('worker_day', 'worker_day__worker').filter(
         worker_day__worker__shop_id=shop_id,
