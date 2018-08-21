@@ -395,20 +395,21 @@ def get_cashiers_timetable(request, form):
 @api_method(
     'GET',
     GetWorkersForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    # lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def get_workers(request, form):
-    shop = form['shop_id']
+    # shop = form['shop_id']
 
     from_dt = form['from_dttm'].date()
     from_tm = form['from_dttm'].time()
     to_dt = form['to_dttm'].date()
     to_tm = form['to_dttm'].time()
+    shop = FormUtil.get_shop_id(request, form)
 
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
         'worker_day', 'on_cashbox'
     ).filter(
-        worker_day__worker_shop_id=shop.id,
+        worker_day__worker_shop_id=shop,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         worker_day__dt__gte=from_dt,
         worker_day__dt__lte=to_dt,
