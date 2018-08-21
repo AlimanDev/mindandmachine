@@ -83,8 +83,6 @@ def get_cashiers_timetable(request, form):
         cashbox_types_main[-ind] = None
 
     worker_day_cashbox_detail_filter = {
-        'worker_day__worker_shop_id': shop_id,
-        # worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         'worker_day__dt__gte': form['from_dt'],
         'worker_day__dt__lte': form['to_dt'],
         'cashbox_type_id__in': cashbox_types.keys(),
@@ -313,7 +311,7 @@ def get_cashiers_timetable(request, form):
     changed_amount = WorkerDayChangeLog.objects.filter(
         worker_day__dt__gte = form['from_dt'],
         worker_day__dt__lte = form['to_dt'],
-        worker_day__worker_shop_id=shop_id,
+        worker_day__worker__shop_id=shop_id,
     ).count() // 11
 
     response = {
@@ -352,7 +350,7 @@ def get_cashiers_timetable(request, form):
 #     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
 #         'worker_day', 'on_cashbox'
 #     ).filter(
-#         worker_day__worker_shop_id=shop,
+#         worker_day__worker_`_shop_id=shop,
 #         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
 #         worker_day__dt__gte=form['from_dttm'].date(),
 #         worker_day__dt__lte=form['to_dttm'].date(),
@@ -406,9 +404,9 @@ def get_workers(request, form):
     to_tm = form['to_dttm'].time()
 
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
-        'worker_day', 'on_cashbox'
+        'worker_day', 'on_cashbox', 'worker_day__worker'
     ).filter(
-        worker_day__worker_shop_id=shop.id,
+        worker_day__worker__shop_id=shop.id,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         worker_day__dt__gte=from_dt,
         worker_day__dt__lte=to_dt,

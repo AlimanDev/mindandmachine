@@ -208,9 +208,8 @@ def add_work_days(shop, cashboxes, dttm_start, dttm_end, work_days, changes=0.2,
             tm_work_end = __gen_tm_work_end(is_wk)
             tm_break_start = __gen_tm_break_start(is_wk)
 
-            wd = models.WorkerDay.objects.create(
+            wd = models.WorkerDay.objects.select_related('worker').create(
                 worker=user,
-                worker_shop_id=user.shop_id,
                 type=st,
                 dt=dttms[i],
                 tm_work_start=tm_work_start,

@@ -8,8 +8,8 @@ def filter_worker_day_by_dttm(shop_id, day_type, dttm_from, dttm_to):
     dt_to = dttm_to.date()
     tm_to = dttm_to.time()
 
-    days_raw = WorkerDay.objects.filter(
-        worker_shop_id=shop_id,
+    days_raw = WorkerDay.objects.select_related('worker').filter(
+        worker__shop_id=shop_id,
         type=day_type,
         dt__gte=dt_from,
         dt__lte=dt_to,

@@ -419,7 +419,7 @@ class WorkerConstraint(models.Model):
 
 class WorkerDay(models.Model):
     class Meta(object):
-        unique_together = (('worker', 'worker_shop', 'dt'),)
+        unique_together = (('worker', 'dt'),)
 
     class Type(utils.Enum):
         TYPE_HOLIDAY = 1
@@ -466,18 +466,12 @@ class WorkerDay(models.Model):
     def __repr__(self):
         return self.__str__()
 
-    # def __str__(self):
-    #     return 'Worker {} | Date {} | {}'.format(self.id, self.dt, self.Type.get_name_by_value(self.type))
-
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     worker = models.ForeignKey(User, on_delete=models.PROTECT)  # todo: make immutable
     dt = models.DateField()  # todo: make immutable
     type = utils.EnumField(Type)
-
-    # extra field for SQL select
-    worker_shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='+')
 
     tm_work_start = models.TimeField(null=True, blank=True)
     tm_work_end = models.TimeField(null=True, blank=True)

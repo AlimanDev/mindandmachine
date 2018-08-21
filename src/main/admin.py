@@ -230,11 +230,11 @@ class WorkerDayAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: WorkerDay):
-        return instance.worker_shop.title
+        return instance.worker.shop.title
 
     @staticmethod
     def super_shop_title(instance: WorkerDay):
-        return instance.worker_shop.super_shop.title
+        return instance.worker.shop.super_shop.title
 
 
 @admin.register(WorkerDayCashboxDetails)
@@ -251,7 +251,7 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: WorkerDayCashboxDetails):
-        return instance.worker_day.worker_shop.title
+        return instance.worker_day.worker.shop.title
 
     @staticmethod
     def worker_day_dt(instance: WorkerDayCashboxDetails):
@@ -274,7 +274,7 @@ class WorkerDayChangeLogAdmin(admin.ModelAdmin):
 
     @staticmethod
     def super_shop_title(instance: WorkerDayChangeLog):
-        return instance.worker_day.worker_shop.title
+        return instance.worker_day.worker.shop.title
 
     @staticmethod
     def worker_day_dt(instance: WorkerDayChangeLog):

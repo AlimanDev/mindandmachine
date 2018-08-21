@@ -112,7 +112,7 @@ def update_worker_month_stat():
             time_break_triplets = 0
 
         worker_days = WorkerDay.objects.select_related('worker').filter(
-            worker_shop=shop,
+            worker__shop=shop,
             dt__lt=dt,
             dt__gte=dt2,
         ).order_by('worker', 'dt')

@@ -181,10 +181,9 @@ def create_user(user_id, shop_id, username, dt_hired=None,
     return user
 
 
-def create_work_day(worker_shop_id, worker, dt, type=2, tm_work_start=datetime.time(hour=12, minute=0, second=0),
+def create_work_day(worker, dt, type=2, tm_work_start=datetime.time(hour=12, minute=0, second=0),
                     tm_work_end=datetime.time(hour=23, minute=0, second=0)):
     worker_day = WorkerDay.objects.create(
-        worker_shop_id=worker_shop_id,
         worker=worker,
         type=type,
         dt=dt,

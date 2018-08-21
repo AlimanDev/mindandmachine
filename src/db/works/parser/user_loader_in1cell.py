@@ -45,7 +45,7 @@ def in1cell_loader(path, sheet_name, shop, first_day, st_row, end_row, st_col, e
                     tm_work_start=st_tm,
                     tm_work_end=end_tm,
 
-                    worker_shop=shop, # fuck you!
+                    worker__shop=shop,
                 ))
             WorkerDay.objects.bulk_create(days)
         else:

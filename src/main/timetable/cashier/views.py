@@ -388,7 +388,6 @@ def set_worker_days(request, form):
             worker=worker,
             dt=day,
             type=form['type'],
-            worker_shop_id=worker.shop_id,
             tm_work_start=form['tm_work_start'],
             tm_work_end=form['tm_work_end'],
         ) for day in form_dates
@@ -656,7 +655,7 @@ def dublicate_cashier_table(request, form):
 
             # обновляем дни и удаляем details для этих дней
             trainee_worker_day.type = main_worker_day.type
-            trainee_worker_day.worker_shop = main_worker_day.worker_shop
+            trainee_worker_day.worker.shop = main_worker_day.worker.shop
             trainee_worker_day.tm_work_start = main_worker_day.tm_work_start
             trainee_worker_day.tm_work_end = main_worker_day.tm_work_end
             trainee_worker_day.tm_break_start = main_worker_day.tm_break_start
@@ -689,7 +688,6 @@ def dublicate_cashier_table(request, form):
             worker=trainee_worker,
             dt=blank_day.dt,
             type=blank_day.type,
-            worker_shop=blank_day.worker_shop,
             tm_work_start=blank_day.tm_work_start,
             tm_work_end=blank_day.tm_work_end,
             tm_break_start=blank_day.tm_break_start

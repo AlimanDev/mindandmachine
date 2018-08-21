@@ -61,7 +61,7 @@ def select_cashiers(request, form):
     if len(work_types) > 0:
         users = [x for x in users if x.work_type in work_types]
 
-    worker_days = WorkerDay.objects.filter(worker_shop_id=shop_id) # todo: change worker_shop to worker__shop
+    worker_days = WorkerDay.objects.select_related('worker').filter(worker__shop_id=shop_id)
 
     workday_type = form.get('workday_type')
     if workday_type is not None:
@@ -89,7 +89,7 @@ def select_cashiers(request, form):
                     return True
                 return False
 
-        worker_days = WorkerDay.objects.filter(worker_shop_id=shop_id, type=WorkerDay.Type.TYPE_WORKDAY.value, dt__in=work_workdays)
+        worker_days = WorkerDay.objects.select_related('worker').filter(worker__shop_id=shop_id, type=WorkerDay.Type.TYPE_WORKDAY.value, dt__in=work_workdays)
 
         tm_from = form.get('from_tm')
         tm_to = form.get('to_tm')

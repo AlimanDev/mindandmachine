@@ -59,11 +59,11 @@ def get_cashboxes_info(request, form):
                     mean_queue = mean_queue['mean_queue']
 
         # todo: rewrite without 100500 requests to db (CameraCashboxStat also)
-        status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+        status = WorkerDayCashboxDetails.objects.select_related('worker_day', 'worker_day__worker').filter(
             on_cashbox=cashbox,
             tm_to__isnull=True,
             worker_day__dt=(dttm_now-timedelta(hours=2)).date(),
-            worker_day__worker_shop=shop_id,
+            worker_day__worker__shop_id=shop_id,
         )
 
         user_id = None
@@ -119,7 +119,7 @@ def get_cashiers_info(request, form):
         worker_day__tm_work_start__lte=(dttm + timedelta(minutes=30)).time() if not is_midnight_period(dttm)
                                         else tm_to_show_all_workers,
         worker_day__dt=(dttm - timedelta(hours=2)).date(),
-        worker_day__worker_shop__id=shop_id,
+        worker_day__worker__shop__id=shop_id,
     ).order_by('id')
 
     for item in status:
