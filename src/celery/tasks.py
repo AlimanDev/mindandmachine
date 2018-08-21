@@ -205,16 +205,17 @@ def notify_cashiers_lack():
             notifications_list = []
             users_with_such_notes = []
 
-            for note in Notifications.objects.filter(
-                            type=Notifications.TYPE_INFO,
-                            text=notification_text,
-                            dttm_added__lt=now() + datetime.timedelta(hours=2)
-                ):
-                    users_with_such_notes.append(note.to_worker)
+            notes = Notifications.objects.filter(
+                type=Notifications.TYPE_INFO,
+                text=notification_text,
+                dttm_added__lt=now() + datetime.timedelta(hours=2)
+            )
+            for note in notes:
+                users_with_such_notes.append(note.to_worker_id)
 
             if to_notify:
                 for recipient in managers_dir_list:
-                    if recipient not in users_with_such_notes:
+                    if recipient.id not in users_with_such_notes:
                         notifications_list.append(
                             Notifications(
                                 type=Notifications.TYPE_INFO,
