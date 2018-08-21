@@ -208,8 +208,10 @@ def get_cashboxes_open_time(request, form):
             'share_time': 0
         }
 
-    worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related('cashbox_type__shop',
-                                                                                'worker_day').filter(
+    worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related(
+        'cashbox_type__shop',
+        'worker_day',
+    ).filter(
         status=WorkerDayCashboxDetails.TYPE_WORK,
         cashbox_type__shop=shop_id,
         on_cashbox__isnull=False,
@@ -276,8 +278,21 @@ def get_cashboxes_used_resource(request, form):
     def get_percent(response, cashbox_type_id, current_dttm, worker_day_cashbox_details, count_of_cashbox):
         count = 0
         for detail in worker_day_cashbox_details:
-            if (detail.tm_from <= current_dttm.time() <= detail.tm_to) and (detail.worker_day.dt == current_dttm.date()):
-                count += 1
+            if (current_dttm.time() < detail.tm_from) and (detail.worker_day.dt == current_dttm.date()):
+                break
+            if detail.tm_from > detail.tm_to:
+                if (detail.tm_from <= current_dttm.time() <= datetime.time(23, 59, 59, 59)) and \
+                        (detail.worker_day.dt == current_dttm.date()):
+                    count += 1
+
+                if (datetime.time(0, 0, 0) <= current_dttm.time() <= detail.tm_to) and \
+                        (detail.worker_day.dt + datetime.timedelta(1) == current_dttm.date()):
+                    count += 1
+            else:
+                if (detail.tm_from <= current_dttm.time() <= detail.tm_to) and \
+                        (detail.worker_day.dt == current_dttm.date()):
+                    count += 1
+
             if (detail.tm_to < current_dttm.time()) and (detail.worker_day.dt == current_dttm.date()):
                 worker_day_cashbox_details.remove(detail)
 
