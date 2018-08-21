@@ -129,7 +129,10 @@ def api_method(
                     if lambda_func is None:
                         cleaned_data = Shop.objects.filter(id=form.cleaned_data['shop_id']).first()
                     else:
-                        cleaned_data = lambda_func(form.cleaned_data)
+                        try:
+                            cleaned_data = lambda_func(form.cleaned_data)
+                        except:
+                            return JsonResponse.does_not_exists_error()
 
                     # print(lambda_func)
                     if groups is None:
