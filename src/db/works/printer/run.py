@@ -210,7 +210,7 @@ def common_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
     format_holiday_debt = workbook.add_format(fmt(font_size=10, border=1, bg_color='#FEFF99'))
 
     for worker in User.objects.qos_filter_active(dt_from, dt_to, shop_id=shop_id).select_related('position').order_by('id'):
-        worker_days = {x.dt: x for x in WorkerDay.objects.filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
+        worker_days = {x.dt: x for x in WorkerDay.objects.current_version().filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
         row = [
             Cell(worker.tabel_code, format_text),
             Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_text),
@@ -387,7 +387,7 @@ def common_add_workers_two(workbook, shop_id, dt_from, dt_to):
     workers = User.objects.qos_filter_active(dt_to, dt_from, shop_id=shop_id).order_by('id')
     last_worker = len(workers) - 1
     for i, worker in enumerate(workers):
-        worker_days = {x.dt: x for x in WorkerDay.objects.filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
+        worker_days = {x.dt: x for x in WorkerDay.objects.current_version().filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
         user_data = [weekdays]
         dt = dt_from - timedelta(days=dt_from.weekday())
         while dt <= dt_to:
@@ -495,7 +495,7 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
 
     timetable_raw = {}
     for worker in cache_workers:
-        worker_days = {x.dt: x for x in WorkerDay.objects.filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
+        worker_days = {x.dt: x for x in WorkerDay.objects.current_version().filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
         cache_worker_days[worker.id] = worker_days
 
         for wd in worker_days.values():
