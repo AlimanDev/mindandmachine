@@ -2,7 +2,7 @@ from datetime import datetime, time, timedelta
 from collections import defaultdict
 
 from django.http import HttpResponse
-from django.db.models import Avg, Max
+from django.db.models import Max
 
 from src.db.models import (
     WorkerDay,
@@ -14,8 +14,8 @@ from src.db.models import (
     Shop
 )
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
-from src.util.collection import range_u, group_by
-from src.util.models_converter import CashboxTypeConverter, UserConverter, WorkerDayConverter, WorkerCashboxInfoConverter, BaseConverter
+from src.util.collection import group_by
+from src.util.models_converter import CashboxTypeConverter, UserConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
 from src.util.forms import FormUtil
 from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
@@ -32,6 +32,7 @@ import io
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
+    checkpoint = FormUtil.get_checkpoint(form)
 
     if form['format'] == 'excel':
         def __file_name(__dt):
@@ -90,9 +91,7 @@ def get_cashiers_timetable(request, form):
     if form['position_id']:
         worker_day_cashbox_detail_filter['worker_day__worker__position__id'] = form['position_id']
 
-    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
-        'worker_day',
-    ).filter(
+    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.filter_version(checkpoint).filter(
         **worker_day_cashbox_detail_filter
     ).exclude(
         status=WorkerDayCashboxDetails.TYPE_BREAK
@@ -399,14 +398,15 @@ def get_cashiers_timetable(request, form):
 )
 def get_workers(request, form):
     shop = form['shop_id']
+    checkpoint = FormUtil.get_checkpoint(form)
 
     from_dt = form['from_dttm'].date()
     from_tm = form['from_dttm'].time()
     to_dt = form['to_dttm'].date()
     to_tm = form['to_dttm'].time()
 
-    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
-        'worker_day', 'on_cashbox', 'worker_day__worker'
+    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.filter_version(checkpoint).select_related(
+        'on_cashbox', 'worker_day__worker'
     ).filter(
         worker_day__worker__shop_id=shop.id,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,

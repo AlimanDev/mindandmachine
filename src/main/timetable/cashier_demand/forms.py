@@ -25,6 +25,7 @@ class GetWorkersForm(forms.Form):
     to_dttm = util_forms.DatetimeField()
     cashbox_type_ids = util_forms.IntegersList()
     shop_id = forms.IntegerField()
+    checkpoint = forms.IntegerField(required=False)
 
     def clean(self):
         if self.errors:

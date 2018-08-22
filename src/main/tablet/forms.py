@@ -10,11 +10,13 @@ from src.util.models_converter import PeriodDemandConverter
 
 class GetCashboxesInfo(forms.Form):
     shop_id = forms.IntegerField(required=False)
+    checkpoint = forms.IntegerField(required=False)
 
 
 class GetCashiersInfo(forms.Form):
     shop_id = forms.IntegerField(required=False)
     dttm = util_forms.DatetimeField()
+    checkpoint = forms.IntegerField(required=False)
 
 
 class ChangeCashierStatus(forms.Form):

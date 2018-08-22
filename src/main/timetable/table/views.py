@@ -204,7 +204,7 @@ def get_table(request, form):
         )
 
         for workerday in workerdays:
-            day_detail = WorkerDayCashboxDetails.objects.select_related(
+            day_detail = WorkerDayCashboxDetails.objects.filter_version(checkpoint).select_related(
                     'cashbox_type'
                 ).filter(
                     worker_day=workerday

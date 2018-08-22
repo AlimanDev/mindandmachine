@@ -31,6 +31,7 @@ def get_cashboxes_info(request, form):
     dttm_now = now() + timedelta(hours=3)
 
     shop_id = FormUtil.get_shop_id(request, form)
+    checkpoint = FormUtil.get_checkpoint(form)
 
     list_of_cashbox = Cashbox.objects.qos_filter_active(
         dttm_now,
@@ -59,7 +60,7 @@ def get_cashboxes_info(request, form):
                     mean_queue = mean_queue['mean_queue']
 
         # todo: rewrite without 100500 requests to db (CameraCashboxStat also)
-        status = WorkerDayCashboxDetails.objects.select_related('worker_day', 'worker_day__worker').filter(
+        status = WorkerDayCashboxDetails.objects.filter_version(checkpoint).select_related('worker_day__worker').filter(
             on_cashbox=cashbox,
             tm_to__isnull=True,
             worker_day__dt=(dttm_now-timedelta(hours=2)).date(),
@@ -104,6 +105,7 @@ def get_cashiers_info(request, form):
     """
 
     shop_id = FormUtil.get_shop_id(request, form)
+    checkpoint = FormUtil.get_checkpoint(form)
     dttm = form['dttm']
     response = {}
 
@@ -115,7 +117,7 @@ def get_cashiers_info(request, form):
     list_of_break_triplets = json.loads(break_triplets)
     time_without_rest = {}
 
-    status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+    status = WorkerDayCashboxDetails.objects.filter_version(checkpoint).filter(
         worker_day__tm_work_start__lte=(dttm + timedelta(minutes=30)).time() if not is_midnight_period(dttm)
                                         else tm_to_show_all_workers,
         worker_day__dt=(dttm - timedelta(hours=2)).date(),
@@ -227,9 +229,9 @@ def get_cashiers_info(request, form):
     user_ids = response.keys()
     worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('cashbox_type').filter(worker_id__in=user_ids, is_active=True)
     worker_cashboxes_types = group_by(list(worker_cashboxes_types), group_key=lambda _: _.worker_id,)
-    for user_id in response.keys():
-        if worker_cashboxes_types:
-            response[user_id]['cashbox_types'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashboxes_types.get(user_id)]
+    # for user_id in response.keys():
+    #     if worker_cashboxes_types:
+    #         response[user_id]['cashbox_types'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashboxes_types.get(user_id)]
     return JsonResponse.success(response)
 
 
@@ -264,7 +266,7 @@ def change_cashier_status(request, form):
     cashbox_type = None if cashbox_id is None else CashboxType.objects.get(cashbox__id=cashbox_id)
     wdcd = None
 
-    workerday_detail_obj = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+    workerday_detail_obj = WorkerDayCashboxDetails.objects.filter_version(checkpoint).filter(
         worker_day__dt=dt,
         worker_day__worker_id=worker_id
     ).order_by('id').last()
@@ -276,7 +278,7 @@ def change_cashier_status(request, form):
     except WorkerDay.MultipleObjectsReturned:
         return JsonResponse.multiple_objects_returned()
 
-    cashbox_worked = WorkerDayCashboxDetails.objects.filter(
+    cashbox_worked = WorkerDayCashboxDetails.objects.filter_version(checkpoint).filter(
         Q(tm_to__isnull=True) | Q(tm_to__gt=dttm_now.time()),
         worker_day__dt=dt,
         is_tablet=True,
@@ -306,7 +308,7 @@ def change_cashier_status(request, form):
         worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
         worker_day.save()
     elif new_user_status == WorkerDayCashboxDetails.TYPE_FINISH:
-        WorkerDayCashboxDetails.objects.filter(
+        WorkerDayCashboxDetails.objects.filter_version(checkpoint).filter(
             worker_day__dt=dt,
             worker_day__worker_id=worker_id,
             is_tablet=False,

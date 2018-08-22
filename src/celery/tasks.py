@@ -73,11 +73,10 @@ def update_queue(till_dttm=None):
 @app.task
 def release_all_workers():
     dttm_now = now() + datetime.timedelta(hours=3)
-    worker_day_cashbox_objs = \
-        WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
-            worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
-            tm_to__is_null=True
-        )
+    worker_day_cashbox_objs = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+        worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
+        tm_to__is_null=True
+    )
 
     for obj in worker_day_cashbox_objs:
         obj.on_cashbox = None
@@ -186,9 +185,7 @@ def notify_cashiers_lack():
         for cashbox_type in return_dict.keys():
             if return_dict[cashbox_type]:
                 to_notify = True
-                notification_text =\
-                'За типом кассы {} не хватает кассиров: {}. '.\
-                format(
+                notification_text = 'За типом кассы {} не хватает кассиров: {}. '.format(
                     CashboxType.objects.get(id=cashbox_type).name,
                     return_dict[cashbox_type]
                 )

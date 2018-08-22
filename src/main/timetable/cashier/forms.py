@@ -90,6 +90,7 @@ class SetWorkerDaysForm(forms.Form):
     type = forms.CharField()
     tm_work_start = util_forms.TimeField(required=False)
     tm_work_end = util_forms.TimeField(required=False)
+    checkpoint = forms.IntegerField(required=False)
 
     cashbox_type = forms.IntegerField(required=False)
     comment = forms.CharField(max_length=128, required=False)

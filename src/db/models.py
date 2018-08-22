@@ -504,6 +504,24 @@ class WorkerDay(models.Model):
     objects = WorkerDayManager()
 
 
+class WorkerDayCashboxDetailsManager(models.Manager):
+    def current_version(self):
+        return super().get_queryset().select_related('worker_day').filter(worker_day__child__id__isnull=True)
+
+    def initial_version(self):
+        return super().get_queryset().select_related('worker_day').filter(worker_day__parent_worker_day__isnull=True)
+
+    def filter_version(self, checkpoint):
+        """
+        :param checkpoint: 0 or 1 / True of False. If 1 -- current version, else -- initial
+        :return:
+        """
+        if checkpoint:
+            return self.current_version()
+        else:
+            return self.initial_version()
+
+
 class WorkerDayCashboxDetails(models.Model):
     TYPE_WORK = 'W'
     TYPE_BREAK = 'B'
@@ -547,6 +565,8 @@ class WorkerDayCashboxDetails(models.Model):
 
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.cashbox_type.name, self.id)
+
+    objects = WorkerDayCashboxDetailsManager()
 
 
 class WorkerDayChangeRequest(models.Model):
