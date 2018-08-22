@@ -351,7 +351,7 @@ def get_cashiers_timetable(request, form):
 #     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
 #         'worker_day', 'on_cashbox'
 #     ).filter(
-#         worker_day__worker_`_shop_id=shop,
+#         worker_day__worker__shop_id=shop,
 #         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
 #         worker_day__dt__gte=form['from_dttm'].date(),
 #         worker_day__dt__lte=form['to_dttm'].date(),
