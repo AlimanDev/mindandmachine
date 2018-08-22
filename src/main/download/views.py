@@ -18,6 +18,7 @@ def get_tabel(request, workbook, form):
     ws = workbook.add_worksheet(Tabel_xlsx.MONTH_NAMES[form['weekday'].month])
 
     shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
+    checkpoint = FormUtil.get_checkpoint(form)
 
     tabel = Tabel_xlsx(
         workbook,
@@ -34,11 +35,11 @@ def get_tabel(request, workbook, form):
 
     breaktimes = json.loads(shop.break_triplets)
     breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
-    workdays = WorkerDay.objects.filter(
+
+    workdays = WorkerDay.objects.filter_version(checkpoint).select_related('worker').filter(
         worker__shop=shop,
         dt__gte=tabel.prod_days[0].dt,
         dt__lte=tabel.prod_days[-1].dt,
-
     ).order_by('worker__position_id', 'worker__last_name', 'worker__first_name', 'worker__tabel_code', 'dt')
 
     tabel.format_cells(len(users))

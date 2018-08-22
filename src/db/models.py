@@ -416,6 +416,24 @@ class WorkerConstraint(models.Model):
     tm = models.TimeField()
 
 
+class WorkerDayManager(models.Manager):
+    def current_version(self):
+        return super().get_queryset().filter(child__id__isnull=True)
+
+    def initial_version(self):
+        return super().get_queryset().filter(parent_worker_day__isnull=True)
+
+    def filter_version(self, checkpoint):
+        """
+        :param checkpoint: 0 or 1 / True of False. If 1 -- current version, else -- initial
+        :return:
+        """
+        if checkpoint:
+            return self.current_version()
+        else:
+            return self.initial_version()
+
+
 class WorkerDay(models.Model):
     class Type(utils.Enum):
         TYPE_HOLIDAY = 1
@@ -465,7 +483,7 @@ class WorkerDay(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
-    worker = models.ForeignKey(User, on_delete=models.PROTECT, related_name='worker')  # todo: make immutable
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)  # todo: make immutable
     dt = models.DateField()  # todo: make immutable
     type = utils.EnumField(Type)
 
@@ -477,11 +495,13 @@ class WorkerDay(models.Model):
     cashbox_types = models.ManyToManyField(CashboxType, through='WorkerDayCashboxDetails')
 
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
-    parent_worker_day = models.OneToOneField('self', on_delete=models.PROTECT, blank=True, null=True)
+    parent_worker_day = models.OneToOneField('self', on_delete=models.PROTECT, blank=True, null=True, related_name='child')
 
     @classmethod
     def is_type_with_tm_range(cls, t):
         return t in (cls.Type.TYPE_WORKDAY.value, cls.Type.TYPE_BUSINESS_TRIP.value, cls.Type.TYPE_QUALIFICATION.value)
+
+    objects = WorkerDayManager()
 
 
 class WorkerDayCashboxDetails(models.Model):

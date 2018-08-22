@@ -101,8 +101,7 @@ def get_cashiers_timetable(request, form):
         'tm_from',
         'tm_to',
     )
-
-    worker_cashbox_info = list(WorkerCashboxInfo.objects.filter(
+    worker_cashbox_info = list(WorkerCashboxInfo.objects.select_related('worker').filter(
         is_active=True,
         worker__workerday__dt__gte=form['from_dt'],
         worker__workerday__dt__lte=form['to_dt'],
@@ -311,7 +310,11 @@ def get_cashiers_timetable(request, form):
         dt__gte=form['from_dt'],
         dt__lte=form['to_dt'],
         worker__shop_id=shop_id,
-    ).count()
+    ).count() - WorkerDay.objects.select_related('worker').filter(
+        dt__gte=form['from_dt'],
+        dt__lte=form['to_dt'],
+        worker__shop_id=shop_id
+    ).distinct('dt', 'worker').count()
 
     response = {
         'indicators': {
@@ -509,6 +512,7 @@ def get_timetable_xlsx(request, form):
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
     worksheet = workbook.add_worksheet()
+    checkpoint = FormUtil.get_checkpoint(form)
 
     row = 6
     col = 5
@@ -518,7 +522,7 @@ def get_timetable_xlsx(request, form):
             worksheet.write(row, col + 3 * i + 0, 'НД')
             worksheet.write(row, col + 3 * i + 1, 'НД')
 
-        for wd in WorkerDay.objects.filter(worker=user, dt__gte=dt_from, dt__lte=dt_to).order_by('dt'):
+        for wd in WorkerDay.objects.filter_version(checkpoint).filter(worker=user, dt__gte=dt_from, dt__lte=dt_to).order_by('dt'):
             if wd.type == WorkerDay.Type.TYPE_HOLIDAY.value:
                 cell_1 = 'В'
                 cell_2 = 'В'

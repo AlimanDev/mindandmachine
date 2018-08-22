@@ -32,12 +32,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='workerday',
             name='parent_worker_day',
-            field=models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='db.WorkerDay'),
-        ),
-        migrations.AlterField(
-            model_name='workerday',
-            name='worker',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='worker', to=settings.AUTH_USER_MODEL),
+            field=models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='child', to='db.WorkerDay'),
         ),
         migrations.AlterUniqueTogether(
             name='workerday',

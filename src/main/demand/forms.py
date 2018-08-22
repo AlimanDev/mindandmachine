@@ -13,6 +13,7 @@ class GetIndicatorsForm(forms.Form):
     to_dt = util_forms.DateField()
     type = util_forms.PeriodDemandForecastType()
     shop_id = forms.IntegerField(required=False)
+    checkpoint = forms.IntegerField(required=False)
 
 
 class GetForecastForm(forms.Form):

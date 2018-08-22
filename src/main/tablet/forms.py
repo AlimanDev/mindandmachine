@@ -23,6 +23,7 @@ class ChangeCashierStatus(forms.Form):
     cashbox_id = forms.IntegerField(required=False)
     is_current_time = util_forms.BooleanField()  # True: current time, False: timetable time
     tm_changing = util_forms.TimeField(required=False)
+    checkpoint = forms.IntegerField(required=False)
 
     # случай когда сажаем человека не из расписания
     # ситуация: заболел человек звонят рандомному сотруднику, просят выйти за место заболевшего

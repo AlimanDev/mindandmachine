@@ -252,6 +252,7 @@ def change_cashier_status(request, form):
     cashbox_id = form['cashbox_id']
     is_current_time = form['is_current_time']
     tm_work_end = form['tm_work_end']
+    checkpoint = FormUtil.get_checkpoint(form)
 
     dttm_now = (now() + timedelta(hours=3)).replace(microsecond=0)
     dt = (dttm_now-timedelta(hours=3)).date()
@@ -268,7 +269,12 @@ def change_cashier_status(request, form):
         worker_day__worker_id=worker_id
     ).order_by('id').last()
 
-    worker_day = WorkerDay.objects.get(worker__id=worker_id, dt=dt)
+    try:
+        worker_day = WorkerDay.objects.filter_version(checkpoint).get(dt=dt, worker_id=worker_id)
+    except WorkerDay.DoesNotExist:
+        return JsonResponse.does_not_exists_error()
+    except WorkerDay.MultipleObjectsReturned:
+        return JsonResponse.multiple_objects_returned()
 
     cashbox_worked = WorkerDayCashboxDetails.objects.filter(
         Q(tm_to__isnull=True) | Q(tm_to__gt=dttm_now.time()),

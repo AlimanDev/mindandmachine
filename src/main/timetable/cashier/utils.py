@@ -36,9 +36,6 @@ def worker_day_create_args(form):
             'tm_work_end': form['tm_work_end'],
             'tm_break_start': form['tm_break_start']
         })
-        # day.tm_work_start = form['tm_work_start']
-        # day.tm_work_end = form['tm_work_end']
-        # day.tm_break_start = form['tm_break_start']
     else:
         wd_args.update({
             'tm_work_start': None,

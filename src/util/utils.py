@@ -35,6 +35,10 @@ class JsonResponse(object):
         return cls.__base_error_response(400, 'DoesNotExist', msg)
 
     @classmethod
+    def multiple_objects_returned(cls, msg=''):
+        return cls.__base_error_response(400, 'MultipleObjectsReturned', msg)
+
+    @classmethod
     def auth_error(cls):
         return cls.__base_error_response(400, 'AuthError', 'No such user or password incorrect')
 

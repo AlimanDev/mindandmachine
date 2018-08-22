@@ -10,6 +10,7 @@ class GetCashiersTimetableForm(forms.Form):
     format = util_forms.ChoiceField(['raw', 'excel'], default='raw')
     position_id = forms.IntegerField(required=False)
     shop_id = forms.IntegerField(required=False)
+    checkpoint = forms.IntegerField(required=False)
 
     def clean(self):
         if self.errors:

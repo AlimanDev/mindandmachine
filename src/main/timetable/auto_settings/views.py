@@ -74,6 +74,10 @@ def set_selected_cashiers(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def create_timetable(request, form):
+    """
+    using actual workerday instance (with no children)
+    :return:
+    """
     shop_id = form['shop_id']
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
     dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
@@ -109,12 +113,20 @@ def create_timetable(request, form):
     )
 
     worker_day = group_by(
-        collection=WorkerDay.objects.select_related('worker').filter(worker__shop_id=shop_id, dt__gte=dt_from, dt__lte=dt_to),
+        collection=WorkerDay.objects.current_version().select_related('worker').filter(
+            worker__shop_id=shop_id,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+        ),
         group_key=lambda x: x.worker_id
     )
 
     prev_data = group_by(
-        collection=WorkerDay.objects.select_related('worker').filter(worker__shop_id=shop_id, dt__gte=dt_from - timedelta(days=7), dt__lt=dt_from),
+        collection=WorkerDay.objects.current_version().select_related('worker').filter(
+            worker__shop_id=shop_id,
+            dt__gte=dt_from - timedelta(days=7),
+            dt__lt=dt_from,
+        ),
         group_key=lambda x: x.worker_id
     )
 
@@ -367,7 +379,7 @@ def set_timetable(request, form):
 
             dt = BaseConverter.parse_date(wd['dt'])
             try:
-                wd_obj = WorkerDay.objects.get(worker_id=uid, dt=dt)
+                wd_obj = WorkerDay.objects.get(worker_id=uid, dt=dt, child__id__isnull=True)
                 if wd_obj.is_manual_tuning or wd_obj.type != WorkerDay.Type.TYPE_EMPTY:
                     continue
             except WorkerDay.DoesNotExist:
