@@ -732,10 +732,14 @@ def dublicate_cashier_table(request, form):
 def delete_cashier(request, form):
     try:
         user = User.objects.get(id=form['user_id'])
+        errors = check_group_hierarchy(user, request.user)
+        if errors:
+            return errors
     except User.DoesNotExist:
         return JsonResponse.does_not_exists_error()
 
     user.dt_fired = form['dt_fired']
+    user.set_unusable_password()
     user.save()
 
     send_notification('D', user, sender=request.user)
@@ -773,6 +777,7 @@ def password_edit(request, form):
     else:
         user.set_password(new_password)
         update_session_auth_hash(request, user)
+    user.save()
 
     return JsonResponse.success(UserConverter.convert(user))
 
@@ -825,5 +830,6 @@ def change_cashier_info(request, form):
     if form['birthday']:
         user.birthday = form['birthday']
         response['new_birthday'] = str(form['birthday'])
+    user.save()
 
     return JsonResponse.success(response)
