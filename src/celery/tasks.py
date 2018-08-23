@@ -39,7 +39,7 @@ def update_queue(till_dttm=None):
     )
     for cashbox_type in cashbox_types:
         dif_time = till_dttm - cashbox_type.dttm_last_update_queue
-        print('начал работать')
+        print('начал работать в функции update_queue')
         while dif_time > time_step:
             mean_queue = CameraCashboxStat.objects.filter(
                 camera_cashbox__cashbox__type__id=cashbox_type.id,
@@ -89,6 +89,8 @@ def release_all_workers():
         obj.tm_to = obj.worker_day.tm_work_end
         obj.save()
 
+    print('отпустил всех домой')
+
 
 @app.task
 def update_worker_month_stat():
@@ -106,6 +108,7 @@ def update_worker_month_stat():
     for shop in shops:
         work_hours = 0
         work_days = 0
+        print('начал обновлять worker month stat для {}'.format(shop))
 
         break_triplets = shop.break_triplets
         list_of_break_triplets = json.loads(break_triplets)
@@ -227,6 +230,7 @@ def notify_cashiers_lack():
                         )
             dttm += datetime.timedelta(minutes=30)
             Notifications.objects.bulk_create(notifications_list)
+    print('уведомил о нехватке')
 
 
 @app.task
@@ -234,3 +238,4 @@ def create_pred_bills():
     # todo: подумать, мб есть более красивый способ, чем задавать default_dt
     for shop in Shop.objects.all():
         create_predbills_request_function(shop.id)
+    print('создал спрос на месяц')
