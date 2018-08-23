@@ -399,11 +399,13 @@ def get_cashiers_timetable(request, form):
 )
 def get_workers(request, form):
     # shop = form['shop_id']
+    # Todo: нужно с фронта передавать shop_id...
 
     from_dt = form['from_dttm'].date()
     from_tm = form['from_dttm'].time()
     to_dt = form['to_dttm'].date()
     to_tm = form['to_dttm'].time()
+
     shop = FormUtil.get_shop_id(request, form)
 
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
@@ -414,7 +416,6 @@ def get_workers(request, form):
         worker_day__dt__gte=from_dt,
         worker_day__dt__lte=to_dt,
     )
-
     cashboxes_types = {x.id: x for x in CashboxType.objects.filter(shop=shop)}
 
     cashbox_type_ids = form['cashbox_type_ids']
@@ -452,18 +453,18 @@ def get_workers(request, form):
 
         day = user['days'][from_dt]['day']
         details = user['days'][from_dt]['details']
-
         cashbox = []
         for d in details:
             if d.tm_to is None:
                 if d.tm_from <= from_tm:
                     cashbox.append(d)
-            elif d.tm_from < d.tm_to:
-                if d.tm_from <= from_tm < d.tm_to:
-                    cashbox.append(d)
             else:
-                if d.tm_from <= from_tm or d.tm_to > from_tm:
-                    cashbox.append(d)
+                if d.tm_from < d.tm_to:
+                    if d.tm_from <= to_tm and d.tm_to > from_tm:
+                        cashbox.append(d)
+                else:
+                    if d.tm_from <= to_tm or d.tm_to > from_tm:
+                        cashbox.append(d)
 
         if len(cashbox) == 0:
             continue
@@ -479,7 +480,8 @@ def get_workers(request, form):
         # cashbox_info = user['cashbox_info'].get(cashbox_type)
 
     response = {
-        'cashbox_types': {x.id: CashboxTypeConverter.convert(x) for x in cashboxes_types.values()},
+        'cashbox_types': {x.id: CashboxTypeConverter.convert(x) for x in cashboxes_types.values()},    # Todo: зачем это нужно?
+
         'users': {}
     }
 
