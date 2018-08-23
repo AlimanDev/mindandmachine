@@ -197,7 +197,7 @@ CELERY_ROUTES = {
 CELERY_BEAT_SCHEDULE = {
     'task-every-30-min-update-queue': {
         'task': 'src.celery.tasks.update_queue',
-        'schedule': crontab(minute='0, 10, 20, 30, 40, 50'),
+        'schedule': crontab(minute='*/1'),
         'options': {'queue': 'backend_queue'}
     },
     'task-free-all-workers-after-shop-closes': {
