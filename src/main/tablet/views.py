@@ -145,7 +145,6 @@ def get_cashiers_info(request, form):
         else:
             if item.is_tablet is True:
                 if item.status == WorkerDayCashboxDetails.TYPE_BREAK:
-                    time_without_rest[item.worker_day.worker_id] = 0
                     break_end = item.tm_to
 
                     if item.tm_to is None:
@@ -173,7 +172,7 @@ def get_cashiers_info(request, form):
                     tm_to = item.tm_to
                     if item.tm_to is None:
                         tm_to = dttm.time()
-                    time_without_rest[item.worker_day.worker_id] += round(time_diff(item.tm_from, tm_to) / 60)
+                    time_without_rest[item.worker_day.worker_id] = round(time_diff(item.tm_from, tm_to) / 60)
 
                 if not item.tm_to is None:
                     item.status = WorkerDayCashboxDetails.TYPE_FINISH

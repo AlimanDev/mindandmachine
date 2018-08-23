@@ -80,7 +80,7 @@ def release_all_workers():
     worker_day_cashbox_objs = \
         WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
             worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
-            tm_to__is_null=True
+            tm_to__isnull=True
         )
 
     for obj in worker_day_cashbox_objs:

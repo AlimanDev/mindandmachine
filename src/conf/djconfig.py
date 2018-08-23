@@ -183,17 +183,17 @@ CELERY_BEAT_SCHEDULE = {
     },
     'task-free-all-workers-after-shop-closes': {
         'task': 'src.celery.tasks.release_all_workers',
-        'schedule': crontab(hour=2, minute=0)
+        'schedule': crontab(hour=1, minute=0)
     },
 
     'task-update_worker_month_stat': {
         'task': 'src.celery.tasks.update_worker_month_stat',
-        'schedule': crontab(day_of_month='1,15', hour=3, minute=0)
+        'schedule': crontab(day_of_month='1,15', hour=1, minute=0)
     },
 
     'task-notify-cashiers-lack': {
         'task': 'src.celery.tasks.notify_cashiers_lack',
-        'schedule': crontab(hour=5, minute=0)
+        'schedule': crontab(hour=1, minute=0)
     },
     'task-create-pred-bills': {
         'task': 'src.celery.tasks.create_pred_bills',
