@@ -78,7 +78,7 @@ def api_method(
         check_permissions=True,
         groups=None,
         lambda_func=None
-    ):
+):
     """
 
     :param method:
@@ -86,13 +86,17 @@ def api_method(
     :param auth_required:
     :param check_permissions: bool, отображает нужно ли делать проверку на доступ к функциям
     :param groups: User.group_type list: группы доступа к функциям
-    :param lambda_func: False -- on object creation, функция которая исходя из данных формирует данные необходимые для проверки доступа
+    :param lambda_func: False -- on object creation, функция которая исходя из данных формирует данные необходимые для
+    проверки доступа
+
     :return:
     """
+
     def decor(func):
         def wrapper(request, *args, **kwargs):
             if auth_required and not request.user.is_authenticated and settings.QOS_DEV_AUTOLOGIN_ENABLED:
-                user = authenticate(request, username=settings.QOS_DEV_AUTOLOGIN_USERNAME, password=settings.QOS_DEV_AUTOLOGIN_PASSWORD)
+                user = authenticate(request, username=settings.QOS_DEV_AUTOLOGIN_USERNAME,
+                                    password=settings.QOS_DEV_AUTOLOGIN_PASSWORD)
                 if user is None:
                     return JsonResponse.internal_error('cannot dev_autologin')
                 login(request, user)
@@ -191,4 +195,17 @@ def api_method(
                     return JsonResponse.internal_error()
 
         return wrapper
+
     return decor
+
+
+def check_group_hierarchy(changed_user, user_who_changes):
+    group_hierarchy = {
+        User.GROUP_CASHIER: 0,
+        User.GROUP_HQ: 0,
+        User.GROUP_MANAGER: 1,
+        User.GROUP_SUPERVISOR: 2,
+        User.GROUP_DIRECTOR: 3,
+    }
+    if group_hierarchy[user_who_changes.group] <= group_hierarchy[changed_user.group]:
+        return JsonResponse.access_forbidden('You are not allowed to edit this user')

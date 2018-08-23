@@ -15,7 +15,7 @@ from src.db.models import (
     WorkerPosition,
     Shop,
 )
-from src.util.utils import JsonResponse, api_method
+from src.util.utils import JsonResponse, api_method, check_group_hierarchy
 from src.util.forms import FormUtil
 from src.util.models_converter import (
     UserConverter,
@@ -39,10 +39,13 @@ from .forms import (
     DeleteCashierForm,
     GetCashiersListForm,
     DublicateCashierTimetableForm,
-    SetWorkerDaysForm
+    SetWorkerDaysForm,
+    PasswordChangeForm,
+    ChangeCashierInfo,
 )
 from . import utils
 from src.main.other.notification.utils import send_notification
+from django.contrib.auth import update_session_auth_hash
 
 
 @api_method('GET', GetCashiersListForm)
@@ -170,7 +173,7 @@ def get_cashier_timetable(request, form):
             'sick_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_SICK.value),
             'vacation_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_VACATION.value),
             'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and
-                                                 x.dt in official_holidays),
+                                                                        x.dt in official_holidays),
             'change_amount': len(worker_day_change_log)
         }
 
@@ -738,3 +741,89 @@ def delete_cashier(request, form):
     send_notification('D', user, sender=request.user)
 
     return JsonResponse.success(UserConverter.convert(user))
+
+
+@api_method(
+    'POST',
+    PasswordChangeForm,
+    groups=User.__all_groups__,
+    lambda_func=lambda x: User.objects.get(id=x['user_id'])
+)
+def password_edit(request, form):
+    user_id = form['user_id']
+    old_password = form['old_password']
+    new_password = form['new_password']
+    confirm_password = form['confirm_password']
+
+    if user_id != request.user.id:
+        try:
+            user = User.objects.get(id=user_id)
+            errors = check_group_hierarchy(user, request.user)
+            if errors:
+                return errors
+        except User.DoesNotExist:
+            return JsonResponse.does_not_exists_error()
+    else:
+        user = request.user
+    if not user.check_password(old_password):
+        return JsonResponse.auth_error()
+
+    if new_password != confirm_password:
+        return JsonResponse.value_error('Password_mismatch')
+    else:
+        user.set_password(new_password)
+        update_session_auth_hash(request, user)
+
+    return JsonResponse.success(UserConverter.convert(user))
+
+
+@api_method(
+    'POST',
+    ChangeCashierInfo,
+    groups=User.__allowed_to_modify__,
+    lambda_func=lambda x: User.objects.get(id=x['user_id']))
+def change_cashier_info(request, form):
+    user_id = form['user_id']
+    response = {}
+    group_hierarchy = {
+        User.GROUP_CASHIER: 0,
+        User.GROUP_HQ: 0,
+        User.GROUP_MANAGER: 1,
+        User.GROUP_SUPERVISOR: 2,
+        User.GROUP_DIRECTOR: 3,
+    }
+    if user_id != request.user.id:
+        try:
+            user = User.objects.get(id=user_id)
+            errors = check_group_hierarchy(user, request.user)
+            if errors:
+                return errors
+        except User.DoesNotExist:
+            return JsonResponse.does_not_exists_error()
+    else:
+        user = request.user
+
+    if form['group']:
+        if group_hierarchy[request.user.group] <= group_hierarchy[form['group']]:
+            return JsonResponse.access_forbidden('You are not allowed to edit this group')
+
+    if form['first_name']:
+        user.first_name = form['first_name']
+        response['new_first_name'] = user.first_name
+    if form['middle_name']:
+        user.middle_name = form['middle_name']
+        response['new_middle_name'] = form['middle_name']
+
+    if form['last_name']:
+        user.last_name = form['last_name']
+        response['new_last_name'] = form['last_name']
+
+    if form['avatar']:
+        user.avatar = form['avatar']
+        response['new_avatar'] = 'True'
+
+    if form['birthday']:
+        user.birthday = form['birthday']
+        response['new_birthday'] = str(form['birthday'])
+
+    return JsonResponse.success(response)

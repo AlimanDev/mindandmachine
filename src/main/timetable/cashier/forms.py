@@ -139,7 +139,8 @@ class SetWorkerDayForm(forms.Form):
             return
 
         if WorkerDay.is_type_with_tm_range(self.cleaned_data['type']):
-            if self.cleaned_data.get('tm_work_start') is None or self.cleaned_data.get('tm_work_end') is None or self.cleaned_data.get('tm_break_start') is None:
+            if self.cleaned_data.get('tm_work_start') is None or self.cleaned_data.get('tm_work_end') is None or \
+                    self.cleaned_data.get('tm_break_start') is None:
                 raise ValidationError('tm_work_start, tm_work_end and tm_break_start required')
 
 
@@ -218,3 +219,19 @@ class DeleteCashierForm(forms.Form):
     user_id = forms.IntegerField()
     dt_fired = util_forms.DateField()
 
+
+class PasswordChangeForm(forms.Form):
+    user_id = forms.IntegerField()
+    old_password = forms.CharField(max_length=128)
+    new_password = forms.CharField(max_length=128)
+    confirm_password = forms.CharField(max_length=128)
+
+
+class ChangeCashierInfo(forms.Form):
+    user_id = forms.IntegerField()
+    first_name = forms.CharField(max_length=30, required=False)
+    middle_name = forms.CharField(max_length=64, required=False)
+    last_name = forms.CharField(max_length=150, required=False)
+    avatar = forms.ImageField(required=False)
+    group = forms.CharField(max_length=1, required=False)
+    birthday = forms.DateField(required=False)

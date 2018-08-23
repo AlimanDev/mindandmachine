@@ -30,13 +30,21 @@ class LocalTestCase(TestCase):
             title='Shop2',
             hidden_title='Shop2',
         )
-        self.user1 = User.objects.create_user(self.USER_USERNAME, self.USER_EMAIL, self.USER_PASSWORD, id=1,
-                                              shop=self.shop)
+        self.user1 = User.objects.create_user(self.USER_USERNAME, self.USER_EMAIL, self.USER_PASSWORD,
+                                              id=1,
+                                              shop=self.shop,
+                                              group=User.GROUP_SUPERVISOR,
+                                              )
         # self.user1 = create_user(user_id=1, shop_id=self.shop, username='user1')
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2')
         self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3')
         self.user4 = create_user(user_id=4, shop_id=self.shop, username='user4',
                                  dt_fired=(dttm_now - datetime.timedelta(days=1)).date())
+        User.objects.create_user('Director', 'Director@q.q', '1111',
+                                 id=5,
+                                 shop=self.shop,
+                                 group=User.GROUP_DIRECTOR,
+                                 )
         self.cashboxType = create_cashbox_type(self.shop, 'тип_кассы_1', id=1,
                                                dttm_last_update_queue=datetime.datetime(2018, 6, 18, 8, 30, 0))
 
