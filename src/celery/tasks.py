@@ -39,6 +39,7 @@ def update_queue(till_dttm=None):
     )
     for cashbox_type in cashbox_types:
         dif_time = till_dttm - cashbox_type.dttm_last_update_queue
+        print('начал работать')
         while dif_time > time_step:
             mean_queue = CameraCashboxStat.objects.filter(
                 camera_cashbox__cashbox__type__id=cashbox_type.id,
