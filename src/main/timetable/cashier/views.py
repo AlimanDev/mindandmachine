@@ -789,6 +789,7 @@ def password_edit(request, form):
     lambda_func=lambda x: User.objects.get(id=x['user_id']))
 def change_cashier_info(request, form):
     user_id = form['user_id']
+
     response = {}
     group_hierarchy = {
         User.GROUP_CASHIER: 0,
@@ -797,6 +798,7 @@ def change_cashier_info(request, form):
         User.GROUP_SUPERVISOR: 2,
         User.GROUP_DIRECTOR: 3,
     }
+
     if user_id != request.user.id:
         try:
             user = User.objects.get(id=user_id)
@@ -815,6 +817,7 @@ def change_cashier_info(request, form):
     if form['first_name']:
         user.first_name = form['first_name']
         response['new_first_name'] = user.first_name
+
     if form['middle_name']:
         user.middle_name = form['middle_name']
         response['new_middle_name'] = form['middle_name']
@@ -830,6 +833,7 @@ def change_cashier_info(request, form):
     if form['birthday']:
         user.birthday = form['birthday']
         response['new_birthday'] = str(form['birthday'])
+
     user.save()
 
     return JsonResponse.success(response)
