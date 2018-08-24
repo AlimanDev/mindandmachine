@@ -11,6 +11,7 @@ from src.main.timetable.worker_exchange.utils import (
     has_deficiency
 )
 from src.main.demand.utils import create_predbills_request_function
+from src.main.other.notification.utils import get_month_name
 
 from src.db.models import (
     PeriodDemand,
@@ -180,7 +181,7 @@ def notify_cashiers_lack():
     creates notification if there's deficiency of cashiers for each shop
     :return:
     """
-    for shop in Shop.objects.all():
+    for shop in Shop.objects.filter(id=5):
         dttm_now = now()
         notify_to = dttm_now + datetime.timedelta(days=7)
         shop_id = shop.id
@@ -196,14 +197,13 @@ def notify_cashiers_lack():
                     init_params_dict['cashbox_types_hard_dict'],
                     dttm
                 )
-
                 to_notify = False  # есть ли вообще нехватка
                 notification_text = None  # {ct type : 'notification_text' or False если нет нехватки }
                 for cashbox_type in return_dict.keys():
                     if return_dict[cashbox_type]:
                         to_notify = True
-                        notification_text = '{}.{} в {}-{} за типом кассы {} не будет хватать кассиров: {}. '.format(
-                            dttm.day, dttm.month, dttm.hour, dttm.minute,
+                        notification_text = '{}.{} в {}-{} за типом кассы {} будет не хватать сотрудников: {}. '.format(
+                            dttm.strftime('%d'), dttm.strftime('%m'), dttm.strftime('%H'), dttm.strftime('%M'),
                             CashboxType.objects.get(id=cashbox_type).name,
                             return_dict[cashbox_type]
                         )
@@ -232,7 +232,7 @@ def notify_cashiers_lack():
                             )
 
                 Notifications.objects.bulk_create(notifications_list)
-            dttm += datetime.timedelta(minutes=30)
+            dttm += datetime.timedelta(hours=1)
 
     print('уведомил о нехватке')
 
