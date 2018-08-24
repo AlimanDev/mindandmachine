@@ -4,6 +4,7 @@ from src.db.models import (
     User,
     Slot,
     UserWeekdaySlot,
+    CashboxType
 )
 from src.util.forms import FormUtil
 from src.util.models_converter import (
@@ -24,7 +25,6 @@ from .forms import (
     DeleteSlotForm
 )
 from collections import defaultdict
-
 
 
 @api_method('GET', GetDepartmentForm)
@@ -169,17 +169,20 @@ def get_slots(request, form):
     })
 
 
-@api_method('POST', CreateSlotForm)
+@api_method(
+    'GET',
+    CreateSlotForm,
+    lambda_func=lambda x: CashboxType.objects.get(id=x['cashbox_type_id']).shop
+)
 def create_slot(request, form):
     """
     creates new Slot. If slot with such cashbox_type and time exists returns already_exists_error
-    :param shop_id: required=True
     :param cashbox_type_id: required=True
     :param tm_start: required=True
     :param tm_end: required=True
     :return: created Slot
     """
-    shop_id = Shop.objects.get(id=form['shop_id']).id
+    shop_id = FormUtil.get_shop_id(request, form)
 
     slot_dict = {
         'shop_id': shop_id,
