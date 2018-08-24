@@ -5,7 +5,15 @@ from src.util.db import CashboxTypeUtil
 from src.util.forms import FormUtil
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import CashboxTypeConverter, CashboxConverter
-from .forms import GetTypesForm, GetCashboxesForm, CreateCashboxForm, DeleteCashboxForm, UpdateCashboxForm
+from .forms import (
+    GetTypesForm,
+    GetCashboxesForm,
+    CreateCashboxForm,
+    DeleteCashboxForm,
+    UpdateCashboxForm,
+    CreateCashboxTypeForm,
+    DeleteCashboxTypeForm
+)
 from src.main.other.notification.utils import send_notification
 
 
@@ -156,3 +164,43 @@ def update_cashbox(request, form):
     return JsonResponse.success(
         CashboxConverter.convert(cashbox)
     )
+
+
+@api_method('GET', CreateCashboxTypeForm)
+def create_cashbox_type(request, form):
+    shop_id = FormUtil.get_shop_id(request, form)
+    name = form['name']
+
+    if CashboxType.objects.filter(name=name, shop_id=shop_id, dttm_deleted__isnull=True).count() > 0:
+        return JsonResponse.already_exists_error('cashbox type already exists')
+
+    new_cashbox_type = CashboxType.objects.create(
+        name=name,
+        shop_id=shop_id,
+        is_main_type=True if name == 'Линия' else False
+    )
+
+    send_notification('C', new_cashbox_type, sender=request.user)
+
+    return JsonResponse.success(CashboxTypeConverter.convert(new_cashbox_type))
+
+
+@api_method(
+    'GET',
+    DeleteCashboxTypeForm,
+    lambda_func=lambda x: CashboxType.objects.get(id=x['cashbox_type_id']).shop
+)
+def delete_cashbox_type(request, form):
+    cashbox_type = CashboxType.objects.get(id=form['cashbox_type_id'])
+
+    attached_cashboxes = Cashbox.objects.filter(type=cashbox_type, dttm_deleted__isnull=True)
+
+    if attached_cashboxes.count() > 0:
+        return JsonResponse.internal_error('there are cashboxes on this type')
+
+    cashbox_type.dttm_deleted = datetime.datetime.now()
+    cashbox_type.save()
+
+    send_notification('D', cashbox_type, sender=request.user)
+
+    return JsonResponse.success(CashboxTypeConverter.convert(cashbox_type))
