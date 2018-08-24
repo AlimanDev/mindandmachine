@@ -170,7 +170,7 @@ def get_slots(request, form):
 
 
 @api_method(
-    'GET',
+    'POST',
     CreateSlotForm,
     lambda_func=lambda x: CashboxType.objects.get(id=x['cashbox_type_id']).shop
 )
