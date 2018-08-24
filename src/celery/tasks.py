@@ -181,7 +181,7 @@ def notify_cashiers_lack():
     creates notification if there's deficiency of cashiers for each shop
     :return:
     """
-    for shop in Shop.objects.filter(id=5):
+    for shop in Shop.objects.all():
         dttm_now = now()
         notify_to = dttm_now + datetime.timedelta(days=7)
         shop_id = shop.id
