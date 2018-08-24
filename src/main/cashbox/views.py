@@ -166,8 +166,14 @@ def update_cashbox(request, form):
     )
 
 
-@api_method('GET', CreateCashboxTypeForm)
+@api_method('POST', CreateCashboxTypeForm)
 def create_cashbox_type(request, form):
+    """
+    also send notifications about created cashbox_type
+    :param shop_id: required=True
+    :param name: max_length=128
+    :return: created CashboxType in case of success, else already_exists error if cashbox_type with such name already exists
+    """
     shop_id = FormUtil.get_shop_id(request, form)
     name = form['name']
 
@@ -186,11 +192,16 @@ def create_cashbox_type(request, form):
 
 
 @api_method(
-    'GET',
+    'POST',
     DeleteCashboxTypeForm,
     lambda_func=lambda x: CashboxType.objects.get(id=x['cashbox_type_id']).shop
 )
 def delete_cashbox_type(request, form):
+    """
+    also send notifications about deleted cashbox_type
+    :param cashbox_type_id: required=True
+    :return: deleted CashboxType if success, else internal_error if there are cashboxes attached to this cashbox_type
+    """
     cashbox_type = CashboxType.objects.get(id=form['cashbox_type_id'])
 
     attached_cashboxes = Cashbox.objects.filter(type=cashbox_type, dttm_deleted__isnull=True)
@@ -204,3 +215,5 @@ def delete_cashbox_type(request, form):
     send_notification('D', cashbox_type, sender=request.user)
 
     return JsonResponse.success(CashboxTypeConverter.convert(cashbox_type))
+
+

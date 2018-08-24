@@ -6,11 +6,25 @@ from src.db.models import (
     UserWeekdaySlot,
 )
 from src.util.forms import FormUtil
-from src.util.models_converter import ShopConverter, SuperShopConverter, BaseConverter
+from src.util.models_converter import (
+    ShopConverter,
+    SuperShopConverter,
+    BaseConverter,
+    SlotConverter
+)
 from src.util.utils import api_method, JsonResponse
-from .forms import GetDepartmentForm, GetSuperShopForm, GetSuperShopListForm, GetSlots, GetAllSlots, SetSlot
+from .forms import (
+    GetDepartmentForm,
+    GetSuperShopForm,
+    GetSuperShopListForm,
+    GetSlots,
+    GetAllSlots,
+    SetSlot,
+    CreateSlotForm,
+    DeleteSlotForm
+)
 from collections import defaultdict
-import datetime
+
 
 
 @api_method('GET', GetDepartmentForm)
@@ -153,3 +167,47 @@ def get_slots(request, form):
     return JsonResponse.success({
         'slots': slots_by_weekday,
     })
+
+
+@api_method('POST', CreateSlotForm)
+def create_slot(request, form):
+    """
+    creates new Slot. If slot with such cashbox_type and time exists returns already_exists_error
+    :param shop_id: required=True
+    :param cashbox_type_id: required=True
+    :param tm_start: required=True
+    :param tm_end: required=True
+    :return: created Slot
+    """
+    shop_id = Shop.objects.get(id=form['shop_id']).id
+
+    slot_dict = {
+        'shop_id': shop_id,
+        'cashbox_type_id': form['cashbox_type_id'],
+        'tm_start': form['tm_start'],
+        'tm_end': form['tm_end']
+    }
+
+    is_exist = Slot.objects.filter(**slot_dict)
+    if is_exist.count() > 0:
+        return JsonResponse.already_exists_error('such slot already exists')
+
+    new_slot = Slot.objects.create(**slot_dict)
+
+    return JsonResponse.success(SlotConverter.convert(new_slot))
+
+
+@api_method(
+    'POST',
+    DeleteSlotForm,
+    lambda_func=lambda x: Slot.objects.get(id=x['slot_id']).shop
+)
+def delete_slot(request, form):
+    """
+    Attention!! directly deletes slot from db.
+    :param slot_id: required=True
+    :return: -
+    """
+    Slot.objects.get(id=form['slot_id']).delete()
+
+    return JsonResponse.success('slot was successfully deleted')
