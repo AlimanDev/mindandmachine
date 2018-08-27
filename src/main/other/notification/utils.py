@@ -11,6 +11,15 @@ from django.db.models import Q
 
 
 def get_month_name(dt):
+    """
+    Функция которая возвращает название месяца в зависимости от полученной даты
+
+    Args:
+        dt(datetime.date): дата
+
+    Returns:
+        (char): название месяца
+    """
     month_dict = {
         1: 'январь',
         2: 'февраль',
@@ -30,10 +39,16 @@ def get_month_name(dt):
 
 def create_notification(action, instance):
     """
-    creates notification text and notification type for different situations
-    :param instance: instance, about which we need to notify
-    :param action: 'C' or 'D' for creation or deletion
-    :return:
+    Создает текст и тип уведомления в зависимости от действия и объекта
+
+    Args:
+        action(str): 'C' или 'D' для создания/удаления соответственно
+        instance(object): объект какой-то модели
+
+    Returns:
+        (tuple): tuple содержащий:
+            notification_text(char): текст уведоления
+            notification_type(Notifications.type): тип уведомления
     """
     notification_text = None
     notification_type = Notifications.TYPE_INFO
@@ -72,12 +87,16 @@ def create_notification(action, instance):
 
 def send_notification(action, instance, recipient_list=None, sender=None):
     """
+    Функция "отправки" уведомлений (на самом деле она их просто создает в бд)
 
-    :param instance: instance, about which we need to notify
-    :param action: 'C' or 'D' for creation or deletion
-    :param recipient_list: list of users (or one user) who'd receive this notification
-    :param sender: user who performed action of creation or deletion
-    :return:
+    Args:
+        action(char): 'C' или 'D' для создания/удаления соответственно
+        instance(object): объект модели о которой нам надо уведомить
+        recipient_list(list): список получателей
+        sender(user object): тот, кто тригернул это действие (обычно request.user)
+
+    Returns:
+
     """
     notification_text, notification_type = create_notification(action, instance)
 

@@ -6,10 +6,14 @@ from src.db.models import WorkerDayCashboxDetails, WorkerDay
 
 def time_diff(start, end):
     """
-    difference between 2 times taking into account midnight switch
-    :param start: start_time
-    :param end: end_time
-    :return: int object in seconds
+    Разница между двумя временами с учетом перехода через полночь
+
+    Args:
+        start (datetime.time): начало
+        end (datetime.time): конец
+
+    Returns:
+        int: количество секунд между двумя временами
     """
     if isinstance(start, datetime_time):
         assert isinstance(end, datetime_time)
@@ -27,8 +31,13 @@ def time_diff(start, end):
 
 def is_midnight_period(dttm_now):
     """
-    :param dttm_now: current date and time
-    :return: True if time is less than 6 a.m, false -- otherwise
+    Проверяет полночь ли сейчас
+
+    Args:
+        dttm_now(QOS_DATETIME): дата-время
+
+    Returns:
+        bool: True если время меньше 6 утра, иначе -- False
     """
 
     tm_shop_opens = dt.time(6, 0)
@@ -38,10 +47,17 @@ def is_midnight_period(dttm_now):
 
 def get_status_and_details(worker_id, dttm):
     """
-    get status of worker and useful WorkerDayCashboxDetails (usual last), also return WorkerDay
-    :param worker_id: worker id (User.id)
-    :param dttm: datetime -- date -- day, time -- current time
-    :return:
+    Получаем какую-то полезную инфу о worker_day_cashbox_details
+
+    Args:
+        worker_id (int): id работника
+        dttm (datetime.datetime): datetime -- date -- day, time -- current time
+
+    Returns:
+        (tuple): tuple содержащий:
+            day_detail (WorkerDayCashboxDetails): последний объект в QuerySet'e
+            worker_day (WorkerDay): соответствующий worker_day
+            status (WorkerDayCashboxDetails.status): статус
     """
 
     status = ''

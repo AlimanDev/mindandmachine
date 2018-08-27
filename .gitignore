@@ -20,3 +20,5 @@ qos_backend.log*
 
 venv/*
 celerybeat*
+docs/_*
+docs/qos*

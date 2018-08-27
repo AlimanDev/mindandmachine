@@ -15,6 +15,18 @@ import json
 @api_method('GET', GetTable)
 @xlsx_method
 def get_tabel(request, workbook, form):
+    """
+    Скачать табель на дату
+
+    Args:
+        method: GET
+        url: api/download/get_tabel
+        shop_id(int): required = False
+        weekday(QOS_DATE): на какую дату табель хотим
+
+    Returns:
+        Табель
+    """
     ws = workbook.add_worksheet(Tabel_xlsx.MONTH_NAMES[form['weekday'].month])
 
     shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))

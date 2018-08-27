@@ -252,13 +252,6 @@ def create_predbills_request(request, form):
 @csrf_exempt
 @api_method('POST', SetPredictBillsForm, auth_required=False, check_permissions=False)
 def set_pred_bills(request, form):
-    """
-    listens for response from qos_algo. when gets it, pushes data from response to database
-    :SetPredBillsForm: key, data -- both char fields
-    :param request:
-    :param form:
-    :return:
-    """
     set_pred_bills_function(form['data'], form['key'])
 
     return JsonResponse.success()
