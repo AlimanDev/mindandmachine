@@ -188,31 +188,54 @@ QOS_TIME_FORMAT = '%H:%M:%S'
 QOS_SHORT_TIME_FORMAT = '%H:%M'
 
 
-imports = 'proj.tasks'
+CELERY_IMPORTS = ('src.celery.tasks',)
 CELERY_BROKER_URL = 'redis://localhost:6379'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379'
 CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+CELERYD_CONCURRENCY = 2
+CELERYD_PREFETCH_MULTIPLIER = 1
+BACKEND_QUEUE = 'backend_queue'
+
+
+CELERY_QUEUES = {
+    "backend_queue": {
+        "exchange": "backend_queue",
+        "routing_key": "backend_queue",
+    }
+}
+
+CELERY_ROUTES = {
+    'src.app.tasks.*': {
+        'queue': BACKEND_QUEUE,
+        'routing_key': 'backend_queue',
+    },
+}
+
 CELERY_BEAT_SCHEDULE = {
     'task-every-30-min-update-queue': {
         'task': 'src.celery.tasks.update_queue',
-        'schedule': crontab(minute='*/30'),
+        'schedule': crontab(minute='0,30'),
+        'options': {'queue': BACKEND_QUEUE}
     },
     'task-free-all-workers-after-shop-closes': {
         'task': 'src.celery.tasks.release_all_workers',
-        'schedule': crontab(hour=2, minute=0)
+        'schedule': crontab(hour=2, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
     },
 
     'task-update_worker_month_stat': {
         'task': 'src.celery.tasks.update_worker_month_stat',
-        'schedule': crontab(day_of_month='1,15', hour=3, minute=0)
+        'schedule': crontab(day_of_month='1,15', hour=0, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
     },
 
     'task-notify-cashiers-lack': {
         'task': 'src.celery.tasks.notify_cashiers_lack',
-        'schedule': crontab(hour=5, minute=0),
+        'schedule': crontab(hour=1, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
     },
     'task-allocation-of-time-for-work-on-cashbox': {
         'task': 'src.celery.tasks.allocation_of_time_for_work_on_cashbox',
@@ -220,7 +243,8 @@ CELERY_BEAT_SCHEDULE = {
     },
     'task-create-pred-bills': {
         'task': 'src.celery.tasks.create_pred_bills',
-        'schedule': crontab(0, 0, day_of_month='1')
+        'schedule': crontab(hour=23, minute=0, day_of_month='1'),
+        'options': {'queue': BACKEND_QUEUE}
     },
 }
 

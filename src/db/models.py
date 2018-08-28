@@ -560,7 +560,12 @@ class WorkerDayCashboxDetails(models.Model):
     tm_to = models.TimeField(null=True, blank=True)
 
     def __str__(self):
-        return '{}, {}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.cashbox_type.name, self.id)
+        return '{}, {}, {}, {}, {}'.format(
+            self.worker_day.worker.last_name,
+            self.worker_day.worker.shop.super_shop.title,
+            self.worker_day.dt,
+            self.cashbox_type.name if self.cashbox_type else None,
+            self.id)
 
 
 class WorkerDayChangeRequest(models.Model):
