@@ -3,6 +3,6 @@ Cashier
 
 Views
 ----------
-.. automodule:: src.main.timetable.auto_settings.views
+.. automodule:: src.main.timetable.cashier.views
    :members:
 

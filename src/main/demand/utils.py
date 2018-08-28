@@ -115,9 +115,6 @@ def set_pred_bills_function(data, key):
         data(str): json data от qos_algo
         key(str): ключ
 
-    Returns:
-        None
-
     Raises:
         SystemError: если клюс не передан или не соответствует
         ValueError: если ошибка при загрузке data'ы

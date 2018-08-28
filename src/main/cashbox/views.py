@@ -11,6 +11,26 @@ from src.main.other.notification.utils import send_notification
 
 @api_method('GET', GetTypesForm, groups=User.__all_groups__)
 def get_types(request, form):
+    """
+    Возвращает список рабочих типов касс для данного магазина
+
+    Args:
+        method: GET
+        url: /api/cashbox/get_types
+        shop_id(int): required = False
+    Returns:
+        [
+            {
+                | 'id': cashbox_type_id,
+                | 'dttm_deleted': дата удаления(здесь везде null),
+                | 'shop': shop_id,
+                | 'is_stable': True/False,
+                | 'dttm_added': дата добавления,
+                | 'speed_coef': int,
+                | 'name': имя типа
+            },...
+        ]
+    """
     shop_id = FormUtil.get_shop_id(request, form)
 
     # todo: add selecting in time period
@@ -26,6 +46,42 @@ def get_types(request, form):
 
 @api_method('GET', GetCashboxesForm, groups=User.__all_groups__)
 def get_cashboxes(request, form):
+    """
+    Возвращает список касс для заданных в cashbox_types_ids типов
+
+    Args:
+        method: GET
+        url: api/cashbox/get_cashboxes
+        shop_id(int): required = False
+        from_dt(QOS_DATE): required = False
+        to_dt(QOS_DATE): required = False
+        cashbox_type_ids(list): список типов касс
+
+    Returns:
+        {
+            'cashbox_types':{
+                cashbox_type_id: {
+                    | 'dttm_deleted': дата-время удаления (null),
+                    | 'dttm_added': дата-время добавления,
+                    | 'shop': shop_id,
+                    | 'id': id типа кассы,
+                    | 'is_stable': True/False,
+                    | 'name': имя типа кассы,
+                    | 'speed_coef': int
+                }
+            },\n
+            'cashboxes': [
+                {
+                    | 'dttm_deleted': ,
+                    | 'dttm_added': ,
+                    | 'number'(str): номер кассы,
+                    | 'id': id кассы,
+                    | 'type': id типа кассы,
+                    | 'bio'(str): биография лол?
+                }, ...
+            ]
+        }
+    """
     shop_id = FormUtil.get_shop_id(request, form)
     dt_from = FormUtil.get_dt_from(form)
     dt_to = FormUtil.get_dt_to(form)
@@ -56,6 +112,39 @@ def get_cashboxes(request, form):
     lambda_func=lambda x: CashboxType.objects.get(id=x['cashbox_type_id']).shop
 )
 def create_cashbox(request, form):
+    """
+    Создает новую кассу
+
+    Args:
+        method: POST
+        url: /api/cashbox/create_cashbox
+        cashbox_type_id(int): id типа кассы, к которой будет привязана созданная касса
+        number(str): номер кассы
+
+    Returns:
+        {
+            'cashbox_type': {
+                | 'id': id типа кассы,
+                | 'dttm_added': ,
+                | 'dttm_deleted': ,
+                | 'shop': shop_id,
+                | 'name': название типа кассы,
+                | 'is_stable': True/False,
+                | 'speed_coef': int
+            },\n
+            'cashbox': {
+                | 'id': id созданной кассы,
+                | 'dttm_added': ,
+                | 'dttm_deleted': null,
+                | 'type': id типа кассы,
+                | 'number'(str): номер,
+                | 'bio'(str): лол
+            }
+        }
+
+    Note:
+        Отправляет уведомление о созданной кассе
+    """
     cashbox_type_id = form['cashbox_type_id']
     cashbox_number = form['number']
 
@@ -86,11 +175,34 @@ def create_cashbox(request, form):
 
 
 @api_method(
-    'GET',
+    'POST',
     DeleteCashboxForm,
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def delete_cashbox(request, form):
+    """
+    "Удаляет" кассу с заданным номером
+
+    Args:
+        method: POST
+        url: /api/cashbox/delete_cashbox
+        shop_id(int): required = True
+        number(str): номер кассы которую удаляем
+        bio(str): доп инфа
+
+    Returns:
+        {
+            | 'id': id удаленной кассы,
+            | 'dttm_added': ,
+            | 'dttm_deleted': datetime.now(),
+            | 'type': id типа кассы,
+            | 'number': номер,
+            | 'bio': доп инфа
+        }
+
+    Note:
+        Отправляет уведомление об удаленной кассе
+    """
     shop_id = FormUtil.get_shop_id(request, form)
 
     try:
@@ -123,6 +235,32 @@ def delete_cashbox(request, form):
     lambda_func=lambda x: CashboxType.objects.get(id=x['to_cashbox_type_id'].shop)
 )
 def update_cashbox(request, form):
+    """
+    Меняет тип кассы у кассы с заданным номером
+
+    Args:
+        method: POST
+        url: /api/cashbox/update_cashbox
+        from_cashbox_type_id(int): с какого типа меняем
+        to_cashbox_type_id(int): на какой
+        number(str): номер кассы
+
+    Returns:
+        {
+            | 'id': id,
+            | 'dttm_added': ,
+            | 'dttm_deleted': ,
+            | 'type': id типа,
+            | 'number': номер,
+            | 'bio': доп инфа
+        }
+
+    Raises:
+        JsonResponse.does_not_exists_error: если тип кассы с from/to_cashbox_type_id не существует\
+        или если кассы с заданным номером и привязанной к данному типу не существует
+        JsonResponse.multiple_objects_returned: если вернулось несколько объектов в QuerySet'e
+
+    """
     cashbox_number = form['number']
 
     try:
@@ -146,7 +284,7 @@ def update_cashbox(request, form):
     except Cashbox.DoesNotExist:
         return JsonResponse.does_not_exists_error('cashbox')
     except Cashbox.MultipleObjectsReturned:
-        return JsonResponse.internal_error()
+        return JsonResponse.multiple_objects_returned()
 
     cashbox.dttm_deleted = datetime.datetime.now()
     cashbox.save()

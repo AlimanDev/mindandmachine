@@ -17,6 +17,7 @@ Welcome to QoS_backend's documentation!
    modules/download
    modules/notifications
    modules/other
+   modules/queue
    modules/tablet
    modules/autosettings
    modules/cashier

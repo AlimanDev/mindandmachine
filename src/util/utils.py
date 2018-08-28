@@ -4,6 +4,7 @@ from django.conf import settings
 from functools import wraps
 from django.contrib.auth import authenticate, login
 from django.http import HttpResponse
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from src.db.models import (
     User,
     Shop
@@ -148,8 +149,10 @@ def api_method(
                     else:
                         try:
                             cleaned_data = lambda_func(form.cleaned_data)
-                        except:
+                        except ObjectDoesNotExist:
                             return JsonResponse.does_not_exists_error()
+                        except MultipleObjectsReturned:
+                            return JsonResponse.multiple_objects_returned()
 
                     # print(lambda_func)
                     if groups is None:

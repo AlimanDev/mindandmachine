@@ -61,7 +61,7 @@ def set_notifications_read(request, form):
     Args:
         method: POST
         url: /api/other/notification/set_notifications_read
-        ids(str([1,2,]): список уведомлений, которые сделать прочитанными
+        ids(list): список уведомлений, которые сделать прочитанными (либо [] -- для всех)
 
     Returns:
         {

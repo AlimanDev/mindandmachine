@@ -3,8 +3,8 @@
 ## Installation
 
 ```
-pip install pipenv
-pipenv install
+pip install virtualenv
+virtualenv venv
 ```
 
 ## Usage
@@ -12,8 +12,18 @@ pipenv install
 To run a dev server:
 
 ```
-pipenv shell
+source venv/bin/activate
+pip install -r requirements.txt
+cd QoS_backend/
 python manage.py runserver
+```
+
+## Generate doc
+```
+cd docs/
+make html
+Команда сгенерит _build/html/index.html
+index.html -- это док файл
 ```
 
 

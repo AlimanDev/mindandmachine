@@ -24,8 +24,9 @@ from src.util.models_converter import BaseConverter
 
 class ChangeType(Enum):
     """
-    не забудь добавить новую функция в ChangeTypeFunctions в конце файла
-    число -- приоритет: чем меньше -- тем важнее
+    Warning:
+        не забудь добавить новую функция в ChangeTypeFunctions в конце файла \
+        число -- приоритет: чем меньше -- тем важнее
     """
     from_other_spec = 1
     day_switch = 2
