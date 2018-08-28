@@ -228,38 +228,6 @@ def notify_cashiers_lack():
             dttm += datetime.timedelta(minutes=30)
             Notifications.objects.bulk_create(notifications_list)
 
-        return_dict = has_deficiency(
-            init_params_dict['predict_demand'],
-            init_params_dict['mean_bills_per_step'],
-            init_params_dict['cashbox_types_hard_dict'],
-            dttm_now
-        )
-
-        to_notify = False  # есть ли вообще нехватка
-        notification_text = None  # {ct type : 'notification_text' or False если нет нехватки }
-        for cashbox_type in return_dict.keys():
-            if return_dict[cashbox_type]:
-                to_notify = True
-                notification_text = 'За типом кассы {} не хватает кассиров: {}. '.format(
-                    CashboxType.objects.get(id=cashbox_type).name,
-                    return_dict[cashbox_type]
-                )
-
-        managers_lists = User.objects.filter(shop_id=shop_id, work_type=User.WorkType.TYPE_MANAGER.value)
-        # если такого уведомления еще нет
-        if to_notify:
-            for manager in managers_lists:
-                if not Notifications.objects.filter(
-                        type=Notifications.TYPE_INFO,
-                        to_worker=manager,
-                        text=notification_text,
-                        dttm_added__lt=now() + datetime.timedelta(hours=2)):  # повторить уведомление раз в час
-                    Notifications.objects.create(
-                        type=Notifications.TYPE_INFO,
-                        to_worker=manager,
-                        text=notification_text
-                    )
-
 
 @app.task
 def allocation_of_time_for_work_on_cashbox():
