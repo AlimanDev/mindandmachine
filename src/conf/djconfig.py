@@ -28,7 +28,8 @@ SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*',
+                 ]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -40,7 +41,6 @@ INSTALLED_APPS = [
     'src',
     'src.db',
     'src.main',
-    # 'src.main.other.notification.apps.NotificationConfig',
     'django_celery_beat',
     'django_celery_results',
     'src.celery',
@@ -102,11 +102,24 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# emails for sending errors
-# TODO: its not working actually because we must deploy our SMTP server or use Google SMTP
-# https://stackoverflow.com/questions/6367014/how-to-send-email-via-django/6367458#6367458
-ADMINS = [('Name Surname', 'test@test.com'),]
 
+ADMINS = [('Robot', 'robot@mindandmachine.ru'), ]
+MANAGERS = ADMINS
+
+# To send messages, you must put in the mode DEBUG = False
+# For use TLS
+EMAIL_USE_TLS = True
+EMAIL_PORT = 587
+
+# For use SSL
+# EMAIL_USE_SSL = True
+# EMAIL_PORT = 465
+
+EMAIL_HOST = 'smtp.yandex.ru'
+EMAIL_HOST_USER = 'robot@mindandmachine.ru'
+EMAIL_HOST_PASSWORD = 'twtdtcgztorfruwz'
+
+SERVER_EMAIL = EMAIL_HOST_USER
 
 LOGGING = {
     'version': 1,
@@ -128,7 +141,8 @@ LOGGING = {
         'mail_admins': {
             'level': 'ERROR',
             'class': 'django.utils.log.AdminEmailHandler',
-            'email_backend': 'django.core.mail.backends.filebased.EmailBackend',
+            'email_backend': 'django.core.mail.backends.smtp.EmailBackend',
+            'formatter': 'simple',
         },
     },
     'loggers': {
@@ -137,6 +151,11 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
+        'django.request': {
+                'handlers': ['mail_admins'],
+                'level': 'ERROR',
+                'propagate': True,
+            },
     },
 }
 
@@ -216,6 +235,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'src.celery.tasks.notify_cashiers_lack',
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': 'backend_queue'}
+    },
+    'task-allocation-of-time-for-work-on-cashbox': {
+        'task': 'src.celery.tasks.allocation_of_time_for_work_on_cashbox',
+        'schedule': crontab(day_of_month='1', hour=4, minute=0)
     },
     'task-create-pred-bills': {
         'task': 'src.celery.tasks.create_pred_bills',
