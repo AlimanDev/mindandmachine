@@ -229,6 +229,24 @@ class User(DjangoAbstractUser):
     objects = WorkerManager()
 
 
+class CashboxTypeManager(models.Manager):
+    def qos_filter_active(self, dttm_from, dttm_to, *args, **kwargs):
+        """
+        added earlier then dt_from, deleted later then dt_to
+        :param dttm_from:
+        :param dttm_to:
+        :param args:
+        :param kwargs:
+        :return:
+        """
+
+        return self.filter(
+            models.Q(dttm_added__lte=dttm_from) | models.Q(dttm_added__isnull=True)
+        ).filter(
+            models.Q(dttm_deleted__gte=dttm_to) | models.Q(dttm_deleted__isnull=True)
+        ).filter(*args, **kwargs)
+
+
 class CashboxType(models.Model):
     class Meta:
         verbose_name = 'Тип кассы'
@@ -240,7 +258,7 @@ class CashboxType(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    priority = models.PositiveIntegerField(default=100)  # 1--main, 2-ord, 3-express, etc
+    priority = models.PositiveIntegerField(default=100)  # 1--главная касса, 2--линия, 3--экспресс
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
     dttm_last_update_queue = models.DateTimeField(null=True, blank=True)
@@ -264,6 +282,7 @@ class CashboxType(models.Model):
     probability = models.FloatField(default=1.0)
     prior_weight = models.FloatField(default=1.0)
     is_main_type = models.BooleanField(default=False)
+    objects = CashboxTypeManager()
 
     period_demand_params = models.CharField(
         max_length=1024,
@@ -309,7 +328,7 @@ class Slot(models.Model):
 class CashboxManager(models.Manager):
     def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
         """
-        added earlier then dt_from, added later then dt_to
+        added earlier then dt_from, deleted later then dt_to
         :param dt_from:
         :param dt_to:
         :param args:
@@ -405,6 +424,9 @@ class WorkerCashboxInfo(models.Model):
     mean_speed = models.FloatField(default=1)
     bills_amount = models.PositiveIntegerField(default=0)
     priority = models.IntegerField(default=0)
+
+    # how many hours did he work
+    duration = models.FloatField(default=0)
 
 
 class WorkerConstraint(models.Model):
@@ -738,7 +760,7 @@ class ProductionDay(models.Model):
 
     def __repr__(self):
         return self.__str__()
-    
+
     # is it enough or work hours also needs?
 
 

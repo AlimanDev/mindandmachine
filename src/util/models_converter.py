@@ -217,7 +217,8 @@ class WorkerCashboxInfoConverter(BaseConverter):
             'mean_speed': obj.mean_speed,
             'bills_amount': obj.bills_amount,
             'period': obj.period,
-            'priority': obj.priority
+            'priority': obj.priority,
+            'duration': obj.duration
         }
 
 
