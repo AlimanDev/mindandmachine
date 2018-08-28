@@ -15,8 +15,6 @@ class TestTablet(LocalTestCase):
         response = self.api_get('/api/tablet/get_cashboxes_info?shop_id=1')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
-        print(response.json)
-
         self.assertEqual(response.json['data']['1']['with_queue'], True)
         self.assertEqual(response.json['data']['1']['cashbox'][0]['number'], 1)
         self.assertEqual(response.json['data']['1']['cashbox'][0]['status'], 'O')
@@ -27,7 +25,6 @@ class TestTablet(LocalTestCase):
         self.auth()
         response = self.api_get('/api/tablet/get_cashiers_info?shop_id=1&dttm={}'
                                 .format(BaseConverter.convert_datetime(now() + datetime.timedelta(hours=3))))
-        print(response.json)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data']['1']['worker_id'], 1)

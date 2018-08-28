@@ -76,16 +76,16 @@ def select_cashiers(request, form):
     work_workdays = form.get('work_workdays', [])
     if len(work_workdays) > 0:
         def __is_match_tm(__x, __tm_from, __tm_to):
-            if __x.tm_work_start < __x.tm_work_end:
-                if __tm_from > __x.tm_work_end:
+            if __x.dttm_work_start.time() < __x.dttm_work_end.time():
+                if __tm_from > __x.dttm_work_end.time():
                     return False
-                if __tm_to < __x.tm_work_start:
+                if __tm_to < __x.dttm_work_start.time():
                     return False
                 return True
             else:
-                if __tm_from >= __x.tm_work_start:
+                if __tm_from >= __x.dttm_work_start.time():
                     return True
-                if __tm_to <= __x.tm_work_end:
+                if __tm_to <= __x.dttm_work_end.time():
                     return True
                 return False
 
@@ -192,7 +192,7 @@ def get_table(request, form):
             worker__shop__title="Кассиры",
             dt=weekday,
         ).order_by(
-            'tm_work_start',
+            'dttm_work_start',
             'worker__last_name'
         )
 
@@ -209,8 +209,8 @@ def get_table(request, form):
 
             bg_color_format = {'bg_color': '#D9D9D9'} if is_working_or_main_type else None
             to_align_right = align_right if is_working_or_main_type else None
-            if workerday.tm_work_start is None\
-                or workerday.tm_work_end is None\
+            if workerday.dttm_work_start is None\
+                or workerday.dttm_work_end is None\
                 or workerday.type != WorkerDay.Type.TYPE_WORKDAY.value:
                 continue
             # user data
@@ -246,19 +246,18 @@ def get_table(request, form):
             worksheet.write_blank(row, 7+len(rest_time), '',
                 mix_formats(workbook, size_format))
             # start and end time
-            worksheet.write(row, 3, workerday.tm_work_start.strftime(QOS_SHORT_TIME_FORMAT),
+            worksheet.write(row, 3, workerday.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
                 mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
             worksheet.write_blank(row, 4, '',
                 mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
-            worksheet.write(row, 5, workerday.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT),
+            worksheet.write(row, 5, workerday.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT),
                 mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
             worksheet.write_blank(row, 6, '',
                 mix_formats(workbook, bold_left_cell_format, bold_right_cell_format, bold_format, bg_color_format, size_format))
             # update stats
             for stat_time in local_stats:
-                if stat_time >= workerday.tm_work_start and (\
-                    stat_time < workerday.tm_work_end or\
-                    workerday.tm_work_end.hour == 0):
+                if stat_time >= workerday.dttm_work_start.time() and \
+                        (stat_time < workerday.dttm_work_end.time() or workerday.dttm_work_end.time().hour == 0):
                     local_stats[stat_time].append(workerday)
             row += 1
 
