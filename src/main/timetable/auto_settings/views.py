@@ -433,8 +433,8 @@ def set_timetable(request, form):
             wd_obj.worker_shop_id=users[int(uid)].shop_id
             wd_obj.type = WorkerDayConverter.parse_type(wd['type'])
             if WorkerDay.is_type_with_tm_range(wd_obj.type):
-                wd_obj.tm_work_start = BaseConverter.parse_time(wd['tm_work_start'])
-                wd_obj.tm_work_end = BaseConverter.parse_time(wd['tm_work_end'])
+                wd_obj.dttm_work_start = BaseConverter.parse_datetime(wd['dttm_work_start'])
+                wd_obj.dttm_work_end = BaseConverter.parse_datetime(wd['dttm_work_end'])
                 # if wd['tm_break_start']:
                 #     wd_obj.tm_break_start = BaseConverter.parse_time(wd['tm_break_start'])
                 # else:

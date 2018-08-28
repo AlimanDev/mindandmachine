@@ -538,7 +538,7 @@ class WorkerDayCashboxDetails(models.Model):
 
     is_tablet = models.BooleanField(default=False)
 
-    tm_from = models.TimeField()
+    tm_from = models.TimeField(null=True, blank=True)
     tm_to = models.TimeField(null=True, blank=True)
 
     # ToDo: надо сделать dttm_from = models.DateTimeField()

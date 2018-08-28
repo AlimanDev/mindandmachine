@@ -114,10 +114,8 @@ def get_cashiers_info(request, form):
     break_triplets = shop.break_triplets
     list_of_break_triplets = json.loads(break_triplets)
     time_without_rest = {}
-
     status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
-        worker_day__dttm_work_start__lte=dttm + timedelta(minutes=30) if not is_midnight_period(dttm)
-                                        else tm_to_show_all_workers,
+        worker_day__dttm_work_start__lte=dttm + timedelta(minutes=30),
         worker_day__dt=(dttm - timedelta(hours=2)).date(),
         worker_day__worker_shop__id=shop_id,
     ).order_by('id')
@@ -126,10 +124,10 @@ def get_cashiers_info(request, form):
         triplets = []
         default_break_triplets = []
 
-        tm_work_end = item.worker_day.dttm_work_end.time()
-        tm_work_start = item.worker_day.dttm_work_start.time()
+        dttm_work_end = item.worker_day.dttm_work_end if item.worker_day.dttm_work_end else None
+        dttm_work_start = item.worker_day.dttm_work_start if item.worker_day.dttm_work_start else None
 
-        duration_of_work = round(time_diff(tm_work_start, tm_work_end) / 60)
+        duration_of_work = round((dttm_work_end - dttm_work_start).total_seconds() / 60)
 
         if item.worker_day.worker_id not in time_without_rest.keys():
             time_without_rest[item.worker_day.worker_id] = 0
@@ -140,19 +138,21 @@ def get_cashiers_info(request, form):
                     triplets.append([0, 0])
                     default_break_triplets.append(time_triplet)
 
-        if item.worker_day.dttm_work_start.time() > dttm.time() and item.worker_day.dt == dttm.date() and not item.is_tablet:
+        if item.worker_day.dttm_work_start > dttm and item.worker_day.dt == dttm.date() and not item.is_tablet:
             item.status = WorkerDayCashboxDetails.TYPE_SOON
         else:
             if item.is_tablet is True:
                 if item.status == WorkerDayCashboxDetails.TYPE_BREAK:
                     time_without_rest[item.worker_day.worker_id] = 0
-                    break_end = item.dttm_to.time()
 
                     if item.dttm_to is None:
-                        break_end = dttm.time()
+                        break_end = dttm
+                    else:
+                        break_end = item.dttm_to
+
                     if item.dttm_from is None:
                         item.dttm_from = dttm
-                    real_break_time = time_diff(item.dttm_from.time(), break_end)
+                    real_break_time = time_diff(item.dttm_from.time(), break_end.time())
 
                     for triplet in list_of_break_triplets:
                         if int(triplet[0]) < duration_of_work <= int(triplet[1]):
@@ -170,10 +170,13 @@ def get_cashiers_info(request, form):
                             break
 
                 elif item.status == WorkerDayCashboxDetails.TYPE_WORK:
-                    tm_to = item.dttm_to.time()
+
                     if item.dttm_to is None:
-                        tm_to = dttm.time()
-                    time_without_rest[item.worker_day.worker_id] += round(time_diff(item.dttm_from.time(), tm_to) / 60)
+                        dttm_to = dttm
+                    else:
+                        dttm_to = item.dttm_to
+
+                    time_without_rest[item.worker_day.worker_id] += round((dttm_to - item.dttm_from).total_seconds() / 60)
 
                 if not item.dttm_to is None:
                     item.status = WorkerDayCashboxDetails.TYPE_FINISH
@@ -207,7 +210,7 @@ def get_cashiers_info(request, form):
             }
 
         else:
-            tm_work_end = item.dttm_to.time() if item.status == WorkerDayCashboxDetails.TYPE_FINISH else item.worker_day.dttm_work_end.time()
+            tm_work_end = item.dttm_to if item.status == WorkerDayCashboxDetails.TYPE_FINISH else item.worker_day.dttm_work_end
             if not item.on_cashbox_id is None:
                 cashbox_type = item.cashbox_type_id
             else:
@@ -220,7 +223,7 @@ def get_cashiers_info(request, form):
                 "cashbox_number": cashbox_number,
                 "time_without_rest": time_without_rest[item.worker_day.worker_id],
                 "default_break_triplets": str(default_break_triplets),
-                "tm_work_end": str(tm_work_end),
+                "tm_work_end": str(tm_work_end.time()),
                 "cashbox_type": cashbox_type,
             })
 
@@ -315,7 +318,7 @@ def change_cashier_status(request, form):
             worker_day=worker_day,
             on_cashbox_id=cashbox_id,
             cashbox_type=cashbox_type,
-            tm_from=time,
+            dttm_from=dttm_now,
             status=new_user_status,
             is_tablet=True,
         )

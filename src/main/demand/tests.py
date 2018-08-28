@@ -24,3 +24,10 @@ class TestDemand(LocalTestCase):
         # self.assertEqual(response.json['data']['growth'], 0)
         self.assertEqual(response.json['data']['total_bills'], 26.0)
         self.assertEqual(response.json['data']['total_codes'], 13.0)
+
+        import datetime
+        dt = datetime.date(2018,1,1)
+        tm = datetime.time(22,12,32)
+        ps = datetime.datetime(dt.year, dt.month, dt.day, tm.hour, tm.minute, tm.second)
+        # ps = datetime.time(21,2,2)
+        print((ps - ps.replace(hour=1)).total_seconds())

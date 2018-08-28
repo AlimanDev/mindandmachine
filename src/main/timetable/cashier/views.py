@@ -344,14 +344,14 @@ def set_worker_days(request, form):
             fields=[
                 'dt',
                 'type',
-                'tm_work_start',
-                'tm_work_end',
+                'dttm_work_start',
+                'dttm_work_end',
             ]
         )
         # обновляем дни и удаляем details для этих дней
         worker_day.type = form['type']
-        worker_day.tm_work_start = form['tm_work_start']
-        worker_day.tm_work_end = form['tm_work_end']
+        worker_day.dttm_work_start = datetime.combine(worker_day.dt, form['tm_work_start'])
+        worker_day.dttm_work_end = datetime.combine(worker_day.dt, form['tm_work_end'])
         worker_day.save()
         WorkerDayCashboxDetails.objects.filter(worker_day=worker_day).delete()
 
@@ -359,8 +359,8 @@ def set_worker_days(request, form):
         WorkerDayCashboxDetails(
             worker_day=worker_day,
             cashbox_type_id=form['cashbox_type'],
-            tm_from=form['tm_work_start'],
-            tm_to=form['tm_work_end']
+            dttm_from=datetime.combine(worker_day.dt, form['tm_work_start']),
+            dttm_to=datetime.combine(worker_day.dt, form['tm_work_end'])
         ) for worker_day in existed_worker_days
     ])
 

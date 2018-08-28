@@ -5,7 +5,6 @@ from src.db.models import User, WorkerDay, CameraCashboxStat, CashboxType, Perio
 import datetime
 from django.utils.timezone import now
 
-
 class LocalTestCase(TestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -102,7 +101,8 @@ class LocalTestCase(TestCase):
                                                    cashbox_type=self.cashboxType,
                                                    is_tablet=True,
                                                    tm_from=datetime.time(9, 0, 0),
-                                                   tm_to=datetime.time(18, 0, 0),
+                                                   dttm_from=datetime.datetime(2018, 6, i, 9, 0, 0),
+                                                   dttm_to=datetime.datetime(2018, 6, i, 18, 0, 0),
                                                    )
 
             WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day2,
@@ -110,7 +110,8 @@ class LocalTestCase(TestCase):
                                                    cashbox_type=self.cashboxType,
                                                    is_tablet=True,
                                                    tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
-                                                   tm_to=(dttm_now + datetime.timedelta(hours=3)).time()
+                                                   dttm_from=(dttm_now - datetime.timedelta(hours=3)),
+                                                   dttm_to=(dttm_now + datetime.timedelta(hours=3)),
                                                    )
 
         self.worker_day = create_work_day(self.shop.id, self.user1, dt=dttm_now.date())
@@ -120,6 +121,7 @@ class LocalTestCase(TestCase):
         WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day, on_cashbox=self.cashbox1, is_tablet=True,
                                                cashbox_type=self.cashboxType, tm_to=None,
                                                tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
+                                               dttm_from=dttm_now - datetime.timedelta(hours=3),
                                                )
 
         self.cameracashbox = CameraCashbox.objects.create(name='Camera_1', cashbox=self.cashbox1)
@@ -191,6 +193,8 @@ def create_work_day(worker_shop_id, worker, dt, type=2, tm_work_start=datetime.t
         dt=dt,
         tm_work_start=tm_work_start,
         tm_work_end=tm_work_end,
+        dttm_work_start=datetime.datetime.combine(dt, tm_work_start),
+        dttm_work_end=datetime.datetime.combine(dt, tm_work_end),
     )
     return worker_day
 
