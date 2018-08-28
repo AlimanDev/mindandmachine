@@ -4,12 +4,13 @@ import json
 
 from django.db.models import Avg
 from django.utils.timezone import now
-from datetime import timedelta
+from django.db.models import Q
 
 from src.main.timetable.worker_exchange.utils import (
     get_init_params,
     has_deficiency
 )
+from src.main.demand.utils import create_predbills_request_function
 
 from src.db.models import (
     PeriodDemand,
@@ -25,7 +26,6 @@ from src.db.models import (
     ProductionDay,
     WorkerCashboxInfo,
 )
-
 from src.celery.celery import app
 
 
@@ -73,6 +73,10 @@ def update_queue(till_dttm=None):
 
 @app.task
 def release_all_workers():
+    """
+    отпускает всех работников с касс
+    :return:
+    """
     dttm_now = now() + datetime.timedelta(hours=3)
     worker_day_cashbox_objs = \
         WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
@@ -169,11 +173,60 @@ def update_worker_month_stat():
 
 @app.task
 def notify_cashiers_lack():
+    """
+    creates notification if there's deficiency of cashiers for each shop
+    :return:
+    """
     for shop in Shop.objects.all():
         dttm_now = now()
+        notify_to = dttm_now + datetime.timedelta(days=7)
         shop_id = shop.id
+        dttm = dttm_now
+        while dttm <= notify_to:
+            init_params_dict = get_init_params(dttm, shop_id)
 
-        init_params_dict = get_init_params(dttm_now, shop_id)
+            return_dict = has_deficiency(
+                init_params_dict['predict_demand'],
+                init_params_dict['mean_bills_per_step'],
+                init_params_dict['cashbox_types_hard_dict'],
+                dttm
+            )
+
+            to_notify = False  # есть ли вообще нехватка
+            notification_text = None  # {ct type : 'notification_text' or False если нет нехватки }
+            for cashbox_type in return_dict.keys():
+                if return_dict[cashbox_type]:
+                    to_notify = True
+                    notification_text = '{}.{} в {}-{} за типом кассы {} не будет хватать кассиров: {}. '.format(
+                        dttm.day, dttm.month, dttm.hour, dttm.minute,
+                        CashboxType.objects.get(id=cashbox_type).name,
+                        return_dict[cashbox_type]
+                    )
+
+            managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop_id)
+            notifications_list = []
+            users_with_such_notes = []
+
+            notes = Notifications.objects.filter(
+                type=Notifications.TYPE_INFO,
+                text=notification_text,
+                dttm_added__lt=now() + datetime.timedelta(hours=2)
+            )
+            for note in notes:
+                users_with_such_notes.append(note.to_worker_id)
+
+            if to_notify:
+                for recipient in managers_dir_list:
+                    if recipient.id not in users_with_such_notes:
+                        notifications_list.append(
+                            Notifications(
+                                type=Notifications.TYPE_INFO,
+                                to_worker=recipient,
+                                text=notification_text,
+                            )
+                        )
+            dttm += datetime.timedelta(minutes=30)
+            Notifications.objects.bulk_create(notifications_list)
 
         return_dict = has_deficiency(
             init_params_dict['predict_demand'],
@@ -200,7 +253,7 @@ def notify_cashiers_lack():
                         type=Notifications.TYPE_INFO,
                         to_worker=manager,
                         text=notification_text,
-                        dttm_added__lt=now() + timedelta(hours=2)):  # повторить уведомление раз в час
+                        dttm_added__lt=now() + datetime.timedelta(hours=2)):  # повторить уведомление раз в час
                     Notifications.objects.create(
                         type=Notifications.TYPE_INFO,
                         to_worker=manager,
@@ -264,3 +317,10 @@ def allocation_of_time_for_work_on_cashbox():
 
             if last_user:
                 update_duration(last_user, last_cashbox_type, duration)
+
+@app.task
+def create_pred_bills():
+    # todo: подумать, мб есть более красивый способ, чем задавать default_dt
+    for shop in Shop.objects.all():
+        create_predbills_request_function(shop.id)
+

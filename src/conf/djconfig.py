@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'src',
     'src.db',
     'src.main',
+    # 'src.main.other.notification.apps.NotificationConfig',
     'django_celery_beat',
     'django_celery_results',
     'src.celery',
@@ -192,12 +193,16 @@ CELERY_BEAT_SCHEDULE = {
 
     'task-notify-cashiers-lack': {
         'task': 'src.celery.tasks.notify_cashiers_lack',
-        'schedule': crontab(hour='*/1')
+        'schedule': crontab(hour=5, minute=0),
     },
     'task-allocation-of-time-for-work-on-cashbox': {
         'task': 'src.celery.tasks.allocation_of_time_for_work_on_cashbox',
         'schedule': crontab(day_of_month='1', hour=4, minute=0)
-    }
+    },
+    'task-create-pred-bills': {
+        'task': 'src.celery.tasks.create_pred_bills',
+        'schedule': crontab(0, 0, day_of_month='1')
+    },
 }
 
 
