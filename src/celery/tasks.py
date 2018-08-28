@@ -23,7 +23,8 @@ from src.db.models import (
     Notifications,
     Shop,
     User,
-    ProductionDay
+    ProductionDay,
+    WorkerCashboxInfo,
 )
 from src.celery.celery import app
 
@@ -35,7 +36,7 @@ def update_queue(till_dttm=None):
         till_dttm = now()
 
     cashbox_types = CashboxType.objects.filter(
-        dttm_last_update_queue__isnull=False
+        dttm_last_update_queue__isnull=False,
     )
     for cashbox_type in cashbox_types:
         dif_time = till_dttm - cashbox_type.dttm_last_update_queue
@@ -52,7 +53,7 @@ def update_queue(till_dttm=None):
                 changed_amount = PeriodDemand.objects.filter(
                     dttm_forecast=cashbox_type.dttm_last_update_queue,
                     cashbox_type_id=cashbox_type.id,
-                    type=PeriodDemand.Type.FACT.value
+                    type=PeriodDemand.Type.FACT.value,
                 ).update(queue_wait_length=mean_queue)
                 if changed_amount == 0:
                     PeriodDemand.objects.create(
@@ -62,7 +63,7 @@ def update_queue(till_dttm=None):
                         type=PeriodDemand.Type.FACT.value,
                         queue_wait_time=0,
                         queue_wait_length=mean_queue,
-                        cashbox_type_id=cashbox_type.id
+                        cashbox_type_id=cashbox_type.id,
                     )
 
             cashbox_type.dttm_last_update_queue += time_step
@@ -80,7 +81,7 @@ def release_all_workers():
     worker_day_cashbox_objs = \
         WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
             worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
-            tm_to__is_null=True
+            tm_to__is_null=True,
         )
 
     for obj in worker_day_cashbox_objs:
@@ -229,7 +230,65 @@ def notify_cashiers_lack():
 
 
 @app.task
+def allocation_of_time_for_work_on_cashbox():
+    """
+    Update the number of worked hours last month for each user in WorkerCashboxInfo
+    """
+
+    def update_duration(last_user, last_cashbox_type, duration):
+        WorkerCashboxInfo.objects.filter(
+            worker=last_user,
+            cashbox_type=last_cashbox_type,
+        ).update(duration=round(duration, 3))
+
+    dt = now().date().replace(day=1)
+
+    delta = datetime.timedelta(days=20)
+    prev_month = (dt - delta).replace(day=1)
+    shops = Shop.objects.all()
+
+    for shop in shops:
+        # Todo: может нужно сделать qos_filter на типы касс?
+        cashbox_types = CashboxType.objects.filter(shop=shop)
+        last_user = None
+        last_cashbox_type = None
+        duration = 0
+
+        if len(cashbox_types):
+            for cashbox_type in cashbox_types:
+                worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related(
+                    'worker_day__worker',
+                    'worker_day'
+                ).filter(
+                    status=WorkerDayCashboxDetails.TYPE_WORK,
+                    cashbox_type=cashbox_type,
+                    on_cashbox__isnull=False,
+                    worker_day__dt__gte=prev_month,
+                    worker_day__dt__lt=dt,
+                    tm_to__isnull=False,
+                    is_tablet=True,
+                ).order_by('worker_day__worker')
+
+                for detail in worker_day_cashbox_details:
+
+                    if last_user is None:
+                        last_cashbox_type = cashbox_type
+                        last_user = detail.worker_day.worker
+
+                    if last_user != detail.worker_day.worker:
+                        update_duration(last_user, last_cashbox_type, duration)
+                        last_user = detail.worker_day.worker
+                        last_cashbox_type = cashbox_type
+                        duration = 0
+
+                    duration += time_diff(detail.tm_from, detail.tm_to) / 3600
+
+            if last_user:
+                update_duration(last_user, last_cashbox_type, duration)
+
+@app.task
 def create_pred_bills():
     # todo: подумать, мб есть более красивый способ, чем задавать default_dt
     for shop in Shop.objects.all():
         create_predbills_request_function(shop.id)
+

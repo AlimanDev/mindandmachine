@@ -425,6 +425,9 @@ class WorkerCashboxInfo(models.Model):
     bills_amount = models.PositiveIntegerField(default=0)
     priority = models.IntegerField(default=0)
 
+    # how many hours did he work
+    duration = models.FloatField(default=0)
+
 
 class WorkerConstraint(models.Model):
     class Meta(object):
