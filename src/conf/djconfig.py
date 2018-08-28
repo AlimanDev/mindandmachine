@@ -178,6 +178,7 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERYD_CONCURRENCY = 2
 CELERYD_PREFETCH_MULTIPLIER = 1
+BACKEND_QUEUE = 'backend_queue'
 
 
 CELERY_QUEUES = {
@@ -189,7 +190,7 @@ CELERY_QUEUES = {
 
 CELERY_ROUTES = {
     'src.app.tasks.*': {
-        'queue': 'backend_queue',
+        'queue': BACKEND_QUEUE,
         'routing_key': 'backend_queue',
     },
 }
@@ -198,29 +199,29 @@ CELERY_BEAT_SCHEDULE = {
     'task-every-30-min-update-queue': {
         'task': 'src.celery.tasks.update_queue',
         'schedule': crontab(minute='0,30'),
-        'options': {'queue': 'backend_queue'}
+        'options': {'queue': BACKEND_QUEUE}
     },
     'task-free-all-workers-after-shop-closes': {
         'task': 'src.celery.tasks.release_all_workers',
-        'schedule': crontab(hour=1, minute=0),
-        'options': {'queue': 'backend_queue'}
+        'schedule': crontab(hour=2, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
     },
 
     'task-update_worker_month_stat': {
         'task': 'src.celery.tasks.update_worker_month_stat',
-        'schedule': crontab(day_of_month='1,15', hour=1, minute=0),
-        'options': {'queue': 'backend_queue'}
+        'schedule': crontab(day_of_month='1,15', hour=0, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
     },
 
     'task-notify-cashiers-lack': {
         'task': 'src.celery.tasks.notify_cashiers_lack',
         'schedule': crontab(hour=1, minute=0),
-        'options': {'queue': 'backend_queue'}
+        'options': {'queue': BACKEND_QUEUE}
     },
     'task-create-pred-bills': {
         'task': 'src.celery.tasks.create_pred_bills',
-        'schedule': crontab(hour=1, minute=0, day_of_month='1'),
-        'options': {'queue': 'backend_queue'}
+        'schedule': crontab(hour=23, minute=0, day_of_month='1'),
+        'options': {'queue': BACKEND_QUEUE}
     },
 }
 
