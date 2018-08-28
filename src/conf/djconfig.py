@@ -26,7 +26,7 @@ if is_config_exists('qosconfig_local.py'):
 
 SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
 
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['*',
                  ]
@@ -103,9 +103,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-ADMINS = [('Robot', 'robot@mindandmachine.ru'),
-          ]
-MANAGERS = ADMINS\
+ADMINS = [('Robot', 'robot@mindandmachine.ru'), ]
+MANAGERS = ADMINS
 
 # To send messages, you must put in the mode DEBUG = False
 # For use TLS
