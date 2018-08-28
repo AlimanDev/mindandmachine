@@ -11,8 +11,10 @@ from .forms import (
     CreateCashboxForm,
     DeleteCashboxForm,
     UpdateCashboxForm,
+    CreateCashboxTypeForm,
+    DeleteCashboxTypeForm,
     CashboxesOpenTime,
-    CashboxesUsedResource
+    CashboxesUsedResource,
 )
 
 from src.main.tablet.utils import time_diff
@@ -167,6 +169,57 @@ def update_cashbox(request, form):
     return JsonResponse.success(
         CashboxConverter.convert(cashbox)
     )
+
+
+@api_method('POST', CreateCashboxTypeForm)
+def create_cashbox_type(request, form):
+    """
+    also send notifications about created cashbox_type
+    :param shop_id: required=True
+    :param name: max_length=128
+    :return: created CashboxType in case of success, else already_exists error if cashbox_type with such name already exists
+    """
+    shop_id = FormUtil.get_shop_id(request, form)
+    name = form['name']
+
+    if CashboxType.objects.filter(name=name, shop_id=shop_id, dttm_deleted__isnull=True).count() > 0:
+        return JsonResponse.already_exists_error('cashbox type already exists')
+
+    new_cashbox_type = CashboxType.objects.create(
+        name=name,
+        shop_id=shop_id,
+        is_main_type=True if name == 'Линия' else False
+    )
+
+    send_notification('C', new_cashbox_type, sender=request.user)
+
+    return JsonResponse.success(CashboxTypeConverter.convert(new_cashbox_type))
+
+
+@api_method(
+    'POST',
+    DeleteCashboxTypeForm,
+    lambda_func=lambda x: CashboxType.objects.get(id=x['cashbox_type_id']).shop
+)
+def delete_cashbox_type(request, form):
+    """
+    also send notifications about deleted cashbox_type
+    :param cashbox_type_id: required=True
+    :return: deleted CashboxType if success, else internal_error if there are cashboxes attached to this cashbox_type
+    """
+    cashbox_type = CashboxType.objects.get(id=form['cashbox_type_id'])
+
+    attached_cashboxes = Cashbox.objects.filter(type=cashbox_type, dttm_deleted__isnull=True)
+
+    if attached_cashboxes.count() > 0:
+        return JsonResponse.internal_error('there are cashboxes on this type')
+
+    cashbox_type.dttm_deleted = datetime.datetime.now()
+    cashbox_type.save()
+
+    send_notification('D', cashbox_type, sender=request.user)
+
+    return JsonResponse.success(CashboxTypeConverter.convert(cashbox_type))
 
 
 @api_method('GET', CashboxesOpenTime)
@@ -374,3 +427,4 @@ def get_cashboxes_used_resource(request, form):
                                                                          (duration_of_the_shop / time_delta / 100), 3)
 
     return JsonResponse.success(response)
+

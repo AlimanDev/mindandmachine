@@ -258,7 +258,7 @@ class CashboxType(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    priority = models.PositiveIntegerField(default=100)  # 1--main, 2-ord, 3-express, etc
+    priority = models.PositiveIntegerField(default=100)  # 1--главная касса, 2--линия, 3--экспресс
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
     dttm_last_update_queue = models.DateTimeField(null=True, blank=True)

@@ -34,6 +34,16 @@ class UpdateCashboxForm(forms.Form):
     number = forms.CharField(max_length=6)
 
 
+
+class CreateCashboxTypeForm(forms.Form):
+    shop_id = forms.IntegerField()
+    name = forms.CharField(max_length=128)
+
+
+class DeleteCashboxTypeForm(forms.Form):
+    cashbox_type_id = forms.IntegerField()
+
+
 class CashboxesOpenTime(forms.Form):
     shop_id = forms.IntegerField(required=False)
     from_dt = util_forms.DateField()
@@ -43,3 +53,5 @@ class CashboxesUsedResource(forms.Form):
     shop_id = forms.IntegerField(required=False)
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
+
+
