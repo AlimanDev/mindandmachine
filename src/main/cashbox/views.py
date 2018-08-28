@@ -16,6 +16,7 @@ from .forms import (
 )
 
 from src.main.tablet.utils import time_diff
+from src.main.other.notification.utils import send_notification
 
 
 @api_method('GET', GetTypesForm, groups=User.__all_groups__)
@@ -87,6 +88,8 @@ def create_cashbox(request, form):
 
     cashbox = Cashbox.objects.create(type=cashbox_type, number=cashbox_number)
 
+    send_notification('C', cashbox, sender=request.user)
+
     return JsonResponse.success({
         'cashbox_type': CashboxTypeConverter.convert(cashbox_type),
         'cashbox': CashboxConverter.convert(cashbox)
@@ -117,6 +120,8 @@ def delete_cashbox(request, form):
     cashbox.dttm_deleted = datetime.datetime.now()
     cashbox.bio = form['bio']
     cashbox.save()
+
+    send_notification('D', cashbox, sender=request.user)
 
     return JsonResponse.success(
         CashboxConverter.convert(cashbox)
