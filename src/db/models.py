@@ -486,6 +486,10 @@ class WorkerDay(models.Model):
 
     tm_work_start = models.TimeField(null=True, blank=True)
     tm_work_end = models.TimeField(null=True, blank=True)
+
+    dttm_work_start = models.DateTimeField(null=True, blank=True)
+    dttm_work_end = models.DateTimeField(null=True, blank=True)
+
     tm_break_start = models.TimeField(null=True, blank=True)
 
     is_manual_tuning = models.BooleanField(default=False)
@@ -536,6 +540,11 @@ class WorkerDayCashboxDetails(models.Model):
 
     tm_from = models.TimeField()
     tm_to = models.TimeField(null=True, blank=True)
+
+    # ToDo: надо сделать dttm_from = models.DateTimeField()
+    dttm_from = models.DateTimeField(null=True, blank=True)
+    dttm_to = models.DateTimeField(null=True, blank=True)
+
 
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.cashbox_type.name, self.id)
@@ -733,7 +742,7 @@ class ProductionDay(models.Model):
 
     def __repr__(self):
         return self.__str__()
-    
+
     # is it enough or work hours also needs?
 
 

@@ -88,7 +88,7 @@ def get_cashiers_timetable(request, form):
         'worker_day__dt__gte': form['from_dt'],
         'worker_day__dt__lte': form['to_dt'],
         'cashbox_type_id__in': cashbox_types.keys(),
-        'tm_to__isnull': False,
+        'dttm_to__isnull': False,
     }
     if form['position_id']:
         worker_day_cashbox_detail_filter['worker_day__worker__position__id'] = form['position_id']
@@ -101,8 +101,8 @@ def get_cashiers_timetable(request, form):
         status=WorkerDayCashboxDetails.TYPE_BREAK
     ).order_by(
         'worker_day__dt',
-        'tm_from',
-        'tm_to',
+        'dttm_from',
+        'dttm_to',
     )
 
     worker_cashbox_info = list(WorkerCashboxInfo.objects.filter(
@@ -198,8 +198,8 @@ def get_cashiers_timetable(request, form):
             # for cashier in cashier_working_now:
             #     if cashier.cashbox_type is not None:
             #         cashiers_on_cashbox_type[cashier.cashbox_type.id] += 1  # shift to first model, which has intersection
-            while (ind_b < wdcds_len) and (dttm_ind <= dttm) and wdcds[ind_b].tm_to:
-                dttm_ind = dttm_combine(wdcds[ind_b].worker_day.dt, wdcds[ind_b].tm_to)
+            while (ind_b < wdcds_len) and (dttm_ind <= dttm) and wdcds[ind_b].dttm_to.time():
+                dttm_ind = dttm_combine(wdcds[ind_b].worker_day.dt, wdcds[ind_b].dttm_to.time())
                 ind_b += 1
             ind_b = ind_b - 1 if (dttm_ind > dttm) and ind_b else ind_b
 
@@ -207,9 +207,9 @@ def get_cashiers_timetable(request, form):
             period_bills = {i: 0 for i in cashbox_types.keys()}
             period_cashiers = 0.0
             period_cashiers_hard = 0.0
-            if ind_e < wdcds_len and wdcds[ind_e].tm_to:
-                dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_from)
-                dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_to)
+            if ind_e < wdcds_len and wdcds[ind_e].dttm_to.time():
+                dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].dttm_from.time())
+                dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].dttm_to.time())
 
             while (ind_e < wdcds_len) and (dttm_ind < dttm_end):
                 if dttm_ind_end > dttm:
@@ -226,9 +226,9 @@ def get_cashiers_timetable(request, form):
                         period_cashiers_hard += 1 * proportion
 
                 ind_e += 1
-                if ind_e < wdcds_len and wdcds[ind_e].tm_to:
-                    dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_from)
-                    dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_to)
+                if ind_e < wdcds_len and wdcds[ind_e].dttm_to.time():
+                    dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].dttm_from.time())
+                    dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].dttm_to.time())
 
             dttm_converted = BaseConverter.convert_datetime(dttm)
             real_cashiers.append({
@@ -372,7 +372,7 @@ def get_cashiers_timetable(request, form):
 #     users_ids = list(days.keys())
 #     users = User.objects.filter(id__in=users_ids)
 #     cashbox_types = CashboxType.objects.filter(shop_id=shop.id)
-#
+#xf
 #     worker_cashbox_info = group_by(
 #         WorkerCashboxInfo.objects.filter(worker_id__in=users_ids),
 #         group_key=lambda _: _.worker_id
@@ -454,14 +454,14 @@ def get_workers(request, form):
 
         cashbox = []
         for d in details:
-            if d.tm_to is None:
-                if d.tm_from <= from_tm:
+            if d.dttm_to.time() is None:
+                if d.dttm_from.time() <= from_tm:
                     cashbox.append(d)
-            elif d.tm_from < d.tm_to:
-                if d.tm_from <= from_tm < d.tm_to:
+            elif d.dttm_from.time() < d.dttm_to.time():
+                if d.dttm_from.time() <= from_tm < d.dttm_to.time():
                     cashbox.append(d)
             else:
-                if d.tm_from <= from_tm or d.tm_to > from_tm:
+                if d.dttm_from.time() <= from_tm or d.dttm_to.time() > from_tm:
                     cashbox.append(d)
 
         if len(cashbox) == 0:

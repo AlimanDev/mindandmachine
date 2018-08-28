@@ -24,6 +24,7 @@ class GetSlots(forms.Form):
     user_id = forms.IntegerField(required=True)
     shop_id = forms.IntegerField(required=False)
 
+
 class GetAllSlots(forms.Form):
     shop_id = forms.IntegerField(required=True)
 

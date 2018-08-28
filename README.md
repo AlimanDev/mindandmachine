@@ -16,6 +16,16 @@ pipenv shell
 python manage.py runserver
 ```
 
+Для запуска всех тестов:
+```
+./manage.py test 
+```
+Для запуска определенных тестов необходимо указывать путь, например:
+```
+./manage.py test src.main.demand.tests
+./manage.py test src.main.tablet.tests.TestTablet.test_get_cashiers_info
+```
+
 
 ## Структура проекта
 

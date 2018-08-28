@@ -303,8 +303,8 @@ def get_worker_day(request, form):
     cashboxes_types = {}
     for x in WorkerDayCashboxDetails.objects.select_related('on_cashbox', 'cashbox_type').filter(worker_day=wd):
         details.append({
-            'tm_from': BaseConverter.convert_time(x.tm_from),
-            'tm_to': BaseConverter.convert_time(x.tm_to),
+            'tm_from': BaseConverter.convert_time(x.dttm_from.time()),
+            'tm_to': BaseConverter.convert_time(x.dttm_to.time()),
             'cashbox_type': x.cashbox_type_id,
         })
         cashboxes_types[x.cashbox_type_id] = CashboxTypeConverter.convert(x.cashbox_type)
@@ -713,8 +713,8 @@ def dublicate_cashier_table(request, form):
             worker_day=full_trainee_worker_days.get(day_detail.worker_day.dt),
             on_cashbox=day_detail.on_cashbox,
             cashbox_type=day_detail.cashbox_type,
-            tm_from=day_detail.tm_from,
-            tm_to=day_detail.tm_to
+            dttm_from=day_detail.dttm_from,
+            dttm_to=day_detail.dttm_to
         ) for day_detail in main_worker_days_details
     ])
 
