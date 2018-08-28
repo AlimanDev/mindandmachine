@@ -32,3 +32,14 @@ class UpdateCashboxForm(forms.Form):
     from_cashbox_type_id = forms.IntegerField()
     to_cashbox_type_id = forms.IntegerField()
     number = forms.CharField(max_length=6)
+
+
+class CashboxesOpenTime(forms.Form):
+    shop_id = forms.IntegerField(required=False)
+    from_dt = util_forms.DateField()
+    to_dt = util_forms.DateField()
+
+class CashboxesUsedResource(forms.Form):
+    shop_id = forms.IntegerField(required=False)
+    from_dt = util_forms.DateField()
+    to_dt = util_forms.DateField()
