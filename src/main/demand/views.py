@@ -34,7 +34,7 @@ def get_indicators(request, form):
         dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1)
     )
 
-    worker_days = WorkerDay.objects.filter_version(checkpoint).select_related('worker').filter(
+    worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
         worker__shop_id=shop_id,
         type=WorkerDay.Type.TYPE_WORKDAY.value,
         dt__gte=dt_from,

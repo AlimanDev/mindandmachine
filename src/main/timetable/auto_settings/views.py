@@ -113,7 +113,7 @@ def create_timetable(request, form):
     )
 
     worker_day = group_by(
-        collection=WorkerDay.objects.current_version().select_related('worker').filter(
+        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
             worker__shop_id=shop_id,
             dt__gte=dt_from,
             dt__lte=dt_to,
@@ -122,7 +122,7 @@ def create_timetable(request, form):
     )
 
     prev_data = group_by(
-        collection=WorkerDay.objects.current_version().select_related('worker').filter(
+        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
             worker__shop_id=shop_id,
             dt__gte=dt_from - timedelta(days=7),
             dt__lt=dt_from,

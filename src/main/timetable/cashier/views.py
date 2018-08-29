@@ -64,7 +64,7 @@ def get_not_working_cashiers_list(request, form):
 
     users_not_working_today = []
 
-    for u in WorkerDay.objects.filter_version(checkpoint).select_related('worker').filter(
+    for u in WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
         dt=dt_now.date(),
         worker__shop_id=shop_id,
 
@@ -98,7 +98,7 @@ def get_cashier_timetable(request, form):
     response = {}
     # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_id']:
-        worker_days_db = WorkerDay.objects.filter_version(checkpoint).select_related('worker').filter(
+        worker_days_db = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
             worker_id=worker_id,
             worker__shop_id=form['shop_id'],
             dt__gte=from_dt,
@@ -280,7 +280,7 @@ def get_worker_day(request, form):
     checkpoint = FormUtil.get_checkpoint(form)
 
     try:
-        wd = WorkerDay.objects.filter_version(checkpoint).get(dt=dt, worker_id=worker_id)
+        wd = WorkerDay.objects.qos_filter_version(checkpoint).get(dt=dt, worker_id=worker_id)
     except WorkerDay.DoesNotExist:
         return JsonResponse.does_not_exists_error()
     except WorkerDay.MultipleObjectsReturned:
@@ -310,7 +310,7 @@ def get_worker_day(request, form):
 
     details = []
     cashboxes_types = {}
-    for x in WorkerDayCashboxDetails.objects.filter_version(checkpoint).\
+    for x in WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).\
             select_related('on_cashbox', 'cashbox_type').\
             filter(worker_day=wd):
         details.append({
@@ -342,7 +342,7 @@ def set_worker_days(request, form):
     for dt in range(int((form['dt_end'] - form['dt_begin']).days) + 1):
         form_dates.append(form['dt_begin'] + timedelta(dt))
 
-    existed_worker_days = WorkerDay.objects.filter_version(checkpoint).filter(
+    existed_worker_days = WorkerDay.objects.qos_filter_version(checkpoint).filter(
         worker=worker,
         dt__gte=form['dt_begin'],
         dt__lte=form['dt_end']
@@ -377,7 +377,7 @@ def set_worker_days(request, form):
         # worker_day.tm_work_start = form['tm_work_start']
         # worker_day.tm_work_end = form['tm_work_end']
         # worker_day.save()
-        # WorkerDayCashboxDetails.objects.filter_version(checkpoint).filter(worker_day=worker_day).delete()
+        # WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(worker_day=worker_day).delete()
 
     WorkerDay.objects.bulk_create(new_worker_days)
 
@@ -449,7 +449,7 @@ def set_worker_day(request, form):
 
     wd_args = utils.worker_day_create_args(form)
     try:
-        old_wd = WorkerDay.objects.current_version().get(
+        old_wd = WorkerDay.objects.qos_current_version().get(
             worker_id=worker.id,
             dt=form['dt']
         )
@@ -644,7 +644,7 @@ def create_cashier(request, form):
 )
 def dublicate_cashier_table(request, form):
     """
-    Здесь будем использовать только актуальные данные (current_version)
+    Здесь будем использовать только актуальные данные (qos_current_version)
     :return:
     """
     main_worker = form['main_worker_id']
@@ -652,16 +652,16 @@ def dublicate_cashier_table(request, form):
     dt_begin = form['dt_begin']
     dt_end = form['dt_end']
 
-    main_worker_days = WorkerDay.objects.current_version().prefetch_related('workerdaycashboxdetails_set').filter(
+    main_worker_days = WorkerDay.objects.qos_current_version().prefetch_related('workerdaycashboxdetails_set').filter(
         worker=main_worker,
         dt__gte=dt_begin,
         dt__lte=dt_end
     )
-    main_worker_days_details = WorkerDayCashboxDetails.objects.current_version().filter(worker_day__in=main_worker_days)
+    main_worker_days_details = WorkerDayCashboxDetails.objects.qos_current_version().filter(worker_day__in=main_worker_days)
 
     # проверка на наличие дней у стажера
     trainee_worker_days = group_by_object(
-        WorkerDay.objects.current_version().prefetch_related('workerdaycashboxdetails_set').filter(
+        WorkerDay.objects.qos_current_version().prefetch_related('workerdaycashboxdetails_set').filter(
             worker=trainee_worker,
             dt__gte=dt_begin,
             dt__lte=dt_end
@@ -727,7 +727,7 @@ def dublicate_cashier_table(request, form):
     ])
 
     full_trainee_worker_days = group_by_object(
-        WorkerDay.objects.current_version().prefetch_related('workerdaycashboxdetails_set').filter(
+        WorkerDay.objects.qos_current_version().prefetch_related('workerdaycashboxdetails_set').filter(
             worker=trainee_worker,
             dt__gte=dt_begin,
             dt__lte=dt_end

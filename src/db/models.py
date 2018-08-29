@@ -417,21 +417,21 @@ class WorkerConstraint(models.Model):
 
 
 class WorkerDayManager(models.Manager):
-    def current_version(self):
+    def qos_current_version(self):
         return super().get_queryset().filter(child__id__isnull=True)
 
-    def initial_version(self):
+    def qos_initial_version(self):
         return super().get_queryset().filter(parent_worker_day__isnull=True)
 
-    def filter_version(self, checkpoint):
+    def qos_filter_version(self, checkpoint):
         """
         :param checkpoint: 0 or 1 / True of False. If 1 -- current version, else -- initial
         :return:
         """
         if checkpoint:
-            return self.current_version()
+            return self.qos_current_version()
         else:
-            return self.initial_version()
+            return self.qos_initial_version()
 
 
 class WorkerDay(models.Model):
@@ -505,10 +505,10 @@ class WorkerDay(models.Model):
 
 
 class WorkerDayCashboxDetailsManager(models.Manager):
-    def current_version(self):
+    def qos_current_version(self):
         return super().get_queryset().select_related('worker_day').filter(worker_day__child__id__isnull=True)
 
-    def initial_version(self):
+    def qos_initial_version(self):
         return super().get_queryset().select_related('worker_day').filter(worker_day__parent_worker_day__isnull=True)
 
     def filter_version(self, checkpoint):
@@ -517,9 +517,9 @@ class WorkerDayCashboxDetailsManager(models.Manager):
         :return:
         """
         if checkpoint:
-            return self.current_version()
+            return self.qos_current_version()
         else:
-            return self.initial_version()
+            return self.qos_initial_version()
 
 
 class WorkerDayCashboxDetails(models.Model):

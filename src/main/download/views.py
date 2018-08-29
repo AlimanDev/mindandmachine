@@ -36,7 +36,7 @@ def get_tabel(request, workbook, form):
     breaktimes = json.loads(shop.break_triplets)
     breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
-    workdays = WorkerDay.objects.filter_version(checkpoint).select_related('worker').filter(
+    workdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
         worker__shop=shop,
         dt__gte=tabel.prod_days[0].dt,
         dt__lte=tabel.prod_days[-1].dt,

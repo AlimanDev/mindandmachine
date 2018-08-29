@@ -91,7 +91,7 @@ def get_cashiers_timetable(request, form):
     if form['position_id']:
         worker_day_cashbox_detail_filter['worker_day__worker__position__id'] = form['position_id']
 
-    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.filter_version(checkpoint).filter(
+    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
         **worker_day_cashbox_detail_filter
     ).exclude(
         status=WorkerDayCashboxDetails.TYPE_BREAK
@@ -405,7 +405,7 @@ def get_workers(request, form):
     to_dt = form['to_dttm'].date()
     to_tm = form['to_dttm'].time()
 
-    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.filter_version(checkpoint).select_related(
+    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related(
         'on_cashbox', 'worker_day__worker'
     ).filter(
         worker_day__worker__shop_id=shop.id,
@@ -522,7 +522,7 @@ def get_timetable_xlsx(request, form):
             worksheet.write(row, col + 3 * i + 0, 'НД')
             worksheet.write(row, col + 3 * i + 1, 'НД')
 
-        for wd in WorkerDay.objects.filter_version(checkpoint).filter(worker=user, dt__gte=dt_from, dt__lte=dt_to).order_by('dt'):
+        for wd in WorkerDay.objects.qos_filter_version(checkpoint).filter(worker=user, dt__gte=dt_from, dt__lte=dt_to).order_by('dt'):
             if wd.type == WorkerDay.Type.TYPE_HOLIDAY.value:
                 cell_1 = 'В'
                 cell_2 = 'В'

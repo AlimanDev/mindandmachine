@@ -99,7 +99,7 @@ def get_cashiers_working_at_time_on(dttm, ct_ids):
     """
     if not isinstance(ct_ids, list):
         ct_ids = [ct_ids]
-    worker_day_cashbox_details = WorkerDayCashboxDetails.objects.current_version().select_related('worker_day', 'worker_day__worker').filter(
+    worker_day_cashbox_details = WorkerDayCashboxDetails.objects.qos_current_version().select_related('worker_day', 'worker_day__worker').filter(
         Q(worker_day__tm_work_end__gte=dttm.time()) & Q(worker_day__tm_work_end__lt=datetime_module.time(23, 59)) |
         Q(worker_day__tm_work_end__lt=datetime_module.time(2, 0)),
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,

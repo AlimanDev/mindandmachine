@@ -62,7 +62,7 @@ def select_cashiers(request, form):
     if len(work_types) > 0:
         users = [x for x in users if x.work_type in work_types]
 
-    worker_days = WorkerDay.objects.filter_version(checkpoint).select_related('worker').filter(worker__shop_id=shop_id)
+    worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(worker__shop_id=shop_id)
 
     workday_type = form.get('workday_type')
     if workday_type is not None:
@@ -90,7 +90,7 @@ def select_cashiers(request, form):
                     return True
                 return False
 
-        worker_days = WorkerDay.objects.filter_version(checkpoint).select_related('worker').filter(
+        worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
             worker__shop_id=shop_id,
             type=WorkerDay.Type.TYPE_WORKDAY.value,
             dt__in=work_workdays
@@ -194,7 +194,7 @@ def get_table(request, form):
         local_stats = dict(stats)
         row = 3
         start_row = row
-        workerdays = WorkerDay.objects.filter_version(checkpoint).select_related('worker').filter(
+        workerdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
             worker__shop__id=shop_id,
             worker__shop__title="Кассиры",
             dt=weekday,
@@ -204,7 +204,7 @@ def get_table(request, form):
         )
 
         for workerday in workerdays:
-            day_detail = WorkerDayCashboxDetails.objects.filter_version(checkpoint).select_related(
+            day_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related(
                     'cashbox_type'
                 ).filter(
                     worker_day=workerday
