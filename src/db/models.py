@@ -311,8 +311,13 @@ class Slot(models.Model):
             cbt_name = self.cashbox_type.name
         else:
             cbt_name = None
-        return '{}, {}, {}, {}, {}'.format(self.name, cbt_name, self.shop.title, self.shop.super_shop.title, self.id)
-        # return f'{self.name}, {cbt_name}, {self.shop.title}, {self.shop.super_shop.title}, {self.id}'
+        return '{}, начало: {}, конец: {}, {}, {}, {}'.format(
+            cbt_name,
+            self.tm_start,
+            self.tm_end,
+            self.shop.title,
+            self.shop.super_shop.title,
+            self.id)
 
     id = models.BigAutoField(primary_key=True)
 
@@ -321,6 +326,7 @@ class Slot(models.Model):
     name = models.CharField(max_length=32, null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     cashbox_type = models.ForeignKey(CashboxType, null=True, blank=True, on_delete=models.PROTECT)
+    workers_needed = models.IntegerField(default=1)
 
     worker = models.ManyToManyField(User, through=UserWeekdaySlot)
 
