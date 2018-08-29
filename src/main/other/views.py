@@ -179,6 +179,8 @@ def create_slot(request, form):
     Создает новый слов
 
     Args:
+        method: POST
+        url: /api/other/create_slot
         cashbox_type_id(int): required = True
         tm_start(QOS_TIME): required = True
         tm_end(QOS_TIME): required = True
@@ -224,6 +226,8 @@ def delete_slot(request, form):
         Напрямую удаляет слот из бд(без всякого проставления dttm_deleted или чего-то еще)
 
     Args:
+        method: POST
+        url: /api/other/delete_slot
         slot_id(int): required = True
     """
     Slot.objects.get(id=form['slot_id']).delete()
