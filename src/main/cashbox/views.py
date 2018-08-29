@@ -187,13 +187,13 @@ def create_cashbox_type(request, form):
 
     Returns:
         {
-            'id': id новой созданной кассы,
-            'dttm_added': дата добавления,
-            'dttm_deleted': null,
-            'shop': id shop'a,
-            'name': имя,
-            'is_stable': True,
-            'speed_coef': 1
+            | 'id': id новой созданной кассы,
+            | 'dttm_added': дата добавления,
+            | 'dttm_deleted': null,
+            | 'shop': id shop'a,
+            | 'name': имя,
+            | 'is_stable': True,
+            | 'speed_coef': 1
         }
 
     Raises:
