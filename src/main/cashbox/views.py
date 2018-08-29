@@ -174,10 +174,30 @@ def update_cashbox(request, form):
 @api_method('POST', CreateCashboxTypeForm)
 def create_cashbox_type(request, form):
     """
-    also send notifications about created cashbox_type
-    :param shop_id: required=True
-    :param name: max_length=128
-    :return: created CashboxType in case of success, else already_exists error if cashbox_type with such name already exists
+    Создает тип касс с заданным именем
+
+    Args:
+        method: POST
+        url: /api/cashbox/create_cashbox_type
+        shop_id(int): required = True
+        name(str): max_length=128
+
+    Note:
+        Также отправлет уведомление о том, что тип касс был создан
+
+    Returns:
+        {
+            'id': id новой созданной кассы,
+            'dttm_added': дата добавления,
+            'dttm_deleted': null,
+            'shop': id shop'a,
+            'name': имя,
+            'is_stable': True,
+            'speed_coef': 1
+        }
+
+    Raises:
+        JsonResponse.already_exists_error: если тип касс с таким именем уже существует
     """
     shop_id = FormUtil.get_shop_id(request, form)
     name = form['name']
@@ -203,9 +223,29 @@ def create_cashbox_type(request, form):
 )
 def delete_cashbox_type(request, form):
     """
-    also send notifications about deleted cashbox_type
-    :param cashbox_type_id: required=True
-    :return: deleted CashboxType if success, else internal_error if there are cashboxes attached to this cashbox_type
+    Удаляет тип касс с заданным id'шником
+
+    Args:
+        method: POST
+        url: /api/cashbox/create_cashbox_type
+        cashbox_type_id(int): required = True
+
+    Note:
+        Также отправлет уведомление о том, что тип касс был удален
+
+    Returns:
+        {
+            | 'id': id новой созданной кассы,
+            | 'dttm_added': дата добавления,
+            | 'dttm_deleted': дата удаления(сейчас),
+            | 'shop': id shop'a,
+            | 'name': имя,
+            | 'is_stable': True/False,
+            | 'speed_coef': int
+        }
+
+    Raises:
+        JsonResponse.internal_error: если к данному типу касс привязаны какие-то кассы
     """
     cashbox_type = CashboxType.objects.get(id=form['cashbox_type_id'])
 

@@ -4,6 +4,7 @@ import json
 
 from django.db.models import Avg
 from django.utils.timezone import now
+from dateutil.relativedelta import relativedelta
 from django.db.models import Q
 
 from src.main.timetable.worker_exchange.utils import (
@@ -301,3 +302,17 @@ def create_pred_bills():
     for shop in Shop.objects.all():
         create_predbills_request_function(shop.id)
     print('создал спрос на месяц')
+
+
+@app.task
+def clean_camera_stats():
+    """
+    Удаляет данные с камер за последние for_past_months месяцев
+
+    Note:
+        Запускается раз в неделю
+    """
+    for_past_months = 3
+    dttm_to_delete = now() - relativedelta(months=for_past_months)
+
+    CameraCashboxStat.objects.filter(dttm__lt=dttm_to_delete).delete()
