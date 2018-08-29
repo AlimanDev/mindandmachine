@@ -115,7 +115,6 @@ def set_pred_bills_function(data, key):
 
     for period_demand_value in data.values():
         clients = period_demand_value['clients']
-        print(clients)
         if clients < 0:
             clients = 0
         dttm_forecast = datetime.strptime(period_demand_value['datetime'], QOS_DATETIME_FORMAT)
