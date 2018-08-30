@@ -114,11 +114,13 @@ def get_cashiers_info(request, form):
     break_triplets = shop.break_triplets
     list_of_break_triplets = json.loads(break_triplets)
     time_without_rest = {}
+
     status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
         worker_day__dttm_work_start__lte=dttm + timedelta(minutes=30),
         worker_day__dt=(dttm - timedelta(hours=2)).date(),
         worker_day__worker_shop__id=shop_id,
     ).order_by('id')
+
 
     for item in status:
         triplets = []

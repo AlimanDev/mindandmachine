@@ -275,7 +275,7 @@ def get_cashboxes_open_time(request, form):
         on_cashbox__isnull=False,
         worker_day__dt__gte=dt_from,
         worker_day__dt__lte=dt_to,
-        tm_to__isnull=False,
+        dttm_to__isnull=False,
         is_tablet=True,
     ).order_by('on_cashbox')
 
@@ -288,11 +288,11 @@ def get_cashboxes_open_time(request, form):
 
         for detail in worker_day_cashbox_details:
             if detail.on_cashbox == last_cashbox:
-                share_of_open_time += time_diff(detail.tm_from, detail.tm_to)
+                share_of_open_time += (detail.dttm_to - detail.dttm_from).total_seconds()
             else:
                 update_response(last_cashbox.id, share_of_open_time, duration_of_the_shop)
                 last_cashbox = detail.on_cashbox
-                share_of_open_time = time_diff(detail.tm_from, detail.tm_to)
+                share_of_open_time = (detail.dttm_to - detail.dttm_from).total_seconds()
 
         update_response(last_cashbox.id, share_of_open_time, duration_of_the_shop)
 
@@ -336,22 +336,21 @@ def get_cashboxes_used_resource(request, form):
     def get_percent(response, cashbox_type_id, current_dttm, worker_day_cashbox_details, count_of_cashbox):
         count = 0
         for detail in worker_day_cashbox_details:
-            if (current_dttm.time() < detail.tm_from) and (detail.worker_day.dt == current_dttm.date()):
+            if current_dttm < detail.dttm_from:
                 break
-            if detail.tm_from > detail.tm_to:
-                if (detail.tm_from <= current_dttm.time() <= datetime.time(23, 59, 59, 59)) and \
-                        (detail.worker_day.dt == current_dttm.date()):
-                    count += 1
+            # if detail.dttm_from > detail.tm_to:
+            #     if (detail.tm_from <= current_dttm.time() <= datetime.time(23, 59, 59, 59)) and \
+            #             (detail.worker_day.dt == current_dttm.date()):
+            #         count += 1
+            #
+            #     if (datetime.time(0, 0, 0) <= current_dttm.time() <= detail.tm_to) and \
+            #             (detail.worker_day.dt + datetime.timedelta(1) == current_dttm.date()):
+            #         count += 1
+            # else:
+            if detail.dttm_from <= current_dttm <= detail.dttm_to:
+                count += 1
 
-                if (datetime.time(0, 0, 0) <= current_dttm.time() <= detail.tm_to) and \
-                        (detail.worker_day.dt + datetime.timedelta(1) == current_dttm.date()):
-                    count += 1
-            else:
-                if (detail.tm_from <= current_dttm.time() <= detail.tm_to) and \
-                        (detail.worker_day.dt == current_dttm.date()):
-                    count += 1
-
-            if (detail.tm_to < current_dttm.time()) and (detail.worker_day.dt == current_dttm.date()):
+            if detail.dttm_to < current_dttm:
                 worker_day_cashbox_details.remove(detail)
 
         percent = count / count_of_cashbox * 100 if count_of_cashbox > 0 else 0
@@ -375,8 +374,8 @@ def get_cashboxes_used_resource(request, form):
     time_delta = 300
 
     cashbox_types = CashboxType.objects.qos_filter_active(
-        dttm_from=datetime.datetime(dt_from.year, dt_from.month, dt_from.day, 23, 59, 59),
-        dttm_to=datetime.datetime(dt_to.year, dt_to.month, dt_to.day, 0, 0, 0),
+        dttm_from=datetime.datetime.combine(dt_from, datetime.time(23, 59, 59)),
+        dttm_to=datetime.datetime.combine(dt_to, datetime.time(0, 0, 0)),
         shop=shop_id,
     )
     super_shop = cashbox_types[0].shop.super_shop if len(cashbox_types) else None
@@ -413,8 +412,8 @@ def get_cashboxes_used_resource(request, form):
                 on_cashbox__isnull=False,
                 worker_day__dt__gte=dt_from,
                 worker_day__dt__lte=dt_to,
-                tm_to__isnull=False,
-            ).order_by('on_cashbox', 'worker_day__dt', 'tm_from')
+                dttm_to__isnull=False,
+            ).order_by('on_cashbox', 'worker_day__dt', 'dttm_from')
 
             if worker_day_cashbox_details:
                 details = list(worker_day_cashbox_details)

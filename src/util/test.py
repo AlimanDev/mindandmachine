@@ -50,7 +50,8 @@ class LocalTestCase(TestCase):
             hidden_title='Shop2',
         )
         self.user1 = User.objects.create_user(self.USER_USERNAME, self.USER_EMAIL, self.USER_PASSWORD, id=1,
-                                              shop=self.shop)
+                                              shop=self.shop,
+                                              group=User.GROUP_SUPERVISOR)
         # self.user1 = create_user(user_id=1, shop_id=self.shop, username='user1')
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2')
         self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3')
@@ -155,7 +156,7 @@ class LocalTestCase(TestCase):
 
         WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day, on_cashbox=self.cashbox1, is_tablet=True,
                                                cashbox_type=self.cashboxType1, tm_to=None,
-                                               tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
+                                               # tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
                                                dttm_from=dttm_now - datetime.timedelta(hours=3),
                                                )
 
@@ -247,8 +248,8 @@ def create_work_day(worker_shop_id, worker, dt, type=2, tm_work_start=datetime.t
         worker=worker,
         type=type,
         dt=dt,
-        tm_work_start=tm_work_start,
-        tm_work_end=tm_work_end,
+        dttm_work_start=datetime.datetime.combine(dt, tm_work_start),
+        dttm_work_end=datetime.datetime.combine(dt, tm_work_end),
     )
     return worker_day
 
