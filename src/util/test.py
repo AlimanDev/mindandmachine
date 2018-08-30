@@ -125,18 +125,18 @@ class LocalTestCase(TestCase):
 
             WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day1,
                                                    on_cashbox=self.cashbox1,
-                                                   cashbox_type=self.cashboxType,
+                                                   cashbox_type=self.cashboxType1,
                                                    is_tablet=True,
-                                                   tm_from=datetime.time(9, 0, 0),
+                                                   # tm_from=datetime.time(9, 0, 0),
                                                    dttm_from=datetime.datetime(2018, 6, i, 9, 0, 0),
                                                    dttm_to=datetime.datetime(2018, 6, i, 18, 0, 0),
                                                    )
 
             WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day2,
                                                    on_cashbox=self.cashbox1,
-                                                   cashbox_type=self.cashboxType,
+                                                   cashbox_type=self.cashboxType1,
                                                    is_tablet=True,
-                                                   tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
+                                                   # tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
                                                    dttm_from=(dttm_now - datetime.timedelta(hours=3)),
                                                    dttm_to=(dttm_now + datetime.timedelta(hours=3)),
                                                    )
@@ -145,8 +145,8 @@ class LocalTestCase(TestCase):
                                                    on_cashbox=self.cashbox2,
                                                    cashbox_type=self.cashboxType2,
                                                    is_tablet=True,
-                                                   tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
-                                                   tm_to=(dttm_now + datetime.timedelta(hours=3)).time(),
+                                                   dttm_from=dttm_now - datetime.timedelta(hours=3),
+                                                   dttm_to=dttm_now + datetime.timedelta(hours=3),
                                                    status=WorkerDayCashboxDetails.TYPE_WORK,
                                                    )
         self.worker_day = create_work_day(self.shop.id, self.user1, dt=dttm_now.date())
