@@ -59,6 +59,10 @@ class JsonResponse(object):
         return cls.__base_error_response(500, 'InternalError', msg)
 
     @classmethod
+    def algo_internal_error(cls, msg=''):
+        return cls.__base_error_response(500, 'AlgorithmInternalError', msg)
+
+    @classmethod
     def __base_error_response(cls, code, error_type, error_message=''):
         response_data = {
             'error_type': error_type,
@@ -72,7 +76,7 @@ class JsonResponse(object):
             'code': code,
             'data': data
         }
-        return HttpResponse(json.dumps(response_data, separators=(',', ':')), content_type='application/json')
+        return HttpResponse(json.dumps(response_data, separators=(',', ':'), ensure_ascii=False), content_type='application/json')
 
 
 def api_method(

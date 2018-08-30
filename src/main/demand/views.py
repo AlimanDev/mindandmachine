@@ -1,15 +1,12 @@
-import json
 from datetime import datetime, timedelta, time
 
 from src.db.models import (
     PeriodDemand,
     WorkerDay,
     PeriodDemandChangeLog,
-    User,
     Shop
 )
 from src.util.collection import range_u
-from src.util.forms import FormUtil
 from src.util.models_converter import BaseConverter, PeriodDemandConverter, PeriodDemandChangeLogConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import (
@@ -20,9 +17,9 @@ from .forms import (
     CreatePredictBillsRequestForm
 )
 from .utils import create_predbills_request_function, set_pred_bills_function
-from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from src.util.forms import FormUtil
+from django.core.exceptions import EmptyResultSet, ImproperlyConfigured
 
 
 @api_method('GET', GetIndicatorsForm)
@@ -244,8 +241,12 @@ def create_predbills_request(request, form):
 
     try:
         create_predbills_request_function(shop_id, dt)
-    except Exception:
-        return JsonResponse.success('error upon creating request')
+    except ValueError as error_message:
+        return JsonResponse.value_error(str(error_message))
+    except EmptyResultSet as empty_error:
+        return JsonResponse.internal_error(str(empty_error))
+    except ImproperlyConfigured:
+        return JsonResponse.algo_internal_error()
 
     return JsonResponse.success()
 

@@ -6,8 +6,10 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from src.conf.djconfig import QOS_DATETIME_FORMAT
 
-from src.db.models import PeriodDemand, CashboxType
+from src.db.models import PeriodDemand, CashboxType, Slot
 from src.util.models_converter import BaseConverter
+from django.db.models import Sum
+from django.core.exceptions import EmptyResultSet, ImproperlyConfigured
 
 
 def set_param_list(shop_id):
@@ -25,9 +27,9 @@ def set_param_list(shop_id):
                 if parameter >= 0:
                     pass
                 else:
-                    return ValueError('invalid parameter {} for {}'.format(parameter, cashbox_type.name))
+                    raise ValueError('invalid parameter {} for {}'.format(parameter, cashbox_type.name))
         else:
-            return ValueError('invalid number of params for {}'.format(cashbox_type.name))
+            raise ValueError('invalid number of params for {}'.format(cashbox_type.name))
 
         params_dict[cashbox_type.id] = period_params
 
@@ -52,10 +54,19 @@ def create_predbills_request_function(shop_id, dt=None):
         dttm_forecast__gt=from_dt_to_collect,
         dttm_forecast__lt=dt
     )
+
+    if not period_demands:
+        raise EmptyResultSet('There is no period demand objects')
+
+    try:
+        param_list = set_param_list(shop_id)
+    except ValueError as error_message:
+        raise ValueError(error_message)
+
     aggregation_dict = {
         'IP': settings.HOST_IP,
         'dt': BaseConverter.convert_date(dt),
-        'algo_params': set_param_list(shop_id),
+        'algo_params': param_list,
         'period_demands': [
             {
                 'CashType': period_demand.cashbox_type_id,
@@ -77,9 +88,8 @@ def create_predbills_request_function(shop_id, dt=None):
         task_id = json.loads(res).get('task_id', '')
         if task_id is None:
             raise Exception('Error upon creating task')
-    except Exception as e:
-        print(e)
-        return Exception
+    except Exception:
+        raise ImproperlyConfigured('Error upon creating task')
 
 
 def set_pred_bills_function(data, key):
@@ -91,13 +101,17 @@ def set_pred_bills_function(data, key):
     """
     if settings.QOS_SET_TIMETABLE_KEY is None:
         return SystemError('key is not configured')
-
     if key != settings.QOS_SET_TIMETABLE_KEY:
         return SystemError('invalid key')
     try:
         data = json.loads(data)
     except ValueError as ve:
         return ve
+
+    # костыль, но по-другому никак. берем первый пришедший cashbox_type_id и находим для какого магаза составлялся спрос
+    shop = CashboxType.objects.get(id=list(data.values())[0]['CashType']).shop
+    sloted_cashbox_types = CashboxType.objects.filter(do_forecast=CashboxType.FORECAST_LITE, shop=shop)
+    LONG_FORECAST = PeriodDemand.Type.LONG_FORECAST.value
 
     for period_demand_value in data.values():
         clients = period_demand_value['clients']
@@ -106,10 +120,35 @@ def set_pred_bills_function(data, key):
         dttm_forecast = datetime.strptime(period_demand_value['datetime'], QOS_DATETIME_FORMAT)
         cashbox_type_id = period_demand_value['CashType']
         PeriodDemand.objects.update_or_create(
-            type=PeriodDemand.Type.LONG_FORECAST.value,
+            type=LONG_FORECAST,
             dttm_forecast=dttm_forecast,
             cashbox_type_id=cashbox_type_id,
             defaults={
                 'clients': clients
             }
         )
+
+        # блок для составления спроса на слотовые типы касс (никак не зависит от data с qos_algo)
+        # todo: возможно не лучшее решение размещать этот блок здесь, потому что он зависит от dttm_forecast
+        for sloted_cashbox in sloted_cashbox_types:
+            workers_needed = Slot.objects.filter(
+                cashbox_type=sloted_cashbox,
+                tm_start__lte=dttm_forecast.time(),
+                tm_end__gte=dttm_forecast.time(),
+            ).aggregate(Sum('workers_needed'))['workers_needed__sum']
+
+            if workers_needed is None:
+                workers_needed = 0
+            try:
+                PeriodDemand.objects.update_or_create(
+                    type=LONG_FORECAST,
+                    dttm_forecast=dttm_forecast,
+                    cashbox_type=sloted_cashbox,
+                    defaults={
+                        'clients': workers_needed
+                    }
+                )
+            except PeriodDemand.MultipleObjectsReturned as exc:
+                print(exc)
+                raise Exception('error upon creating period demands for sloted types')
+
