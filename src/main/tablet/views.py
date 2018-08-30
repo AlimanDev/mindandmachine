@@ -107,9 +107,6 @@ def get_cashiers_info(request, form):
     dttm = form['dttm']
     response = {}
 
-    tm_to_show_all_workers = datetime_module.time(23, 59)  # в 23:59 уже можно показывать всех сотрудников
-    # todo: сделать без привязки к времени
-
     shop = Shop.objects.get(id=shop_id)
     break_triplets = shop.break_triplets
     list_of_break_triplets = json.loads(break_triplets)
@@ -120,7 +117,6 @@ def get_cashiers_info(request, form):
         worker_day__dt=(dttm - timedelta(hours=2)).date(),
         worker_day__worker_shop__id=shop_id,
     ).order_by('id')
-
 
     for item in status:
         triplets = []

@@ -130,7 +130,6 @@ class LocalTestCase(TestCase):
                 on_cashbox=self.cashbox1,
                 cashbox_type=self.cashboxType1,
                 is_tablet=True,
-                # tm_from=datetime.time(9, 0, 0),
                 dttm_from=datetime.datetime(2018, 6, i, 9, 0, 0),
                 dttm_to=datetime.datetime(2018, 6, i, 18, 0, 0),
             )
@@ -141,7 +140,6 @@ class LocalTestCase(TestCase):
                 on_cashbox=self.cashbox1,
                 cashbox_type=self.cashboxType1,
                 is_tablet=True,
-                # tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
                 dttm_from=(dttm_now - datetime.timedelta(hours=3)),
                 dttm_to=(dttm_now + datetime.timedelta(hours=3)),
             )

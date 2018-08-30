@@ -449,8 +449,8 @@ def set_worker_day(request, form):
                     WorkerDayCashboxDetails.objects.create(
                         cashbox_type_id=item['cashBox_type'],
                         worker_day=day,
-                        tm_from=item['tm_from'],
-                        tm_to=item['tm_to']
+                        dttm_from=item['dttm_from'],
+                        dttm_to=item['dttm_to']
                     )
             else:
                 cashbox_type_id = form.get('cashbox_type')

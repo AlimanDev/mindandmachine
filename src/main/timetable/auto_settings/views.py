@@ -447,8 +447,8 @@ def set_timetable(request, form):
                 for wdd in wd['details']:
                     wdd_el = WorkerDayCashboxDetails(
                         worker_day=wd_obj,
-                        tm_from=BaseConverter.parse_time(wdd['tm_from']),
-                        tm_to=BaseConverter.parse_time(wdd['tm_to']),
+                        dttm_from=BaseConverter.parse_datetime(wdd['dttm_from']),
+                        dttm_to=BaseConverter.parse_datetime(wdd['dttm_to']),
                     )
                     if wdd['type'] > 0:
                         wdd_el.cashbox_type_id = wdd['type']
