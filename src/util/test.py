@@ -163,11 +163,13 @@ class LocalTestCase(TestCase):
         self.worker_day2 = create_work_day(self.shop.id, self.user2, dt=dttm_now.date())
         self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=dttm_now.date())
 
-        WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day, on_cashbox=self.cashbox1, is_tablet=True,
-                                               cashbox_type=self.cashboxType1, tm_to=None,
-                                               # tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
-                                               dttm_from=dttm_now - datetime.timedelta(hours=3),
-                                               )
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=self.worker_day,
+            on_cashbox=self.cashbox1,
+            is_tablet=True,
+            cashbox_type=self.cashboxType1,
+            dttm_from=dttm_now - datetime.timedelta(hours=3),
+        )
 
         self.cameracashbox = CameraCashbox.objects.create(name='Camera_1', cashbox=self.cashbox1)
         test_time = dttm_now
