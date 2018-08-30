@@ -16,7 +16,6 @@ from src.db.models import (
     Slot,
     UserWeekdaySlot,
     WorkerConstraint,
-    WorkerDayChangeLog,
     Timetable,
     ProductionDay,
     ProductionMonth,
@@ -231,11 +230,11 @@ class WorkerDayAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: WorkerDay):
-        return instance.worker_shop.title
+        return instance.worker.shop.title
 
     @staticmethod
     def super_shop_title(instance: WorkerDay):
-        return instance.worker_shop.super_shop.title
+        return instance.worker.shop.super_shop.title
 
 
 @admin.register(WorkerDayCashboxDetails)
@@ -252,7 +251,7 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: WorkerDayCashboxDetails):
-        return instance.worker_day.worker_shop.title
+        return instance.worker_day.worker.shop.title
 
     @staticmethod
     def worker_day_dt(instance: WorkerDayCashboxDetails):
@@ -261,25 +260,6 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     @staticmethod
     def on_cashbox_type(instance: WorkerDayCashboxDetails):
         return instance.cashbox_type.name if instance.cashbox_type else ''
-
-
-@admin.register(WorkerDayChangeLog)
-class WorkerDayChangeLogAdmin(admin.ModelAdmin):
-    list_display = ('worker_last_name', 'super_shop_title', 'worker_day_dt', 'id')
-    search_fields = ('worker_day__worker__last_name', 'worker_day__worker__shop__title', 'id')
-    list_filter = ('worker_day__worker__shop',)
-
-    @staticmethod
-    def worker_last_name(instance: WorkerDayChangeLog):
-        return instance.worker_day.worker.last_name
-
-    @staticmethod
-    def super_shop_title(instance: WorkerDayChangeLog):
-        return instance.worker_day.worker_shop.title
-
-    @staticmethod
-    def worker_day_dt(instance: WorkerDayChangeLog):
-        return instance.worker_day.dt
 
 
 @admin.register(Notifications)

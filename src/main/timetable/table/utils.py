@@ -22,6 +22,14 @@ from src.util.models_converter import WorkerDayConverter
 
 
 def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
+    """
+    Функция для посчета статистики работника за месяц
+
+    Args:
+         dt_start(datetime.date): дата начала подсчета
+         dt_end(datetime.date): дата конца подсчета
+         users(QuerySet): список пользователей для которых считать
+    """
     def get_norm_work_periods(days, dt_start, dt_end):
         norm = {
             'days': 0,
@@ -145,11 +153,13 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
 
 def count_normal_days(dt_start, dt_end, usrs):
     """
-    count normal amount of working days and working hours from dt_start to dt_end
-    :param dt_end:
-    :param dt_start:
-    :param usrs:
-    :return:
+    Считает количество нормального количества рабочих дней и рабочих часов от dt_start до dt_end
+
+    Args:
+        dt_start(datetime.date): дата начала подсчета
+        dt_end(datetime.date): дата конца подсчета
+        usrs(QuerySet): список пользователей для которых считать
+
     """
 
     year_days = ProductionDay.objects.filter(
@@ -179,11 +189,16 @@ def count_normal_days(dt_start, dt_end, usrs):
 
 def count_difference_of_normal_days(dt_end, usrs, dt_start=None):
     """
-    return dict with user_ids as keys, and 'diff_prev_paid_days', 'diff_prev_paid_hours' as values
-    :param dt_end:
-    :param usrs:
-    :param dt_start:
-    :return:
+    Функция для подсчета разница между нормальным количеством отработанных дней и часов и фактическими
+
+    Args:
+        dt_start(datetime.date):
+        dt_end(datetime.date):
+        usrs(QuerySet):
+
+    Returns:
+        (dict): словарь с id'шниками пользователей -- по ключам, и 'diff_prev_paid_days' и 'diff_prev_paid_hours' \
+        -- по значениям
     """
 
     dt_start = dt_start if dt_start else dt.date(dt_end.year, 1, 1)

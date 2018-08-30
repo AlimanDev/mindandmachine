@@ -4,6 +4,7 @@ import json
 
 from django.db.models import Avg
 from django.utils.timezone import now
+from dateutil.relativedelta import relativedelta
 from django.db.models import Q
 
 from src.main.timetable.worker_exchange.utils import (
@@ -32,6 +33,15 @@ from src.celery.celery import app
 
 @app.task
 def update_queue(till_dttm=None):
+    """
+    Обновляет данные по очереди на всех типах касс
+
+    Args:
+        till_dttm(datetime.datetime): до какого времени обновлять?
+
+    Note:
+        Выполняется каждые полчаса
+    """
     time_step = datetime.timedelta(seconds=1800)
     if till_dttm is None:
         till_dttm = now()
@@ -76,15 +86,18 @@ def update_queue(till_dttm=None):
 @app.task
 def release_all_workers():
     """
-    отпускает всех работников с касс
-    :return:
+    Отпускает всех работников с касс
+
+    Note:
+        Выполняется каждую ночь
     """
+
     dttm_now = now() + datetime.timedelta(hours=3)
-    worker_day_cashbox_objs = \
-        WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
-            worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
-            dttm_to__isnull=True,
-        )
+    worker_day_cashbox_objs = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+        worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
+        dttm_to__isnull=True,
+    )
+
 
     for obj in worker_day_cashbox_objs:
         obj.on_cashbox = None
@@ -96,6 +109,12 @@ def release_all_workers():
 
 @app.task
 def update_worker_month_stat():
+    """
+    Обновляет данные по рабочим дням и часам сотрудников
+
+    Note:
+        Обновляется 1 и 15 числа каждого месяца
+    """
     dt = now().date().replace(day=1)
     delta = datetime.timedelta(days=20)
     dt1 = (dt - delta).replace(day=1)
@@ -121,8 +140,8 @@ def update_worker_month_stat():
             triplet[2] = time_break_triplets
             time_break_triplets = 0
 
-        worker_days = WorkerDay.objects.select_related('worker').filter(
-            worker_shop=shop,
+        worker_days = WorkerDay.objects.qos_current_version().select_related('worker').filter(
+            worker__shop=shop,
             dt__lt=dt,
             dt__gte=dt2,
         ).order_by('worker', 'dt')
@@ -180,8 +199,10 @@ def update_worker_month_stat():
 @app.task
 def notify_cashiers_lack():
     """
-    creates notification if there's deficiency of cashiers for each shop
-    :return:
+    Создает уведомления на неделю вперед, если в магазине будет нехватка кассиров
+
+    Note:
+        Выполняется каждую ночь
     """
     for shop in Shop.objects.all():
         dttm_now = now()
@@ -298,7 +319,26 @@ def allocation_of_time_for_work_on_cashbox():
 
 @app.task
 def create_pred_bills():
-    # todo: подумать, мб есть более красивый способ, чем задавать default_dt
+    """
+    Обновляет данные по спросу
+
+    Note:
+        Выполняется первого числа каждого месяца
+    """
     for shop in Shop.objects.all():
         create_predbills_request_function(shop.id)
     print('создал спрос на месяц')
+
+
+@app.task
+def clean_camera_stats():
+    """
+    Удаляет данные с камер за последние for_past_months месяцев
+
+    Note:
+        Запускается раз в неделю
+    """
+    for_past_months = 3
+    dttm_to_delete = now() - relativedelta(months=for_past_months)
+
+    CameraCashboxStat.objects.filter(dttm__lt=dttm_to_delete).delete()

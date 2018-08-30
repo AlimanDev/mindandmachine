@@ -1,15 +1,12 @@
-import json
 from datetime import datetime, timedelta, time
 
 from src.db.models import (
     PeriodDemand,
     WorkerDay,
     PeriodDemandChangeLog,
-    User,
     Shop
 )
 from src.util.collection import range_u
-from src.util.forms import FormUtil
 from src.util.models_converter import BaseConverter, PeriodDemandConverter, PeriodDemandChangeLogConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import (
@@ -20,13 +17,40 @@ from .forms import (
     CreatePredictBillsRequestForm
 )
 from .utils import create_predbills_request_function, set_pred_bills_function
-from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from src.util.forms import FormUtil
+from django.core.exceptions import EmptyResultSet, ImproperlyConfigured
 
 
 @api_method('GET', GetIndicatorsForm)
 def get_indicators(request, form):
+    """
+
+    Args:
+        method: GET
+        url: /api/demand/get_indicators
+        from_dt(QOS_DATE): required = True
+        to_dt(QOS_DATE): required = True
+        type(str): тип forecast'a (L/S/F)
+        shop_id(int): required = False
+
+    Returns:
+        {
+            | 'mean_bills': int or None,
+            | 'mean_codes': int or None,
+            | 'mean_income': None,
+            | 'mean_bill_codes': int or None,
+            | 'mean_hour_bills': int or None,
+            | 'mean_hour_codes': int or None,
+            | 'mean_hour_income': None,
+            | 'growth': int or None,
+            | 'total_people': None,
+            | 'total_bills': int,
+            | 'total_codes': int,
+            | 'total_income': None
+        }
+
+    """
     dt_from = form['from_dt']
     dt_to = form['to_dt']
     dt_days_count = (dt_to - dt_from).days + 1
@@ -34,6 +58,7 @@ def get_indicators(request, form):
     forecast_type = form['type']
 
     shop_id = FormUtil.get_shop_id(request, form)
+    checkpoint = FormUtil.get_checkpoint(form)
 
     period_demands = PeriodDemand.objects.select_related(
         'cashbox_type'
@@ -44,11 +69,11 @@ def get_indicators(request, form):
         dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1)
     )
 
-    worker_days = WorkerDay.objects.filter(
-        worker_shop_id=shop_id,
+    worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+        worker__shop_id=shop_id,
         type=WorkerDay.Type.TYPE_WORKDAY.value,
         dt__gte=dt_from,
-        dt__lte=dt_to
+        dt__lte=dt_to,
     )
     workers_count = len(set([x.worker_id for x in worker_days]))
 
@@ -101,6 +126,22 @@ def get_indicators(request, form):
 
 @api_method('GET', GetForecastForm)
 def get_forecast(request, form):
+    """
+    Получаем прогноз
+
+    Args:
+        method: GET
+        url: /api/demand/get_forecast
+        from_dt(QOS_DATE): required = True
+        to_dt(QOS_DATE): required = True
+        cashbox_type_ids(list): список типов касс (либо [] -- для всех типов)
+        format(str): 'raw' или 'excel' , default='raw'
+        shop_id(int): required = False
+
+    Returns:
+
+
+    """
     if form['format'] == 'excel':
         return JsonResponse.value_error('Excel is not supported yet')
 
@@ -192,6 +233,20 @@ def get_forecast(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def set_demand(request, form):
+    """
+    Изменяет объекты PeriodDemand'ов с LONG_FORECAST умножая на multiply_coef, либо задавая значение set_value
+
+    Args:
+        method: POST
+        url: /api/demand/set_forecast
+        from_dttm(QOS_DATETIME): required = True
+        to_dttm(QOS_DATETIME): required = True
+        cashbox_type_ids(list): список типов касс (либо [] -- если для всех)
+        multiply_coef(float): required = False
+        set_value(float): required = False
+        shop_id(int): required = True
+
+    """
     cashbox_type_ids = form['cashbox_type_ids']
 
     multiply_coef = form.get('multiply_coef')
@@ -238,13 +293,32 @@ def set_demand(request, form):
 
 @api_method('POST', CreatePredictBillsRequestForm)
 def create_predbills_request(request, form):
+    """
+    Создает request на qos_algo на создание PeriodDemand'ов с dt
+
+    Args:
+        method: POST
+        url: /api/demand/create_predbills
+        shop_id(int): required = True
+        dt(QOS_DATE): required = True . с какой даты создавать
+
+    Note:
+         На алгоритмах выставлено dt_start = dt, dt_end = dt_start + 1 месяц (с какого по какое создавать)
+
+    Raises:
+        JsonResponse.internal_error: если произошла ошибка при создании request'a
+    """
     shop_id = FormUtil.get_shop_id(request, form)
     dt = form['dt']
 
     try:
         create_predbills_request_function(shop_id, dt)
-    except Exception:
-        return JsonResponse.success('error upon creating request')
+    except ValueError as error_message:
+        return JsonResponse.value_error(str(error_message))
+    except EmptyResultSet as empty_error:
+        return JsonResponse.internal_error(str(empty_error))
+    except ImproperlyConfigured:
+        return JsonResponse.algo_internal_error()
 
     return JsonResponse.success()
 
@@ -253,11 +327,13 @@ def create_predbills_request(request, form):
 @api_method('POST', SetPredictBillsForm, auth_required=False, check_permissions=False)
 def set_pred_bills(request, form):
     """
-    listens for response from qos_algo. when gets it, pushes data from response to database
-    :SetPredBillsForm: key, data -- both char fields
-    :param request:
-    :param form:
-    :return:
+    ждет request'a от qos_algo. когда получает, записывает данные из data в базу данных
+
+    Args:
+        method: POST
+        url: /api/demand/set_predbills
+        data(str): json data от qos_algo
+        key(str): ключ
     """
     set_pred_bills_function(form['data'], form['key'])
 

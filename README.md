@@ -3,8 +3,8 @@
 ## Installation
 
 ```
-pip install pipenv
-pipenv install
+pip install virtualenv
+virtualenv venv
 ```
 
 ## Usage
@@ -12,7 +12,9 @@ pipenv install
 To run a dev server:
 
 ```
-pipenv shell
+source venv/bin/activate
+pip install -r requirements.txt
+cd QoS_backend/
 python manage.py runserver
 ```
 
@@ -26,6 +28,56 @@ python manage.py runserver
 ./manage.py test src.main.tablet.tests.TestTablet.test_get_cashiers_info
 ```
 
+## Generate doc
+```
+cd docs/
+make html
+Команда сгенерит _build/html/index.html
+index.html -- это док файл
+```
+
+
+## Как документировать
+Используем Google Style:
+
+"""
+
+Docstring заключается в тройные ковычки
+
+"""
+
+Есть список опций, которые можно использовать в docstring'e:
+
+• Args (alias of Parameters)
+
+• Attributes
+
+• Example(s) (возможны оба варианта)
+
+• Keyword Args (alias of Keyword Arguments)
+
+• Methods
+
+• Note(s) (возможны оба варианта)
+
+• Other Parameters
+
+• Parameters
+
+• Return(s)
+
+• Raises
+
+• References
+
+• See Also
+
+• Todo
+
+• Warning(s)
+
+Для дополнительной информации смотри:
+https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html#example-google
 
 ## Структура проекта
 

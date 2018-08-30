@@ -57,6 +57,11 @@ class LocalTestCase(TestCase):
         self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3')
         self.user4 = create_user(user_id=4, shop_id=self.shop, username='user4',
                                  dt_fired=(dttm_now - datetime.timedelta(days=1)).date())
+        User.objects.create_user('Director', 'Director@q.q', '1111',
+                                 id=5,
+                                 shop=self.shop,
+                                 group=User.GROUP_DIRECTOR,
+                                 )
         self.cashboxType1 = create_cashbox_type(self.shop, 'тип_кассы_1', id=1,
                                                 dttm_last_update_queue=datetime.datetime(2018, 6, 18, 8, 30, 0))
 
@@ -114,10 +119,10 @@ class LocalTestCase(TestCase):
             create_period_demand(datetime.datetime(2018, 6, 18, 7, 30), i, i * 3, 1, i * 4, i, self.cashboxType2)
 
             # self.worker_day = create_work_day(self.shop.id, self.user1, dt=datetime.datetime(2018, 7, i))
-            self.worker_day1 = create_work_day(self.shop.id, self.user1, dt=datetime.datetime(2018, 6, i))
-            self.worker_day2 = create_work_day(self.shop.id, self.user2, dt=datetime.datetime(2018, 6, i))
-            self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 6, i))
-            self.worker_day4 = create_work_day(self.shop.id, self.user1, dt=datetime.datetime(2018, 7, i))
+            self.worker_day1 = create_work_day(self.user1, dt=datetime.datetime(2018, 6, i))
+            self.worker_day2 = create_work_day(self.user2, dt=datetime.datetime(2018, 6, i))
+            self.worker_day3 = create_work_day(self.user3, dt=datetime.datetime(2018, 6, i))
+            self.worker_day4 = create_work_day(self.user1, dt=datetime.datetime(2018, 7, i))
 
             if i < 10:
                 self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 7, i), type=5)
@@ -250,10 +255,9 @@ def create_user(user_id, shop_id, username, dt_hired=None,
     return user
 
 
-def create_work_day(worker_shop_id, worker, dt, type=2, tm_work_start=datetime.time(hour=12, minute=0, second=0),
+def create_work_day(worker, dt, type=2, tm_work_start=datetime.time(hour=12, minute=0, second=0),
                     tm_work_end=datetime.time(hour=23, minute=0, second=0)):
     worker_day = WorkerDay.objects.create(
-        worker_shop_id=worker_shop_id,
         worker=worker,
         type=type,
         dt=dt,

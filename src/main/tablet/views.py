@@ -14,11 +14,10 @@ from src.db.models import (
     User
 )
 from django.db.models import Avg
-from src.conf.djconfig import QOS_DATETIME_FORMAT
 
 from src.util.utils import api_method, JsonResponse
 from src.util.forms import FormUtil
-from .utils import time_diff, is_midnight_period, get_status_and_details
+from .utils import time_diff, is_midnight_period
 from .forms import GetCashboxesInfo, GetCashiersInfo, ChangeCashierStatus
 from django.utils.timezone import now
 from src.util.models_converter import WorkerCashboxInfoConverter
@@ -27,10 +26,44 @@ from src.util.collection import group_by
 
 @api_method('GET', GetCashboxesInfo)
 def get_cashboxes_info(request, form):
+    """
+    Возвращает состояние каждой кассы в магазине
+
+    Args:
+        method: GET
+        url: /api/tablet/get_cashboxes_info
+        shop_id (int): required = False
+
+    Returns:
+        {
+            cashbox_type_id (int) :{
+                'cashbox' : {
+                    [
+                        {
+                            | 'number': номер кассы,
+                            | 'cashbox_id': id кассы,
+                            | 'user_id': id пользователя, который за ней сидит (либо null если касса пустая),
+                            | 'queue': число человек в очереди, либо null,
+                            | 'status': 'O' или 'C' -- открыта касса или закрыта
+                        }
+                    ], ...
+                },
+
+                'priority':
+                    | для линии -- 1,
+                    | для главной кассы -- 2,
+                    | для экспресс касс -- 3,
+                    | для остальных -- 100 (по дефолту)
+                | 'with_queue': True/False,
+                | 'name': имя cashbox_type_id
+            }
+        }
+    """
     response = {}
     dttm_now = now() + timedelta(hours=3)
 
     shop_id = FormUtil.get_shop_id(request, form)
+    checkpoint = FormUtil.get_checkpoint(form)
 
     list_of_cashbox = Cashbox.objects.qos_filter_active(
         dttm_now,
@@ -59,11 +92,11 @@ def get_cashboxes_info(request, form):
                     mean_queue = mean_queue['mean_queue']
 
         # todo: rewrite without 100500 requests to db (CameraCashboxStat also)
-        status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+        status = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related('worker_day__worker').filter(
             on_cashbox=cashbox,
             dttm_to__isnull=True,
             worker_day__dt=(dttm_now-timedelta(hours=2)).date(),
-            worker_day__worker_shop=shop_id,
+            worker_day__worker__shop_id=shop_id,
         )
 
         user_id = None
@@ -96,14 +129,53 @@ def get_cashboxes_info(request, form):
 @api_method('GET', GetCashiersInfo)
 def get_cashiers_info(request, form):
     """
-    gets status of all cashiers, working today
+    Показывает статусы всех кассиров работающих в данное время.
 
-    :param request:
-    :param form:
-    :return: complicated dict (see the code below)
+    Todo:
+        Сделать без привязки к времени tm_to_show_all_workers
+
+    Args:
+        method: GET
+        url: /api/tablet/get_cashiers_info
+        shop_id (int): required = False
+        dttm (QOS_DATETIME): дата и время
+    Returns:
+        {
+            worker_id: {
+                | 'break_triplets': [\n
+                    [время в минутах сколько перерыв идет/был, 0/1 (перерыв был или нет)],
+                    ...
+                | ],
+                | 'cashbox_dttm_added': время, когда была добавлена касса (либо null),
+                | 'cashbox_dttm_deleted': время, когда была удалена касса (либо null),
+                | 'cashbox_id': id кассы за которой сидит сотрудник, либо null (если сотрудник на перерыве, например),
+                | 'cashbox_number': номер кассы, либо null,
+                | 'cashbox_type': id типа касы за которой сегодня сотрудник работает,
+                'cashbox_types': [
+                    {
+                        | 'bills_amount': количество чеков,
+                        | 'cashbox_type: id типа кассы,
+                        | 'id': id объекта WorkerCashboxInfo,
+                        | 'mean_speed': средняя скорость,
+                        | 'period': ,
+                        | 'priority': ,
+                        | 'worker': id работника
+                    }
+                ],\n
+                | 'default_break_triplets' (str): "[15, 30, 15]", либо "[15, 30, 15, 15]" (например),
+                | 'status': статус работника. например "W" -- работает, "B" -- перерыв
+                | 'time_without_rest': количество минут которое сотрудник работает без перерыва(обнуляется после каждого перерыва),
+                | 'dttm_work_end': дата-время, когда заканчивается рабочий день,
+                | 'dttm_work_start': дата-время, когда начинается рабочий день,
+                | 'worker_day_id': id соответствующего объекта worker_day,
+                | 'worker_id': id работника
+            }
+        }
+
     """
 
     shop_id = FormUtil.get_shop_id(request, form)
+    checkpoint = FormUtil.get_checkpoint(form)
     dttm = form['dttm']
     response = {}
 
@@ -112,10 +184,10 @@ def get_cashiers_info(request, form):
     list_of_break_triplets = json.loads(break_triplets)
     time_without_rest = {}
 
-    status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+    status = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
         worker_day__dttm_work_start__lte=dttm + timedelta(minutes=30),
         worker_day__dt=(dttm - timedelta(hours=2)).date(),
-        worker_day__worker_shop__id=shop_id,
+        worker_day__worker__shop__id=shop_id,
     ).order_by('id')
 
     for item in status:
@@ -242,17 +314,40 @@ def get_cashiers_info(request, form):
 )
 def change_cashier_status(request, form):
     """
-    change cashier status if possible
+    Меняет статус кассира если это возможно.
 
-    :param request:
-    :param form:
-    :return:
+    Args:
+        method: POST
+        url: api/tablet/change_cashier_status
+        worker_id (int): required = True
+        status (char): статус на который хотим поменять (например, "W", "H")
+        cashbox_id (int): required = False. id кассы на которую хотим посадить (либо null если например отправляем работника домой)
+        is_current_time (bool): когда приходит сотрудник ставить ему время прихода текущее (True), или по расписанию (False)
+        tm_changin (QOS_TIME): required = False
+        tm_work_end (QOS_TIME): required = False. Если сотрудник вышел не по расписанию, объекта workerday_cashbox_details у него
+            на этот день нету, соответственно нужно проставить время окончания рабочего дня.
+
+    Returns:
+        {
+            | 'worker_id': id работяги,
+            | 'status': новый статус пользователя,
+            | 'cashbox_id': id кассы, либо null
+        }
+
+    Raises:
+        JsonResponse.value_error в случаях, когда:
+            Пытаемся поменять статус работника, который уже ушел домой или был отпущен. \n
+            Пытаемся поменять статус на 'Скоро придет' \n
+            Пытаемся посадить сотрудника на кассу, на которой уже кто-то работает \n
+
+
     """
     worker_id = form['worker_id']
     new_user_status = form['status']
     cashbox_id = form['cashbox_id']
     is_current_time = form['is_current_time']
     tm_work_end = form['tm_work_end']
+    checkpoint = FormUtil.get_checkpoint(form)
 
     dttm_now = (now() + timedelta(hours=3)).replace(microsecond=0)
     dt = (dttm_now-timedelta(hours=3)).date()
@@ -264,14 +359,19 @@ def change_cashier_status(request, form):
     cashbox_type = None if cashbox_id is None else CashboxType.objects.get(cashbox__id=cashbox_id)
     wdcd = None
 
-    workerday_detail_obj = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+    workerday_detail_obj = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
         worker_day__dt=dt,
         worker_day__worker_id=worker_id
     ).order_by('id').last()
 
-    worker_day = WorkerDay.objects.get(worker__id=worker_id, dt=dt)
+    try:
+        worker_day = WorkerDay.objects.qos_filter_version(checkpoint).get(dt=dt, worker_id=worker_id)
+    except WorkerDay.DoesNotExist:
+        return JsonResponse.does_not_exists_error()
+    except WorkerDay.MultipleObjectsReturned:
+        return JsonResponse.multiple_objects_returned()
 
-    cashbox_worked = WorkerDayCashboxDetails.objects.filter(
+    cashbox_worked = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
         Q(dttm_to__isnull=True) | Q(dttm_to__gt=dttm_now),
         worker_day__dt=dt,
         is_tablet=True,
@@ -302,7 +402,7 @@ def change_cashier_status(request, form):
         worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
         worker_day.save()
     elif new_user_status == WorkerDayCashboxDetails.TYPE_FINISH:
-        WorkerDayCashboxDetails.objects.filter(
+        WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
             worker_day__dt=dt,
             worker_day__worker_id=worker_id,
             is_tablet=False,
