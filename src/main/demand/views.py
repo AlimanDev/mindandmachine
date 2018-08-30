@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, time
 
 from src.db.models import (
@@ -11,7 +12,17 @@ from src.util.collection import range_u
 from src.util.forms import FormUtil
 from src.util.models_converter import BaseConverter, PeriodDemandConverter, PeriodDemandChangeLogConverter
 from src.util.utils import api_method, JsonResponse
-from .forms import GetForecastForm, SetDemandForm, GetIndicatorsForm
+from .forms import (
+    GetForecastForm,
+    SetDemandForm,
+    GetIndicatorsForm,
+    SetPredictBillsForm,
+    CreatePredictBillsRequestForm
+)
+from .utils import create_predbills_request_function, set_pred_bills_function
+from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+from src.util.forms import FormUtil
 
 
 @api_method('GET', GetIndicatorsForm)
@@ -222,5 +233,33 @@ def set_demand(request, form):
             multiply_coef=multiply_coef,
             set_value=set_value
         )
+
+    return JsonResponse.success()
+
+
+@api_method('POST', CreatePredictBillsRequestForm)
+def create_predbills_request(request, form):
+    shop_id = FormUtil.get_shop_id(request, form)
+    dt = form['dt']
+
+    try:
+        create_predbills_request_function(shop_id, dt)
+    except Exception:
+        return JsonResponse.success('error upon creating request')
+
+    return JsonResponse.success()
+
+
+@csrf_exempt
+@api_method('POST', SetPredictBillsForm, auth_required=False, check_permissions=False)
+def set_pred_bills(request, form):
+    """
+    listens for response from qos_algo. when gets it, pushes data from response to database
+    :SetPredBillsForm: key, data -- both char fields
+    :param request:
+    :param form:
+    :return:
+    """
+    set_pred_bills_function(form['data'], form['key'])
 
     return JsonResponse.success()

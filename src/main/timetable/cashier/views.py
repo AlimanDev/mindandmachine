@@ -41,6 +41,7 @@ from .forms import (
     SetWorkerDaysForm
 )
 from . import utils
+from src.main.other.notification.utils import send_notification
 
 
 @api_method('GET', GetCashiersListForm)
@@ -634,6 +635,8 @@ def create_cashier(request, form):
     except:
         return JsonResponse.already_exists_error()
 
+    send_notification('C', user, sender=request.user)
+
     return JsonResponse.success(UserConverter.convert(user))
 
 
@@ -761,5 +764,7 @@ def delete_cashier(request, form):
 
     user.dt_fired = form['dt_fired']
     user.save()
+
+    send_notification('D', user, sender=request.user)
 
     return JsonResponse.success(UserConverter.convert(user))

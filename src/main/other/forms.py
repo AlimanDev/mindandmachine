@@ -24,6 +24,7 @@ class GetSlots(forms.Form):
     user_id = forms.IntegerField(required=True)
     shop_id = forms.IntegerField(required=False)
 
+
 class GetAllSlots(forms.Form):
     shop_id = forms.IntegerField(required=True)
 
@@ -47,3 +48,13 @@ class SetSlot(forms.Form):
                 raise ValidationError('Invalid week day')
 
         return value
+
+
+class CreateSlotForm(forms.Form):
+    cashbox_type_id = forms.IntegerField()
+    tm_start = util_forms.TimeField()
+    tm_end = util_forms.TimeField()
+
+
+class DeleteSlotForm(forms.Form):
+    slot_id = forms.IntegerField()

@@ -228,6 +228,24 @@ class User(DjangoAbstractUser):
     objects = WorkerManager()
 
 
+class CashboxTypeManager(models.Manager):
+    def qos_filter_active(self, dttm_from, dttm_to, *args, **kwargs):
+        """
+        added earlier then dt_from, deleted later then dt_to
+        :param dttm_from:
+        :param dttm_to:
+        :param args:
+        :param kwargs:
+        :return:
+        """
+
+        return self.filter(
+            models.Q(dttm_added__lte=dttm_from) | models.Q(dttm_added__isnull=True)
+        ).filter(
+            models.Q(dttm_deleted__gte=dttm_to) | models.Q(dttm_deleted__isnull=True)
+        ).filter(*args, **kwargs)
+
+
 class CashboxType(models.Model):
     class Meta:
         verbose_name = 'Тип кассы'
@@ -239,7 +257,7 @@ class CashboxType(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    priority = models.PositiveIntegerField(default=100)  # 1--main, 2-ord, 3-express, etc
+    priority = models.PositiveIntegerField(default=100)  # 1--главная касса, 2--линия, 3--экспресс
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
     dttm_last_update_queue = models.DateTimeField(null=True, blank=True)
@@ -263,6 +281,12 @@ class CashboxType(models.Model):
     probability = models.FloatField(default=1.0)
     prior_weight = models.FloatField(default=1.0)
     is_main_type = models.BooleanField(default=False)
+    objects = CashboxTypeManager()
+
+    period_demand_params = models.CharField(
+        max_length=1024,
+        default='{"max_depth":-1,"eta":-1,"min_split_loss":-1,"reg_lambda":-1,"silent":-1,"is_main_type":-1}'
+    )
 
 
 class UserWeekdaySlot(models.Model):
@@ -303,7 +327,7 @@ class Slot(models.Model):
 class CashboxManager(models.Manager):
     def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
         """
-        added earlier then dt_from, added later then dt_to
+        added earlier then dt_from, deleted later then dt_to
         :param dt_from:
         :param dt_to:
         :param args:
@@ -354,13 +378,13 @@ class PeriodDemand(models.Model):
 
     dttm_forecast = models.DateTimeField()
     clients = models.FloatField()
-    products = models.FloatField()
+    products = models.FloatField(default=0)
 
     type = utils.EnumField(Type)
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
-    queue_wait_time = models.FloatField()  # in minutes
-    queue_wait_length = models.FloatField()
+    queue_wait_time = models.FloatField(default=0)  # in minutes
+    queue_wait_length = models.FloatField(default=0)
     lack_of_cashiers = models.IntegerField(default=0)  # can be both pos and neg
 
 
@@ -399,6 +423,9 @@ class WorkerCashboxInfo(models.Model):
     mean_speed = models.FloatField(default=1)
     bills_amount = models.PositiveIntegerField(default=0)
     priority = models.IntegerField(default=0)
+
+    # how many hours did he work
+    duration = models.FloatField(default=0)
 
 
 class WorkerConstraint(models.Model):
@@ -564,7 +591,12 @@ class WorkerDayCashboxDetails(models.Model):
     tm_to = models.TimeField(null=True, blank=True)
 
     def __str__(self):
-        return '{}, {}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.cashbox_type.name, self.id)
+        return '{}, {}, {}, {}, {}'.format(
+            self.worker_day.worker.last_name,
+            self.worker_day.worker.shop.super_shop.title,
+            self.worker_day.dt,
+            self.cashbox_type.name if self.cashbox_type else None,
+            self.id)
 
     objects = WorkerDayCashboxDetailsManager()
 
@@ -664,6 +696,7 @@ class Timetable(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    status_message = models.CharField(max_length=256, null=True, blank=True)
     dt = models.DateField()
     status = utils.EnumField(Status)
     dttm_status_change = models.DateTimeField()
@@ -730,7 +763,7 @@ class ProductionDay(models.Model):
 
     def __repr__(self):
         return self.__str__()
-    
+
     # is it enough or work hours also needs?
 
 
