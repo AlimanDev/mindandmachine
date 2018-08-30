@@ -24,7 +24,6 @@ import datetime
 #     'WorkerDay',
 #     'WorkerDayCashboxDetails',
 #     'WorkerDayChangeRequest',
-#     'WorkerDayChangeLog',
 #     'Notifications',
 #     'OfficialHolidays',
 #     'LevelType',
@@ -444,10 +443,25 @@ class WorkerConstraint(models.Model):
     tm = models.TimeField()
 
 
-class WorkerDay(models.Model):
-    class Meta(object):
-        unique_together = (('worker', 'worker_shop', 'dt'),)
+class WorkerDayManager(models.Manager):
+    def qos_current_version(self):
+        return super().get_queryset().filter(child__id__isnull=True)
 
+    def qos_initial_version(self):
+        return super().get_queryset().filter(parent_worker_day__isnull=True)
+
+    def qos_filter_version(self, checkpoint):
+        """
+        :param checkpoint: 0 or 1 / True of False. If 1 -- current version, else -- initial
+        :return:
+        """
+        if checkpoint:
+            return self.qos_current_version()
+        else:
+            return self.qos_initial_version()
+
+
+class WorkerDay(models.Model):
     class Type(utils.Enum):
         TYPE_HOLIDAY = 1
         TYPE_WORKDAY = 2
@@ -493,18 +507,12 @@ class WorkerDay(models.Model):
     def __repr__(self):
         return self.__str__()
 
-    # def __str__(self):
-    #     return 'Worker {} | Date {} | {}'.format(self.id, self.dt, self.Type.get_name_by_value(self.type))
-
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     worker = models.ForeignKey(User, on_delete=models.PROTECT)  # todo: make immutable
     dt = models.DateField()  # todo: make immutable
     type = utils.EnumField(Type)
-
-    # extra field for SQL select
-    worker_shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='+')
 
     tm_work_start = models.TimeField(null=True, blank=True)
     tm_work_end = models.TimeField(null=True, blank=True)
@@ -513,9 +521,32 @@ class WorkerDay(models.Model):
     is_manual_tuning = models.BooleanField(default=False)
     cashbox_types = models.ManyToManyField(CashboxType, through='WorkerDayCashboxDetails')
 
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
+    parent_worker_day = models.OneToOneField('self', on_delete=models.PROTECT, blank=True, null=True, related_name='child')
+
     @classmethod
     def is_type_with_tm_range(cls, t):
         return t in (cls.Type.TYPE_WORKDAY.value, cls.Type.TYPE_BUSINESS_TRIP.value, cls.Type.TYPE_QUALIFICATION.value)
+
+    objects = WorkerDayManager()
+
+
+class WorkerDayCashboxDetailsManager(models.Manager):
+    def qos_current_version(self):
+        return super().get_queryset().select_related('worker_day').filter(worker_day__child__id__isnull=True)
+
+    def qos_initial_version(self):
+        return super().get_queryset().select_related('worker_day').filter(worker_day__parent_worker_day__isnull=True)
+
+    def filter_version(self, checkpoint):
+        """
+        :param checkpoint: 0 or 1 / True of False. If 1 -- current version, else -- initial
+        :return:
+        """
+        if checkpoint:
+            return self.qos_current_version()
+        else:
+            return self.qos_initial_version()
 
 
 class WorkerDayCashboxDetails(models.Model):
@@ -567,6 +598,8 @@ class WorkerDayCashboxDetails(models.Model):
             self.cashbox_type.name if self.cashbox_type else None,
             self.id)
 
+    objects = WorkerDayCashboxDetailsManager()
+
 
 class WorkerDayChangeRequest(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -584,36 +617,6 @@ class WorkerDayChangeRequest(models.Model):
     tm_work_start = models.TimeField(null=True, blank=True)
     tm_work_end = models.TimeField(null=True, blank=True)
     tm_break_start = models.TimeField(null=True, blank=True)
-
-
-class WorkerDayChangeLog(models.Model):
-    def __str__(self):
-        return '{}, {}, {}, {}'.format(self.worker_day.worker.last_name, self.worker_day.worker.shop.super_shop.title, self.worker_day.dt, self.id)
-        # return f'{self.worker_day.worker.last_name}, {self.worker_day.worker.shop.super_shop.title},' \
-        #        f' {self.worker_day.dt}, {self.id}'
-
-    id = models.BigAutoField(primary_key=True)
-
-    dttm_changed = models.DateTimeField(auto_now_add=True)
-
-    worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
-
-    # extra fields for SQL SELECT performance
-    worker_day_dt = models.DateField()
-    worker_day_worker = models.ForeignKey(User, on_delete=models.PROTECT, related_name='+')
-
-    from_type = utils.EnumField(WorkerDay.Type)
-    from_tm_work_start = models.TimeField(null=True, blank=True)
-    from_tm_work_end = models.TimeField(null=True, blank=True)
-    from_tm_break_start = models.TimeField(null=True, blank=True)
-
-    to_type = utils.EnumField(WorkerDay.Type)
-    to_tm_work_start = models.TimeField(null=True, blank=True)
-    to_tm_work_end = models.TimeField(null=True, blank=True)
-    to_tm_break_start = models.TimeField(null=True, blank=True)
-
-    changed_by = models.ForeignKey(User, on_delete=models.PROTECT)
-    comment = models.CharField(max_length=128, default='', blank=True)
 
 
 class Notifications(models.Model):

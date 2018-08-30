@@ -79,12 +79,13 @@ def release_all_workers():
     отпускает всех работников с касс
     :return:
     """
+
     dttm_now = now() + datetime.timedelta(hours=3)
-    worker_day_cashbox_objs = \
-        WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
-            worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
-            tm_to__isnull=True,
-        )
+    worker_day_cashbox_objs = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+        worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
+        tm_to__isnull=True,
+    )
+
 
     for obj in worker_day_cashbox_objs:
         obj.on_cashbox = None
@@ -121,8 +122,8 @@ def update_worker_month_stat():
             triplet[2] = time_break_triplets
             time_break_triplets = 0
 
-        worker_days = WorkerDay.objects.select_related('worker').filter(
-            worker_shop=shop,
+        worker_days = WorkerDay.objects.qos_current_version().select_related('worker').filter(
+            worker__shop=shop,
             dt__lt=dt,
             dt__gte=dt2,
         ).order_by('worker', 'dt')

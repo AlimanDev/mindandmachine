@@ -307,7 +307,6 @@ def parse_users_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, co
                 worker=user,
                 dt=dt,
                 type=workday_type,
-                worker_shop=ctx.shop,
                 tm_work_start=tm_work_start,
                 tm_work_end=tm_work_end
             )
@@ -410,7 +409,6 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
                 worker=user,
                 dt=dt,
                 type=workday_type,
-                worker_shop=ctx.shop,
                 tm_work_start=tm_work_start,
                 tm_work_end=tm_work_end
             )

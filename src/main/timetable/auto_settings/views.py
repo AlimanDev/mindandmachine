@@ -18,7 +18,6 @@ from src.db.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     Shop,
-    WorkerDayChangeLog,
     WorkerDayChangeRequest,
     Slot,
     UserWeekdaySlot,
@@ -79,6 +78,10 @@ def set_selected_cashiers(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def create_timetable(request, form):
+    """
+    using actual workerday instance (with no children)
+    :return:
+    """
     shop_id = form['shop_id']
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
     dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
@@ -159,12 +162,20 @@ def create_timetable(request, form):
     )
 
     worker_day = group_by(
-        collection=WorkerDay.objects.filter(worker_shop_id=shop_id, dt__gte=dt_from, dt__lte=dt_to),
+        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
+            worker__shop_id=shop_id,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+        ),
         group_key=lambda x: x.worker_id
     )
 
     prev_data = group_by(
-        collection=WorkerDay.objects.filter(worker_shop_id=shop_id, dt__gte=dt_from - timedelta(days=7), dt__lt=dt_from),
+        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
+            worker__shop_id=shop_id,
+            dt__gte=dt_from - timedelta(days=7),
+            dt__lt=dt_from,
+        ),
         group_key=lambda x: x.worker_id
     )
 
@@ -340,8 +351,8 @@ def delete_timetable(request, form):
             send_notification('D', tt, sender=request.user)
     tts.delete()
 
-    WorkerDayChangeLog.objects.filter(
-        worker_day__worker_shop_id=shop_id,
+    WorkerDayChangeRequest.objects.select_related('worker_day', 'worker_day__worker').filter(
+        worker_day__worker__shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
         worker_day__worker__auto_timetable=True,
@@ -350,8 +361,8 @@ def delete_timetable(request, form):
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
     ).delete()
 
-    WorkerDayChangeRequest.objects.filter(
-        worker_day__worker_shop_id=shop_id,
+    WorkerDayCashboxDetails.objects.select_related('worker_day', 'worker_day__worker').filter(
+        worker_day__worker__shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
         worker_day__worker__auto_timetable=True,
@@ -360,18 +371,8 @@ def delete_timetable(request, form):
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
     ).delete()
 
-    WorkerDayCashboxDetails.objects.filter(
-        worker_day__worker_shop_id=shop_id,
-        worker_day__dt__month=dt_from.month,
-        worker_day__dt__year=dt_from.year,
-        worker_day__worker__auto_timetable=True,
-    ).filter(
-        Q(worker_day__is_manual_tuning=False) |
-        Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
-    ).delete()
-
-    WorkerDay.objects.filter(
-        worker_shop_id=shop_id,
+    WorkerDay.objects.select_related('worker').filter(
+        worker__shop_id=shop_id,
         dt__month=dt_from.month,
         dt__year=dt_from.year,
         worker__auto_timetable=True,
@@ -420,7 +421,7 @@ def set_timetable(request, form):
 
             dt = BaseConverter.parse_date(wd['dt'])
             try:
-                wd_obj = WorkerDay.objects.get(worker_id=uid, dt=dt)
+                wd_obj = WorkerDay.objects.get(worker_id=uid, dt=dt, child__id__isnull=True)
                 if wd_obj.is_manual_tuning or wd_obj.type != WorkerDay.Type.TYPE_EMPTY:
                     continue
             except WorkerDay.DoesNotExist:
@@ -430,7 +431,7 @@ def set_timetable(request, form):
 
                 )
 
-            wd_obj.worker_shop_id=users[int(uid)].shop_id
+            wd_obj.worker.shop_id = users[int(uid)].shop_id
             wd_obj.type = WorkerDayConverter.parse_type(wd['type'])
             if WorkerDay.is_type_with_tm_range(wd_obj.type):
                 wd_obj.tm_work_start = BaseConverter.parse_time(wd['tm_work_start'])

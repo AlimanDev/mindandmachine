@@ -281,7 +281,7 @@ class Tabel_xlsx(Xlsx_base):
             diff_h += 24
         if (breaks is not None) and len(breaks):
             i = 0
-            print(breaks, diff_h)
+            # print(breaks, diff_h)
             while (len(breaks) > i) and not (breaks[i][0] <= diff_h < breaks[i][1]):
                 i += 1
             if len(breaks) == i:

@@ -34,6 +34,7 @@ def get_indicators(request, form):
     forecast_type = form['type']
 
     shop_id = FormUtil.get_shop_id(request, form)
+    checkpoint = FormUtil.get_checkpoint(form)
 
     period_demands = PeriodDemand.objects.select_related(
         'cashbox_type'
@@ -44,11 +45,11 @@ def get_indicators(request, form):
         dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1)
     )
 
-    worker_days = WorkerDay.objects.filter(
-        worker_shop_id=shop_id,
+    worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+        worker__shop_id=shop_id,
         type=WorkerDay.Type.TYPE_WORKDAY.value,
         dt__gte=dt_from,
-        dt__lte=dt_to
+        dt__lte=dt_to,
     )
     workers_count = len(set([x.worker_id for x in worker_days]))
 
