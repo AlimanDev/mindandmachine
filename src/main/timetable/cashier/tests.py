@@ -15,27 +15,15 @@ class TestCashier(LocalTestCase):
             'user_id': 1,
             'old_password': 'qqq',
             'new_password': 'new_password',
-            'confirm_password': 'new_password',
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 400)
         self.assertEqual(response.json['data']['error_type'], 'AuthError')
 
         response = self.api_post('/api/timetable/cashier/password_edit', {
-            'user_id': 1,
-            'old_password': self.USER_PASSWORD,
-            'new_password': 'new_password',
-            'confirm_password': 'confirm_password',
-        })
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 400)
-        self.assertEqual(response.json['data']['error_type'], 'ValueException')
-
-        response = self.api_post('/api/timetable/cashier/password_edit', {
             'user_id': 5,
             'old_password': self.USER_PASSWORD,
             'new_password': 'new_password',
-            'confirm_password': 'new_password',
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 403)
@@ -46,14 +34,32 @@ class TestCashier(LocalTestCase):
             'user_id': 1,
             'old_password': self.USER_PASSWORD,
             'new_password': 'new_password',
-            'confirm_password': 'new_password',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['code'], 200)
+
+        response = self.api_post('/api/timetable/cashier/password_edit', {
+            'user_id': 1,
+            'old_password': 'new_password',
+            'new_password': self.USER_PASSWORD,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['code'], 200)
+
+        self.user1.group = User.GROUP_CASHIER
+        self.user1.save()
+        self.auth()
+
+        response = self.api_post('/api/timetable/cashier/password_edit', {
+            'user_id': 1,
+            'old_password': self.USER_PASSWORD,
+            'new_password': 'new_password',
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
 
     def test_change_cashier_info(self):
         self.auth()
-
         response = self.api_post('/api/timetable/cashier/change_cashier_info', {
             'user_id': 1,
             'first_name': 'Benedick',

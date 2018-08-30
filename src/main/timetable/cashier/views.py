@@ -757,7 +757,6 @@ def password_edit(request, form):
     user_id = form['user_id']
     old_password = form['old_password']
     new_password = form['new_password']
-    confirm_password = form['confirm_password']
 
     if user_id != request.user.id:
         try:
@@ -772,11 +771,8 @@ def password_edit(request, form):
     if not user.check_password(old_password):
         return JsonResponse.auth_error()
 
-    if new_password != confirm_password:
-        return JsonResponse.value_error('Password_mismatch')
-    else:
-        user.set_password(new_password)
-        update_session_auth_hash(request, user)
+    user.set_password(new_password)
+    update_session_auth_hash(request, user)
     user.save()
 
     return JsonResponse.success(UserConverter.convert(user))

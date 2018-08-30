@@ -224,7 +224,6 @@ class PasswordChangeForm(forms.Form):
     user_id = forms.IntegerField()
     old_password = forms.CharField(max_length=128)
     new_password = forms.CharField(max_length=128)
-    confirm_password = forms.CharField(max_length=128)
 
 
 class ChangeCashierInfo(forms.Form):
