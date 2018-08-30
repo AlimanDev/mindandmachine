@@ -124,7 +124,6 @@ def api_method(
             if check_permissions:  # for signout
                 if auth_required and request.user.is_authenticated:
                     user_group = request.user.group
-                    # print(form.cleaned_data)
 
                     if lambda_func is None:
                         cleaned_data = Shop.objects.filter(id=form.cleaned_data['shop_id']).first()
@@ -134,7 +133,6 @@ def api_method(
                         except:
                             return JsonResponse.does_not_exists_error()
 
-                    # print(lambda_func)
                     if groups is None:
                         if method == 'GET':
                             __groups = User.__except_cashiers__
