@@ -124,32 +124,37 @@ class LocalTestCase(TestCase):
             else:
                 self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 7, i))
 
-            WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day1,
-                                                   on_cashbox=self.cashbox1,
-                                                   cashbox_type=self.cashboxType1,
-                                                   is_tablet=True,
-                                                   # tm_from=datetime.time(9, 0, 0),
-                                                   dttm_from=datetime.datetime(2018, 6, i, 9, 0, 0),
-                                                   dttm_to=datetime.datetime(2018, 6, i, 18, 0, 0),
-                                                   )
+            WorkerDayCashboxDetails.objects.create(
+                status=WorkerDayCashboxDetails.TYPE_WORK,
+                worker_day=self.worker_day1,
+                on_cashbox=self.cashbox1,
+                cashbox_type=self.cashboxType1,
+                is_tablet=True,
+                # tm_from=datetime.time(9, 0, 0),
+                dttm_from=datetime.datetime(2018, 6, i, 9, 0, 0),
+                dttm_to=datetime.datetime(2018, 6, i, 18, 0, 0),
+            )
 
-            WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day2,
-                                                   on_cashbox=self.cashbox1,
-                                                   cashbox_type=self.cashboxType1,
-                                                   is_tablet=True,
-                                                   # tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
-                                                   dttm_from=(dttm_now - datetime.timedelta(hours=3)),
-                                                   dttm_to=(dttm_now + datetime.timedelta(hours=3)),
-                                                   )
+            WorkerDayCashboxDetails.objects.create(
+                status=WorkerDayCashboxDetails.TYPE_WORK,
+                worker_day=self.worker_day2,
+                on_cashbox=self.cashbox1,
+                cashbox_type=self.cashboxType1,
+                is_tablet=True,
+                # tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
+                dttm_from=(dttm_now - datetime.timedelta(hours=3)),
+                dttm_to=(dttm_now + datetime.timedelta(hours=3)),
+            )
 
-            WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day1,
-                                                   on_cashbox=self.cashbox2,
-                                                   cashbox_type=self.cashboxType2,
-                                                   is_tablet=True,
-                                                   dttm_from=dttm_now - datetime.timedelta(hours=3),
-                                                   dttm_to=dttm_now + datetime.timedelta(hours=3),
-                                                   status=WorkerDayCashboxDetails.TYPE_WORK,
-                                                   )
+            WorkerDayCashboxDetails.objects.create(
+                worker_day=self.worker_day1,
+                on_cashbox=self.cashbox2,
+                cashbox_type=self.cashboxType2,
+                is_tablet=True,
+                dttm_from=dttm_now - datetime.timedelta(hours=3),
+                dttm_to=dttm_now + datetime.timedelta(hours=3),
+                status=WorkerDayCashboxDetails.TYPE_WORK,
+            )
         self.worker_day = create_work_day(self.shop.id, self.user1, dt=dttm_now.date())
         self.worker_day2 = create_work_day(self.shop.id, self.user2, dt=dttm_now.date())
         self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=dttm_now.date())
