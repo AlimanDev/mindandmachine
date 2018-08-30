@@ -49,9 +49,43 @@ from django.contrib.auth import update_session_auth_hash
 
 @api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
+    """
+    Возвращает список кассиров в данном магазине, уволенных позже чем dt_fired_after и нанятых\
+    раньше, чем dt_hired_before.
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier/get_cashiers_list
+        dt_hired_before(QOS_DATE): required = False.
+        dt_fired_after(QOS_DATE): required False
+        shop_id(int): required = False
+
+    Returns:
+        {[
+            {
+                | 'id': id пользователя,
+                | 'username': username,
+                | 'shop_id': id магазина к которому он привязан,
+                | 'work_type': тип рабочего дня,
+                | 'first_name': имя,
+                | 'last_name': фамилия,
+                | 'avatar_url': аватар,
+                | 'dt_hired': дата найма,
+                | 'dt_fired': дата увольнения,
+                | 'auto_timetable': True/False,
+                | 'comment': доп инфа,
+                | 'sex': пол,
+                | 'is_fixed_hours': True/False,
+                | 'is_fixed_days': True/False,
+                | 'phone_number'(str): номер телефона,
+                | 'is_ready_for_overworkings': True/False (готов сотрудник к переработкам или нет),
+                | 'tabel_code': табельный номер,
+            }, ...
+        ]}
+
+    """
     users = []
     shop_id = FormUtil.get_shop_id(request, form)
-    # todo: прочекать что все ок
     for u in User.objects.filter(shop_id=shop_id).order_by('last_name', 'first_name'):
         if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
             if u.dt_fired is None or u.dt_fired >= form['dt_fired_after']:
@@ -62,6 +96,39 @@ def get_cashiers_list(request, form):
 
 @api_method('GET', GetCashiersListForm)
 def get_not_working_cashiers_list(request, form):
+    """
+    Возващает список пользователей, которые сегодня не работают
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier/get_not_working_cashiers_list
+        dt_hired_before(QOS_DATE): required = False.
+        dt_fired_after(QOS_DATE): required False
+        shop_id(int): required = False
+
+    Returns:
+        {[
+            {
+                | 'id': id пользователя,
+                | 'username': username,
+                | 'shop_id': id магазина к которому он привязан,
+                | 'work_type': тип рабочего дня,
+                | 'first_name': имя,
+                | 'last_name': фамилия,
+                | 'avatar_url': аватар,
+                | 'dt_hired': дата найма,
+                | 'dt_fired': дата увольнения,
+                | 'auto_timetable': True/False,
+                | 'comment': доп инфа,
+                | 'sex': пол,
+                | 'is_fixed_hours': True/False,
+                | 'is_fixed_days': True/False,
+                | 'phone_number'(str): номер телефона,
+                | 'is_ready_for_overworkings': True/False (готов сотрудник к переработкам или нет),
+                | 'tabel_code': табельный номер,
+            }, ...
+        ]}
+    """
     dt_now = datetime.now() + timedelta(hours=3)
     shop_id = FormUtil.get_shop_id(request, form)
     checkpoint = FormUtil.get_checkpoint(form)
@@ -92,6 +159,49 @@ def get_not_working_cashiers_list(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def get_cashier_timetable(request, form):
+    """
+    Возвращает информацию о расписании сотрудника
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier/get_cashier_timetable
+        worker_id(int): required = True
+        from_dt(QOS_DATE): с какого числа смотреть расписание
+        to_dt(QOS_DATE): по какое число
+        format(str): 'raw' или 'excel'
+        shop_id(int): required = True
+
+    Returns:
+        {
+            'user': { в формате как get_cashiers_list },\n
+            'indicators': {
+                | 'change_amount': количество измененных дней,
+                | 'holiday_amount': количество выходных,
+                | 'sick_day_amount': количество больничных,
+                | 'vacation_day_amount': количество отпускных дней,
+                | 'work_day_amount': количество рабочих дней,
+                | 'work_day_in_holidays_amount': количество рабочих дней в выходные
+            },\n
+            'days': [
+                {
+                    'day': {
+                        | 'id': id worker_day'a,
+                        | 'dttm_added': дата добавления worker_day'a,
+                        | 'dt': worker_day dt,
+                        | 'worker': id пользователя,
+                        | 'type': тип worker_day'a,
+                        | 'dttm_work_start': дата-время начала работы,
+                        | 'dttm_work_end': дата-время конца рабочего дня,
+                        | 'tm_break_start': время начала перерыва,
+                        | 'is_manual_tuning': True/False,
+                        | 'cashbox_types': [список id'шников типов касс, на которых сотрудник работает в этот день],
+                    },\n
+                    | 'change_requests': [список change_request'ов],
+                }
+            ]
+        }
+
+    """
     if form['format'] == 'excel':
         return JsonResponse.value_error('Excel is not supported yet')
 
@@ -213,6 +323,60 @@ def get_cashier_timetable(request, form):
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
 def get_cashier_info(request, form):
+    """
+    Возвращает инфорацию о кассире в зависимости от опции info
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier/get_cashier_info
+        worker_id(int): required = True
+        info(str): general_info/cashbox_type_info/constraints_info/work_hours
+
+    Returns:
+        {
+            'general_info': {
+                | 'id': id пользователя,
+                | 'username': username,
+                | 'shop_id': id магазина к которому он привязан,
+                | 'work_type': тип рабочего дня,
+                | 'first_name': имя,
+                | 'last_name': фамилия,
+                | 'avatar_url': аватар,
+                | 'dt_hired': дата найма,
+                | 'dt_fired': дата увольнения,
+                | 'auto_timetable': True/False,
+                | 'comment': доп инфа,
+                | 'sex': пол,
+                | 'is_fixed_hours': True/False,
+                | 'is_fixed_days': True/False,
+                | 'phone_number'(str): номер телефона,
+                | 'is_ready_for_overworkings': True/False (готов сотрудник к переработкам или нет),
+                | 'tabel_code': табельный номер,
+            },\n
+            (список с пн-вс(0-6), с какого и по какое время может работать сотрудник)\n
+            'work_hours': [
+                {
+                    | 'tm_from': с какого времени может работать
+                    | 'tm_to': по какое
+                },...
+            ],\n
+            'constraint_info': [
+                список constraints по каким дням не может работать сотрудник
+                {
+                    | 'weekday': 0-6,
+                    | 'worker': id сотрудника,
+                    | 'id': id constaint'a,
+                    | 'tm': время когда сотрудник не может работать
+                }
+            ],
+            'cashbox_type_info': {
+                | 'cashbox_type': [список типов касс в магазине],
+                | 'worker_cashbox_info': [список касс за которыми может работать сотрудник]
+            }
+
+        }
+
+    """
     response = {}
 
     try:
@@ -279,6 +443,63 @@ def get_cashier_info(request, form):
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
 def get_worker_day(request, form):
+    """
+    Возвращает информацию по конкретному дню сотрудника
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier/get_worker_day
+        worker_id(int): id пользователя
+        dt(QOS_DATE): на какую дату хотим посмотреть worker_day
+
+    Returns:
+        {
+            'details': [
+                {
+                    | 'tm_to': до какого времени объект WorkerDayCashboxDetails,
+                    | 'tm_from': от какого времени,
+                    | 'cashbox_type': id типа кассы за которым работает сотрудник (либо null)
+                }
+            ],\n
+            'cashbox_types': [
+                cashbox_type_id: {
+                    | 'id': id типа кассы
+                    | 'dttm_added': дата добавления кассы,
+                    | 'dttm_deleted': дата удаления,
+                    | 'is_stable': True/False
+                    | 'speed_coef': int,
+                    | 'shop':	id магазина,
+                    | 'name': имя типа
+                ],..\n
+            },\n
+            'day': {
+                | 'id': id worker_day'a,
+                | 'tm_work_end': ,
+                | 'worker': id worker'a,
+                | 'cashbox_types': [],
+                | 'type': тип worker_day'a,
+                | 'tm_work_start': ,
+                | 'is_manual_tuning': True/False,
+                | 'tm_break_start': время начала перерыва,
+                | 'dttm_added': ,
+                | 'dt': дата создания worker_day'a
+            },\n
+            видимо список рабочих часов сотрудника\n
+            'work_hours': [
+                {
+                    | 'from': с какого времени,
+                    | 'to': по какое
+                }
+            ]
+        }
+
+
+    Raises:
+        JsonResponse.does_not_exists_error: если нет такого объекта WorkerDay'a удвовлетворяющего\
+        заданной дате и worker_id
+        JsonResponse.intrnal_error: во всех остальных случаях
+
+    """
     worker_id = form['worker_id']
     dt = form['dt']
     checkpoint = FormUtil.get_checkpoint(form)

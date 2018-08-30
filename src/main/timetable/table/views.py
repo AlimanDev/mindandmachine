@@ -40,6 +40,20 @@ from .utils import count_difference_of_normal_days
 
 @api_method('GET', SelectCashiersForm)
 def select_cashiers(request, form):
+    """
+    Args:
+        method: GET
+        url: /api/timetable/table/select_cashiers
+        cashbox_types(list): required = True
+        cashier_ids(list): required = True
+        work_types(str): required = False
+        workday_type(str): required = False
+        workdays(str): required = False
+        shop_id(int): required = False
+        work_workdays(str): required = False
+        from_tm(QOS_TIME): required = False
+        to_tm(QOS_TIME): required = False
+    """
     shop_id = FormUtil.get_shop_id(request, form)
     checkpoint = FormUtil.get_checkpoint(form)
 
@@ -108,6 +122,13 @@ def select_cashiers(request, form):
 
 @api_method('GET', GetTable)
 def get_table(request, form):
+    """
+    Args:
+        method: GET
+        url: /api/timetable/table/get_table
+        shop_id(int): required = False
+        weekday(QOS_DATE): required = True
+    """
     font_size = 12
     boarder_size = 1
     checkpoint = FormUtil.get_checkpoint(form)
@@ -401,6 +422,16 @@ def get_table(request, form):
 
 @api_method('GET', GetWorkerStatForm)
 def get_month_stat(request, form):
+    """
+    Считает статистику за месяц dt
+
+    Args:
+        method: GET
+        url: /api/timetable/table/get_month_stat
+        shop_id(int): required = False
+        dt(QOS_DATE): required = True
+        worker_ids(list): required = False
+    """
     # prepare data
     dt_start = datetime.date(form['dt'].year, form['dt'].month, 1)
     dt_start_year = datetime.date(dt_start.year, 1, 1)

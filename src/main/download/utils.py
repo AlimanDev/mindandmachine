@@ -1,13 +1,12 @@
 import xlsxwriter
 import io
 
-from django.conf import settings
-from django.contrib.auth import authenticate, login
 from django.http import HttpResponse
-from src.util.utils import JsonResponse
+from functools import wraps
 
 
 def xlsx_method(func):
+    @wraps(func)
     def wrapper(request, *args, **kwargs):
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})

@@ -14,9 +14,26 @@ from django.core.exceptions import EmptyResultSet, ImproperlyConfigured
 
 def set_param_list(shop_id):
     """
-    creates dict for algorithm. Note: only CashboxType HARD type is considered
-    :param shop_id:
-    :return: {cashbox_type_id: {..params..}, cashbox_type_id: {..params..}, ..}
+    Создает словарь из типов касс и параметров для них для алгоритма.
+    Здесь же проверяет что все параметры в базе данных заданы правильно.
+
+    Args:
+        shop_id(int): id отдела
+
+    Warning:
+        учитывает только типы касс с do_forecast = CashboxType.FORECAST_HARD
+
+    Returns:
+        {
+            cashbox_type_id: {
+                | 'max_depth': int,
+                | 'eta': int,
+                | 'min_split_loss': int,
+                | 'reg_lambda': int,
+                | 'silent': int,
+                | 'is_main_type': 0/1
+            }, ...
+        }
     """
     params_dict = {}
     for cashbox_type in CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD):
@@ -39,9 +56,17 @@ def set_param_list(shop_id):
 def create_predbills_request_function(shop_id, dt=None):
     """
     создает request на qos_algo с параметрами которые указаны в aggregation_dict
-    :param shop_id: для какого магаза
-    :param dt: с какой даты создавать объекты спроса
-    :return:
+
+    Args:
+        shop_id(int):
+        dt(datetime.date): дата на которую создавать PeriodDemand'ы
+
+    Returns:
+        None
+
+    Raises:
+        Exception
+
     """
     if dt is None:
         dt = (PeriodDemand.objects.all().order_by('dttm_forecast').last().dttm_forecast + timedelta(hours=7)).date()
@@ -95,9 +120,14 @@ def create_predbills_request_function(shop_id, dt=None):
 def set_pred_bills_function(data, key):
     """
     ждет request'a от qos_algo. когда получает, записывает данные из data в базу данных
-    :param data: json data от qos_algo
-    :param key: ключ
-    :return:
+
+    Args:
+        data(str): json data от qos_algo
+        key(str): ключ
+
+    Raises:
+        SystemError: если клюс не передан или не соответствует
+        ValueError: если ошибка при загрузке data'ы
     """
     if settings.QOS_SET_TIMETABLE_KEY is None:
         return SystemError('key is not configured')

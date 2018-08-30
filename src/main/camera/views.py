@@ -10,6 +10,18 @@ from .forms import CameraStatFrom
 @csrf_exempt
 @api_method('POST', None, auth_required=False, check_permissions=False)
 def set_queue(request):
+    """
+    Обновляет данные по камерам
+
+    Args:
+        method: POST
+        url: /api/camera/set_queue
+        key(str):
+        data(str):
+    Raises:
+        JsonResponse.value_error
+
+    """
     form = CamRequestForm(json.loads(request.body.decode('utf-8')))
     try:
         if not form.is_valid():

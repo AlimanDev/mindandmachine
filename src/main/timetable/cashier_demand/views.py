@@ -31,6 +31,38 @@ import io
 
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
+    """
+    Отображает информацию о расписании кассиров с from_dt до to_dt на типах касс с id'шинками \
+    cashbox_types_ids
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier_demand/get_cashiers_timetable
+        from_dt(QOS_DATE): required = True
+        to_dt(QOS_DATE): required = True
+        cashbox_type_ids(list): required = True (либо [] -- если для всех типов касс)
+        format(str): 'raw' или 'excel'. default = 'raw'
+        position_id(int): required = False
+        shop_id(int): required = False
+
+    Returns:
+        {
+            'indicators': {
+                | 'FOT': None,
+                | 'big_demand_persent': int,
+                | 'cashier_amount': int,
+                | 'change_amounut'(int): количество изменений в графике,
+                | 'deadtime_part'(float): доля простоя,
+                | 'need_cashier_amount'(int): сколько еще нужно кассиров в этот период
+            },\n
+            'period_step'(int): 30,\n
+            'tt_periods': {
+                'fact_cashier_need': [сколько по факту нужно в период],
+                'predict_cashier_needs': [сколько нужно кассиров в период],
+                'real_cashiers': [сколько сидит кассиров в период]
+            }
+        }
+    """
     shop_id = FormUtil.get_shop_id(request, form)
     checkpoint = FormUtil.get_checkpoint(form)
 
@@ -404,6 +436,19 @@ def get_cashiers_timetable(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def get_workers(request, form):
+    """
+    Todo: сделать нормальное описание
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier_demand/get_workers
+        from_dttm(QOS_DATETIME): required = True
+        to_dttm(QOS_DATETIME): required = True
+        cashbox_type_ids(list): required = True ([] -- если для всех)
+        shop_id(int): required = True
+
+
+    """
     shop = form['shop_id']
     checkpoint = FormUtil.get_checkpoint(form)
 
@@ -513,6 +558,22 @@ def get_workers(request, form):
 
 @api_method('GET', GetCashiersTimetableForm)
 def get_timetable_xlsx(request, form):
+    """
+    Вьюха для скачивания расписания
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier_demand/get_cashiers_timetable
+        from_dt(QOS_DATE): required = True
+        to_dt(QOS_DATE): required = True
+        cashbox_type_ids(list): required = True (либо [] -- если для всех типов касс)
+        format(str): 'raw' или 'excel'. default = 'raw'
+        position_id(int): required = False
+        shop_id(int): required = False
+
+    Returns:
+        Файл расписания
+    """
     shop = FormUtil.get_shop_id(request, form)
     dt_from = datetime(year=form['from_dt'].year, month=form['from_dt'].month, day=1)
     dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)

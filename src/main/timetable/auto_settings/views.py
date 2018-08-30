@@ -51,6 +51,24 @@ from src.main.other.notification.utils import send_notification
 
 @api_method('GET', GetStatusForm)
 def get_status(request, form):
+    """
+    Возвращает статус расписания на данный месяц
+
+    Args:
+        method: GET
+        url: /api/timetable/auto_setting/get_status
+        shop_id(int): required = False
+        dt(QOS_DATE): required = True
+
+    Returns:
+        {
+            'id': id расписания,
+            'shop': int,
+            'dt': дата расписания,
+            'status': статус расписания,
+            'dttm_status_change': дата изменения
+        }
+    """
     shop_id = FormUtil.get_shop_id(request, form)
     try:
         tt = Timetable.objects.get(shop_id=shop_id, dt=form['dt'])
@@ -66,6 +84,19 @@ def get_status(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def set_selected_cashiers(request, form):
+    """
+    Проставляет поле auto_timetable = value у заданных сотрудников
+
+    Args:
+        method: POST
+        url: /api/timetable/auto_settings/set_selected_cashiers
+        cashier_ids(list): id'шники сотрудников которым проставлять
+        shop_id(int): required = True
+        value(bool): required = True
+
+    Note:
+        Всем другим сотрудникам из этого магаза проставляется значение противоположное value
+    """
     shop = Shop.objects.get(id=form['shop_id'])
     User.objects.filter(shop=shop).exclude(id__in=form['cashier_ids']).update(auto_timetable=False)
     User.objects.filter(id__in=form['cashier_ids']).update(auto_timetable=True)
@@ -79,8 +110,19 @@ def set_selected_cashiers(request, form):
 )
 def create_timetable(request, form):
     """
-    using actual workerday instance (with no children)
-    :return:
+    Создает request на qos_algo с заданным параметрами
+
+    Args:
+        method: POST
+        url: /api/timetable/auto_settings/create_timetable
+        shop_id(int): required = True
+        dt(QOS_DATE): required = True
+
+    Raises:
+        JsonResponse.internal_error: если ошибка при составлении расписания
+
+    Note:
+        Отправляет уведомление о том, что расписание начало составляться
     """
     shop_id = form['shop_id']
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
@@ -331,6 +373,18 @@ def create_timetable(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def delete_timetable(request, form):
+    """
+    Удаляет расписание на заданный месяц. Также отправляет request на qos_algo на остановку задачи в селери
+
+    Args:
+        method: POST
+        url: /api/timetable/auto_settings/delete_timetable
+        shop_id(int): required = True
+        dt(QOS_DATE): required = True
+
+    Note:
+        Отправляет уведомление о том, что расписание было удалено
+    """
     shop_id = form['shop_id']
 
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
@@ -392,6 +446,22 @@ def delete_timetable(request, form):
 @csrf_exempt
 @api_method('POST', SetTimetableForm, auth_required=False)
 def set_timetable(request, form):
+    """
+    Ждет request'a от qos_algo. Когда получает, записывает данные по расписанию в бд
+
+    Args:
+        method: POST
+        url: /api/timetable/auto_settings/set_timetable
+        key(str): ключ для сверки
+        data(str): json data с данными от qos_algo
+
+    Raises:
+        JsonResponse.internal_error: если ключ не сконфигурирован, либо не подходит
+        JsonResponse.does_not_exists_error: если расписания нет в бд
+
+    Note:
+        Отправляет уведомление о том, что расписание успешно было создано
+    """
     if settings.QOS_SET_TIMETABLE_KEY is None:
         return JsonResponse.internal_error('key is not configured')
 

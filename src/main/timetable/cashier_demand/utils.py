@@ -2,37 +2,54 @@ from src.db.models import WorkerDay
 from datetime import time, timedelta
 
 
-# def filter_worker_day_by_dttm(shop_id, day_type, dttm_from, dttm_to):
-#     dt_from = dttm_from.date()
-#     tm_from = dttm_from.time()
-#     dt_to = dttm_to.date()
-#     tm_to = dttm_to.time()
-#
-#     days_raw = WorkerDay.objects.select_related('worker').filter(
-#         worker__shop_id=shop_id,
-#         type=day_type,
-#         dt__gte=dt_from,
-#         dt__lte=dt_to,
-#     )
-#
-#     days = []
-#     for d in days_raw:
-#         if d.dt == dt_from and d.tm_work_end <= tm_from:
-#             continue
-#         if d.dt == dt_to and d.tm_work_start >= tm_to:
-#             continue
-#
-#         days.append(d)
-#
-#     return days
+def filter_worker_day_by_dttm(shop_id, day_type, dttm_from, dttm_to):
+    """
+    Ну, что-то она да делает
+
+    Args:
+        shop_id(int):
+        day_type: ?
+        dttm_from(datetime.datetime):
+        dttm_to(datetime.datetime):
+
+    """
+    dt_from = dttm_from.date()
+    tm_from = dttm_from.time()
+    dt_to = dttm_to.date()
+    tm_to = dttm_to.time()
+
+    days_raw = WorkerDay.objects.filter(
+        worker_shop_id=shop_id,
+        type=day_type,
+        dt__gte=dt_from,
+        dt__lte=dt_to,
+    )
+
+    days = []
+    for d in days_raw:
+        if d.dt == dt_from and d.tm_work_end <= tm_from:
+            continue
+        if d.dt == dt_to and d.tm_work_start >= tm_to:
+            continue
+
+        days.append(d)
+
+    return days
 
 
 def check_time_is_between_boarders(tm, borders):
     """
-    checks if time is in allowed boarders
-    :param tm: datetime.time obj
-    :param borders: [datetime.time(), datetime.time(), 'day type'] : 'day type': 'morning', 'evening'
-    :return: day type if in borders else False
+    Проверяет, что время в допустимых значениях borders
+
+    Args:
+        tm(datetime.time): время которое надо проверить
+        borders(list): граница времени
+
+    Examples:
+        borders -- [[8:00, 12:00, 'morning'], [18:00, 22:00, 'evening']]
+
+    Returns:
+        Тип дня 'evening'/'morning', либо False если ни в один из промежутков не попадает
     """
     for border in borders:
         if border[0] < tm < border[1]:
@@ -41,6 +58,22 @@ def check_time_is_between_boarders(tm, borders):
 
 
 def count_diff(dttm, period_demands, demand_ind, mean_bills_per_step, cashbox_types, PERIOD_MINUTES = 30):
+    """
+    Функция, которая считает нехватку
+
+    Args:
+        dttm(datetime.datetime): время на которое считать
+        period_demands(PeriodDemand QuerySet): список PeriodDemand'ов
+        demand_ind(int): индекс
+        mean_bills_per_step:
+        cashbox_types(dict): словарь типов касс. по ключу -- id типа, по значению -- объект
+        PERIOD_MINUTES(int):
+
+    Returns:
+        (tuple): tuple содержащий:
+            need_amount_dict (dict): по ключу -- id типа кассы, по значению -- значение нехватки
+            demand_ind (int): индекс для следующего вызова этой функции
+    """
     # fixme: aa: work only if all steps are 30 minutes
     # todo: period_bills -- а они нужны вообще?
     # period_demand is sorted by dttm_forecast, so find the dttm

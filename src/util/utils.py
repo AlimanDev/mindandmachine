@@ -1,8 +1,10 @@
 import json
 
 from django.conf import settings
+from functools import wraps
 from django.contrib.auth import authenticate, login
 from django.http import HttpResponse
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from src.db.models import (
     User,
     Shop
@@ -10,6 +12,21 @@ from src.db.models import (
 
 
 class JsonResponse(object):
+    """
+    Methods:
+        success(data): 200
+        method_error(current_method, expected_method): 400
+        value_error(msg): 400
+        already_exists_error(msg): 400
+        does_not_exists_error(msg): 400
+        multiple_objects_returned(msg): 400
+        auth_error(): 400
+        auth_required(): 401
+        csrf_required(): 401
+        access_forbidden(msg): 403
+        internal_error(msg): 500
+
+    """
     @classmethod
     def success(cls, data=None):
         return cls.__base_response(200, data)
@@ -85,22 +102,21 @@ def api_method(
         auth_required=True,
         check_permissions=True,
         groups=None,
-        lambda_func=None
-):
+        lambda_func=None,
+    ):
     """
 
-    :param method:
-    :param form_cls:
-    :param auth_required:
-    :param check_permissions: bool, отображает нужно ли делать проверку на доступ к функциям
-    :param groups: User.group_type list: группы доступа к функциям
-    :param lambda_func: False -- on object creation, функция которая исходя из данных формирует данные необходимые для
-    проверки доступа
-
-    :return:
+    Args:
+        method(str): 'GET' or 'POST'
+        form_cls: класс формы
+        auth_required(bool): нужна ли авторизация для выполнения этой вьюхи
+        check_permissions(bool): нужно ли делать проверку на доступ
+        groups(list): список групп, которым разрешен доступ
+        lambda_func(function): функция которая исходя из данных формирует данные необходимые для проверки доступа. при создании объекта -- False
     """
 
     def decor(func):
+        @wraps(func)
         def wrapper(request, *args, **kwargs):
             if auth_required and not request.user.is_authenticated and settings.QOS_DEV_AUTOLOGIN_ENABLED:
                 user = authenticate(request, username=settings.QOS_DEV_AUTOLOGIN_USERNAME,
@@ -142,8 +158,10 @@ def api_method(
                     else:
                         try:
                             cleaned_data = lambda_func(form.cleaned_data)
-                        except:
+                        except ObjectDoesNotExist:
                             return JsonResponse.does_not_exists_error()
+                        except MultipleObjectsReturned:
+                            return JsonResponse.multiple_objects_returned()
 
                     if groups is None:
                         if method == 'GET':

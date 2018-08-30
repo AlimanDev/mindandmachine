@@ -33,6 +33,15 @@ from src.celery.celery import app
 
 @app.task
 def update_queue(till_dttm=None):
+    """
+    Обновляет данные по очереди на всех типах касс
+
+    Args:
+        till_dttm(datetime.datetime): до какого времени обновлять?
+
+    Note:
+        Выполняется каждые полчаса
+    """
     time_step = datetime.timedelta(seconds=1800)
     if till_dttm is None:
         till_dttm = now()
@@ -77,8 +86,10 @@ def update_queue(till_dttm=None):
 @app.task
 def release_all_workers():
     """
-    отпускает всех работников с касс
-    :return:
+    Отпускает всех работников с касс
+
+    Note:
+        Выполняется каждую ночь
     """
 
     dttm_now = now() + datetime.timedelta(hours=3)
@@ -98,6 +109,12 @@ def release_all_workers():
 
 @app.task
 def update_worker_month_stat():
+    """
+    Обновляет данные по рабочим дням и часам сотрудников
+
+    Note:
+        Обновляется 1 и 15 числа каждого месяца
+    """
     dt = now().date().replace(day=1)
     delta = datetime.timedelta(days=20)
     dt1 = (dt - delta).replace(day=1)
@@ -181,8 +198,10 @@ def update_worker_month_stat():
 @app.task
 def notify_cashiers_lack():
     """
-    creates notification if there's deficiency of cashiers for each shop
-    :return:
+    Создает уведомления на неделю вперед, если в магазине будет нехватка кассиров
+
+    Note:
+        Выполняется каждую ночь
     """
     for shop in Shop.objects.all():
         dttm_now = now()
@@ -299,7 +318,12 @@ def allocation_of_time_for_work_on_cashbox():
 
 @app.task
 def create_pred_bills():
-    # todo: подумать, мб есть более красивый способ, чем задавать default_dt
+    """
+    Обновляет данные по спросу
+
+    Note:
+        Выполняется первого числа каждого месяца
+    """
     for shop in Shop.objects.all():
         create_predbills_request_function(shop.id)
     print('создал спрос на месяц')

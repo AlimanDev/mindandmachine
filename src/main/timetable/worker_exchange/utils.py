@@ -1,3 +1,27 @@
+"""
+Note:
+    Во всех функциях, которые ищут сотрудников для замены в качестве аргумента используется
+
+    arguments_dict = {
+        | 'shop_id': int,
+        | 'dttm_exchange(datetime.datetime): дата-время, на которые искать замену,
+        | 'ct_type'(int): на какую специализацию ищем замену,
+        | 'predict_demand'(list): QuerySet PeriodDemand'ов,
+        | 'mean_bills_per_step'(dict): по ключу -- id типа кассы, по значению -- средняя скорость,
+        | 'cashbox_types_hard_dict'(dict): по ключу -- id типа кассы, по значению -- объект
+        | 'users_who_can_work(list): список пользователей, которые могут работать на ct_type
+    }
+
+    А возвращается:
+        {
+            user_id: {
+                | 'type': ,
+                | 'tm_start': ,
+                | 'tm_end':
+            }, ..
+        }
+"""
+
 from src.db.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
@@ -24,8 +48,9 @@ from src.util.models_converter import BaseConverter
 
 class ChangeType(Enum):
     """
-    не забудь добавить новую функция в ChangeTypeFunctions в конце файла
-    число -- приоритет: чем меньше -- тем важнее
+    Warning:
+        не забудь добавить новую функция в ChangeTypeFunctions в конце файла \
+        число -- приоритет: чем меньше -- тем важнее
     """
     from_other_spec = 1
     day_switch = 2
@@ -43,9 +68,17 @@ standard_tm_interval = 30  # minutes
 def get_init_params(dttm_exchange, shop_id):
     """
     чтобы получить необходимые данные для работы функций
-    :param dttm_exchange:
-    :param shop_id:
-    :return:
+
+    Args:
+        dttm_exchange(datetime.datetime): дата-время на которые искать замену
+        shop_id(int): id магазина
+
+    Returns:
+        {
+            | 'predict_demand': QuerySet PeriodDemand'ов,
+            | 'mean_bills_per_step'(dict): по ключу -- id типа кассы, по значению -- средняя скорость,
+            | 'cashbox_types_hard_dict'(dict): по ключу -- id типа кассы, по значению -- объект
+        }
     """
 
     day_begin_dttm = datetime.combine(dttm_exchange.date(), time(6, 30))
@@ -84,6 +117,14 @@ def get_init_params(dttm_exchange, shop_id):
 
 
 def set_response_dict(_type, tm_start, tm_end):
+    """
+    Устанавливаем в каком формате получать результат каждой из функций
+
+    Args:
+        _type(ChangeType.value): с какого типа
+        tm_start(datetime.time): начало новоого рабочего дня
+        tm_end(datetime.time): конец нового рабочего дня
+    """
     return {
         'type': _type,
         'tm_start': BaseConverter.convert_time(tm_start),
@@ -93,9 +134,16 @@ def set_response_dict(_type, tm_start, tm_end):
 
 def get_cashiers_working_at_time_on(dttm, ct_ids):
     """
-    :param ct_ids: list of CashboxType ids
-    :param dttm: datetime obj
-    :return: dict{ct_type_id: list of users, working at ct_type}
+    Возвращает кассиров которые работают в dttm за типами касс ct_ids
+
+    Args:
+        dttm(datetime.datetime):
+        ct_ids(list/int): список id'шников типов касс
+
+    Returns:
+        {
+            cashbox_type_id: [QuerySet юзеров, которые работают в это время за cashbox_type_id]
+        }
     """
     if not isinstance(ct_ids, list):
         ct_ids = [ct_ids]
@@ -120,9 +168,13 @@ def get_cashiers_working_at_time_on(dttm, ct_ids):
 
 def get_users_who_can_work_on_ct_type(ct_id):
     """
+    Возвращает пользователей, которые могут работать за типом кассы с ct_id
 
-    :param ct_id:
-    :return: list of users who can work on cashbox type with id=ct_id
+    Args:
+        ct_id(int): id типа кассы
+
+    Returns:
+        (list): список пользователей, которые могут работать за этим типом кассы
     """
     wci = WorkerCashboxInfo.objects.filter(cashbox_type_id=ct_id, is_active=True)
     users = []
@@ -133,11 +185,15 @@ def get_users_who_can_work_on_ct_type(ct_id):
 
 def is_consistent_with_user_constraints(user, dttm_start, dttm_end):
     """
+    Проверяет, что пользователь может работать с dttm_start до dttm_end
 
-    :param user: user obj
-    :param dttm_start:
-    :param dttm_end:
-    :return: True if user can work at [dttm_start, dttm_end] interval, else : False
+    Args:
+        user(User): пользователь которого проверяем
+        dttm_start(datetime.datetime):
+        dttm_end(datetime.datetime):
+
+    Returns:
+        (bool): True -- если пользователь может работать в этот интервал, иначе -- False
     """
 
     dttm = dttm_start
@@ -151,10 +207,14 @@ def is_consistent_with_user_constraints(user, dttm_start, dttm_end):
 
 def get_intervals_with_excess(arguments_dict):
     """
-    returns intervals with excess of workers for each cashbox type
-    :param arguments_dict: { 'shop_id': int, 'dttm_exchange: dttm obj, 'ct_type': int, 'predict_demand': list,
-                             'mean_bills_per_step': list, 'cashbox_types': {cashbox_type_id : [cashbox_type obj]} }
-    :return: { cashbox type: [dttm_start, dttm_end, dttm_start2, dttm_end2, ..] }
+    Возвращает словарь с id'шниками типов касс по ключам, и интервалами с излишком -- по значениям
+    dttm_start, dttm_end -- первый интервал
+    dttm_start2, dttm_end2 -- второй интервал
+
+    Returns:
+        {
+            cashbox_type_id: [dttm_start, dttm_end, dttm_start2, dttm_end2, ..],..
+        }
     """
     to_collect = {}  # { cashbox type: [amount of intervals] }
     dttm_to_collect = {}
@@ -196,9 +256,12 @@ def get_intervals_with_excess(arguments_dict):
 
 def has_deficiency(predict_demand, mean_bills_per_step, cashbox_types, dttm):
     """
+    Проверяет есть ли нехватка кассиров в dttm за типами касс cashbox_types
 
-    :return: { cashbox type: lack of workers/False }
-    lack of workers -- if there is deficiency behind cashbox type, False -- in other case
+    Returns:
+        {
+            cashbox_type_id: количество кассиров, сколько не хватает(либо False, если нехватки нет)
+        }
     """
     ct_deficieny_dict = {}
 
@@ -219,6 +282,19 @@ def has_deficiency(predict_demand, mean_bills_per_step, cashbox_types, dttm):
 
 
 def shift_user_times(dttm_exchange, user):
+    """
+    Функция, которая ищет время, в которое пользователь может работать (не противоречит constraints)
+
+    Args:
+        dttm_exchange(datetime.datetime): время на которое ищем замену
+        user(User): пользователь
+
+    Returns:
+         (tuple): tuple содержащий:
+            user_new_tm_work_start(datetime.time): новое время начала рабочего дня
+            user_new_tm_work_end(datetime.time): новое время конца рабочего дня
+    """
+
     threshold_time = datetime_module.time(0, 30)
     tm_start_case_threshold = datetime_module.time(15, 30)
 
@@ -261,16 +337,7 @@ def shift_user_times(dttm_exchange, user):
 def from_other_spec(arguments_dict):
     """
     с другой специлизации + с другой специлизации если там частичные излишки(не менее чем excess_percent * 100%)
-    :param arguments_dict: {
-                            'shop_id': int,
-                            'dttm_exchange: dttm obj,
-                            'ct_type': int,
-                            'predict_demand': list,
-                            'mean_bills_per_step': list,
-                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                            'users_who_can_work: list of users who can work on ct_type
-                            }
-    :return: dict = { user : [CHANGE_TYPE, from which cashbox id] }
+
     """
     #presets
     demand_ind = 0
@@ -329,17 +396,7 @@ def from_other_spec(arguments_dict):
 
 def day_switch(arguments_dict):
     """
-
-    :param arguments_dict: {
-                            'shop_id': int,
-                            'dttm_exchange: dttm obj,
-                            'ct_type': int,
-                            'predict_demand': list,
-                            'mean_bills_per_step': list,
-                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                            'users_who_can_work: list of users who can work on ct_type
-                            }
-    :return: dict = { user : [CHANGE_TYPE, from which cashbox id] }
+    Со сдвигом рабочего дня
     """
     #presets
     users_for_exchange = {}
@@ -379,16 +436,6 @@ def excess_dayoff(arguments_dict):
     показываем пользователей у которых выходной в последний день из трехдневного периода, в котором есть dttm_exchange,
     которые могут работать в это время и при этом не будут работать 6 дней подряд
     Например: dttm_exchange=15 июня. Пользователь отдыхает 15, 16 и 17. Можно попросить его выйти 15, за место 17.
-    :param arguments_dict: {
-                            'shop_id': int,
-                            'dttm_exchange: dttm obj,
-                            'ct_type': int,
-                            'predict_demand': list,
-                            'mean_bills_per_step': list,
-                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                            'users_who_can_work: list of users who can work on ct_type
-                            }
-    :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
     #presets
     dttm_exchange = arguments_dict['dttm_exchange']
@@ -439,17 +486,7 @@ def excess_dayoff(arguments_dict):
 
 def overworking(arguments_dict):
     """
-    подработки
-    :param arguments_dict: {
-                            'shop_id': int,
-                            'dttm_exchange: dttm obj,
-                            'ct_type': int,
-                            'predict_demand': list,
-                            'mean_bills_per_step': list,
-                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                            'users_who_can_work: list of users who can work on ct_type
-                            }
-    :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
+    Пользователи, готовые на подработки
     """
     # presets
     dttm_exchange = arguments_dict['dttm_exchange']
@@ -494,16 +531,6 @@ def overworking(arguments_dict):
 def from_evening_line(arguments_dict):
     """
     c вечера (если частичные излишки, или нехватка вечером менее 5 человек(для линии))
-    :param arguments_dict: {
-                            'shop_id': int,
-                            'dttm_exchange: dttm obj,
-                            'ct_type': int,
-                            'predict_demand': list,
-                            'mean_bills_per_step': list,
-                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                            'users_who_can_work: list of users who can work on ct_type
-                            }
-    :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
     # presets
     dttm_exchange = arguments_dict['dttm_exchange']
@@ -559,16 +586,6 @@ def from_evening_line(arguments_dict):
 def dayoff(arguments_dict):
     """
     у кого выходной
-    :param arguments_dict: {
-                            'shop_id': int,
-                            'dttm_exchange: dttm obj,
-                            'ct_type': int,
-                            'predict_demand': list,
-                            'mean_bills_per_step': list,
-                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                            'users_who_can_work: list of users who can work on ct_type
-                            }
-    :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
     #presets
     dttm_exchange = arguments_dict['dttm_exchange']
@@ -598,23 +615,14 @@ def sos_group(arguments_dict):
     """
     если пришел тип касс -- линия, то берем работников, которые работают в это время на линии, и если у них тип
     SOS, то выбираем их
-    :param arguments_dict: {
-                            'shop_id': int,
-                            'dttm_exchange: dttm obj,
-                            'ct_type': int,
-                            'predict_demand': list,
-                            'mean_bills_per_step': list,
-                            'cashbox_types': {cashbox_type_id : [cashbox_type obj]},
-                            'users_who_can_work: list of users who can work on ct_type
-                            }
-    :return: dict = { user : [CHANGE_TYPE, from which cashbox id=None, from which date] }
     """
     #presets
     dttm_exchange = arguments_dict['dttm_exchange']
     ct_type = arguments_dict['ct_type']
+    shop_id = arguments_dict['shop_id']
     users_for_exchange = {}
 
-    line_ct_id = CashboxType.objects.get(is_main_type=True).id
+    line_ct_id = CashboxType.objects.get(is_main_type=True, shop_id=shop_id).id
 
     if ct_type == line_ct_id:
         users_working_on_lines = get_cashiers_working_at_time_on(dttm_exchange, line_ct_id)  # dict {ct_id: users}

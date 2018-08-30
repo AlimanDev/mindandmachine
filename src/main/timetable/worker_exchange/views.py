@@ -23,6 +23,25 @@ from src.util.models_converter import UserConverter
     lambda_func=lambda x: CashboxType.objects.get(id=x['specialization']).shop
 )
 def get_workers_to_exchange(request, form):
+    """
+    Args:
+        method: GET
+        url: /api/timetable/worker_exchange/get_workers_to_exchange
+        specialization(int): required = True. на какую специализацию ищем замену
+        dttm(QOS_DATETIME): required = True. на какую дату-время ищем замену
+
+    Returns:
+        {
+            user_id: {
+                | 'tm_start': время начала нового рабочего дня,
+                | 'tm_end': время конца нового рабочего дня,
+                | 'type': с какой функции получили этого пользователя\n
+                'user_info': {
+                    Информация о пользователе (UserConverter)
+                }
+            }
+        }
+    """
     ct_type = form['specialization']
     dttm_exchange = form['dttm']
     try:
