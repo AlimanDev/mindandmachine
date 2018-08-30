@@ -115,7 +115,7 @@ def get_cashiers_timetable(request, form):
     mean_bills_per_step = WorkerCashboxInfo.objects.filter(
         is_active=True,
         cashbox_type_id__in=cashbox_types.keys()
-    ).values('cashbox_type_id').annotate(speed_usual=PERIOD_MINUTES*Max('mean_speed'))
+    ).values('cashbox_type_id').annotate(speed_usual=Max('mean_speed'))
     mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
 
     worker_amount = len(set([w.worker_id for w in worker_cashbox_info]))
