@@ -246,6 +246,11 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=23, minute=0, day_of_month='1'),
         'options': {'queue': BACKEND_QUEUE}
     },
+    'task-clean-camera-stats': {
+        'task': 'src.celery.tasks.clean_camera_stats',
+        'schedule': crontab(day_of_week=6, hour=0, minute=15),
+        'options': {'queue': BACKEND_QUEUE}
+    },
 }
 
 

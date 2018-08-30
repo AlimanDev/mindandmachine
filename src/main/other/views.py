@@ -176,11 +176,26 @@ def get_slots(request, form):
 )
 def create_slot(request, form):
     """
-    creates new Slot. If slot with such cashbox_type and time exists returns already_exists_error
-    :param cashbox_type_id: required=True
-    :param tm_start: required=True
-    :param tm_end: required=True
-    :return: created Slot
+    Создает новый слов
+
+    Args:
+        method: POST
+        url: /api/other/create_slot
+        cashbox_type_id(int): required = True
+        tm_start(QOS_TIME): required = True
+        tm_end(QOS_TIME): required = True
+
+    Returns:
+        {
+            | 'id': id созданного слота,
+            | 'shop': id shop'a,
+            | 'tm_start': tm_start,
+            | 'tm_end':  tm_end,
+            | 'name': название слота
+        }
+
+    Raises:
+        JsonResponse.already_exists_error: если слот с таким cashbox_type_id и временами уже существует
     """
     shop_id = FormUtil.get_shop_id(request, form)
 
@@ -207,9 +222,13 @@ def create_slot(request, form):
 )
 def delete_slot(request, form):
     """
-    Attention!! directly deletes slot from db.
-    :param slot_id: required=True
-    :return: -
+    Warning:
+        Напрямую удаляет слот из бд(без всякого проставления dttm_deleted или чего-то еще)
+
+    Args:
+        method: POST
+        url: /api/other/delete_slot
+        slot_id(int): required = True
     """
     Slot.objects.get(id=form['slot_id']).delete()
 
