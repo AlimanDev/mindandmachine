@@ -10,11 +10,13 @@ from src.util.models_converter import PeriodDemandConverter
 
 class GetCashboxesInfo(forms.Form):
     shop_id = forms.IntegerField(required=False)
+    checkpoint = forms.IntegerField(required=False)
 
 
 class GetCashiersInfo(forms.Form):
     shop_id = forms.IntegerField(required=False)
     dttm = util_forms.DatetimeField()
+    checkpoint = forms.IntegerField(required=False)
 
 
 class ChangeCashierStatus(forms.Form):
@@ -23,6 +25,7 @@ class ChangeCashierStatus(forms.Form):
     cashbox_id = forms.IntegerField(required=False)
     is_current_time = util_forms.BooleanField()  # True: current time, False: timetable time
     tm_changing = util_forms.TimeField(required=False)
+    checkpoint = forms.IntegerField(required=False)
 
     # случай когда сажаем человека не из расписания
     # ситуация: заболел человек звонят рандомному сотруднику, просят выйти за место заболевшего

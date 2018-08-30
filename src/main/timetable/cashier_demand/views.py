@@ -2,7 +2,7 @@ from datetime import datetime, time, timedelta
 from collections import defaultdict
 
 from django.http import HttpResponse
-from django.db.models import Avg, Max
+from django.db.models import Max
 
 from src.db.models import (
     WorkerDay,
@@ -11,12 +11,11 @@ from src.db.models import (
     WorkerCashboxInfo,
     WorkerDayCashboxDetails,
     PeriodDemand,
-    WorkerDayChangeLog,
     Shop
 )
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
-from src.util.collection import range_u, group_by
-from src.util.models_converter import CashboxTypeConverter, UserConverter, WorkerDayConverter, WorkerCashboxInfoConverter, BaseConverter
+from src.util.collection import group_by
+from src.util.models_converter import CashboxTypeConverter, UserConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
 from src.util.forms import FormUtil
 from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
@@ -33,6 +32,7 @@ import io
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
+    checkpoint = FormUtil.get_checkpoint(form)
 
     if form['format'] == 'excel':
         def __file_name(__dt):
@@ -83,8 +83,6 @@ def get_cashiers_timetable(request, form):
         cashbox_types_main[-ind] = None
 
     worker_day_cashbox_detail_filter = {
-        'worker_day__worker_shop_id': shop_id,
-        # worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         'worker_day__dt__gte': form['from_dt'],
         'worker_day__dt__lte': form['to_dt'],
         'cashbox_type_id__in': cashbox_types.keys(),
@@ -93,9 +91,7 @@ def get_cashiers_timetable(request, form):
     if form['position_id']:
         worker_day_cashbox_detail_filter['worker_day__worker__position__id'] = form['position_id']
 
-    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
-        'worker_day',
-    ).filter(
+    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
         **worker_day_cashbox_detail_filter
     ).exclude(
         status=WorkerDayCashboxDetails.TYPE_BREAK
@@ -104,8 +100,7 @@ def get_cashiers_timetable(request, form):
         'tm_from',
         'tm_to',
     )
-
-    worker_cashbox_info = list(WorkerCashboxInfo.objects.filter(
+    worker_cashbox_info = list(WorkerCashboxInfo.objects.select_related('worker').filter(
         is_active=True,
         worker__workerday__dt__gte=form['from_dt'],
         worker__workerday__dt__lte=form['to_dt'],
@@ -310,11 +305,15 @@ def get_cashiers_timetable(request, form):
     #             total_lack_of_cashiers_on_period_demand = one_period_demand.lack_of_cashiers
     #         prev_one_period_demand = one_period_demand
 
-    changed_amount = WorkerDayChangeLog.objects.filter(
-        worker_day__dt__gte = form['from_dt'],
-        worker_day__dt__lte = form['to_dt'],
-        worker_day__worker_shop_id=shop_id,
-    ).count() // 11
+    changed_amount = WorkerDay.objects.select_related('worker').filter(
+        dt__gte=form['from_dt'],
+        dt__lte=form['to_dt'],
+        worker__shop_id=shop_id,
+    ).count() - WorkerDay.objects.select_related('worker').filter(
+        dt__gte=form['from_dt'],
+        dt__lte=form['to_dt'],
+        worker__shop_id=shop_id
+    ).distinct('dt', 'worker').count()
 
     response = {
         'indicators': {
@@ -352,7 +351,7 @@ def get_cashiers_timetable(request, form):
 #     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
 #         'worker_day', 'on_cashbox'
 #     ).filter(
-#         worker_day__worker_shop_id=shop,
+#         worker_day__worker__shop_id=shop,
 #         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
 #         worker_day__dt__gte=form['from_dttm'].date(),
 #         worker_day__dt__lte=form['to_dttm'].date(),
@@ -399,16 +398,17 @@ def get_cashiers_timetable(request, form):
 )
 def get_workers(request, form):
     shop = form['shop_id']
+    checkpoint = FormUtil.get_checkpoint(form)
 
     from_dt = form['from_dttm'].date()
     from_tm = form['from_dttm'].time()
     to_dt = form['to_dttm'].date()
     to_tm = form['to_dttm'].time()
 
-    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
-        'worker_day', 'on_cashbox'
+    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related(
+        'on_cashbox', 'worker_day__worker'
     ).filter(
-        worker_day__worker_shop_id=shop.id,
+        worker_day__worker__shop_id=shop.id,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         worker_day__dt__gte=from_dt,
         worker_day__dt__lte=to_dt,
@@ -512,6 +512,7 @@ def get_timetable_xlsx(request, form):
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
     worksheet = workbook.add_worksheet()
+    checkpoint = FormUtil.get_checkpoint(form)
 
     row = 6
     col = 5
@@ -521,7 +522,7 @@ def get_timetable_xlsx(request, form):
             worksheet.write(row, col + 3 * i + 0, 'НД')
             worksheet.write(row, col + 3 * i + 1, 'НД')
 
-        for wd in WorkerDay.objects.filter(worker=user, dt__gte=dt_from, dt__lte=dt_to).order_by('dt'):
+        for wd in WorkerDay.objects.qos_filter_version(checkpoint).filter(worker=user, dt__gte=dt_from, dt__lte=dt_to).order_by('dt'):
             if wd.type == WorkerDay.Type.TYPE_HOLIDAY.value:
                 cell_1 = 'В'
                 cell_2 = 'В'

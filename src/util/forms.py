@@ -4,7 +4,7 @@ import json
 from django import forms
 from django.core.exceptions import ValidationError
 
-from src.db.models import Shop
+from src.db.models import WorkerDay
 
 from src.util.dict import DictUtil
 from src.util.models_converter import PeriodDemandConverter
@@ -135,15 +135,14 @@ class FormUtil(object):
     @staticmethod
     def get_shop_id(request, form):
         return DictUtil.get_not_none(form, 'shop_id', request.user.shop_id)
-        # try:
-        #     shop_id = Shop.objects.get(id=form['shop_id']).id
-        # except Shop.DoesNotExist:
-        #     shop_id = request.user.shop_id
-        # return shop_id
 
     @staticmethod
     def get_dt_from(form):
         return DictUtil.get_not_none(form, 'from_dt', datetime.date(year=1971, month=1, day=1))
+
+    @staticmethod
+    def get_checkpoint(form):
+        return DictUtil.get_not_none(form, 'checkpoint', 1)
 
     @staticmethod
     def get_dt_to(form):
