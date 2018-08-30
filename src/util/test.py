@@ -125,9 +125,9 @@ class LocalTestCase(TestCase):
             self.worker_day4 = create_work_day(self.user1, dt=datetime.datetime(2018, 7, i))
 
             if i < 10:
-                self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 7, i), type=5)
+                self.worker_day3 = create_work_day(self.user3, dt=datetime.datetime(2018, 7, i), type=5)
             else:
-                self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 7, i))
+                self.worker_day3 = create_work_day(self.user3, dt=datetime.datetime(2018, 7, i))
 
             WorkerDayCashboxDetails.objects.create(
                 status=WorkerDayCashboxDetails.TYPE_WORK,
@@ -162,9 +162,9 @@ class LocalTestCase(TestCase):
                     (dttm_now + datetime.timedelta(hours=3)).time()),
                 status=WorkerDayCashboxDetails.TYPE_WORK,
             )
-        self.worker_day = create_work_day(self.shop.id, self.user1, dt=dttm_now.date())
-        self.worker_day2 = create_work_day(self.shop.id, self.user2, dt=dttm_now.date())
-        self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=dttm_now.date())
+        self.worker_day = create_work_day(self.user1, dt=dttm_now.date())
+        self.worker_day2 = create_work_day(self.user2, dt=dttm_now.date())
+        self.worker_day3 = create_work_day(self.user3, dt=dttm_now.date())
 
         WorkerDayCashboxDetails.objects.create(
             worker_day=self.worker_day,

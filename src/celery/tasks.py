@@ -129,7 +129,7 @@ def update_worker_month_stat():
     for shop in shops:
         work_hours = 0
         work_days = 0
-        print('начал обновлять worker month stat для {}'.format(shop))
+        # print('начал обновлять worker month stat для {}'.format(shop))
 
         break_triplets = shop.break_triplets
         list_of_break_triplets = json.loads(break_triplets)

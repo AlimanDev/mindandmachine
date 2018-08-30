@@ -36,7 +36,7 @@ def change_tm_to_dttm(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('db', '0048_merge_20180820_1453'),
+        ('db', '0050_merge_20180830_1205'),
     ]
 
     operations = [

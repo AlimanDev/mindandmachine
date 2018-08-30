@@ -520,7 +520,7 @@ class WorkerDay(models.Model):
     dt = models.DateField()  # todo: make immutable
     type = utils.EnumField(Type)
 
-    worker_shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='+')
+    # worker_shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='+')
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
     tm_break_start = models.TimeField(null=True, blank=True)
@@ -545,7 +545,7 @@ class WorkerDayCashboxDetailsManager(models.Manager):
     def qos_initial_version(self):
         return super().get_queryset().select_related('worker_day').filter(worker_day__parent_worker_day__isnull=True)
 
-    def filter_version(self, checkpoint):
+    def qos_filter_version(self, checkpoint):
         """
         :param checkpoint: 0 or 1 / True of False. If 1 -- current version, else -- initial
         :return:
