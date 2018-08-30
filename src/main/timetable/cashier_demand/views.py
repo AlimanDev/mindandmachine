@@ -71,14 +71,20 @@ def get_cashiers_timetable(request, form):
         cashbox_types = cashbox_types.filter(id__in=form['cashbox_type_ids'])
         if len(cashbox_types) != len(form['cashbox_type_ids']):
             return JsonResponse.value_error('bad cashbox_type_ids')
-
     cashbox_types = group_by(cashbox_types, group_key=lambda x: x.id)
+
+    cashbox_types_hard = []
+    for cashbox_type in cashbox_types.values():
+        if cashbox_type[0].do_forecast == CashboxType.FORECAST_HARD:
+            cashbox_types_hard.append(cashbox_type[0])
+    cashbox_types_hard = group_by(cashbox_types_hard, group_key=lambda x: x.id)
 
     cashbox_types_main = []
     for cashbox_type in cashbox_types.values():
         if cashbox_type[0].is_main_type:
             cashbox_types_main.append(cashbox_type[0])
     cashbox_types_main = group_by(cashbox_types_main, group_key=lambda x: x.id)
+
     for ind in range(1, len(cashbox_types) - len(cashbox_types_main) + 1):
         cashbox_types_main[-ind] = None
 
@@ -140,7 +146,9 @@ def get_cashiers_timetable(request, form):
     real_cashiers = []
     predict_cashier_needs = []
     fact_cashier_needs = []
-    lack_of_cashiers_on_period = []
+    lack_of_cashiers_on_period = {}
+    for cashbox_type in cashbox_types_hard:
+        lack_of_cashiers_on_period[cashbox_type] = []
     dttm_start = datetime.combine(form['from_dt'], time(3, 0))
     periods = 48
     # dttm_start = datetime.combine(form['from_dt'], supershop.tm_start) - PERIOD_STEP
@@ -271,13 +279,12 @@ def get_cashiers_timetable(request, form):
                         need_amount_morning += predict_diff_dict.get(cashbox_type, 0)
                     elif check_time == 'evening':
                         need_amount_evening += predict_diff_dict.get(cashbox_type, 0)
-
+                if cashbox_type in cashbox_types_hard.keys():
                     need_total += predict_diff_dict.get(cashbox_type, 0)
-
-            lack_of_cashiers_on_period.append({
-                'lack_of_cashiers': max(0, need_total - period_cashiers_hard),
-                'dttm_start': dttm_converted,
-            })
+                    lack_of_cashiers_on_period[cashbox_type].append({
+                        'lack_of_cashiers': max(0, need_total - period_cashiers_hard),
+                        'dttm_start': dttm_converted,
+                    })
 
             need_amount_morning = max(0, need_amount_morning - period_cashiers_hard)
             need_amount_evening = max(0, need_amount_evening - period_cashiers_hard)
