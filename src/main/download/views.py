@@ -23,6 +23,7 @@ def get_tabel(request, workbook, form):
         url: api/download/get_tabel
         shop_id(int): required = False
         weekday(QOS_DATE): на какую дату табель хотим
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         Табель

@@ -59,6 +59,7 @@ def get_cashiers_list(request, form):
         dt_hired_before(QOS_DATE): required = False.
         dt_fired_after(QOS_DATE): required False
         shop_id(int): required = False
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         {[
@@ -170,6 +171,7 @@ def get_cashier_timetable(request, form):
         to_dt(QOS_DATE): по какое число
         format(str): 'raw' или 'excel'
         shop_id(int): required = True
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         {
@@ -451,6 +453,7 @@ def get_worker_day(request, form):
         url: /api/timetable/cashier/get_worker_day
         worker_id(int): id пользователя
         dt(QOS_DATE): на какую дату хотим посмотреть worker_day
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         {
@@ -559,6 +562,26 @@ def get_worker_day(request, form):
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
 def set_worker_days(request, form):
+    """
+    Меняет рабочие дни от dt_begin до dt_end у пользователя с worker_id на tm_work_start и tm_work_end
+
+    Warning:
+        В данный момент не используется
+
+    Args:
+        method: POST
+        url: /api/timetable/cashier/set_worker_days
+        worker_id(int): required = True
+        dt_begin(QOS_DATE): с какой даты менять
+        dt_end(QOS_DATE: по какую дату менять
+        type(str): тип новых WorkerDay'ев. required = True
+        tm_work_start(QOS_TIME): required = True. новое время начала дня
+        tm_work_end(QOS_TIME): required = True. новое время конца дня
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
+        cashbox_type(int): required = False. какая специализация будет у кассира в эти дни(если он работает)
+        comment(str): max_length=128, required = False.
+
+    """
     worker = form['worker_id']
     checkpoint = FormUtil.get_checkpoint(form)
 
@@ -662,6 +685,42 @@ def set_worker_days(request, form):
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
 def set_worker_day(request, form):
+    """
+    Меняет конкретный рабочий день работяги
+
+    Args:
+        method: POST
+        url: /api/timetable/cashier/set_worker_day
+        worker_id(int): required = True
+        dt(QOS_DAT): дата рабочего дня
+        type(str): required = True. новый тип рабочего дня
+        tm_work_start(QOS_TIME): новое время начала рабочего дня
+        tm_work_end(QOS_TIME): новое время конца рабочего дня
+        tm_break_start(QOS_TIME): required = False
+        cashbox_type(int): required = False. на какой специализации он будет работать
+        comment(str): max_length=128, required = False
+        details(srt): детали рабочего дня (заносятся в WorkerDayCashboxDetails)
+
+    Returns:
+        {
+            'day': {
+                | 'id': id нового WorkerDay'a,
+                | 'dttm_added': сейчас,
+                | 'dt': дата WorkerDay'a,
+                | 'worker': id worker'a,
+                | 'type': тип,
+                | 'tm_work_start': время начала рабочего дня,
+                | 'tm_work_end': время конца рабочего дня,
+                | 'tm_break_start': начало перерыва,
+                | 'is_manual_tuning': True,
+                | 'cashbox_types'(list): специализации (id'шники типов касс)
+            },\n
+            'action': 'update'/'create',\n
+            'cashbox_updated': True/False
+        }
+    Raises:
+        JsonResponse.multiple_objects_returned
+    """
     if form['details']:
         details = json.loads(form['details'])
     else:
@@ -725,11 +784,36 @@ def set_worker_day(request, form):
 
 
 @api_method(
-    'POST',
+    'GET',
     SetCashierInfoForm,
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
 def set_cashier_info(request, form):
+    """
+    Устанавливает заданные параметры кассиру
+
+    Args:
+        method: POST
+        url: /api/timetable/cashier/set_cashier_info
+        worker_id(int): required = True
+        work_type(str): тип графика кассира (40часов, 5/2, etc). required = False
+        cashbox_info(str): за какими типами касс может рабоать? required = False
+        constraint(str):required = False
+        comment(str): required = False
+        sex(str): required = False
+        is_fixed_hours(bool) required = False
+        is_fixed_days(bool): required = False
+        phone_number(str): required = False
+        is_ready_for_overworkings(bool): required = False
+        tabel_code(str): required = False
+        position_department(int): required = False
+        position_title(str): required = False, max_length=64
+
+    Returns:
+        {
+            Сложный дикт
+        }
+    """
     try:
         worker = User.objects.get(id=form['worker_id'])
     except User.DoesNotExist:
@@ -847,6 +931,44 @@ def set_cashier_info(request, form):
     lambda_func=lambda x: False
 )
 def create_cashier(request, form):
+    """
+    Создает кассира
+
+    Args:
+        method: POST
+        url: /api/timetable/cashier/create_cashier
+        first_name(str): max_length = 30, required = True
+        middle_name(str): max_length = 64, required = True
+        last_name(str): max_length = 150, required = True
+        username(str): max_length = 150, required = True
+        password(str): max_length = 64, required = True
+        work_type(str): max_length = 3, required = True
+        dt_hired(QOS_DATE): дата найма, required = True
+
+    Note:
+        также отправляет уведомление о том, что пользователь был создан
+
+    Returns:
+        {
+            | 'id': id user'a,
+            | 'username': ,
+            | 'shop_id': ,
+            | 'work_type': ,
+            | 'first_name': ,
+            | 'last_name': ,
+            | 'avatar_url': ,
+            | 'dt_hired': ,
+            | 'dt_fired': ,
+            | 'auto_timetable': ,
+            | 'comment': ,
+            | 'sex': ,
+            | 'is_fixed_hours': ,
+            | 'is_fixed_days': ,
+            | 'phone_number': ,
+            | 'is_ready_for_overworkings': ,
+            | 'tabel_code':
+        }
+    """
     try:
         user = User.objects.create_user(username=form['username'], password=form['password'], email='q@q.com')
         user.first_name = form['first_name']
@@ -872,7 +994,17 @@ def create_cashier(request, form):
 def dublicate_cashier_table(request, form):
     """
     Здесь будем использовать только актуальные данные (qos_current_version)
-    :return:
+
+    Note:
+        пока не используется. функция для стажеров и наставников
+
+    Args:
+        method: POST
+        url: /api/
+        main_worker_id(int): required = True
+        trainee_worker_id(int): required = True
+        dt_begin(QOS_DATE): дата начала стажировки
+        dt_end(QOS_DATE): дата конца стажировки
     """
     main_worker = form['main_worker_id']
     trainee_worker = form['trainee_worker_id']
@@ -972,7 +1104,7 @@ def dublicate_cashier_table(request, form):
         ) for day_detail in main_worker_days_details
     ])
 
-    return JsonResponse.success({})
+    return JsonResponse.success()
 
 
 @api_method(
@@ -981,6 +1113,25 @@ def dublicate_cashier_table(request, form):
     lambda_func=lambda x: User.objects.get(id=x['user_id'])
 )
 def delete_cashier(request, form):
+    """
+    "Удаляет" кассира (на самом деле просто проставляет dt_fired)
+
+    Args:
+        method: POST
+        url: /api/timetable/cashier/delete_cashier
+        user_id(int): required = True
+        dt_fired(QOS_DATE): дата увольнения. required = True
+
+    Note:
+        также отправляет уведомление о том, что пользователь был удален
+
+    Returns:
+        тот же дикт, что и create_cashier
+
+    Raises:
+        JsonResponse.does_not_exists_error: если такого пользователя нет
+
+    """
     try:
         user = User.objects.get(id=form['user_id'])
         errors = check_group_hierarchy(user, request.user)
@@ -1005,6 +1156,19 @@ def delete_cashier(request, form):
     lambda_func=lambda x: User.objects.get(id=x['user_id'])
 )
 def password_edit(request, form):
+    """
+    Меняет пароль пользователя
+
+    Args:
+        method: POST
+        url: /api/timetable/cashier/password_edit
+        user_id(int): required = True
+        old_password(str): max_length = 128, required = True
+        new_password(str): max_length = 128, required = True
+
+    Returns:
+        дикт как в create_user
+    """
     user_id = form['user_id']
     old_password = form['old_password']
     new_password = form['new_password']
@@ -1035,6 +1199,22 @@ def password_edit(request, form):
     groups=User.__allowed_to_modify__,
     lambda_func=lambda x: User.objects.get(id=x['user_id']))
 def change_cashier_info(request, form):
+    """
+
+    Args:
+        method: POST
+        api: /api/timetable/cashier/change_cashier_info
+        user_id(int): required = True
+        first_name(str): required = False
+        middle_name(str): required = False
+        last_name(str): required = False
+        avatar(img): required = False
+        group(str): required = False. Группа пользователя ('C'/'S'/'M'/'D'/'H')
+        birthday(QOS_DATE): required = False
+
+    Returns:
+         сложный дикт
+    """
     user_id = form['user_id']
 
     response = {}

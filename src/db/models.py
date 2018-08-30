@@ -544,7 +544,7 @@ class WorkerDayCashboxDetailsManager(models.Manager):
     def qos_initial_version(self):
         return super().get_queryset().select_related('worker_day').filter(worker_day__parent_worker_day__isnull=True)
 
-    def filter_version(self, checkpoint):
+    def qos_filter_version(self, checkpoint):
         """
         :param checkpoint: 0 or 1 / True of False. If 1 -- current version, else -- initial
         :return:
