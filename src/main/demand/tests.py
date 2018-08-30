@@ -24,3 +24,4 @@ class TestDemand(LocalTestCase):
         # self.assertEqual(response.json['data']['growth'], 0)
         self.assertEqual(response.json['data']['total_bills'], 26.0)
         self.assertEqual(response.json['data']['total_codes'], 13.0)
+
