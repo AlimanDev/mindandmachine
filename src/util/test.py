@@ -151,8 +151,12 @@ class LocalTestCase(TestCase):
                 on_cashbox=self.cashbox2,
                 cashbox_type=self.cashboxType2,
                 is_tablet=True,
-                dttm_from=dttm_now - datetime.timedelta(hours=3),
-                dttm_to=dttm_now + datetime.timedelta(hours=3),
+                dttm_from=datetime.datetime.combine(
+                    datetime.date(2018, 6, i),
+                    (dttm_now - datetime.timedelta(hours=3)).time()),
+                dttm_to=datetime.datetime.combine(
+                    datetime.date(2018, 6, i),
+                    (dttm_now + datetime.timedelta(hours=3)).time()),
                 status=WorkerDayCashboxDetails.TYPE_WORK,
             )
         self.worker_day = create_work_day(self.shop.id, self.user1, dt=dttm_now.date())

@@ -506,9 +506,6 @@ class WorkerDay(models.Model):
     # extra field for SQL select
     worker_shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='+')
 
-    tm_work_start = models.TimeField(null=True, blank=True)
-    tm_work_end = models.TimeField(null=True, blank=True)
-
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
 
@@ -560,11 +557,7 @@ class WorkerDayCashboxDetails(models.Model):
 
     is_tablet = models.BooleanField(default=False)
 
-    tm_from = models.TimeField(null=True, blank=True)
-    tm_to = models.TimeField(null=True, blank=True)
-
-    # ToDo: надо сделать dttm_from = models.DateTimeField()
-    dttm_from = models.DateTimeField(null=True, blank=True)
+    dttm_from = models.DateTimeField(default=datetime.datetime(2000, 1, 1, 0, 0, 0))
     dttm_to = models.DateTimeField(null=True, blank=True)
 
 

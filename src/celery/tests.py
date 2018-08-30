@@ -18,8 +18,8 @@ class TestCelery(LocalTestCase):
                     on_cashbox=self.cashbox2,
                     cashbox_type=self.cashboxType1,
                     is_tablet=True,
-                    tm_from=datetime.time(9, 0, 0),
-                    tm_to=datetime.time(18, 0, 0),
+                    dttm_from=datetime.datetime.combine(datetime.date(2018, 7, 21), datetime.time(9, 0, 0)),
+                    dttm_to=datetime.datetime.combine(datetime.date(2018, 7, 21), datetime.time(18, 0, 0)),
                 )
             except Exception:
                 pass
