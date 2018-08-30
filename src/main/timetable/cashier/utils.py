@@ -4,7 +4,6 @@ from src.db.models import WorkerDay
 def prepare_worker_day_create_args(form, worker):
     args = {
         'worker_id': worker.id,
-        'worker_shop_id': worker.shop_id,
         'dt': form['dt'],
         'type': form['type'],
         'is_manual_tuning': True,
@@ -26,18 +25,24 @@ def prepare_worker_day_create_args(form, worker):
     return args
 
 
-def prepare_worker_day_update_obj(form, day):
-    day.type = form['type']
-    day.is_manual_tuning = True
-
+def worker_day_create_args(form):
+    wd_args = {
+        'dt': form['dt'],
+        'type': form['type'],
+    }
     if WorkerDay.is_type_with_tm_range(form['type']):
-        day.tm_work_start = form['tm_work_start']
-        day.tm_work_end = form['tm_work_end']
-        day.tm_break_start = form['tm_break_start']
+        wd_args.update({
+            'tm_work_start': form['tm_work_start'],
+            'tm_work_end': form['tm_work_end'],
+            'tm_break_start': form['tm_break_start']
+        })
     else:
-        day.tm_work_start = None
-        day.tm_work_end = None
-        day.tm_break_start = None
+        wd_args.update({
+            'tm_work_start': None,
+            'tm_work_end': None,
+            'tm_break_start': None
+        })
+    return wd_args
 
 
 def prepare_worker_day_change_create_args(request, form, day):

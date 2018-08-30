@@ -52,6 +52,10 @@ class JsonResponse(object):
         return cls.__base_error_response(400, 'DoesNotExist', msg)
 
     @classmethod
+    def multiple_objects_returned(cls, msg=''):
+        return cls.__base_error_response(400, 'MultipleObjectsReturned', msg)
+
+    @classmethod
     def auth_error(cls):
         return cls.__base_error_response(400, 'AuthError', 'No such user or password incorrect')
 
@@ -72,6 +76,10 @@ class JsonResponse(object):
         return cls.__base_error_response(500, 'InternalError', msg)
 
     @classmethod
+    def algo_internal_error(cls, msg=''):
+        return cls.__base_error_response(500, 'AlgorithmInternalError', msg)
+
+    @classmethod
     def __base_error_response(cls, code, error_type, error_message=''):
         response_data = {
             'error_type': error_type,
@@ -85,7 +93,7 @@ class JsonResponse(object):
             'code': code,
             'data': data
         }
-        return HttpResponse(json.dumps(response_data, separators=(',', ':')), content_type='application/json')
+        return HttpResponse(json.dumps(response_data, separators=(',', ':'), ensure_ascii=False), content_type='application/json')
 
 
 def api_method(
@@ -106,11 +114,13 @@ def api_method(
         groups(list): список групп, которым разрешен доступ
         lambda_func(function): функция которая исходя из данных формирует данные необходимые для проверки доступа. при создании объекта -- False
     """
+
     def decor(func):
         @wraps(func)
         def wrapper(request, *args, **kwargs):
             if auth_required and not request.user.is_authenticated and settings.QOS_DEV_AUTOLOGIN_ENABLED:
-                user = authenticate(request, username=settings.QOS_DEV_AUTOLOGIN_USERNAME, password=settings.QOS_DEV_AUTOLOGIN_PASSWORD)
+                user = authenticate(request, username=settings.QOS_DEV_AUTOLOGIN_USERNAME,
+                                    password=settings.QOS_DEV_AUTOLOGIN_PASSWORD)
                 if user is None:
                     return JsonResponse.internal_error('cannot dev_autologin')
                 login(request, user)
@@ -142,7 +152,6 @@ def api_method(
             if check_permissions:  # for signout
                 if auth_required and request.user.is_authenticated:
                     user_group = request.user.group
-                    # print(form.cleaned_data)
 
                     if lambda_func is None:
                         cleaned_data = Shop.objects.filter(id=form.cleaned_data['shop_id']).first()
@@ -154,7 +163,6 @@ def api_method(
                         except MultipleObjectsReturned:
                             return JsonResponse.multiple_objects_returned()
 
-                    # print(lambda_func)
                     if groups is None:
                         if method == 'GET':
                             __groups = User.__except_cashiers__
@@ -214,4 +222,17 @@ def api_method(
                     return JsonResponse.internal_error()
 
         return wrapper
+
     return decor
+
+
+def check_group_hierarchy(changed_user, user_who_changes):
+    group_hierarchy = {
+        User.GROUP_CASHIER: 0,
+        User.GROUP_HQ: 0,
+        User.GROUP_MANAGER: 1,
+        User.GROUP_SUPERVISOR: 2,
+        User.GROUP_DIRECTOR: 3,
+    }
+    if group_hierarchy[user_who_changes.group] <= group_hierarchy[changed_user.group]:
+        return JsonResponse.access_forbidden('You are not allowed to edit this user')

@@ -147,12 +147,12 @@ def get_cashiers_working_at_time_on(dttm, ct_ids):
     """
     if not isinstance(ct_ids, list):
         ct_ids = [ct_ids]
-    worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+    worker_day_cashbox_details = WorkerDayCashboxDetails.objects.qos_current_version().select_related('worker_day', 'worker_day__worker').filter(
         Q(worker_day__tm_work_end__gte=dttm.time()) & Q(worker_day__tm_work_end__lt=datetime_module.time(23, 59)) |
         Q(worker_day__tm_work_end__lt=datetime_module.time(2, 0)),
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         worker_day__tm_work_start__lte=dttm.time(),
-        worker_day__worker_shop=CashboxType.objects.get(id=ct_ids[0]).shop,
+        worker_day__worker__shop=CashboxType.objects.get(id=ct_ids[0]).shop,
         worker_day__dt=dttm.date(),
     )
 
@@ -447,7 +447,11 @@ def excess_dayoff(arguments_dict):
         days_list_to_check_for_6_days_constraint.append(dttm_to_start_check.date())
         dttm_to_start_check += timedelta(days=1)
 
-    users_with_holiday_on_dttm_exchange = WorkerDay.objects.filter(dt=dttm_exchange.date(), type=WorkerDay.Type.TYPE_HOLIDAY.value, worker_shop=arguments_dict['shop_id'])
+    users_with_holiday_on_dttm_exchange = WorkerDay.objects.select_related('worker').filter(
+        dt=dttm_exchange.date(),
+        type=WorkerDay.Type.TYPE_HOLIDAY.value,
+        worker__shop=arguments_dict['shop_id']
+    )
     try:
         for worker_day_of_user in users_with_holiday_on_dttm_exchange:
             worker = worker_day_of_user.worker
@@ -489,11 +493,11 @@ def overworking(arguments_dict):
     shop_id = arguments_dict['shop_id']
     users_for_exchange = {}
 
-    users_not_working_wds = WorkerDay.objects.filter(
+    users_not_working_wds = WorkerDay.objects.select_related('worker').filter(
         Q(tm_work_start__gt=dttm_exchange) | (Q(tm_work_end__lt=dttm_exchange) &
         Q(tm_work_end__gte=datetime_module.time(2, 0))),
         dt=dttm_exchange.date(),
-        worker_shop=shop_id,
+        worker__shop=shop_id,
         type=WorkerDay.Type.TYPE_WORKDAY.value
         )
 
@@ -588,10 +592,10 @@ def dayoff(arguments_dict):
     shop_id = arguments_dict['shop_id']
     users_for_exchange = {}
 
-    dayoff_users_wds = WorkerDay.objects.filter(
+    dayoff_users_wds = WorkerDay.objects.select_related('worker').filter(
         dt=dttm_exchange.date(),
         type=WorkerDay.Type.TYPE_HOLIDAY.value,
-        worker_shop=shop_id
+        worker__shop=shop_id
     )
 
     for user_wd in dayoff_users_wds:

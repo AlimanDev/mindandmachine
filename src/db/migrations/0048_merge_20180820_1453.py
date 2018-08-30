@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('db', '0047_cashboxtype_period_demand_params'),
-        ('db', '0045_merge_20180812_2012'),
+        ('db', '0046_workercashboxinfo_duration'),
     ]
 
     operations = [
