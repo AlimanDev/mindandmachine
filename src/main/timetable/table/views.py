@@ -53,6 +53,8 @@ def select_cashiers(request, form):
         work_workdays(str): required = False
         from_tm(QOS_TIME): required = False
         to_tm(QOS_TIME): required = False
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
+
     """
     shop_id = FormUtil.get_shop_id(request, form)
     checkpoint = FormUtil.get_checkpoint(form)

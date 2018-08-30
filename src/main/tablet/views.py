@@ -33,6 +33,7 @@ def get_cashboxes_info(request, form):
         method: GET
         url: /api/tablet/get_cashboxes_info
         shop_id (int): required = False
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         {
@@ -139,6 +140,8 @@ def get_cashiers_info(request, form):
         url: /api/tablet/get_cashiers_info
         shop_id (int): required = False
         dttm (QOS_DATETIME): дата и время
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
+
     Returns:
         {
             worker_id: {
@@ -297,15 +300,11 @@ def get_cashiers_info(request, form):
     user_ids = response.keys()
     worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('cashbox_type').filter(worker_id__in=user_ids, is_active=True)
     worker_cashboxes_types = group_by(list(worker_cashboxes_types), group_key=lambda _: _.worker_id,)
-# <<<<<<< HEAD
-    # for user_id in response.keys():
-    #     if worker_cashboxes_types:
-    #         response[user_id]['cashbox_types'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashboxes_types.get(user_id)]
-# =======
+
     for user_id in response.keys():
         if user_id in worker_cashboxes_types.keys():
             response[user_id]['cashbox_types'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashboxes_types.get(user_id)]
-# >>>>>>> master
+
     return JsonResponse.success(response)
 
 
@@ -329,6 +328,7 @@ def change_cashier_status(request, form):
         tm_changin (QOS_TIME): required = False
         tm_work_end (QOS_TIME): required = False. Если сотрудник вышел не по расписанию, объекта workerday_cashbox_details у него
             на этот день нету, соответственно нужно проставить время окончания рабочего дня.
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         {
