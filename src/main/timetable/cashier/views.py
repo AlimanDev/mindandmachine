@@ -227,8 +227,8 @@ def get_cashier_timetable(request, form):
             'dttm_added',
             'dt',
             'worker_id',
-            'tm_work_start',
-            'tm_work_end',
+            'dttm_work_start',
+            'dttm_work_end',
             'tm_break_start',
             'is_manual_tuning',
             'cashbox_types__id',
@@ -248,8 +248,8 @@ def get_cashier_timetable(request, form):
                     dttm_added=wd['dttm_added'],
                     dt=wd['dt'],
                     worker_id=wd['worker_id'],
-                    tm_work_start=wd['tm_work_start'],
-                    tm_work_end=wd['tm_work_end'],
+                    dttm_work_start=wd['dttm_work_start'],
+                    dttm_work_end=wd['dttm_work_end'],
                     tm_break_start=wd['tm_break_start'],
                     is_manual_tuning=wd['is_manual_tuning'],
                 )
@@ -542,8 +542,8 @@ def get_worker_day(request, form):
             select_related('on_cashbox', 'cashbox_type').\
             filter(worker_day=wd):
         details.append({
-            'tm_from': BaseConverter.convert_time(x.tm_from),
-            'tm_to': BaseConverter.convert_time(x.tm_to),
+            'tm_from': BaseConverter.convert_time(x.dttm_from.time()),
+            'tm_to': BaseConverter.convert_time(x.dttm_to.time()),
             'cashbox_type': x.cashbox_type_id,
         })
         cashboxes_types[x.cashbox_type_id] = CashboxTypeConverter.convert(x.cashbox_type)
@@ -585,7 +585,14 @@ def set_worker_days(request, form):
     worker = form['worker_id']
     checkpoint = FormUtil.get_checkpoint(form)
 
-    # интервал дней из формы
+    def get_dttm_work_end(dt, dttm_work_start, dttm_work_end):
+        if dttm_work_start > dttm_work_end:
+            dttm_work_end = form[datetime.combine(dt + timedelta(days=1), dttm_work_end)]
+        else:
+            dttm_work_end = form[datetime.combine(dt, dttm_work_end)]
+        return dttm_work_end
+
+        # интервал дней из формы
     form_dates = []
     for dt in range(int((form['dt_end'] - form['dt_begin']).days) + 1):
         form_dates.append(form['dt_begin'] + timedelta(dt))
@@ -610,12 +617,13 @@ def set_worker_days(request, form):
         #     ]
         # )
         # обновляем дни и удаляем details для этих дней
+
         new_worker_days.append(
             WorkerDay(
                 worker=worker,
                 type=form['type'],
-                tm_work_start=form['tm_work_start'],
-                tm_work_end=form['tm_work_end'],
+                dttm_work_start=datetime.combine(worker_day.dt, form['tm_work_start']),
+                dttm_work_end=get_dttm_work_end(worker_day.dt, form['tm_work_start'], form['tm_work_end']),
                 dt=worker_day.dt,
                 created_by=request.user,
                 parent_worker_day=worker_day
@@ -633,8 +641,8 @@ def set_worker_days(request, form):
         WorkerDayCashboxDetails(
             worker_day=worker_day,
             cashbox_type_id=form['cashbox_type'],
-            tm_from=form['tm_work_start'],
-            tm_to=form['tm_work_end']
+            dttm_from=datetime.combine(worker_day.dt, form['tm_work_start']),
+            dttm_to=get_dttm_work_end(worker_day.dt, form['tm_work_start'], form['tm_work_end']),
         ) for worker_day in existed_worker_days
     ])
 
@@ -663,16 +671,16 @@ def set_worker_days(request, form):
             worker=worker,
             dt=day,
             type=form['type'],
-            tm_work_start=form['tm_work_start'],
-            tm_work_end=form['tm_work_end'],
+            dttm_work_start=datetime.combine(day, form['tm_work_start']),
+            dttm_work_end=get_dttm_work_end(day, form['tm_work_start'], form['tm_work_end']),
         ) for day in form_dates
     ])
     WorkerDayCashboxDetails.objects.bulk_create([
         WorkerDayCashboxDetails(
             worker_day=worker_day,
             cashbox_type_id=form['cashbox_type'],
-            tm_from=form['tm_work_start'],
-            tm_to=form['tm_work_end']
+            dttm_from=datetime.combine(worker_day.dt, form['tm_work_start']),
+            dttm_to=get_dttm_work_end(worker_day.dt, form['tm_work_start'], form['tm_work_end']),
         ) for worker_day in filled_days
     ])
 
@@ -761,16 +769,16 @@ def set_worker_day(request, form):
                 WorkerDayCashboxDetails.objects.create(
                     cashbox_type_id=item['cashBox_type'],
                     worker_day=new_worker_day,
-                    tm_from=item['tm_from'],
-                    tm_to=item['tm_to']
+                    dttm_from=item['dttm_from'],
+                    dttm_to=item['dttm_to']
                 )
         else:
             cashbox_type_id = form.get('cashbox_type')
             WorkerDayCashboxDetails.objects.create(
                 cashbox_type_id=cashbox_type_id,
                 worker_day=new_worker_day,
-                tm_from=new_worker_day.tm_work_start,
-                tm_to=new_worker_day.tm_work_end
+                dttm_from=new_worker_day.dttm_work_start,
+                dttm_to=new_worker_day.dttm_work_end
             )
         cashbox_updated = True
 
@@ -1038,8 +1046,8 @@ def dublicate_cashier_table(request, form):
                 fields=[
                     'dt',
                     'type',
-                    'tm_work_start',
-                    'tm_work_end',
+                    'dttm_work_start',
+                    'dttm_work_end',
                     'tm_break_start'
                 ]
             )
@@ -1047,8 +1055,8 @@ def dublicate_cashier_table(request, form):
             # обновляем дни и удаляем details для этих дней
             trainee_worker_day.type = main_worker_day.type
             trainee_worker_day.worker.shop = main_worker_day.worker.shop
-            trainee_worker_day.tm_work_start = main_worker_day.tm_work_start
-            trainee_worker_day.tm_work_end = main_worker_day.tm_work_end
+            trainee_worker_day.dttm_work_start = main_worker_day.dttm_work_start
+            trainee_worker_day.dttm_work_end = main_worker_day.dttm_work_end
             trainee_worker_day.tm_break_start = main_worker_day.tm_break_start
             trainee_worker_day.save()
 
@@ -1079,8 +1087,8 @@ def dublicate_cashier_table(request, form):
             worker=trainee_worker,
             dt=blank_day.dt,
             type=blank_day.type,
-            tm_work_start=blank_day.tm_work_start,
-            tm_work_end=blank_day.tm_work_end,
+            dttm_work_start=blank_day.dttm_work_start,
+            dttm_work_end=blank_day.dttm_work_end,
             tm_break_start=blank_day.tm_break_start
         ) for blank_day in main_worker_days
     ])
@@ -1099,8 +1107,8 @@ def dublicate_cashier_table(request, form):
             worker_day=full_trainee_worker_days.get(day_detail.worker_day.dt),
             on_cashbox=day_detail.on_cashbox,
             cashbox_type=day_detail.cashbox_type,
-            tm_from=day_detail.tm_from,
-            tm_to=day_detail.tm_to
+            dttm_from=day_detail.dttm_from,
+            dttm_to=day_detail.dttm_to
         ) for day_detail in main_worker_days_details
     ])
 

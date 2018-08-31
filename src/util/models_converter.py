@@ -26,6 +26,10 @@ class BaseConverter(object):
         return datetime.datetime.strptime(obj, QOS_TIME_FORMAT).time()
 
     @classmethod
+    def parse_datetime(cls, obj):
+        return datetime.datetime.strptime(obj, QOS_DATETIME_FORMAT)
+
+    @classmethod
     def convert_datetime(cls, obj):
         return obj.strftime(QOS_DATETIME_FORMAT) if obj is not None else None
 

@@ -219,7 +219,8 @@ class WorkerConstraintAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerDay)
 class WorkerDayAdmin(admin.ModelAdmin):
-    list_display = ('worker_last_name', 'shop_title', 'super_shop_title', 'dt', 'type', 'id','tm_work_start', 'tm_work_end')
+    list_display = ('worker_last_name', 'shop_title', 'super_shop_title', 'dt', 'type', 'id', 'dttm_work_start',
+                    'dttm_work_end')
     search_fields = ('worker__last_name', 'worker__shop__title', 'worker__shop__super_shop__title', 'id', 'dt')
     list_filter = ('worker__shop',)
 
@@ -240,7 +241,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
 class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
     # todo: upd: сервак просто падает если туда зайти
-    list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_cashbox_type', 'id', 'tm_from', 'tm_to')
+    list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_cashbox_type', 'id', 'dttm_from', 'dttm_to')
     search_fields = ('worker_day__worker__last_name', 'worker_day__worker__shop__title', 'id')
     list_filter = ('worker_day__worker__shop',)
 

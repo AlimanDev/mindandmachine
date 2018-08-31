@@ -183,7 +183,7 @@ def get_all_slots(request, form):
 
     """
     result = []
-    slots = Slot.objects.filter(shop__id=form['shop_id'])
+    slots = Slot.objects.filter(shop=form['shop_id'])
     for slot in slots:
         result.append({
             'id': slot.id,
@@ -196,7 +196,7 @@ def get_all_slots(request, form):
     })
 
 
-@api_method('POST', SetSlot)
+@api_method('POST', SetSlot, lambda_func=lambda x: User.objects.filter(id=x['user_id']).first())
 def set_slot(request, form):
     """
 

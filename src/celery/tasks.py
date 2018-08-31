@@ -95,13 +95,13 @@ def release_all_workers():
     dttm_now = now() + datetime.timedelta(hours=3)
     worker_day_cashbox_objs = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
         worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
-        tm_to__isnull=True,
+        dttm_to__isnull=True,
     )
 
 
     for obj in worker_day_cashbox_objs:
         obj.on_cashbox = None
-        obj.tm_to = obj.worker_day.tm_work_end
+        obj.dttm_to = obj.worker_day.dttm_work_end
         obj.save()
 
     print('отпустил всех домой')
@@ -129,7 +129,7 @@ def update_worker_month_stat():
     for shop in shops:
         work_hours = 0
         work_days = 0
-        print('начал обновлять worker month stat для {}'.format(shop))
+        # print('начал обновлять worker month stat для {}'.format(shop))
 
         break_triplets = shop.break_triplets
         list_of_break_triplets = json.loads(break_triplets)
@@ -159,7 +159,8 @@ def update_worker_month_stat():
                         worker_day.type != WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
                     duration_of_workerday = ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK]
                 else:
-                    duration_of_workerday = round(time_diff(worker_day.tm_work_start, worker_day.tm_work_end) / 3600, 3)
+                    duration_of_workerday = round((worker_day.dttm_work_end - worker_day.dttm_work_start)
+                                                  .total_seconds() / 3600, 3)
 
                     for triplet in list_of_break_triplets:
                         if float(triplet[0]) < duration_of_workerday * 60 <= float(triplet[1]):
@@ -295,7 +296,7 @@ def allocation_of_time_for_work_on_cashbox():
                     on_cashbox__isnull=False,
                     worker_day__dt__gte=prev_month,
                     worker_day__dt__lt=dt,
-                    tm_to__isnull=False,
+                    dttm_to__isnull=False,
                     is_tablet=True,
                 ).order_by('worker_day__worker')
 
@@ -311,10 +312,11 @@ def allocation_of_time_for_work_on_cashbox():
                         last_cashbox_type = cashbox_type
                         duration = 0
 
-                    duration += time_diff(detail.tm_from, detail.tm_to) / 3600
+                    duration += (detail.dttm_to - detail.dttm_from).total_seconds() / 3600
 
             if last_user:
                 update_duration(last_user, last_cashbox_type, duration)
+
 
 @app.task
 def create_pred_bills():

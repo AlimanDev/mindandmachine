@@ -76,6 +76,7 @@ class TestCashboxTypes(LocalTestCase):
 
         response = self.api_post('/api/other/set_slot', {
             # 'weekday': 0,
+
             'slots': json.dumps({0: [self.slot1.id]}),
             'user_id': self.user1.id,
         })

@@ -520,8 +520,9 @@ class WorkerDay(models.Model):
     dt = models.DateField()  # todo: make immutable
     type = utils.EnumField(Type)
 
-    tm_work_start = models.TimeField(null=True, blank=True)
-    tm_work_end = models.TimeField(null=True, blank=True)
+    # worker_shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='+')
+    dttm_work_start = models.DateTimeField(null=True, blank=True)
+    dttm_work_end = models.DateTimeField(null=True, blank=True)
     tm_break_start = models.TimeField(null=True, blank=True)
 
     is_manual_tuning = models.BooleanField(default=False)
@@ -593,8 +594,9 @@ class WorkerDayCashboxDetails(models.Model):
 
     is_tablet = models.BooleanField(default=False)
 
-    tm_from = models.TimeField()
-    tm_to = models.TimeField(null=True, blank=True)
+    dttm_from = models.DateTimeField()
+    dttm_to = models.DateTimeField(null=True, blank=True)
+
 
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(

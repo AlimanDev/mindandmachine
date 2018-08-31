@@ -49,33 +49,21 @@ class LocalTestCase(TestCase):
             title='Shop2',
             hidden_title='Shop2',
         )
-# <<<<<<< HEAD
-#         self.user1 = User.objects.create_user(self.USER_USERNAME, self.USER_EMAIL, self.USER_PASSWORD,
-#                                               id=1,
-#                                               shop=self.shop,
-#                                               group=User.GROUP_SUPERVISOR,
-#                                               )
-# =======
         self.user1 = User.objects.create_user(self.USER_USERNAME, self.USER_EMAIL, self.USER_PASSWORD, id=1,
-                                              shop=self.shop, group=User.GROUP_SUPERVISOR)
-# >>>>>>> master
+                                              shop=self.shop,
+                                              group=User.GROUP_SUPERVISOR)
         # self.user1 = create_user(user_id=1, shop_id=self.shop, username='user1')
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2')
         self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3')
         self.user4 = create_user(user_id=4, shop_id=self.shop, username='user4',
                                  dt_fired=(dttm_now - datetime.timedelta(days=1)).date())
-# <<<<<<< HEAD
         User.objects.create_user('Director', 'Director@q.q', '1111',
                                  id=5,
                                  shop=self.shop,
                                  group=User.GROUP_DIRECTOR,
                                  )
-#         self.cashboxType = create_cashbox_type(self.shop, 'тип_кассы_1', id=1,
-#                                                dttm_last_update_queue=datetime.datetime(2018, 6, 18, 8, 30, 0))
-# =======
         self.cashboxType1 = create_cashbox_type(self.shop, 'тип_кассы_1', id=1,
                                                 dttm_last_update_queue=datetime.datetime(2018, 6, 18, 8, 30, 0))
-# >>>>>>> master
 
         self.cashboxType2 = create_cashbox_type(self.shop, 'тип_кассы_2', id=2,
                                                 dttm_last_update_queue=datetime.datetime(2018, 6, 18, 9, 0, 0))
@@ -90,12 +78,15 @@ class LocalTestCase(TestCase):
             type=self.cashboxType1,
             number=1,
             id=1,
+            dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0),
         )
 
         self.cashbox2 = Cashbox.objects.create(
             type=self.cashboxType2,
             number=2,
             id=2,
+            dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0)
+
         )
 
         self.cashbox3 = Cashbox.objects.create(
@@ -103,12 +94,15 @@ class LocalTestCase(TestCase):
             dttm_deleted=dttm_now - datetime.timedelta(days=3),
             number=3,
             id=3,
+            dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0)
+
         )
 
         self.cashbox4 = Cashbox.objects.create(
             type=self.cashboxType4,
             number=4,
             id=4,
+            dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0)
         )
 
         for i in range(5, 10):
@@ -116,6 +110,8 @@ class LocalTestCase(TestCase):
                 type=self.cashboxType3,
                 number=i,
                 id=i,
+            dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0)
+
             )
 
         # create_period_demand(dttm_now, 10, 50, 1, 4, 3, self.cashboxType)
@@ -131,15 +127,15 @@ class LocalTestCase(TestCase):
             create_period_demand(datetime.datetime(2018, 6, 18, 7, 30), i, i * 3, 1, i * 4, i, self.cashboxType2)
 
             # self.worker_day = create_work_day(self.shop.id, self.user1, dt=datetime.datetime(2018, 7, i))
-            self.worker_day1 = create_work_day(self.shop.id, self.user1, dt=datetime.datetime(2018, 6, i))
-            self.worker_day2 = create_work_day(self.shop.id, self.user2, dt=datetime.datetime(2018, 6, i))
-            self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 6, i))
-            self.worker_day4 = create_work_day(self.shop.id, self.user1, dt=datetime.datetime(2018, 7, i))
+            self.worker_day1 = create_work_day(self.user1, dt=datetime.datetime(2018, 6, i))
+            self.worker_day2 = create_work_day(self.user2, dt=datetime.datetime(2018, 6, i))
+            self.worker_day3 = create_work_day(self.user3, dt=datetime.datetime(2018, 6, i))
+            self.worker_day4 = create_work_day(self.user1, dt=datetime.datetime(2018, 7, i))
 
             if i < 10:
-                self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 7, i), type=5)
+                self.worker_day3 = create_work_day(self.user3, dt=datetime.datetime(2018, 7, i), type=5)
             else:
-                self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=datetime.datetime(2018, 7, i))
+                self.worker_day3 = create_work_day(self.user3, dt=datetime.datetime(2018, 7, i))
 
             WorkerDayCashboxDetails.objects.create(
                 status=WorkerDayCashboxDetails.TYPE_WORK,
@@ -147,8 +143,8 @@ class LocalTestCase(TestCase):
                 on_cashbox=self.cashbox1,
                 cashbox_type=self.cashboxType1,
                 is_tablet=True,
-                tm_from=datetime.time(9, 0, 0),
-                tm_to=datetime.time(18, 0, 0),
+                dttm_from=datetime.datetime(2018, 6, i, 9, 0, 0),
+                dttm_to=datetime.datetime(2018, 6, i, 18, 0, 0),
             )
 
             WorkerDayCashboxDetails.objects.create(
@@ -157,44 +153,34 @@ class LocalTestCase(TestCase):
                 on_cashbox=self.cashbox1,
                 cashbox_type=self.cashboxType1,
                 is_tablet=True,
-                tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
-                tm_to=(dttm_now + datetime.timedelta(hours=3)).time()
+                dttm_from=(dttm_now - datetime.timedelta(hours=3)),
+                dttm_to=(dttm_now + datetime.timedelta(hours=3)),
             )
-            
-            # WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day1,
-            #                                        on_cashbox=self.cashbox1,
-            #                                        cashbox_type=self.cashboxType,
-            #                                        is_tablet=True,
-            #                                        tm_from=datetime.time(9, 0, 0),
-            #                                        tm_to=datetime.time(18, 0, 0),
-            #                                        status=WorkerDayCashboxDetails.TYPE_WORK,
-            #                                        )
-            #
-            # WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day2,
-            #                                        on_cashbox=self.cashbox1,
-            #                                        cashbox_type=self.cashboxType,
-            #                                        is_tablet=True,
-            #                                        tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
-            #                                        tm_to=(dttm_now + datetime.timedelta(hours=3)).time(),
-            #                                        status=WorkerDayCashboxDetails.TYPE_WORK,
-            #                                        )
 
-            WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day1,
-                                                   on_cashbox=self.cashbox2,
-                                                   cashbox_type=self.cashboxType2,
-                                                   is_tablet=True,
-                                                   tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
-                                                   tm_to=(dttm_now + datetime.timedelta(hours=3)).time(),
-                                                   status=WorkerDayCashboxDetails.TYPE_WORK,
-                                                   )
-        self.worker_day = create_work_day(self.shop.id, self.user1, dt=dttm_now.date())
-        self.worker_day2 = create_work_day(self.shop.id, self.user2, dt=dttm_now.date())
-        self.worker_day3 = create_work_day(self.shop.id, self.user3, dt=dttm_now.date())
+            WorkerDayCashboxDetails.objects.create(
+                worker_day=self.worker_day1,
+                on_cashbox=self.cashbox2,
+                cashbox_type=self.cashboxType2,
+                is_tablet=True,
+                dttm_from=datetime.datetime.combine(
+                    datetime.date(2018, 6, i),
+                    (dttm_now - datetime.timedelta(hours=3)).time()),
+                dttm_to=datetime.datetime.combine(
+                    datetime.date(2018, 6, i),
+                    (dttm_now + datetime.timedelta(hours=3)).time()),
+                status=WorkerDayCashboxDetails.TYPE_WORK,
+            )
+        self.worker_day = create_work_day(self.user1, dt=dttm_now.date())
+        self.worker_day2 = create_work_day(self.user2, dt=dttm_now.date())
+        self.worker_day3 = create_work_day(self.user3, dt=dttm_now.date())
 
-        WorkerDayCashboxDetails.objects.create(worker_day=self.worker_day, on_cashbox=self.cashbox1, is_tablet=True,
-                                               cashbox_type=self.cashboxType1, tm_to=None,
-                                               tm_from=(dttm_now - datetime.timedelta(hours=3)).time(),
-                                               )
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=self.worker_day,
+            on_cashbox=self.cashbox1,
+            is_tablet=True,
+            cashbox_type=self.cashboxType1,
+            dttm_from=dttm_now - datetime.timedelta(hours=3),
+        )
 
         self.cameracashbox = CameraCashbox.objects.create(name='Camera_1', cashbox=self.cashbox1)
         test_time = dttm_now
@@ -283,8 +269,8 @@ def create_work_day(worker, dt, type=2, tm_work_start=datetime.time(hour=12, min
         worker=worker,
         type=type,
         dt=dt,
-        tm_work_start=tm_work_start,
-        tm_work_end=tm_work_end,
+        dttm_work_start=datetime.datetime.combine(dt, tm_work_start),
+        dttm_work_end=datetime.datetime.combine(dt, tm_work_end),
     )
     return worker_day
 

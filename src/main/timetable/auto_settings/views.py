@@ -504,8 +504,8 @@ def set_timetable(request, form):
             wd_obj.worker.shop_id = users[int(uid)].shop_id
             wd_obj.type = WorkerDayConverter.parse_type(wd['type'])
             if WorkerDay.is_type_with_tm_range(wd_obj.type):
-                wd_obj.tm_work_start = BaseConverter.parse_time(wd['tm_work_start'])
-                wd_obj.tm_work_end = BaseConverter.parse_time(wd['tm_work_end'])
+                wd_obj.dttm_work_start = BaseConverter.parse_datetime(wd['dttm_work_start'])
+                wd_obj.dttm_work_end = BaseConverter.parse_datetime(wd['dttm_work_end'])
                 # if wd['tm_break_start']:
                 #     wd_obj.tm_break_start = BaseConverter.parse_time(wd['tm_break_start'])
                 # else:
@@ -518,8 +518,8 @@ def set_timetable(request, form):
                 for wdd in wd['details']:
                     wdd_el = WorkerDayCashboxDetails(
                         worker_day=wd_obj,
-                        tm_from=BaseConverter.parse_time(wdd['tm_from']),
-                        tm_to=BaseConverter.parse_time(wdd['tm_to']),
+                        dttm_from=BaseConverter.parse_datetime(wdd['dttm_from']),
+                        dttm_to=BaseConverter.parse_datetime(wdd['dttm_to']),
                     )
                     if wdd['type'] > 0:
                         wdd_el.cashbox_type_id = wdd['type']

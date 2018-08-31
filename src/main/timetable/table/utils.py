@@ -81,8 +81,8 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
         'worker_id',
         'dt',
         'type',
-        'tm_work_start',
-        'tm_work_end',
+        'dttm_work_start',
+        'dttm_work_end',
         'workerdaycashboxdetails__tm_from',
         'workerdaycashboxdetails__tm_to',
     ).order_by(
@@ -123,7 +123,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
                     worker['paid_hours'] += ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK]
                 else:
                     i = 0
-                    while (i < len(times_borders)) and (row['tm_work_start'] > times_borders[i][0]):
+                    while (i < len(times_borders)) and (row['dttm_work_start'] > times_borders[i][0]):
                         i += 1
                     str_name = '{}_days_periods'.format(times_borders[i][1])
                     worker[str_name] += 1
