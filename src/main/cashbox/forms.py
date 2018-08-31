@@ -19,7 +19,7 @@ class GetCashboxesForm(forms.Form):
 
 class CreateCashboxForm(forms.Form):
     cashbox_type_id = forms.IntegerField()
-    number = forms.CharField(max_length=6)
+    number = forms.IntegerField(max_length=6)
 
 
 class DeleteCashboxForm(forms.Form):

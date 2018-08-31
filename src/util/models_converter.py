@@ -168,6 +168,7 @@ class CashboxTypeConverter(BaseConverter):
                 'prob': obj.probability,
                 'prior_weight': obj.prior_weight,
                 'prediction': cls.convert_type(obj.do_forecast),
+                'is_main_type': obj.is_main_type,
             })
         return vals
 
