@@ -365,7 +365,7 @@ def delete_cashbox_type(request, form):
 
     Args:
         method: POST
-        url: /api/cashbox/create_cashbox_type
+        url: /api/cashbox/delete_cashbox_type
         cashbox_type_id(int): required = True
 
     Note:
@@ -403,24 +403,21 @@ def delete_cashbox_type(request, form):
 @api_method('GET', CashboxesOpenTime)
 def get_cashboxes_open_time(request, form):
     """
-    Receiving percentage of used time of cashboxes in relation to the selected period
+    Возвращает процент "используемости" касс по отношению к периоду
 
-    :param shop_id (Integer): in id of the department
-    :param dt_from (Date): start date of the period
-    :param dt_to (Date): end date of the period
+    Args:
+        method: GET
+        url: /api/cashbox/get_cashboxes_open_time
+        shop_id(int): required = False
+        from_dt(QOS_DATE): с какого периода
+        to_dt(QOS_DATE): по какой период
 
-    :return:
-        dictionary with a list of cashboxes ids and shares of open time with respect to the selected period:
-
-    {
-        "cashbox1_id":
-            {"share_time": 2.977},
-
-        "cashbox2_id":
-            {"share_time": 0},
-
-        ...
-    }
+    Returns:
+        {
+            cashbox_id: {
+                'share_time': float
+            },..
+        }
 
     """
     response = {}
@@ -480,35 +477,25 @@ def get_cashboxes_open_time(request, form):
 @api_method('GET', CashboxesUsedResource)
 def get_cashboxes_used_resource(request, form):
     """
-    Obtaining a share of time for different congestion of cash box types in relation to the selected period of work
+    Возвращает доли времени для разных перегрузок типов касс в зависимости от выбранного периода работы
 
-    :param shop_id (Integer): id of the department
-    :param dt_from (Date): start date of the period
-    :param dt_to (Date): end date of the period
+    Args:
+        method: GET
+        url: /api/cashbox/get_cashboxes_used_resource
+        shop_id(int): required = False
+        from_dt(QOS_DATE): с какого периода
+        to_dt(QOS_DATE): по какой период
 
-    :return:
-
-     dictionary with a list of various congestion and share of time for cashbox type:
-
-    {
-        "cashbox_type1.id" : {
-                        '20': 12,
-                        '40': 4,
-                        '60': 0,
-                        '80': 6,
-                        '100': 3
-                    },
-
-        "cashbox_type2.id" : {
-                        '20': 15,
-                        '40': 33,
-                        '60': 5,
-                        '80': 0,
-                        '100': 0
-                    },
-        ...
-    }
-
+    Returns:
+        {
+            cashbox_type_id : {
+                | '20': int,
+                | '40': int,
+                | '60': int,
+                | '80': int,
+                | '100': int
+            },...
+        }
     """
 
     def get_percent(response, cashbox_type_id, current_dttm, worker_day_cashbox_details, count_of_cashbox):

@@ -44,6 +44,7 @@ def get_cashiers_timetable(request, form):
         format(str): 'raw' или 'excel'. default = 'raw'
         position_id(int): required = False
         shop_id(int): required = False
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         {
@@ -60,6 +61,14 @@ def get_cashiers_timetable(request, form):
                 'fact_cashier_need': [сколько по факту нужно в период],
                 'predict_cashier_needs': [сколько нужно кассиров в период],
                 'real_cashiers': [сколько сидит кассиров в период]
+            },\n
+            'lack_of_cashiers_on_period': {
+                cashbox_type_id(int): [
+                    {
+                        | 'dttm_start'(QOS_DATETIME): ,
+                        | 'lack_of_cashiers'(float): ,
+                    },...
+                ],..
             }
         }
     """
@@ -446,7 +455,7 @@ def get_workers(request, form):
         to_dttm(QOS_DATETIME): required = True
         cashbox_type_ids(list): required = True ([] -- если для всех)
         shop_id(int): required = True
-
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     """
     shop = form['shop_id']
@@ -563,13 +572,14 @@ def get_timetable_xlsx(request, form):
 
     Args:
         method: GET
-        url: /api/timetable/cashier_demand/get_cashiers_timetable
+        url: /api/timetable/cashier_demand/get_timetable_xlsx
         from_dt(QOS_DATE): required = True
         to_dt(QOS_DATE): required = True
         cashbox_type_ids(list): required = True (либо [] -- если для всех типов касс)
         format(str): 'raw' или 'excel'. default = 'raw'
         position_id(int): required = False
         shop_id(int): required = False
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         Файл расписания

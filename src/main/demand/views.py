@@ -33,6 +33,7 @@ def get_indicators(request, form):
         to_dt(QOS_DATE): required = True
         type(str): тип forecast'a (L/S/F)
         shop_id(int): required = False
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         {
