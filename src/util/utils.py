@@ -215,6 +215,7 @@ def api_method(
             try:
                 return func(request, *args, **kwargs)
             except Exception as e:
+                print(e)
                 if settings.DEBUG:
                     raise e
                 else:

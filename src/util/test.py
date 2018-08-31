@@ -78,12 +78,15 @@ class LocalTestCase(TestCase):
             type=self.cashboxType1,
             number=1,
             id=1,
+            dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0),
         )
 
         self.cashbox2 = Cashbox.objects.create(
             type=self.cashboxType2,
             number=2,
             id=2,
+            dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0)
+
         )
 
         self.cashbox3 = Cashbox.objects.create(
@@ -91,12 +94,15 @@ class LocalTestCase(TestCase):
             dttm_deleted=dttm_now - datetime.timedelta(days=3),
             number=3,
             id=3,
+            dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0)
+
         )
 
         self.cashbox4 = Cashbox.objects.create(
             type=self.cashboxType4,
             number=4,
             id=4,
+            dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0)
         )
 
         for i in range(5, 10):
@@ -104,6 +110,8 @@ class LocalTestCase(TestCase):
                 type=self.cashboxType3,
                 number=i,
                 id=i,
+            dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0)
+
             )
 
         # create_period_demand(dttm_now, 10, 50, 1, 4, 3, self.cashboxType)
