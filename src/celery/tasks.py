@@ -159,8 +159,8 @@ def update_worker_month_stat():
                         worker_day.type != WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
                     duration_of_workerday = ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK]
                 else:
-                    duration_of_workerday = round(time_diff(worker_day.dttm_work_start.time(),
-                                                            worker_day.dttm_work_end.time()) / 3600, 3)
+                    duration_of_workerday = round((worker_day.dttm_work_end - worker_day.dttm_work_start)
+                                                  .total_seconds() / 3600, 3)
 
                     for triplet in list_of_break_triplets:
                         if float(triplet[0]) < duration_of_workerday * 60 <= float(triplet[1]):
@@ -312,10 +312,11 @@ def allocation_of_time_for_work_on_cashbox():
                         last_cashbox_type = cashbox_type
                         duration = 0
 
-                    duration += time_diff(detail.dttm_from.time(), detail.dttm_to.time()) / 3600
+                    duration += (detail.dttm_to - detail.dttm_from).total_seconds() / 3600
 
             if last_user:
                 update_duration(last_user, last_cashbox_type, duration)
+
 
 @app.task
 def create_pred_bills():

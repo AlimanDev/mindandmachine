@@ -27,4 +27,9 @@ class Migration(migrations.Migration):
             model_name='workerdaycashboxdetails',
             name='tm_to',
         ),
+        migrations.AlterField(
+            model_name='workerdaycashboxdetails',
+            name='dttm_from',
+            field=models.DateTimeField(),
+        ),
     ]

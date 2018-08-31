@@ -562,7 +562,14 @@ def set_worker_days(request, form):
     worker = form['worker_id']
     checkpoint = FormUtil.get_checkpoint(form)
 
-    # интервал дней из формы
+    def get_dttm_work_end(dt, dttm_work_start, dttm_work_end):
+        if dttm_work_start > dttm_work_end:
+            dttm_work_end = form[datetime.combine(dt + timedelta(days=1), dttm_work_end)]
+        else:
+            dttm_work_end = form[datetime.combine(dt, dttm_work_end)]
+        return dttm_work_end
+
+        # интервал дней из формы
     form_dates = []
     for dt in range(int((form['dt_end'] - form['dt_begin']).days) + 1):
         form_dates.append(form['dt_begin'] + timedelta(dt))
@@ -587,12 +594,13 @@ def set_worker_days(request, form):
         #     ]
         # )
         # обновляем дни и удаляем details для этих дней
+
         new_worker_days.append(
             WorkerDay(
                 worker=worker,
                 type=form['type'],
-                dttm_work_start=form['dttm_work_start'],
-                dttm_work_end=form['dttm_work_end'],
+                dttm_work_start=datetime.combine(worker_day.dt, form['tm_work_start']),
+                dttm_work_end=get_dttm_work_end(worker_day.dt, form['tm_work_start'], form['tm_work_end']),
                 dt=worker_day.dt,
                 created_by=request.user,
                 parent_worker_day=worker_day
@@ -610,8 +618,8 @@ def set_worker_days(request, form):
         WorkerDayCashboxDetails(
             worker_day=worker_day,
             cashbox_type_id=form['cashbox_type'],
-            dttm_from=form['dttm_work_start'],
-            dttm_to=form['dttm_work_end'],
+            dttm_from=datetime.combine(worker_day.dt, form['tm_work_start']),
+            dttm_to=get_dttm_work_end(worker_day.dt, form['tm_work_start'], form['tm_work_end']),
         ) for worker_day in existed_worker_days
     ])
 
@@ -640,16 +648,16 @@ def set_worker_days(request, form):
             worker=worker,
             dt=day,
             type=form['type'],
-            dttm_work_start=form['dttm_work_start'],
-            dttm_work_end=form['dttm_work_end'],
+            dttm_work_start=datetime.combine(day, form['tm_work_start']),
+            dttm_work_end=get_dttm_work_end(day, form['tm_work_start'], form['tm_work_end']),
         ) for day in form_dates
     ])
     WorkerDayCashboxDetails.objects.bulk_create([
         WorkerDayCashboxDetails(
             worker_day=worker_day,
             cashbox_type_id=form['cashbox_type'],
-            dttm_from=form['dttm_work_start'],
-            dttm_to=form['dttm_work_end']
+            dttm_from=datetime.combine(worker_day.dt, form['tm_work_start']),
+            dttm_to=get_dttm_work_end(worker_day.dt, form['tm_work_start'], form['tm_work_end']),
         ) for worker_day in filled_days
     ])
 

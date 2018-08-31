@@ -460,7 +460,7 @@ def get_workers(request, form):
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related(
         'on_cashbox', 'worker_day__worker'
     ).filter(
-        worker_day__worker__shop_id=shop.id,
+        worker_day__worker__shop_id=shop,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         worker_day__dt__gte=from_dt,
         worker_day__dt__lte=to_dt,

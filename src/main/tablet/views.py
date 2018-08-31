@@ -222,7 +222,7 @@ def get_cashiers_info(request, form):
 
                     if item.dttm_from is None:
                         item.dttm_from = dttm
-                    real_break_time = time_diff(item.dttm_from.time(), break_end.time())
+                    real_break_time = (break_end - item.dttm_from).total_seconds()
 
                     for triplet in list_of_break_triplets:
                         if int(triplet[0]) < duration_of_work <= int(triplet[1]):
@@ -380,7 +380,7 @@ def change_cashier_status(request, form):
         status=WorkerDayCashboxDetails.TYPE_WORK,
     ).count()
     if cashbox_worked:
-        return JsonResponse.value_error('cashbox {} already opened'.format(cashbox_id))
+        return JsonResponse.value_error('cashbox already opened')
 
     # todo: add other checks for change statuses
     if (new_user_status == WorkerDayCashboxDetails.TYPE_FINISH) and (worker_day.type == WorkerDay.Type.TYPE_ABSENSE):
