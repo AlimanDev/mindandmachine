@@ -59,7 +59,7 @@ def get_workers_to_exchange(request, form):
         'ct_type': ct_type,
         'predict_demand': init_params_dict['predict_demand'],
         'mean_bills_per_step': init_params_dict['mean_bills_per_step'],
-        'cashbox_types': init_params_dict['cashbox_types_hard_dict'],
+        'cashbox_types': init_params_dict['cashbox_types_dict'],
         'users_who_can_work': users_who_can_work_on_ct
     }
 
@@ -74,7 +74,7 @@ def get_workers_to_exchange(request, form):
                 result_dict[user_id] = {}
                 result_dict[user_id].update(func_result_dict[user_id])
 
-    for k in result_dict.keys():
-        result_dict[k].update({'user_info': UserConverter.convert(User.objects.get(id=k))})
+    # for k in result_dict.keys():
+    #     result_dict[k].update({'user_info': UserConverter.convert(User.objects.get(id=k))})
 
     return JsonResponse.success(result_dict)

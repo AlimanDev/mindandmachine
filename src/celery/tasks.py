@@ -211,13 +211,15 @@ def notify_cashiers_lack():
         dttm = dttm_now
         while dttm <= notify_to:
             init_params_dict = get_init_params(dttm, shop_id)
-
+            cashbox_types = init_params_dict['cashbox_types_dict']
+            period_demands = init_params_dict['predict_demand']
+            mean_bills_per_step = init_params_dict['mean_bills_per_step']
             # пока что есть магазы в которых нет касс с ForecastHard
-            if init_params_dict['cashbox_types_hard_dict']:
+            if cashbox_types and period_demands:
                 return_dict = has_deficiency(
-                    init_params_dict['predict_demand'],
-                    init_params_dict['mean_bills_per_step'],
-                    init_params_dict['cashbox_types_hard_dict'],
+                    period_demands,
+                    mean_bills_per_step,
+                    cashbox_types,
                     dttm
                 )
                 to_notify = False  # есть ли вообще нехватка
