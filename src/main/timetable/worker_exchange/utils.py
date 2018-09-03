@@ -553,6 +553,7 @@ def excess_dayoff(arguments_dict):
             worker = worker_day_of_user.worker
             if worker.id not in users_for_exchange.keys():
                 user_new_dttm_work_start, user_new_dttm_work_end = shift_user_times(dttm_exchange, worker)
+                update_dict = {}
                 if user_new_dttm_work_start and user_new_dttm_work_end:
                     update_dict = set_response_dict(
                         ChangeType.excess_dayoff.value,
