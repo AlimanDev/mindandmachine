@@ -161,7 +161,8 @@ class CashboxTypeConverter(BaseConverter):
             'shop': obj.shop_id,
             'name': obj.name,
             'is_stable': obj.is_stable,
-            'speed_coef': obj.speed_coef
+            'speed_coef': obj.speed_coef,
+            'do_forecast': obj.do_forecast
         }
         if add_algo_params:
             vals.update({
