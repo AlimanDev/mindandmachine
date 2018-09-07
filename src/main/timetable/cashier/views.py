@@ -481,7 +481,8 @@ def get_worker_day(request, form):
                 | 'worker': id worker'a,
                 | 'cashbox_types': [],
                 | 'type': тип worker_day'a,
-                | 'tm_work_start': ,
+                | 'dttm_work_start': ,
+                | 'dttm_work_end': ,
                 | 'is_manual_tuning': True/False,
                 | 'tm_break_start': время начала перерыва,
                 | 'dttm_added': ,
@@ -542,8 +543,8 @@ def get_worker_day(request, form):
             select_related('on_cashbox', 'cashbox_type').\
             filter(worker_day=wd):
         details.append({
-            'tm_from': BaseConverter.convert_time(x.dttm_from.time()),
-            'tm_to': BaseConverter.convert_time(x.dttm_to.time()),
+            'dttm_from': BaseConverter.convert_time(x.dttm_from.time()),
+            'dttm_to': BaseConverter.convert_time(x.dttm_to.time()),
             'cashbox_type': x.cashbox_type_id,
         })
         cashboxes_types[x.cashbox_type_id] = CashboxTypeConverter.convert(x.cashbox_type)

@@ -59,13 +59,19 @@ def get_workers_to_exchange(request, form):
         'ct_type': ct_type,
         'predict_demand': init_params_dict['predict_demand'],
         'mean_bills_per_step': init_params_dict['mean_bills_per_step'],
-        'cashbox_types': init_params_dict['cashbox_types_hard_dict'],
+        'cashbox_types': init_params_dict['cashbox_types_dict'],
         'users_who_can_work': users_who_can_work_on_ct
     }
 
+    error_message = ''
+
     result_dict = {}
     for f in ChangeTypeFunctions:
-        func_result_dict = f(default_function_dict)
+        try:
+            func_result_dict = f(default_function_dict)
+        except InterruptedError:
+            error_message += 'Ошибка в функции {}.'.format(f.__name__)
+            # return JsonResponse.internal_error('Ошибка в функции {}'.format(f.__name__))
         for user_id in func_result_dict:
             if user_id in result_dict.keys():
                 if func_result_dict[user_id]['type'] < result_dict[user_id]['type']:
@@ -77,4 +83,4 @@ def get_workers_to_exchange(request, form):
     for k in result_dict.keys():
         result_dict[k].update({'user_info': UserConverter.convert(User.objects.get(id=k))})
 
-    return JsonResponse.success(result_dict)
+    return JsonResponse.success(result_dict, additional_info=error_message)

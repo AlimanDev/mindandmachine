@@ -504,10 +504,7 @@ class WorkerDay(models.Model):
         Type.TYPE_TRAIN_VACATION.value,
     ]
 
-
     def __str__(self):
-        # return f'{self.worker.last_name}, {self.worker.shop.title}, {self.worker.shop.super_shop.title}, {self.dt},' \
-        #        f' {self.Type.get_name_by_value(self.type)}, {self.id}'
         return '{}, {}, {}, {}, {}, {}'.format(self.worker.last_name, self.worker.shop.title, self.worker.shop.super_shop.title, self.dt, self.Type.get_name_by_value(self.type), self.id)
 
     def __repr__(self):
@@ -520,7 +517,6 @@ class WorkerDay(models.Model):
     dt = models.DateField()  # todo: make immutable
     type = utils.EnumField(Type)
 
-    # worker_shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='+')
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
     tm_break_start = models.TimeField(null=True, blank=True)
@@ -596,7 +592,6 @@ class WorkerDayCashboxDetails(models.Model):
 
     dttm_from = models.DateTimeField()
     dttm_to = models.DateTimeField(null=True, blank=True)
-
 
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(

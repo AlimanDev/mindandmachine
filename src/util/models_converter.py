@@ -113,8 +113,8 @@ class WorkerDayConverter(BaseConverter):
             'dt': cls.convert_date(obj.dt),
             'worker': obj.worker_id,
             'type': cls.convert_type(obj.type),
-            'tm_work_start': __work_tm(obj.tm_work_start),
-            'tm_work_end': __work_tm(obj.tm_work_end),
+            'dttm_work_start': __work_tm(obj.dttm_work_start),
+            'dttm_work_end': __work_tm(obj.dttm_work_end),
             'tm_break_start': __work_tm(obj.tm_break_start),
             'is_manual_tuning': obj.is_manual_tuning,
             'cashbox_types': list(set(obj.cashbox_types_ids)) if hasattr(obj, 'cashbox_types_ids') else [],
@@ -133,8 +133,8 @@ class WorkerDayChangeRequestConverter(BaseConverter):
             'worker_day': obj.worker_day_id,
 
             'type': WorkerDayConverter.convert_type(obj.type),
-            'tm_work_start': __work_tm(obj.tm_work_start),
-            'tm_work_end': __work_tm(obj.tm_work_end),
+            'dttm_work_start': __work_tm(obj.dttm_work_start),
+            'dttm_work_end': __work_tm(obj.dttm_work_end),
             'tm_break_start': __work_tm(obj.tm_break_start),
         }
 
@@ -161,7 +161,8 @@ class CashboxTypeConverter(BaseConverter):
             'shop': obj.shop_id,
             'name': obj.name,
             'is_stable': obj.is_stable,
-            'speed_coef': obj.speed_coef
+            'speed_coef': obj.speed_coef,
+            'do_forecast': obj.do_forecast
         }
         if add_algo_params:
             vals.update({
