@@ -73,7 +73,7 @@ class UserConverter(BaseConverter):
             'phone_number': obj.phone_number,
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
-
+            'group': obj.group,
         }
 
 

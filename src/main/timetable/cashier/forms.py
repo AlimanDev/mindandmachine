@@ -226,7 +226,7 @@ class DeleteCashierForm(forms.Form):
 
 class PasswordChangeForm(forms.Form):
     user_id = forms.IntegerField()
-    old_password = forms.CharField(max_length=128)
+    old_password = forms.CharField(max_length=128, required=False)
     new_password = forms.CharField(max_length=128)
 
 

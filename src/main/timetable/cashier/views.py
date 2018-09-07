@@ -793,7 +793,7 @@ def set_worker_day(request, form):
 
 
 @api_method(
-    'GET',
+    'POST',
     SetCashierInfoForm,
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
@@ -1166,13 +1166,13 @@ def delete_cashier(request, form):
 )
 def password_edit(request, form):
     """
-    Меняет пароль пользователя
+    Меняет пароль пользователя. Если группа пользователя S или D, он может менять пароль всем
 
     Args:
         method: POST
         url: /api/timetable/cashier/password_edit
         user_id(int): required = True
-        old_password(str): max_length = 128, required = True
+        old_password(str): max_length = 128, required = False
         new_password(str): max_length = 128, required = True
 
     Returns:
@@ -1192,8 +1192,9 @@ def password_edit(request, form):
             return JsonResponse.does_not_exists_error()
     else:
         user = request.user
-    if not user.check_password(old_password):
-        return JsonResponse.auth_error()
+    if request.user.group not in [User.GROUP_DIRECTOR, User.GROUP_SUPERVISOR]:
+        if not user.check_password(old_password):
+            return JsonResponse.auth_error()
 
     user.set_password(new_password)
     update_session_auth_hash(request, user)

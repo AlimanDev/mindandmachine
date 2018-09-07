@@ -30,6 +30,7 @@ def signin(request, form):
         url: api/auth/signin
         username(str):
         password(stt):
+
     Returns:
         (User): user instance
     """
