@@ -162,14 +162,14 @@ class CashboxTypeConverter(BaseConverter):
             'name': obj.name,
             'is_stable': obj.is_stable,
             'speed_coef': obj.speed_coef,
-            'do_forecast': obj.do_forecast
+            'do_forecast': obj.do_forecast,
+            'is_main_type': obj.is_main_type,
         }
         if add_algo_params:
             vals.update({
                 'prob': obj.probability,
                 'prior_weight': obj.prior_weight,
                 'prediction': cls.convert_type(obj.do_forecast),
-                'is_main_type': obj.is_main_type,
             })
         return vals
 
