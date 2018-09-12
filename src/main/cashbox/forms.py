@@ -1,8 +1,4 @@
-import json
-
 from django import forms
-from django.core.exceptions import ValidationError
-
 from src.util import forms as util_forms
 
 
@@ -38,7 +34,7 @@ class UpdateCashboxForm(forms.Form):
 class CreateCashboxTypeForm(forms.Form):
     shop_id = forms.IntegerField()
     name = forms.CharField(max_length=128)
-    is_main_type = forms.BooleanField()
+    is_main_type = forms.BooleanField(required=False)
 
 
 class DeleteCashboxTypeForm(forms.Form):

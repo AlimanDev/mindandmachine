@@ -323,7 +323,7 @@ def create_cashbox_type(request, form):
         url: /api/cashbox/create_cashbox_type
         shop_id(int): required = True
         name(str): max_length=128
-        is_main_type(boolean): делать новый тип касс главным или нет
+        is_main_type(boolean): делать новый тип касс главным или нет, required = False
 
     Note:
         Также отправлет уведомление о том, что тип касс был создан
