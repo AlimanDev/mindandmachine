@@ -123,7 +123,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
                     worker['paid_hours'] += ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK]
                 else:
                     i = 0
-                    while (i < len(times_borders)) and (row['dttm_work_start'] > times_borders[i][0]):
+                    while (i < len(times_borders)) and (row['dttm_work_start'].time() > times_borders[i][0]):
                         i += 1
                     str_name = '{}_days_periods'.format(times_borders[i][1])
                     worker[str_name] += 1
