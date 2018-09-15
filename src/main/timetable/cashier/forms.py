@@ -124,9 +124,9 @@ class SetWorkerDayForm(forms.Form):
     worker_id = forms.IntegerField()
     dt = util_forms.DateField()
     type = forms.CharField()
-    dttm_work_start = util_forms.TimeField(required=False)
-    dttm_work_end = util_forms.TimeField(required=False)
-    tm_break_start = util_forms.TimeField(required=False)
+    dttm_work_start = util_forms.DatetimeField(required=False)
+    dttm_work_end = util_forms.DatetimeField(required=False)
+    tm_break_start = util_forms.DatetimeField(required=False)
 
     cashbox_type = forms.IntegerField(required=False)
     comment = forms.CharField(max_length=128, required=False)

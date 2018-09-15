@@ -703,8 +703,8 @@ def set_worker_day(request, form):
         worker_id(int): required = True
         dt(QOS_DAT): дата рабочего дня
         type(str): required = True. новый тип рабочего дня
-        tm_work_start(QOS_TIME): новое время начала рабочего дня
-        tm_work_end(QOS_TIME): новое время конца рабочего дня
+        dttm_work_start(QOS_TIME): новое время начала рабочего дня
+        dttm_work_end(QOS_TIME): новое время конца рабочего дня
         tm_break_start(QOS_TIME): required = False
         cashbox_type(int): required = False. на какой специализации он будет работать
         comment(str): max_length=128, required = False
@@ -718,8 +718,8 @@ def set_worker_day(request, form):
                 | 'dt': дата WorkerDay'a,
                 | 'worker': id worker'a,
                 | 'type': тип,
-                | 'tm_work_start': время начала рабочего дня,
-                | 'tm_work_end': время конца рабочего дня,
+                | 'dttm_work_start': время начала рабочего дня,
+                | 'dttm_work_end': время конца рабочего дня,
                 | 'tm_break_start': начало перерыва,
                 | 'is_manual_tuning': True,
                 | 'cashbox_types'(list): специализации (id'шники типов касс)
@@ -762,11 +762,14 @@ def set_worker_day(request, form):
     )
 
     cashbox_updated = False
+    # tm_work_start = form['dttm_work_start']  # на самом деле с фронта приходят время а не дата-время
+    # tm_work_end = form['dttm_work_end']
+    # dttm_work_start = datetime.combine(form['dt'], form['dttm_work_start'])
+    # dttm_work_end = datetime.combine(form['dt'], form['dttm_work_start']) if
 
     if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
         if len(details):
             for item in details:
-                print(item)
                 WorkerDayCashboxDetails.objects.create(
                     cashbox_type_id=item['cashBox_type'],
                     worker_day=new_worker_day,
@@ -1192,9 +1195,9 @@ def password_edit(request, form):
             return JsonResponse.does_not_exists_error()
     else:
         user = request.user
-    if request.user.group not in [User.GROUP_DIRECTOR, User.GROUP_SUPERVISOR]:
-        if not user.check_password(old_password):
-            return JsonResponse.auth_error()
+
+    if not request.user.check_password(old_password):
+            return JsonResponse.access_forbidden()
 
     user.set_password(new_password)
     update_session_auth_hash(request, user)
