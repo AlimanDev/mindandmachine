@@ -734,13 +734,36 @@ def set_worker_day(request, form):
         details = json.loads(form['details'])
     else:
         details = []
+    dt = form['dt']
+    print(type(form['tm_work_end']), form['tm_work_end'])
 
     try:
         worker = User.objects.get(id=form['worker_id'])
     except User.DoesNotExist:
         return JsonResponse.value_error('Invalid worker_id')
 
-    wd_args = utils.worker_day_create_args(form)
+    dttm_work_start = datetime.combine(dt, form['tm_work_start'])  # на самом деле с фронта приходят время а не дата-время
+    tm_work_end = form['tm_work_end']
+    dttm_work_end = datetime.combine(form['dt'], tm_work_end) if tm_work_end > form['tm_work_start'] else\
+        datetime.combine(dt + timedelta(days=1), tm_work_end)
+
+    wd_args = {
+        'dt': dt,
+        'type': form['type'],
+    }
+    if WorkerDay.is_type_with_tm_range(form['type']):
+        wd_args.update({
+            'dttm_work_start': dttm_work_start,
+            'dttm_work_end': dttm_work_end,
+            'tm_break_start': form['tm_break_start']
+        })
+    else:
+        wd_args.update({
+            'dttm_work_start': None,
+            'dttm_work_end': None,
+            'tm_break_start': None
+        })
+
     try:
         old_wd = WorkerDay.objects.qos_current_version().get(
             worker_id=worker.id,
@@ -762,10 +785,6 @@ def set_worker_day(request, form):
     )
 
     cashbox_updated = False
-    # tm_work_start = form['dttm_work_start']  # на самом деле с фронта приходят время а не дата-время
-    # tm_work_end = form['dttm_work_end']
-    # dttm_work_start = datetime.combine(form['dt'], form['dttm_work_start'])
-    # dttm_work_end = datetime.combine(form['dt'], form['dttm_work_start']) if
 
     if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
         if len(details):

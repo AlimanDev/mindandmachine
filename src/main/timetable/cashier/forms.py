@@ -124,9 +124,9 @@ class SetWorkerDayForm(forms.Form):
     worker_id = forms.IntegerField()
     dt = util_forms.DateField()
     type = forms.CharField()
-    dttm_work_start = util_forms.DatetimeField(required=False)
-    dttm_work_end = util_forms.DatetimeField(required=False)
-    tm_break_start = util_forms.DatetimeField(required=False)
+    tm_work_start = util_forms.TimeField(required=False)
+    tm_work_end = util_forms.TimeField(required=False)
+    tm_break_start = util_forms.TimeField(required=False)
 
     cashbox_type = forms.IntegerField(required=False)
     comment = forms.CharField(max_length=128, required=False)
@@ -143,9 +143,9 @@ class SetWorkerDayForm(forms.Form):
             return
 
         if WorkerDay.is_type_with_tm_range(self.cleaned_data['type']):
-            if self.cleaned_data.get('dttm_work_start') is None or self.cleaned_data.get('dttm_work_end') is None or \
+            if self.cleaned_data.get('tm_work_start') is None or self.cleaned_data.get('tm_work_end') is None or \
                     self.cleaned_data.get('tm_break_start') is None:
-                raise ValidationError('dttm_work_start, dttm_work_end and tm_break_start required')
+                raise ValidationError('tm_work_start, tm_work_end and tm_break_start required')
 
 
 class SetCashierInfoForm(forms.Form):

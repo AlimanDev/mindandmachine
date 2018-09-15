@@ -25,26 +25,6 @@ def prepare_worker_day_create_args(form, worker):
     return args
 
 
-def worker_day_create_args(form):
-    wd_args = {
-        'dt': form['dt'],
-        'type': form['type'],
-    }
-    if WorkerDay.is_type_with_tm_range(form['type']):
-        wd_args.update({
-            'dttm_work_start': form['dttm_work_start'],
-            'dttm_work_end': form['dttm_work_end'],
-            'tm_break_start': form['tm_break_start']
-        })
-    else:
-        wd_args.update({
-            'dttm_work_start': None,
-            'dttm_work_end': None,
-            'tm_break_start': None
-        })
-    return wd_args
-
-
 def prepare_worker_day_change_create_args(request, form, day):
     args = {
         'worker_day_id': day.id,
