@@ -842,6 +842,7 @@ def get_worker_day_logs(request, form):
     size = form['size'] if form['size'] else 10
     worker_day_id = form['worker_day_id']
     worker_day_desired = None
+    response_data = {}
 
     if worker_day_id:
         try:
@@ -861,8 +862,9 @@ def get_worker_day_logs(request, form):
             worker_id=worker_day_desired.worker_id,
         )
 
-    response_data = [WorkerDayConverter.convert(worker_day) for worker_day in child_worker_days]
-    for one_wd in response_data:
+    response_data['change_logs'] = [WorkerDayConverter.convert(worker_day) for worker_day in child_worker_days]
+    response_data['total_count'] = child_worker_days.count()
+    for one_wd in response_data['change_logs']:
         one_wd['prev_dttm_work_start'] = BaseConverter.convert_datetime(
             WorkerDay.objects.get(
                 id=child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
@@ -878,8 +880,9 @@ def get_worker_day_logs(request, form):
                 id=child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
             ).type
         )
+    response_data['change_logs'] = response_data['change_logs'][pointer:pointer+size]
 
-    return JsonResponse.success(response_data[pointer:pointer+size])
+    return JsonResponse.success(response_data)
 
 
 @api_method(
