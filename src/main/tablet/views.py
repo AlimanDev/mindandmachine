@@ -14,11 +14,10 @@ from src.db.models import (
     User
 )
 from django.db.models import Avg
-from src.conf.djconfig import QOS_DATETIME_FORMAT
 
 from src.util.utils import api_method, JsonResponse
 from src.util.forms import FormUtil
-from .utils import time_diff, is_midnight_period, get_status_and_details
+from .utils import time_diff, is_midnight_period
 from .forms import GetCashboxesInfo, GetCashiersInfo, ChangeCashierStatus
 from django.utils.timezone import now
 from src.util.models_converter import WorkerCashboxInfoConverter
@@ -27,10 +26,45 @@ from src.util.collection import group_by
 
 @api_method('GET', GetCashboxesInfo)
 def get_cashboxes_info(request, form):
+    """
+    Возвращает состояние каждой кассы в магазине
+
+    Args:
+        method: GET
+        url: /api/tablet/get_cashboxes_info
+        shop_id (int): required = False
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
+
+    Returns:
+        {
+            cashbox_type_id (int) :{
+                'cashbox' : {
+                    [
+                        {
+                            | 'number': номер кассы,
+                            | 'cashbox_id': id кассы,
+                            | 'user_id': id пользователя, который за ней сидит (либо null если касса пустая),
+                            | 'queue': число человек в очереди, либо null,
+                            | 'status': 'O' или 'C' -- открыта касса или закрыта
+                        }
+                    ], ...
+                },
+
+                'priority':
+                    | для линии -- 1,
+                    | для главной кассы -- 2,
+                    | для экспресс касс -- 3,
+                    | для остальных -- 100 (по дефолту)
+                | 'with_queue': True/False,
+                | 'name': имя cashbox_type_id
+            }
+        }
+    """
     response = {}
     dttm_now = now() + timedelta(hours=3)
 
     shop_id = FormUtil.get_shop_id(request, form)
+    checkpoint = FormUtil.get_checkpoint(form)
 
     list_of_cashbox = Cashbox.objects.qos_filter_active(
         dttm_now,
@@ -59,11 +93,11 @@ def get_cashboxes_info(request, form):
                     mean_queue = mean_queue['mean_queue']
 
         # todo: rewrite without 100500 requests to db (CameraCashboxStat also)
-        status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+        status = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related('worker_day__worker').filter(
             on_cashbox=cashbox,
-            tm_to__isnull=True,
+            dttm_to__isnull=True,
             worker_day__dt=(dttm_now-timedelta(hours=2)).date(),
-            worker_day__worker_shop=shop_id,
+            worker_day__worker__shop_id=shop_id,
         )
 
         user_id = None
@@ -96,40 +130,78 @@ def get_cashboxes_info(request, form):
 @api_method('GET', GetCashiersInfo)
 def get_cashiers_info(request, form):
     """
-    gets status of all cashiers, working today
+    Показывает статусы всех кассиров работающих в данное время.
 
-    :param request:
-    :param form:
-    :return: complicated dict (see the code below)
+    Todo:
+        Неправильно работает ползунок со временем (проблема скорее всего на бэке)
+        Сделать без привязки к времени tm_to_show_all_workers.
+
+    Args:
+        method: GET
+        url: /api/tablet/get_cashiers_info
+        shop_id (int): required = False
+        dttm (QOS_DATETIME): дата и время
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
+
+    Returns:
+        {
+            worker_id: {
+                | 'break_triplets': [\n
+                    [время в минутах сколько перерыв идет/был, 0/1 (перерыв был или нет)],
+                    ...
+                | ],
+                | 'cashbox_dttm_added': время, когда была добавлена касса (либо null),
+                | 'cashbox_dttm_deleted': время, когда была удалена касса (либо null),
+                | 'cashbox_id': id кассы за которой сидит сотрудник, либо null (если сотрудник на перерыве, например),
+                | 'cashbox_number': номер кассы, либо null,
+                | 'cashbox_type': id типа касы за которой сегодня сотрудник работает,
+                'cashbox_types': [
+                    {
+                        | 'bills_amount': количество чеков,
+                        | 'cashbox_type: id типа кассы,
+                        | 'id': id объекта WorkerCashboxInfo,
+                        | 'mean_speed': средняя скорость,
+                        | 'period': ,
+                        | 'priority': ,
+                        | 'worker': id работника
+                    }
+                ],\n
+                | 'default_break_triplets' (str): "[15, 30, 15]", либо "[15, 30, 15, 15]" (например),
+                | 'status': статус работника. например "W" -- работает, "B" -- перерыв
+                | 'time_without_rest': количество минут которое сотрудник работает без перерыва(обнуляется после каждого перерыва),
+                | 'dttm_work_end': дата-время, когда заканчивается рабочий день,
+                | 'dttm_work_start': дата-время, когда начинается рабочий день,
+                | 'worker_day_id': id соответствующего объекта worker_day,
+                | 'worker_id': id работника
+            }
+        }
+
     """
 
     shop_id = FormUtil.get_shop_id(request, form)
+    checkpoint = FormUtil.get_checkpoint(form)
     dttm = form['dttm']
     response = {}
-
-    tm_to_show_all_workers = datetime_module.time(23, 59)  # в 23:59 уже можно показывать всех сотрудников
-    # todo: сделать без привязки к времени
 
     shop = Shop.objects.get(id=shop_id)
     break_triplets = shop.break_triplets
     list_of_break_triplets = json.loads(break_triplets)
     time_without_rest = {}
 
-    status = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
-        worker_day__tm_work_start__lte=(dttm + timedelta(minutes=30)).time() if not is_midnight_period(dttm)
-                                        else tm_to_show_all_workers,
+    status = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
+        worker_day__dttm_work_start__lte=dttm + timedelta(minutes=30),
         worker_day__dt=(dttm - timedelta(hours=2)).date(),
-        worker_day__worker_shop__id=shop_id,
+        worker_day__worker__shop__id=shop_id,
     ).order_by('id')
 
     for item in status:
         triplets = []
         default_break_triplets = []
 
-        tm_work_end = item.worker_day.tm_work_end
-        tm_work_start = item.worker_day.tm_work_start
+        dttm_work_end = item.worker_day.dttm_work_end if item.worker_day.dttm_work_end else None
+        dttm_work_start = item.worker_day.dttm_work_start if item.worker_day.dttm_work_start else None
 
-        duration_of_work = round(time_diff(tm_work_start, tm_work_end) / 60)
+        duration_of_work = round((dttm_work_end - dttm_work_start).total_seconds() / 60)
 
         if item.worker_day.worker_id not in time_without_rest.keys():
             time_without_rest[item.worker_day.worker_id] = 0
@@ -140,19 +212,21 @@ def get_cashiers_info(request, form):
                     triplets.append([0, 0])
                     default_break_triplets.append(time_triplet)
 
-        if item.worker_day.tm_work_start > dttm.time() and item.worker_day.dt == dttm.date() and not item.is_tablet:
+        if item.worker_day.dttm_work_start > dttm and item.worker_day.dt == dttm.date() and not item.is_tablet:
             item.status = WorkerDayCashboxDetails.TYPE_SOON
         else:
             if item.is_tablet is True:
                 if item.status == WorkerDayCashboxDetails.TYPE_BREAK:
                     time_without_rest[item.worker_day.worker_id] = 0
-                    break_end = item.tm_to
 
-                    if item.tm_to is None:
-                        break_end = dttm.time()
-                    if item.tm_from is None:
-                        item.tm_from = dttm.time()
-                    real_break_time = time_diff(item.tm_from, break_end)
+                    if item.dttm_to is None:
+                        break_end = dttm
+                    else:
+                        break_end = item.dttm_to
+
+                    if item.dttm_from is None:
+                        item.dttm_from = dttm
+                    real_break_time = (break_end - item.dttm_from).total_seconds()
 
                     for triplet in list_of_break_triplets:
                         if int(triplet[0]) < duration_of_work <= int(triplet[1]):
@@ -170,12 +244,15 @@ def get_cashiers_info(request, form):
                             break
 
                 elif item.status == WorkerDayCashboxDetails.TYPE_WORK:
-                    tm_to = item.tm_to
-                    if item.tm_to is None:
-                        tm_to = dttm.time()
-                    time_without_rest[item.worker_day.worker_id] += round(time_diff(item.tm_from, tm_to) / 60)
 
-                if not item.tm_to is None:
+                    if item.dttm_to is None:
+                        dttm_to = dttm
+                    else:
+                        dttm_to = item.dttm_to
+
+                    time_without_rest[item.worker_day.worker_id] += round((dttm_to - item.dttm_from).total_seconds() / 60)
+
+                if not item.dttm_to is None:
                     item.status = WorkerDayCashboxDetails.TYPE_FINISH
             else:
                 item.status = WorkerDayCashboxDetails.TYPE_T
@@ -195,8 +272,8 @@ def get_cashiers_info(request, form):
                 "worker_id": item.worker_day.worker_id,
                 "status": item.status,
                 "worker_day_id": item.worker_day_id,
-                "tm_work_start": str(item.tm_from),
-                "tm_work_end": str(item.worker_day.tm_work_end),
+                "tm_work_start": str(item.dttm_from.time()),
+                "tm_work_end": str(item.worker_day.dttm_work_end.time()),
                 "default_break_triplets": str(default_break_triplets),
                 "break_triplets": triplets,
                 "cashbox_id": item.on_cashbox_id,
@@ -207,7 +284,7 @@ def get_cashiers_info(request, form):
             }
 
         else:
-            tm_work_end = item.tm_to if item.status == WorkerDayCashboxDetails.TYPE_FINISH else item.worker_day.tm_work_end
+            tm_work_end = item.dttm_to if item.status == WorkerDayCashboxDetails.TYPE_FINISH else item.worker_day.dttm_work_end
             if not item.on_cashbox_id is None:
                 cashbox_type = item.cashbox_type_id
             else:
@@ -220,16 +297,18 @@ def get_cashiers_info(request, form):
                 "cashbox_number": cashbox_number,
                 "time_without_rest": time_without_rest[item.worker_day.worker_id],
                 "default_break_triplets": str(default_break_triplets),
-                "tm_work_end": str(tm_work_end),
+                "tm_work_end": str(tm_work_end.time()),
                 "cashbox_type": cashbox_type,
             })
 
     user_ids = response.keys()
     worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('cashbox_type').filter(worker_id__in=user_ids, is_active=True)
     worker_cashboxes_types = group_by(list(worker_cashboxes_types), group_key=lambda _: _.worker_id,)
+
     for user_id in response.keys():
-        if worker_cashboxes_types:
+        if user_id in worker_cashboxes_types.keys():
             response[user_id]['cashbox_types'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashboxes_types.get(user_id)]
+
     return JsonResponse.success(response)
 
 
@@ -241,17 +320,41 @@ def get_cashiers_info(request, form):
 )
 def change_cashier_status(request, form):
     """
-    change cashier status if possible
+    Меняет статус кассира если это возможно.
 
-    :param request:
-    :param form:
-    :return:
+    Args:
+        method: POST
+        url: api/tablet/change_cashier_status
+        worker_id (int): required = True
+        status (char): статус на который хотим поменять (например, "W", "H")
+        cashbox_id (int): required = False. id кассы на которую хотим посадить (либо null если например отправляем работника домой)
+        is_current_time (bool): когда приходит сотрудник ставить ему время прихода текущее (True), или по расписанию (False)
+        tm_changin (QOS_TIME): required = False
+        tm_work_end (QOS_TIME): required = False. Если сотрудник вышел не по расписанию, объекта workerday_cashbox_details у него
+            на этот день нету, соответственно нужно проставить время окончания рабочего дня.
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
+
+    Returns:
+        {
+            | 'worker_id': id работяги,
+            | 'status': новый статус пользователя,
+            | 'cashbox_id': id кассы, либо null
+        }
+
+    Raises:
+        JsonResponse.value_error в случаях, когда:
+            Пытаемся поменять статус работника, который уже ушел домой или был отпущен. \n
+            Пытаемся поменять статус на 'Скоро придет' \n
+            Пытаемся посадить сотрудника на кассу, на которой уже кто-то работает \n
+
+
     """
     worker_id = form['worker_id']
     new_user_status = form['status']
     cashbox_id = form['cashbox_id']
     is_current_time = form['is_current_time']
     tm_work_end = form['tm_work_end']
+    checkpoint = FormUtil.get_checkpoint(form)
 
     dttm_now = (now() + timedelta(hours=3)).replace(microsecond=0)
     dt = (dttm_now-timedelta(hours=3)).date()
@@ -263,23 +366,28 @@ def change_cashier_status(request, form):
     cashbox_type = None if cashbox_id is None else CashboxType.objects.get(cashbox__id=cashbox_id)
     wdcd = None
 
-    workerday_detail_obj = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
+    workerday_detail_obj = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
         worker_day__dt=dt,
         worker_day__worker_id=worker_id
     ).order_by('id').last()
 
-    worker_day = WorkerDay.objects.get(worker__id=worker_id, dt=dt)
+    try:
+        worker_day = WorkerDay.objects.qos_filter_version(checkpoint).get(dt=dt, worker_id=worker_id)
+    except WorkerDay.DoesNotExist:
+        return JsonResponse.does_not_exists_error()
+    except WorkerDay.MultipleObjectsReturned:
+        return JsonResponse.multiple_objects_returned()
 
-    cashbox_worked = WorkerDayCashboxDetails.objects.filter(
-        Q(tm_to__isnull=True) | Q(tm_to__gt=dttm_now.time()),
+    cashbox_worked = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
+        Q(dttm_to__isnull=True) | Q(dttm_to__gt=dttm_now),
         worker_day__dt=dt,
         is_tablet=True,
-        tm_from__lte=dttm_now.time(),
+        dttm_from__lte=dttm_now,
         on_cashbox_id=cashbox_id,
         status=WorkerDayCashboxDetails.TYPE_WORK,
     ).count()
     if cashbox_worked:
-        return JsonResponse.value_error('cashbox already opened'.format(cashbox_id))
+        return JsonResponse.value_error('cashbox already opened')
 
     # todo: add other checks for change statuses
     if (new_user_status == WorkerDayCashboxDetails.TYPE_FINISH) and (worker_day.type == WorkerDay.Type.TYPE_ABSENSE):
@@ -292,15 +400,16 @@ def change_cashier_status(request, form):
     #     return JsonResponse.value_error(
     #         'can not change the status to {}'.format(new_user_status))
 
-    if (not workerday_detail_obj is None) and (workerday_detail_obj.is_tablet == True) and (workerday_detail_obj.tm_to is None):
-        workerday_detail_obj.tm_to = time
+    if (not workerday_detail_obj is None) and (workerday_detail_obj.is_tablet is True) and \
+            (workerday_detail_obj.dttm_to is None):
+        workerday_detail_obj.dttm_to = dttm_now
         workerday_detail_obj.save()
 
     if new_user_status == WorkerDayCashboxDetails.TYPE_ABSENCE:
         worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
         worker_day.save()
     elif new_user_status == WorkerDayCashboxDetails.TYPE_FINISH:
-        WorkerDayCashboxDetails.objects.filter(
+        WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
             worker_day__dt=dt,
             worker_day__worker_id=worker_id,
             is_tablet=False,
@@ -314,15 +423,15 @@ def change_cashier_status(request, form):
             worker_day=worker_day,
             on_cashbox_id=cashbox_id,
             cashbox_type=cashbox_type,
-            tm_from=time,
+            dttm_from=dttm_now,
             status=new_user_status,
             is_tablet=True,
         )
 
         if (new_user_status == WorkerDayCashboxDetails.TYPE_WORK) and (worker_day.type != WorkerDay.Type.TYPE_WORKDAY.value):
             worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
-            worker_day.tm_work_start = time
-            worker_day.tm_work_end = tm_work_end
+            worker_day.dttm_work_start.replace(hour=time.hour, minute=time.minute, second=time.second)
+            worker_day.dttm_work_end.replace(hour=tm_work_end.hour, minute=tm_work_end.minute, second=tm_work_end.second)
             worker_day.save()
     else:
         return JsonResponse.value_error('can not change the status to {}'.format(new_user_status))

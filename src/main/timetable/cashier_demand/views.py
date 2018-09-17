@@ -2,7 +2,7 @@ from datetime import datetime, time, timedelta
 from collections import defaultdict
 
 from django.http import HttpResponse
-from django.db.models import Avg, Max
+from django.db.models import Max
 
 from src.db.models import (
     WorkerDay,
@@ -11,15 +11,14 @@ from src.db.models import (
     WorkerCashboxInfo,
     WorkerDayCashboxDetails,
     PeriodDemand,
-    WorkerDayChangeLog,
     Shop
 )
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
-from src.util.collection import range_u, group_by
-from src.util.models_converter import CashboxTypeConverter, UserConverter, WorkerDayConverter, WorkerCashboxInfoConverter, BaseConverter
+from src.util.collection import group_by
+from src.util.models_converter import CashboxTypeConverter, UserConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
 from src.util.forms import FormUtil
-from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
+from src.conf.djconfig import QOS_DATETIME_FORMAT
 
 from src.db.works.printer.run import run as get_xlsx
 from dateutil.relativedelta import relativedelta
@@ -32,7 +31,49 @@ import io
 
 @api_method('GET', GetCashiersTimetableForm)
 def get_cashiers_timetable(request, form):
+    """
+    Отображает информацию о расписании кассиров с from_dt до to_dt на типах касс с id'шинками \
+    cashbox_types_ids
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier_demand/get_cashiers_timetable
+        from_dt(QOS_DATE): required = True
+        to_dt(QOS_DATE): required = True
+        cashbox_type_ids(list): required = True (либо [] -- если для всех типов касс)
+        format(str): 'raw' или 'excel'. default = 'raw'
+        position_id(int): required = False
+        shop_id(int): required = False
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
+
+    Returns:
+        {
+            'indicators': {
+                | 'FOT': None,
+                | 'big_demand_persent': int,
+                | 'cashier_amount': int,
+                | 'change_amounut'(int): количество изменений в графике,
+                | 'deadtime_part'(float): доля простоя,
+                | 'need_cashier_amount'(int): сколько еще нужно кассиров в этот период
+            },\n
+            'period_step'(int): 30,\n
+            'tt_periods': {
+                'fact_cashier_need': [сколько по факту нужно в период],
+                'predict_cashier_needs': [сколько нужно кассиров в период],
+                'real_cashiers': [сколько сидит кассиров в период]
+            },\n
+            'lack_of_cashiers_on_period': {
+                cashbox_type_id(int): [
+                    {
+                        | 'dttm_start'(QOS_DATETIME): ,
+                        | 'lack_of_cashiers'(float): ,
+                    },...
+                ],..
+            }
+        }
+    """
     shop_id = FormUtil.get_shop_id(request, form)
+    checkpoint = FormUtil.get_checkpoint(form)
 
     if form['format'] == 'excel':
         def __file_name(__dt):
@@ -71,41 +112,42 @@ def get_cashiers_timetable(request, form):
         cashbox_types = cashbox_types.filter(id__in=form['cashbox_type_ids'])
         if len(cashbox_types) != len(form['cashbox_type_ids']):
             return JsonResponse.value_error('bad cashbox_type_ids')
-
     cashbox_types = group_by(cashbox_types, group_key=lambda x: x.id)
+
+    cashbox_types_hard = []
+    for cashbox_type in cashbox_types.values():
+        if cashbox_type[0].do_forecast == CashboxType.FORECAST_HARD:
+            cashbox_types_hard.append(cashbox_type[0])
+    cashbox_types_hard = group_by(cashbox_types_hard, group_key=lambda x: x.id)
 
     cashbox_types_main = []
     for cashbox_type in cashbox_types.values():
         if cashbox_type[0].is_main_type:
             cashbox_types_main.append(cashbox_type[0])
     cashbox_types_main = group_by(cashbox_types_main, group_key=lambda x: x.id)
+
     for ind in range(1, len(cashbox_types) - len(cashbox_types_main) + 1):
         cashbox_types_main[-ind] = None
 
     worker_day_cashbox_detail_filter = {
-        'worker_day__worker_shop_id': shop_id,
-        # worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         'worker_day__dt__gte': form['from_dt'],
         'worker_day__dt__lte': form['to_dt'],
         'cashbox_type_id__in': cashbox_types.keys(),
-        'tm_to__isnull': False,
+        'dttm_to__isnull': False,
     }
     if form['position_id']:
         worker_day_cashbox_detail_filter['worker_day__worker__position__id'] = form['position_id']
 
-    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
-        'worker_day',
-    ).filter(
+    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
         **worker_day_cashbox_detail_filter
     ).exclude(
         status=WorkerDayCashboxDetails.TYPE_BREAK
     ).order_by(
         'worker_day__dt',
-        'tm_from',
-        'tm_to',
+        'dttm_from',
+        'dttm_to',
     )
-
-    worker_cashbox_info = list(WorkerCashboxInfo.objects.filter(
+    worker_cashbox_info = list(WorkerCashboxInfo.objects.select_related('worker').filter(
         is_active=True,
         worker__workerday__dt__gte=form['from_dt'],
         worker__workerday__dt__lte=form['to_dt'],
@@ -145,7 +187,9 @@ def get_cashiers_timetable(request, form):
     real_cashiers = []
     predict_cashier_needs = []
     fact_cashier_needs = []
-    lack_of_cashiers_on_period = []
+    lack_of_cashiers_on_period = {}
+    for cashbox_type in cashbox_types_hard:
+        lack_of_cashiers_on_period[cashbox_type] = []
     dttm_start = datetime.combine(form['from_dt'], time(3, 0))
     periods = 48
     # dttm_start = datetime.combine(form['from_dt'], supershop.tm_start) - PERIOD_STEP
@@ -198,8 +242,8 @@ def get_cashiers_timetable(request, form):
             # for cashier in cashier_working_now:
             #     if cashier.cashbox_type is not None:
             #         cashiers_on_cashbox_type[cashier.cashbox_type.id] += 1  # shift to first model, which has intersection
-            while (ind_b < wdcds_len) and (dttm_ind <= dttm) and wdcds[ind_b].tm_to:
-                dttm_ind = dttm_combine(wdcds[ind_b].worker_day.dt, wdcds[ind_b].tm_to)
+            while (ind_b < wdcds_len) and (dttm_ind <= dttm) and wdcds[ind_b].dttm_to.time():
+                dttm_ind = dttm_combine(wdcds[ind_b].worker_day.dt, wdcds[ind_b].dttm_to.time())
                 ind_b += 1
             ind_b = ind_b - 1 if (dttm_ind > dttm) and ind_b else ind_b
 
@@ -207,9 +251,9 @@ def get_cashiers_timetable(request, form):
             period_bills = {i: 0 for i in cashbox_types.keys()}
             period_cashiers = 0.0
             period_cashiers_hard = 0.0
-            if ind_e < wdcds_len and wdcds[ind_e].tm_to:
-                dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_from)
-                dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_to)
+            if ind_e < wdcds_len and wdcds[ind_e].dttm_to.time():
+                dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].dttm_from.time())
+                dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].dttm_to.time())
 
             while (ind_e < wdcds_len) and (dttm_ind < dttm_end):
                 if dttm_ind_end > dttm:
@@ -226,9 +270,9 @@ def get_cashiers_timetable(request, form):
                         period_cashiers_hard += 1 * proportion
 
                 ind_e += 1
-                if ind_e < wdcds_len and wdcds[ind_e].tm_to:
-                    dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_from)
-                    dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].tm_to)
+                if ind_e < wdcds_len and wdcds[ind_e].dttm_to.time():
+                    dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].dttm_from.time())
+                    dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].dttm_to.time())
 
             dttm_converted = BaseConverter.convert_datetime(dttm)
             real_cashiers.append({
@@ -276,13 +320,12 @@ def get_cashiers_timetable(request, form):
                         need_amount_morning += predict_diff_dict.get(cashbox_type, 0)
                     elif check_time == 'evening':
                         need_amount_evening += predict_diff_dict.get(cashbox_type, 0)
-
+                if cashbox_type in cashbox_types_hard.keys():
                     need_total += predict_diff_dict.get(cashbox_type, 0)
-
-            lack_of_cashiers_on_period.append({
-                'lack_of_cashiers': max(0, need_total - period_cashiers_hard),
-                'dttm_start': dttm_converted,
-            })
+                    lack_of_cashiers_on_period[cashbox_type].append({
+                        'lack_of_cashiers': max(0, need_total - period_cashiers_hard),
+                        'dttm_start': dttm_converted,
+                    })
 
             need_amount_morning = max(0, need_amount_morning - period_cashiers_hard)
             need_amount_evening = max(0, need_amount_evening - period_cashiers_hard)
@@ -310,11 +353,15 @@ def get_cashiers_timetable(request, form):
     #             total_lack_of_cashiers_on_period_demand = one_period_demand.lack_of_cashiers
     #         prev_one_period_demand = one_period_demand
 
-    changed_amount = WorkerDayChangeLog.objects.filter(
-        worker_day__dt__gte = form['from_dt'],
-        worker_day__dt__lte = form['to_dt'],
-        worker_day__worker_shop_id=shop_id,
-    ).count() // 11
+    changed_amount = WorkerDay.objects.select_related('worker').filter(
+        dt__gte=form['from_dt'],
+        dt__lte=form['to_dt'],
+        worker__shop_id=shop_id,
+    ).count() - WorkerDay.objects.select_related('worker').filter(
+        dt__gte=form['from_dt'],
+        dt__lte=form['to_dt'],
+        worker__shop_id=shop_id
+    ).distinct('dt', 'worker').count()
 
     response = {
         'indicators': {
@@ -352,7 +399,7 @@ def get_cashiers_timetable(request, form):
 #     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
 #         'worker_day', 'on_cashbox'
 #     ).filter(
-#         worker_day__worker_shop_id=shop,
+#         worker_day__worker__shop_id=shop,
 #         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
 #         worker_day__dt__gte=form['from_dttm'].date(),
 #         worker_day__dt__lte=form['to_dttm'].date(),
@@ -372,7 +419,7 @@ def get_cashiers_timetable(request, form):
 #     users_ids = list(days.keys())
 #     users = User.objects.filter(id__in=users_ids)
 #     cashbox_types = CashboxType.objects.filter(shop_id=shop.id)
-#
+#xf
 #     worker_cashbox_info = group_by(
 #         WorkerCashboxInfo.objects.filter(worker_id__in=users_ids),
 #         group_key=lambda _: _.worker_id
@@ -398,8 +445,21 @@ def get_cashiers_timetable(request, form):
     # lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def get_workers(request, form):
-    # shop = form['shop_id']
-    # Todo: нужно с фронта передавать shop_id...
+    """
+    Todo: сделать нормальное описание
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier_demand/get_workers
+        from_dttm(QOS_DATETIME): required = True
+        to_dttm(QOS_DATETIME): required = True
+        cashbox_type_ids(list): required = True ([] -- если для всех)
+        shop_id(int): required = True
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
+
+    """
+  
+    checkpoint = FormUtil.get_checkpoint(form)
 
     from_dt = form['from_dttm'].date()
     from_tm = form['from_dttm'].time()
@@ -408,10 +468,10 @@ def get_workers(request, form):
 
     shop = FormUtil.get_shop_id(request, form)
 
-    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.select_related(
-        'worker_day', 'on_cashbox'
+    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related(
+        'on_cashbox', 'worker_day__worker'
     ).filter(
-        worker_day__worker_shop_id=shop,
+        worker_day__worker__shop_id=shop,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         worker_day__dt__gte=from_dt,
         worker_day__dt__lte=to_dt,
@@ -455,8 +515,8 @@ def get_workers(request, form):
         details = user['days'][from_dt]['details']
         cashbox = []
         for d in details:
-            if d.tm_to is None:
-                if d.tm_from <= from_tm:
+            if d.dttm_to.time() is None:
+                if d.dttm_from.time() <= from_tm:
                     cashbox.append(d)
             else:
                 if d.tm_from < d.tm_to:
@@ -465,6 +525,12 @@ def get_workers(request, form):
                 else:
                     if d.tm_from <= to_tm or d.tm_to > from_tm:
                         cashbox.append(d)
+#             elif d.dttm_from.time() < d.dttm_to.time():
+#                 if d.dttm_from.time() <= from_tm < d.dttm_to.time():
+#                     cashbox.append(d)
+#             else:
+#                 if d.dttm_from.time() <= from_tm or d.dttm_to.time() > from_tm:
+#                     cashbox.append(d)
 
         if len(cashbox) == 0:
             continue
@@ -509,12 +575,30 @@ def get_workers(request, form):
 
 @api_method('GET', GetCashiersTimetableForm)
 def get_timetable_xlsx(request, form):
+    """
+    Вьюха для скачивания расписания
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier_demand/get_timetable_xlsx
+        from_dt(QOS_DATE): required = True
+        to_dt(QOS_DATE): required = True
+        cashbox_type_ids(list): required = True (либо [] -- если для всех типов касс)
+        format(str): 'raw' или 'excel'. default = 'raw'
+        position_id(int): required = False
+        shop_id(int): required = False
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
+
+    Returns:
+        Файл расписания
+    """
     shop = FormUtil.get_shop_id(request, form)
     dt_from = datetime(year=form['from_dt'].year, month=form['from_dt'].month, day=1)
     dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
     worksheet = workbook.add_worksheet()
+    checkpoint = FormUtil.get_checkpoint(form)
 
     row = 6
     col = 5
@@ -524,7 +608,7 @@ def get_timetable_xlsx(request, form):
             worksheet.write(row, col + 3 * i + 0, 'НД')
             worksheet.write(row, col + 3 * i + 1, 'НД')
 
-        for wd in WorkerDay.objects.filter(worker=user, dt__gte=dt_from, dt__lte=dt_to).order_by('dt'):
+        for wd in WorkerDay.objects.qos_filter_version(checkpoint).filter(worker=user, dt__gte=dt_from, dt__lte=dt_to).order_by('dt'):
             if wd.type == WorkerDay.Type.TYPE_HOLIDAY.value:
                 cell_1 = 'В'
                 cell_2 = 'В'
@@ -538,9 +622,13 @@ def get_timetable_xlsx(request, form):
             worksheet.write_string(row, col + 3 * int(wd.dt.day) - 3, cell_1)
             worksheet.write_string(row, col + 3 * int(wd.dt.day) - 2, cell_2)
 
-        for wd in WorkerDayCashboxDetails.objects.select_related('cashbox_type', 'worker_day').filter(worker_day__worker=user, worker_day__dt__gte=dt_from, worker_day__dt__lte=dt_to).order_by('worker_day__dt'):
-            cell_1 = wd.worker_day.tm_work_start.strftime(QOS_SHORT_TIME_FORMAT)
-            cell_2 = wd.worker_day.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT)
+        for wd in WorkerDayCashboxDetails.objects.select_related('cashbox_type', 'worker_day').filter(
+                worker_day__worker=user,
+                worker_day__dt__gte=dt_from,
+                worker_day__dt__lte=dt_to
+        ).order_by('worker_day__dt'):
+            cell_1 = wd.worker_day.dttm_work_start.strftime(QOS_DATETIME_FORMAT)
+            cell_2 = wd.worker_day.dttm_work_end.strftime(QOS_DATETIME_FORMAT)
             cell_3 = wd.cashbox_type.name
 
             worksheet.write_string(row, col + 3 * int(wd.worker_day.dt.day) - 3, cell_1)

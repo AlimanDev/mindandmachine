@@ -18,7 +18,6 @@ from src.db.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     Shop,
-    WorkerDayChangeLog,
     WorkerDayChangeRequest,
     Slot,
     UserWeekdaySlot,
@@ -47,10 +46,29 @@ from .forms import (
 import requests
 from .utils import time2int
 from ..table.utils import count_difference_of_normal_days
+from src.main.other.notification.utils import send_notification
 
 
 @api_method('GET', GetStatusForm)
 def get_status(request, form):
+    """
+    Возвращает статус расписания на данный месяц
+
+    Args:
+        method: GET
+        url: /api/timetable/auto_setting/get_status
+        shop_id(int): required = False
+        dt(QOS_DATE): required = True
+
+    Returns:
+        {
+            'id': id расписания,
+            'shop': int,
+            'dt': дата расписания,
+            'status': статус расписания,
+            'dttm_status_change': дата изменения
+        }
+    """
     shop_id = FormUtil.get_shop_id(request, form)
     try:
         tt = Timetable.objects.get(shop_id=shop_id, dt=form['dt'])
@@ -66,6 +84,19 @@ def get_status(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def set_selected_cashiers(request, form):
+    """
+    Проставляет поле auto_timetable = value у заданных сотрудников
+
+    Args:
+        method: POST
+        url: /api/timetable/auto_settings/set_selected_cashiers
+        cashier_ids(list): id'шники сотрудников которым проставлять
+        shop_id(int): required = True
+        value(bool): required = True
+
+    Note:
+        Всем другим сотрудникам из этого магаза проставляется значение противоположное value
+    """
     shop = Shop.objects.get(id=form['shop_id'])
     User.objects.filter(shop=shop).exclude(id__in=form['cashier_ids']).update(auto_timetable=False)
     User.objects.filter(id__in=form['cashier_ids']).update(auto_timetable=True)
@@ -78,6 +109,21 @@ def set_selected_cashiers(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def create_timetable(request, form):
+    """
+    Создает request на qos_algo с заданным параметрами
+
+    Args:
+        method: POST
+        url: /api/timetable/auto_settings/create_timetable
+        shop_id(int): required = True
+        dt(QOS_DATE): required = True
+
+    Raises:
+        JsonResponse.internal_error: если ошибка при составлении расписания
+
+    Note:
+        Отправляет уведомление о том, что расписание начало составляться
+    """
     shop_id = form['shop_id']
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
     dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
@@ -158,12 +204,20 @@ def create_timetable(request, form):
     )
 
     worker_day = group_by(
-        collection=WorkerDay.objects.filter(worker_shop_id=shop_id, dt__gte=dt_from, dt__lte=dt_to),
+        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
+            worker__shop_id=shop_id,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+        ),
         group_key=lambda x: x.worker_id
     )
 
     prev_data = group_by(
-        collection=WorkerDay.objects.filter(worker_shop_id=shop_id, dt__gte=dt_from - timedelta(days=7), dt__lt=dt_from),
+        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
+            worker__shop_id=shop_id,
+            dt__gte=dt_from - timedelta(days=7),
+            dt__lt=dt_from,
+        ),
         group_key=lambda x: x.worker_id
     )
 
@@ -308,6 +362,8 @@ def create_timetable(request, form):
         tt.status_message = str(e)
         tt.save()
         JsonResponse.internal_error('Error sending data to server')
+
+    send_notification('C', tt, sender=request.user)
     return JsonResponse.success()
 
 
@@ -317,6 +373,18 @@ def create_timetable(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def delete_timetable(request, form):
+    """
+    Удаляет расписание на заданный месяц. Также отправляет request на qos_algo на остановку задачи в селери
+
+    Args:
+        method: POST
+        url: /api/timetable/auto_settings/delete_timetable
+        shop_id(int): required = True
+        dt(QOS_DATE): required = True
+
+    Note:
+        Отправляет уведомление о том, что расписание было удалено
+    """
     shop_id = form['shop_id']
 
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
@@ -334,10 +402,11 @@ def delete_timetable(request, form):
                 )
             except (requests.ConnectionError, requests.ConnectTimeout):
                 pass
+            send_notification('D', tt, sender=request.user)
     tts.delete()
 
-    WorkerDayChangeLog.objects.filter(
-        worker_day__worker_shop_id=shop_id,
+    WorkerDayChangeRequest.objects.select_related('worker_day', 'worker_day__worker').filter(
+        worker_day__worker__shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
         worker_day__worker__auto_timetable=True,
@@ -346,8 +415,8 @@ def delete_timetable(request, form):
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
     ).delete()
 
-    WorkerDayChangeRequest.objects.filter(
-        worker_day__worker_shop_id=shop_id,
+    WorkerDayCashboxDetails.objects.select_related('worker_day', 'worker_day__worker').filter(
+        worker_day__worker__shop_id=shop_id,
         worker_day__dt__month=dt_from.month,
         worker_day__dt__year=dt_from.year,
         worker_day__worker__auto_timetable=True,
@@ -356,18 +425,8 @@ def delete_timetable(request, form):
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
     ).delete()
 
-    WorkerDayCashboxDetails.objects.filter(
-        worker_day__worker_shop_id=shop_id,
-        worker_day__dt__month=dt_from.month,
-        worker_day__dt__year=dt_from.year,
-        worker_day__worker__auto_timetable=True,
-    ).filter(
-        Q(worker_day__is_manual_tuning=False) |
-        Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
-    ).delete()
-
-    WorkerDay.objects.filter(
-        worker_shop_id=shop_id,
+    WorkerDay.objects.select_related('worker').filter(
+        worker__shop_id=shop_id,
         dt__month=dt_from.month,
         dt__year=dt_from.year,
         worker__auto_timetable=True,
@@ -387,6 +446,22 @@ def delete_timetable(request, form):
 @csrf_exempt
 @api_method('POST', SetTimetableForm, auth_required=False)
 def set_timetable(request, form):
+    """
+    Ждет request'a от qos_algo. Когда получает, записывает данные по расписанию в бд
+
+    Args:
+        method: POST
+        url: /api/timetable/auto_settings/set_timetable
+        key(str): ключ для сверки
+        data(str): json data с данными от qos_algo
+
+    Raises:
+        JsonResponse.internal_error: если ключ не сконфигурирован, либо не подходит
+        JsonResponse.does_not_exists_error: если расписания нет в бд
+
+    Note:
+        Отправляет уведомление о том, что расписание успешно было создано
+    """
     if settings.QOS_SET_TIMETABLE_KEY is None:
         return JsonResponse.internal_error('key is not configured')
 
@@ -416,7 +491,7 @@ def set_timetable(request, form):
 
             dt = BaseConverter.parse_date(wd['dt'])
             try:
-                wd_obj = WorkerDay.objects.get(worker_id=uid, dt=dt)
+                wd_obj = WorkerDay.objects.get(worker_id=uid, dt=dt, child__id__isnull=True)
                 if wd_obj.is_manual_tuning or wd_obj.type != WorkerDay.Type.TYPE_EMPTY:
                     continue
             except WorkerDay.DoesNotExist:
@@ -426,11 +501,11 @@ def set_timetable(request, form):
 
                 )
 
-            wd_obj.worker_shop_id=users[int(uid)].shop_id
+            wd_obj.worker.shop_id = users[int(uid)].shop_id
             wd_obj.type = WorkerDayConverter.parse_type(wd['type'])
             if WorkerDay.is_type_with_tm_range(wd_obj.type):
-                wd_obj.tm_work_start = BaseConverter.parse_time(wd['tm_work_start'])
-                wd_obj.tm_work_end = BaseConverter.parse_time(wd['tm_work_end'])
+                wd_obj.dttm_work_start = BaseConverter.parse_datetime(wd['dttm_work_start'])
+                wd_obj.dttm_work_end = BaseConverter.parse_datetime(wd['dttm_work_end'])
                 # if wd['tm_break_start']:
                 #     wd_obj.tm_break_start = BaseConverter.parse_time(wd['tm_break_start'])
                 # else:
@@ -443,8 +518,8 @@ def set_timetable(request, form):
                 for wdd in wd['details']:
                     wdd_el = WorkerDayCashboxDetails(
                         worker_day=wd_obj,
-                        tm_from=BaseConverter.parse_time(wdd['tm_from']),
-                        tm_to=BaseConverter.parse_time(wdd['tm_to']),
+                        dttm_from=BaseConverter.parse_datetime(wdd['dttm_from']),
+                        dttm_to=BaseConverter.parse_datetime(wdd['dttm_to']),
                     )
                     if wdd['type'] > 0:
                         wdd_el.cashbox_type_id = wdd['type']
@@ -468,5 +543,6 @@ def set_timetable(request, form):
                 'cashbox_type': line,
                 'type': PeriodDemand.Type.LONG_FORECAST.value,
             })
+    send_notification('C', timetable)
 
     return JsonResponse.success()

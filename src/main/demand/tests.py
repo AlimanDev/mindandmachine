@@ -6,11 +6,6 @@ class TestDemand(LocalTestCase):
         super().setUp()
 
     def test_get_indicators(self):
-
-        # response = self.api_get('/api/demand/get_indicators?from_dt=08.5.2018&to_dt=08.7.2018&type=L')
-        # self.assertEqual(response.status_code, 200)
-        # self.assertEqual(response.json['code'], 403)
-        # self.assertEqual(response.json['data']['error_type'], 'AuthRequired')
         self.auth()
 
         response = self.api_get('/api/demand/get_indicators?from_dt=06.6.2018&to_dt=07.6.2018&type=L')
@@ -24,3 +19,4 @@ class TestDemand(LocalTestCase):
         # self.assertEqual(response.json['data']['growth'], 0)
         self.assertEqual(response.json['data']['total_bills'], 26.0)
         self.assertEqual(response.json['data']['total_codes'], 13.0)
+

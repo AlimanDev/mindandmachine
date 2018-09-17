@@ -25,7 +25,6 @@ class TestTablet(LocalTestCase):
         self.auth()
         response = self.api_get('/api/tablet/get_cashiers_info?shop_id=1&dttm={}'
                                 .format(BaseConverter.convert_datetime(now() + datetime.timedelta(hours=3))))
-
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data']['1']['worker_id'], 1)
@@ -61,7 +60,7 @@ class TestTablet(LocalTestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 400)
-        self.assertEqual(response.json['data']['error_message'], 'cashbox 1 already opened')
+        self.assertEqual(response.json['data']['error_message'], 'cashbox already opened')
 
         response = self.api_get('/api/tablet/get_cashiers_info?shop_id=1&dttm={}'
                                 .format(BaseConverter.convert_datetime(now() + datetime.timedelta(hours=3))))

@@ -13,6 +13,7 @@ class GetCashiersListForm(forms.Form):
     dt_hired_before = util_forms.DateField(required=False)
     dt_fired_after = util_forms.DateField(required=False)
     shop_id = forms.IntegerField(required=False)
+    checkpoint = forms.IntegerField(required=False)
 
     def clean_dt_hired_before(self):
         value = self.cleaned_data.get('dt_hired_before')
@@ -33,6 +34,7 @@ class GetCashierTimetableForm(forms.Form):
     to_dt = util_forms.DateField()
     format = util_forms.ChoiceField(['raw', 'excel'], 'raw')
     shop_id = forms.IntegerField()
+    checkpoint = forms.IntegerField(required=False)
 
     def clean(self):
         if self.errors:
@@ -78,6 +80,7 @@ class GetCashierInfoForm(forms.Form):
 class GetWorkerDayForm(forms.Form):
     worker_id = forms.IntegerField()
     dt = util_forms.DateField()
+    checkpoint = forms.IntegerField(required=False)
 
 
 class SetWorkerDaysForm(forms.Form):
@@ -87,6 +90,7 @@ class SetWorkerDaysForm(forms.Form):
     type = forms.CharField()
     tm_work_start = util_forms.TimeField(required=False)
     tm_work_end = util_forms.TimeField(required=False)
+    checkpoint = forms.IntegerField(required=False)
 
     cashbox_type = forms.IntegerField(required=False)
     comment = forms.CharField(max_length=128, required=False)
@@ -139,7 +143,8 @@ class SetWorkerDayForm(forms.Form):
             return
 
         if WorkerDay.is_type_with_tm_range(self.cleaned_data['type']):
-            if self.cleaned_data.get('tm_work_start') is None or self.cleaned_data.get('tm_work_end') is None or self.cleaned_data.get('tm_break_start') is None:
+            if self.cleaned_data.get('tm_work_start') is None or self.cleaned_data.get('tm_work_end') is None or \
+                    self.cleaned_data.get('tm_break_start') is None:
                 raise ValidationError('tm_work_start, tm_work_end and tm_break_start required')
 
 
@@ -218,3 +223,18 @@ class DeleteCashierForm(forms.Form):
     user_id = forms.IntegerField()
     dt_fired = util_forms.DateField()
 
+
+class PasswordChangeForm(forms.Form):
+    user_id = forms.IntegerField()
+    old_password = forms.CharField(max_length=128)
+    new_password = forms.CharField(max_length=128)
+
+
+class ChangeCashierInfo(forms.Form):
+    user_id = forms.IntegerField()
+    first_name = forms.CharField(max_length=30, required=False)
+    middle_name = forms.CharField(max_length=64, required=False)
+    last_name = forms.CharField(max_length=150, required=False)
+    avatar = forms.ImageField(required=False)
+    group = forms.CharField(max_length=1, required=False)
+    birthday = forms.DateField(required=False)

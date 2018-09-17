@@ -26,6 +26,10 @@ class BaseConverter(object):
         return datetime.datetime.strptime(obj, QOS_TIME_FORMAT).time()
 
     @classmethod
+    def parse_datetime(cls, obj):
+        return datetime.datetime.strptime(obj, QOS_DATETIME_FORMAT)
+
+    @classmethod
     def convert_datetime(cls, obj):
         return obj.strftime(QOS_DATETIME_FORMAT) if obj is not None else None
 
@@ -135,32 +139,6 @@ class WorkerDayChangeRequestConverter(BaseConverter):
         }
 
 
-class WorkerDayChangeLogConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        def __work_tm(__field, __type):
-            return cls.convert_time(__field) if __type == WorkerDay.Type.TYPE_WORKDAY.value else None
-
-        return {
-            'id': obj.id,
-            'dttm_changed': cls.convert_datetime(obj.dttm_changed),
-            'worker_day': obj.worker_day_id,
-
-            'from_type': WorkerDayConverter.convert_type(obj.from_type),
-            'from_tm_work_start': __work_tm(obj.from_tm_work_start, obj.from_type),
-            'from_tm_work_end': __work_tm(obj.from_tm_work_end, obj.from_type),
-            'from_tm_break_start': __work_tm(obj.from_tm_break_start, obj.from_type),
-
-            'to_type': WorkerDayConverter.convert_type(obj.to_type),
-            'to_tm_work_start': __work_tm(obj.to_tm_work_start, obj.to_type),
-            'to_tm_work_end': __work_tm(obj.to_tm_work_end, obj.to_type),
-            'to_tm_break_start': __work_tm(obj.to_tm_break_start, obj.to_type),
-            'comment': obj.comment,
-
-            'changed_by': obj.changed_by_id,
-        }
-
-
 class CashboxTypeConverter(BaseConverter):
     __FORECAST_TYPE = {
         CashboxType.FORECAST_HARD: 1,
@@ -190,6 +168,7 @@ class CashboxTypeConverter(BaseConverter):
                 'prob': obj.probability,
                 'prior_weight': obj.prior_weight,
                 'prediction': cls.convert_type(obj.do_forecast),
+                'is_main_type': obj.is_main_type,
             })
         return vals
 
@@ -217,7 +196,8 @@ class WorkerCashboxInfoConverter(BaseConverter):
             'mean_speed': obj.mean_speed,
             'bills_amount': obj.bills_amount,
             'period': obj.period,
-            'priority': obj.priority
+            'priority': obj.priority,
+            'duration': obj.duration
         }
 
 

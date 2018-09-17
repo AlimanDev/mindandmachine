@@ -140,7 +140,6 @@ def load_users(manager_username, shop, data, year, month, column_cashbox_type, c
                 worker=user,
                 dt=dt,
                 type=workday_type,
-                worker_shop=shop,
                 tm_work_start=tm_work_start,
                 tm_work_end=tm_work_end
             )

@@ -6,6 +6,30 @@ from.forms import SetNotificationsReadForm, GetNotificationsForm
 
 @api_method('GET', GetNotificationsForm, check_permissions=False)
 def get_notifications(request, form):
+    """
+    Получить список уведомлений
+
+    Args:
+        method: GET
+        url: /api/other/notification/get_notifications
+        pointer(int): required = False. Начиная с каких уведомлений получать (id меньше pointer'a)
+        count(int): required = True. Сколько уведомлений мы хотим получить
+
+    Returns:
+        {
+            | 'get_noty_pointer': int,
+            | 'get_new_noty_pointer': id уведомления начиная с которого в след раз получать,
+            'notifications': [
+                | 'was_read': True/False,
+                | 'id': id уведомления,
+                | 'to_worker': id пользователя кому это уведомления,
+                | 'type': "I"/"W"/etc,
+                | 'dttm_added': дата создания уведомления
+            | ],
+            | 'unread_count': количество непрочитанных уведомлений
+
+        }
+    """
     pointer = form.get('pointer')
     count = form['count']
     user = request.user
@@ -31,6 +55,19 @@ def get_notifications(request, form):
 
 @api_method('POST', SetNotificationsReadForm, check_permissions=False)
 def set_notifications_read(request, form):
+    """
+    Сделать уведомление прочитанным
+
+    Args:
+        method: POST
+        url: /api/other/notification/set_notifications_read
+        ids(list): список уведомлений, которые сделать прочитанными (либо [] -- для всех)
+
+    Returns:
+        {
+            'updated_count': количество прочтенных уведомлений
+        }
+    """
     count = Notifications.objects.filter(to_worker=request.user, id__in=form['ids']).update(was_read=True)
     return JsonResponse.success({
         'updated_count': count
