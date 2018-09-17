@@ -42,6 +42,7 @@ from .forms import (
     PasswordChangeForm,
     ChangeCashierInfo,
     GetWorkerDayChangeLogsForm,
+    DeleteWorkerDayChangeLogsForm,
 )
 from src.main.other.notification.utils import send_notification
 from django.contrib.auth import update_session_auth_hash
@@ -830,6 +831,9 @@ def get_worker_day_logs(request, form):
          {
             Список worker_day'ев (детей worker_day_id, либо все worker_day'и, у которых есть дети)
          }
+
+    Raises:
+        JsonResponse.does_not_exist_error: если рабочего дня с worker_day_id нет
     """
     shop_id = FormUtil.get_shop_id(request, form)
     worker_day_id = form['worker_day_id']
@@ -842,7 +846,7 @@ def get_worker_day_logs(request, form):
             return JsonResponse.does_not_exists_error('Ошибка. Такого рабочего дня в расписании нет.')
 
     child_worker_days = WorkerDay.objects.select_related('worker').filter(
-        child__id__isnull=False,
+        parent_worker_day_id__isnull=False,
         worker__shop_id=shop_id,
         dt__gte=form['from_dt'],
         dt__lte=form['to_dt']
@@ -853,7 +857,77 @@ def get_worker_day_logs(request, form):
             worker_id=worker_day_desired.worker_id,
         )
 
-    return JsonResponse.success([WorkerDayConverter.convert(worker_day) for worker_day in child_worker_days])
+    response_data = [WorkerDayConverter.convert(worker_day) for worker_day in child_worker_days]
+    for one_wd in response_data:
+        one_wd['prev_dttm_work_start'] = BaseConverter.convert_datetime(
+            WorkerDay.objects.get(
+                id=child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
+            ).dttm_work_start
+        )
+        one_wd['prev_dttm_work_end'] = BaseConverter.convert_datetime(
+            WorkerDay.objects.get(
+                id=child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
+            ).dttm_work_end
+        )
+        one_wd['prev_type'] = WorkerDayConverter.convert_type(
+            WorkerDay.objects.get(
+                id=child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
+            ).type
+        )
+
+    return JsonResponse.success(response_data)
+
+
+@api_method(
+    'GET',
+    DeleteWorkerDayChangeLogsForm,
+    lambda_func=lambda x: WorkerDay.objects.get(id=x['worker_day_id']).worker
+)
+def delete_worker_day(request, form):
+    """
+    Удаляет объект WorkerDay'a с worker_day_id из бд. При этом перезаписывает parent_worker_day
+
+    Args:
+        method: POST
+        url: /api/timetable/cashier/delete_worker_day
+        worker_day_id(int): required = True
+
+    Raises:
+        JsonResponse.does_not_exists_error: если такого рабочего дня нет в бд
+        JsonResponse.internal_error: ошибка при удалении из базы
+    """
+    try:
+        worker_day_to_delete = WorkerDay.objects.get(id=form['worker_day_id'])
+    except WorkerDay.DoesNotExist:
+        return JsonResponse.does_not_exists_error('Такого рабочего дня нет в расписании.')
+
+    wd_parent = worker_day_to_delete.parent_worker_day
+
+    if wd_parent is None:
+        return JsonResponse.internal_error('Нельзя удалить версию, составленную расписанием.')
+
+    try:
+        wd_child = worker_day_to_delete.child
+    except:
+        wd_child = None
+
+    if wd_child is not None:
+        wd_child.parent_worker_day = wd_parent
+
+    try:
+        worker_day_to_delete.parent_worker_day = None
+        worker_day_to_delete.save()
+        if wd_child:
+            wd_child.save()
+        try:
+            WorkerDayCashboxDetails.objects.get(worker_day_id=worker_day_to_delete.id).delete()
+        except WorkerDayCashboxDetails.DoesNotExist:
+            pass
+        worker_day_to_delete.delete()
+    except:
+        return JsonResponse.internal_error('Не удалось удалить день из расписания.')
+
+    return JsonResponse.success()
 
 
 @api_method(
