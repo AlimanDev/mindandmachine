@@ -826,6 +826,8 @@ def get_worker_day_logs(request, form):
         from_dt(QOS_DATE): required = True. от какой даты брать логи
         to_dt(QOS_DATE): required = True. до какой даты
         worker_day_id(int): required = False
+        pointer(int): для пагинации. начиная с какого элемента, отдаваемого списка, показывать. required = True
+        size(int): сколько записей отдавать (то есть отдаст срез [pointer: pointer + size]. required = False (default 10)
 
     Returns:
          {
@@ -836,6 +838,8 @@ def get_worker_day_logs(request, form):
         JsonResponse.does_not_exist_error: если рабочего дня с worker_day_id нет
     """
     shop_id = FormUtil.get_shop_id(request, form)
+    pointer = form['pointer']
+    size = form['size'] if form['size'] else 10
     worker_day_id = form['worker_day_id']
     worker_day_desired = None
 
@@ -850,7 +854,7 @@ def get_worker_day_logs(request, form):
         worker__shop_id=shop_id,
         dt__gte=form['from_dt'],
         dt__lte=form['to_dt']
-    )
+    ).order_by('-dttm_added')
     if worker_day_desired:
         child_worker_days = child_worker_days.filter(
             dt=worker_day_desired.dt,
@@ -875,7 +879,7 @@ def get_worker_day_logs(request, form):
             ).type
         )
 
-    return JsonResponse.success(response_data)
+    return JsonResponse.success(response_data[pointer:pointer+size])
 
 
 @api_method(
@@ -894,7 +898,7 @@ def delete_worker_day(request, form):
 
     Raises:
         JsonResponse.does_not_exists_error: если такого рабочего дня нет в бд
-        JsonResponse.internal_error: ошибка при удалении из базы
+        JsonResponse.internal_error: ошибка при удалении из базы, либо если пытаемся удалить версию, составленную расписанием
     """
     try:
         worker_day_to_delete = WorkerDay.objects.get(id=form['worker_day_id'])
@@ -917,11 +921,12 @@ def delete_worker_day(request, form):
     try:
         worker_day_to_delete.parent_worker_day = None
         worker_day_to_delete.save()
+
         if wd_child:
             wd_child.save()
         try:
             WorkerDayCashboxDetails.objects.get(worker_day_id=worker_day_to_delete.id).delete()
-        except WorkerDayCashboxDetails.DoesNotExist:
+        except:
             pass
         worker_day_to_delete.delete()
     except:

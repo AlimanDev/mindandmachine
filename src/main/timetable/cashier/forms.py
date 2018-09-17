@@ -244,6 +244,8 @@ class GetWorkerDayChangeLogsForm(forms.Form):
     shop_id = forms.IntegerField()
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
+    pointer = forms.IntegerField()
+    size = forms.IntegerField(required=False)
     worker_day_id = forms.IntegerField(required=False)
 
 
