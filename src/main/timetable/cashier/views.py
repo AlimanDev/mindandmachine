@@ -41,8 +41,8 @@ from .forms import (
     SetWorkerDaysForm,
     PasswordChangeForm,
     ChangeCashierInfo,
+    GetWorkerDayChangeLogsForm,
 )
-from . import utils
 from src.main.other.notification.utils import send_notification
 from django.contrib.auth import update_session_auth_hash
 
@@ -735,7 +735,6 @@ def set_worker_day(request, form):
     else:
         details = []
     dt = form['dt']
-    print(type(form['tm_work_end']), form['tm_work_end'])
 
     try:
         worker = User.objects.get(id=form['worker_id'])
@@ -812,6 +811,49 @@ def set_worker_day(request, form):
     }
 
     return JsonResponse.success(response)
+
+
+@api_method('GET', GetWorkerDayChangeLogsForm)
+def get_worker_day_logs(request, form):
+    """
+    Получаем список изменений в расписании (либо конкретного сотрудника, если указыван worker_day_id), либо всех (иначе)
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier/get_worker_day_logs
+        shop_id(int): required = True
+        from_dt(QOS_DATE): required = True. от какой даты брать логи
+        to_dt(QOS_DATE): required = True. до какой даты
+        worker_day_id(int): required = False
+
+    Returns:
+         {
+            Список worker_day'ев (детей worker_day_id, либо все worker_day'и, у которых есть дети)
+         }
+    """
+    shop_id = FormUtil.get_shop_id(request, form)
+    worker_day_id = form['worker_day_id']
+    worker_day_desired = None
+
+    if worker_day_id:
+        try:
+            worker_day_desired = WorkerDay.objects.get(id=worker_day_id)
+        except WorkerDay.DoesNotExist:
+            return JsonResponse.does_not_exists_error('Ошибка. Такого рабочего дня в расписании нет.')
+
+    child_worker_days = WorkerDay.objects.select_related('worker').filter(
+        child__id__isnull=False,
+        worker__shop_id=shop_id,
+        dt__gte=form['from_dt'],
+        dt__lte=form['to_dt']
+    )
+    if worker_day_desired:
+        child_worker_days = child_worker_days.filter(
+            dt=worker_day_desired.dt,
+            worker_id=worker_day_desired.worker_id,
+        )
+
+    return JsonResponse.success([WorkerDayConverter.convert(worker_day) for worker_day in child_worker_days])
 
 
 @api_method(

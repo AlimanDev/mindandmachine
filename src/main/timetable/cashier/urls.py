@@ -16,6 +16,6 @@ urlpatterns = [
     path('delete_cashier', views.delete_cashier),
     path(r'password_edit', views.password_edit),
     path(r'change_cashier_info', views.change_cashier_info),
-
+    path('get_worker_day_logs', views.get_worker_day_logs),
 ]
 

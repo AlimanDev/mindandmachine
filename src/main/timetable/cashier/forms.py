@@ -238,3 +238,11 @@ class ChangeCashierInfo(forms.Form):
     avatar = forms.ImageField(required=False)
     group = forms.CharField(max_length=1, required=False)
     birthday = forms.DateField(required=False)
+
+
+class GetWorkerDayChangeLogsForm(forms.Form):
+    shop_id = forms.IntegerField()
+    from_dt = util_forms.DateField()
+    to_dt = util_forms.DateField()
+    worker_day_id = forms.IntegerField(required=False)
+
