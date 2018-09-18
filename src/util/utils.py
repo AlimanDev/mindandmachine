@@ -25,11 +25,12 @@ class JsonResponse(object):
         csrf_required(): 401
         access_forbidden(msg): 403
         internal_error(msg): 500
+        algo_internal_error(msg): 500
 
     """
     @classmethod
-    def success(cls, data=None):
-        return cls.__base_response(200, data)
+    def success(cls, data=None, additional_info=None):
+        return cls.__base_response(200, data, additional_info)
 
     @classmethod
     def method_error(cls, current_method, expected_method):
@@ -88,10 +89,11 @@ class JsonResponse(object):
         return cls.__base_response(code, response_data)
 
     @classmethod
-    def __base_response(cls, code, data):
+    def __base_response(cls, code, data, additional_info=None):
         response_data = {
             'code': code,
-            'data': data
+            'data': data,
+            'info': additional_info
         }
         return HttpResponse(json.dumps(response_data, separators=(',', ':'), ensure_ascii=False), content_type='application/json')
 

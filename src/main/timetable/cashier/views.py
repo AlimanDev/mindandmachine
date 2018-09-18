@@ -24,7 +24,8 @@ from src.util.models_converter import (
     WorkerConstraintConverter,
     WorkerCashboxInfoConverter,
     CashboxTypeConverter,
-    BaseConverter
+    BaseConverter,
+    WorkerDayChangeLogConverter,
 )
 from src.util.collection import group_by, count, range_u, group_by_object
 
@@ -41,8 +42,9 @@ from .forms import (
     SetWorkerDaysForm,
     PasswordChangeForm,
     ChangeCashierInfo,
+    GetWorkerDayChangeLogsForm,
+    DeleteWorkerDayChangeLogsForm,
 )
-from . import utils
 from src.main.other.notification.utils import send_notification
 from django.contrib.auth import update_session_auth_hash
 
@@ -281,7 +283,8 @@ def get_cashier_timetable(request, form):
             WorkerDay.objects.filter(
                 worker_id=worker_id,
                 dt__gte=from_dt,
-                dt__lte=to_dt
+                dt__lte=to_dt,
+                parent_worker_day__isnull=False
             ),
             group_key=lambda _: _.id,
             sort_key=lambda _: _.dt,
@@ -302,7 +305,7 @@ def get_cashier_timetable(request, form):
         for obj in worker_days:
             days_response.append({
                 'day': WorkerDayConverter.convert(obj),
-                'change_log': [WorkerDayConverter.convert(x) for x in
+                'change_log': [WorkerDayChangeLogConverter.convert(x) for x in
                                worker_day_change_log.get(obj.id, [])[:10]],
                 'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in
                                     worker_day_change_requests.get(obj.id, [])[:10]]
@@ -481,7 +484,8 @@ def get_worker_day(request, form):
                 | 'worker': id worker'a,
                 | 'cashbox_types': [],
                 | 'type': тип worker_day'a,
-                | 'tm_work_start': ,
+                | 'dttm_work_start': ,
+                | 'dttm_work_end': ,
                 | 'is_manual_tuning': True/False,
                 | 'tm_break_start': время начала перерыва,
                 | 'dttm_added': ,
@@ -542,8 +546,8 @@ def get_worker_day(request, form):
             select_related('on_cashbox', 'cashbox_type').\
             filter(worker_day=wd):
         details.append({
-            'tm_from': BaseConverter.convert_time(x.dttm_from.time()),
-            'tm_to': BaseConverter.convert_time(x.dttm_to.time()),
+            'dttm_from': BaseConverter.convert_time(x.dttm_from.time()),
+            'dttm_to': BaseConverter.convert_time(x.dttm_to.time()),
             'cashbox_type': x.cashbox_type_id,
         })
         cashboxes_types[x.cashbox_type_id] = CashboxTypeConverter.convert(x.cashbox_type)
@@ -702,8 +706,8 @@ def set_worker_day(request, form):
         worker_id(int): required = True
         dt(QOS_DAT): дата рабочего дня
         type(str): required = True. новый тип рабочего дня
-        tm_work_start(QOS_TIME): новое время начала рабочего дня
-        tm_work_end(QOS_TIME): новое время конца рабочего дня
+        dttm_work_start(QOS_TIME): новое время начала рабочего дня
+        dttm_work_end(QOS_TIME): новое время конца рабочего дня
         tm_break_start(QOS_TIME): required = False
         cashbox_type(int): required = False. на какой специализации он будет работать
         comment(str): max_length=128, required = False
@@ -717,8 +721,8 @@ def set_worker_day(request, form):
                 | 'dt': дата WorkerDay'a,
                 | 'worker': id worker'a,
                 | 'type': тип,
-                | 'tm_work_start': время начала рабочего дня,
-                | 'tm_work_end': время конца рабочего дня,
+                | 'dttm_work_start': время начала рабочего дня,
+                | 'dttm_work_end': время конца рабочего дня,
                 | 'tm_break_start': начало перерыва,
                 | 'is_manual_tuning': True,
                 | 'cashbox_types'(list): специализации (id'шники типов касс)
@@ -733,13 +737,35 @@ def set_worker_day(request, form):
         details = json.loads(form['details'])
     else:
         details = []
+    dt = form['dt']
 
     try:
         worker = User.objects.get(id=form['worker_id'])
     except User.DoesNotExist:
         return JsonResponse.value_error('Invalid worker_id')
 
-    wd_args = utils.worker_day_create_args(form)
+    dttm_work_start = datetime.combine(dt, form['tm_work_start'])  # на самом деле с фронта приходят время а не дата-время
+    tm_work_end = form['tm_work_end']
+    dttm_work_end = datetime.combine(form['dt'], tm_work_end) if tm_work_end > form['tm_work_start'] else\
+        datetime.combine(dt + timedelta(days=1), tm_work_end)
+
+    wd_args = {
+        'dt': dt,
+        'type': form['type'],
+    }
+    if WorkerDay.is_type_with_tm_range(form['type']):
+        wd_args.update({
+            'dttm_work_start': dttm_work_start,
+            'dttm_work_end': dttm_work_end,
+            'tm_break_start': form['tm_break_start']
+        })
+    else:
+        wd_args.update({
+            'dttm_work_start': None,
+            'dttm_work_end': None,
+            'tm_break_start': None
+        })
+
     try:
         old_wd = WorkerDay.objects.qos_current_version().get(
             worker_id=worker.id,
@@ -765,7 +791,6 @@ def set_worker_day(request, form):
     if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
         if len(details):
             for item in details:
-                print(item)
                 WorkerDayCashboxDetails.objects.create(
                     cashbox_type_id=item['cashBox_type'],
                     worker_day=new_worker_day,
@@ -791,8 +816,132 @@ def set_worker_day(request, form):
     return JsonResponse.success(response)
 
 
+@api_method('GET', GetWorkerDayChangeLogsForm)
+def get_worker_day_logs(request, form):
+    """
+    Получаем список изменений в расписании (либо конкретного сотрудника, если указыван worker_day_id), либо всех (иначе)
+
+    Args:
+        method: GET
+        url: /api/timetable/cashier/get_worker_day_logs
+        shop_id(int): required = True
+        from_dt(QOS_DATE): required = True. от какой даты брать логи
+        to_dt(QOS_DATE): required = True. до какой даты
+        worker_day_id(int): required = False
+        pointer(int): для пагинации. начиная с какого элемента, отдаваемого списка, показывать. required = True
+        size(int): сколько записей отдавать (то есть отдаст срез [pointer: pointer + size]. required = False (default 10)
+
+    Returns:
+         {
+            Список worker_day'ев (детей worker_day_id, либо все worker_day'и, у которых есть дети)
+         }
+
+    Raises:
+        JsonResponse.does_not_exist_error: если рабочего дня с worker_day_id нет
+    """
+    shop_id = FormUtil.get_shop_id(request, form)
+    pointer = form['pointer']
+    size = form['size'] if form['size'] else 10
+    worker_day_id = form['worker_day_id']
+    worker_day_desired = None
+    response_data = {}
+
+    if worker_day_id:
+        try:
+            worker_day_desired = WorkerDay.objects.get(id=worker_day_id)
+        except WorkerDay.DoesNotExist:
+            return JsonResponse.does_not_exists_error('Ошибка. Такого рабочего дня в расписании нет.')
+
+    child_worker_days = WorkerDay.objects.select_related('worker').filter(
+        parent_worker_day_id__isnull=False,
+        worker__shop_id=shop_id,
+        dt__gte=form['from_dt'],
+        dt__lte=form['to_dt']
+    ).order_by('-dttm_added')
+    if worker_day_desired:
+        child_worker_days = child_worker_days.filter(
+            dt=worker_day_desired.dt,
+            worker_id=worker_day_desired.worker_id,
+        )
+
+    response_data['change_logs'] = [WorkerDayConverter.convert(worker_day) for worker_day in child_worker_days]
+    response_data['total_count'] = child_worker_days.count()
+    for one_wd in response_data['change_logs']:
+        one_wd['prev_dttm_work_start'] = BaseConverter.convert_datetime(
+            WorkerDay.objects.get(
+                id=child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
+            ).dttm_work_start
+        )
+        one_wd['prev_dttm_work_end'] = BaseConverter.convert_datetime(
+            WorkerDay.objects.get(
+                id=child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
+            ).dttm_work_end
+        )
+        one_wd['prev_type'] = WorkerDayConverter.convert_type(
+            WorkerDay.objects.get(
+                id=child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
+            ).type
+        )
+    response_data['change_logs'] = response_data['change_logs'][pointer:pointer+size]
+
+    return JsonResponse.success(response_data)
+
+
 @api_method(
-    'GET',
+    'POST',
+    DeleteWorkerDayChangeLogsForm,
+    lambda_func=lambda x: WorkerDay.objects.get(id=x['worker_day_id']).worker
+)
+def delete_worker_day(request, form):
+    """
+    Удаляет объект WorkerDay'a с worker_day_id из бд. При этом перезаписывает parent_worker_day
+
+    Args:
+        method: POST
+        url: /api/timetable/cashier/delete_worker_day
+        worker_day_id(int): required = True
+
+    Raises:
+        JsonResponse.does_not_exists_error: если такого рабочего дня нет в бд
+        JsonResponse.internal_error: ошибка при удалении из базы, либо если пытаемся удалить версию, составленную расписанием
+    """
+    try:
+        worker_day_to_delete = WorkerDay.objects.get(id=form['worker_day_id'])
+    except WorkerDay.DoesNotExist:
+        return JsonResponse.access_forbidden('Такого рабочего дня нет в расписании.')
+
+    wd_parent = worker_day_to_delete.parent_worker_day
+
+    if wd_parent is None:
+        return JsonResponse.internal_error('Нельзя удалить версию, составленную расписанием.')
+
+    try:
+        wd_child = worker_day_to_delete.child
+    except:
+        wd_child = None
+
+    if wd_child is not None:
+        wd_child.parent_worker_day = wd_parent
+
+    try:
+        worker_day_to_delete.parent_worker_day = None
+        worker_day_to_delete.save()
+
+        if wd_child:
+            wd_child.save()
+        try:
+            WorkerDayCashboxDetails.objects.get(worker_day_id=worker_day_to_delete.id).delete()
+        except:
+            pass
+        worker_day_to_delete.delete()
+    except:
+        return JsonResponse.internal_error('Не удалось удалить день из расписания.')
+
+    return JsonResponse.success()
+
+
+@api_method(
+    'POST',
     SetCashierInfoForm,
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
@@ -1165,13 +1314,13 @@ def delete_cashier(request, form):
 )
 def password_edit(request, form):
     """
-    Меняет пароль пользователя
+    Меняет пароль пользователя. Если группа пользователя S или D, он может менять пароль всем
 
     Args:
         method: POST
         url: /api/timetable/cashier/password_edit
         user_id(int): required = True
-        old_password(str): max_length = 128, required = True
+        old_password(str): max_length = 128, required = False
         new_password(str): max_length = 128, required = True
 
     Returns:
@@ -1191,8 +1340,9 @@ def password_edit(request, form):
             return JsonResponse.does_not_exists_error()
     else:
         user = request.user
-    if not user.check_password(old_password):
-        return JsonResponse.auth_error()
+
+    if not request.user.check_password(old_password):
+            return JsonResponse.access_forbidden()
 
     user.set_password(new_password)
     update_session_auth_hash(request, user)

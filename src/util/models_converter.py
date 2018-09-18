@@ -73,7 +73,7 @@ class UserConverter(BaseConverter):
             'phone_number': obj.phone_number,
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
-
+            'group': obj.group,
         }
 
 
@@ -113,12 +113,39 @@ class WorkerDayConverter(BaseConverter):
             'dt': cls.convert_date(obj.dt),
             'worker': obj.worker_id,
             'type': cls.convert_type(obj.type),
-            'tm_work_start': __work_tm(obj.tm_work_start),
-            'tm_work_end': __work_tm(obj.tm_work_end),
+            'dttm_work_start': __work_tm(obj.dttm_work_start),
+            'dttm_work_end': __work_tm(obj.dttm_work_end),
             'tm_break_start': __work_tm(obj.tm_break_start),
             'is_manual_tuning': obj.is_manual_tuning,
             'cashbox_types': list(set(obj.cashbox_types_ids)) if hasattr(obj, 'cashbox_types_ids') else [],
+            'created_by': obj.created_by_id,
         }
+
+
+class WorkerDayChangeLogConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        def __work_tm(__field):
+            return cls.convert_time(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+
+        parent = obj.parent_worker_day
+        if parent:
+            return {
+                'worker_day': obj.id,
+                'dttm_changed': WorkerDayConverter.convert_datetime(obj.dttm_added),
+                'changed_by': obj.created_by.id,
+                'comment': '',
+                'from_tm_break_start': __work_tm(parent.tm_break_start),
+                'from_tm_work_start': __work_tm(parent.dttm_work_start),
+                'from_tm_work_end': __work_tm(parent.dttm_work_end),
+                'from_type': WorkerDayConverter.convert_type(parent.type),
+                'to_tm_break_start': __work_tm(obj.tm_break_start),
+                'to_tm_work_start': __work_tm(obj.dttm_work_start),
+                'to_tm_work_end': __work_tm(obj.dttm_work_end),
+                'to_type': WorkerDayConverter.convert_type(obj.type),
+            }
+        else:
+            return {}
 
 
 class WorkerDayChangeRequestConverter(BaseConverter):
@@ -131,10 +158,9 @@ class WorkerDayChangeRequestConverter(BaseConverter):
             'id': obj.id,
             'dttm_added': cls.convert_datetime(obj.dttm_added),
             'worker_day': obj.worker_day_id,
-
             'type': WorkerDayConverter.convert_type(obj.type),
-            'tm_work_start': __work_tm(obj.tm_work_start),
-            'tm_work_end': __work_tm(obj.tm_work_end),
+            'dttm_work_start': __work_tm(obj.dttm_work_start),
+            'dttm_work_end': __work_tm(obj.dttm_work_end),
             'tm_break_start': __work_tm(obj.tm_break_start),
         }
 
@@ -161,14 +187,15 @@ class CashboxTypeConverter(BaseConverter):
             'shop': obj.shop_id,
             'name': obj.name,
             'is_stable': obj.is_stable,
-            'speed_coef': obj.speed_coef
+            'speed_coef': obj.speed_coef,
+            'do_forecast': obj.do_forecast,
+            'is_main_type': obj.is_main_type,
         }
         if add_algo_params:
             vals.update({
                 'prob': obj.probability,
                 'prior_weight': obj.prior_weight,
                 'prediction': cls.convert_type(obj.do_forecast),
-                'is_main_type': obj.is_main_type,
             })
         return vals
 

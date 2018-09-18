@@ -114,10 +114,23 @@ def get_cashiers_timetable(request, form):
             return JsonResponse.value_error('bad cashbox_type_ids')
     cashbox_types = group_by(cashbox_types, group_key=lambda x: x.id)
 
-    cashbox_types_hard = []
-    for cashbox_type in cashbox_types.values():
-        if cashbox_type[0].do_forecast == CashboxType.FORECAST_HARD:
-            cashbox_types_hard.append(cashbox_type[0])
+    if len(form['cashbox_type_ids']) == 0:
+        cashbox_types_hard = CashboxType.objects.filter(shop_id=shop_id, is_main_type=True)
+        if not cashbox_types_hard:
+            cashbox_types_hard = CashboxType.objects.filter(
+                shop_id=shop_id,
+                do_forecast=CashboxType.FORECAST_HARD
+            )[:1]
+    else:
+        cashbox_types_hard = CashboxType.objects.filter(
+            shop_id=shop_id,
+            id__in=form['cashbox_type_ids'],
+            do_forecast=CashboxType.FORECAST_HARD
+        )
+    # cashbox_types_hard = []
+    # for cashbox_type in cashbox_types.values():
+    #     if cashbox_type[0].do_forecast == CashboxType.FORECAST_HARD:
+    #         cashbox_types_hard.append(cashbox_type[0])
     cashbox_types_hard = group_by(cashbox_types_hard, group_key=lambda x: x.id)
 
     cashbox_types_main = []

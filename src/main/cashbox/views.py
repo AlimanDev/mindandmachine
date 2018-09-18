@@ -171,11 +171,12 @@ def create_cashbox(request, form):
     ).filter(
         type__shop_id=cashbox_type.shop_id,
         dttm_deleted=None,
-        number=cashbox_number
+        number=cashbox_number,
+        type_id=cashbox_type_id
     ).count()
 
     if cashboxes_count > 0:
-        return JsonResponse.already_exists_error('Cashbox with number already exists')
+        return JsonResponse.already_exists_error('Касса с таким номером уже существует')
 
     cashbox = Cashbox.objects.create(type=cashbox_type, number=cashbox_number)
 
@@ -200,6 +201,7 @@ def delete_cashbox(request, form):
         method: POST
         url: /api/cashbox/delete_cashbox
         shop_id(int): required = True
+        cashbox_type_id(int): required = True
         number(str): номер кассы которую удаляем
         bio(str): доп инфа
 
@@ -222,6 +224,7 @@ def delete_cashbox(request, form):
         cashbox = Cashbox.objects.select_related(
             'type'
         ).get(
+            type__id=form['cashbox_type_id'],
             type__shop_id=shop_id,
             dttm_deleted=None,
             number=form['number']
@@ -229,7 +232,7 @@ def delete_cashbox(request, form):
     except Cashbox.DoesNotExist:
         return JsonResponse.does_not_exists_error()
     except Cashbox.MultipleObjectsReturned:
-        return JsonResponse.internal_error()
+        return JsonResponse.multiple_objects_returned()
 
     cashbox.dttm_deleted = datetime.datetime.now()
     cashbox.bio = form['bio']
@@ -290,6 +293,7 @@ def update_cashbox(request, form):
         cashbox = Cashbox.objects.select_related(
             'type'
         ).filter(
+            type__id=from_cashbox_type.id,
             type__shop_id=from_cashbox_type.shop_id,
             dttm_deleted=None,
             number=cashbox_number
@@ -319,6 +323,7 @@ def create_cashbox_type(request, form):
         url: /api/cashbox/create_cashbox_type
         shop_id(int): required = True
         name(str): max_length=128
+        is_main_type(boolean): делать новый тип касс главным или нет, required = False
 
     Note:
         Также отправлет уведомление о том, что тип касс был создан
@@ -339,14 +344,17 @@ def create_cashbox_type(request, form):
     """
     shop_id = FormUtil.get_shop_id(request, form)
     name = form['name']
+    is_main_type = form['is_main_type']
 
     if CashboxType.objects.filter(name=name, shop_id=shop_id, dttm_deleted__isnull=True).count() > 0:
-        return JsonResponse.already_exists_error('cashbox type already exists')
+        return JsonResponse.already_exists_error('Такой тип кассы уже существует')
+    if is_main_type is True:
+        CashboxType.objects.filter(shop_id=shop_id, is_main_type=True).update(is_main_type=False)
 
     new_cashbox_type = CashboxType.objects.create(
         name=name,
         shop_id=shop_id,
-        is_main_type=True if name == 'Линия' else False
+        is_main_type=is_main_type
     )
 
     send_notification('C', new_cashbox_type, sender=request.user)

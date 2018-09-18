@@ -88,8 +88,8 @@ class SetWorkerDaysForm(forms.Form):
     dt_begin = util_forms.DateField()
     dt_end = util_forms.DateField()
     type = forms.CharField()
-    tm_work_start = util_forms.TimeField(required=False)
-    tm_work_end = util_forms.TimeField(required=False)
+    dttm_work_start = util_forms.TimeField(required=False)
+    dttm_work_end = util_forms.TimeField(required=False)
     checkpoint = forms.IntegerField(required=False)
 
     cashbox_type = forms.IntegerField(required=False)
@@ -113,8 +113,8 @@ class SetWorkerDaysForm(forms.Form):
             return
 
         if WorkerDay.is_type_with_tm_range(self.cleaned_data['type']):
-            if self.cleaned_data.get('tm_work_start') is None or self.cleaned_data.get('tm_work_end') is None:
-                raise ValidationError('tm_work_start, tm_work_end required')
+            if self.cleaned_data.get('dttm_work_start') is None or self.cleaned_data.get('dttm_work_end') is None:
+                raise ValidationError('dttm_work_start, dttm_work_end required')
 
         if self.cleaned_data['dt_begin'] > self.cleaned_data['dt_end']:
             raise forms.ValidationError('dt_begin have to be less or equal than dt_end')
@@ -226,7 +226,7 @@ class DeleteCashierForm(forms.Form):
 
 class PasswordChangeForm(forms.Form):
     user_id = forms.IntegerField()
-    old_password = forms.CharField(max_length=128)
+    old_password = forms.CharField(max_length=128, required=False)
     new_password = forms.CharField(max_length=128)
 
 
@@ -238,3 +238,17 @@ class ChangeCashierInfo(forms.Form):
     avatar = forms.ImageField(required=False)
     group = forms.CharField(max_length=1, required=False)
     birthday = forms.DateField(required=False)
+
+
+class GetWorkerDayChangeLogsForm(forms.Form):
+    shop_id = forms.IntegerField()
+    from_dt = util_forms.DateField()
+    to_dt = util_forms.DateField()
+    pointer = forms.IntegerField()
+    size = forms.IntegerField(required=False)
+    worker_day_id = forms.IntegerField(required=False)
+
+
+class DeleteWorkerDayChangeLogsForm(forms.Form):
+    worker_day_id = forms.IntegerField()
+

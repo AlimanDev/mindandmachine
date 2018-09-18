@@ -83,12 +83,12 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
         'type',
         'dttm_work_start',
         'dttm_work_end',
-        'workerdaycashboxdetails__tm_from',
-        'workerdaycashboxdetails__tm_to',
+        'workerdaycashboxdetails__dttm_from',
+        'workerdaycashboxdetails__dttm_to',
     ).order_by(
         'worker_id',
         'dt',
-        'workerdaycashboxdetails__tm_from',
+        'workerdaycashboxdetails__dttm_from',
     ))
 
     workers_info = {}
@@ -115,7 +115,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
         if dt != row['dt']:
             dt = row['dt']
 
-            worker[ WorkerDayConverter.convert_type(row['type'])] += 1
+            worker[WorkerDayConverter.convert_type(row['type'])] += 1
 
             if row['type'] in WorkerDay.TYPES_PAID:
                 worker['paid_days'] += 1
@@ -123,7 +123,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
                     worker['paid_hours'] += ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK]
                 else:
                     i = 0
-                    while (i < len(times_borders)) and (row['dttm_work_start'] > times_borders[i][0]):
+                    while (i < len(times_borders)) and (row['dttm_work_start'].time() > times_borders[i][0]):
                         i += 1
                     str_name = '{}_days_periods'.format(times_borders[i][1])
                     worker[str_name] += 1
@@ -131,10 +131,10 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
                 if prod_days_list[dt.day - 1] == ProductionDay.TYPE_HOLIDAY:
                     worker['work_in_holidays'] += 1
 
-        if row['workerdaycashboxdetails__tm_from'] and row['workerdaycashboxdetails__tm_to']:
+        if row['workerdaycashboxdetails__dttm_from'] and row['workerdaycashboxdetails__dttm_to']:
             worker['paid_hours'] += round(timediff(
-                row['workerdaycashboxdetails__tm_from'],
-                row['workerdaycashboxdetails__tm_to'],
+                row['workerdaycashboxdetails__dttm_from'],
+                row['workerdaycashboxdetails__dttm_to'],
             ))
 
     # t = check_time(t)
