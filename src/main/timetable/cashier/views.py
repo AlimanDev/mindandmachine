@@ -886,7 +886,7 @@ def get_worker_day_logs(request, form):
 
 
 @api_method(
-    'GET',
+    'POST',
     DeleteWorkerDayChangeLogsForm,
     lambda_func=lambda x: WorkerDay.objects.get(id=x['worker_day_id']).worker
 )
@@ -906,7 +906,7 @@ def delete_worker_day(request, form):
     try:
         worker_day_to_delete = WorkerDay.objects.get(id=form['worker_day_id'])
     except WorkerDay.DoesNotExist:
-        return JsonResponse.does_not_exists_error('Такого рабочего дня нет в расписании.')
+        return JsonResponse.access_forbidden('Такого рабочего дня нет в расписании.')
 
     wd_parent = worker_day_to_delete.parent_worker_day
 
