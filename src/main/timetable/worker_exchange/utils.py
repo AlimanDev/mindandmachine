@@ -16,7 +16,7 @@ Note:
         | 'users_who_can_work(list): список пользователей, которые могут работать на ct_type
     }
 
-    Если одна из функций падает, рейзим InterruptedError, во вьюхе это отлавливается, и возвращается в 'info' в какой \
+    Если одна из функций падает, рейзим ValueError, во вьюхе это отлавливается, и возвращается в 'info' в какой \
     именно функции произошла ошибка.
 
     А возвращается:
@@ -510,7 +510,7 @@ def day_switch(arguments_dict):
             else:
                 dttm_end.append(dttm_to_collect[ct_type][i])
     except KeyError:
-        raise InterruptedError
+        raise ValueError
     for i in range(len(dttm_start)):
         users_working_on_interval = get_cashier_on_interval(dttm_start[i], dttm_end[i], ct_type)  # dict {ct_id: users}
         for user in users_working_on_interval[ct_type]:

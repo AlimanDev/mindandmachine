@@ -69,7 +69,7 @@ def get_workers_to_exchange(request, form):
     for f in ChangeTypeFunctions:
         try:
             func_result_dict = f(default_function_dict)
-        except InterruptedError:
+        except ValueError:
             error_message += 'Ошибка в функции {}.'.format(f.__name__)
             # return JsonResponse.internal_error('Ошибка в функции {}'.format(f.__name__))
         for user_id in func_result_dict:
