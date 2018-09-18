@@ -24,7 +24,8 @@ from src.util.models_converter import (
     WorkerConstraintConverter,
     WorkerCashboxInfoConverter,
     CashboxTypeConverter,
-    BaseConverter
+    BaseConverter,
+    WorkerDayChangeLogConverter,
 )
 from src.util.collection import group_by, count, range_u, group_by_object
 
@@ -282,7 +283,8 @@ def get_cashier_timetable(request, form):
             WorkerDay.objects.filter(
                 worker_id=worker_id,
                 dt__gte=from_dt,
-                dt__lte=to_dt
+                dt__lte=to_dt,
+                parent_worker_day__isnull=False
             ),
             group_key=lambda _: _.id,
             sort_key=lambda _: _.dt,
@@ -303,7 +305,7 @@ def get_cashier_timetable(request, form):
         for obj in worker_days:
             days_response.append({
                 'day': WorkerDayConverter.convert(obj),
-                'change_log': [WorkerDayConverter.convert(x) for x in
+                'change_log': [WorkerDayChangeLogConverter.convert(x) for x in
                                worker_day_change_log.get(obj.id, [])[:10]],
                 'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in
                                     worker_day_change_requests.get(obj.id, [])[:10]]

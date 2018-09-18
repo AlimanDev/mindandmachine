@@ -122,6 +122,32 @@ class WorkerDayConverter(BaseConverter):
         }
 
 
+class WorkerDayChangeLogConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        def __work_tm(__field):
+            return cls.convert_time(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+
+        parent = obj.parent_worker_day
+        if parent:
+            return {
+                'worker_day': obj.id,
+                'dttm_changed': WorkerDayConverter.convert_datetime(obj.dttm_added),
+                'changed_by': obj.created_by.id,
+                'comment': '',
+                'from_tm_break_start': __work_tm(parent.tm_break_start),
+                'from_tm_work_start': __work_tm(parent.dttm_work_start),
+                'from_tm_work_end': __work_tm(parent.dttm_work_end),
+                'from_type': WorkerDayConverter.convert_type(parent.type),
+                'to_tm_break_start': __work_tm(obj.tm_break_start),
+                'to_tm_work_start': __work_tm(obj.dttm_work_start),
+                'to_tm_work_end': __work_tm(obj.dttm_work_end),
+                'to_type': WorkerDayConverter.convert_type(obj.type),
+            }
+        else:
+            return {}
+
+
 class WorkerDayChangeRequestConverter(BaseConverter):
     @classmethod
     def convert(cls, obj):
@@ -132,7 +158,6 @@ class WorkerDayChangeRequestConverter(BaseConverter):
             'id': obj.id,
             'dttm_added': cls.convert_datetime(obj.dttm_added),
             'worker_day': obj.worker_day_id,
-
             'type': WorkerDayConverter.convert_type(obj.type),
             'dttm_work_start': __work_tm(obj.dttm_work_start),
             'dttm_work_end': __work_tm(obj.dttm_work_end),
