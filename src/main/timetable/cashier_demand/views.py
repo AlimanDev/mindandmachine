@@ -73,7 +73,6 @@ def get_cashiers_timetable(request, form):
         }
     """
     shop_id = FormUtil.get_shop_id(request, form)
-    checkpoint = FormUtil.get_checkpoint(form)
 
     if form['format'] == 'excel':
         def __file_name(__dt):
@@ -151,7 +150,7 @@ def get_cashiers_timetable(request, form):
     if form['position_id']:
         worker_day_cashbox_detail_filter['worker_day__worker__position__id'] = form['position_id']
 
-    worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
+    cashbox_details_current = WorkerDayCashboxDetails.objects.qos_current_version().filter(
         **worker_day_cashbox_detail_filter
     ).exclude(
         status=WorkerDayCashboxDetails.TYPE_BREAK
@@ -160,6 +159,16 @@ def get_cashiers_timetable(request, form):
         'dttm_from',
         'dttm_to',
     )
+    cashbox_details_initial = WorkerDayCashboxDetails.objects.qos_initial_version().filter(
+        **worker_day_cashbox_detail_filter
+    ).exclude(
+        status=WorkerDayCashboxDetails.TYPE_BREAK
+    ).order_by(
+        'worker_day__dt',
+        'dttm_from',
+        'dttm_to',
+    )
+
     worker_cashbox_info = list(WorkerCashboxInfo.objects.select_related('worker').filter(
         is_active=True,
         worker__workerday__dt__gte=form['from_dt'],
@@ -197,7 +206,8 @@ def get_cashiers_timetable(request, form):
     # supershop = SuperShop.objects.get(shop__id=shop_id)
 
     # init data
-    real_cashiers = []
+    real_cashiers = []  # текущее расписание (с изменениями)
+    real_cashiers_initial = []  # составленное алгоритмом
     predict_cashier_needs = []
     fact_cashier_needs = []
     lack_of_cashiers_on_period = {}
@@ -213,7 +223,8 @@ def get_cashiers_timetable(request, form):
         [time(18, 00), time(22, 30), 'evening'],
     ]
 
-    ind_b = 0
+    ind_b_current = 0
+    ind_b_initial = 0
     demand_ind = 0
     fact_ind = 0
     idle_time_numerator = 0
@@ -228,8 +239,10 @@ def get_cashiers_timetable(request, form):
     predict_demand = period_demand[:edge_ind]
     fact_demand = period_demand[edge_ind:]
 
-    wdcds = worker_day_cashbox_detail  # alias
-    wdcds_len = len(wdcds)
+    wdcds_current = cashbox_details_current  # alias
+    wdcds_initial = cashbox_details_initial
+    wdcds_current_len = len(wdcds_current)
+    wdcds_initial_len = len(wdcds_initial)
 
     for day_ind in range((form['to_dt'] - form['from_dt']).days):
         each_day_morning = []
@@ -239,7 +252,8 @@ def get_cashiers_timetable(request, form):
             dttm = dttm_start + timedelta(days=day_ind) + time_ind * PERIOD_STEP
 
             dttm_end = dttm + PERIOD_STEP
-            dttm_ind = dttm - PERIOD_STEP
+            dttm_ind_current = dttm - PERIOD_STEP
+            dttm_ind_initial = dttm - PERIOD_STEP
 
             cashiers_on_cashbox_type = defaultdict(int)
 
@@ -255,54 +269,87 @@ def get_cashiers_timetable(request, form):
             # for cashier in cashier_working_now:
             #     if cashier.cashbox_type is not None:
             #         cashiers_on_cashbox_type[cashier.cashbox_type.id] += 1  # shift to first model, which has intersection
-            while (ind_b < wdcds_len) and (dttm_ind <= dttm) and wdcds[ind_b].dttm_to.time():
-                dttm_ind = dttm_combine(wdcds[ind_b].worker_day.dt, wdcds[ind_b].dttm_to.time())
-                ind_b += 1
-            ind_b = ind_b - 1 if (dttm_ind > dttm) and ind_b else ind_b
+            while (ind_b_current < wdcds_current_len) and (dttm_ind_current <= dttm) and wdcds_current[ind_b_current].dttm_to:
+                dttm_ind_current = dttm_combine(wdcds_current[ind_b_current].worker_day.dt, wdcds_current[ind_b_current].dttm_to.time())
+                ind_b_current += 1
+            ind_b_current = ind_b_current - 1 if (dttm_ind_current > dttm) and ind_b_current else ind_b_current
+            while (ind_b_initial < wdcds_initial_len) and (dttm_ind_initial <= dttm) and wdcds_initial[ind_b_initial].dttm_to:
+                dttm_ind_initial = dttm_combine(wdcds_initial[ind_b_initial].worker_day.dt, wdcds_initial[ind_b_initial].dttm_to.time())
+                ind_b_initial += 1
+            ind_b_initial = ind_b_initial - 1 if (dttm_ind_initial > dttm) and ind_b_initial else ind_b_initial
 
-            ind_e = ind_b
+            ind_e_current = ind_b_current
+            ind_e_initial = ind_b_initial
             period_bills = {i: 0 for i in cashbox_types.keys()}
-            period_cashiers = 0.0
+            period_cashiers_current = 0.0
+            period_cashiers_initial = 0.0
             period_cashiers_hard = 0.0
-            if ind_e < wdcds_len and wdcds[ind_e].dttm_to.time():
-                dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].dttm_from.time())
-                dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].dttm_to.time())
 
-            while (ind_e < wdcds_len) and (dttm_ind < dttm_end):
-                if dttm_ind_end > dttm:
+            if ind_e_current < wdcds_current_len and wdcds_current[ind_e_current].dttm_to.time():
+                dttm_ind_current = dttm_combine(wdcds_current[ind_e_current].worker_day.dt, wdcds_current[ind_e_current].dttm_from.time())
+                dttm_ind_current_end = dttm_combine(wdcds_current[ind_e_current].worker_day.dt, wdcds_current[ind_e_current].dttm_to.time())
+
+            if ind_e_initial < wdcds_initial_len and wdcds_initial[ind_e_initial].dttm_to.time():
+                dttm_ind_initial = dttm_combine(wdcds_initial[ind_e_initial].worker_day.dt, wdcds_initial[ind_e_initial].dttm_from.time())
+                dttm_ind_initial_end = dttm_combine(wdcds_initial[ind_e_initial].worker_day.dt, wdcds_initial[ind_e_initial].dttm_to.time())
+
+            while (ind_e_current < wdcds_current_len) and (dttm_ind_current < dttm_end):
+                if dttm_ind_current_end > dttm:
                     proportion = min(
-                        (dttm_ind_end - dttm).total_seconds(),
-                        (dttm_end - dttm_ind).total_seconds(),
+                        (dttm_ind_current_end - dttm).total_seconds(),
+                        (dttm_end - dttm_ind_current).total_seconds(),
                         TOTAL_PERIOD_SECONDS
                     ) / TOTAL_PERIOD_SECONDS
-                    if wdcds[ind_e].worker_day.worker_id in worker_cashbox_info.keys():
-                        period_bills[wdcds[ind_e].cashbox_type_id] += proportion *  \
-                            (PERIOD_MINUTES / worker_cashbox_info[(wdcds[ind_e].worker_day.worker_id, wdcds[ind_e].cashbox_type_id)][0].mean_speed)
-                    period_cashiers += 1 * proportion
-                    if wdcds[ind_e].cashbox_type_id in cashbox_types_main.keys():
+                    if wdcds_current[ind_e_current].worker_day.worker_id in worker_cashbox_info.keys():
+                        period_bills[wdcds_current[ind_e_current].cashbox_type_id] += proportion *  \
+                            (PERIOD_MINUTES / worker_cashbox_info[(wdcds_current[ind_e_current].worker_day.worker_id, wdcds_current[ind_e_current].cashbox_type_id)][0].mean_speed)
+                    period_cashiers_current += 1 * proportion
+                    if wdcds_current[ind_e_current].cashbox_type_id in cashbox_types_main.keys():
                         period_cashiers_hard += 1 * proportion
 
-                ind_e += 1
-                if ind_e < wdcds_len and wdcds[ind_e].dttm_to.time():
-                    dttm_ind = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].dttm_from.time())
-                    dttm_ind_end = dttm_combine(wdcds[ind_e].worker_day.dt, wdcds[ind_e].dttm_to.time())
+                ind_e_current += 1
+                if ind_e_current < wdcds_current_len and wdcds_current[ind_e_current].dttm_to:
+                    dttm_ind_current = dttm_combine(wdcds_current[ind_e_current].worker_day.dt, wdcds_current[ind_e_current].dttm_from.time())
+                    dttm_ind_current_end = dttm_combine(wdcds_current[ind_e_current].worker_day.dt, wdcds_current[ind_e_current].dttm_to.time())
+
+            while (ind_e_initial < wdcds_initial_len) and (dttm_ind_initial < dttm_end):
+                if dttm_ind_initial_end > dttm:
+                    proportion = min(
+                        (dttm_ind_initial_end - dttm).total_seconds(),
+                        (dttm_end - dttm_ind_initial).total_seconds(),
+                        TOTAL_PERIOD_SECONDS
+                    ) / TOTAL_PERIOD_SECONDS
+                    if wdcds_initial[ind_e_initial].worker_day.worker_id in worker_cashbox_info.keys():
+                        period_bills[wdcds_initial[ind_e_initial].cashbox_type_id] += proportion *  \
+                            (PERIOD_MINUTES / worker_cashbox_info[(wdcds_initial[ind_e_initial].worker_day.worker_id, wdcds_initial[ind_e_initial].cashbox_type_id)][0].mean_speed)
+                    period_cashiers_initial += 1 * proportion
+
+                ind_e_initial += 1
+                if ind_e_initial < wdcds_initial_len and wdcds_initial[ind_e_initial].dttm_to.time():
+                    dttm_ind_initial = dttm_combine(wdcds_initial[ind_e_initial].worker_day.dt, wdcds_initial[ind_e_initial].dttm_from.time())
+                    dttm_ind_initial_end = dttm_combine(wdcds_initial[ind_e_initial].worker_day.dt, wdcds_initial[ind_e_initial].dttm_to.time())
 
             dttm_converted = BaseConverter.convert_datetime(dttm)
             real_cashiers.append({
                 'dttm': dttm_converted,
-                'amount': period_cashiers
+                'amount': period_cashiers_current
+            })
+
+            real_cashiers_initial.append({
+                'dttm': dttm_converted,
+                'amount': period_cashiers_initial
             })
 
             predict_diff_dict, demand_ind_2 = count_diff(dttm, predict_demand, demand_ind,  mean_bills_per_step, cashbox_types)
             predict_cashier_needs.append({
                 'dttm': dttm_converted,
-                'amount': sum(predict_diff_dict.values()), #+ period_cashiers,
+                'amount': sum(predict_diff_dict.values()),  # + period_cashiers,
             })
 
             real_diff_dict, fact_ind = count_diff(dttm, fact_demand, fact_ind,  mean_bills_per_step, cashbox_types)
             fact_cashier_needs.append({
                 'dttm': dttm_converted,
-                'amount': sum(real_diff_dict.values()), # + period_cashiers,
+                'amount': sum(real_diff_dict.values()),  # + period_cashiers,
             })
 
             predict_diff_hard_dict, _ = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types_main)
@@ -388,8 +435,9 @@ def get_cashiers_timetable(request, form):
         'period_step': PERIOD_MINUTES,
         'tt_periods': {
             'real_cashiers': real_cashiers,
+            'real_cashiers_initial': real_cashiers_initial,
             'predict_cashier_needs': predict_cashier_needs,
-            'fact_cashier_needs': fact_cashier_needs
+            'fact_cashier_needs': fact_cashier_needs,
         },
         'lack_of_cashiers_on_period': lack_of_cashiers_on_period
     }
@@ -471,7 +519,7 @@ def get_workers(request, form):
         checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     """
-  
+
     checkpoint = FormUtil.get_checkpoint(form)
 
     from_dt = form['from_dttm'].date()
@@ -532,7 +580,7 @@ def get_workers(request, form):
                 if d.dttm_from.time() <= from_tm:
                     cashbox.append(d)
             else:
-                if d.tm_from < d.tm_to:
+                if d.tm_from < d.dttm_to:
                     if d.tm_from <= to_tm and d.tm_to > from_tm:
                         cashbox.append(d)
                 else:
