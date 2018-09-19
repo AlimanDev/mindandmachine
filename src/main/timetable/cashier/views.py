@@ -61,6 +61,7 @@ def get_cashiers_list(request, form):
         dt_hired_before(QOS_DATE): required = False.
         dt_fired_after(QOS_DATE): required False
         shop_id(int): required = False
+        consider_outsource(bool): required = False (учитывать outsource работников)
         checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
@@ -88,8 +89,9 @@ def get_cashiers_list(request, form):
 
     """
     users = []
+    attachment_groups = [User.GROUP_STAFF, User.GROUP_OUTSOURCE if form['consider_outsource'] else None]
     shop_id = FormUtil.get_shop_id(request, form)
-    for u in User.objects.filter(shop_id=shop_id).order_by('last_name', 'first_name'):
+    for u in User.objects.filter(shop_id=shop_id, attachment_group__in=attachment_groups).order_by('last_name', 'first_name'):
         if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
             if u.dt_fired is None or u.dt_fired >= form['dt_fired_after']:
                 users.append(u)
@@ -141,7 +143,7 @@ def get_not_working_cashiers_list(request, form):
     for u in WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
         dt=dt_now.date(),
         worker__shop_id=shop_id,
-
+        worker__attachment_group=User.GROUP_STAFF
     ).exclude(
         type=WorkerDay.Type.TYPE_WORKDAY.value
     ).order_by(

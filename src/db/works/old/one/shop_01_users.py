@@ -207,7 +207,7 @@ def parse_time_sheet(ctx, data, row_begin, row_end, column_sheet_begin, column_s
                     cashbox_type_id=cashbox.type_id,
                 )
 
-    for user in User.objects.filter(shop=ctx.shop):
+    for user in User.objects.filter(shop=ctx.shop, attachment_group=User.GROUP_STAFF):
         for cashbox_type in cashboxes_types.values():
             WorkerCashboxInfo.objects.create(
                 worker=user,

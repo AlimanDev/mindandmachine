@@ -374,7 +374,7 @@ def change_cashier_status(request, form):
     try:
         worker_day = WorkerDay.objects.qos_filter_version(checkpoint).get(dt=dt, worker_id=worker_id)
     except WorkerDay.DoesNotExist:
-        return JsonResponse.does_not_exists_error()
+        return JsonResponse.does_not_exists_error('Такого дня нет в расписании.')
     except WorkerDay.MultipleObjectsReturned:
         return JsonResponse.multiple_objects_returned()
 

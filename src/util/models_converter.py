@@ -74,6 +74,7 @@ class UserConverter(BaseConverter):
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
             'group': obj.group,
+            'attachment_group': obj.attachment_group
         }
 
 

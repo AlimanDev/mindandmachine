@@ -59,7 +59,7 @@ def select_cashiers(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     checkpoint = FormUtil.get_checkpoint(form)
 
-    users = User.objects.filter(shop_id=shop_id)
+    users = User.objects.filter(shop_id=shop_id, attachment_group=User.GROUP_STAFF)
 
     cashboxes_type_ids = set(form.get('cashbox_types', []))
     if len(cashboxes_type_ids) > 0:
