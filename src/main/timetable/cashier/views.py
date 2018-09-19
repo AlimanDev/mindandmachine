@@ -44,6 +44,7 @@ from .forms import (
     ChangeCashierInfo,
     GetWorkerDayChangeLogsForm,
     DeleteWorkerDayChangeLogsForm,
+    GetOutsourceWorkers,
 )
 from src.main.other.notification.utils import send_notification
 from django.contrib.auth import update_session_auth_hash
@@ -91,13 +92,40 @@ def get_cashiers_list(request, form):
     users = []
     attachment_groups = [User.GROUP_STAFF, User.GROUP_OUTSOURCE if form['consider_outsource'] else None]
     shop_id = FormUtil.get_shop_id(request, form)
-    for u in User.objects.filter(shop_id=shop_id, attachment_group__in=attachment_groups).order_by('last_name', 'first_name'):
+    for u in User.objects.filter(
+            shop_id=shop_id,
+            attachment_group__in=attachment_groups
+    ).order_by('last_name', 'first_name'):
         if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
             if u.dt_fired is None or u.dt_fired >= form['dt_fired_after']:
                 users.append(u)
 
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
+
+@api_method('GET', GetOutsourceWorkers)
+def get_outsource_workers(request, form):
+    """
+        Возвращает список кассиров в данном магазине, уволенных позже чем dt_fired_after и нанятых\
+        раньше, чем dt_hired_before.
+
+        Args:
+            method: GET
+            url: /api/timetable/cashier/get_outsource_workers
+            dt(QOS_DATE): required = True
+            shop_id(int): required = True
+
+        Returns:
+            Cписок как во вьюхе выше
+        """
+    return JsonResponse.success([
+        UserConverter.convert(u) for u in User.objects.filter(
+            shop_id=form['shop_id'],
+            attachment_group=User.GROUP_OUTSOURCE,
+            dt_hired__lte=form['dt'],
+            dt_fired__gte=form['dt'],
+        )
+    ])
 
 @api_method('GET', GetCashiersListForm)
 def get_not_working_cashiers_list(request, form):
