@@ -29,11 +29,6 @@ class GetCashiersListForm(forms.Form):
         return value
 
 
-class GetOutsourceWorkers(forms.Form):
-    dt = util_forms.DateField(required=True)
-    shop_id = forms.IntegerField(required=True)
-
-
 class GetCashierTimetableForm(forms.Form):
     worker_id = util_forms.IntegersList(required=True)
     from_dt = util_forms.DateField()

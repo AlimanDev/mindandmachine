@@ -98,8 +98,8 @@ def add_outsource_workers(request, form):
         added = User.objects.create(
             shop_id=shop_id,
             attachment_group=User.GROUP_OUTSOURCE,
-            first_name='Наемный сотрудник',
-            last_name='№' + outsourcer_number,
+            first_name='№' + outsourcer_number,
+            last_name='Наемный сотрудник',
             dt_hired=dt,
             dt_fired=dt,
             username='outsourcer_' + outsourcer_number,
