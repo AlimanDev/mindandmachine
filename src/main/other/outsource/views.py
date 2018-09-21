@@ -10,8 +10,9 @@ from .forms import (
 )
 
 from src.util.utils import api_method, JsonResponse
-from src.util.models_converter import UserConverter
-from datetime import datetime
+from src.util.models_converter import UserConverter, BaseConverter, WorkerDayConverter
+from datetime import datetime, timedelta
+from django.core.exceptions import ObjectDoesNotExist
 
 
 @api_method('GET', GetOutsourceWorkersForm)
@@ -44,14 +45,43 @@ def get_outsource_workers(request, form):
     from_dt = form['from_dt']
     to_dt = form['to_dt']
 
-    outsource_workers = User.objects.filter(
-        shop=shop,
-        attachment_group=User.GROUP_OUTSOURCE,
-        dt_hired__gte=from_dt,
-        dt_fired__lte=to_dt
-    )
-    response_dict['outsource_workers'] = [UserConverter.convert(u) for u in outsource_workers]
-    response_dict['amount'] = outsource_workers.count()
+    for date in range((to_dt - from_dt).days + 1):
+        converted_date = BaseConverter.convert_date(from_dt + timedelta(days=date))
+        response_dict[converted_date] = {
+            'outsource_workers': [],
+            'amount': 0
+        }
+        outsource_workers = User.objects.filter(
+            shop=shop,
+            attachment_group=User.GROUP_OUTSOURCE,
+            dt_hired__gte=from_dt + timedelta(days=date),
+            dt_fired__lte=from_dt + timedelta(days=date)
+        ).order_by('dt_hired')
+        outsource_workers_count_per_day = 0
+        if outsource_workers.count() > 0:
+            for u in outsource_workers:
+                u.first_name = '№{}'.format(str(outsource_workers_count_per_day + 1))
+                outsource_workers_count_per_day += 1
+
+                outsourcer_workerday = WorkerDay.objects.filter(worker=u).first()
+                if outsourcer_workerday:
+                    try:
+                        response_dict[converted_date]['outsource_workers'].append({
+                            'id': u.id,
+                            'first_name': u.first_name,
+                            'last_name': u.last_name,
+                            'type': WorkerDay.Type.TYPE_HOLIDAY.value,
+                            'dttm_work_start': BaseConverter.convert_time(outsourcer_workerday.dttm_work_start.time()),
+                            'dttm_work_end': BaseConverter.convert_time(outsourcer_workerday.dttm_work_end.time()),
+                            'cashbox_type': WorkerDayCashboxDetails.objects.get(
+                                worker_day=outsourcer_workerday
+                            ).cashbox_type.id
+                        })
+                    except ObjectDoesNotExist:
+                        return JsonResponse.does_not_exists_error(
+                            'Ошибка в get_outsource_workers. Такого дня нет в расписании.'
+                        )
+        response_dict[converted_date]['amount'] = outsource_workers_count_per_day
 
     return JsonResponse.success(response_dict)
 
@@ -88,7 +118,7 @@ def add_outsource_workers(request, form):
 
     last_outsourcer = User.objects.filter(shop_id=shop_id, attachment_group=User.GROUP_OUTSOURCE).last()
     if last_outsourcer:
-        last_outsourcer_number = last_outsourcer.last_name[1:]
+        last_outsourcer_number = last_outsourcer.first_name[1:]
     else:
         last_outsourcer_number = '0'
     added_outsourcers = []

@@ -106,7 +106,6 @@ def get_cashiers_list(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
-
 @api_method('GET', GetCashiersListForm)
 def get_not_working_cashiers_list(request, form):
     """
