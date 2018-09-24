@@ -86,7 +86,7 @@ def get_outsource_workers(request, form):
     return JsonResponse.success(response_dict)
 
 
-@api_method('GET', AddOutsourceWorkersForm)
+@api_method('POST', AddOutsourceWorkersForm)
 def add_outsource_workers(request, form):
     """
     Добавляет аутсорсеров на dt
