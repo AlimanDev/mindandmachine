@@ -373,8 +373,9 @@ def get_cashiers_timetable(request, form):
     ).count() - WorkerDay.objects.select_related('worker').filter(
         dt__gte=form['from_dt'],
         dt__lte=form['to_dt'],
-        worker__shop_id=shop_id
-    ).distinct('dt', 'worker').count()
+        worker__shop_id=shop_id,
+        parent_worker_day__isnull=True
+    ).count()
 
     response = {
         'indicators': {
