@@ -36,7 +36,10 @@ def get_outsource_workers(request, form):
     Raises:
         JsonResponse.does_not_exists_error: если такого магазина нету
     """
-    response_dict = {}
+    response_dict = {
+        'max_amount': 0,
+        'dates': {}
+    }
     try:
         shop = Shop.objects.get(id=form['shop_id'])
     except Shop.DoesNotExist:
@@ -44,10 +47,12 @@ def get_outsource_workers(request, form):
 
     from_dt = form['from_dt']
     to_dt = form['to_dt']
+    max_outsource_worker_on_period = 0  # для рендера на фронте
+    date_response_dict = response_dict['dates']
 
     for date in range((to_dt - from_dt).days + 1):
         converted_date = BaseConverter.convert_date(from_dt + timedelta(days=date))
-        response_dict[converted_date] = {
+        date_response_dict[converted_date] = {
             'outsource_workers': [],
             'amount': 0
         }
@@ -63,25 +68,31 @@ def get_outsource_workers(request, form):
                 u.first_name = '№{}'.format(str(outsource_workers_count_per_day + 1))
                 outsource_workers_count_per_day += 1
 
-                outsourcer_workerday = WorkerDay.objects.filter(worker=u).first()
+                outsourcer_workerday = WorkerDay.objects.qos_current_version().filter(worker=u).first()
                 if outsourcer_workerday:
                     try:
-                        response_dict[converted_date]['outsource_workers'].append({
+                        date_response_dict[converted_date]['outsource_workers'].append({
                             'id': u.id,
                             'first_name': u.first_name,
                             'last_name': u.last_name,
-                            'type': WorkerDay.Type.TYPE_HOLIDAY.value,
-                            'dttm_work_start': BaseConverter.convert_time(outsourcer_workerday.dttm_work_start.time()),
-                            'dttm_work_end': BaseConverter.convert_time(outsourcer_workerday.dttm_work_end.time()),
+                            'type': WorkerDayConverter.convert_type(outsourcer_workerday.type),
+                            'dttm_work_start': BaseConverter.convert_time(outsourcer_workerday.dttm_work_start.time())\
+                                if outsourcer_workerday.type == WorkerDay.Type.TYPE_WORKDAY.value else None,
+                            'dttm_work_end': BaseConverter.convert_time(outsourcer_workerday.dttm_work_end.time())\
+                                if outsourcer_workerday.type == WorkerDay.Type.TYPE_WORKDAY.value else None,
                             'cashbox_type': WorkerDayCashboxDetails.objects.get(
                                 worker_day=outsourcer_workerday
-                            ).cashbox_type.id
+                            ).cashbox_type.id if outsourcer_workerday.type == WorkerDay.Type.TYPE_WORKDAY.value else None
                         })
                     except ObjectDoesNotExist:
                         return JsonResponse.does_not_exists_error(
                             'Ошибка в get_outsource_workers. Такого дня нет в расписании.'
                         )
-        response_dict[converted_date]['amount'] = outsource_workers_count_per_day
+        date_response_dict[converted_date]['amount'] = outsource_workers_count_per_day
+        if outsource_workers_count_per_day > max_outsource_worker_on_period:
+            max_outsource_worker_on_period = outsource_workers_count_per_day
+
+    response_dict['max_amount'] = max_outsource_worker_on_period
 
     return JsonResponse.success(response_dict)
 

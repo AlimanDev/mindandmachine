@@ -289,11 +289,12 @@ def get_cashier_timetable(request, form):
         )
 
         worker_day_change_log = group_by(
-            WorkerDay.objects.filter(
+            WorkerDay.objects.select_related('worker').filter(
                 worker_id=worker_id,
                 dt__gte=from_dt,
                 dt__lte=to_dt,
-                parent_worker_day__isnull=False
+                parent_worker_day__isnull=False,
+                worker__attachment_group=User.GROUP_STAFF
             ),
             group_key=lambda _: _.id,
             sort_key=lambda _: _.dt,
@@ -852,6 +853,7 @@ def get_worker_day_logs(request, form):
     pointer = form['pointer']
     size = form['size'] if form['size'] else 10
     worker_day_id = form['worker_day_id']
+
     worker_day_desired = None
     response_data = {}
 
@@ -864,6 +866,7 @@ def get_worker_day_logs(request, form):
     child_worker_days = WorkerDay.objects.select_related('worker').filter(
         parent_worker_day_id__isnull=False,
         worker__shop_id=shop_id,
+        worker__attachment_group=User.GROUP_STAFF,
         dt__gte=form['from_dt'],
         dt__lte=form['to_dt']
     ).order_by('-dttm_added')
