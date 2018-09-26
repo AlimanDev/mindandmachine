@@ -63,11 +63,12 @@ def get_outsource_workers(request, form):
             dt_fired__lte=from_dt + timedelta(days=date)
         ).order_by('dt_hired')
         outsource_workers_count_per_day = 0
+        outsource_workerdays = WorkerDay.objects.qos_current_version().filter(worker__in=outsource_workers)
         if outsource_workers.count() > 0:
             for u in outsource_workers:
                 u.first_name = '№{}'.format(str(outsource_workers_count_per_day + 1))
 
-                outsourcer_workerday = WorkerDay.objects.qos_current_version().filter(worker=u).first()
+                outsourcer_workerday = outsource_workerdays.filter(worker=u).first()
                 if outsourcer_workerday:
                     outsource_workers_count_per_day += 1
                     try:
