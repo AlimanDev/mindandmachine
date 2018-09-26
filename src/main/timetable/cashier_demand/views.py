@@ -370,11 +370,13 @@ def get_cashiers_timetable(request, form):
         dt__gte=form['from_dt'],
         dt__lte=form['to_dt'],
         worker__shop_id=shop_id,
+        worker__attachment_group=User.GROUP_STAFF,
     ).count() - WorkerDay.objects.select_related('worker').filter(
         dt__gte=form['from_dt'],
         dt__lte=form['to_dt'],
         worker__shop_id=shop_id,
-        parent_worker_day__isnull=True
+        parent_worker_day__isnull=True,
+        worker__attachment_group=User.GROUP_STAFF,
     ).count()
 
     response = {
