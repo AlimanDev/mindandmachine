@@ -56,39 +56,35 @@ def get_outsource_workers(request, form):
             'outsource_workers': [],
             'amount': 0
         }
-        outsource_workers = User.objects.filter(
-            shop=shop,
-            attachment_group=User.GROUP_OUTSOURCE,
-            dt_hired__gte=from_dt + timedelta(days=date),
-            dt_fired__lte=from_dt + timedelta(days=date)
-        ).order_by('dt_hired')
-        outsource_workers_count_per_day = 0
-        outsource_workerdays = WorkerDay.objects.qos_current_version().filter(worker__in=outsource_workers)
-        if outsource_workers.count() > 0:
-            for u in outsource_workers:
-                u.first_name = '№{}'.format(str(outsource_workers_count_per_day + 1))
 
-                outsourcer_workerday = outsource_workerdays.filter(worker=u).first()
-                if outsourcer_workerday:
-                    outsource_workers_count_per_day += 1
-                    try:
-                        date_response_dict[converted_date]['outsource_workers'].append({
-                            'id': u.id,
-                            'first_name': u.first_name,
-                            'last_name': u.last_name,
-                            'type': WorkerDayConverter.convert_type(outsourcer_workerday.type),
-                            'dttm_work_start': BaseConverter.convert_time(outsourcer_workerday.dttm_work_start.time())\
-                                if outsourcer_workerday.type == WorkerDay.Type.TYPE_WORKDAY.value else None,
-                            'dttm_work_end': BaseConverter.convert_time(outsourcer_workerday.dttm_work_end.time())\
-                                if outsourcer_workerday.type == WorkerDay.Type.TYPE_WORKDAY.value else None,
-                            'cashbox_type': WorkerDayCashboxDetails.objects.get(
-                                worker_day=outsourcer_workerday
-                            ).cashbox_type.id if outsourcer_workerday.type == WorkerDay.Type.TYPE_WORKDAY.value else None
-                        })
-                    except ObjectDoesNotExist:
-                        return JsonResponse.does_not_exists_error(
-                            'Ошибка в get_outsource_workers. Такого дня нет в расписании.'
-                        )
+        outsource_workerdays = WorkerDay.objects.qos_current_version().select_related('worker').filter(
+            worker__shop=shop,
+            worker__attachment_group=User.GROUP_OUTSOURCE,
+            worker__dt_hired__gte=from_dt + timedelta(days=date),
+            worker__dt_fired__lte=from_dt + timedelta(days=date),
+        )
+        outsource_workers_count_per_day = outsource_workerdays.count()
+        if outsource_workers_count_per_day > 0:
+            for wd in outsource_workerdays:
+                first_name = '№{}'.format(str(outsource_workers_count_per_day + 1))
+                try:
+                    date_response_dict[converted_date]['outsource_workers'].append({
+                        'id': wd.worker.id,
+                        'first_name': first_name,
+                        'last_name': wd.worker.last_name,
+                        'type': WorkerDayConverter.convert_type(wd.type),
+                        'dttm_work_start': BaseConverter.convert_time(wd.dttm_work_start.time())\
+                            if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None,
+                        'dttm_work_end': BaseConverter.convert_time(wd.dttm_work_end.time())\
+                            if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None,
+                        'cashbox_type': WorkerDayCashboxDetails.objects.get(
+                            worker_day=wd
+                        ).cashbox_type.id if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+                    })
+                except ObjectDoesNotExist:
+                    return JsonResponse.does_not_exists_error(
+                        'Ошибка в get_outsource_workers. Такого дня нет в расписании.'
+                    )
         date_response_dict[converted_date]['amount'] = outsource_workers_count_per_day
         if outsource_workers_count_per_day > max_outsource_worker_on_period:
             max_outsource_worker_on_period = outsource_workers_count_per_day
