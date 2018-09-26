@@ -66,10 +66,10 @@ def get_outsource_workers(request, form):
         if outsource_workers.count() > 0:
             for u in outsource_workers:
                 u.first_name = '№{}'.format(str(outsource_workers_count_per_day + 1))
-                outsource_workers_count_per_day += 1
 
                 outsourcer_workerday = WorkerDay.objects.qos_current_version().filter(worker=u).first()
                 if outsourcer_workerday:
+                    outsource_workers_count_per_day += 1
                     try:
                         date_response_dict[converted_date]['outsource_workers'].append({
                             'id': u.id,

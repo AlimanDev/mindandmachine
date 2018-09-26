@@ -1,6 +1,7 @@
 from datetime import time, datetime, timedelta
 from django.db.models import Avg
 from django.forms.models import model_to_dict
+from django.core.exceptions import ObjectDoesNotExist
 import json
 
 from src.db.models import (
@@ -748,6 +749,7 @@ def set_worker_day(request, form):
     else:
         details = []
     dt = form['dt']
+    response = {}
 
     try:
         worker = User.objects.get(id=form['worker_id'])
@@ -788,37 +790,50 @@ def set_worker_day(request, form):
     except WorkerDay.MultipleObjectsReturned:
         return JsonResponse.multiple_objects_returned()
 
-    new_worker_day = WorkerDay.objects.create(
-        worker_id=worker.id,
-        parent_worker_day=old_wd,
-        is_manual_tuning=True,
-        created_by=request.user,
-        **wd_args
-    )
-
     cashbox_updated = False
 
-    if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
-        if len(details):
-            for item in details:
+    # этот блок вводит логику относительно аутсорс сотрудников. у них выходных нет, поэтому их мы просто удаляем
+    if old_wd.worker.attachment_group == User.GROUP_OUTSOURCE and form['type'] not in [
+        WorkerDay.Type.TYPE_WORKDAY.value,
+        WorkerDay.Type.TYPE_ETC.value
+    ]:
+        cashbox_detail = WorkerDayCashboxDetails.objects.filter(worker_day=old_wd).first()
+        try:
+            cashbox_detail.delete()
+        except ObjectDoesNotExist:
+            pass
+        old_wd.delete()
+    else:
+        new_worker_day = WorkerDay.objects.create(
+            worker_id=worker.id,
+            parent_worker_day=old_wd,
+            is_manual_tuning=True,
+            created_by=request.user,
+            **wd_args
+        )
+
+        if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
+            if len(details):
+                for item in details:
+                    WorkerDayCashboxDetails.objects.create(
+                        cashbox_type_id=item['cashBox_type'],
+                        worker_day=new_worker_day,
+                        dttm_from=item['dttm_from'],
+                        dttm_to=item['dttm_to']
+                    )
+            else:
+                cashbox_type_id = form.get('cashbox_type')
                 WorkerDayCashboxDetails.objects.create(
-                    cashbox_type_id=item['cashBox_type'],
+                    cashbox_type_id=cashbox_type_id,
                     worker_day=new_worker_day,
-                    dttm_from=item['dttm_from'],
-                    dttm_to=item['dttm_to']
+                    dttm_from=new_worker_day.dttm_work_start,
+                    dttm_to=new_worker_day.dttm_work_end
                 )
-        else:
-            cashbox_type_id = form.get('cashbox_type')
-            WorkerDayCashboxDetails.objects.create(
-                cashbox_type_id=cashbox_type_id,
-                worker_day=new_worker_day,
-                dttm_from=new_worker_day.dttm_work_start,
-                dttm_to=new_worker_day.dttm_work_end
-            )
-        cashbox_updated = True
+            cashbox_updated = True
+
+            response['day'] = WorkerDayConverter.convert(new_worker_day)
 
     response = {
-        'day': WorkerDayConverter.convert(new_worker_day),
         'action': action,
         'cashbox_updated': cashbox_updated
     }
