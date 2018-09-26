@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from django.conf.urls import include
 from .notification import urls as notification_urls
+from .outsource import urls as outsource_urls
 
 
 urlpatterns = [
@@ -13,5 +14,6 @@ urlpatterns = [
     path('set_slot', views.set_slot),
     path('create_slot', views.create_slot),
     path('delete_slot', views.delete_slot),
-    path('notifications/', include(notification_urls))
+    path('notifications/', include(notification_urls)),
+    path('outsource/', include(outsource_urls)),
 ]

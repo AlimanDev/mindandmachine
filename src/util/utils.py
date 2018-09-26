@@ -161,7 +161,7 @@ def api_method(
                         try:
                             cleaned_data = lambda_func(form.cleaned_data)
                         except ObjectDoesNotExist:
-                            return JsonResponse.does_not_exists_error()
+                            return JsonResponse.does_not_exists_error('error in api_method')
                         except MultipleObjectsReturned:
                             return JsonResponse.multiple_objects_returned()
 

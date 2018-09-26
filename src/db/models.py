@@ -129,9 +129,11 @@ class WorkerManager(UserManager):
         """
 
         return self.filter(
-            models.Q(dt_hired__lte=dt_from) | models.Q(dt_hired__isnull=True)
+            models.Q(dt_hired__lte=dt_from) | models.Q(dt_hired__isnull=True),
+            attachment_group=User.GROUP_STAFF
         ).filter(
-            models.Q(dt_fired__gte=dt_to) | models.Q(dt_fired__isnull=True)
+            models.Q(dt_fired__gte=dt_to) | models.Q(dt_fired__isnull=True),
+            attachment_group=User.GROUP_STAFF
         ).filter(*args, **kwargs)
 
 
@@ -176,6 +178,14 @@ class User(DjangoAbstractUser):
         (GROUP_HQ, 'headquarter')
     )
 
+    GROUP_STAFF = 'S'
+    GROUP_OUTSOURCE = 'O'
+
+    ATTACHMENT_TYPE = (
+        (GROUP_STAFF, 'staff'),
+        (GROUP_OUTSOURCE, 'outsource'),
+    )
+
     __all_groups__ = [x[0] for x in GROUP_TYPE]
     __except_cashiers__ = [GROUP_MANAGER, GROUP_SUPERVISOR, GROUP_DIRECTOR, GROUP_HQ]
     __allowed_to_modify__ = [GROUP_SUPERVISOR, GROUP_DIRECTOR]
@@ -192,7 +202,11 @@ class User(DjangoAbstractUser):
         default=GROUP_CASHIER,
         choices=GROUP_TYPE
     )
-    # permissions = models.BigIntegerField(default=0)
+    attachment_group = models.CharField(
+        max_length=1,
+        default=GROUP_STAFF,
+        choices=ATTACHMENT_TYPE
+    )
 
     middle_name = models.CharField(max_length=64, blank=True, null=True)
 

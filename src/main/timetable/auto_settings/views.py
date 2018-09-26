@@ -98,8 +98,8 @@ def set_selected_cashiers(request, form):
         Всем другим сотрудникам из этого магаза проставляется значение противоположное value
     """
     shop = Shop.objects.get(id=form['shop_id'])
-    User.objects.filter(shop=shop).exclude(id__in=form['cashier_ids']).update(auto_timetable=False)
-    User.objects.filter(id__in=form['cashier_ids']).update(auto_timetable=True)
+    User.objects.filter(shop=shop, attachment_group=User.GROUP_STAFF).exclude(id__in=form['cashier_ids']).update(auto_timetable=False)
+    User.objects.filter(id__in=form['cashier_ids'], attachment_group=User.GROUP_STAFF).update(auto_timetable=True)
     return JsonResponse.success()
 
 
@@ -482,7 +482,7 @@ def set_timetable(request, form):
     timetable.save()
     if timetable.status != Timetable.Status.READY.value and timetable.status_message:
         return JsonResponse.success(timetable.status_message)
-    users = {x.id: x for x in User.objects.filter(id__in=list(data['users']))}
+    users = {x.id: x for x in User.objects.filter(id__in=list(data['users']), attachment_group=User.GROUP_STAFF)}
 
     for uid, v in data['users'].items():
         for wd in v['workdays']:

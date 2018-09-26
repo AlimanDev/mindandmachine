@@ -1,6 +1,7 @@
 from datetime import time, datetime, timedelta
 from django.db.models import Avg
 from django.forms.models import model_to_dict
+from django.core.exceptions import ObjectDoesNotExist
 import json
 
 from src.db.models import (
@@ -61,6 +62,7 @@ def get_cashiers_list(request, form):
         dt_hired_before(QOS_DATE): required = False.
         dt_fired_after(QOS_DATE): required False
         shop_id(int): required = False
+        consider_outsource(bool): required = False (учитывать outsource работников)
         checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
@@ -88,10 +90,18 @@ def get_cashiers_list(request, form):
 
     """
     users = []
+    attachment_groups = [User.GROUP_STAFF, User.GROUP_OUTSOURCE if form['consider_outsource'] else None]
     shop_id = FormUtil.get_shop_id(request, form)
-    for u in User.objects.filter(shop_id=shop_id).order_by('last_name', 'first_name'):
+    outsourcers_count = 1  # в бд лежат 'Наемный сотрудник №1213'. хочу отдавать на конкретный день 'Наемный сотрудник №1,2,3'
+    for u in User.objects.filter(
+            shop_id=shop_id,
+            attachment_group__in=attachment_groups
+    ).order_by('last_name', 'first_name'):
         if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
             if u.dt_fired is None or u.dt_fired >= form['dt_fired_after']:
+                if u.attachment_group == User.GROUP_OUTSOURCE:
+                    u.first_name = '№{}'.format(outsourcers_count)
+                    outsourcers_count += 1
                 users.append(u)
 
     return JsonResponse.success([UserConverter.convert(x) for x in users])
@@ -141,7 +151,7 @@ def get_not_working_cashiers_list(request, form):
     for u in WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
         dt=dt_now.date(),
         worker__shop_id=shop_id,
-
+        worker__attachment_group=User.GROUP_STAFF
     ).exclude(
         type=WorkerDay.Type.TYPE_WORKDAY.value
     ).order_by(
@@ -280,11 +290,12 @@ def get_cashier_timetable(request, form):
         )
 
         worker_day_change_log = group_by(
-            WorkerDay.objects.filter(
+            WorkerDay.objects.select_related('worker').filter(
                 worker_id=worker_id,
                 dt__gte=from_dt,
                 dt__lte=to_dt,
-                parent_worker_day__isnull=False
+                parent_worker_day__isnull=False,
+                worker__attachment_group=User.GROUP_STAFF
             ),
             group_key=lambda _: _.id,
             sort_key=lambda _: _.dt,
@@ -738,6 +749,7 @@ def set_worker_day(request, form):
     else:
         details = []
     dt = form['dt']
+    response = {}
 
     try:
         worker = User.objects.get(id=form['worker_id'])
@@ -778,37 +790,49 @@ def set_worker_day(request, form):
     except WorkerDay.MultipleObjectsReturned:
         return JsonResponse.multiple_objects_returned()
 
-    new_worker_day = WorkerDay.objects.create(
-        worker_id=worker.id,
-        parent_worker_day=old_wd,
-        is_manual_tuning=True,
-        created_by=request.user,
-        **wd_args
-    )
-
     cashbox_updated = False
 
-    if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
-        if len(details):
-            for item in details:
+    # этот блок вводит логику относительно аутсорс сотрудников. у них выходных нет, поэтому их мы просто удаляем
+    if old_wd.worker.attachment_group == User.GROUP_OUTSOURCE and form['type'] not in [
+        WorkerDay.Type.TYPE_WORKDAY.value,
+        WorkerDay.Type.TYPE_ETC.value
+    ]:
+        try:
+            WorkerDayCashboxDetails.objects.filter(worker_day=old_wd).delete()
+        except ObjectDoesNotExist:
+            pass
+        old_wd.delete()
+    else:
+        new_worker_day = WorkerDay.objects.create(
+            worker_id=worker.id,
+            parent_worker_day=old_wd,
+            is_manual_tuning=True,
+            created_by=request.user,
+            **wd_args
+        )
+
+        if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
+            if len(details):
+                for item in details:
+                    WorkerDayCashboxDetails.objects.create(
+                        cashbox_type_id=item['cashBox_type'],
+                        worker_day=new_worker_day,
+                        dttm_from=item['dttm_from'],
+                        dttm_to=item['dttm_to']
+                    )
+            else:
+                cashbox_type_id = form.get('cashbox_type')
                 WorkerDayCashboxDetails.objects.create(
-                    cashbox_type_id=item['cashBox_type'],
+                    cashbox_type_id=cashbox_type_id,
                     worker_day=new_worker_day,
-                    dttm_from=item['dttm_from'],
-                    dttm_to=item['dttm_to']
+                    dttm_from=new_worker_day.dttm_work_start,
+                    dttm_to=new_worker_day.dttm_work_end
                 )
-        else:
-            cashbox_type_id = form.get('cashbox_type')
-            WorkerDayCashboxDetails.objects.create(
-                cashbox_type_id=cashbox_type_id,
-                worker_day=new_worker_day,
-                dttm_from=new_worker_day.dttm_work_start,
-                dttm_to=new_worker_day.dttm_work_end
-            )
-        cashbox_updated = True
+            cashbox_updated = True
+
+            response['day'] = WorkerDayConverter.convert(new_worker_day)
 
     response = {
-        'day': WorkerDayConverter.convert(new_worker_day),
         'action': action,
         'cashbox_updated': cashbox_updated
     }
@@ -843,6 +867,7 @@ def get_worker_day_logs(request, form):
     pointer = form['pointer']
     size = form['size'] if form['size'] else 10
     worker_day_id = form['worker_day_id']
+
     worker_day_desired = None
     response_data = {}
 
@@ -855,6 +880,7 @@ def get_worker_day_logs(request, form):
     child_worker_days = WorkerDay.objects.select_related('worker').filter(
         parent_worker_day_id__isnull=False,
         worker__shop_id=shop_id,
+        worker__attachment_group=User.GROUP_STAFF,
         dt__gte=form['from_dt'],
         dt__lte=form['to_dt']
     ).order_by('-dttm_added')
