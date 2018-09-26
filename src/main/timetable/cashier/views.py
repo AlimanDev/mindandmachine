@@ -798,7 +798,7 @@ def set_worker_day(request, form):
         WorkerDay.Type.TYPE_ETC.value
     ]:
         try:
-            WorkerDayCashboxDetails.objects.filter(worker_day=old_wd).first().delete()
+            WorkerDayCashboxDetails.objects.filter(worker_day=old_wd).delete()
         except ObjectDoesNotExist:
             pass
         old_wd.delete()
