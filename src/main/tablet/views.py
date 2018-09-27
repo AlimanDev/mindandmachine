@@ -332,7 +332,6 @@ def change_cashier_status(request, form):
         tm_changin (QOS_TIME): required = False
         tm_work_end (QOS_TIME): required = False. Если сотрудник вышел не по расписанию, объекта workerday_cashbox_details у него
             на этот день нету, соответственно нужно проставить время окончания рабочего дня.
-        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         {
@@ -354,7 +353,6 @@ def change_cashier_status(request, form):
     cashbox_id = form['cashbox_id']
     is_current_time = form['is_current_time']
     tm_work_end = form['tm_work_end']
-    checkpoint = FormUtil.get_checkpoint(form)
 
     dttm_now = (now() + timedelta(hours=3)).replace(microsecond=0)
     dt = (dttm_now-timedelta(hours=3)).date()
@@ -366,19 +364,19 @@ def change_cashier_status(request, form):
     cashbox_type = None if cashbox_id is None else CashboxType.objects.get(cashbox__id=cashbox_id)
     wdcd = None
 
-    workerday_detail_obj = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
+    workerday_detail_obj = WorkerDayCashboxDetails.objects.qos_current_version().filter(
         worker_day__dt=dt,
         worker_day__worker_id=worker_id
     ).order_by('id').last()
 
     try:
-        worker_day = WorkerDay.objects.qos_filter_version(checkpoint).get(dt=dt, worker_id=worker_id)
+        worker_day = WorkerDay.objects.qos_current_version().get(dt=dt, worker_id=worker_id)
     except WorkerDay.DoesNotExist:
         return JsonResponse.does_not_exists_error('Такого дня нет в расписании.')
     except WorkerDay.MultipleObjectsReturned:
         return JsonResponse.multiple_objects_returned()
 
-    cashbox_worked = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
+    cashbox_worked = WorkerDayCashboxDetails.objects.qos_current_version().filter(
         Q(dttm_to__isnull=True) | Q(dttm_to__gt=dttm_now),
         worker_day__dt=dt,
         is_tablet=True,
@@ -409,7 +407,7 @@ def change_cashier_status(request, form):
         worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
         worker_day.save()
     elif new_user_status == WorkerDayCashboxDetails.TYPE_FINISH:
-        WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
+        WorkerDayCashboxDetails.objects.qos_current_version().filter(
             worker_day__dt=dt,
             worker_day__worker_id=worker_id,
             is_tablet=False,
