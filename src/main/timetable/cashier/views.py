@@ -802,6 +802,7 @@ def set_worker_day(request, form):
         except ObjectDoesNotExist:
             pass
         old_wd.delete()
+        old_wd.worker.delete()
     else:
         new_worker_day = WorkerDay.objects.create(
             worker_id=worker.id,

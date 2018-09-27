@@ -278,7 +278,7 @@ class CashboxType(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     name = models.CharField(max_length=128)
     speed_coef = models.FloatField(default=1)
-    is_stable = models.BooleanField(default=True)
+    is_stable = models.BooleanField(default=False)
     FORECAST_HARD = 'H'
     FORECAST_LITE = 'L'
     FORECAST_NONE = 'N'

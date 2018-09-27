@@ -446,11 +446,7 @@ def get_cashiers_timetable(request, form):
     return JsonResponse.success(response)
 
 
-@api_method(
-    'GET',
-    GetWorkersForm,
-    # lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
-)
+@api_method('GET', GetWorkersForm)
 def get_workers(request, form):
     """
     Todo: сделать нормальное описание
@@ -467,115 +463,41 @@ def get_workers(request, form):
     """
 
     checkpoint = FormUtil.get_checkpoint(form)
-
-    from_dt = form['from_dttm'].date()
-    from_tm = form['from_dttm'].time()
-    to_dt = form['to_dttm'].date()
-    to_tm = form['to_dttm'].time()
-
+    from_dttm = form['from_dttm']
+    to_dttm = form['to_dttm']
     shop = FormUtil.get_shop_id(request, form)
 
+    response = {}
+
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related(
-        'on_cashbox', 'worker_day__worker'
+        'worker_day'
     ).filter(
         worker_day__worker__shop_id=shop,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
-        worker_day__dt__gte=from_dt,
-        worker_day__dt__lte=to_dt,
+        worker_day__dt=from_dttm.date(),
+        worker_day__dttm_work_start__lte=from_dttm,
+        worker_day__dttm_work_end__gte=to_dttm,
+        status__in=[
+            WorkerDayCashboxDetails.TYPE_WORK,
+            WorkerDayCashboxDetails.TYPE_BREAK,
+            WorkerDayCashboxDetails.TYPE_T
+        ]
     )
-    cashboxes_types = {x.id: x for x in CashboxType.objects.filter(shop=shop)}
 
     cashbox_type_ids = form['cashbox_type_ids']
     if len(cashbox_type_ids) > 0:
         worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.cashbox_type_id in cashbox_type_ids]
 
-    users = {}
     for x in worker_day_cashbox_detail:
-        worker_id = x.worker_day.worker_id
-        if worker_id not in users:
-            users[worker_id] = {
-                'days': {},
-                'cashbox_info': {}
-            }
-        user_item = users[worker_id]
-
-        from_dt = x.worker_day.dt
-        if from_dt not in user_item['days']:
-            user_item['days'][from_dt] = {
-                'day': x.worker_day,
-                'details': []
-            }
-
-        user_item['days'][from_dt]['details'].append(x)
-
-    users_ids = list(users.keys())
-    for x in WorkerCashboxInfo.objects.filter(is_active=True, worker_id__in=users_ids):
-        users[x.worker_id]['cashbox_info'][x.cashbox_type_id] = x
-
-    today = datetime.now().date()
-    response_users_ids = []
-    for uid, user in users.items():
-        if from_dt not in user['days']:
-            continue
-
-        day = user['days'][from_dt]['day']
-        details = user['days'][from_dt]['details']
-        cashbox = []
-        for d in details:
-            if d.dttm_to.time() is None:
-                if d.dttm_from.time() <= from_tm:
-                    cashbox.append(d)
-            else:
-                if d.tm_from < d.dttm_to:
-                    if d.tm_from <= to_tm and d.tm_to > from_tm:
-                        cashbox.append(d)
-                else:
-                    if d.tm_from <= to_tm or d.tm_to > from_tm:
-                        cashbox.append(d)
-#             elif d.dttm_from.time() < d.dttm_to.time():
-#                 if d.dttm_from.time() <= from_tm < d.dttm_to.time():
-#                     cashbox.append(d)
-#             else:
-#                 if d.dttm_from.time() <= from_tm or d.dttm_to.time() > from_tm:
-#                     cashbox.append(d)
-
-        if len(cashbox) == 0:
-            continue
-
-        user['days'][from_dt]['details_one'] = cashbox[0]
-        response_users_ids.append(uid)
-
-        # if day.tm_break_start is not None:
-        #     if datetime.combine(from_dt, day.tm_break_start) <= form['from_dttm'] < datetime.combine(from_dt, day.tm_break_start) + timedelta(hours=1):
-        #         continue
-
-        # cashbox_type = cashbox[0].on_cashbox.type_id
-        # cashbox_info = user['cashbox_info'].get(cashbox_type)
-
-    response = {
-        'cashbox_types': {x.id: CashboxTypeConverter.convert(x) for x in cashboxes_types.values()},    # Todo: зачем это нужно?
-
-        'users': {}
-    }
-
-    for x in User.objects.filter(id__in=response_users_ids):
-        response['users'][x.id] = {
-            'u': UserConverter.convert(x),
-            'd': [],
-            'c': []
+        response[x.worker_day.worker_id] = {
+            'id': x.id,
+            'from_dttm': BaseConverter.convert_datetime(x.dttm_from),
+            'to_dttm': BaseConverter.convert_datetime(x.dttm_to),
+            'on_cashbox': x.on_cashbox_id,
+            'cashbox_type': x.cashbox_type_id,
+            'status': x.status,
+            'user_info': UserConverter.convert(x.worker_day.worker)
         }
-
-    # response = {
-    #     'users': {
-    #         uid: {
-    #             'u': UserConverter.convert(u),
-    #             'd': [WorkerDayConverter.convert(x) for x in days.get(u.id, [])],
-    #             'c': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(u.id, [])]
-    #         }
-    #         for uid in response_users
-    #     },
-    #     'cashbox_types': {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types}
-    # }
 
     return JsonResponse.success(response)
 
