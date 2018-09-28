@@ -355,9 +355,9 @@ def get_cashiers_timetable(request, form):
             if difference_of_pred_real > 0:
                 idle_time_numerator += difference_of_pred_real
                 idle_time_denominator += period_cashiers_hard
-            else:
+            elif difference_of_pred_real < 0:
                 covering_time_numerator += abs(difference_of_pred_real)
-                idle_time_denominator += period_cashiers_hard
+                covering_time_denominator += sum(predict_diff_hard_dict.values())
             demand_ind = demand_ind_2
 
             need_amount_morning = 0
@@ -385,7 +385,7 @@ def get_cashiers_timetable(request, form):
                 if cashbox_type in cashbox_types.keys():
                     need_total += predict_diff_dict.get(cashbox_type, 0)
                     lack_of_cashiers_on_period[cashbox_type].append({
-                        'lack_of_cashiers': max(0, need_total - period_cashiers_hard),
+                        'lack_of_cashiers': max(0, int(need_total - period_cashiers_hard)),
                         'dttm_start': dttm_converted,
                     })
 
@@ -436,7 +436,7 @@ def get_cashiers_timetable(request, form):
             'FOT': None,
             'need_cashier_amount': round((max_of_cashiers_lack_morning + max_of_cashiers_lack_evening)), # * 1.4
             'change_amount': changed_amount,
-            'covering_part': 100 - round(100 * covering_time_numerator / (idle_time_denominator + 1e-8), 1)
+            'covering_part': 100 - round(100 * covering_time_numerator / (covering_time_denominator + 1e-8), 1)
         },
         'period_step': PERIOD_MINUTES,
         'tt_periods': {

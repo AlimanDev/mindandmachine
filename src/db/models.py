@@ -295,7 +295,6 @@ class CashboxType(models.Model):
     probability = models.FloatField(default=1.0)
     prior_weight = models.FloatField(default=1.0)
     is_main_type = models.BooleanField(default=False)
-    is_trading_floor = models.BooleanField(default=False)
     objects = CashboxTypeManager()
 
     period_demand_params = models.CharField(
@@ -569,6 +568,7 @@ class WorkerDayCashboxDetailsManager(models.Manager):
 
 class WorkerDayCashboxDetails(models.Model):
     TYPE_WORK = 'W'
+    TYPE_WORK_TRADING_FLOOR = 'Z'
     TYPE_BREAK = 'B'
     TYPE_STUDY = 'S'
 
@@ -580,19 +580,22 @@ class WorkerDayCashboxDetails(models.Model):
             (TYPE_WORK, 'work period'),
             (TYPE_BREAK, 'rest / break'),
             (TYPE_STUDY, 'study period'),
+            (TYPE_WORK_TRADING_FLOOR, 'work in trading floor'),
     )
 
     TYPE_T = 'T'
 
     WORK_TYPES_LIST = (
         TYPE_WORK,
-        TYPE_STUDY
+        TYPE_STUDY,
+        TYPE_WORK_TRADING_FLOOR,
     )
 
     DETAILS_TYPES_LIST = (
         TYPE_WORK,
         TYPE_BREAK,
-        TYPE_STUDY
+        TYPE_STUDY,
+        TYPE_WORK_TRADING_FLOOR,
     )
 
     id = models.BigAutoField(primary_key=True)

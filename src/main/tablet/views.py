@@ -1,4 +1,3 @@
-import datetime as datetime_module
 from datetime import timedelta, datetime
 from django.db.models import Q
 import json
@@ -14,10 +13,8 @@ from src.db.models import (
     User
 )
 from django.db.models import Avg
-
 from src.util.utils import api_method, JsonResponse
 from src.util.forms import FormUtil
-from .utils import time_diff, is_midnight_period
 from .forms import GetCashboxesInfo, GetCashiersInfo, ChangeCashierStatus
 from django.utils.timezone import now
 from src.util.models_converter import WorkerCashboxInfoConverter
@@ -124,13 +121,6 @@ def get_cashboxes_info(request, form):
             "user_id": user_id,
         },
 
-    trading_floor = CashboxType.objects.filter(shop_id=shop_id, is_trading_floor=True).first()
-    if trading_floor:
-        response[trading_floor.id] = {
-            "name": trading_floor.name,
-            "priority": trading_floor.priority,
-        }
-
     return JsonResponse.success(response)
 
 
@@ -194,6 +184,7 @@ def get_cashiers_info(request, form):
     time_without_rest = {}
 
     status = WorkerDayCashboxDetails.objects.qos_current_version().filter(
+        Q(worker_day__worker__dt_fired__gt=dttm.date()) | Q(worker_day__worker__dt_fired__isnull=True),
         worker_day__dttm_work_start__lte=dttm + timedelta(minutes=30),
         worker_day__dt=(dttm - timedelta(hours=2)).date(),
         worker_day__worker__shop__id=shop_id,
@@ -276,6 +267,7 @@ def get_cashiers_info(request, form):
             response[item.worker_day.worker_id] = {
                 "worker_id": item.worker_day.worker_id,
                 "status": item.status,
+                "attachment_group": item.worker_day.worker.attachment_group,
                 "worker_day_id": item.worker_day_id,
                 "tm_work_start": str(item.dttm_from.time()),
                 "tm_work_end": str(item.worker_day.dttm_work_end.time()),
@@ -290,8 +282,7 @@ def get_cashiers_info(request, form):
 
         else:
             tm_work_end = item.dttm_to if item.status == WorkerDayCashboxDetails.TYPE_FINISH else item.worker_day.dttm_work_end
-            # cashbox_type = response[item.worker_day.worker_id]["cashbox_type"]
-            if item.on_cashbox_id is None:
+            if not item.on_cashbox_id is None:
                 cashbox_type = item.cashbox_type_id
             else:
                 cashbox_type = response[item.worker_day.worker_id]["cashbox_type"]
@@ -413,20 +404,6 @@ def change_cashier_status(request, form):
         worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
         worker_day.save()
 
-    if new_user_status == 'Z':
-        try:
-            WorkerDayCashboxDetails.objects.create(
-                worker_day=worker_day,
-                cashbox_type=CashboxType.objects.get(
-                    shop_id=worker_day.worker.shop.id,
-                    is_trading_floor=True,
-                ),
-                dttm_from=dttm_now,
-                status=WorkerDayCashboxDetails.TYPE_WORK,
-                is_tablet=True
-            )
-        except CashboxType.DoesNotExist:
-            return JsonResponse.internal_error('Добавьте в систему Торговый зал, как тип касс.')
     elif new_user_status == WorkerDayCashboxDetails.TYPE_FINISH:
         WorkerDayCashboxDetails.objects.qos_current_version().filter(
             worker_day__dt=dt,
