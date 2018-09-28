@@ -191,6 +191,7 @@ class CashboxTypeConverter(BaseConverter):
             'speed_coef': obj.speed_coef,
             'do_forecast': obj.do_forecast,
             'is_main_type': obj.is_main_type,
+            'is_trading_floor': obj.is_trading_floor,
         }
         if add_algo_params:
             vals.update({

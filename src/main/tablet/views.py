@@ -124,6 +124,13 @@ def get_cashboxes_info(request, form):
             "user_id": user_id,
         },
 
+    trading_floor = CashboxType.objects.filter(shop_id=shop_id, is_trading_floor=True).first()
+    if trading_floor:
+        response[trading_floor.id] = {
+            "name": trading_floor.name,
+            "priority": trading_floor.priority,
+        }
+
     return JsonResponse.success(response)
 
 
@@ -141,7 +148,6 @@ def get_cashiers_info(request, form):
         url: /api/tablet/get_cashiers_info
         shop_id (int): required = False
         dttm (QOS_DATETIME): дата и время
-        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         {
@@ -179,7 +185,6 @@ def get_cashiers_info(request, form):
     """
 
     shop_id = FormUtil.get_shop_id(request, form)
-    checkpoint = FormUtil.get_checkpoint(form)
     dttm = form['dttm']
     response = {}
 
@@ -188,7 +193,7 @@ def get_cashiers_info(request, form):
     list_of_break_triplets = json.loads(break_triplets)
     time_without_rest = {}
 
-    status = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(
+    status = WorkerDayCashboxDetails.objects.qos_current_version().filter(
         worker_day__dttm_work_start__lte=dttm + timedelta(minutes=30),
         worker_day__dt=(dttm - timedelta(hours=2)).date(),
         worker_day__worker__shop__id=shop_id,
@@ -285,10 +290,10 @@ def get_cashiers_info(request, form):
 
         else:
             tm_work_end = item.dttm_to if item.status == WorkerDayCashboxDetails.TYPE_FINISH else item.worker_day.dttm_work_end
-            if not item.on_cashbox_id is None:
-                cashbox_type = item.cashbox_type_id
-            else:
-                cashbox_type = response[item.worker_day.worker_id]["cashbox_type"]
+            # if not item.on_cashbox_id is None:
+            #     cashbox_type = item.cashbox_type_id
+            # else:
+            #     cashbox_type = response[item.worker_day.worker_id]["cashbox_type"]
 
             response[item.worker_day.worker_id].update({
                 "status": item.status,
@@ -378,10 +383,10 @@ def change_cashier_status(request, form):
 
     cashbox_worked = WorkerDayCashboxDetails.objects.qos_current_version().filter(
         Q(dttm_to__isnull=True) | Q(dttm_to__gt=dttm_now),
+        Q(on_cashbox_id=cashbox_id) & Q(on_cashbox_id__isnull=False),
         worker_day__dt=dt,
         is_tablet=True,
         dttm_from__lte=dttm_now,
-        on_cashbox_id=cashbox_id,
         status=WorkerDayCashboxDetails.TYPE_WORK,
     ).count()
     if cashbox_worked:
@@ -406,6 +411,21 @@ def change_cashier_status(request, form):
     if new_user_status == WorkerDayCashboxDetails.TYPE_ABSENCE:
         worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
         worker_day.save()
+
+    if new_user_status == 'Z':
+        try:
+            WorkerDayCashboxDetails.objects.create(
+                worker_day=worker_day,
+                cashbox_type=CashboxType.objects.get(
+                    shop_id=worker_day.worker.shop.id,
+                    is_trading_floor=True,
+                ),
+                dttm_from=dttm_now,
+                status=WorkerDayCashboxDetails.TYPE_WORK,
+                is_tablet=True
+            )
+        except CashboxType.DoesNotExist:
+            return JsonResponse.internal_error('Добавьте в систему Торговый зал, как тип касс.')
     elif new_user_status == WorkerDayCashboxDetails.TYPE_FINISH:
         WorkerDayCashboxDetails.objects.qos_current_version().filter(
             worker_day__dt=dt,

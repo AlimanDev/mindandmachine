@@ -78,9 +78,9 @@ def get_outsource_workers(request, form):
                             if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None,
                         'dttm_work_end': BaseConverter.convert_time(wd.dttm_work_end.time())\
                             if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None,
-                        'cashbox_type': WorkerDayCashboxDetails.objects.get(
+                        'cashbox_type': WorkerDayCashboxDetails.objects.filter(
                             worker_day=wd
-                        ).cashbox_type.id if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+                        ).first().cashbox_type_id if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None
                     })
                 except ObjectDoesNotExist:
                     return JsonResponse.does_not_exists_error(

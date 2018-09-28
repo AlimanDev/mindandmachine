@@ -10,7 +10,6 @@ class GetCashboxesInfo(forms.Form):
 class GetCashiersInfo(forms.Form):
     shop_id = forms.IntegerField(required=False)
     dttm = util_forms.DatetimeField()
-    checkpoint = forms.IntegerField(required=False)
 
 
 class ChangeCashierStatus(forms.Form):

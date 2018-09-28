@@ -295,6 +295,7 @@ class CashboxType(models.Model):
     probability = models.FloatField(default=1.0)
     prior_weight = models.FloatField(default=1.0)
     is_main_type = models.BooleanField(default=False)
+    is_trading_floor = models.BooleanField(default=False)
     objects = CashboxTypeManager()
 
     period_demand_params = models.CharField(
