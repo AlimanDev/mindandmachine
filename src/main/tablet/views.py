@@ -290,10 +290,11 @@ def get_cashiers_info(request, form):
 
         else:
             tm_work_end = item.dttm_to if item.status == WorkerDayCashboxDetails.TYPE_FINISH else item.worker_day.dttm_work_end
-            # if not item.on_cashbox_id is None:
-            #     cashbox_type = item.cashbox_type_id
-            # else:
-            #     cashbox_type = response[item.worker_day.worker_id]["cashbox_type"]
+            # cashbox_type = response[item.worker_day.worker_id]["cashbox_type"]
+            if item.on_cashbox_id is None:
+                cashbox_type = item.cashbox_type_id
+            else:
+                cashbox_type = response[item.worker_day.worker_id]["cashbox_type"]
 
             response[item.worker_day.worker_id].update({
                 "status": item.status,
