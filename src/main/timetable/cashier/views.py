@@ -96,7 +96,7 @@ def get_cashiers_list(request, form):
             attachment_group__in=attachment_groups
     ).order_by('last_name', 'first_name'):
         if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
-            if u.dt_fired is None or u.dt_fired >= form['dt_fired_after']:
+            if u.dt_fired is None or u.dt_fired > form['dt_fired_after']:
                 users.append(u)
 
     return JsonResponse.success([UserConverter.convert(x) for x in users])
