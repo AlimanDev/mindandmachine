@@ -228,10 +228,10 @@ def get_cashiers_timetable(request, form):
     fact_ind = 0
     idle_time_numerator = 0
     idle_time_denominator = 0
+    covering_time_numerator = 0
+    covering_time_denominator = 0
     cashiers_lack_on_period_morning = []
     cashiers_lack_on_period_evening = []
-    covered_on_period_morning = []
-    covered_on_period_evening = []
 
     edge_ind = 0
     while (edge_ind < len(period_demand)) and (period_demand[edge_ind].type != PeriodDemand.Type.FACT.value):
@@ -248,8 +248,6 @@ def get_cashiers_timetable(request, form):
     for day_ind in range((form['to_dt'] - form['from_dt']).days):
         each_day_morning = []
         each_day_evening = []
-        covered_each_day_morning = []
-        covered_each_day_evening = []
         for time_ind in range(periods):
             dttm = dttm_start + timedelta(days=day_ind) + time_ind * PERIOD_STEP
 
@@ -353,15 +351,17 @@ def get_cashiers_timetable(request, form):
             })
 
             predict_diff_hard_dict, _ = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types_main)
-            if period_cashiers_hard > sum(predict_diff_hard_dict.values()):
-                idle_time_numerator += period_cashiers_hard - sum(predict_diff_hard_dict.values())
-            idle_time_denominator += period_cashiers_hard
+            difference_of_pred_real = period_cashiers_hard - sum(predict_diff_hard_dict.values())
+            if difference_of_pred_real > 0:
+                idle_time_numerator += difference_of_pred_real
+                idle_time_denominator += period_cashiers_hard
+            else:
+                covering_time_numerator += abs(difference_of_pred_real)
+                idle_time_denominator += period_cashiers_hard
             demand_ind = demand_ind_2
 
             need_amount_morning = 0
             need_amount_evening = 0
-            covered_amount_morning = 0
-            covered_amount_evening = 0
             need_total = 0
 
             for cashbox_type in cashbox_types:
@@ -391,23 +391,15 @@ def get_cashiers_timetable(request, form):
 
             need_amount_morning = max(0, need_amount_morning - period_cashiers_hard)
             need_amount_evening = max(0, need_amount_evening - period_cashiers_hard)
-            covered_amount_morning = max(0, period_cashiers_hard - covered_amount_morning)
-            covered_amount_evening = max(0, period_cashiers_hard - covered_amount_evening)
 
             each_day_morning.append(need_amount_morning)
             each_day_evening.append(need_amount_evening)
-            covered_each_day_morning.append(covered_amount_morning)
-            covered_each_day_evening.append(covered_amount_evening)
 
         cashiers_lack_on_period_morning.append(max(each_day_morning))
         cashiers_lack_on_period_evening.append(max(each_day_evening))
-        covered_on_period_morning.append(max(covered_each_day_morning))
-        covered_on_period_evening.append(max(covered_each_day_evening))
 
     max_of_cashiers_lack_morning = max(cashiers_lack_on_period_morning)
     max_of_cashiers_lack_evening = max(cashiers_lack_on_period_evening)
-    max_of_cashiers_coverage_morning = max(covered_on_period_morning)
-    max_of_cashiers_coverage_evening = max(covered_on_period_evening)
 
     # total_lack_of_cashiers_on_period_demand = 0  # on all cashboxes types
     # if period_demand:
@@ -438,13 +430,13 @@ def get_cashiers_timetable(request, form):
 
     response = {
         'indicators': {
-            'deadtime_part': round(100 * idle_time_numerator / (idle_time_denominator + 1e-8) , 1),
+            'deadtime_part': round(100 * idle_time_numerator / (idle_time_denominator + 1e-8), 1),
             'big_demand_persent': 0,  # big_demand_persent,
             'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': None,
             'need_cashier_amount': round((max_of_cashiers_lack_morning + max_of_cashiers_lack_evening)), # * 1.4
             'change_amount': changed_amount,
-            'covering_part': round(max_of_cashiers_coverage_morning + max_of_cashiers_coverage_evening)
+            'covering_part': 100 - round(100 * covering_time_numerator / (idle_time_denominator + 1e-8), 1)
         },
         'period_step': PERIOD_MINUTES,
         'tt_periods': {

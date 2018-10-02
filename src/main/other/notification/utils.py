@@ -101,7 +101,6 @@ def send_notification(action, instance, recipient_list=None, sender=None):
     notification_text, notification_type = create_notification(action, instance)
 
     shop_id = instance.type.shop.id if isinstance(instance, Cashbox) else instance.shop.id
-    print(shop_id)
     if recipient_list is None:
         recipient_list = User.objects.filter(
             Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER),
