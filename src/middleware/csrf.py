@@ -12,6 +12,9 @@ class CsrfMiddleware(DjangoCsrfViewMiddleware):
         if settings.QOS_DEV_CSRF_DISABLED:
             return
 
+        if "Expo" in request.META['HTTP_USER_AGENT']:
+            return
+
         response = super().process_view(request, callback, callback_args, callback_kwargs)
         if response is not None:
             return JsonResponse.csrf_required()
