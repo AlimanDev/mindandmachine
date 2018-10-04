@@ -1,12 +1,12 @@
 import json
 import urllib.request
 
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, time
 
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Q
+from django.db.models import Q, Avg
 
 from src.db.models import (
     Timetable,
@@ -128,15 +128,15 @@ def create_timetable(request, form):
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
     dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
 
-    try:
-        tt = Timetable.objects.create(
-            shop_id=shop_id,
-            dt=dt_from,
-            status=Timetable.Status.PROCESSING.value,
-            dttm_status_change=datetime.now()
-        )
-    except:
-        return JsonResponse.already_exists_error()
+    # try:
+    #     tt = Timetable.objects.create(
+    #         shop_id=shop_id,
+    #         dt=dt_from,
+    #         status=Timetable.Status.PROCESSING.value,
+    #         dttm_status_change=datetime.now()
+    #     )
+    # except:
+    #     return JsonResponse.already_exists_error()
 
     users = User.objects.qos_filter_active(
         dt_from,
@@ -162,7 +162,7 @@ def create_timetable(request, form):
     # проверка что есть спрос на период
     period_difference = {'cashbox_name': [], 'difference': []}
     period_normal_count = (round((datetime.combine(date.today(), super_shop.tm_end) -
-                                  datetime.combine(date.today(), super_shop.tm_start)).seconds/3600) * 2 + 1) * \
+                                  datetime.combine(date.today(), super_shop.tm_start)).seconds/3600) * 2 + 1 - 1) * \
                           ((dt_to - dt_from).days + 1)
     cashboxes = CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD)
     for cashbox in cashboxes:
@@ -170,7 +170,9 @@ def create_timetable(request, form):
             cashbox_type=cashbox,
             type=PeriodDemand.Type.LONG_FORECAST.value,
             dttm_forecast__date__gte=dt_from,
-            dttm_forecast__date__lt=dt_to + timedelta(days=1)
+            dttm_forecast__date__lt=dt_to + timedelta(days=1),
+        ).exclude(
+            dttm_forecast__time=time(0, 0),
         )
         if periods.count() != period_normal_count:
             period_difference['cashbox_name'].append(cashbox.name)
@@ -180,7 +182,7 @@ def create_timetable(request, form):
             ', '.join(period_difference['cashbox_name']),
             ', '.join(str(x) for x in period_difference['difference'])
         )
-        tt.delete()
+        # tt.delete()
         return JsonResponse.value_error(status_message)
 
     periods = PeriodDemand.objects.select_related(
@@ -189,7 +191,9 @@ def create_timetable(request, form):
         cashbox_type__shop_id=shop_id,
         type=PeriodDemand.Type.LONG_FORECAST.value,
         dttm_forecast__date__gte=dt_from,
-        dttm_forecast__date__lte=dt_to
+        dttm_forecast__date__lte=dt_to,
+    ).exclude(
+        dttm_forecast__time=time(0, 0)
     )
 
     constraints = group_by(
@@ -226,7 +230,29 @@ def create_timetable(request, form):
         'mean_queue_length': shop.mean_queue_length,
         'max_queue_length': shop.max_queue_length,
         'dead_time_part': shop.dead_time_part,
-        'shop_count_lack': shop.count_lack,
+        # 'shop_count_lack': shop.count_lack,
+
+        'period_step': 30,
+        'tm_start_work': '07:00:00',
+        'tm_end_work': '00:30:00',
+        'min_work_period': 60 * 9,
+        'max_work_period': 60 * 9,
+        'tm_lock_start': [
+            '21:00:00', '21:30:00',
+            '22:00:00', '22:30:00',
+            '23:00:00', '23:30:00',
+            '00:00:00', '00:30:00',
+        ],
+        'tm_lock_end': [
+            '06:30:00',
+            '07:00:00', '07:30:00',
+            '08:00:00', '08:30:00',
+            '09:00:00', '09:30:00',
+            '10:00:00', '10:30:00',
+            '11:00:00', '11:30:00',
+        ],
+
+        'max_outsourcing_day': 3,
     }
 
     cashboxes = [CashboxTypeConverter.convert(x, True) for x in
@@ -257,15 +283,15 @@ def create_timetable(request, form):
     for key, slots in slots_all.items():
         for slot in slots:
             # todo: temp fix for algo
-            int_s = time2int(slot.tm_start, shop.forecast_step_minutes.minute, start_h=6)
-            int_e = time2int(slot.tm_end, shop.forecast_step_minutes.minute, start_h=6)
-            if int_s < int_e:
-                slots_periods_dict[key].append([
-                    time2int(slot.tm_start),
-                    # BaseConverter.convert_time(slot.tm_start),
-                    time2int(slot.tm_end),
-                    # BaseConverter.convert_time(slot.tm_end),
-                ])
+            # int_s = time2int(slot.tm_start, shop.forecast_step_minutes.minute, start_h=6)
+            # int_e = time2int(slot.tm_end, shop.forecast_step_minutes.minute, start_h=6)
+            # if int_s < int_e:
+                slots_periods_dict[key].append({
+                    # time2int(slot.tm_start),
+                    'tm_start': BaseConverter.convert_time(slot.tm_start),
+                    # time2int(slot.tm_end),
+                    'tm_end': BaseConverter.convert_time(slot.tm_end),
+            })
 
     for cashbox in cashboxes:
         cashbox['slots'] = slots_periods_dict[cashbox['id']]
@@ -311,17 +337,31 @@ def create_timetable(request, form):
 
     user_info = count_difference_of_normal_days(dt_end=dt_from, usrs=users)
 
+    mean_bills_per_step = WorkerCashboxInfo.objects.filter(
+        is_active=True,
+        cashbox_type__shop_id=shop_id,
+    ).values('cashbox_type_id').annotate(speed_usual=Avg('mean_speed'))
+    mean_bills_per_step = {m['cashbox_type_id']: 30 / m['speed_usual'] for m in mean_bills_per_step}
+
+
+    cashboxes_dict = {cb['id']: cb for cb in cashboxes}
+    demands = [PeriodDemandConverter.convert(x) for x in periods]
+    for demand in demands:
+        demand['clients'] = demand['clients'] / mean_bills_per_step[demand['cashbox_type']] / cashboxes_dict[demand['cashbox_type']]['speed_coef']
+        if cashboxes_dict[demand['cashbox_type']]['do_forecast'] == CashboxType.FORECAST_LITE:
+            demand['clients'] = 1
+
     data = {
-        'start_dt': BaseConverter.convert_date(tt.dt),
+        # 'start_dt': BaseConverter.convert_date(tt.dt),
         'IP': settings.HOST_IP,
-        'timetable_id': tt.id,
+        # 'timetable_id': tt.id,
         'forecast_step_minutes': shop.forecast_step_minutes.minute,
         'cashbox_types': cashboxes,
         # 'slots': slots_periods_dict,
         'shop': shop_dict,
-        'shop_type': shop.full_interface, # todo: remove when change in algo
-        'shop_count_lack': shop.count_lack, # todo: remove when change in algo
-        'demand': [PeriodDemandConverter.convert(x) for x in periods],
+        # 'shop_type': shop.full_interface, # todo: remove when change in algo
+        # 'shop_count_lack': shop.count_lack, # todo: remove when change in algo
+        'demand': demands,
         'cashiers': [
             {
                 'general_info': UserConverter.convert(u),
