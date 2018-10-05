@@ -13,6 +13,7 @@ from src.util.utils import api_method, JsonResponse
 from src.util.models_converter import UserConverter, BaseConverter, WorkerDayConverter
 from datetime import datetime, timedelta
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import IntegrityError
 
 
 @api_method('GET', GetOutsourceWorkersForm)
@@ -66,20 +67,20 @@ def get_outsource_workers(request, form):
         outsource_workers_count_per_day = outsource_workerdays.count()
         if outsource_workers_count_per_day > 0:
             for wd in outsource_workerdays:
-                first_name = '№{}'.format(str(outsource_workers_count_per_day + 1))
+                # first_name = '№{}'.format(str(outsource_workers_count_per_day + 1))
                 try:
                     date_response_dict[converted_date]['outsource_workers'].append({
                         'id': wd.worker.id,
-                        'first_name': first_name,
+                        'first_name': wd.worker.first_name,
                         'last_name': wd.worker.last_name,
                         'type': WorkerDayConverter.convert_type(wd.type),
                         'dttm_work_start': BaseConverter.convert_time(wd.dttm_work_start.time())\
                             if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None,
                         'dttm_work_end': BaseConverter.convert_time(wd.dttm_work_end.time())\
                             if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None,
-                        'cashbox_type': WorkerDayCashboxDetails.objects.get(
+                        'cashbox_type': WorkerDayCashboxDetails.objects.filter(
                             worker_day=wd
-                        ).cashbox_type.id if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+                        ).first().cashbox_type_id if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None
                     })
                 except ObjectDoesNotExist:
                     return JsonResponse.does_not_exists_error(
@@ -124,27 +125,40 @@ def add_outsource_workers(request, form):
     if not amount or amount < 1:
         return JsonResponse.value_error('Некоректное число работников: {}'.format(amount))
 
-    last_outsourcer = User.objects.filter(shop_id=shop_id, attachment_group=User.GROUP_OUTSOURCE).last()
-    if last_outsourcer:
-        last_outsourcer_number = last_outsourcer.first_name[1:]
+    last_outsourcer_in_day = WorkerDay.objects.select_related('worker').filter(
+        worker__shop_id=shop_id,
+        worker__attachment_group=User.GROUP_OUTSOURCE,
+        dt=dt,
+    ).last()
+    last_outsourcer_in_db = User.objects.filter(attachment_group=User.GROUP_OUTSOURCE).order_by('date_joined').last()
+    if last_outsourcer_in_day:
+        last_outsourcer_in_day_number = last_outsourcer_in_day.worker.first_name[1:]
     else:
-        last_outsourcer_number = '0'
+        last_outsourcer_in_day_number = '0'
+    if last_outsourcer_in_db:
+        last_outsourcer_in_db_number = last_outsourcer_in_db.id
+    else:
+        last_outsourcer_in_db_number = User.objects.all().order_by('date_joined').last().id
     added_outsourcers = []
 
     for i in range(form['amount']):
-        outsourcer_number = str(int(last_outsourcer_number) + i + 1)
-        added = User.objects.create(
-            shop_id=shop_id,
-            attachment_group=User.GROUP_OUTSOURCE,
-            first_name='№' + outsourcer_number,
-            last_name='Наемный сотрудник',
-            dt_hired=dt,
-            dt_fired=dt,
-            username='outsourcer_' + outsourcer_number,
-            auto_timetable=False
-        )
-        dttm_work_start = datetime.combine(dt, from_tm)
-        dttm_work_end = datetime.combine(dt, to_tm)
+        outsourcer_number = str(int(last_outsourcer_in_day_number) + i + 1)
+        outsourcer_username = str(last_outsourcer_in_db_number + i + 1)
+        try:
+            added = User.objects.create(
+                shop_id=shop_id,
+                attachment_group=User.GROUP_OUTSOURCE,
+                first_name='№' + outsourcer_number,
+                last_name='Наемный сотрудник',
+                dt_hired=dt,
+                dt_fired=dt,
+                username='outsourcer_' + outsourcer_username,
+                auto_timetable=False
+            )
+            dttm_work_start = datetime.combine(dt, from_tm)
+            dttm_work_end = datetime.combine(dt, to_tm)
+        except IntegrityError:
+            return JsonResponse.internal_error('Не удалось добавить аутсорс сотрудника.')
 
         outsourcer_worker_day = WorkerDay.objects.create(
             worker=added,
