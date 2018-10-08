@@ -12,7 +12,7 @@ class CsrfMiddleware(DjangoCsrfViewMiddleware):
         if settings.QOS_DEV_CSRF_DISABLED:
             return
 
-        if "Expo" in request.META['HTTP_USER_AGENT']:
+        if "Expo" in request.META['HTTP_USER_AGENT'] or "okhttp/3.6.0" in request.META['HTTP_USER_AGENT']:
             return
 
         response = super().process_view(request, callback, callback_args, callback_kwargs)
