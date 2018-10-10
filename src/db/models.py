@@ -453,7 +453,7 @@ class WorkerConstraint(models.Model):
         unique_together = (('worker', 'weekday', 'tm'),)
 
     def __str__(self):
-        return ''.format(self.worker.last_name, self.weekday, self.tm, self.id)
+        return '{} {}, {}, {}, {}'.format(self.worker.last_name, self.worker.id, self.weekday, self.tm, self.id)
         # return f'{self.worker.last_name}, {self.weekday}, {self.tm}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
