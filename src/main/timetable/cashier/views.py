@@ -414,6 +414,10 @@ def get_cashier_info(request, form):
     if 'constraints_info' in form['info']:
         constraints = WorkerConstraint.objects.filter(worker_id=worker.id)
         response['constraints_info'] = [WorkerConstraintConverter.convert(x) for x in constraints]
+        response['shop_times'] = {
+            'tm_start': BaseConverter.convert_time(worker.shop.super_shop.tm_start),
+            'tm_end': BaseConverter.convert_time(worker.shop.super_shop.tm_end)
+        }
 
     if 'work_hours' in form['info']:
         def __create_time_obj(__from, __to):
