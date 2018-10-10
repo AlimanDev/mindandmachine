@@ -1071,6 +1071,7 @@ def set_cashier_info(request, form):
         response['constraint'] = constraints_converted
 
     if form.get('sex') is not None:
+        print('here')
         worker.sex = form['sex']
         response['sex'] = worker.sex
 
