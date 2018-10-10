@@ -1008,14 +1008,14 @@ def set_cashier_info(request, form):
 
     response = {}
 
-    if form.get('work_type') is not None:
+    if form.get('work_type'):
         worker.work_type = form['work_type']
         response['work_type'] = UserConverter.convert_work_type(worker.work_type)
 
     worker.extra_info = form.get('comment', '')
     worker.save()
 
-    if form.get('cashbox_info') is not None:
+    if form.get('cashbox_info'):
         cashbox_types = {
             x.id: x for x in CashboxType.objects.filter(
             shop_id=worker.shop_id
@@ -1056,7 +1056,7 @@ def set_cashier_info(request, form):
         response['cashbox_type'] = {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types.values()}
         response['cashbox_type_info'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info]
 
-    if form.get('constraint') is not None:
+    if form.get('constraint'):
         constraints = []
         WorkerConstraint.objects.filter(worker_id=worker.id).delete()
         for wd, times in form['constraint'].items():
@@ -1070,33 +1070,32 @@ def set_cashier_info(request, form):
 
         response['constraint'] = constraints_converted
 
-    if form.get('sex') is not None:
-        print('here')
+    if form.get('sex'):
         worker.sex = form['sex']
         response['sex'] = worker.sex
 
-    if form.get('is_fixed_hours') is not None:
+    if form.get('is_fixed_hours'):
         worker.is_fixed_hours = form['is_fixed_hours']
         response['is_fixed_hours'] = worker.is_fixed_hours
 
-    if form.get('is_fixed_days') is not None:
+    if form.get('is_fixed_days'):
         worker.is_fixed_days = form['is_fixed_days']
         response['is_fixed_days'] = worker.is_fixed_days
 
-    if form.get('phone_number') is not None:
+    if form.get('phone_number'):
         worker.phone_number = form['phone_number']
         response['phone_number'] = worker.phone_number
 
-    if form.get('is_ready_for_overworkings') is not None:
+    if form.get('is_ready_for_overworkings'):
         worker.is_ready_for_overworkings = form['is_ready_for_overworkings']
         response['is_ready_for_overworkings'] = worker.is_ready_for_overworkings
 
-    if form.get('tabel_code') is not None:
+    if form.get('tabel_code'):
         worker.tabel_code = form['tabel_code']
         response['tabel_code'] = worker.tabel_code
 
-    if form.get('position_title') is not None \
-            and form.get('position_department') is not None:
+    if form.get('position_title') \
+            and form.get('position_department'):
         department = Shop.objects.get(id=form['position_department'])
         position, created = WorkerPosition.objects.get_or_create(
             title=form['position_title'],
