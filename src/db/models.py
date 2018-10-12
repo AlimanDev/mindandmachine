@@ -392,7 +392,6 @@ class PeriodDemand(models.Model):
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(self.cashbox_type.name, self.cashbox_type.shop.title, self.dttm_forecast,
                                            self.type, self.id)
-        # return f'{self.cashbox_type.name}, {self.cashbox_type.shop.title}, {self.dttm_forecast}, {self.type}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
 
@@ -460,6 +459,7 @@ class WorkerConstraint(models.Model):
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
+    is_lite = models.BooleanField(default=False)  # True -- если сам сотрудник выставил, False -- если менеджер
     tm = models.TimeField()
 
 

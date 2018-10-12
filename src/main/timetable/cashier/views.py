@@ -1061,7 +1061,12 @@ def set_cashier_info(request, form):
         WorkerConstraint.objects.filter(worker_id=worker.id).delete()
         for wd, times in form['constraint'].items():
             for tm in times:
-                c = WorkerConstraint.objects.create(worker_id=worker.id, weekday=wd, tm=tm)
+                c = WorkerConstraint.objects.create(
+                    worker_id=worker.id,
+                    weekday=wd,
+                    tm=tm,
+                    is_lite=request.user.group == User.GROUP_CASHIER
+                )
                 constraints.append(c)
 
         constraints_converted = {x: [] for x in range(7)}
