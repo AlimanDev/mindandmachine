@@ -169,7 +169,7 @@ def get_not_working_cashiers_list(request, form):
     'GET',
     GetCashierTimetableForm,
     groups=User.__all_groups__,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: User.objects.get(id=x['worker_id'].first())
 )
 def get_cashier_timetable(request, form):
     """
