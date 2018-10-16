@@ -34,7 +34,6 @@ def signin(request, form):
     Returns:
         (User): user instance
     """
-    print(_get_user_session_key(request))
     if not request.user.is_authenticated:
         user = authenticate(request, username=form['username'], password=form['password'])
         if user is None:
@@ -44,7 +43,6 @@ def signin(request, form):
 
     user = User.objects.get(id=request.user.id)
     data = UserConverter.convert(user)
-    print(_get_user_session_key(request))
 
     return JsonResponse.success(data)
 
