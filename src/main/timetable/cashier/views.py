@@ -797,7 +797,7 @@ def set_worker_day(request, form):
     cashbox_updated = False
 
     # этот блок вводит логику относительно аутсорс сотрудников. у них выходных нет, поэтому их мы просто удаляем
-    if old_wd.worker.attachment_group == User.GROUP_OUTSOURCE and form['type'] not in [
+    if old_wd and old_wd.worker.attachment_group == User.GROUP_OUTSOURCE and form['type'] not in [
         WorkerDay.Type.TYPE_WORKDAY.value,
         WorkerDay.Type.TYPE_ETC.value
     ]:

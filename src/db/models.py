@@ -480,6 +480,10 @@ class WorkerDayManager(models.Manager):
         else:
             return self.qos_initial_version()
 
+    def qos_delete_all_versions(self, wd_id):
+        worker_day = super().get_queryset().filter(id=wd_id)
+        return worker_day
+
 
 class WorkerDay(models.Model):
     class Type(utils.Enum):

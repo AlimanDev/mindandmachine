@@ -125,7 +125,7 @@ class PrintHelper(object):
 
         if obj.type == WorkerDay.Type.TYPE_WORKDAY.value:
             return Cell(
-                '{}-{}'.format(obj.tm_work_start.strftime(QOS_SHORT_TIME_FORMAT), obj.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT)),
+                '{}-{}'.format(obj.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT), obj.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT)),
                 fmts['default']
             )
 
@@ -154,7 +154,7 @@ class PrintHelper(object):
             return __ret('')
 
         if obj.type == WorkerDay.Type.TYPE_WORKDAY.value:
-            key = '{}-{}'.format(obj.tm_work_start.strftime(QOS_SHORT_TIME_FORMAT), obj.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT))
+            key = '{}-{}'.format(obj.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT), obj.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
             value = timetable[key]
 
             __tt_add(value)
@@ -404,8 +404,8 @@ def common_add_workers_two(workbook, shop_id, dt_from, dt_to):
                     continue
 
                 if wd.type == WorkerDay.Type.TYPE_WORKDAY.value:
-                    work_begin.append(Cell(wd.tm_work_start, format_time if xdt.weekday() != 6 else format_time_bottom))
-                    work_end.append(Cell(wd.tm_work_end, format_time if xdt.weekday() != 6 else format_time_bottom))
+                    work_begin.append(Cell(wd.dttm_work_start.time(), format_time if xdt.weekday() != 6 else format_time_bottom))
+                    work_end.append(Cell(wd.dttm_work_end.time(), format_time if xdt.weekday() != 6 else format_time_bottom))
                     continue
 
                 mapping = {
@@ -501,8 +501,8 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
         for wd in worker_days.values():
             if wd.type != WorkerDay.Type.TYPE_WORKDAY.value:
                 continue
-            key = '{}-{}'.format(wd.tm_work_start.strftime(QOS_SHORT_TIME_FORMAT), wd.tm_work_end.strftime(QOS_SHORT_TIME_FORMAT))
-            timetable_raw[key] = [wd.tm_work_start, wd.tm_work_end]
+            key = '{}-{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT), wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
+            timetable_raw[key] = [wd.dttm_work_start.time(), wd.dttm_work_end.time()]
 
     timetable = {}
     counter = 1

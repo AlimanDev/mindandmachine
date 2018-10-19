@@ -28,6 +28,7 @@ class Tabel_xlsx(Xlsx_base):
         WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value: (COLOR_BLACK, COLOR_GREEN2),
         WorkerDay.Type.TYPE_ETC.value: (COLOR_GREY, COLOR_GREY),
         WorkerDay.Type.TYPE_EMPTY.value: (COLOR_GREY, COLOR_GREY),
+        WorkerDay.Type.TYPE_QUALIFICATION.value: (COLOR_GREY, COLOR_GREY),
 
         'night_work': (COLOR_BLACK, COLOR_PINK2),
 
@@ -38,6 +39,7 @@ class Tabel_xlsx(Xlsx_base):
         WorkerDay.Type.TYPE_HOLIDAY.value: 'В',
         WorkerDay.Type.TYPE_ABSENSE.value: 'Н',
         WorkerDay.Type.TYPE_REAL_ABSENCE.value: 'ПР',
+        WorkerDay.Type.TYPE_QUALIFICATION.value: 'КВ',
         WorkerDay.Type.TYPE_SICK.value: 'Б',
         WorkerDay.Type.TYPE_VACATION.value: 'ОТ',
         WorkerDay.Type.TYPE_EXTRA_VACATION.value: 'ОД',
@@ -314,8 +316,6 @@ class Tabel_xlsx(Xlsx_base):
         :return:
         """
 
-
-
         it = 0
         cell_format = dict(self.day_type)
         n_workdays = len(workdays)
@@ -325,7 +325,7 @@ class Tabel_xlsx(Xlsx_base):
                 if (it < n_workdays) and (workdays[it].worker_id == user.id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
                     if wd.type == WorkerDay.Type.TYPE_WORKDAY.value:
-                        total_h, night_h = self.__count_time(wd.tm_work_start, wd.tm_work_end, (0, 0), triplets)
+                        total_h, night_h = self.__count_time(wd.dttm_work_start.time(), wd.dttm_work_end.time(), (0, 0), triplets)
                         if night_h == 'all':  # night_work
                             wd.type = 'night_work'
                         if (type(night_h) != str) and (night_h > 0):
@@ -334,7 +334,7 @@ class Tabel_xlsx(Xlsx_base):
                             text = str(total_h)
 
                     elif wd.type == WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
-                        total_h = int(self.__time2hours(wd.tm_work_start, wd.tm_work_end, triplets))
+                        total_h = int(self.__time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), triplets))
                         text = 'В{}'.format(total_h)
 
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
