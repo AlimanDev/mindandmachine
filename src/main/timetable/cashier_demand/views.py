@@ -436,7 +436,7 @@ def get_cashiers_timetable(request, form):
             'FOT': None,
             'need_cashier_amount': round((max_of_cashiers_lack_morning + max_of_cashiers_lack_evening)), # * 1.4
             'change_amount': changed_amount,
-            'covering_part': 100 - round(100 * covering_time_numerator / (covering_time_denominator + 1e-8), 1)
+            'covering_part': round(100 * covering_time_numerator / (covering_time_denominator + 1e-8), 1)
         },
         'period_step': PERIOD_MINUTES,
         'tt_periods': {
