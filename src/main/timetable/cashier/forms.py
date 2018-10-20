@@ -14,7 +14,6 @@ class GetCashiersListForm(forms.Form):
     dt_fired_after = util_forms.DateField(required=False)
     shop_id = forms.IntegerField(required=False)
     consider_outsource = forms.BooleanField(required=False)
-    checkpoint = forms.IntegerField(required=False)
 
     def clean_dt_hired_before(self):
         value = self.cleaned_data.get('dt_hired_before')

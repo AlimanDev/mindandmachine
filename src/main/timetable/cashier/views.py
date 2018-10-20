@@ -63,7 +63,6 @@ def get_cashiers_list(request, form):
         dt_fired_after(QOS_DATE): required False
         shop_id(int): required = False
         consider_outsource(bool): required = False (учитывать outsource работников)
-        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         {[
@@ -92,16 +91,12 @@ def get_cashiers_list(request, form):
     users = []
     attachment_groups = [User.GROUP_STAFF, User.GROUP_OUTSOURCE if form['consider_outsource'] else None]
     shop_id = FormUtil.get_shop_id(request, form)
-    outsourcers_count = 1  # в бд лежат 'Наемный сотрудник №1213'. хочу отдавать на конкретный день 'Наемный сотрудник №1,2,3'
     for u in User.objects.filter(
             shop_id=shop_id,
             attachment_group__in=attachment_groups
     ).order_by('last_name', 'first_name'):
         if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
-            if u.dt_fired is None or u.dt_fired >= form['dt_fired_after']:
-                if u.attachment_group == User.GROUP_OUTSOURCE:
-                    u.first_name = '№{}'.format(outsourcers_count)
-                    outsourcers_count += 1
+            if u.dt_fired is None or u.dt_fired > form['dt_fired_after']:
                 users.append(u)
 
     return JsonResponse.success([UserConverter.convert(x) for x in users])
@@ -806,6 +801,7 @@ def set_worker_day(request, form):
         except ObjectDoesNotExist:
             pass
         old_wd.delete()
+        old_wd.worker.delete()
     else:
         new_worker_day = WorkerDay.objects.create(
             worker_id=worker.id,

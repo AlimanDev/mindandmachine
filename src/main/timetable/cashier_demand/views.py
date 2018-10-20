@@ -228,6 +228,8 @@ def get_cashiers_timetable(request, form):
     fact_ind = 0
     idle_time_numerator = 0
     idle_time_denominator = 0
+    covering_time_numerator = 0
+    covering_time_denominator = 0
     cashiers_lack_on_period_morning = []
     cashiers_lack_on_period_evening = []
 
@@ -246,15 +248,12 @@ def get_cashiers_timetable(request, form):
     for day_ind in range((form['to_dt'] - form['from_dt']).days):
         each_day_morning = []
         each_day_evening = []
-        # cashiers_working_today = wdcds.filter(worker_day__dt=form['from_dt'] + timedelta(days=day_ind))
         for time_ind in range(periods):
             dttm = dttm_start + timedelta(days=day_ind) + time_ind * PERIOD_STEP
 
             dttm_end = dttm + PERIOD_STEP
             dttm_ind_current = dttm - PERIOD_STEP
             dttm_ind_initial = dttm - PERIOD_STEP
-
-            cashiers_on_cashbox_type = defaultdict(int)
 
             # cashier_working_now = []
             # for cashier in cashiers_working_today:
@@ -352,9 +351,13 @@ def get_cashiers_timetable(request, form):
             })
 
             predict_diff_hard_dict, _ = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types_main)
-            if period_cashiers_hard > sum(predict_diff_hard_dict.values()):
-                idle_time_numerator += period_cashiers_hard - sum(predict_diff_hard_dict.values())
-            idle_time_denominator += period_cashiers_hard
+            difference_of_pred_real = period_cashiers_hard - sum(predict_diff_hard_dict.values())
+            if difference_of_pred_real > 0:
+                idle_time_numerator += difference_of_pred_real
+                idle_time_denominator += period_cashiers_hard
+            elif difference_of_pred_real < 0:
+                covering_time_numerator += abs(difference_of_pred_real)
+                covering_time_denominator += sum(predict_diff_hard_dict.values())
             demand_ind = demand_ind_2
 
             need_amount_morning = 0
@@ -382,7 +385,7 @@ def get_cashiers_timetable(request, form):
                 if cashbox_type in cashbox_types.keys():
                     need_total += predict_diff_dict.get(cashbox_type, 0)
                     lack_of_cashiers_on_period[cashbox_type].append({
-                        'lack_of_cashiers': max(0, need_total - period_cashiers_hard),
+                        'lack_of_cashiers': max(0, int(need_total - period_cashiers_hard)),
                         'dttm_start': dttm_converted,
                     })
 
@@ -427,12 +430,13 @@ def get_cashiers_timetable(request, form):
 
     response = {
         'indicators': {
-            'deadtime_part': round(100 * idle_time_numerator / (idle_time_denominator + 1e-8) , 1),
+            'deadtime_part': round(100 * idle_time_numerator / (idle_time_denominator + 1e-8), 1),
             'big_demand_persent': 0,  # big_demand_persent,
             'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': None,
             'need_cashier_amount': round((max_of_cashiers_lack_morning + max_of_cashiers_lack_evening)), # * 1.4
             'change_amount': changed_amount,
+            'covering_part': 100 - round(100 * covering_time_numerator / (covering_time_denominator + 1e-8), 1)
         },
         'period_step': PERIOD_MINUTES,
         'tt_periods': {
@@ -446,11 +450,7 @@ def get_cashiers_timetable(request, form):
     return JsonResponse.success(response)
 
 
-@api_method(
-    'GET',
-    GetWorkersForm,
-    # lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
-)
+@api_method('GET', GetWorkersForm)
 def get_workers(request, form):
     """
     Todo: сделать нормальное описание
@@ -467,115 +467,41 @@ def get_workers(request, form):
     """
 
     checkpoint = FormUtil.get_checkpoint(form)
-
-    from_dt = form['from_dttm'].date()
-    from_tm = form['from_dttm'].time()
-    to_dt = form['to_dttm'].date()
-    to_tm = form['to_dttm'].time()
-
+    from_dttm = form['from_dttm']
+    to_dttm = form['to_dttm']
     shop = FormUtil.get_shop_id(request, form)
 
+    response = {}
+
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related(
-        'on_cashbox', 'worker_day__worker'
+        'worker_day'
     ).filter(
         worker_day__worker__shop_id=shop,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
-        worker_day__dt__gte=from_dt,
-        worker_day__dt__lte=to_dt,
+        worker_day__dt=from_dttm.date(),
+        worker_day__dttm_work_start__lte=from_dttm,
+        worker_day__dttm_work_end__gte=to_dttm,
+        status__in=[
+            WorkerDayCashboxDetails.TYPE_WORK,
+            WorkerDayCashboxDetails.TYPE_BREAK,
+            WorkerDayCashboxDetails.TYPE_T
+        ]
     )
-    cashboxes_types = {x.id: x for x in CashboxType.objects.filter(shop=shop)}
 
     cashbox_type_ids = form['cashbox_type_ids']
     if len(cashbox_type_ids) > 0:
         worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.cashbox_type_id in cashbox_type_ids]
 
-    users = {}
     for x in worker_day_cashbox_detail:
-        worker_id = x.worker_day.worker_id
-        if worker_id not in users:
-            users[worker_id] = {
-                'days': {},
-                'cashbox_info': {}
-            }
-        user_item = users[worker_id]
-
-        from_dt = x.worker_day.dt
-        if from_dt not in user_item['days']:
-            user_item['days'][from_dt] = {
-                'day': x.worker_day,
-                'details': []
-            }
-
-        user_item['days'][from_dt]['details'].append(x)
-
-    users_ids = list(users.keys())
-    for x in WorkerCashboxInfo.objects.filter(is_active=True, worker_id__in=users_ids):
-        users[x.worker_id]['cashbox_info'][x.cashbox_type_id] = x
-
-    today = datetime.now().date()
-    response_users_ids = []
-    for uid, user in users.items():
-        if from_dt not in user['days']:
-            continue
-
-        day = user['days'][from_dt]['day']
-        details = user['days'][from_dt]['details']
-        cashbox = []
-        for d in details:
-            if d.dttm_to.time() is None:
-                if d.dttm_from.time() <= from_tm:
-                    cashbox.append(d)
-            else:
-                if d.tm_from < d.dttm_to:
-                    if d.tm_from <= to_tm and d.tm_to > from_tm:
-                        cashbox.append(d)
-                else:
-                    if d.tm_from <= to_tm or d.tm_to > from_tm:
-                        cashbox.append(d)
-#             elif d.dttm_from.time() < d.dttm_to.time():
-#                 if d.dttm_from.time() <= from_tm < d.dttm_to.time():
-#                     cashbox.append(d)
-#             else:
-#                 if d.dttm_from.time() <= from_tm or d.dttm_to.time() > from_tm:
-#                     cashbox.append(d)
-
-        if len(cashbox) == 0:
-            continue
-
-        user['days'][from_dt]['details_one'] = cashbox[0]
-        response_users_ids.append(uid)
-
-        # if day.tm_break_start is not None:
-        #     if datetime.combine(from_dt, day.tm_break_start) <= form['from_dttm'] < datetime.combine(from_dt, day.tm_break_start) + timedelta(hours=1):
-        #         continue
-
-        # cashbox_type = cashbox[0].on_cashbox.type_id
-        # cashbox_info = user['cashbox_info'].get(cashbox_type)
-
-    response = {
-        'cashbox_types': {x.id: CashboxTypeConverter.convert(x) for x in cashboxes_types.values()},    # Todo: зачем это нужно?
-
-        'users': {}
-    }
-
-    for x in User.objects.filter(id__in=response_users_ids):
-        response['users'][x.id] = {
-            'u': UserConverter.convert(x),
-            'd': [],
-            'c': []
+        response[x.worker_day.worker_id] = {
+            'id': x.id,
+            'from_dttm': BaseConverter.convert_datetime(x.dttm_from),
+            'to_dttm': BaseConverter.convert_datetime(x.dttm_to),
+            'on_cashbox': x.on_cashbox_id,
+            'cashbox_type': x.cashbox_type_id,
+            'status': x.status,
+            'user_info': UserConverter.convert(x.worker_day.worker)
         }
-
-    # response = {
-    #     'users': {
-    #         uid: {
-    #             'u': UserConverter.convert(u),
-    #             'd': [WorkerDayConverter.convert(x) for x in days.get(u.id, [])],
-    #             'c': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(u.id, [])]
-    #         }
-    #         for uid in response_users
-    #     },
-    #     'cashbox_types': {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types}
-    # }
 
     return JsonResponse.success(response)
 

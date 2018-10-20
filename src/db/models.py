@@ -278,7 +278,7 @@ class CashboxType(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     name = models.CharField(max_length=128)
     speed_coef = models.FloatField(default=1)
-    is_stable = models.BooleanField(default=True)
+    is_stable = models.BooleanField(default=False)
     FORECAST_HARD = 'H'
     FORECAST_LITE = 'L'
     FORECAST_NONE = 'N'
@@ -572,6 +572,7 @@ class WorkerDayCashboxDetailsManager(models.Manager):
 
 class WorkerDayCashboxDetails(models.Model):
     TYPE_WORK = 'W'
+    TYPE_WORK_TRADING_FLOOR = 'Z'
     TYPE_BREAK = 'B'
     TYPE_STUDY = 'S'
 
@@ -583,19 +584,22 @@ class WorkerDayCashboxDetails(models.Model):
             (TYPE_WORK, 'work period'),
             (TYPE_BREAK, 'rest / break'),
             (TYPE_STUDY, 'study period'),
+            (TYPE_WORK_TRADING_FLOOR, 'work in trading floor'),
     )
 
     TYPE_T = 'T'
 
     WORK_TYPES_LIST = (
         TYPE_WORK,
-        TYPE_STUDY
+        TYPE_STUDY,
+        TYPE_WORK_TRADING_FLOOR,
     )
 
     DETAILS_TYPES_LIST = (
         TYPE_WORK,
         TYPE_BREAK,
-        TYPE_STUDY
+        TYPE_STUDY,
+        TYPE_WORK_TRADING_FLOOR,
     )
 
     id = models.BigAutoField(primary_key=True)
