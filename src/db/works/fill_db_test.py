@@ -2,6 +2,7 @@ import json
 from django.utils import timezone
 from django.db.models import F
 import pandas as pd
+import numpy as np
 from datetime import time
 from ..models import (
     SuperShop,
@@ -19,7 +20,7 @@ from src.util.models_converter import (
     WorkerDayConverter,
 )
 
-import pdb
+# import pdb
 
 def create_shop(shop_ind):
     supershop = SuperShop.objects.create(
@@ -154,8 +155,8 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         while day < days:
             wd = wds.iloc[day_ind]
             dt = wd['dt'] + dt_diff
-            dttm_work_start = None if  wd['dttm_work_start'] is pd.NaT else timezone.datetime.combine(dt, wd['dttm_work_start'])
-            dttm_work_end = None if wd['dttm_work_end'] is pd.NaT else timezone.datetime.combine(dt, wd['dttm_work_end'])
+            dttm_work_start = None if wd['dttm_work_start'] in [pd.NaT, np.NaN] else timezone.datetime.combine(dt, wd['dttm_work_start'])
+            dttm_work_end = None if wd['dttm_work_end'] in [pd.NaT, np.NaN] else timezone.datetime.combine(dt, wd['dttm_work_end'])
             if dttm_work_start and dttm_work_end and (dttm_work_end < dttm_work_start):
                 dttm_work_end += timezone.timedelta(days=1)
 
