@@ -20,7 +20,6 @@ from src.util.models_converter import (
     WorkerDayConverter,
 )
 
-# import pdb
 
 def create_shop(shop_ind):
     supershop = SuperShop.objects.create(
@@ -32,7 +31,7 @@ def create_shop(shop_ind):
         super_shop=supershop,
         title='',
         # hidden_title='',
-        forecast_step_minutes=time(minute=15),
+        forecast_step_minutes=time(minute=30),
         break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]]]'
     )
     return supershop, shop
@@ -59,7 +58,7 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datet
             create = True
         else:
             _models.append(model)
-            create =  len(_models) == 1000
+            create = len(_models) == 1000
 
         if create:
             PeriodDemand.objects.bulk_create(_models)
@@ -69,26 +68,29 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datet
     df = pd.DataFrame(demand)
     df['dttm_forecast'] = pd.to_datetime(df['dttm_forecast'], format=dttm_format)
     df = df.sort_values('dttm_forecast')
-    dt_diff = start_dt - df.iloc[0]['dttm_forecast'].date()
-
 
     for wt_key in work_types_dict.keys():
         wt = work_types_dict[wt_key]
         wt_df = df[df['cashbox_type'] == wt_key]
+        dt_diff = start_dt - df.iloc[0]['dttm_forecast'].date()
         day = 0
         prev_dt = wt_df.iloc[0]['dttm_forecast'].date()
         wt_df_index = 0
         while day < days:
             item = wt_df.iloc[wt_df_index]
             add_models(PeriodDemand(
-                clients=item['clients'],
+                clients=item['clients'] * (1 + (np.random.rand() - 0.5) / 10),
                 dttm_forecast=item['dttm_forecast'] + dt_diff,
                 type=PeriodDemand.Type.LONG_FORECAST.value,
                 cashbox_type=wt,
             ))
-            wt_df_index = (wt_df_index + 1) % df.shape[0]
+            wt_df_index = (wt_df_index + 1) % wt_df.shape[0]
             if prev_dt != item['dttm_forecast'].date():
                 day += 1
+                prev_dt = item['dttm_forecast'].date()
+
+            if wt_df_index == 0:
+                dt_diff = start_dt - wt_df.iloc[0]['dttm_forecast'].date() + timezone.timedelta(days=day)
     add_models(None) # send query to db
 
 
@@ -98,7 +100,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             create = True
         else:
             lst.append(model)
-            create =  len(lst) == 1000
+            create = len(lst) == 1000
 
         if create:
             model_type.objects.bulk_create(lst)
@@ -121,6 +123,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             worker.first_name = 'Иван'
             worker.last_name = 'Иванов'
             worker.group = User.GROUP_SUPERVISOR
+            worker.shop = shop
             worker.save()
         else:
             worker = User.objects.create(
@@ -155,8 +158,9 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         while day < days:
             wd = wds.iloc[day_ind]
             dt = wd['dt'] + dt_diff
-            dttm_work_start = None if wd['dttm_work_start'] in [pd.NaT, np.NaN] else timezone.datetime.combine(dt, wd['dttm_work_start'])
-            dttm_work_end = None if wd['dttm_work_end'] in [pd.NaT, np.NaN] else timezone.datetime.combine(dt, wd['dttm_work_end'])
+            default_dttm = timezone.datetime.combine(dt, time(15, 30))
+            dttm_work_start = default_dttm if wd['dttm_work_start'] in [pd.NaT, np.NaN] else timezone.datetime.combine(dt, wd['dttm_work_start'])
+            dttm_work_end = default_dttm if wd['dttm_work_end'] in [pd.NaT, np.NaN] else timezone.datetime.combine(dt, wd['dttm_work_end'])
             if dttm_work_start and dttm_work_end and (dttm_work_end < dttm_work_start):
                 dttm_work_end += timezone.timedelta(days=1)
 
@@ -179,10 +183,16 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                 add_models(models, WorkerDay, WorkerDay(
                     worker=worker,
                     dt=dt,
-                    type=WorkerDay.Type.TYPE_WORKDAY.value,
+                    type=WorkerDayConverter.parse_type(wd['type']),
+
+                    dttm_work_start=dttm_work_start,
+                    dttm_work_end=dttm_work_end,
                 ))
             day += 1
             day_ind = (day_ind + 1) % wds.shape[0]
+            if day_ind == 0:
+                dt_diff = start_dt - wds.iloc[0]['dt'] + timezone.timedelta(days=day)
+
 
     add_models(details, WorkerDayCashboxDetails, None)
     add_models(models, WorkerDay, None)
@@ -194,17 +204,20 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         else:
             coef = 2
 
-        WorkerCashboxInfo.objects.all().update(mean_speed=F('mean_speed') / coef)
-        User.objects.all().update(dt_fired=timezone.datetime(2018, 1, 1).date())
+        WorkerCashboxInfo.objects.filter(worker__shop=shop).update(mean_speed=F('mean_speed') * coef)
+        User.objects.filter(shop=shop).update(dt_fired=timezone.datetime(2018, 1, 1).date())
 
         for wt_key in work_types_dict.keys():
             wt_type = work_types_dict[wt_key]
             wt_users = list(User.objects.filter(
-                workerday__workerdaycashboxdetails__cashbox_type=wt_type
+                workerday__workerdaycashboxdetails__cashbox_type=wt_type,
+                shop=shop,
             ).distinct().values_list('id', flat=True))
             wt_users_id = wt_users[:int(len(wt_users) / coef + 0.5)]
             User.objects.filter(id__in=wt_users_id).update(dt_fired=None)
 
+    #  че то как-то не отнормированно получилось все
+    # WorkerCashboxInfo.objects.all().update(mean_speed=F('mean_speed') * 15)
 
 
 
@@ -219,17 +232,17 @@ def main(date=None, shops=None):
     if shops is None:
         shops = ['small', 'normal', 'big']
 
-    day_step = 20
+    day_step = 18
     if date.day > day_step:
         start_date = date.replace(day=1)
-        end_date = (date + timezone.timedelta(days=day_step * 2)).replace(day=1) - timezone.timedelta(days=1)
-        predict_date = (end_date + timezone.timedelta(days=day_step * 2)).replace(day=1) - timezone.timedelta(days=1)
+        end_date = (date + timezone.timedelta(days=day_step * 3)).replace(day=1)
     else:
         start_date = (date - timezone.timedelta(days=day_step)).replace(day=1)
         end_date = (date + timezone.timedelta(days=day_step)).replace(day=1)
-        predict_date = (end_date + timezone.timedelta(days=day_step * 2)).replace(day=1) - timezone.timedelta(days=1)
-    worker_days = (end_date - start_date).days
-    demand_days = (predict_date - start_date).days
+    predict_date = (end_date + timezone.timedelta(days=day_step * 3)).replace(day=1)
+    worker_days = (end_date - start_date).days + 1
+    demand_days = (predict_date - start_date).days + 1
+    print(start_date, end_date, predict_date, worker_days, demand_days)
 
     for shop_ind, shop_size in enumerate(shops, start=1):
         supershop, shop = create_shop(shop_ind)
