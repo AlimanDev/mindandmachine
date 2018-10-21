@@ -238,17 +238,22 @@ def get_cashier_on_interval(dttm_start, dttm_end, ct_ids):
     return ct_user_dict
 
 
-def get_users_who_can_work_on_ct_type(ct_id):
+def get_users_who_can_work_on_ct_type(ct_id, dttm_exchange):
     """
     Возвращает пользователей, которые могут работать за типом кассы с ct_id
 
     Args:
         ct_id(int): id типа кассы
+        dttm_exchange(QOS_DATETIME):
 
     Returns:
         (list): список пользователей, которые могут работать за этим типом кассы
     """
-    wci = WorkerCashboxInfo.objects.filter(cashbox_type_id=ct_id, is_active=True)
+    wci = WorkerCashboxInfo.objects.select_related('worker').filter(
+        Q(worker__dt_fired__gt=dttm_exchange.date()) | Q(worker__dt_fired__isnull=True),
+        cashbox_type_id=ct_id,
+        is_active=True,
+    )
     users = []
     for wci_obj in wci:
         users.append(wci_obj.worker)
@@ -326,7 +331,7 @@ def get_intervals_with_excess(arguments_dict):
     return dttm_to_collect
 
 
-def has_deficiency(predict_demand, mean_bills_per_step, cashbox_types, dttm):
+def has_deficiency(predict_demand, mean_bills_per_step, cashbox_types, dttm, notify_to):
     """
     Проверяет есть ли нехватка кассиров в dttm за типами касс cashbox_types
 
@@ -338,17 +343,22 @@ def has_deficiency(predict_demand, mean_bills_per_step, cashbox_types, dttm):
     ct_deficieny_dict = {}
 
     demand_ind = 0
-    predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types)
+    while dttm <= notify_to:
+        predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types)
+        users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list(cashbox_types.keys()))
+        dttm_converted = BaseConverter.convert_datetime(dttm)
+        ct_deficieny_dict[dttm_converted] = {}
 
-    users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list(cashbox_types.keys()))
-    for cashbox_type in predict_diff_dict.keys():
-        if cashbox_type not in ct_deficieny_dict.keys():
-            ct_deficieny_dict[cashbox_type] = False
-        number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
-        if int(predict_diff_dict[cashbox_type]) > number_of_workers:
-            ct_deficieny_dict[cashbox_type] = int(predict_diff_dict[cashbox_type]) - number_of_workers
-        else:
-            ct_deficieny_dict[cashbox_type] = False
+        for cashbox_type in predict_diff_dict.keys():
+            if cashbox_type not in ct_deficieny_dict[dttm_converted]:
+                ct_deficieny_dict[dttm_converted][cashbox_type] = 0
+            number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
+            if int(predict_diff_dict[cashbox_type]) > number_of_workers:
+                ct_deficieny_dict[dttm_converted][cashbox_type] = int(predict_diff_dict[cashbox_type]) - number_of_workers
+            else:
+                ct_deficieny_dict[dttm_converted][cashbox_type] = 0
+
+        dttm += datetime_module.timedelta(hours=1)
 
     return ct_deficieny_dict
 

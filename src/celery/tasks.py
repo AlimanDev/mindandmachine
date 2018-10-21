@@ -208,31 +208,33 @@ def notify_cashiers_lack():
         dttm_now = now()
         notify_to = dttm_now + datetime.timedelta(days=7)
         shop_id = shop.id
-        dttm = dttm_now
-        while dttm <= notify_to:
-            init_params_dict = get_init_params(dttm, shop_id)
-            cashbox_types = init_params_dict['cashbox_types_dict']
-            period_demands = init_params_dict['predict_demand']
-            mean_bills_per_step = init_params_dict['mean_bills_per_step']
-            # пока что есть магазы в которых нет касс с ForecastHard
-            if cashbox_types and period_demands:
-                return_dict = has_deficiency(
-                    period_demands,
-                    mean_bills_per_step,
-                    cashbox_types,
-                    dttm
-                )
-                to_notify = False  # есть ли вообще нехватка
-                notification_text = None  # {ct type : 'notification_text' or False если нет нехватки }
-                for cashbox_type in return_dict.keys():
-                    if return_dict[cashbox_type]:
+        dttm = datetime.datetime.combine(
+            dttm_now.date(),
+            datetime.time(dttm_now.hour, 0 if dttm_now.minute < 30 else 30, 0)
+        )
+        init_params_dict = get_init_params(dttm_now, shop_id)
+        cashbox_types = init_params_dict['cashbox_types_dict']
+        period_demands = init_params_dict['predict_demand']
+        mean_bills_per_step = init_params_dict['mean_bills_per_step']
+        # пока что есть магазы в которых нет касс с ForecastHard
+        if cashbox_types and period_demands:
+            return_dict = has_deficiency(
+                period_demands,
+                mean_bills_per_step,
+                cashbox_types,
+                dttm,
+                notify_to
+            )
+            to_notify = False  # есть ли вообще нехватка
+            for dttm_converted in return_dict.keys():
+                notification_text = '{}: '.format(dttm_converted[:-3])
+                for cashbox_type in return_dict[dttm_converted].keys():
+                    if return_dict[dttm_converted][cashbox_type]:
                         to_notify = True
-                        notification_text = '{}.{} в {}-{} за типом кассы {} будет не хватать сотрудников: {}. '.format(
-                            dttm.strftime('%d'), dttm.strftime('%m'), dttm.strftime('%H'), dttm.strftime('%M'),
+                        notification_text += '{} будет не хватать сотрудников: {}. '.format(
                             CashboxType.objects.get(id=cashbox_type).name,
-                            return_dict[cashbox_type]
+                            return_dict[dttm_converted][cashbox_type]
                         )
-
                 managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop_id)
                 notifications_list = []
                 users_with_such_notes = []
@@ -257,7 +259,6 @@ def notify_cashiers_lack():
                             )
 
                 Notifications.objects.bulk_create(notifications_list)
-            dttm += datetime.timedelta(hours=1)
 
     print('уведомил о нехватке')
 
