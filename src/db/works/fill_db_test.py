@@ -90,7 +90,7 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datet
                 prev_dt = item['dttm_forecast'].date()
 
             if wt_df_index == 0:
-                dt_diff = start_dt - wt_df.iloc[0]['dttm_forecast'].date() + timezone.timedelta(days=day)
+                dt_diff = start_dt - wt_df.iloc[0]['dttm_forecast'].date() + timezone.timedelta(days=day + 1)
     add_models(None) # send query to db
 
 
@@ -204,7 +204,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         else:
             coef = 2
 
-        WorkerCashboxInfo.objects.filter(worker__shop=shop).update(mean_speed=F('mean_speed') * coef)
+        WorkerCashboxInfo.objects.filter(worker__shop=shop).update(mean_speed=F('mean_speed') / coef)
         User.objects.filter(shop=shop).update(dt_fired=timezone.datetime(2018, 1, 1).date())
 
         for wt_key in work_types_dict.keys():
@@ -217,7 +217,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             User.objects.filter(id__in=wt_users_id).update(dt_fired=None)
 
     #  че то как-то не отнормированно получилось все
-    # WorkerCashboxInfo.objects.all().update(mean_speed=F('mean_speed') * 15)
+    WorkerCashboxInfo.objects.all().update(mean_speed=F('mean_speed') * 1.75)
 
 
 
@@ -242,7 +242,7 @@ def main(date=None, shops=None):
     predict_date = (end_date + timezone.timedelta(days=day_step * 3)).replace(day=1)
     worker_days = (end_date - start_date).days + 1
     demand_days = (predict_date - start_date).days + 1
-    print(start_date, end_date, predict_date, worker_days, demand_days)
+    # print(start_date, end_date, predict_date, worker_days, demand_days)
 
     for shop_ind, shop_size in enumerate(shops, start=1):
         supershop, shop = create_shop(shop_ind)
