@@ -41,7 +41,7 @@ class SuperShop(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     title = models.CharField(max_length=64, unique=True)
-    hidden_title = models.CharField(max_length=64, unique=True)
+    # hidden_title = models.CharField(max_length=64, unique=True)
 
     code = models.CharField(max_length=64, null=True, blank=True)
 
@@ -59,7 +59,7 @@ class SuperShop(models.Model):
 # на самом деле это отдел
 class Shop(models.Model):
     class Meta(object):
-        unique_together = (('super_shop', 'title'), ('super_shop', 'hidden_title'),)
+        unique_together = (('super_shop', 'title'))
         verbose_name = 'Отдел'
         verbose_name_plural = 'Отделы'
 
@@ -72,7 +72,7 @@ class Shop(models.Model):
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
     title = models.CharField(max_length=64)
-    hidden_title = models.CharField(max_length=64)
+    # hidden_title = models.CharField(max_length=64)
 
     mean_queue_length = models.FloatField(default=3)
     max_queue_length = models.FloatField(default=7)
