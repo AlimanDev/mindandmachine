@@ -225,27 +225,30 @@ def notify_cashiers_lack():
                 dttm,
                 notify_to
             )
-            to_notify = False  # есть ли вообще нехватка
-            for dttm_converted in return_dict.keys():
-                notification_text = '{}: '.format(dttm_converted[:-3])
-                for cashbox_type in return_dict[dttm_converted].keys():
-                    if return_dict[dttm_converted][cashbox_type]:
-                        to_notify = True
-                        notification_text += '{} будет не хватать сотрудников: {}. '.format(
-                            CashboxType.objects.get(id=cashbox_type).name,
-                            return_dict[dttm_converted][cashbox_type]
-                        )
-                managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop_id)
-                notifications_list = []
-                users_with_such_notes = []
 
-                notes = Notifications.objects.filter(
-                    type=Notifications.TYPE_INFO,
-                    text=notification_text,
-                    dttm_added__lt=now() + datetime.timedelta(hours=2)
-                )
-                for note in notes:
-                    users_with_such_notes.append(note.to_worker_id)
+            notifications_list = []
+            for dttm_converted in return_dict.keys():
+                to_notify = False  # есть ли вообще нехватка
+                hrs, minutes, other = dttm_converted.split(':')
+                notification_text = '{}:{} {}:\n'.format(hrs, minutes, other[3:])
+                if return_dict[dttm_converted]:
+                    to_notify = True
+                    for cashbox_type in return_dict[dttm_converted].keys():
+                        if return_dict[dttm_converted][cashbox_type]:
+                            notification_text += '{} будет не хватать сотрудников: {}. '.format(
+                                CashboxType.objects.get(id=cashbox_type).name,
+                                return_dict[dttm_converted][cashbox_type]
+                            )
+                    managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop_id)
+                    users_with_such_notes = []
+
+                    notes = Notifications.objects.filter(
+                        type=Notifications.TYPE_INFO,
+                        text=notification_text,
+                        dttm_added__lt=now() + datetime.timedelta(hours=2)
+                    )
+                    for note in notes:
+                        users_with_such_notes.append(note.to_worker_id)
 
                 if to_notify:
                     for recipient in managers_dir_list:
@@ -258,7 +261,7 @@ def notify_cashiers_lack():
                                 )
                             )
 
-                Notifications.objects.bulk_create(notifications_list)
+            Notifications.objects.bulk_create(notifications_list)
 
     print('уведомил о нехватке')
 
