@@ -15,7 +15,7 @@ class BaseConverter(object):
 
     @classmethod
     def parse_date(cls, obj):
-        return datetime.datetime.strptime(obj, QOS_DATE_FORMAT)
+        return datetime.datetime.strptime(obj, QOS_DATE_FORMAT).date()
 
     @classmethod
     def convert_time(cls, obj):

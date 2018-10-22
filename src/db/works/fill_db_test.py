@@ -80,6 +80,7 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datet
             item = wt_df.iloc[wt_df_index]
             add_models(PeriodDemand(
                 clients=item['clients'] * (1 + (np.random.rand() - 0.5) / 10),
+                queue_wait_length=item['clients'] * (1 + (np.random.rand() - 0.5) / 5) / 50,
                 dttm_forecast=item['dttm_forecast'] + dt_diff,
                 type=PeriodDemand.Type.LONG_FORECAST.value,
                 cashbox_type=wt,
@@ -129,7 +130,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             worker = User.objects.create(
                 username='u_{}_{}'.format(shop.id, worker_ind),
                 group=User.GROUP_CASHIER,
-                first_name=worker_d['general_info']['first_name'],
+                last_name=worker_d['general_info']['first_name'],
                 password='a',
                 tabel_code='{}{}'.format(shop.id, worker_ind),
                 shop=shop,
@@ -217,7 +218,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             User.objects.filter(id__in=wt_users_id).update(dt_fired=None)
 
     #  че то как-то не отнормированно получилось все
-    WorkerCashboxInfo.objects.all().update(mean_speed=F('mean_speed') * 1.75)
+    WorkerCashboxInfo.objects.all().update(mean_speed=F('mean_speed'))
 
 
 
