@@ -240,7 +240,7 @@ def main(date=None, shops=None):
         start_date = (date - timezone.timedelta(days=day_step)).replace(day=1)
         end_date = (date + timezone.timedelta(days=day_step)).replace(day=1)
     predict_date = (end_date + timezone.timedelta(days=day_step * 3)).replace(day=1)
-    worker_days = (end_date - start_date).days + 1
+    worker_days = (end_date - start_date).days
     demand_days = (predict_date - start_date).days + 1
     # print(start_date, end_date, predict_date, worker_days, demand_days)
 
