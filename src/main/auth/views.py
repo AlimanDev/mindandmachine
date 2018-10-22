@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate, login, logout, _get_user_session_key
+from django.contrib.auth import authenticate, login, logout
 from django.middleware.csrf import rotate_token
 
 from src.db.models import User
