@@ -128,15 +128,15 @@ def create_timetable(request, form):
     dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
     dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
 
-    # try:
-    #     tt = Timetable.objects.create(
-    #         shop_id=shop_id,
-    #         dt=dt_from,
-    #         status=Timetable.Status.PROCESSING.value,
-    #         dttm_status_change=datetime.now()
-    #     )
-    # except:
-    #     return JsonResponse.already_exists_error()
+    try:
+        tt = Timetable.objects.create(
+            shop_id=shop_id,
+            dt=dt_from,
+            status=Timetable.Status.PROCESSING.value,
+            dttm_status_change=datetime.now()
+        )
+    except:
+        return JsonResponse.already_exists_error()
 
     users = User.objects.qos_filter_active(
         dt_from,
@@ -182,7 +182,7 @@ def create_timetable(request, form):
             ', '.join(period_difference['cashbox_name']),
             ', '.join(str(x) for x in period_difference['difference'])
         )
-        # tt.delete()
+        tt.delete()
         return JsonResponse.value_error(status_message)
 
     periods = PeriodDemand.objects.select_related(
@@ -260,7 +260,6 @@ def create_timetable(request, form):
 
     if shop.full_interface:
         lambda_func = lambda x: x.cashbox_type_id
-        working_days = 22
     else:
         lambda_func = lambda x: periods[0].cashbox_type_id
 
@@ -272,7 +271,6 @@ def create_timetable(request, form):
             'prior_weight': 1,
             'prediction': 1,
         }]
-        working_days = 20
 
     slots_all = group_by(
         collection=Slot.objects.filter(shop_id=shop_id),
@@ -354,7 +352,7 @@ def create_timetable(request, form):
     data = {
         # 'start_dt': BaseConverter.convert_date(tt.dt),
         'IP': settings.HOST_IP,
-        # 'timetable_id': tt.id,
+        'timetable_id': tt.id,
         'forecast_step_minutes': shop.forecast_step_minutes.minute,
         'cashbox_types': cashboxes,
         # 'slots': slots_periods_dict,
@@ -383,8 +381,8 @@ def create_timetable(request, form):
         },
     }
 
+    tt.save()
     try:
-
         data = json.dumps(data).encode('ascii')
         # with open('./send_data_tmp.json', 'wb+') as f:
         #     f.write(data)
@@ -395,7 +393,7 @@ def create_timetable(request, form):
         # print('\n\n\n\ {} \n\n\n'.format(tt.task_id))
         if tt.task_id is None:
             tt.status = Timetable.Status.ERROR.value
-        tt.save()
+            tt.save()
     except Exception as e:
         print(e)
         tt.status = Timetable.Status.ERROR.value
@@ -571,18 +569,17 @@ def set_timetable(request, form):
 
             else:
                 wd_obj.save()
-
     # update lack
-    line = CashboxType.objects.filter(is_main_type=True, shop=timetable.shop_id)
-    for str_dttm, lack in data['lack']:
-        dttm = BaseConverter.convert_datetime(str_dttm)
-        PeriodDemand.objects.update_or_create(
-            lack_of_cashiers=lack,
-            defaults={
-                'dttm_forecast': dttm,
-                'cashbox_type': line,
-                'type': PeriodDemand.Type.LONG_FORECAST.value,
-            })
+    # line = CashboxType.objects.filter(is_main_type=True, shop=timetable.shop_id)
+    # for str_dttm, lack in data['lack']:
+    #     dttm = BaseConverter.convert_datetime(str_dttm)
+    #     PeriodDemand.objects.update_or_create(
+    #         lack_of_cashiers=lack,
+    #         defaults={
+    #             'dttm_forecast': dttm,
+    #             'cashbox_type': line,
+    #             'type': PeriodDemand.Type.LONG_FORECAST.value,
+    #         })
     send_notification('C', timetable)
 
     return JsonResponse.success()
