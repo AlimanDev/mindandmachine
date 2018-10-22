@@ -1,8 +1,7 @@
 from datetime import datetime, time, timedelta
-from collections import defaultdict
 
 from django.http import HttpResponse
-from django.db.models import Max
+from django.db.models import Max, Q
 
 from src.db.models import (
     WorkerDay,
@@ -150,7 +149,9 @@ def get_cashiers_timetable(request, form):
         worker_day_cashbox_detail_filter['worker_day__worker__position__id'] = form['position_id']
 
     cashbox_details_current = WorkerDayCashboxDetails.objects.qos_current_version().filter(
-        **worker_day_cashbox_detail_filter
+        Q(worker_day__worker__dt_fired__gt=form['to_dt']) | Q(worker_day__worker__dt_fired__isnull=True),
+        Q(worker_day__worker__dt_hired__lt=form['from_dt']) | Q(worker_day__worker__dt_fired__isnull=True),
+        **worker_day_cashbox_detail_filter,
     ).exclude(
         status=WorkerDayCashboxDetails.TYPE_BREAK
     ).order_by(
@@ -159,7 +160,9 @@ def get_cashiers_timetable(request, form):
         'dttm_to',
     )
     cashbox_details_initial = WorkerDayCashboxDetails.objects.qos_initial_version().filter(
-        **worker_day_cashbox_detail_filter
+        Q(worker_day__worker__dt_fired__gt=form['to_dt']) | Q(worker_day__worker__dt_fired__isnull=True),
+        Q(worker_day__worker__dt_hired__lt=form['from_dt']) | Q(worker_day__worker__dt_fired__isnull=True),
+        **worker_day_cashbox_detail_filter,
     ).exclude(
         status=WorkerDayCashboxDetails.TYPE_BREAK
     ).order_by(
@@ -169,6 +172,8 @@ def get_cashiers_timetable(request, form):
     )
 
     worker_cashbox_info = list(WorkerCashboxInfo.objects.select_related('worker').filter(
+        Q(worker__dt_fired__gt=form['to_dt']) | Q(worker__dt_fired__isnull=True),
+        Q(worker__dt_hired__lt=form['from_dt']) | Q(worker__dt_fired__isnull=True),
         is_active=True,
         worker__workerday__dt__gte=form['from_dt'],
         worker__workerday__dt__lte=form['to_dt'],
@@ -341,51 +346,41 @@ def get_cashiers_timetable(request, form):
             predict_diff_dict, demand_ind_2 = count_diff(dttm, predict_demand, demand_ind,  mean_bills_per_step, cashbox_types)
             predict_cashier_needs.append({
                 'dttm': dttm_converted,
-                'amount': sum(predict_diff_dict.values()),  # + period_cashiers,
+                'amount': sum(predict_diff_dict.values()),
             })
 
             real_diff_dict, fact_ind = count_diff(dttm, fact_demand, fact_ind,  mean_bills_per_step, cashbox_types)
             fact_cashier_needs.append({
                 'dttm': dttm_converted,
-                'amount': sum(real_diff_dict.values()),  # + period_cashiers,
+                'amount': sum(real_diff_dict.values()),
             })
 
-            predict_diff_hard_dict, _ = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types_main)
-            difference_of_pred_real = period_cashiers_hard - sum(predict_diff_hard_dict.values())
+            # predict_diff_hard_dict, _ = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types_main)
+            difference_of_pred_real = period_cashiers_current - sum(predict_diff_dict.values())
             if difference_of_pred_real > 0:
                 idle_time_numerator += difference_of_pred_real
-                idle_time_denominator += period_cashiers_hard
             elif difference_of_pred_real < 0:
                 covering_time_numerator += abs(difference_of_pred_real)
-                covering_time_denominator += sum(predict_diff_hard_dict.values())
+                covering_time_denominator += sum(predict_diff_dict.values())
+            idle_time_denominator += period_cashiers_current
+
             demand_ind = demand_ind_2
 
             need_amount_morning = 0
             need_amount_evening = 0
-            need_total = 0
+            # need_total = 0
 
             for cashbox_type in cashbox_types:
                 check_time = check_time_is_between_boarders(dttm.time(), time_borders)
-                # if check_time == 'morning' or check_time == 'evening':
-                    # if cashbox_type in predict_diff_dict.keys() \
-                    #         and cashbox_type in cashiers_on_cashbox_type.keys()\
-                    #         and predict_diff_dict[cashbox_type] > cashiers_on_cashbox_type.get(cashbox_type) \
-                    #         and predict_diff_dict[cashbox_type] > 0:
-                    #     if check_time == 'morning':
-                    #         need_amount_morning += predict_diff_dict[cashbox_type] - cashiers_on_cashbox_type.get(cashbox_type)
-                    #     elif check_time == 'evening':
-                    #         need_amount_evening += predict_diff_dict[cashbox_type] - cashiers_on_cashbox_type.get(cashbox_type)
-                    #     else:
-                    #         pass
                 if cashbox_type in cashbox_types_main.keys():
                     if check_time == 'morning':
                         need_amount_morning += predict_diff_dict.get(cashbox_type, 0)
                     elif check_time == 'evening':
                         need_amount_evening += predict_diff_dict.get(cashbox_type, 0)
                 if cashbox_type in cashbox_types.keys():
-                    need_total += predict_diff_dict.get(cashbox_type, 0)
+                    # need_total += predict_diff_dict.get(cashbox_type, 0)
                     lack_of_cashiers_on_period[cashbox_type].append({
-                        'lack_of_cashiers': max(0, int(need_total - period_cashiers_hard)),
+                        'lack_of_cashiers': max(0, sum(predict_diff_dict.values()) - period_cashiers_current),
                         'dttm_start': dttm_converted,
                     })
 
@@ -436,7 +431,7 @@ def get_cashiers_timetable(request, form):
             'FOT': None,
             'need_cashier_amount': round((max_of_cashiers_lack_morning + max_of_cashiers_lack_evening)), # * 1.4
             'change_amount': changed_amount,
-            'covering_part': 100 - round(100 * covering_time_numerator / (covering_time_denominator + 1e-8), 1)
+            'covering_part': round(100 * covering_time_numerator / (covering_time_denominator + 1e-8), 1)
         },
         'period_step': PERIOD_MINUTES,
         'tt_periods': {
@@ -476,6 +471,8 @@ def get_workers(request, form):
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related(
         'worker_day'
     ).filter(
+        Q(worker_day__worker__dt_fired__gt=from_dttm.date()) | Q(worker_day__worker__dt_fired__isnull=True),
+        Q(worker_day__worker__dt_hired__lt=to_dttm.date()) | Q(worker_day__worker__dt_fired__isnull=True),
         worker_day__worker__shop_id=shop,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         worker_day__dt=from_dttm.date(),

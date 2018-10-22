@@ -66,8 +66,9 @@ def get_outsource_workers(request, form):
         )
         outsource_workers_count_per_day = outsource_workerdays.count()
         if outsource_workers_count_per_day > 0:
+            outsourcer_number = 0
             for wd in outsource_workerdays:
-                # first_name = '№{}'.format(str(outsource_workers_count_per_day + 1))
+                # first_name = '№{}'.format(str(outsourcer_number + 1))
                 try:
                     date_response_dict[converted_date]['outsource_workers'].append({
                         'id': wd.worker.id,
@@ -86,6 +87,7 @@ def get_outsource_workers(request, form):
                     return JsonResponse.does_not_exists_error(
                         'Ошибка в get_outsource_workers. Такого дня нет в расписании.'
                     )
+                outsourcer_number += 1
         date_response_dict[converted_date]['amount'] = outsource_workers_count_per_day
         if outsource_workers_count_per_day > max_outsource_worker_on_period:
             max_outsource_worker_on_period = outsource_workers_count_per_day

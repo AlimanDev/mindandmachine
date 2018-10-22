@@ -1,6 +1,4 @@
 from src.db.models import (
-    PeriodDemand,
-    WorkerCashboxInfo,
     CashboxType,
     User,
     Shop
@@ -49,7 +47,7 @@ def get_workers_to_exchange(request, form):
     except Shop.DoesNotExist:
         shop_id = request.user.shop_id
 
-    users_who_can_work_on_ct = get_users_who_can_work_on_ct_type(ct_type)
+    users_who_can_work_on_ct = get_users_who_can_work_on_ct_type(ct_type, dttm_exchange)
 
     init_params_dict = get_init_params(dttm_exchange, shop_id)
 

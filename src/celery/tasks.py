@@ -208,42 +208,47 @@ def notify_cashiers_lack():
         dttm_now = now()
         notify_to = dttm_now + datetime.timedelta(days=7)
         shop_id = shop.id
-        dttm = dttm_now
-        while dttm <= notify_to:
-            init_params_dict = get_init_params(dttm, shop_id)
-            cashbox_types = init_params_dict['cashbox_types_dict']
-            period_demands = init_params_dict['predict_demand']
-            mean_bills_per_step = init_params_dict['mean_bills_per_step']
-            # пока что есть магазы в которых нет касс с ForecastHard
-            if cashbox_types and period_demands:
-                return_dict = has_deficiency(
-                    period_demands,
-                    mean_bills_per_step,
-                    cashbox_types,
-                    dttm
-                )
+        dttm = datetime.datetime.combine(
+            dttm_now.date(),
+            datetime.time(dttm_now.hour, 0 if dttm_now.minute < 30 else 30, 0)
+        )
+        init_params_dict = get_init_params(dttm_now, shop_id)
+        cashbox_types = init_params_dict['cashbox_types_dict']
+        period_demands = init_params_dict['predict_demand']
+        mean_bills_per_step = init_params_dict['mean_bills_per_step']
+        # пока что есть магазы в которых нет касс с ForecastHard
+        if cashbox_types and period_demands:
+            return_dict = has_deficiency(
+                period_demands,
+                mean_bills_per_step,
+                cashbox_types,
+                dttm,
+                notify_to
+            )
+
+            notifications_list = []
+            for dttm_converted in return_dict.keys():
                 to_notify = False  # есть ли вообще нехватка
-                notification_text = None  # {ct type : 'notification_text' or False если нет нехватки }
-                for cashbox_type in return_dict.keys():
-                    if return_dict[cashbox_type]:
-                        to_notify = True
-                        notification_text = '{}.{} в {}-{} за типом кассы {} будет не хватать сотрудников: {}. '.format(
-                            dttm.strftime('%d'), dttm.strftime('%m'), dttm.strftime('%H'), dttm.strftime('%M'),
-                            CashboxType.objects.get(id=cashbox_type).name,
-                            return_dict[cashbox_type]
-                        )
+                hrs, minutes, other = dttm_converted.split(':')
+                notification_text = '{}:{} {}:\n'.format(hrs, minutes, other[3:])
+                if return_dict[dttm_converted]:
+                    to_notify = True
+                    for cashbox_type in return_dict[dttm_converted].keys():
+                        if return_dict[dttm_converted][cashbox_type]:
+                            notification_text += '{} будет не хватать сотрудников: {}. '.format(
+                                CashboxType.objects.get(id=cashbox_type).name,
+                                return_dict[dttm_converted][cashbox_type]
+                            )
+                    managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop_id)
+                    users_with_such_notes = []
 
-                managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop_id)
-                notifications_list = []
-                users_with_such_notes = []
-
-                notes = Notifications.objects.filter(
-                    type=Notifications.TYPE_INFO,
-                    text=notification_text,
-                    dttm_added__lt=now() + datetime.timedelta(hours=2)
-                )
-                for note in notes:
-                    users_with_such_notes.append(note.to_worker_id)
+                    notes = Notifications.objects.filter(
+                        type=Notifications.TYPE_INFO,
+                        text=notification_text,
+                        dttm_added__lt=now() + datetime.timedelta(hours=2)
+                    )
+                    for note in notes:
+                        users_with_such_notes.append(note.to_worker_id)
 
                 if to_notify:
                     for recipient in managers_dir_list:
@@ -256,8 +261,7 @@ def notify_cashiers_lack():
                                 )
                             )
 
-                Notifications.objects.bulk_create(notifications_list)
-            dttm += datetime.timedelta(hours=1)
+            Notifications.objects.bulk_create(notifications_list)
 
     print('уведомил о нехватке')
 

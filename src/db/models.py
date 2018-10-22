@@ -392,7 +392,6 @@ class PeriodDemand(models.Model):
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(self.cashbox_type.name, self.cashbox_type.shop.title, self.dttm_forecast,
                                            self.type, self.id)
-        # return f'{self.cashbox_type.name}, {self.cashbox_type.shop.title}, {self.dttm_forecast}, {self.type}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
 
@@ -453,13 +452,14 @@ class WorkerConstraint(models.Model):
         unique_together = (('worker', 'weekday', 'tm'),)
 
     def __str__(self):
-        return ''.format(self.worker.last_name, self.weekday, self.tm, self.id)
+        return '{} {}, {}, {}, {}'.format(self.worker.last_name, self.worker.id, self.weekday, self.tm, self.id)
         # return f'{self.worker.last_name}, {self.weekday}, {self.tm}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
+    is_lite = models.BooleanField(default=False)  # True -- если сам сотрудник выставил, False -- если менеджер
     tm = models.TimeField()
 
 
@@ -479,6 +479,10 @@ class WorkerDayManager(models.Manager):
             return self.qos_current_version()
         else:
             return self.qos_initial_version()
+
+    def qos_delete_all_versions(self, wd_id):
+        worker_day = super().get_queryset().filter(id=wd_id)
+        return worker_day
 
 
 class WorkerDay(models.Model):
