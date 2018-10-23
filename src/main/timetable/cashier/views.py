@@ -1182,7 +1182,7 @@ def create_cashier(request, form):
 @api_method(
     'POST',
     DublicateCashierTimetableForm,
-    lambda_func=lambda x: User.objects.get(id=x['main_worker_id'])
+    lambda_func=lambda x: User.objects.get(id=x['from_worker_id'])
 )
 def dublicate_cashier_table(request, form):
     """
@@ -1193,110 +1193,90 @@ def dublicate_cashier_table(request, form):
 
     Args:
         method: POST
-        url: /api/
-        main_worker_id(int): required = True
-        trainee_worker_id(int): required = True
-        dt_begin(QOS_DATE): дата начала стажировки
-        dt_end(QOS_DATE): дата конца стажировки
+        url: /api/timetable/cashier/dublicate_cashier_table
+        from_worker_id(int): required = True
+        to_worker_id(int): required = True
+        from_dt(QOS_DATE): дата начала копирования расписания
+        to_dt(QOS_DATE): дата конца копирования
     """
-    main_worker = form['main_worker_id']
-    trainee_worker = form['trainee_worker_id']
-    dt_begin = form['dt_begin']
-    dt_end = form['dt_end']
+    from_worker_id = form['from_worker_id']
+    to_worker_id = form['to_worker_id']
+    from_dt = form['from_dt']
+    to_dt = form['to_dt']
 
-    main_worker_days = WorkerDay.objects.qos_current_version().prefetch_related('workerdaycashboxdetails_set').filter(
-        worker=main_worker,
-        dt__gte=dt_begin,
-        dt__lte=dt_end
+    main_worker_days = WorkerDay.objects.qos_current_version().filter(
+        worker_id=from_worker_id,
+        dt__gte=from_dt,
+        dt__lte=to_dt
     )
     main_worker_days_details = WorkerDayCashboxDetails.objects.qos_current_version().filter(
-        worker_day__in=main_worker_days)
-
-    # проверка на наличие дней у стажера
-    trainee_worker_days = group_by_object(
-        WorkerDay.objects.qos_current_version().prefetch_related('workerdaycashboxdetails_set').filter(
-            worker=trainee_worker,
-            dt__gte=dt_begin,
-            dt__lte=dt_end
-        ),
-        group_key=lambda _: _.dt,
+        worker_day__in=main_worker_days
     )
 
-    old_values = {}
-    for main_worker_day in main_worker_days:
-        if main_worker_day.dt in trainee_worker_days:
-            # записываем аргументы для лога до изменения WorkerDay
-            trainee_worker_day = trainee_worker_days.get(main_worker_day.dt)
-            old_values[trainee_worker_day.dt] = model_to_dict(
-                trainee_worker_day,
-                fields=[
-                    'dt',
-                    'type',
-                    'dttm_work_start',
-                    'dttm_work_end',
-                    'tm_break_start'
-                ]
+    trainee_worker_days = WorkerDay.objects.qos_current_version().filter(
+        worker_id=to_worker_id,
+        dt__gte=from_dt,
+        dt__lte=to_dt
+    )
+    WorkerDayCashboxDetails.objects.filter(worker_day__in=trainee_worker_days).delete()
+    trainee_worker_days.delete()
+
+    # old_values = {}
+    # for main_worker_day in main_worker_days:
+    #     if main_worker_day.dt in trainee_worker_days:
+    #         # записываем аргументы для лога до изменения WorkerDay
+    #         trainee_worker_day = trainee_worker_days.get(main_worker_day.dt)
+    #         old_values[trainee_worker_day.dt] = model_to_dict(
+    #             trainee_worker_day,
+    #             fields=[
+    #                 'dt',
+    #                 'type',
+    #                 'dttm_work_start',
+    #                 'dttm_work_end',
+    #                 'tm_break_start'
+    #             ]
+    #         )
+    #
+    #         # обновляем дни и удаляем details для этих дней
+    #         trainee_worker_day.type = main_worker_day.type
+    #         trainee_worker_day.worker.shop = main_worker_day.worker.shop
+    #         trainee_worker_day.dttm_work_start = main_worker_day.dttm_work_start
+    #         trainee_worker_day.dttm_work_end = main_worker_day.dttm_work_end
+    #         trainee_worker_day.tm_break_start = main_worker_day.tm_break_start
+    #         trainee_worker_day.save()
+    #
+    #         main_worker_days = main_worker_days.exclude(dt=main_worker_day.dt)
+
+    wds_list_to_create = []
+    wdcds_list_to_create = []
+
+    try:
+        for blank_day in main_worker_days:
+            new_wd = WorkerDay(
+                worker_id=to_worker_id,
+                dt=blank_day.dt,
+                type=blank_day.type,
+                dttm_work_start=blank_day.dttm_work_start,
+                dttm_work_end=blank_day.dttm_work_end,
+                tm_break_start=blank_day.tm_break_start
             )
+            wds_list_to_create.append(new_wd)
+            new_wdcds = main_worker_days_details.filter(worker_day=new_wd).order_by('id').first()
+            if new_wdcds:
+                wdcds_list_to_create.append(
+                    WorkerDayCashboxDetails(
+                        worker_day=new_wd,
+                        on_cashbox=new_wdcds.on_cashbox,
+                        cashbox_type=new_wdcds.cashbox_type,
+                        dttm_from=new_wdcds.dttm_from,
+                        dttm_to=new_wdcds.dttm_to
+                    )
+                )
 
-            # обновляем дни и удаляем details для этих дней
-            trainee_worker_day.type = main_worker_day.type
-            trainee_worker_day.worker.shop = main_worker_day.worker.shop
-            trainee_worker_day.dttm_work_start = main_worker_day.dttm_work_start
-            trainee_worker_day.dttm_work_end = main_worker_day.dttm_work_end
-            trainee_worker_day.tm_break_start = main_worker_day.tm_break_start
-            trainee_worker_day.save()
-
-            main_worker_days = main_worker_days.exclude(dt=main_worker_day.dt)
-
-    WorkerDayCashboxDetails.objects.filter(worker_day__in=trainee_worker_days.values()).delete()
-
-    # WorkerDayChangeLog.objects.bulk_create([
-    #     WorkerDayChangeLog(
-    #         worker_day=trainee_worker_days.get(trainee_worker_day_dt),
-    #         worker_day_worker=trainee_worker_days.get(trainee_worker_day_dt).worker,
-    #         worker_day_dt=trainee_worker_day_dt,
-    #         from_type=old_values.get(trainee_worker_day.dt)['type'],
-    #         from_tm_work_start=old_values.get(trainee_worker_day.dt)['tm_work_start'],
-    #         from_tm_work_end=old_values.get(trainee_worker_day.dt)['tm_work_end'],
-    #         from_tm_break_start=old_values.get(trainee_worker_day.dt)['tm_break_start'],
-    #         to_type=trainee_worker_days.get(trainee_worker_day_dt).type,
-    #         to_tm_work_start=trainee_worker_days.get(trainee_worker_day_dt).tm_work_start,
-    #         to_tm_work_end=trainee_worker_days.get(trainee_worker_day_dt).tm_work_end,
-    #         to_tm_break_start=trainee_worker_days.get(trainee_worker_day_dt).tm_break_start,
-    #         changed_by=request.user
-    #     ) for trainee_worker_day_dt in trainee_worker_days
-    # ])
-
-    # незаполненные дни
-    WorkerDay.objects.bulk_create([
-        WorkerDay(
-            worker=trainee_worker,
-            dt=blank_day.dt,
-            type=blank_day.type,
-            dttm_work_start=blank_day.dttm_work_start,
-            dttm_work_end=blank_day.dttm_work_end,
-            tm_break_start=blank_day.tm_break_start
-        ) for blank_day in main_worker_days
-    ])
-
-    full_trainee_worker_days = group_by_object(
-        WorkerDay.objects.qos_current_version().prefetch_related('workerdaycashboxdetails_set').filter(
-            worker=trainee_worker,
-            dt__gte=dt_begin,
-            dt__lte=dt_end
-        ),
-        group_key=lambda _: _.dt,
-    )
-
-    WorkerDayCashboxDetails.objects.bulk_create([
-        WorkerDayCashboxDetails(
-            worker_day=full_trainee_worker_days.get(day_detail.worker_day.dt),
-            on_cashbox=day_detail.on_cashbox,
-            cashbox_type=day_detail.cashbox_type,
-            dttm_from=day_detail.dttm_from,
-            dttm_to=day_detail.dttm_to
-        ) for day_detail in main_worker_days_details
-    ])
+        WorkerDay.objects.bulk_create(wds_list_to_create)
+        WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
+    except Exception:
+        return JsonResponse.internal_error('Ошибка при дублировании расписания.')
 
     return JsonResponse.success()
 
