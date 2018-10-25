@@ -45,31 +45,31 @@ class GetCashierTimetableForm(forms.Form):
 
 
 class DublicateCashierTimetableForm(forms.Form):
-    main_worker_id = forms.IntegerField(required=True)
-    trainee_worker_id = forms.IntegerField(required=True)
-    dt_begin = util_forms.DateField()
-    dt_end = util_forms.DateField()
+    from_worker_id = forms.IntegerField(required=True)
+    to_worker_id = forms.IntegerField(required=True)
+    from_dt = util_forms.DateField(required=True)
+    to_dt = util_forms.DateField(required=True)
 
-    def clean_main_worker_id(self):
+    def clean_from_worker_id(self):
         try:
-            main_worker = User.objects.get(id=self.cleaned_data['main_worker_id'])
+            main_worker = User.objects.get(id=self.cleaned_data['from_worker_id'])
         except User.DoesNotExist:
-            raise forms.ValidationError('Invalid main_worker_id')
-        return main_worker
+            raise forms.ValidationError('Неверно указан сотрудник, чье расписание копировать.')
+        return main_worker.id
 
-    def clean_trainee_worker_id(self):
+    def clean_to_worker_id(self):
         try:
-            trainee_worker = User.objects.get(id=self.cleaned_data['trainee_worker_id'])
+            trainee_worker = User.objects.get(id=self.cleaned_data['to_worker_id'])
         except User.DoesNotExist:
-            raise forms.ValidationError('Invalid trainee_worker_id')
-        return trainee_worker
+            raise forms.ValidationError('Неверно указан сотрудник, кому хотите копировать расписание.')
+        return trainee_worker.id
 
     def clean(self):
         if self.errors:
             return
 
-        if self.cleaned_data['dt_begin'] > self.cleaned_data['dt_end']:
-            raise forms.ValidationError('dt_begin have to be less or equal than dt_end')
+        if self.cleaned_data['from_dt'] > self.cleaned_data['to_dt']:
+            raise forms.ValidationError('Дата начала должна быть меньше даты конца.')
 
 
 class GetCashierInfoForm(forms.Form):
