@@ -556,8 +556,8 @@ def get_worker_day(request, form):
             select_related('on_cashbox', 'cashbox_type'). \
             filter(worker_day=wd):
         details.append({
-            'dttm_from': BaseConverter.convert_time(x.dttm_from.time()),
-            'dttm_to': BaseConverter.convert_time(x.dttm_to.time()),
+            'dttm_from': BaseConverter.convert_time(x.dttm_from.time()) if x.dttm_to else None,
+            'dttm_to': BaseConverter.convert_time(x.dttm_to.time()) if x.dttm_to else None,
             'cashbox_type': x.cashbox_type_id,
         })
         cashboxes_types[x.cashbox_type_id] = CashboxTypeConverter.convert(x.cashbox_type)
