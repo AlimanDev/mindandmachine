@@ -91,7 +91,7 @@ def create_notification(action, instance):
                 )
             if len(instance.wish_text) > 0:
                 change_request_info += '. Текст пожелания: ' + instance.wish_text
-            notification_text = 'Пользователь {} {} запросил измнение рабочего дня на {}: {}'.format(
+            notification_text = 'Пользователь {} {} запросил изменение рабочего дня на {}: {}'.format(
                 instance.worker.first_name,
                 instance.worker.last_name,
                 instance.dt.strftime('%d.%m.%Y'),
