@@ -1340,8 +1340,8 @@ def request_worker_day(request, form):
     tm_work_end = form['tm_work_end']
     worker_id = form['worker_id']
 
-    existing_requests = WorkerDayChangeRequest.objects.filter(dt=dt, worker_id=worker_id)
-    Notifications.objects.filter(object__in=existing_requests).delete()
+    existing_requests = WorkerDayChangeRequest.objects.filter(dt=dt, worker_id=worker_id).values_list('id')
+    Notifications.objects.filter(object_id__in=existing_requests).delete()
     existing_requests.delete()
 
     if tm_work_end and tm_work_start:
