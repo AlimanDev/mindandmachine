@@ -1305,7 +1305,7 @@ def change_cashier_info(request, form):
 
 
 @api_method(
-    'GET',
+    'POST',
     SetWorkerDayForm,
     check_permissions=False,
 )
