@@ -637,6 +637,7 @@ class WorkerDayChangeRequest(models.Model):
     dttm_work_start = models.TimeField(null=True, blank=True)
     dttm_work_end = models.TimeField(null=True, blank=True)
     tm_break_start = models.TimeField(null=True, blank=True)
+    wish_text = models.CharField(null=True, blank=True, max_length=512)
 
 
 class Notifications(models.Model):

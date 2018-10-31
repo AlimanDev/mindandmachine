@@ -1326,6 +1326,7 @@ def request_worker_day(request, form):
             type=form['type'],
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,
+            wish_text=form['wish_text']
         )
     except Exception as exc:
         print(exc)
