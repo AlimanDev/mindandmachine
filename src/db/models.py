@@ -623,20 +623,19 @@ class WorkerDayCashboxDetails(models.Model):
 
 
 class WorkerDayChangeRequest(models.Model):
+    def __str__(self):
+        return '{}, {}, {}'.format(self.worker.id, self.dt, self.is_approved)
+
     id = models.BigAutoField(primary_key=True)
-
     dttm_added = models.DateTimeField(auto_now_add=True)
+    is_approved = models.BooleanField(default=False)
 
-    worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
-
-    # extra fields for SQL SELECT performance
-    worker_day_dt = models.DateField()
-    worker_day_worker = models.ForeignKey(User, on_delete=models.PROTECT, related_name='+')
-
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
+    dt = models.DateField()
     type = utils.EnumField(WorkerDay.Type)
 
-    tm_work_start = models.TimeField(null=True, blank=True)
-    tm_work_end = models.TimeField(null=True, blank=True)
+    dttm_work_start = models.TimeField(null=True, blank=True)
+    dttm_work_end = models.TimeField(null=True, blank=True)
     tm_break_start = models.TimeField(null=True, blank=True)
 
 

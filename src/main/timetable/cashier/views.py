@@ -1,6 +1,5 @@
 from datetime import time, datetime, timedelta
 from django.db.models import Avg
-from django.forms.models import model_to_dict
 from django.core.exceptions import ObjectDoesNotExist
 import json
 
@@ -40,7 +39,6 @@ from .forms import (
     DeleteCashierForm,
     GetCashiersListForm,
     DublicateCashierTimetableForm,
-    SetWorkerDaysForm,
     PasswordChangeForm,
     ChangeCashierInfo,
     GetWorkerDayChangeLogsForm,
@@ -273,16 +271,16 @@ def get_cashier_timetable(request, form):
             )
         ]
 
-        worker_day_change_requests = group_by(
-            WorkerDayChangeRequest.objects.filter(
-                worker_day_worker_id=worker_id,
-                worker_day_dt__gte=from_dt,
-                worker_day_dt__lte=to_dt
-            ),
-            group_key=lambda _: _.worker_day_id,
-            sort_key=lambda _: _.worker_day_dt,
-            sort_reverse=True
-        )
+        # worker_day_change_requests = group_by(
+        #     WorkerDayChangeRequest.objects.filter(
+        #         worker_day_worker_id=worker_id,
+        #         worker_day_dt__gte=from_dt,
+        #         worker_day_dt__lte=to_dt
+        #     ),
+        #     group_key=lambda _: _.worker_day_id,
+        #     sort_key=lambda _: _.worker_day_dt,
+        #     sort_reverse=True
+        # )
 
         worker_day_change_log = group_by(
             WorkerDay.objects.select_related('worker').filter(
@@ -313,8 +311,9 @@ def get_cashier_timetable(request, form):
                 'day': WorkerDayConverter.convert(obj),
                 'change_log': [WorkerDayChangeLogConverter.convert(x) for x in
                                worker_day_change_log.get(obj.id, [])[:10]],
-                'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in
-                                    worker_day_change_requests.get(obj.id, [])[:10]]
+                'change_requests': []
+                # 'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in
+                #                     worker_day_change_requests.get(obj.id, [])[:10]]
             })
 
         user = User.objects.get(id=worker_id)
@@ -407,7 +406,7 @@ def get_cashier_info(request, form):
         }
 
     if 'constraints_info' in form['info']:
-        constraints = WorkerConstraint.objects.filter(worker_id=worker.id)
+        constraints = WorkerConstraint.objects.filter(worker_id=worker.id, is_lite=request.is_mobile)
         response['constraints_info'] = [WorkerConstraintConverter.convert(x) for x in constraints]
         response['shop_times'] = {
             'tm_start': BaseConverter.convert_time(worker.shop.super_shop.tm_start),
@@ -572,138 +571,6 @@ def get_worker_day(request, form):
 
 @api_method(
     'POST',
-    SetWorkerDaysForm,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
-)
-def set_worker_days(request, form):
-    """
-    Меняет рабочие дни от dt_begin до dt_end у пользователя с worker_id на tm_work_start и tm_work_end
-
-    Warning:
-        В данный момент не используется
-
-    Args:
-        method: POST
-        url: /api/timetable/cashier/set_worker_days
-        worker_id(int): required = True
-        dt_begin(QOS_DATE): с какой даты менять
-        dt_end(QOS_DATE: по какую дату менять
-        type(str): тип новых WorkerDay'ев. required = True
-        tm_work_start(QOS_TIME): required = True. новое время начала дня
-        tm_work_end(QOS_TIME): required = True. новое время конца дня
-        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
-        cashbox_type(int): required = False. какая специализация будет у кассира в эти дни(если он работает)
-        comment(str): max_length=128, required = False.
-
-    """
-    worker = form['worker_id']
-    checkpoint = FormUtil.get_checkpoint(form)
-
-    def get_dttm_work_end(dt, dttm_work_start, dttm_work_end):
-        if dttm_work_start > dttm_work_end:
-            dttm_work_end = form[datetime.combine(dt + timedelta(days=1), dttm_work_end)]
-        else:
-            dttm_work_end = form[datetime.combine(dt, dttm_work_end)]
-        return dttm_work_end
-
-        # интервал дней из формы
-
-    form_dates = []
-    for dt in range(int((form['dt_end'] - form['dt_begin']).days) + 1):
-        form_dates.append(form['dt_begin'] + timedelta(dt))
-
-    existed_worker_days = WorkerDay.objects.qos_filter_version(checkpoint).filter(
-        worker=worker,
-        dt__gte=form['dt_begin'],
-        dt__lte=form['dt_end']
-    )
-    # обновляем worker_day, если есть
-    change_log = {}
-    new_worker_days = []
-    for worker_day in existed_worker_days:
-        form_dates.remove(worker_day.dt)
-        # change_log[worker_day.dt] = model_to_dict(
-        #     worker_day,
-        #     fields=[
-        #         'dt',
-        #         'type',
-        #         'tm_work_start',
-        #         'tm_work_end',
-        #     ]
-        # )
-        # обновляем дни и удаляем details для этих дней
-
-        new_worker_days.append(
-            WorkerDay(
-                worker=worker,
-                type=form['type'],
-                dttm_work_start=datetime.combine(worker_day.dt, form['tm_work_start']),
-                dttm_work_end=get_dttm_work_end(worker_day.dt, form['tm_work_start'], form['tm_work_end']),
-                dt=worker_day.dt,
-                created_by=request.user,
-                parent_worker_day=worker_day
-            )
-        )
-        # worker_day.type = form['type']
-        # worker_day.tm_work_start = form['tm_work_start']
-        # worker_day.tm_work_end = form['tm_work_end']
-        # worker_day.save()
-        # WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).filter(worker_day=worker_day).delete()
-
-    WorkerDay.objects.bulk_create(new_worker_days)
-
-    WorkerDayCashboxDetails.objects.bulk_create([
-        WorkerDayCashboxDetails(
-            worker_day=worker_day,
-            cashbox_type_id=form['cashbox_type'],
-            dttm_from=datetime.combine(worker_day.dt, form['tm_work_start']),
-            dttm_to=get_dttm_work_end(worker_day.dt, form['tm_work_start'], form['tm_work_end']),
-        ) for worker_day in existed_worker_days
-    ])
-
-    updated_worker_days = WorkerDay.objects.filter(
-        worker=worker,
-        dt__gte=form['dt_begin'],
-        dt__lte=form['dt_end']
-    )
-    # WorkerDayChangeLog.objects.bulk_create([
-    #     WorkerDayChangeLog(
-    #         worker_day=worker_day,
-    #         worker_day_worker=worker_day.worker,
-    #         worker_day_dt=worker_day.dt,
-    #         from_type=change_log.get(worker_day.dt)['type'],
-    #         from_tm_work_start=change_log.get(worker_day.dt)['tm_work_start'],
-    #         from_tm_work_end=change_log.get(worker_day.dt)['tm_work_end'],
-    #         to_type=worker_day.type,
-    #         to_tm_work_start=worker_day.tm_work_start,
-    #         to_tm_work_end=worker_day.tm_work_end,
-    #         changed_by=request.user
-    #     ) for worker_day in updated_worker_days
-    # ])
-    # незаполненные дни
-    filled_days = WorkerDay.objects.bulk_create([
-        WorkerDay(
-            worker=worker,
-            dt=day,
-            type=form['type'],
-            dttm_work_start=datetime.combine(day, form['tm_work_start']),
-            dttm_work_end=get_dttm_work_end(day, form['tm_work_start'], form['tm_work_end']),
-        ) for day in form_dates
-    ])
-    WorkerDayCashboxDetails.objects.bulk_create([
-        WorkerDayCashboxDetails(
-            worker_day=worker_day,
-            cashbox_type_id=form['cashbox_type'],
-            dttm_from=datetime.combine(worker_day.dt, form['tm_work_start']),
-            dttm_to=get_dttm_work_end(worker_day.dt, form['tm_work_start'], form['tm_work_end']),
-        ) for worker_day in filled_days
-    ])
-
-    return JsonResponse.success()
-
-
-@api_method(
-    'POST',
     SetWorkerDayForm,
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
@@ -816,11 +683,14 @@ def set_worker_day(request, form):
         if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
             if len(details):
                 for item in details:
+                    dttm_to = BaseConverter.parse_time(item['dttm_to'])
+                    dttm_from = BaseConverter.parse_time(item['dttm_from'])
                     WorkerDayCashboxDetails.objects.create(
                         cashbox_type_id=item['cashBox_type'],
                         worker_day=new_worker_day,
-                        dttm_from=item['dttm_from'],
-                        dttm_to=item['dttm_to']
+                        dttm_from=datetime.combine(dt, dttm_from),
+                        dttm_to=datetime.combine(dt, dttm_to) if dttm_to > dttm_from\
+                            else datetime.combine(dt + timedelta(days=1), dttm_to)
                     )
             else:
                 cashbox_type_id = form.get('cashbox_type')
@@ -976,14 +846,33 @@ def delete_worker_day(request, form):
     SetCashierInfoForm,
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
-def set_cashier_info(request, form):
+def set_cashier_info_hard(request, form):
+    """
+    url: /api/timetable/cashier/set_cashier_info_hard
+    """
+    return set_cashier_info(request, form, False)
+
+
+@api_method(
+    'POST',
+    SetCashierInfoForm,
+    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+)
+def set_cashier_info_lite(request, form):
+    """
+    url: /api/timetable/cashier/set_cashier_info_lite
+    """
+    return set_cashier_info(request, form, True)
+
+
+def set_cashier_info(request, form, is_lite=False):
     """
     Устанавливает заданные параметры кассиру
 
     Args:
         method: POST
-        url: /api/timetable/cashier/set_cashier_info
         worker_id(int): required = True
+        is_lite(bool): False -- с фронта, True -- с мобилы
         work_type(str): тип графика кассира (40часов, 5/2, etc). required = False
         cashbox_info(str): за какими типами касс может рабоать? required = False
         constraint(str):required = False
@@ -1064,9 +953,9 @@ def set_cashier_info(request, form):
             for tm in times:
                 c = WorkerConstraint.objects.create(
                     worker_id=worker.id,
+                    is_lite=is_lite,
                     weekday=wd,
                     tm=tm,
-                    is_lite=request.user.group == User.GROUP_CASHIER
                 )
                 constraints.append(c)
 
@@ -1220,32 +1109,6 @@ def dublicate_cashier_table(request, form):
     )
     WorkerDayCashboxDetails.objects.filter(worker_day__in=trainee_worker_days).delete()
     trainee_worker_days.delete()
-
-    # old_values = {}
-    # for main_worker_day in main_worker_days:
-    #     if main_worker_day.dt in trainee_worker_days:
-    #         # записываем аргументы для лога до изменения WorkerDay
-    #         trainee_worker_day = trainee_worker_days.get(main_worker_day.dt)
-    #         old_values[trainee_worker_day.dt] = model_to_dict(
-    #             trainee_worker_day,
-    #             fields=[
-    #                 'dt',
-    #                 'type',
-    #                 'dttm_work_start',
-    #                 'dttm_work_end',
-    #                 'tm_break_start'
-    #             ]
-    #         )
-    #
-    #         # обновляем дни и удаляем details для этих дней
-    #         trainee_worker_day.type = main_worker_day.type
-    #         trainee_worker_day.worker.shop = main_worker_day.worker.shop
-    #         trainee_worker_day.dttm_work_start = main_worker_day.dttm_work_start
-    #         trainee_worker_day.dttm_work_end = main_worker_day.dttm_work_end
-    #         trainee_worker_day.tm_break_start = main_worker_day.tm_break_start
-    #         trainee_worker_day.save()
-    #
-    #         main_worker_days = main_worker_days.exclude(dt=main_worker_day.dt)
 
     wds_list_to_create = []
     wdcds_list_to_create = []
@@ -1439,3 +1302,35 @@ def change_cashier_info(request, form):
     user.save()
 
     return JsonResponse.success(response)
+
+
+@api_method(
+    'GET',
+    SetWorkerDayForm,
+    check_permissions=False,
+)
+def request_worker_day(request, form):
+    dt = form['dt']
+    tm_work_start = form['tm_work_start']
+    tm_work_end = form['tm_work_end']
+    if tm_work_end and tm_work_start:
+        dttm_work_start = datetime.combine(dt, tm_work_start)
+        dttm_work_end = datetime.combine(dt, tm_work_end) if tm_work_end > tm_work_start\
+            else datetime.combine(dt + timedelta(days=1), tm_work_end)
+    else:
+        dttm_work_start = dttm_work_end = None
+    try:
+        change_request = WorkerDayChangeRequest.objects.create(
+            worker_id=form['worker_id'],
+            dt=form['dt'],
+            type=form['type'],
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+        )
+    except Exception as exc:
+        print(exc)
+        return JsonResponse.internal_error('Ошибка при создании запроса на изменение.')
+
+    send_notification('C', change_request, sender=request.user)
+
+    return JsonResponse.success()

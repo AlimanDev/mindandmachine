@@ -345,7 +345,9 @@ class NotificationConverter(BaseConverter):
             'text': obj.text,
             'was_read': obj.was_read,
             'to_worker': obj.to_worker_id,
-            'dttm_added': BaseConverter.convert_datetime(obj.dttm_added)
+            'dttm_added': BaseConverter.convert_datetime(obj.dttm_added),
+            'object_id': obj.object_id,
+            'content_type': obj.content_type.__str__()
         }
 
 
