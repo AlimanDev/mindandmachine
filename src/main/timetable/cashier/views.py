@@ -255,7 +255,7 @@ def get_cashier_timetable(request, form):
                     worker_id=wd['worker_id'],
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
-                    tm_break_start=wd['tm_break_start'],
+                    tm_break_start=wd['tm_break_start'] if wd['tm_break_start'] else None,
                     is_manual_tuning=wd['is_manual_tuning'],
                 )
                 wd_m.cashbox_types_ids = [wd['cashbox_types__id']] if wd['cashbox_types__id'] else []
