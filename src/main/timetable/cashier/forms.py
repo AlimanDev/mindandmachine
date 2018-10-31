@@ -254,3 +254,7 @@ class GetWorkerDayChangeLogsForm(forms.Form):
 class DeleteWorkerDayChangeLogsForm(forms.Form):
     worker_day_id = forms.IntegerField()
 
+
+class GetWorkerChangeRequestsForm(forms.Form):
+    dt = util_forms.DateField()
+    worker_id = forms.IntegerField()

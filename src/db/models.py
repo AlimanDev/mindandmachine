@@ -626,6 +626,9 @@ class WorkerDayChangeRequest(models.Model):
     def __str__(self):
         return '{}, {}, {}'.format(self.worker.id, self.dt, self.is_approved)
 
+    class Meta(object):
+        unique_together = ('worker', 'dt')
+
     id = models.BigAutoField(primary_key=True)
     dttm_added = models.DateTimeField(auto_now_add=True)
     is_approved = models.BooleanField(default=False)

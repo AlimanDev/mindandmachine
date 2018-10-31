@@ -18,5 +18,6 @@ urlpatterns = [
     path('get_worker_day_logs', views.get_worker_day_logs),
     path('delete_worker_day', views.delete_worker_day),
     path('request_worker_day', views.request_worker_day),
+    path('get_change_request', views.get_change_request),
 ]
 

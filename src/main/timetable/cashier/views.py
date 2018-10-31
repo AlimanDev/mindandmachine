@@ -14,6 +14,7 @@ from src.db.models import (
     WorkerDayCashboxDetails,
     WorkerPosition,
     Shop,
+    Notifications,
 )
 from src.util.utils import JsonResponse, api_method, check_group_hierarchy
 from src.util.forms import FormUtil
@@ -43,6 +44,7 @@ from .forms import (
     ChangeCashierInfo,
     GetWorkerDayChangeLogsForm,
     DeleteWorkerDayChangeLogsForm,
+    GetWorkerChangeRequestsForm,
 )
 from src.main.other.notification.utils import send_notification
 from django.contrib.auth import update_session_auth_hash
@@ -1305,6 +1307,29 @@ def change_cashier_info(request, form):
 
 
 @api_method(
+    'GET',
+    GetWorkerChangeRequestsForm,
+    groups=User.__all_groups__,
+    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+)
+def get_change_request(request, form):
+    try:
+        change_request = WorkerDayChangeRequest.objects.get(dt=form['dt'], worker_id=form['worker_id'])
+        return JsonResponse.success({
+            'dt': BaseConverter.convert_date(change_request.dt),
+            'type': WorkerDayConverter.convert_type(change_request.type),
+            'dttm_work_start': BaseConverter.convert_datetime(change_request.dttm_work_start),
+            'dttm_work_end': BaseConverter.convert_datetime(change_request.dttm_work_end),
+            'wish_text': change_request.wish_text,
+            'is_approved': change_request.is_approved
+        })
+    except WorkerDayChangeRequest.DoesNotExist:
+        return JsonResponse.success()
+    except WorkerDayChangeRequest.MultipleObjectsReturned:
+        return JsonResponse.internal_error('Существует несколько запросов на этот день. Не знаю какой выбрать.')
+
+
+@api_method(
     'POST',
     SetWorkerDayForm,
     check_permissions=False,
@@ -1313,6 +1338,12 @@ def request_worker_day(request, form):
     dt = form['dt']
     tm_work_start = form['tm_work_start']
     tm_work_end = form['tm_work_end']
+    worker_id = form['worker_id']
+
+    existing_requests = WorkerDayChangeRequest.objects.filter(dt=dt, worker_id=worker_id)
+    Notifications.objects.filter(object__in=existing_requests).delete()
+    existing_requests.delete()
+
     if tm_work_end and tm_work_start:
         dttm_work_start = datetime.combine(dt, tm_work_start)
         dttm_work_end = datetime.combine(dt, tm_work_end) if tm_work_end > tm_work_start\
@@ -1321,17 +1352,17 @@ def request_worker_day(request, form):
         dttm_work_start = dttm_work_end = None
     try:
         change_request = WorkerDayChangeRequest.objects.create(
-            worker_id=form['worker_id'],
-            dt=form['dt'],
+            worker_id=worker_id,
+            dt=dt,
             type=form['type'],
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,
             wish_text=form['wish_text']
         )
+
+        send_notification('C', change_request, sender=request.user)
     except Exception as exc:
         print(exc)
         return JsonResponse.internal_error('Ошибка при создании запроса на изменение.')
-
-    send_notification('C', change_request, sender=request.user)
 
     return JsonResponse.success()

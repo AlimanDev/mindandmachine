@@ -85,7 +85,10 @@ def create_notification(action, instance):
         elif isinstance(instance, WorkerDayChangeRequest):
             change_request_info = ''
             if instance.type == WorkerDay.Type.TYPE_WORKDAY.value:
-                change_request_info = ' с {} по {}'.format(instance.dttm_work_start.time(), instance.dttm_work_end.time())
+                change_request_info = ' с {} по {}'.format(
+                    instance.dttm_work_start.strftime('%H:%M'),
+                    instance.dttm_work_end.strftime('%H:%M')
+                )
             if len(instance.wish_text) > 0:
                 change_request_info += '. Текст пожелания: ' + instance.wish_text
             notification_text = 'Пользователь {} {} запросил измнение рабочего дня на {}: {}'.format(
