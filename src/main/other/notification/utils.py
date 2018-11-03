@@ -140,6 +140,7 @@ def send_notification(action, instance, recipient_list=None, sender=None):
             Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER),
             shop_id=shop_id
         )
+
     elif not isinstance(recipient_list, list):
         recipient_list = [recipient_list]
     for recipient in recipient_list:

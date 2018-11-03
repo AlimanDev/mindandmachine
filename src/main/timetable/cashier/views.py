@@ -45,6 +45,7 @@ from .forms import (
     GetWorkerDayChangeLogsForm,
     DeleteWorkerDayChangeLogsForm,
     GetWorkerChangeRequestsForm,
+    HandleWorkerDayRequestForm,
 )
 from src.main.other.notification.utils import send_notification
 from django.contrib.auth import update_session_auth_hash
@@ -1305,6 +1306,8 @@ def change_cashier_info(request, form):
 
     return JsonResponse.success(response)
 
+# views for making requests for changing worker day from mobile application
+
 
 @api_method(
     'GET',
@@ -1313,6 +1316,27 @@ def change_cashier_info(request, form):
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
 def get_change_request(request, form):
+    """
+
+    Args:
+        method: GET
+        api: /api/timetable/cashier/get_change_request
+        dt(QOS_DATE): change request'ы на эту дату
+        worker_id: для какого работника
+
+    Returns:
+         {
+            dt:
+            type: тип рабочего дня
+            dttm_work_start:
+            dttm_work_end:
+            wish_text: текст пожелания
+            is_approved: одобрен ли реквест или нет
+         }
+    Raises:
+        JsonResponse.internal_error: если в бд лежит несколько запросов на этот день (по идее такого не должно быть)
+
+    """
     try:
         change_request = WorkerDayChangeRequest.objects.get(dt=form['dt'], worker_id=form['worker_id'])
         return JsonResponse.success({
@@ -1335,6 +1359,23 @@ def get_change_request(request, form):
     check_permissions=False,
 )
 def request_worker_day(request, form):
+    """
+
+        Args:
+            method: POST
+            api: /api/timetable/cashier/request_worker_day
+            worker_id(int): ид работника
+            dt(QOS_DATE): дата на которую делается request
+            type(char): тип рабочего дня который хочет работник
+            tm_work_start(QOS_TIME):
+            tm_work_end(QOS_TIME):
+            wish_text(char): текст пожелания который потом уйдет в уведомлении
+
+        Returns:
+             {}
+        Raises:
+            JsonResponse.internal_error: если не получилось создать запрос на этот день (скорее всего ошибка в send_notificitation методе)
+        """
     dt = form['dt']
     tm_work_start = form['tm_work_start']
     tm_work_end = form['tm_work_end']
@@ -1364,5 +1405,72 @@ def request_worker_day(request, form):
     except Exception as exc:
         print(exc)
         return JsonResponse.internal_error('Ошибка при создании запроса на изменение.')
+
+    return JsonResponse.success()
+
+
+@api_method(
+    'POST',
+    HandleWorkerDayRequestForm,
+    groups=User.__allowed_to_modify__,
+    lambda_func=lambda x: WorkerDayChangeRequest.objects.get(id=x['request_id'].worker)
+)
+def handle_worker_day_request(request, form):
+    """
+    Args:
+        method: POST
+        api: /api/timetable/cashier/request_worker_day
+        request_id(int): id request'a
+        action(char): 'A' for accept, 'D' for decline
+
+    Returns:
+         {}
+    """
+    request_id = form['request_id']
+    action = form['action']
+
+    try:
+        change_request = WorkerDayChangeRequest.objects.get(id=request_id)
+    except WorkerDayChangeRequest.DoesNotExist:
+        return JsonResponse.does_not_exists_error('Такого запроса не существует.')
+
+    new_notification_text = 'Ваш запрос на изменение рабочего дня на {} был '.format(change_request.dt)
+
+    if action == 'A':
+        old_wd = None
+
+        try:
+            old_wd = WorkerDay.objects.qos_current_version().get(
+                dt=change_request.dt,
+                worker_id=change_request.worker_id
+            )
+        except WorkerDay.DoesNotExist:
+            pass
+
+        WorkerDay.objects.create(
+            worker_id=change_request.worker_id,
+            dt=change_request.dt,
+            type=change_request.type,
+            dttm_work_start=change_request.dttm_work_start,
+            dttm_work_end=change_request.dttm_work_end,
+            created_by=request.user,
+            parent_worker_day=old_wd
+        )
+
+        Notifications.objects.create(
+            to_worker_id=change_request.worker_id,
+            type=Notifications.TYPE_INFO,
+            text=new_notification_text+'одобрен.'
+        )
+
+    elif action == 'D':
+        Notifications.objects.filter(object_id=change_request.id).delete()
+        Notifications.objects.create(
+            to_worker_id=change_request.worker_id,
+            type=Notifications.TYPE_INFO,
+            text=new_notification_text + 'отклонен.'
+        )
+    else:
+        return JsonResponse.internal_error('Неизвестное дейсвтие')
 
     return JsonResponse.success()
