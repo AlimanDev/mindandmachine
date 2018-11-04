@@ -1466,7 +1466,6 @@ def handle_worker_day_request(request, form):
         change_request.save()
 
     elif action == 'D':
-        Notifications.objects.filter(object_id=change_request.id).delete()
         Notifications.objects.create(
             to_worker_id=change_request.worker_id,
             type=Notifications.TYPE_INFO,
@@ -1475,5 +1474,7 @@ def handle_worker_day_request(request, form):
         change_request.update(status_type=WorkerDayChangeRequest.TYPE_DECLINED)
     else:
         return JsonResponse.internal_error('Неизвестное дейсвтие')
+
+    Notifications.objects.filter(object_id=change_request.id).delete()
 
     return JsonResponse.success()
