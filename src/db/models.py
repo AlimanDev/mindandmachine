@@ -624,7 +624,7 @@ class WorkerDayCashboxDetails(models.Model):
 
 class WorkerDayChangeRequest(models.Model):
     def __str__(self):
-        return '{}, {}, {}'.format(self.worker.id, self.dt, self.is_approved)
+        return '{}, {}, {}'.format(self.worker.id, self.dt, self.status_type)
 
     class Meta(object):
         unique_together = ('worker', 'dt')
