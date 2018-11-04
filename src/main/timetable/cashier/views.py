@@ -1426,6 +1426,7 @@ def handle_worker_day_request(request, form):
     Returns:
          {}
     """
+    print('here')
     request_id = form['request_id']
     action = form['action']
 
