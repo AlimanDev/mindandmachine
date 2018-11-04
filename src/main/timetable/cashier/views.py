@@ -1419,7 +1419,7 @@ def handle_worker_day_request(request, form):
     """
     Args:
         method: POST
-        api: /api/timetable/cashier/request_worker_day
+        api: /api/timetable/cashier/handle_change_request
         request_id(int): id request'a
         action(char): 'A' for accept, 'D' for decline
 
@@ -1429,7 +1429,6 @@ def handle_worker_day_request(request, form):
     request_id = form['request_id']
     action = form['action']
 
-    print(action, request_id)
     try:
         change_request = WorkerDayChangeRequest.objects.get(id=request_id)
     except WorkerDayChangeRequest.DoesNotExist:

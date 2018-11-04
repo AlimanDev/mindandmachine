@@ -162,7 +162,9 @@ def api_method(
                         cleaned_data = Shop.objects.filter(id=form.cleaned_data['shop_id']).first()
                     else:
                         try:
+                            print('here')
                             cleaned_data = lambda_func(form.cleaned_data)
+                            print(cleaned_data)
                         except ObjectDoesNotExist:
                             return JsonResponse.does_not_exists_error('error in api_method')
                         except MultipleObjectsReturned:
