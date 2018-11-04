@@ -1426,7 +1426,6 @@ def handle_worker_day_request(request, form):
     Returns:
          {}
     """
-    print('here')
     request_id = form['request_id']
     action = form['action']
 
@@ -1463,7 +1462,8 @@ def handle_worker_day_request(request, form):
             type=Notifications.TYPE_INFO,
             text=new_notification_text+'одобрен.'
         )
-        change_request.update(status_type=WorkerDayChangeRequest.TYPE_APPROVED)
+        change_request.status_type = WorkerDayChangeRequest.TYPE_APPROVED
+        change_request.save()
 
     elif action == 'D':
         Notifications.objects.filter(object_id=change_request.id).delete()
