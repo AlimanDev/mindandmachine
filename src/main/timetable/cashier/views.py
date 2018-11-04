@@ -1413,7 +1413,7 @@ def request_worker_day(request, form):
     'POST',
     HandleWorkerDayRequestForm,
     groups=User.__allowed_to_modify__,
-    lambda_func=lambda x: WorkerDayChangeRequest.objects.get(id=x['request_id'].worker)
+    lambda_func=lambda x: WorkerDayChangeRequest.objects.get(id=x['request_id']).worker
 )
 def handle_worker_day_request(request, form):
     """
