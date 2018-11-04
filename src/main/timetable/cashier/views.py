@@ -1429,6 +1429,7 @@ def handle_worker_day_request(request, form):
     request_id = form['request_id']
     action = form['action']
 
+    print(action, request_id)
     try:
         change_request = WorkerDayChangeRequest.objects.get(id=request_id)
     except WorkerDayChangeRequest.DoesNotExist:
