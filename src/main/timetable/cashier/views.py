@@ -1345,7 +1345,7 @@ def get_change_request(request, form):
             'dttm_work_start': BaseConverter.convert_datetime(change_request.dttm_work_start),
             'dttm_work_end': BaseConverter.convert_datetime(change_request.dttm_work_end),
             'wish_text': change_request.wish_text,
-            'is_approved': change_request.is_approved
+            'status_type': change_request.status_type,
         })
     except WorkerDayChangeRequest.DoesNotExist:
         return JsonResponse.success()
@@ -1462,6 +1462,7 @@ def handle_worker_day_request(request, form):
             type=Notifications.TYPE_INFO,
             text=new_notification_text+'одобрен.'
         )
+        change_request.update(status_type=WorkerDayChangeRequest.TYPE_APPROVED)
 
     elif action == 'D':
         Notifications.objects.filter(object_id=change_request.id).delete()
@@ -1470,6 +1471,7 @@ def handle_worker_day_request(request, form):
             type=Notifications.TYPE_INFO,
             text=new_notification_text + 'отклонен.'
         )
+        change_request.update(status_type=WorkerDayChangeRequest.TYPE_DECLINED)
     else:
         return JsonResponse.internal_error('Неизвестное дейсвтие')
 

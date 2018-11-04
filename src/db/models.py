@@ -629,9 +629,19 @@ class WorkerDayChangeRequest(models.Model):
     class Meta(object):
         unique_together = ('worker', 'dt')
 
+    TYPE_APPROVED = 'A'
+    TYPE_DECLINED = 'D'
+    TYPE_PENDING = 'P'
+
+    STATUS_CHOICES = (
+        (TYPE_APPROVED, 'Approved'),
+        (TYPE_DECLINED, 'Declined'),
+        (TYPE_PENDING, 'Pending'),
+    )
+
     id = models.BigAutoField(primary_key=True)
     dttm_added = models.DateTimeField(auto_now_add=True)
-    is_approved = models.BooleanField(default=False)
+    status_type = models.CharField(max_length=1, choices=STATUS_CHOICES, default=TYPE_PENDING)
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     dt = models.DateField()
