@@ -647,8 +647,8 @@ class WorkerDayChangeRequest(models.Model):
     dt = models.DateField()
     type = utils.EnumField(WorkerDay.Type)
 
-    dttm_work_start = models.TimeField(null=True, blank=True)
-    dttm_work_end = models.TimeField(null=True, blank=True)
+    dttm_work_start = models.DateTimeField(null=True, blank=True)
+    dttm_work_end = models.DateTimeField(null=True, blank=True)
     tm_break_start = models.TimeField(null=True, blank=True)
     wish_text = models.CharField(null=True, blank=True, max_length=512)
 
