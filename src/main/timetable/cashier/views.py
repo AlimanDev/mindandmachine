@@ -1437,15 +1437,13 @@ def handle_worker_day_request(request, form):
     new_notification_text = 'Ваш запрос на изменение рабочего дня на {} был '.format(change_request.dt)
 
     if action == 'A':
-        old_wd = None
-
         try:
             old_wd = WorkerDay.objects.qos_current_version().get(
                 dt=change_request.dt,
                 worker_id=change_request.worker_id
             )
         except WorkerDay.DoesNotExist:
-            pass
+            old_wd = None
 
         WorkerDay.objects.create(
             worker_id=change_request.worker_id,
