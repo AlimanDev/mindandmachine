@@ -2,12 +2,12 @@ from datetime import timedelta, datetime, time
 
 from src.db.models import (
     WaitTimeInfo,
-    PeriodDemand,
+    PeriodQueue,
     CashboxType,
     Shop,
+    PeriodDemand
 )
 from src.util.forms import FormUtil
-from src.util.models_converter import PeriodDemandConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import GetTimeDistributionForm, GetIndicatorsForm, GetParametersForm, SetParametersForm
 
@@ -29,11 +29,7 @@ def get_indicators(request, form):
         {
             | 'mean_length_usual': float or None,
             | 'mean_wait_time_usual': float or None,
-            | 'dead_time_part_usual': float or None,
-            | 'mean_length_return': float or None,
-            | 'mean_wait_time_return': float or None,
-            | 'dead_time_part_return': float or None,
-            | 'fund': None
+            | 'dead_time_part_usual': float or None
         }
 
     Raises:
@@ -52,23 +48,19 @@ def get_indicators(request, form):
     except:
         return JsonResponse.internal_error('Cannot get linear cashbox')
 
-    period_demands = list(
-        PeriodDemand.objects.filter(
-            cashbox_type_id=linear_cashbox_type.id,
-            type=forecast_type,
-            dttm_forecast__gte=datetime.combine(dt_from, time()),
-            dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1)
-        )
+    period_queues = PeriodQueue.objects.filter(
+        cashbox_type_id=linear_cashbox_type.id,
+        type=forecast_type,
+        dttm_forecast__gte=datetime.combine(dt_from, time()),
+        dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1)
     )
 
-    queue_wait_time = 0
     queue_wait_length = 0
-    for x in period_demands:
-        queue_wait_time += x.queue_wait_time
+    for x in period_queues:
         queue_wait_length += x.queue_wait_length
 
-    mean_length_usual = queue_wait_length / len(period_demands) if len(period_demands) > 0 else None
-    mean_wait_time_usual = queue_wait_time / len(period_demands) if len(period_demands) > 0 else None
+    mean_length_usual = queue_wait_length / len(period_queues) if len(period_queues) > 0 else None
+    mean_wait_time_usual = None
     dead_time_part_usual = None
 
     return JsonResponse.success({
@@ -125,14 +117,14 @@ def get_time_distribution(request, form):
     for cashbox_type in cashboxes_types:
         result[cashbox_type.id] = {}
 
-        for forecast_type in PeriodDemand.Type.values():
+        for forecast_type in PeriodDemand.FORECAST_TYPES:
             arr = []
             for i in range(1, 10):
                 arr.append({
                     'wait_time': i,
                     'proportion': int(30 * (1 - (i-1)/10))
                 })
-            result[cashbox_type.id][PeriodDemandConverter.convert_forecast_type(forecast_type)] = arr
+            result[cashbox_type.id][forecast_type[0]] = arr
 
     return JsonResponse.success(result)
 

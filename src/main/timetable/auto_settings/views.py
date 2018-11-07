@@ -28,7 +28,6 @@ from src.util.forms import FormUtil
 from src.util.models_converter import (
     TimetableConverter,
     CashboxTypeConverter,
-    PeriodDemandConverter,
     UserConverter,
     WorkerConstraintConverter,
     WorkerCashboxInfoConverter,
@@ -569,17 +568,7 @@ def set_timetable(request, form):
 
             else:
                 wd_obj.save()
-    # update lack
-    # line = CashboxType.objects.filter(is_main_type=True, shop=timetable.shop_id)
-    # for str_dttm, lack in data['lack']:
-    #     dttm = BaseConverter.convert_datetime(str_dttm)
-    #     PeriodDemand.objects.update_or_create(
-    #         lack_of_cashiers=lack,
-    #         defaults={
-    #             'dttm_forecast': dttm,
-    #             'cashbox_type': line,
-    #             'type': PeriodDemand.Type.LONG_FORECAST.value,
-    #         })
+
     send_notification('C', timetable)
 
     return JsonResponse.success()

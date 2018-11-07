@@ -240,38 +240,6 @@ class WorkerConstraintConverter(BaseConverter):
         }
 
 
-class PeriodDemandConverter(BaseConverter):
-    __FORECAST_TYPE = {
-        PeriodDemand.Type.SHORT_FORECAST.value: 'S',
-        PeriodDemand.Type.LONG_FORECAST.value: 'L',
-        PeriodDemand.Type.FACT.value: 'F'
-    }
-
-    __FORECAST_TYPE_REVERSED = {v: k for k, v in __FORECAST_TYPE.items()}
-
-    @classmethod
-    def convert_forecast_type(cls, obj_type):
-        return cls.__FORECAST_TYPE.get(obj_type, '')
-
-    @classmethod
-    def parse_forecast_type(cls, obj_type):
-        return cls.__FORECAST_TYPE_REVERSED.get(obj_type)
-
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'dttm_forecast': cls.convert_datetime(obj.dttm_forecast),
-            'clients': obj.clients,
-            'products': obj.products,
-            'type': cls.convert_forecast_type(obj.type),
-            'cashbox_type': obj.cashbox_type_id,
-            'queue_wait_time': obj.queue_wait_time,
-            'queue_wait_length': obj.queue_wait_length,
-            'lack': obj.lack_of_cashiers,
-        }
-
-
 class PeriodDemandChangeLogConverter(BaseConverter):
     @classmethod
     def convert(cls, obj):

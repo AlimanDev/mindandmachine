@@ -4,10 +4,7 @@ import json
 from django import forms
 from django.core.exceptions import ValidationError
 
-from src.db.models import WorkerDay
-
 from src.util.dict import DictUtil
-from src.util.models_converter import PeriodDemandConverter
 from src.conf.djconfig import (
     QOS_DATE_FORMAT,
     QOS_DATETIME_FORMAT,
@@ -114,19 +111,6 @@ class IntegersList(forms.CharField):
         for x in value:
             if not isinstance(x, int):
                 raise ValidationError('invalid IntegerListType')
-
-        return value
-
-
-class PeriodDemandForecastType(forms.CharField):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def clean(self, value):
-        value = super().clean(value)
-        value = PeriodDemandConverter.parse_forecast_type(value)
-        if value is None:
-            raise ValidationError('invalid PeriodDemandForecastType')
 
         return value
 

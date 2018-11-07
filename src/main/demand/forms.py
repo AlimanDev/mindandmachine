@@ -9,7 +9,7 @@ from src.util import forms as util_forms
 class GetIndicatorsForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
-    type = util_forms.PeriodDemandForecastType()
+    type = forms.CharField(max_length=1)
     shop_id = forms.IntegerField(required=False)
     checkpoint = forms.IntegerField(required=False)
 
@@ -20,22 +20,6 @@ class GetForecastForm(forms.Form):
     cashbox_type_ids = util_forms.IntegersList()
     format = util_forms.ChoiceField(choices=['raw', 'excel'], default='raw')
     shop_id = forms.IntegerField(required=False)
-    # data_type = forms.CharField()
-
-    # def clean_data_type(self):
-    #     value = self.cleaned_data.get('data_type')
-    #     if value is None or value == '':
-    #         raise ValidationError('Invalid enum value')
-    #
-    #     try:
-    #         value = [PeriodDemandConverter.parse_forecast_type(v) for v in json.loads(value)]
-    #     except:
-    #         raise ValidationError('Invalid enum value')
-    #
-    #     if None in value:
-    #         raise ValidationError('Invalid enum value')
-    #
-    #     return value
 
 
 class SetDemandForm(forms.Form):

@@ -1,13 +1,15 @@
 from datetime import datetime, timedelta, time
 
 from src.db.models import (
-    PeriodDemand,
+    PeriodClients,
+    PeriodProducts,
+    PeriodQueue,
     WorkerDay,
     PeriodDemandChangeLog,
     Shop
 )
 from src.util.collection import range_u
-from src.util.models_converter import BaseConverter, PeriodDemandConverter, PeriodDemandChangeLogConverter
+from src.util.models_converter import BaseConverter, PeriodDemandChangeLogConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import (
     GetForecastForm,
@@ -59,32 +61,33 @@ def get_indicators(request, form):
     forecast_type = form['type']
 
     shop_id = FormUtil.get_shop_id(request, form)
-    checkpoint = FormUtil.get_checkpoint(form)
+    # checkpoint = FormUtil.get_checkpoint(form)
 
-    period_demands = PeriodDemand.objects.select_related(
-        'cashbox_type'
-    ).filter(
-        cashbox_type__shop_id=shop_id,
-        type=forecast_type,
-        dttm_forecast__gte=datetime.combine(dt_from, time()),
-        dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1)
-    )
+    period_filter_dict = {
+        'cashbox_type__shop_id': shop_id,
+        'type': forecast_type,
+        'dttm_forecast__gte': datetime.combine(dt_from, time()),
+        'dttm_forecast__lt': datetime.combine(dt_to, time()) + timedelta(days=1)
+    }
 
-    worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
-        worker__shop_id=shop_id,
-        type=WorkerDay.Type.TYPE_WORKDAY.value,
-        dt__gte=dt_from,
-        dt__lte=dt_to,
-    )
-    workers_count = len(set([x.worker_id for x in worker_days]))
+    # worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+    #     worker__shop_id=shop_id,
+    #     type=WorkerDay.Type.TYPE_WORKDAY.value,
+    #     dt__gte=dt_from,
+    #     dt__lte=dt_to,
+    # )
+    # workers_count = len(set([x.worker_id for x in worker_days]))
 
     clients = 0
     products = 0
-    for x in period_demands:
-        clients += x.clients
+
+    for x in PeriodProducts.objects.select_related('cashbox_type').filter(**period_filter_dict):
         products += x.products
 
-    prev_periods_demands = PeriodDemand.objects.select_related(
+    for x in PeriodClients.objects.select_related('cashbox_type').filter(**period_filter_dict):
+        products += x.products
+
+    prev_period_clients = PeriodClients.objects.select_related(
         'cashbox_type'
     ).filter(
         cashbox_type__shop_id=shop_id,
@@ -94,7 +97,7 @@ def get_indicators(request, form):
     )
 
     prev_clients = 0
-    for x in prev_periods_demands:
+    for x in prev_period_clients:
         prev_clients += x.clients
 
     if prev_clients != 0:
@@ -102,7 +105,7 @@ def get_indicators(request, form):
     else:
         growth = None
 
-    mean_hour_count = dt_days_count * 17
+    # mean_hour_count = dt_days_count * 17
 
     def __div_safe(__a, __b):
         return __a / __b if __b > 0 else None
@@ -139,69 +142,75 @@ def get_forecast(request, form):
 
 
     """
+    def _create_demands_dict(query_set):
+        tmp_dict = {}
+        for x in query_set:
+            dt = x.dttm_forecast.date()
+            if dt not in tmp_dict:
+                tmp_dict[dt] = {}
+            tm = x.dttm_forecast.time()
+            if tm not in tmp_dict[dt]:
+                tmp_dict[dt][tm] = []
+            tmp_dict[dt][tm].append(x)
+
+        return tmp_dict
+
     if form['format'] == 'excel':
         return JsonResponse.value_error('Excel is not supported yet')
 
-    # data_types = form['data_type']
-    data_types = PeriodDemand.Type.values()
     cashbox_type_ids = form['cashbox_type_ids']
 
     shop_id = FormUtil.get_shop_id(request, form)
 
-
-    period_demand = PeriodDemand.objects.select_related(
-        'cashbox_type'
-    ).filter(
+    period_clients = PeriodClients.objects.select_related('cashbox_type').filter(
+        cashbox_type__shop_id=shop_id
+    )
+    period_products = PeriodProducts.objects.select_related('cashbox_type').filter(
+        cashbox_type__shop_id=shop_id
+    )
+    period_queues = PeriodQueue.objects.select_related('cashbox_type').filter(
         cashbox_type__shop_id=shop_id
     )
 
     if len(cashbox_type_ids) > 0:
-        period_demand = [x for x in period_demand if x.cashbox_type_id in cashbox_type_ids]
+        period_clients = [x for x in period_clients if x.cashbox_type_id in cashbox_type_ids]
+        period_products = [x for x in period_products if x.cashbox_type_id in cashbox_type_ids]
+        period_queues = [x for x in period_queues if x.cashbox_type_id in cashbox_type_ids]
 
-    tmp = {}
-    for x in period_demand:
-        dt = x.dttm_forecast.date()
-        if dt not in tmp:
-            tmp[dt] = {}
-
-        tm = x.dttm_forecast.time()
-        if tm not in tmp[dt]:
-            tmp[dt][tm] = []
-
-        tmp[dt][tm].append(x)
-    period_demand = tmp
+    period_clients = _create_demands_dict(period_clients)
+    period_products = _create_demands_dict(period_products)
+    period_queues = _create_demands_dict(period_queues)
 
     dttm_from = datetime.combine(form['from_dt'], time())
     dttm_to = datetime.combine(form['to_dt'], time()) + timedelta(days=1)
     dttm_step = timedelta(minutes=30)
 
-    forecast_periods = {x: [] for x in PeriodDemand.Type.values() if x in data_types}
+    forecast_periods = {x: [] for x in PeriodClients.FORECAST_TYPES}
 
     for forecast_type, forecast_data in forecast_periods.items():
         for dttm in range_u(dttm_from, dttm_to, dttm_step, False):
             clients = 0
             products = 0
-            queue_wait_time = 0
             queue_wait_length = 0
 
-            for x in period_demand.get(dttm.date(), {}).get(dttm.time(), []):
+            for x in period_clients.get(dttm.date(), {}).get(dttm.time(), []):
                 if x.type != forecast_type:
                     continue
-
-                if len(cashbox_type_ids) > 0 and x.cashbox_type_id not in cashbox_type_ids:
-                    continue
-
                 clients += x.clients
+            for x in period_products.get(dttm.date(), {}).get(dttm.time(), []):
+                if x.type != forecast_type:
+                    continue
                 products += x.products
-                queue_wait_time += x.queue_wait_time
+            for x in period_queues.get(dttm.date(), {}).get(dttm.time(), []):
+                if x.type != forecast_type:
+                    continue
                 queue_wait_length += x.queue_wait_length
 
             forecast_data.append({
                 'dttm': BaseConverter.convert_datetime(dttm),
-                'B': clients,
-                'C': products,
-                'L': queue_wait_length,
-                'T': queue_wait_time
+                'clients': clients,
+                'products': products,
+                'queue': queue_wait_length
             })
 
     period_demand_change_log = PeriodDemandChangeLog.objects.select_related(
@@ -217,7 +226,7 @@ def get_forecast(request, form):
 
     response = {
         'period_step': 30,
-        'forecast_periods': {PeriodDemandConverter.convert_forecast_type(k): v for k, v in forecast_periods.items()},
+        'forecast_periods': {k: v for k, v in forecast_periods.items()},
         'demand_changes': [PeriodDemandChangeLogConverter.convert(x) for x in period_demand_change_log]
     }
 
@@ -254,20 +263,20 @@ def set_demand(request, form):
 
     shop_id = FormUtil.get_shop_id(request, form)
 
-    period_demands = PeriodDemand.objects.select_related(
+    period_clients = PeriodClients.objects.select_related(
         'cashbox_type'
     ).filter(
         cashbox_type__shop_id=shop_id,
-        type=PeriodDemand.Type.LONG_FORECAST.value,
+        type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__gte=dttm_from,
         dttm_forecast__lte=dttm_to
     )
 
     if len(cashbox_type_ids) > 0:
-        period_demands = [x for x in period_demands if period_demands.cashbox_type_id in cashbox_type_ids]
+        period_clients = [x for x in period_clients if period_clients.cashbox_type_id in cashbox_type_ids]
 
     cashboxes_types = []
-    for x in period_demands:
+    for x in period_clients:
         if multiply_coef is not None:
             x.clients *= multiply_coef
         else:

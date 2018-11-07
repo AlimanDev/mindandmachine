@@ -9,7 +9,7 @@ from src.util import forms as util_forms
 class GetIndicatorsForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
-    type = util_forms.PeriodDemandForecastType()
+    type = forms.CharField(max_length=1)
     shop_id = forms.IntegerField(required=False)
 
 

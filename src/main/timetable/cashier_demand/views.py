@@ -396,20 +396,6 @@ def get_cashiers_timetable(request, form):
     max_of_cashiers_lack_morning = max(cashiers_lack_on_period_morning)
     max_of_cashiers_lack_evening = max(cashiers_lack_on_period_evening)
 
-    # total_lack_of_cashiers_on_period_demand = 0  # on all cashboxes types
-    # if period_demand:
-    #     prev_one_period_demand = period_demand[0]  # for first iteration
-    #     for one_period_demand in period_demand:
-    #         if one_period_demand.dttm_forecast == prev_one_period_demand.dttm_forecast:
-    #             total_lack_of_cashiers_on_period_demand += one_period_demand.lack_of_cashiers
-    #         else:
-    #             lack_of_cashiers_on_period.append({
-    #                 'lack_of_cashiers': total_lack_of_cashiers_on_period_demand,
-    #                 'dttm_start': str(one_period_demand.dttm_forecast),
-    #             })
-    #             total_lack_of_cashiers_on_period_demand = one_period_demand.lack_of_cashiers
-    #         prev_one_period_demand = one_period_demand
-
     changed_amount = WorkerDay.objects.select_related('worker').filter(
         dt__gte=form['from_dt'],
         dt__lte=form['to_dt'],
