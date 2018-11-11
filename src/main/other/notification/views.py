@@ -11,7 +11,7 @@ def get_notifications(request, form):
 
     Args:
         method: GET
-        url: /api/other/notification/get_notifications
+        url: /api/other/notifications/get_notifications
         pointer(int): required = False. Начиная с каких уведомлений получать (id меньше pointer'a)
         count(int): required = True. Сколько уведомлений мы хотим получить
 
@@ -60,7 +60,7 @@ def set_notifications_read(request, form):
 
     Args:
         method: POST
-        url: /api/other/notification/set_notifications_read
+        url: /api/other/notifications/set_notifications_read
         ids(list): список уведомлений, которые сделать прочитанными (либо [] -- для всех)
 
     Returns:

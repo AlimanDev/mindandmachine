@@ -623,21 +623,34 @@ class WorkerDayCashboxDetails(models.Model):
 
 
 class WorkerDayChangeRequest(models.Model):
+    def __str__(self):
+        return '{}, {}, {}'.format(self.worker.id, self.dt, self.status_type)
+
+    class Meta(object):
+        unique_together = ('worker', 'dt')
+
+    TYPE_APPROVED = 'A'
+    TYPE_DECLINED = 'D'
+    TYPE_PENDING = 'P'
+
+    STATUS_CHOICES = (
+        (TYPE_APPROVED, 'Approved'),
+        (TYPE_DECLINED, 'Declined'),
+        (TYPE_PENDING, 'Pending'),
+    )
+
     id = models.BigAutoField(primary_key=True)
-
     dttm_added = models.DateTimeField(auto_now_add=True)
+    status_type = models.CharField(max_length=1, choices=STATUS_CHOICES, default=TYPE_PENDING)
 
-    worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
-
-    # extra fields for SQL SELECT performance
-    worker_day_dt = models.DateField()
-    worker_day_worker = models.ForeignKey(User, on_delete=models.PROTECT, related_name='+')
-
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
+    dt = models.DateField()
     type = utils.EnumField(WorkerDay.Type)
 
-    tm_work_start = models.TimeField(null=True, blank=True)
-    tm_work_end = models.TimeField(null=True, blank=True)
+    dttm_work_start = models.DateTimeField(null=True, blank=True)
+    dttm_work_end = models.DateTimeField(null=True, blank=True)
     tm_break_start = models.TimeField(null=True, blank=True)
+    wish_text = models.CharField(null=True, blank=True, max_length=512)
 
 
 class Notifications(models.Model):

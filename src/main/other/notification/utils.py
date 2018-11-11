@@ -5,9 +5,19 @@ from src.db.models import (
     CashboxType,
     Cashbox,
     User,
-    Timetable
+    Timetable,
+    WorkerDayChangeRequest,
+    WorkerDay
 )
 from django.db.models import Q
+from django.contrib.contenttypes.models import ContentType
+
+work_types = {
+    WorkerDay.Type.TYPE_WORKDAY.value: 'рабочий день',
+    WorkerDay.Type.TYPE_ABSENSE.value: 'отсутствие',
+    WorkerDay.Type.TYPE_HOLIDAY.value: 'выходной',
+    WorkerDay.Type.TYPE_VACATION.value: 'отпуск',
+}
 
 
 def get_month_name(dt):
@@ -64,13 +74,29 @@ def create_notification(action, instance):
             notification_text = 'Был добавлен тип касс {}.'.format(instance.name)
         elif isinstance(instance, Timetable):
             if instance.status == Timetable.Status.PROCESSING.value:
-                    notification_text = 'Расписание на ' + get_month_name(instance.dt) + ' начало составляться.'
+                notification_text = 'Расписание на ' + get_month_name(instance.dt) + ' начало составляться.'
             elif instance.status == Timetable.Status.READY.value:
                 notification_text = 'Расписание на ' + get_month_name(instance.dt) + ' составлено.'
                 notification_type = Notifications.TYPE_SUCCESS
             elif instance.status == Timetable.Status.ERROR.value:
                 notification_text = 'Ошибка при составлении расписания на ' + get_month_name(instance.dt) + '.'
                 notification_type = Notifications.TYPE_ERROR
+
+        elif isinstance(instance, WorkerDayChangeRequest):
+            change_request_info = ''
+            if instance.type == WorkerDay.Type.TYPE_WORKDAY.value:
+                change_request_info = ' с {} по {}'.format(
+                    instance.dttm_work_start.strftime('%H:%M'),
+                    instance.dttm_work_end.strftime('%H:%M')
+                )
+            if len(instance.wish_text) > 0:
+                change_request_info += '. Текст пожелания: ' + instance.wish_text
+            notification_text = 'Пользователь {} {} запросил изменение рабочего дня на {}: {}'.format(
+                instance.worker.first_name,
+                instance.worker.last_name,
+                instance.dt.strftime('%d.%m.%Y'),
+                work_types[instance.type]
+            ) + change_request_info
 
     elif action is 'D':
         if isinstance(instance, User) and instance.dt_fired:
@@ -99,28 +125,37 @@ def send_notification(action, instance, recipient_list=None, sender=None):
 
     """
     notification_text, notification_type = create_notification(action, instance)
+    additional_args = {}
+    if isinstance(instance, Cashbox):
+        shop_id = instance.type.shop.id
+    elif isinstance(instance, WorkerDayChangeRequest):
+        shop_id = instance.worker.shop.id
+        additional_args['object_id'] = instance.id
+        additional_args['content_type'] = ContentType.objects.get(model=WorkerDayChangeRequest.__name__.lower())
+    else:
+        shop_id = instance.shop.id
 
-    shop_id = instance.type.shop.id if isinstance(instance, Cashbox) else instance.shop.id
     if recipient_list is None:
         recipient_list = User.objects.filter(
             Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER),
             shop_id=shop_id
         )
+
     elif not isinstance(recipient_list, list):
         recipient_list = [recipient_list]
     for recipient in recipient_list:
         if not Notifications.objects.filter(
-                type=notification_type,
-                to_worker=recipient,
-                text=notification_text,
-                dttm_added__lt=now() + timedelta(hours=2, minutes=30)
-                # нет смысла слать уведомления больше чем раз в полчаса
+            type=notification_type,
+            to_worker=recipient,
+            text=notification_text,
+            dttm_added__lt=now() + timedelta(hours=2, minutes=30)
+            # нет смысла слать уведомления больше чем раз в полчаса
         ):
             created_note = Notifications.objects.create(
                 type=notification_type,
                 to_worker=recipient,
                 text=notification_text,
-
+                **additional_args
             )
             if sender and sender == recipient:
                 created_note.was_read = True

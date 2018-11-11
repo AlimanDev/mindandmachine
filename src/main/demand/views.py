@@ -107,21 +107,17 @@ def get_indicators(request, form):
     def __div_safe(__a, __b):
         return __a / __b if __b > 0 else None
     return JsonResponse.success({
-        'mean_bills': __div_safe(clients, workers_count),
-        'mean_codes': __div_safe(products, workers_count),
-        'mean_income': None,
-        'mean_bill_codes': __div_safe(products, clients),
-
-        'mean_hour_bills': __div_safe(clients, mean_hour_count),
-        'mean_hour_codes': __div_safe(products, mean_hour_count),
-        'mean_hour_income': None,
-
-        'growth': growth,
-
-        'total_people': None,
         'total_bills': clients,
         'total_codes': products,
-        'total_income': None
+        'total_income': None,
+        'mean_bill_codes': __div_safe(products, clients),
+        'growth': growth,
+        'total_people': None,
+
+        # 'mean_bills': __div_safe(clients, workers_count),
+        # 'mean_codes': __div_safe(products, workers_count),
+        # 'mean_hour_bills': __div_safe(clients, mean_hour_count),
+        # 'mean_hour_codes': __div_safe(products, mean_hour_count),
     })
 
 
