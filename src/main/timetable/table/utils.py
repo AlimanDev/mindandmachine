@@ -12,14 +12,6 @@ from django.db.models.functions import Coalesce
 
 from src.util.models_converter import WorkerDayConverter
 
-# import time as time2
-# def check_time(t=None):
-#     t2 = time2.time()
-#     if t:
-#         # print(t2 - t)
-#         pass
-#     return t2
-
 
 def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
     """

@@ -443,13 +443,10 @@ def delete_timetable(request, form):
     tts.delete()
 
     WorkerDayChangeRequest.objects.select_related('worker_day', 'worker_day__worker').filter(
-        worker_day__worker__shop_id=shop_id,
-        worker_day__dt__month=dt_from.month,
-        worker_day__dt__year=dt_from.year,
-        worker_day__worker__auto_timetable=True,
-    ).filter(
-        Q(worker_day__is_manual_tuning=False) |
-        Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
+        worker__shop_id=shop_id,
+        dt__month=dt_from.month,
+        dt__year=dt_from.year,
+        worker__auto_timetable=True,
     ).delete()
 
     WorkerDayCashboxDetails.objects.select_related('worker_day', 'worker_day__worker').filter(
@@ -471,11 +468,6 @@ def delete_timetable(request, form):
         Q(is_manual_tuning=False) |
         Q(type=WorkerDay.Type.TYPE_EMPTY.value)
     ).delete()
-
-    # if count > 1:
-    #     return JsonResponse.internal_error(msg='too much deleted')
-    # elif count == 0:
-    #     return JsonResponse.does_not_exists_error()
 
     return JsonResponse.success()
 

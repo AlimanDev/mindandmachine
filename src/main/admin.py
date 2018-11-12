@@ -5,7 +5,7 @@ from src.db.models import (
     SuperShop,
     Shop,
     WorkerDay,
-    PeriodDemand,
+    PeriodClients,
     PeriodDemandChangeLog,
     CashboxType,
     Cashbox,
@@ -18,7 +18,6 @@ from src.db.models import (
     WorkerConstraint,
     Timetable,
     ProductionDay,
-    ProductionMonth,
     WorkerMonthStat,
     CameraCashboxStat,
     CameraCashbox,
@@ -161,18 +160,18 @@ class CashboxAdmin(admin.ModelAdmin):
         return instance.type.shop.super_shop.title
 
 
-@admin.register(PeriodDemand)
-class PeriodDemandAdmin(admin.ModelAdmin):
-    list_display = ('cashbox_type_name', 'shop_title', 'dttm_forecast', 'type', 'id')
+@admin.register(PeriodClients)
+class PeriodClientsAdmin(admin.ModelAdmin):
+    list_display = ('cashbox_type_name', 'shop_title', 'clients', 'dttm_forecast', 'type', 'id')
     search_fields = ('cashbox_type__name', 'cashbox_type__shop__title', 'id')
     list_filter = ('cashbox_type__shop', )
 
     @staticmethod
-    def cashbox_type_name(instance: PeriodDemand):
+    def cashbox_type_name(instance: PeriodClients):
         return instance.cashbox_type.name
 
     @staticmethod
-    def shop_title(instance: PeriodDemand):
+    def shop_title(instance: PeriodClients):
         return instance.cashbox_type.shop.title
 
 

@@ -8,7 +8,8 @@ from ..models import (
     SuperShop,
     Shop,
     User,
-    PeriodDemand,
+    PeriodClients,
+    PeriodQueue,
     WorkerDay,
     WorkerConstraint,
     WorkerDayCashboxDetails,
@@ -52,17 +53,30 @@ def create_work_types(work_types, shop):
 
 
 def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datetime.date, days: int):
-    _models = []
-    def add_models(model):
+    clients_models = []
+    queues_models = []
+
+    def add_queues_models(model):
         if model is None:
             create = True
         else:
-            _models.append(model)
-            create = len(_models) == 1000
+            queues_models.append(model)
+            create = len(queues_models) == 1000
 
         if create:
-            PeriodDemand.objects.bulk_create(_models)
-            _models[:] = []
+            PeriodQueue.objects.bulk_create(queues_models)
+            queues_models[:] = []
+
+    def add_clients_models(model):
+        if model is None:
+            create = True
+        else:
+            clients_models.append(model)
+            create = len(clients_models) == 1000
+
+        if create:
+            PeriodClients.objects.bulk_create(clients_models)
+            clients_models[:] = []
 
     dttm_format = '%H:%M:%S %d.%m.%Y'
     df = pd.DataFrame(demand)
@@ -78,11 +92,16 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datet
         wt_df_index = 0
         while day < days:
             item = wt_df.iloc[wt_df_index]
-            add_models(PeriodDemand(
-                clients=item['clients'] * (1 + (np.random.rand() - 0.5) / 10),
+            add_queues_models(PeriodQueue(
                 queue_wait_length=item['clients'] * (1 + (np.random.rand() - 0.5) / 5) / 50,
                 dttm_forecast=item['dttm_forecast'] + dt_diff,
-                type=PeriodDemand.Type.LONG_FORECAST.value,
+                type=PeriodQueue.LONG_FORECASE_TYPE,
+                cashbox_type=wt,
+            ))
+            add_clients_models(PeriodClients(
+                clients=item['clients'] * (1 + (np.random.rand() - 0.5) / 10),
+                dttm_forecast=item['dttm_forecast'] + dt_diff,
+                type=PeriodClients.LONG_FORECASE_TYPE,
                 cashbox_type=wt,
             ))
             wt_df_index = (wt_df_index + 1) % wt_df.shape[0]
@@ -92,7 +111,8 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datet
 
             if wt_df_index == 0:
                 dt_diff = start_dt - wt_df.iloc[0]['dttm_forecast'].date() + timezone.timedelta(days=day + 1)
-    add_models(None) # send query to db
+    add_queues_models(None)
+    add_clients_models(None)  # send query to db
 
 
 def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_size):
