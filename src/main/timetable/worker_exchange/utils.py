@@ -36,7 +36,7 @@ from src.db.models import (
     WorkerCashboxInfo,
     WorkerConstraint,
     User,
-    PeriodDemand
+    PeriodClients,
 )
 
 from django.db.models import Q
@@ -95,11 +95,11 @@ def get_init_params(dttm_exchange, shop_id):
         group_key=lambda x: x.id
     )
 
-    predict_demand = PeriodDemand.objects.filter(
+    predict_demand = PeriodClients.objects.filter(
         cashbox_type__shop_id=shop_id,
         dttm_forecast__gte=day_begin_dttm,
         dttm_forecast__lte=day_end_dttm,
-        type=PeriodDemand.Type.LONG_FORECAST.value,
+        type=PeriodClients.LONG_FORECASE_TYPE,
         cashbox_type_id__in=list(cashbox_types_dict.keys())
     ).order_by(
         'type',

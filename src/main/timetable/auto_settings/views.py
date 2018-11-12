@@ -12,7 +12,7 @@ from src.db.models import (
     Timetable,
     User,
     CashboxType,
-    PeriodDemand,
+    PeriodClients,
     WorkerConstraint,
     WorkerCashboxInfo,
     WorkerDay,
@@ -33,6 +33,7 @@ from src.util.models_converter import (
     WorkerCashboxInfoConverter,
     WorkerDayConverter,
     BaseConverter,
+    PeriodClientsConverter,
 )
 from src.util.utils import api_method, JsonResponse
 from .forms import (
@@ -43,7 +44,6 @@ from .forms import (
     SetTimetableForm,
 )
 import requests
-from .utils import time2int
 from ..table.utils import count_difference_of_normal_days
 from src.main.other.notification.utils import send_notification
 
@@ -165,9 +165,9 @@ def create_timetable(request, form):
                           ((dt_to - dt_from).days + 1)
     cashboxes = CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD)
     for cashbox in cashboxes:
-        periods = PeriodDemand.objects.filter(
+        periods = PeriodClients.objects.filter(
             cashbox_type=cashbox,
-            type=PeriodDemand.Type.LONG_FORECAST.value,
+            type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lt=dt_to + timedelta(days=1),
         ).exclude(
@@ -184,11 +184,11 @@ def create_timetable(request, form):
         tt.delete()
         return JsonResponse.value_error(status_message)
 
-    periods = PeriodDemand.objects.select_related(
+    periods = PeriodClients.objects.select_related(
         'cashbox_type'
     ).filter(
         cashbox_type__shop_id=shop_id,
-        type=PeriodDemand.Type.LONG_FORECAST.value,
+        type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to,
     ).exclude(
@@ -342,7 +342,7 @@ def create_timetable(request, form):
 
 
     cashboxes_dict = {cb['id']: cb for cb in cashboxes}
-    demands = [PeriodDemandConverter.convert(x) for x in periods]
+    demands = [PeriodClientsConverter.convert(x) for x in periods]
     for demand in demands:
         demand['clients'] = demand['clients'] / mean_bills_per_step[demand['cashbox_type']] / cashboxes_dict[demand['cashbox_type']]['speed_coef']
         if cashboxes_dict[demand['cashbox_type']]['do_forecast'] == CashboxType.FORECAST_LITE:

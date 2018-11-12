@@ -13,7 +13,7 @@ from src.db.models import (
     WorkerCashboxInfo,
     WorkerDay,
     WorkerDayCashboxDetails,
-    PeriodDemand,
+    PeriodClients,
     CashboxType,
     Shop
 )
@@ -304,7 +304,7 @@ def get_table(request, form):
         # write stats
         row = 3
         col = 13
-        predictions = PeriodDemand.objects.filter(
+        predictions = PeriodClients.objects.filter(
             dttm_forecast__range=(
                 datetime.datetime.combine(weekday, datetime.time()),
                 datetime.datetime.combine(weekday, datetime.time(hour=23, minute=59))

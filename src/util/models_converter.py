@@ -1,6 +1,6 @@
 import datetime
 
-from src.db.models import User, WorkerDay, PeriodDemand, Timetable, Notifications, CashboxType
+from src.db.models import User, WorkerDay, Timetable, CashboxType
 from src.conf.djconfig import (
     QOS_DATE_FORMAT,
     QOS_DATETIME_FORMAT,
@@ -237,6 +237,18 @@ class WorkerConstraintConverter(BaseConverter):
             'worker': obj.worker_id,
             'weekday': obj.weekday,
             'tm': cls.convert_time(obj.tm)
+        }
+
+
+class PeriodClientsConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'dttm_forecast': cls.convert_datetime(obj.dttm_forecast),
+            'clients': obj.clients,
+            'type': obj.type,
+            'cashbox_type': obj.cashbox_type_id
         }
 
 
