@@ -9,7 +9,12 @@ from src.db.models import (
 )
 from src.util.forms import FormUtil
 from src.util.utils import api_method, JsonResponse
-from .forms import GetTimeDistributionForm, GetIndicatorsForm, GetParametersForm, SetParametersForm
+from .forms import (
+    GetTimeDistributionForm,
+    GetIndicatorsForm,
+    GetParametersForm,
+    SetParametersForm,
+)
 
 
 @api_method('GET', GetIndicatorsForm)

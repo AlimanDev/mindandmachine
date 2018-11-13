@@ -29,4 +29,3 @@ class SetParametersForm(forms.Form):
     mean_queue_length = forms.FloatField()
     max_queue_length = forms.FloatField()
     dead_time_part = forms.FloatField()
-

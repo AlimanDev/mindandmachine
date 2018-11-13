@@ -403,6 +403,9 @@ class PeriodDemand(models.Model):
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
 
+# Ахтунг. Если что-то добавлять в эти классы, сделать так, чтобы PeriodЧеТо._meta.get_fields()[-1] возвращал
+# именно clients, products, queues, иначе упадет get_demand_xlsx
+# или короче говоря, если добавлять сюда поля, сделать так, чтобы они объявлялись ДО(а не после!) описанных выше полей
 class PeriodClients(PeriodDemand):
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.clients)
