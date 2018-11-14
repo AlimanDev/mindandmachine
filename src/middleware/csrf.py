@@ -13,8 +13,7 @@ class CsrfMiddleware(DjangoCsrfViewMiddleware):
             return
 
         request.is_mobile = False
-
-        if "Expo" in request.META['HTTP_USER_AGENT'] or "okhttp/3.6.0" in request.META['HTTP_USER_AGENT']:
+        if "Expo" in request.META.get('HTTP_USER_AGENT', '') or "okhttp/3.6.0" in request.META.get('HTTP_USER_AGENT', ''):
             request.is_mobile = True
             return
 
