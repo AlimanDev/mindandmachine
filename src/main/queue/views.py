@@ -2,7 +2,7 @@ from datetime import timedelta, datetime, time
 
 from src.db.models import (
     WaitTimeInfo,
-    PeriodQueue,
+    PeriodQueues,
     CashboxType,
     Shop,
     PeriodDemand
@@ -53,7 +53,7 @@ def get_indicators(request, form):
     except:
         return JsonResponse.internal_error('Cannot get linear cashbox')
 
-    period_queues = PeriodQueue.objects.filter(
+    period_queues = PeriodQueues.objects.filter(
         cashbox_type_id=linear_cashbox_type.id,
         type=forecast_type,
         dttm_forecast__gte=datetime.combine(dt_from, time()),
@@ -62,7 +62,7 @@ def get_indicators(request, form):
 
     queue_wait_length = 0
     for x in period_queues:
-        queue_wait_length += x.queue_wait_length
+        queue_wait_length += x.value
 
     mean_length_usual = queue_wait_length / len(period_queues) if len(period_queues) > 0 else None
     mean_wait_time_usual = None

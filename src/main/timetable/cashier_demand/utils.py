@@ -99,7 +99,7 @@ def count_diff(dttm, period_clients, demand_ind, mean_bills_per_step, cashbox_ty
             if (ind < dem_len) and (period_clients[ind].dttm_forecast == dttm):
                 ct_id = period_clients[ind].cashbox_type_id
                 if ct_id in cashbox_types.keys():
-                    need_amount_dict[ct_id] = period_clients[ind].clients / cashbox_types[ct_id][0].speed_coef \
+                    need_amount_dict[ct_id] = period_clients[ind].value / cashbox_types[ct_id][0].speed_coef \
                                / (PERIOD_MINUTES / mean_bills_per_step[ct_id])
 
     return need_amount_dict, demand_ind

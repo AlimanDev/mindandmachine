@@ -4,16 +4,18 @@ from django.apps import apps
 from src.db.models import (
     PeriodClients,
     PeriodProducts,
-    PeriodQueue,
+    PeriodQueues,
     CashboxType,
     PeriodDemandChangeLog,
-    Shop
+    Shop,
+    User,
 )
 from dateutil.relativedelta import relativedelta
+from django.http.response import HttpResponse
+from django.db.models import Sum
 from src.util.collection import range_u
 from src.util.models_converter import BaseConverter, PeriodDemandChangeLogConverter
-from src.util.utils import api_method, JsonResponse
-from src.main.download.utils import xlsx_method
+from src.util.utils import api_method, JsonResponse, get_uploaded_file
 from .forms import (
     GetForecastForm,
     SetDemandForm,
@@ -21,7 +23,7 @@ from .forms import (
     SetPredictBillsForm,
     CreatePredictBillsRequestForm,
     GetDemandChangeLogsForm,
-    GetDemandXlsxForm,
+    UploadDemandForm,
 )
 from .utils import create_predbills_request_function, set_pred_bills_function
 from django.views.decorators.csrf import csrf_exempt
@@ -61,7 +63,6 @@ def get_indicators(request, form):
     """
     dt_from = form['from_dt']
     dt_to = form['to_dt']
-    dt_days_count = (dt_to - dt_from).days + 1
 
     forecast_type = form['type']
 
@@ -75,57 +76,32 @@ def get_indicators(request, form):
         'dttm_forecast__lt': datetime.combine(dt_to, time()) + timedelta(days=1)
     }
 
-    # worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
-    #     worker__shop_id=shop_id,
-    #     type=WorkerDay.Type.TYPE_WORKDAY.value,
-    #     dt__gte=dt_from,
-    #     dt__lte=dt_to,
-    # )
-    # workers_count = len(set([x.worker_id for x in worker_days]))
+    clients = PeriodClients.objects.select_related('cashbox_type').filter(**period_filter_dict).aggregate(Sum('value'))['value__sum']
+    products = PeriodProducts.objects.select_related('cashbox_type').filter(**period_filter_dict).aggregate(Sum('value'))['value__sum']
 
-    clients = 0
-    products = 0
-
-    for x in PeriodProducts.objects.select_related('cashbox_type').filter(**period_filter_dict):
-        products += x.products
-
-    for x in PeriodClients.objects.select_related('cashbox_type').filter(**period_filter_dict):
-        clients += x.clients
-
-    prev_period_clients = PeriodClients.objects.select_related(
+    prev_clients = PeriodClients.objects.select_related(
         'cashbox_type'
     ).filter(
         cashbox_type__shop_id=shop_id,
         type=forecast_type,
         dttm_forecast__gte=datetime.combine(dt_from, time()) - timedelta(days=30),
         dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1) - timedelta(days=30)
-    )
+    ).aggregate(Sum('value'))['value__sum']
 
-    prev_clients = 0
-    for x in prev_period_clients:
-        prev_clients += x.clients
-
-    if prev_clients != 0:
+    if prev_clients and prev_clients != 0:
         growth = (clients - prev_clients) / prev_clients * 100
     else:
         growth = None
 
-    # mean_hour_count = dt_days_count * 17
-
     def __div_safe(__a, __b):
-        return __a / __b if __b > 0 else None
+        return __a / __b if (__b > 0 and __b and __a) else None
     return JsonResponse.success({
-        'total_bills': clients,
-        'total_codes': products,
+        'total_bills': clients if clients else 0,  # может вернуть None
+        'total_codes': products if products else 0,  # аналогично
         'total_income': None,
         'mean_bill_codes': __div_safe(products, clients),
         'growth': growth,
         'total_people': None,
-
-        # 'mean_bills': __div_safe(clients, workers_count),
-        # 'mean_codes': __div_safe(products, workers_count),
-        # 'mean_hour_bills': __div_safe(clients, mean_hour_count),
-        # 'mean_hour_codes': __div_safe(products, mean_hour_count),
     })
 
 
@@ -173,7 +149,7 @@ def get_forecast(request, form):
     period_products = PeriodProducts.objects.select_related('cashbox_type').filter(
         cashbox_type__shop_id=shop_id
     )
-    period_queues = PeriodQueue.objects.select_related('cashbox_type').filter(
+    period_queues = PeriodQueues.objects.select_related('cashbox_type').filter(
         cashbox_type__shop_id=shop_id
     )
 
@@ -201,15 +177,15 @@ def get_forecast(request, form):
             for x in period_clients.get(dttm.date(), {}).get(dttm.time(), []):
                 if x.type != forecast_type:
                     continue
-                clients += x.clients
+                clients += x.value
             for x in period_products.get(dttm.date(), {}).get(dttm.time(), []):
                 if x.type != forecast_type:
                     continue
-                products += x.products
+                products += x.value
             for x in period_queues.get(dttm.date(), {}).get(dttm.time(), []):
                 if x.type != forecast_type:
                     continue
-                queue_wait_length += x.queue_wait_length
+                queue_wait_length += x.value
 
             forecast_data.append({
                 'dttm': BaseConverter.convert_datetime(dttm),
@@ -281,9 +257,9 @@ def set_demand(request, form):
     cashboxes_types = []
     for x in period_clients:
         if multiply_coef is not None:
-            x.clients *= multiply_coef
+            x.value *= multiply_coef
         else:
-            x.clients = set_value
+            x.value = set_value
 
         x.save()
         cashboxes_types.append(x.cashbox_type_id)
@@ -343,71 +319,18 @@ def get_demand_change_logs(request, form):
 
 
 @api_method(
-    'GET',
-    GetDemandXlsxForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    'POST',
+    UploadDemandForm,
+    groups=[User.GROUP_SUPERVISOR, User.GROUP_SUPERVISOR]
 )
-@xlsx_method
-def get_demand_xlsx(request, workbook, form):
-    """
-    Скачивает спрос по "клиентам" в эксель формате
+def upload_demand(request, form):
+    demand_file = get_uploaded_file(request)
+    if isinstance(demand_file, HttpResponse):
+        return demand_file
 
-    Args:
-        method: GET
-        url: /api/demand/get_clients_xlsx
-        from_dt(QOS_DATE): с какой даты скачивать
-        to_dt(QOS_DATE): по какую дату скачивать
-        shop_id(int): в каком магазине
-        demand_model(char): !! attention !! передавать что-то из clients/queue/products (см. окончание моделей Period..)
+    print(type(demand_file))
 
-    Returns:
-        эксель файл с форматом Тип работ | Время | Значение
-    """
-    def filter_over_model(model):
-        filter_dict = {
-            'cashbox_type__shop_id': form['shop_id'],
-            'dttm_forecast__date__gte': from_dt,
-            'dttm_forecast__date__lte': to_dt,
-        }
-        period_demands = model.objects.filter(
-            type=PeriodClients.LONG_FORECASE_TYPE,
-            **filter_dict
-        )
-        period_demands_fact = model.objects.filter(
-            type=PeriodClients.FACT_TYPE,
-            **filter_dict
-        )
-        return period_demands, period_demands_fact
-
-    from_dt = form['from_dt']
-    to_dt = form['to_dt']
-
-    worksheet = workbook.add_worksheet('{}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d')))
-    worksheet.write(0, 0, 'Тип работ')
-    worksheet.write(0, 1, 'Время')
-    worksheet.write(0, 2, 'Значение(долгосрочный)')
-    worksheet.write(0, 3, 'Значение(фактический)')
-
-    try:
-        model = apps.get_model('db', 'period{}'.format(form['demand_model']))
-        field_name = model._meta.get_fields()[-1].name
-    except LookupError:
-        return JsonResponse.internal_error('incorrect demand model')
-
-    period_demands, period_demands_fact = filter_over_model(model)
-
-    for index, forecast_item in enumerate(period_demands):
-        fact_on_concrete_date = period_demands_fact.filter(
-            dttm_forecast=forecast_item.dttm_forecast,
-            cashbox_type=forecast_item.cashbox_type
-        ).first()
-
-        worksheet.write(index + 1, 0, forecast_item.cashbox_type.name)
-        worksheet.write(index + 1, 1, forecast_item.dttm_forecast.strftime('%H:%M:%S'))
-        worksheet.write(index + 1, 2, round(getattr(forecast_item, field_name), 1))
-        worksheet.write(index + 1, 3, round(getattr(forecast_item, field_name), 1) if fact_on_concrete_date else 'Нет данных')
-
-    return workbook, '{} {}-{}'.format(field_name, from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))
+    return JsonResponse.success()
 
 
 @api_method('POST', CreatePredictBillsRequestForm)

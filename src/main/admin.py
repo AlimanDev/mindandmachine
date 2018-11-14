@@ -162,7 +162,7 @@ class CashboxAdmin(admin.ModelAdmin):
 
 @admin.register(PeriodClients)
 class PeriodClientsAdmin(admin.ModelAdmin):
-    list_display = ('cashbox_type_name', 'shop_title', 'clients', 'dttm_forecast', 'type', 'id')
+    list_display = ('cashbox_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
     search_fields = ('cashbox_type__name', 'cashbox_type__shop__title', 'id')
     list_filter = ('cashbox_type__shop', )
 

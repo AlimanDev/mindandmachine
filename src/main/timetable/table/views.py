@@ -331,9 +331,9 @@ def get_table(request, form):
             result_prediction = 0
             for prediction in predicted:
                 if prediction.cashbox_type.is_main_type:
-                    result_prediction += prediction.clients / 14
+                    result_prediction += prediction.value / 14
                 else:
-                    result_prediction += prediction.clients / 4
+                    result_prediction += prediction.value / 4
             if tm_st_ad4 < tm < tm_end_ad4:
                 result_prediction += 4
             elif tm_st_ad2 < tm < tm_end_ad2:

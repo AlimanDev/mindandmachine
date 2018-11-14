@@ -246,7 +246,7 @@ class PeriodClientsConverter(BaseConverter):
         return {
             'id': obj.id,
             'dttm_forecast': cls.convert_datetime(obj.dttm_forecast),
-            'clients': obj.clients,
+            'clients': obj.value,
             'type': obj.type,
             'cashbox_type': obj.cashbox_type_id
         }

@@ -408,30 +408,30 @@ class PeriodDemand(models.Model):
 # или короче говоря, если добавлять сюда поля, сделать так, чтобы они объявлялись ДО(а не после!) описанных выше полей
 class PeriodClients(PeriodDemand):
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.clients)
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
 
-    clients = models.FloatField(default=0)
+    value = models.FloatField(default=0)
 
 
 class PeriodProducts(PeriodDemand):
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.products)
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
 
-    products = models.FloatField(default=0)
+    value = models.FloatField(default=0)
 
 
-class PeriodQueue(PeriodDemand):
+class PeriodQueues(PeriodDemand):
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.queue_wait_length)
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
 
-    queue_wait_length = models.FloatField(default=0)
+    value = models.FloatField(default=0)
 
 
 class PeriodVisitors(PeriodDemand):
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.visitors)
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
 
-    visitors = models.FloatField(default=0)
+    value = models.FloatField(default=0)
 
 
 class PeriodDemandChangeLog(models.Model):

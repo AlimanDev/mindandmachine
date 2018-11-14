@@ -340,8 +340,8 @@ def create_timetable(request, form):
     ).values('cashbox_type_id').annotate(speed_usual=Avg('mean_speed'))
     mean_bills_per_step = {m['cashbox_type_id']: 30 / m['speed_usual'] for m in mean_bills_per_step}
 
-
     cashboxes_dict = {cb['id']: cb for cb in cashboxes}
+
     demands = [PeriodClientsConverter.convert(x) for x in periods]
     for demand in demands:
         demand['clients'] = demand['clients'] / mean_bills_per_step[demand['cashbox_type']] / cashboxes_dict[demand['cashbox_type']]['speed_coef']

@@ -54,11 +54,8 @@ class GetDemandChangeLogsForm(forms.Form):
     shop_id = forms.IntegerField()
 
 
-class GetDemandXlsxForm(forms.Form):
-    from_dt = util_forms.DateField()
-    to_dt = util_forms.DateField()
+class UploadDemandForm(forms.Form):
     shop_id = forms.IntegerField()
-    demand_model = forms.CharField()
 
 
 class CreatePredictBillsRequestForm(forms.Form):

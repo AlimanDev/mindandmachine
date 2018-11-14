@@ -9,7 +9,7 @@ from ..models import (
     Shop,
     User,
     PeriodClients,
-    PeriodQueue,
+    PeriodQueues,
     WorkerDay,
     WorkerConstraint,
     WorkerDayCashboxDetails,
@@ -64,7 +64,7 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datet
             create = len(queues_models) == 1000
 
         if create:
-            PeriodQueue.objects.bulk_create(queues_models)
+            PeriodQueues.objects.bulk_create(queues_models)
             queues_models[:] = []
 
     def add_clients_models(model):
@@ -92,14 +92,14 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datet
         wt_df_index = 0
         while day < days:
             item = wt_df.iloc[wt_df_index]
-            add_queues_models(PeriodQueue(
-                queue_wait_length=item['clients'] * (1 + (np.random.rand() - 0.5) / 5) / 50,
+            add_queues_models(PeriodQueues(
+                value=item['clients'] * (1 + (np.random.rand() - 0.5) / 5) / 50,
                 dttm_forecast=item['dttm_forecast'] + dt_diff,
-                type=PeriodQueue.LONG_FORECASE_TYPE,
+                type=PeriodQueues.LONG_FORECASE_TYPE,
                 cashbox_type=wt,
             ))
             add_clients_models(PeriodClients(
-                clients=item['clients'] * (1 + (np.random.rand() - 0.5) / 10),
+                value=item['clients'] * (1 + (np.random.rand() - 0.5) / 10),
                 dttm_forecast=item['dttm_forecast'] + dt_diff,
                 type=PeriodClients.LONG_FORECASE_TYPE,
                 cashbox_type=wt,

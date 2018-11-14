@@ -2,6 +2,7 @@ import json
 
 from django.conf import settings
 from functools import wraps
+from src.conf.djconfig import ALLOWED_UPLOAD_EXTENSIONS
 from django.contrib.auth import authenticate, login
 from django.http import HttpResponse
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
@@ -242,3 +243,14 @@ def check_group_hierarchy(changed_user, user_who_changes):
     }
     if group_hierarchy[user_who_changes.group] <= group_hierarchy[changed_user.group]:
         return JsonResponse.access_forbidden('You are not allowed to edit this user')
+
+
+def get_uploaded_file(request):
+    file = request.FILES['file']
+
+    if not file:
+        return JsonResponse.value_error('Файл не был загружен.')
+    if not file.name.split('.', 1)[1] in ALLOWED_UPLOAD_EXTENSIONS:
+        return JsonResponse.value_error('Файлы с таким расширением не поддерживается.')
+
+    return file

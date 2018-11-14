@@ -152,7 +152,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(primary_key=True, serialize=False)),
                 ('dttm_forecast', models.DateTimeField()),
                 ('type', models.CharField(choices=[('L', 'Long'), ('S', 'Short'), ('F', 'Fact')], default='L', max_length=1)),
-                ('clients', models.FloatField(default=0)),
+                ('value', models.FloatField(default=0)),
                 ('cashbox_type', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='db.CashboxType')),
             ],
             options={
@@ -177,7 +177,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(primary_key=True, serialize=False)),
                 ('dttm_forecast', models.DateTimeField()),
                 ('type', models.CharField(choices=[('L', 'Long'), ('S', 'Short'), ('F', 'Fact')], default='L', max_length=1)),
-                ('products', models.FloatField(default=0)),
+                ('value', models.FloatField(default=0)),
                 ('cashbox_type', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='db.CashboxType')),
             ],
             options={
@@ -185,12 +185,12 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name='PeriodQueue',
+            name='PeriodQueues',
             fields=[
                 ('id', models.BigAutoField(primary_key=True, serialize=False)),
                 ('dttm_forecast', models.DateTimeField()),
                 ('type', models.CharField(choices=[('L', 'Long'), ('S', 'Short'), ('F', 'Fact')], default='L', max_length=1)),
-                ('queue_wait_length', models.FloatField(default=0)),
+                ('value', models.FloatField(default=0)),
                 ('cashbox_type', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='db.CashboxType')),
             ],
             options={
@@ -203,7 +203,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(primary_key=True, serialize=False)),
                 ('dttm_forecast', models.DateTimeField()),
                 ('type', models.CharField(choices=[('L', 'Long'), ('S', 'Short'), ('F', 'Fact')], default='L', max_length=1)),
-                ('visitors', models.FloatField(default=0)),
+                ('value', models.FloatField(default=0)),
                 ('cashbox_type', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='db.CashboxType')),
             ],
             options={

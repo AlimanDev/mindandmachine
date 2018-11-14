@@ -97,7 +97,7 @@ def create_predbills_request_function(shop_id, dt=None):
                 'CashType': period_demand.cashbox_type_id,
                 'products_amount': 0,
                 'positions': 0,
-                'bills': period_demand.clients,
+                'bills': period_demand.value,
                 'hours': period_demand.dttm_forecast.hour,
                 'period': 0 if period_demand.dttm_forecast.minute < 30 else 1,
                 'szDate': BaseConverter.convert_date(period_demand.dttm_forecast.date()),
@@ -143,7 +143,7 @@ def set_pred_bills_function(data, key):
     sloted_cashbox_types = CashboxType.objects.filter(do_forecast=CashboxType.FORECAST_LITE, shop=shop)
 
     for period_demand_value in data.values():
-        clients = period_demand_value['clients']
+        clients = period_demand_value['value']
         if clients < 0:
             clients = 0
         dttm_forecast = datetime.strptime(period_demand_value['datetime'], QOS_DATETIME_FORMAT)
@@ -153,7 +153,7 @@ def set_pred_bills_function(data, key):
             dttm_forecast=dttm_forecast,
             cashbox_type_id=cashbox_type_id,
             defaults={
-                'clients': clients
+                'value': clients
             }
         )
 
@@ -174,7 +174,7 @@ def set_pred_bills_function(data, key):
                     dttm_forecast=dttm_forecast,
                     cashbox_type=sloted_cashbox,
                     defaults={
-                        'clients': workers_needed
+                        'value': workers_needed
                     }
                 )
             except PeriodClients.MultipleObjectsReturned as exc:
