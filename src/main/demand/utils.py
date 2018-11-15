@@ -6,7 +6,7 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from src.conf.djconfig import QOS_DATETIME_FORMAT
 
-from src.db.models import PeriodDemand, CashboxType, Slot
+from src.db.models import PeriodClients, CashboxType, Slot
 from src.util.models_converter import BaseConverter
 from django.db.models import Sum
 from django.core.exceptions import EmptyResultSet, ImproperlyConfigured
@@ -69,18 +69,18 @@ def create_predbills_request_function(shop_id, dt=None):
 
     """
     if dt is None:
-        dt = (PeriodDemand.objects.all().order_by('dttm_forecast').last().dttm_forecast + timedelta(hours=7)).date()
+        dt = (PeriodClients.objects.all().order_by('dttm_forecast').last().dttm_forecast + timedelta(hours=7)).date()
     YEARS_TO_COLLECT = 3  # за последние YEARS_TO_COLLECT года
     from_dt_to_collect = dt - relativedelta(years=YEARS_TO_COLLECT)
 
-    period_demands = PeriodDemand.objects.select_related('cashbox_type').filter(
+    period_clients = PeriodClients.objects.select_related('cashbox_type').filter(
         cashbox_type__shop_id=shop_id,
-        type=PeriodDemand.Type.FACT.value,
+        type=PeriodClients.FACT_TYPE,
         dttm_forecast__gt=from_dt_to_collect,
         dttm_forecast__lt=dt
     )
 
-    if not period_demands:
+    if not period_clients:
         raise EmptyResultSet('There is no period demand objects')
 
     try:
@@ -97,11 +97,11 @@ def create_predbills_request_function(shop_id, dt=None):
                 'CashType': period_demand.cashbox_type_id,
                 'products_amount': 0,
                 'positions': 0,
-                'bills': period_demand.clients,
+                'bills': period_demand.value,
                 'hours': period_demand.dttm_forecast.hour,
                 'period': 0 if period_demand.dttm_forecast.minute < 30 else 1,
                 'szDate': BaseConverter.convert_date(period_demand.dttm_forecast.date()),
-            } for period_demand in period_demands
+            } for period_demand in period_clients
         ]
     }
 
@@ -141,20 +141,19 @@ def set_pred_bills_function(data, key):
     # костыль, но по-другому никак. берем первый пришедший cashbox_type_id и находим для какого магаза составлялся спрос
     shop = CashboxType.objects.get(id=list(data.values())[0]['CashType']).shop
     sloted_cashbox_types = CashboxType.objects.filter(do_forecast=CashboxType.FORECAST_LITE, shop=shop)
-    LONG_FORECAST = PeriodDemand.Type.LONG_FORECAST.value
 
     for period_demand_value in data.values():
-        clients = period_demand_value['clients']
+        clients = period_demand_value['value']
         if clients < 0:
             clients = 0
         dttm_forecast = datetime.strptime(period_demand_value['datetime'], QOS_DATETIME_FORMAT)
         cashbox_type_id = period_demand_value['CashType']
-        PeriodDemand.objects.update_or_create(
-            type=LONG_FORECAST,
+        PeriodClients.objects.update_or_create(
+            type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast=dttm_forecast,
             cashbox_type_id=cashbox_type_id,
             defaults={
-                'clients': clients
+                'value': clients
             }
         )
 
@@ -170,15 +169,15 @@ def set_pred_bills_function(data, key):
             if workers_needed is None:
                 workers_needed = 0
             try:
-                PeriodDemand.objects.update_or_create(
-                    type=LONG_FORECAST,
+                PeriodClients.objects.update_or_create(
+                    type=PeriodClients.LONG_FORECASE_TYPE,
                     dttm_forecast=dttm_forecast,
                     cashbox_type=sloted_cashbox,
                     defaults={
-                        'clients': workers_needed
+                        'value': workers_needed
                     }
                 )
-            except PeriodDemand.MultipleObjectsReturned as exc:
+            except PeriodClients.MultipleObjectsReturned as exc:
                 print(exc)
                 raise Exception('error upon creating period demands for sloted types')
 

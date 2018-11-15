@@ -384,36 +384,65 @@ class Cashbox(models.Model):
 
 
 class PeriodDemand(models.Model):
-    class Type(utils.Enum):
-        LONG_FORECAST = 1  # 60 day
-        SHORT_FORECAST = 2  # 10 day
-        FACT = 3  # real
+    LONG_FORECASE_TYPE = 'L'
+    SHORT_FORECAST_TYPE = 'S'
+    FACT_TYPE = 'F'
 
-    def __str__(self):
-        return '{}, {}, {}, {}, {}'.format(self.cashbox_type.name, self.cashbox_type.shop.title, self.dttm_forecast,
-                                           self.type, self.id)
+    FORECAST_TYPES = (
+        (LONG_FORECASE_TYPE, 'Long'),
+        (SHORT_FORECAST_TYPE, 'Short'),
+        (FACT_TYPE, 'Fact'),
+    )
+
+    class Meta:
+        abstract = True
 
     id = models.BigAutoField(primary_key=True)
-
     dttm_forecast = models.DateTimeField()
-    clients = models.FloatField()
-    products = models.FloatField(default=0)
-
-    type = utils.EnumField(Type)
+    type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
-    queue_wait_time = models.FloatField(default=0)  # in minutes
-    queue_wait_length = models.FloatField(default=0)
-    lack_of_cashiers = models.IntegerField(default=0)  # can be both pos and neg
+
+class PeriodClients(PeriodDemand):
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
+
+    value = models.FloatField(default=0)
+
+
+class PeriodProducts(PeriodDemand):
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
+
+    value = models.FloatField(default=0)
+
+
+class PeriodQueues(PeriodDemand):
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
+
+    value = models.FloatField(default=0)
+
+
+class PeriodVisitors(PeriodDemand):
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
+
+    value = models.FloatField(default=0)
 
 
 class PeriodDemandChangeLog(models.Model):
-    # FIXME: как относится к PeriodDemand?
     def __str__(self):
-        # return f'{self.cashbox_type.name}, {self.cashbox_type.shop.title}, {self.dttm_from}, {self.dttm_to}, {self.id}'
-        return '{}, {}, {}, {}, {}'.format(self.cashbox_type.name, self.cashbox_type.shop.title, self.dttm_from, self.dttm_to, self.id)
+        return '{}, {}, {}, {}, {}'.format(
+            self.cashbox_type.name,
+            self.cashbox_type.shop.title,
+            self.dttm_from,
+            self.dttm_to,
+            self.id
+        )
 
     id = models.BigAutoField(primary_key=True)
+    dttm_added = models.DateTimeField(auto_now_add=True)
 
     dttm_from = models.DateTimeField()
     dttm_to = models.DateTimeField()
@@ -715,7 +744,7 @@ class WaitTimeInfo(models.Model):
     cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
     wait_time = models.PositiveIntegerField()
     proportion = models.FloatField()
-    type = utils.EnumField(PeriodDemand.Type)
+    type = models.CharField(max_length=1, choices=PeriodDemand.FORECAST_TYPES)
 
 
 class Timetable(models.Model):

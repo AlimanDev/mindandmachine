@@ -12,7 +12,7 @@ from src.db.models import (
     Timetable,
     User,
     CashboxType,
-    PeriodDemand,
+    PeriodClients,
     WorkerConstraint,
     WorkerCashboxInfo,
     WorkerDay,
@@ -28,12 +28,12 @@ from src.util.forms import FormUtil
 from src.util.models_converter import (
     TimetableConverter,
     CashboxTypeConverter,
-    PeriodDemandConverter,
     UserConverter,
     WorkerConstraintConverter,
     WorkerCashboxInfoConverter,
     WorkerDayConverter,
     BaseConverter,
+    PeriodClientsConverter,
 )
 from src.util.utils import api_method, JsonResponse
 from .forms import (
@@ -44,7 +44,6 @@ from .forms import (
     SetTimetableForm,
 )
 import requests
-from .utils import time2int
 from ..table.utils import count_difference_of_normal_days
 from src.main.other.notification.utils import send_notification
 
@@ -166,9 +165,9 @@ def create_timetable(request, form):
                           ((dt_to - dt_from).days + 1)
     cashboxes = CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD)
     for cashbox in cashboxes:
-        periods = PeriodDemand.objects.filter(
+        periods = PeriodClients.objects.filter(
             cashbox_type=cashbox,
-            type=PeriodDemand.Type.LONG_FORECAST.value,
+            type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lt=dt_to + timedelta(days=1),
         ).exclude(
@@ -185,11 +184,11 @@ def create_timetable(request, form):
         tt.delete()
         return JsonResponse.value_error(status_message)
 
-    periods = PeriodDemand.objects.select_related(
+    periods = PeriodClients.objects.select_related(
         'cashbox_type'
     ).filter(
         cashbox_type__shop_id=shop_id,
-        type=PeriodDemand.Type.LONG_FORECAST.value,
+        type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to,
     ).exclude(
@@ -341,9 +340,9 @@ def create_timetable(request, form):
     ).values('cashbox_type_id').annotate(speed_usual=Avg('mean_speed'))
     mean_bills_per_step = {m['cashbox_type_id']: 30 / m['speed_usual'] for m in mean_bills_per_step}
 
-
     cashboxes_dict = {cb['id']: cb for cb in cashboxes}
-    demands = [PeriodDemandConverter.convert(x) for x in periods]
+
+    demands = [PeriodClientsConverter.convert(x) for x in periods]
     for demand in demands:
         demand['clients'] = demand['clients'] / mean_bills_per_step[demand['cashbox_type']] / cashboxes_dict[demand['cashbox_type']]['speed_coef']
         if cashboxes_dict[demand['cashbox_type']]['do_forecast'] == CashboxType.FORECAST_LITE:
@@ -444,13 +443,10 @@ def delete_timetable(request, form):
     tts.delete()
 
     WorkerDayChangeRequest.objects.select_related('worker_day', 'worker_day__worker').filter(
-        worker_day__worker__shop_id=shop_id,
-        worker_day__dt__month=dt_from.month,
-        worker_day__dt__year=dt_from.year,
-        worker_day__worker__auto_timetable=True,
-    ).filter(
-        Q(worker_day__is_manual_tuning=False) |
-        Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
+        worker__shop_id=shop_id,
+        dt__month=dt_from.month,
+        dt__year=dt_from.year,
+        worker__auto_timetable=True,
     ).delete()
 
     WorkerDayCashboxDetails.objects.select_related('worker_day', 'worker_day__worker').filter(
@@ -472,11 +468,6 @@ def delete_timetable(request, form):
         Q(is_manual_tuning=False) |
         Q(type=WorkerDay.Type.TYPE_EMPTY.value)
     ).delete()
-
-    # if count > 1:
-    #     return JsonResponse.internal_error(msg='too much deleted')
-    # elif count == 0:
-    #     return JsonResponse.does_not_exists_error()
 
     return JsonResponse.success()
 
@@ -569,17 +560,7 @@ def set_timetable(request, form):
 
             else:
                 wd_obj.save()
-    # update lack
-    # line = CashboxType.objects.filter(is_main_type=True, shop=timetable.shop_id)
-    # for str_dttm, lack in data['lack']:
-    #     dttm = BaseConverter.convert_datetime(str_dttm)
-    #     PeriodDemand.objects.update_or_create(
-    #         lack_of_cashiers=lack,
-    #         defaults={
-    #             'dttm_forecast': dttm,
-    #             'cashbox_type': line,
-    #             'type': PeriodDemand.Type.LONG_FORECAST.value,
-    #         })
+
     send_notification('C', timetable)
 
     return JsonResponse.success()

@@ -9,11 +9,11 @@ from src.db.models import (
     CashboxType,
     WorkerCashboxInfo,
     WorkerDayCashboxDetails,
-    PeriodDemand,
+    PeriodClients,
 )
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
 from src.util.collection import group_by
-from src.util.models_converter import CashboxTypeConverter, UserConverter, BaseConverter
+from src.util.models_converter import UserConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
 from src.util.forms import FormUtil
 from src.conf.djconfig import QOS_DATETIME_FORMAT
@@ -192,13 +192,13 @@ def get_cashiers_timetable(request, form):
         group_key=lambda x: (x.worker_id, x.cashbox_type_id)
     )
 
-    period_demand = PeriodDemand.objects.filter(
+    period_clients = PeriodClients.objects.filter(
         cashbox_type__shop_id=shop_id,
         dttm_forecast__gte=form['from_dt'],
         dttm_forecast__lte=form['to_dt'] + timedelta(days=1),
         type__in=[
-            PeriodDemand.Type.LONG_FORECAST.value,
-            PeriodDemand.Type.FACT.value,
+            PeriodClients.LONG_FORECASE_TYPE,
+            PeriodClients.FACT_TYPE,
         ],
         cashbox_type_id__in=cashbox_types.keys()
     ).order_by(
@@ -239,11 +239,11 @@ def get_cashiers_timetable(request, form):
     cashiers_lack_on_period_evening = []
 
     edge_ind = 0
-    while (edge_ind < len(period_demand)) and (period_demand[edge_ind].type != PeriodDemand.Type.FACT.value):
+    while (edge_ind < len(period_clients)) and (period_clients[edge_ind].type != PeriodClients.FACT_TYPE):
         edge_ind += 1
 
-    predict_demand = period_demand[:edge_ind]
-    fact_demand = period_demand[edge_ind:]
+    predict_demand = period_clients[:edge_ind]
+    fact_demand = period_clients[edge_ind:]
 
     wdcds_current = cashbox_details_current  # alias
     wdcds_initial = cashbox_details_initial
@@ -395,20 +395,6 @@ def get_cashiers_timetable(request, form):
 
     max_of_cashiers_lack_morning = max(cashiers_lack_on_period_morning)
     max_of_cashiers_lack_evening = max(cashiers_lack_on_period_evening)
-
-    # total_lack_of_cashiers_on_period_demand = 0  # on all cashboxes types
-    # if period_demand:
-    #     prev_one_period_demand = period_demand[0]  # for first iteration
-    #     for one_period_demand in period_demand:
-    #         if one_period_demand.dttm_forecast == prev_one_period_demand.dttm_forecast:
-    #             total_lack_of_cashiers_on_period_demand += one_period_demand.lack_of_cashiers
-    #         else:
-    #             lack_of_cashiers_on_period.append({
-    #                 'lack_of_cashiers': total_lack_of_cashiers_on_period_demand,
-    #                 'dttm_start': str(one_period_demand.dttm_forecast),
-    #             })
-    #             total_lack_of_cashiers_on_period_demand = one_period_demand.lack_of_cashiers
-    #         prev_one_period_demand = one_period_demand
 
     changed_amount = WorkerDay.objects.select_related('worker').filter(
         dt__gte=form['from_dt'],

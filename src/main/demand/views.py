@@ -1,20 +1,29 @@
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, time, date
 
+from django.apps import apps
 from src.db.models import (
-    PeriodDemand,
-    WorkerDay,
+    PeriodClients,
+    PeriodProducts,
+    PeriodQueues,
+    CashboxType,
     PeriodDemandChangeLog,
-    Shop
+    Shop,
+    User,
 )
+from dateutil.relativedelta import relativedelta
+from django.http.response import HttpResponse
+from django.db.models import Sum
 from src.util.collection import range_u
-from src.util.models_converter import BaseConverter, PeriodDemandConverter, PeriodDemandChangeLogConverter
-from src.util.utils import api_method, JsonResponse
+from src.util.models_converter import BaseConverter, PeriodDemandChangeLogConverter
+from src.util.utils import api_method, JsonResponse, get_uploaded_file
 from .forms import (
     GetForecastForm,
     SetDemandForm,
     GetIndicatorsForm,
     SetPredictBillsForm,
-    CreatePredictBillsRequestForm
+    CreatePredictBillsRequestForm,
+    GetDemandChangeLogsForm,
+    UploadDemandForm,
 )
 from .utils import create_predbills_request_function, set_pred_bills_function
 from django.views.decorators.csrf import csrf_exempt
@@ -54,70 +63,45 @@ def get_indicators(request, form):
     """
     dt_from = form['from_dt']
     dt_to = form['to_dt']
-    dt_days_count = (dt_to - dt_from).days + 1
 
     forecast_type = form['type']
 
     shop_id = FormUtil.get_shop_id(request, form)
-    checkpoint = FormUtil.get_checkpoint(form)
+    # checkpoint = FormUtil.get_checkpoint(form)
 
-    period_demands = PeriodDemand.objects.select_related(
-        'cashbox_type'
-    ).filter(
-        cashbox_type__shop_id=shop_id,
-        type=forecast_type,
-        dttm_forecast__gte=datetime.combine(dt_from, time()),
-        dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1)
-    )
+    period_filter_dict = {
+        'cashbox_type__shop_id': shop_id,
+        'type': forecast_type,
+        'dttm_forecast__gte': datetime.combine(dt_from, time()),
+        'dttm_forecast__lt': datetime.combine(dt_to, time()) + timedelta(days=1)
+    }
 
-    worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
-        worker__shop_id=shop_id,
-        type=WorkerDay.Type.TYPE_WORKDAY.value,
-        dt__gte=dt_from,
-        dt__lte=dt_to,
-    )
-    workers_count = len(set([x.worker_id for x in worker_days]))
+    clients = PeriodClients.objects.select_related('cashbox_type').filter(**period_filter_dict).aggregate(Sum('value'))['value__sum']
+    products = PeriodProducts.objects.select_related('cashbox_type').filter(**period_filter_dict).aggregate(Sum('value'))['value__sum']
 
-    clients = 0
-    products = 0
-    for x in period_demands:
-        clients += x.clients
-        products += x.products
-
-    prev_periods_demands = PeriodDemand.objects.select_related(
+    prev_clients = PeriodClients.objects.select_related(
         'cashbox_type'
     ).filter(
         cashbox_type__shop_id=shop_id,
         type=forecast_type,
         dttm_forecast__gte=datetime.combine(dt_from, time()) - timedelta(days=30),
         dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1) - timedelta(days=30)
-    )
+    ).aggregate(Sum('value'))['value__sum']
 
-    prev_clients = 0
-    for x in prev_periods_demands:
-        prev_clients += x.clients
-
-    if prev_clients != 0:
+    if prev_clients and prev_clients != 0:
         growth = (clients - prev_clients) / prev_clients * 100
     else:
         growth = None
 
-    mean_hour_count = dt_days_count * 17
-
     def __div_safe(__a, __b):
-        return __a / __b if __b > 0 else None
+        return __a / __b if (__b > 0 and __b and __a) else None
     return JsonResponse.success({
-        'total_bills': clients,
-        'total_codes': products,
+        'total_bills': clients if clients else 0,  # может вернуть None
+        'total_codes': products if products else 0,  # аналогично
         'total_income': None,
         'mean_bill_codes': __div_safe(products, clients),
         'growth': growth,
         'total_people': None,
-
-        # 'mean_bills': __div_safe(clients, workers_count),
-        # 'mean_codes': __div_safe(products, workers_count),
-        # 'mean_hour_bills': __div_safe(clients, mean_hour_count),
-        # 'mean_hour_codes': __div_safe(products, mean_hour_count),
     })
 
 
@@ -139,69 +123,75 @@ def get_forecast(request, form):
 
 
     """
+    def _create_demands_dict(query_set):
+        tmp_dict = {}
+        for x in query_set:
+            dt = x.dttm_forecast.date()
+            if dt not in tmp_dict:
+                tmp_dict[dt] = {}
+            tm = x.dttm_forecast.time()
+            if tm not in tmp_dict[dt]:
+                tmp_dict[dt][tm] = []
+            tmp_dict[dt][tm].append(x)
+
+        return tmp_dict
+
     if form['format'] == 'excel':
         return JsonResponse.value_error('Excel is not supported yet')
 
-    # data_types = form['data_type']
-    data_types = PeriodDemand.Type.values()
     cashbox_type_ids = form['cashbox_type_ids']
 
     shop_id = FormUtil.get_shop_id(request, form)
 
-
-    period_demand = PeriodDemand.objects.select_related(
-        'cashbox_type'
-    ).filter(
+    period_clients = PeriodClients.objects.select_related('cashbox_type').filter(
+        cashbox_type__shop_id=shop_id
+    )
+    period_products = PeriodProducts.objects.select_related('cashbox_type').filter(
+        cashbox_type__shop_id=shop_id
+    )
+    period_queues = PeriodQueues.objects.select_related('cashbox_type').filter(
         cashbox_type__shop_id=shop_id
     )
 
     if len(cashbox_type_ids) > 0:
-        period_demand = [x for x in period_demand if x.cashbox_type_id in cashbox_type_ids]
+        period_clients = [x for x in period_clients if x.cashbox_type_id in cashbox_type_ids]
+        period_products = [x for x in period_products if x.cashbox_type_id in cashbox_type_ids]
+        period_queues = [x for x in period_queues if x.cashbox_type_id in cashbox_type_ids]
 
-    tmp = {}
-    for x in period_demand:
-        dt = x.dttm_forecast.date()
-        if dt not in tmp:
-            tmp[dt] = {}
-
-        tm = x.dttm_forecast.time()
-        if tm not in tmp[dt]:
-            tmp[dt][tm] = []
-
-        tmp[dt][tm].append(x)
-    period_demand = tmp
+    period_clients = _create_demands_dict(period_clients)
+    period_products = _create_demands_dict(period_products)
+    period_queues = _create_demands_dict(period_queues)
 
     dttm_from = datetime.combine(form['from_dt'], time())
     dttm_to = datetime.combine(form['to_dt'], time()) + timedelta(days=1)
     dttm_step = timedelta(minutes=30)
 
-    forecast_periods = {x: [] for x in PeriodDemand.Type.values() if x in data_types}
+    forecast_periods = {x[0]: [] for x in PeriodClients.FORECAST_TYPES}
 
     for forecast_type, forecast_data in forecast_periods.items():
         for dttm in range_u(dttm_from, dttm_to, dttm_step, False):
             clients = 0
             products = 0
-            queue_wait_time = 0
             queue_wait_length = 0
 
-            for x in period_demand.get(dttm.date(), {}).get(dttm.time(), []):
+            for x in period_clients.get(dttm.date(), {}).get(dttm.time(), []):
                 if x.type != forecast_type:
                     continue
-
-                if len(cashbox_type_ids) > 0 and x.cashbox_type_id not in cashbox_type_ids:
+                clients += x.value
+            for x in period_products.get(dttm.date(), {}).get(dttm.time(), []):
+                if x.type != forecast_type:
                     continue
-
-                clients += x.clients
-                products += x.products
-                queue_wait_time += x.queue_wait_time
-                queue_wait_length += x.queue_wait_length
+                products += x.value
+            for x in period_queues.get(dttm.date(), {}).get(dttm.time(), []):
+                if x.type != forecast_type:
+                    continue
+                queue_wait_length += x.value
 
             forecast_data.append({
                 'dttm': BaseConverter.convert_datetime(dttm),
-                'B': clients,
-                'C': products,
-                'L': queue_wait_length,
-                'T': queue_wait_time
+                'clients': clients,
+                'products': products,
+                'queue': queue_wait_length
             })
 
     period_demand_change_log = PeriodDemandChangeLog.objects.select_related(
@@ -217,7 +207,7 @@ def get_forecast(request, form):
 
     response = {
         'period_step': 30,
-        'forecast_periods': {PeriodDemandConverter.convert_forecast_type(k): v for k, v in forecast_periods.items()},
+        'forecast_periods': {k: v for k, v in forecast_periods.items()},
         'demand_changes': [PeriodDemandChangeLogConverter.convert(x) for x in period_demand_change_log]
     }
 
@@ -238,13 +228,13 @@ def set_demand(request, form):
         url: /api/demand/set_forecast
         from_dttm(QOS_DATETIME): required = True
         to_dttm(QOS_DATETIME): required = True
-        cashbox_type_ids(list): список типов касс (либо [] -- если для всех)
+        cashbox_type_id(list): список типов касс (либо [] -- если для всех)
         multiply_coef(float): required = False
         set_value(float): required = False
         shop_id(int): required = True
 
     """
-    cashbox_type_ids = form['cashbox_type_ids']
+    cashbox_type_ids = form['cashbox_type_id']
 
     multiply_coef = form.get('multiply_coef')
     set_value = form.get('set_value')
@@ -254,27 +244,26 @@ def set_demand(request, form):
 
     shop_id = FormUtil.get_shop_id(request, form)
 
-    period_demands = PeriodDemand.objects.select_related(
+    period_clients = PeriodClients.objects.select_related(
         'cashbox_type'
     ).filter(
         cashbox_type__shop_id=shop_id,
-        type=PeriodDemand.Type.LONG_FORECAST.value,
+        type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__gte=dttm_from,
-        dttm_forecast__lte=dttm_to
+        dttm_forecast__lte=dttm_to,
+        cashbox_type_id__in=cashbox_type_ids
     )
 
-    if len(cashbox_type_ids) > 0:
-        period_demands = [x for x in period_demands if period_demands.cashbox_type_id in cashbox_type_ids]
-
     cashboxes_types = []
-    for x in period_demands:
+    for x in period_clients:
         if multiply_coef is not None:
-            x.clients *= multiply_coef
+            x.value *= multiply_coef
         else:
-            x.clients = set_value
+            x.value = set_value
 
         x.save()
         cashboxes_types.append(x.cashbox_type_id)
+    cashboxes_types = list(set(cashboxes_types))
 
     for x in cashboxes_types:
         PeriodDemandChangeLog.objects.create(
@@ -284,6 +273,62 @@ def set_demand(request, form):
             multiply_coef=multiply_coef,
             set_value=set_value
         )
+
+    return JsonResponse.success()
+
+
+@api_method(
+    'GET',
+    GetDemandChangeLogsForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
+def get_demand_change_logs(request, form):
+    """
+    Вовращает список изменений по PeriodClients за текущий месяц
+
+    Args:
+         method: GET
+         url: /api/demand/get_demand_change_logs
+         cashbox_type_ids(list): required = True
+    """
+    dt_from = date.today().replace(day=1)
+    dt_to = dt_from + relativedelta(months=1) - relativedelta(days=1)
+
+    if form['cashbox_type_id'] == 0:
+        cashbox_type_ids = CashboxType.objects.filter(shop_id=form['shop_id'])
+    else:
+        cashbox_type_ids = [form['cashbox_type_id']]
+
+    change_logs = PeriodDemandChangeLog.objects.filter(
+        cashbox_type_id__in=cashbox_type_ids,
+        dttm_from__date__gte=dt_from,
+        dttm_to__date__lte=dt_to,
+    ).order_by('dttm_added')
+
+    return JsonResponse.success({
+        'total_count': change_logs.count(),
+        'demand_change_logs': [{
+            'dttm_added': BaseConverter.convert_datetime(x.dttm_added),
+            'dttm_from': BaseConverter.convert_datetime(x.dttm_from),
+            'dttm_to': BaseConverter.convert_datetime(x.dttm_to),
+            'cashbox_type_id': x.cashbox_type_id,
+            'multiply_coef': x.multiply_coef,
+            'set_value': x.set_value,
+        } for x in change_logs],
+    })
+
+
+@api_method(
+    'POST',
+    UploadDemandForm,
+    groups=[User.GROUP_SUPERVISOR, User.GROUP_SUPERVISOR]
+)
+def upload_demand(request, form):
+    demand_file = get_uploaded_file(request)
+    if isinstance(demand_file, HttpResponse):
+        return demand_file
+
+    print(type(demand_file))
 
     return JsonResponse.success()
 

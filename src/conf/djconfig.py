@@ -186,6 +186,8 @@ QOS_DATE_FORMAT = '%d.%m.%Y'
 QOS_TIME_FORMAT = '%H:%M:%S'
 QOS_SHORT_TIME_FORMAT = '%H:%M'
 
+ALLOWED_UPLOAD_EXTENSIONS = ['xlsx',]
+
 
 CELERY_IMPORTS = ('src.celery.tasks',)
 CELERY_BROKER_URL = 'redis://localhost:6379'

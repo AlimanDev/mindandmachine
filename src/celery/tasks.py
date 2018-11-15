@@ -1,5 +1,4 @@
 import datetime
-from src.main.tablet.utils import time_diff
 import json
 
 from django.db.models import Avg
@@ -12,10 +11,9 @@ from src.main.timetable.worker_exchange.utils import (
     has_deficiency
 )
 from src.main.demand.utils import create_predbills_request_function
-from src.main.other.notification.utils import get_month_name
 
 from src.db.models import (
-    PeriodDemand,
+    PeriodQueues,
     CashboxType,
     CameraCashboxStat,
     WorkerDayCashboxDetails,
@@ -62,19 +60,16 @@ def update_queue(till_dttm=None):
             if len(mean_queue):
                 mean_queue = sum([el['mean_queue'] for el in mean_queue]) / len(mean_queue) * 1.4
 
-                changed_amount = PeriodDemand.objects.filter(
+                changed_amount = PeriodQueues.objects.filter(
                     dttm_forecast=cashbox_type.dttm_last_update_queue,
                     cashbox_type_id=cashbox_type.id,
-                    type=PeriodDemand.Type.FACT.value,
-                ).update(queue_wait_length=mean_queue)
+                    type=PeriodQueues.FACT_TYPE,
+                ).update(value=mean_queue)
                 if changed_amount == 0:
-                    PeriodDemand.objects.create(
+                    PeriodQueues.objects.create(
                         dttm_forecast=cashbox_type.dttm_last_update_queue,
-                        clients=0,
-                        products=0,
-                        type=PeriodDemand.Type.FACT.value,
-                        queue_wait_time=0,
-                        queue_wait_length=mean_queue,
+                        type=PeriodQueues.FACT_TYPE,
+                        value=mean_queue,
                         cashbox_type_id=cashbox_type.id,
                     )
 
