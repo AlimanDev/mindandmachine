@@ -6,13 +6,16 @@ from src.db.models import (
     User,
     WorkerDay,
     PeriodClients,
+    CashboxType,
 )
+from datetime import time, timedelta, datetime
 from django.apps import apps
 from src.util.utils import JsonResponse
 
 from .xlsx.tabel import Tabel_xlsx
 from src.util.forms import FormUtil
 import json
+import pandas as pd
 
 
 @api_method('GET', GetTable)
@@ -92,35 +95,24 @@ def get_demand_xlsx(request, workbook, form):
 
     Args:
         method: GET
-        url: /api/demand/get_clients_xlsx
+        url: /api/download/get_demand_xlsx
         from_dt(QOS_DATE): с какой даты скачивать
         to_dt(QOS_DATE): по какую дату скачивать
-        shop_id(int): в каком магазине
+        shop_id(int): в каком магазинеde
         demand_model(char): !! attention !! передавать что-то из clients/queue/products (см. окончание моделей Period..)
 
     Returns:
         эксель файл с форматом Тип работ | Время | Значение
     """
-    def filter_over_model(model):
-        filter_dict = {
-            'cashbox_type__shop_id': form['shop_id'],
-            'dttm_forecast__date__gte': from_dt,
-            'dttm_forecast__date__lte': to_dt,
-        }
-        period_demands = model.objects.filter(
-            type=PeriodClients.LONG_FORECASE_TYPE,
-            **filter_dict
-        )
-        period_demands_fact = model.objects.filter(
-            type=PeriodClients.FACT_TYPE,
-            **filter_dict
-        )
-        return period_demands, period_demands_fact
-
     from_dt = form['from_dt']
     to_dt = form['to_dt']
+    timestep = 30  # minutes
+
+    if (to_dt - from_dt).days > 90:
+        return JsonResponse.internal_error('Выберите, пожалуйста, более короткий период.')
 
     worksheet = workbook.add_worksheet('{}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d')))
+    worksheet.set_column(0, 3, 30)
     worksheet.write(0, 0, 'Тип работ')
     worksheet.write(0, 1, 'Время')
     worksheet.write(0, 2, 'Значение(долгосрочный)')
@@ -131,17 +123,51 @@ def get_demand_xlsx(request, workbook, form):
     except LookupError:
         return JsonResponse.internal_error('incorrect demand model')
 
-    period_demands, period_demands_fact = filter_over_model(model)
+    period_demands = list(model.objects.select_related('cashbox_type').filter(
+        cashbox_type__shop_id=form['shop_id'],
+        dttm_forecast__date__gte=from_dt,
+        dttm_forecast__date__lte=to_dt,
+        type__in=[PeriodClients.FACT_TYPE, PeriodClients.LONG_FORECASE_TYPE]
+    ).order_by('dttm_forecast', 'cashbox_type_id', 'type'))
 
-    for index, forecast_item in enumerate(period_demands):
-        fact_on_concrete_date = period_demands_fact.filter(
-            dttm_forecast=forecast_item.dttm_forecast,
-            cashbox_type=forecast_item.cashbox_type
-        ).first()
+    cashbox_types = list(CashboxType.objects.filter(shop_id=form['shop_id']).order_by('id'))
+    amount_cashbox_types = len(cashbox_types)
 
-        worksheet.write(index + 1, 0, forecast_item.cashbox_type.name)
-        worksheet.write(index + 1, 1, forecast_item.dttm_forecast.strftime('%H:%M:%S'))
-        worksheet.write(index + 1, 2, round(forecast_item.value, 1))
-        worksheet.write(index + 1, 3, round(forecast_item.value, 1) if fact_on_concrete_date else 'Нет данных')
+    dttm = datetime.combine(from_dt, time(0, 0))
+    expected_record_amount = (to_dt - from_dt).days * amount_cashbox_types * 24 * 60 / timestep
+
+    demand_index = 0
+
+    for index in range(int(expected_record_amount)):
+        cashbox_type_index = index % amount_cashbox_types
+        cashbox_type_name = cashbox_types[cashbox_type_index].name
+
+        demand = period_demands[demand_index]
+
+        worksheet.write(index + 1, 0, cashbox_type_name)
+        worksheet.write(index + 1, 1, dttm.strftime('%d.%m.%Y %H:%M:%S'))
+
+        if demand.dttm_forecast == dttm and demand.cashbox_type.name == cashbox_type_name:
+            if demand.type == PeriodClients.FACT_TYPE:
+                worksheet.write(index + 1, 3, round(demand.value, 1))
+                demand_index += 1
+
+                if index != expected_record_amount - 1:
+                    next_demand = period_demands[demand_index]
+                    if next_demand.type == PeriodClients.LONG_FORECASE_TYPE and\
+                        next_demand.dttm_forecast == demand.dttm_forecast and\
+                            next_demand.cashbox_type.name == demand.cashbox_type.name:
+                                worksheet.write(index + 1, 2, round(next_demand.value, 1))
+                                demand_index += 1
+            else:
+                worksheet.write(index + 1, 2, round(demand.value, 1))
+                worksheet.write(index + 1, 3, 'Нет данных')
+                demand_index += 1
+
+        else:
+            worksheet.write(index + 1, 2, 'Нет данных')
+            worksheet.write(index + 1, 3, 'Нет данных')
+        if index % amount_cashbox_types == amount_cashbox_types - 1 and index != 0:
+            dttm += timedelta(minutes=timestep)
 
     return workbook, '{} {}-{}'.format(model.__name__, from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))

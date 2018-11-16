@@ -250,7 +250,21 @@ def get_uploaded_file(request):
 
     if not file:
         return JsonResponse.value_error('Файл не был загружен.')
-    if not file.name.split('.', 1)[1] in ALLOWED_UPLOAD_EXTENSIONS:
+    if not file.name.split('.', file.name.count('.'))[-1] in ALLOWED_UPLOAD_EXTENSIONS:
         return JsonResponse.value_error('Файлы с таким расширением не поддерживается.')
 
     return file
+
+
+def test_algo_server_connection():
+    from urllib import error, request
+
+    req = request.Request('http://{}/test'.format(settings.TIMETABLE_IP))
+    try:
+        response = request.urlopen(req).read().decode('utf-8')
+    except error.URLError:
+        return JsonResponse.algo_internal_error('Сервер для обработки алгоритма недоступен.')
+    if json.loads(response)['status'] == 'ok':
+        return True
+    else:
+        return JsonResponse.algo_internal_error('Что-то не так при подключении к серверу с алгоритмом')

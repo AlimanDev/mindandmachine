@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, time, date
 
-from django.apps import apps
 from src.db.models import (
     PeriodClients,
     PeriodProducts,
@@ -324,13 +323,91 @@ def get_demand_change_logs(request, form):
     groups=[User.GROUP_SUPERVISOR, User.GROUP_SUPERVISOR]
 )
 def upload_demand(request, form):
+    """
+    Принимает от клиента экселевский файл и загружает из него данные в бд
+
+    Args:
+         method: POST
+         url: /api/demand/upload_demand
+         shop_id(int): required = True
+    """
     demand_file = get_uploaded_file(request)
     if isinstance(demand_file, HttpResponse):
         return demand_file
 
-    print(type(demand_file))
+    from openpyxl import load_workbook
+    try:
+        worksheet = load_workbook(demand_file).active
+    except KeyError:
+        return JsonResponse.internal_error('Не удалось открыть активный лист.')
 
-    return JsonResponse.success()
+    list_to_create = []
+
+    shop_id = form['shop_id']
+    cash_column_num = 0
+    time_column_num = 1
+    value_column_num = 2
+    datetime_format = '%d.%m.%Y %H:%M:%S'
+
+    def create_demand_objs(obj=None):
+        if obj is None:
+            PeriodClients.objects.bulk_create(list_to_create)
+        elif len(list_to_create) == 999:
+            list_to_create.append(obj)
+            PeriodClients.objects.bulk_create(list_to_create)
+            list_to_create[:] = []
+        else:
+            list_to_create.append(obj)
+
+    cashbox_types = list(CashboxType.objects.filter(shop_id=shop_id))
+
+    ######################### сюда писать логику чтения из экселя ######################################################
+
+    for index, row in enumerate(worksheet.rows):
+        value = row[value_column_num].value
+        if not isinstance(row[value_column_num].value, int):
+            continue
+
+        dttm = row[time_column_num].value
+        if '.' not in dttm or ':' not in dttm:
+            continue
+        if not isinstance(dttm, datetime):
+            try:
+                dttm = datetime.strptime(dttm, datetime_format)
+            except ValueError:
+                return JsonResponse.value_error('Невозможно преобразовать время. Пожалуйста введите формат {}'.format(datetime_format))
+
+        cashtype_name = row[cash_column_num].value
+        cashtype_name = cashtype_name[:1].upper() + cashtype_name[1:].lower()  # учет регистра чтобы нормально в бд было
+
+        ct_to_search = list(filter(lambda ct: ct.name == cashtype_name, cashbox_types))  # возвращает фильтр по типам
+        if len(ct_to_search) == 1:
+            PeriodClients.objects.filter(
+                dttm_forecast=dttm,
+                cashbox_type=ct_to_search[0],
+                type=PeriodClients.FACT_TYPE
+            ).delete()
+            create_demand_objs(
+                PeriodClients(
+                    dttm_forecast=dttm,
+                    cashbox_type=ct_to_search[0],
+                    value=value,
+                    type=PeriodClients.FACT_TYPE
+                )
+            )
+        else:
+            return JsonResponse.internal_error('Невозможно прочитать тип работ на строке №{}.'.format(index))
+
+    ####################################################################################################################
+
+    create_demand_objs(None)
+
+    from_dt_to_create = PeriodClients.objects.filter(
+        type=PeriodClients.FACT_TYPE,
+        cashbox_type__shop_id=shop_id
+    ).order_by('dttm_forecast').last().dttm_forecast.date() + relativedelta(days=1)
+
+    return create_predbills_request_function(shop_id=shop_id, dt=from_dt_to_create)
 
 
 @api_method('POST', CreatePredictBillsRequestForm)
@@ -353,16 +430,9 @@ def create_predbills_request(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     dt = form['dt']
 
-    try:
-        create_predbills_request_function(shop_id, dt)
-    except ValueError as error_message:
-        return JsonResponse.value_error(str(error_message))
-    except EmptyResultSet as empty_error:
-        return JsonResponse.internal_error(str(empty_error))
-    except ImproperlyConfigured:
-        return JsonResponse.algo_internal_error()
+    result = create_predbills_request_function(shop_id, dt)
 
-    return JsonResponse.success()
+    return JsonResponse.success() if result is True else result
 
 
 @csrf_exempt

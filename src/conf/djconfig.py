@@ -28,8 +28,7 @@ SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['*',
-                 ]
+ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -44,7 +43,6 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'django_celery_results',
     'src.celery',
-    # 'rest_framework',
 ]
 
 MIDDLEWARE = [

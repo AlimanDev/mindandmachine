@@ -327,6 +327,7 @@ def create_pred_bills():
     Note:
         Выполняется первого числа каждого месяца
     """
+    # todo: переписать
     for shop in Shop.objects.all():
         create_predbills_request_function(shop.id)
     print('создал спрос на месяц')

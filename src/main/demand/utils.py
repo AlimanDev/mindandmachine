@@ -1,12 +1,19 @@
 import json
-import urllib.request
+from urllib import request, error
 
 from datetime import datetime, timedelta
+from src.util.utils import test_algo_server_connection, JsonResponse
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from src.conf.djconfig import QOS_DATETIME_FORMAT
 
-from src.db.models import PeriodClients, CashboxType, Slot
+from src.db.models import (
+    PeriodClients,
+    CashboxType,
+    Slot,
+    Notifications,
+    User,
+)
 from src.util.models_converter import BaseConverter
 from django.db.models import Sum
 from django.core.exceptions import EmptyResultSet, ImproperlyConfigured
@@ -68,6 +75,11 @@ def create_predbills_request_function(shop_id, dt=None):
         Exception
 
     """
+    test_result = test_algo_server_connection()
+
+    if test_result is not True:
+        return test_result
+
     if dt is None:
         dt = (PeriodClients.objects.all().order_by('dttm_forecast').last().dttm_forecast + timedelta(hours=7)).date()
     YEARS_TO_COLLECT = 3  # за последние YEARS_TO_COLLECT года
@@ -81,12 +93,12 @@ def create_predbills_request_function(shop_id, dt=None):
     )
 
     if not period_clients:
-        raise EmptyResultSet('There is no period demand objects')
+        raise EmptyResultSet('В базе данных нет объектов спроса.')
 
     try:
         param_list = set_param_list(shop_id)
     except ValueError as error_message:
-        raise ValueError(error_message)
+        return JsonResponse.internal_error(error_message)
 
     aggregation_dict = {
         'IP': settings.HOST_IP,
@@ -105,16 +117,18 @@ def create_predbills_request_function(shop_id, dt=None):
         ]
     }
 
+    data = json.dumps(aggregation_dict).encode('ascii')
+    req = request.Request('http://{}/create_pred_bills'.format(settings.TIMETABLE_IP), data=data, headers={'content-type': 'application/json'})
     try:
-        data = json.dumps(aggregation_dict).encode('ascii')
-        req = urllib.request.Request('http://{}/create_pred_bills'.format(settings.TIMETABLE_IP), data=data, headers={'content-type': 'application/json'})
-        with urllib.request.urlopen(req) as response:
-            res = response.read().decode('utf-8')
-        task_id = json.loads(res).get('task_id', '')
-        if task_id is None:
-            raise Exception('Error upon creating task')
-    except Exception:
-        raise ImproperlyConfigured('Error upon creating task')
+        response = request.urlopen(req)
+    except request.HTTPError:
+        raise JsonResponse.algo_internal_error('Ошибка при чтении ответа от второго сервера.')
+    except error.URLError:
+        return JsonResponse.algo_internal_error('Сервер для обработки алгоритма недоступен.')
+    task_id = json.loads(response.read().decode('utf-8')).get('task_id')
+    if task_id is None:
+        return JsonResponse.algo_internal_error('Ошибка при создании задачи на исполненение.')
+    return True
 
 
 def set_pred_bills_function(data, key):
@@ -142,11 +156,17 @@ def set_pred_bills_function(data, key):
     shop = CashboxType.objects.get(id=list(data.values())[0]['CashType']).shop
     sloted_cashbox_types = CashboxType.objects.filter(do_forecast=CashboxType.FORECAST_LITE, shop=shop)
 
+    forecast_from = None
+    forecast_to = None
+
     for period_demand_value in data.values():
         clients = period_demand_value['value']
         if clients < 0:
             clients = 0
         dttm_forecast = datetime.strptime(period_demand_value['datetime'], QOS_DATETIME_FORMAT)
+        if forecast_from is None:
+            forecast_from = dttm_forecast.date()
+        forecast_to = dttm_forecast.date()
         cashbox_type_id = period_demand_value['CashType']
         PeriodClients.objects.update_or_create(
             type=PeriodClients.LONG_FORECASE_TYPE,
@@ -180,4 +200,11 @@ def set_pred_bills_function(data, key):
             except PeriodClients.MultipleObjectsReturned as exc:
                 print(exc)
                 raise Exception('error upon creating period demands for sloted types')
+
+    for u in User.objects.filter(shop=shop, group=User.__except_cashiers__):
+        Notifications.objects.create(
+            type=Notifications.TYPE_SUCCESS,
+            to_worker=u,
+            text='Был составлен новый спрос на период с {} по {}'.format(forecast_from, forecast_to)
+        )
 
