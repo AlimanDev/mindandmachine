@@ -407,7 +407,9 @@ def upload_demand(request, form):
         cashbox_type__shop_id=shop_id
     ).order_by('dttm_forecast').last().dttm_forecast.date() + relativedelta(days=1)
 
-    return create_predbills_request_function(shop_id=shop_id, dt=from_dt_to_create)
+    result_of_func = create_predbills_request_function(shop_id=shop_id, dt=from_dt_to_create)
+
+    return JsonResponse.success() if result_of_func is True else result_of_func
 
 
 @api_method('POST', CreatePredictBillsRequestForm)

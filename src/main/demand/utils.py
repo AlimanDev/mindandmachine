@@ -152,8 +152,6 @@ def set_pred_bills_function(data, key):
     except ValueError as ve:
         return ve
 
-    print(data)
-
     # костыль, но по-другому никак. берем первый пришедший cashbox_type_id и находим для какого магаза составлялся спрос
     shop = CashboxType.objects.get(id=list(data.values())[0]['CashType']).shop
     sloted_cashbox_types = CashboxType.objects.filter(do_forecast=CashboxType.FORECAST_LITE, shop=shop)
@@ -162,7 +160,7 @@ def set_pred_bills_function(data, key):
     forecast_to = None
 
     for period_demand_value in data.values():
-        clients = period_demand_value['value']
+        clients = period_demand_value['clients']
         if clients < 0:
             clients = 0
         dttm_forecast = datetime.strptime(period_demand_value['datetime'], QOS_DATETIME_FORMAT)
@@ -200,7 +198,7 @@ def set_pred_bills_function(data, key):
                     }
                 )
             except PeriodClients.MultipleObjectsReturned as exc:
-                print(exc)
+                print('here', exc)
                 raise Exception('error upon creating period demands for sloted types')
 
     for u in User.objects.filter(shop=shop, group=User.__except_cashiers__):
