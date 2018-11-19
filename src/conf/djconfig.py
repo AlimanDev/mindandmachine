@@ -250,6 +250,11 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(day_of_week=6, hour=0, minute=15),
         'options': {'queue': BACKEND_QUEUE}
     },
+    'task-update-visitors-info': {
+        'task': 'src.celery.tasks.update_visitors_info',
+        'schedule': crontab(minute='0,30'),
+        'options': {'queue': BACKEND_QUEUE}
+    },
 }
 
 

@@ -16,7 +16,7 @@ from src.db.models import (
 )
 from src.util.models_converter import BaseConverter
 from django.db.models import Sum
-from django.core.exceptions import EmptyResultSet, ImproperlyConfigured
+from django.core.exceptions import EmptyResultSet
 
 
 def set_param_list(shop_id):
@@ -201,7 +201,7 @@ def set_pred_bills_function(data, key):
                 print('here', exc)
                 raise Exception('error upon creating period demands for sloted types')
 
-    for u in User.objects.filter(shop=shop, group=User.__except_cashiers__):
+    for u in User.objects.filter(shop=shop, group__in=User.__except_cashiers__):
         Notifications.objects.create(
             type=Notifications.TYPE_SUCCESS,
             to_worker=u,

@@ -54,7 +54,9 @@ class GetDemandChangeLogsForm(forms.Form):
     shop_id = forms.IntegerField()
 
 
-class UploadDemandForm(forms.Form):
+class GetVisitorsInfoForm(forms.Form):
+    from_dt = util_forms.DateField()
+    to_dt = util_forms.DateField()
     shop_id = forms.IntegerField()
 
 

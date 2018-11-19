@@ -7,14 +7,12 @@ from src.db.models import (
     CashboxType,
     PeriodDemandChangeLog,
     Shop,
-    User,
 )
 from dateutil.relativedelta import relativedelta
-from django.http.response import HttpResponse
 from django.db.models import Sum
 from src.util.collection import range_u
 from src.util.models_converter import BaseConverter, PeriodDemandChangeLogConverter
-from src.util.utils import api_method, JsonResponse, get_uploaded_file
+from src.util.utils import api_method, JsonResponse
 from .forms import (
     GetForecastForm,
     SetDemandForm,
@@ -22,12 +20,12 @@ from .forms import (
     SetPredictBillsForm,
     CreatePredictBillsRequestForm,
     GetDemandChangeLogsForm,
-    UploadDemandForm,
+    GetVisitorsInfoForm,
 )
 from .utils import create_predbills_request_function, set_pred_bills_function
 from django.views.decorators.csrf import csrf_exempt
 from src.util.forms import FormUtil
-from django.core.exceptions import EmptyResultSet, ImproperlyConfigured
+from django.apps import apps
 
 
 @api_method('GET', GetIndicatorsForm)
@@ -317,99 +315,59 @@ def get_demand_change_logs(request, form):
     })
 
 
-@api_method(
-    'POST',
-    UploadDemandForm,
-    groups=[User.GROUP_SUPERVISOR, User.GROUP_SUPERVISOR]
-)
-def upload_demand(request, form):
+@api_method('GET', GetVisitorsInfoForm)
+def get_visitors_info(request, form):
     """
-    Принимает от клиента экселевский файл и загружает из него данные в бд
+    Отдает информацию с камер по количеству посетителей
 
     Args:
-         method: POST
-         url: /api/demand/upload_demand
-         shop_id(int): required = True
+        method: GET
+        url: /api/demand/get_visitors_info
+        from_dt(QOS_DATE): с какой даты смотрим
+        to_dt(QOS_DATE):
+        shop_id(int): чисто для api_method'a
+    Returns:
+        {
+            'IncomeVisitors': [], |
+            'PurchasesOutcomeVisitors': [], |
+            'EmptyOutcomeVisitors': []
+        }
     """
-    demand_file = get_uploaded_file(request)
-    if isinstance(demand_file, HttpResponse):
-        return demand_file
+    def filter_qs(query_set, dttm):
+        value_dttm_tuple = list(filter(lambda item_in_qs: item_in_qs[0] == dttm, query_set))
+        return value_dttm_tuple[0][1] if value_dttm_tuple else 0
 
-    from openpyxl import load_workbook
-    try:
-        worksheet = load_workbook(demand_file).active
-    except KeyError:
-        return JsonResponse.internal_error('Не удалось открыть активный лист.')
+    dttm_from = datetime.combine(form['from_dt'], time())
+    dttm_to = datetime.combine(form['to_dt'] + timedelta(days=1), time())
 
-    list_to_create = []
+    filter_dict = {
+        'type': PeriodClients.FACT_TYPE,
+        'dttm_forecast__gte': dttm_from,
+        'dttm_forecast__lte': dttm_to,
+    }
 
-    shop_id = form['shop_id']
-    cash_column_num = 0
-    time_column_num = 1
-    value_column_num = 2
-    datetime_format = '%d.%m.%Y %H:%M:%S'
+    return_dict = {
+        'IncomeVisitors': [],
+        'PurchasesOutcomeVisitors': [],
+        'EmptyOutcomeVisitors': []
+    }
+    query_sets = {}
 
-    def create_demand_objs(obj=None):
-        if obj is None:
-            PeriodClients.objects.bulk_create(list_to_create)
-        elif len(list_to_create) == 999:
-            list_to_create.append(obj)
-            PeriodClients.objects.bulk_create(list_to_create)
-            list_to_create[:] = []
-        else:
-            list_to_create.append(obj)
+    for model_name in return_dict.keys():
+        query_sets[model_name] = apps.get_model('db', model_name).objects.filter(**filter_dict).values_list(
+            'dttm_forecast', 'value'
+        )
 
-    cashbox_types = list(CashboxType.objects.filter(shop_id=shop_id))
+    dttm = dttm_from
+    while dttm < dttm_to:
+        for model_name, qs in query_sets.items():
+            return_dict[model_name].append({
+                'dttm': BaseConverter.convert_datetime(dttm),
+                'value': filter_qs(qs, dttm)
+            })
+        dttm += timedelta(minutes=30)
 
-    ######################### сюда писать логику чтения из экселя ######################################################
-
-    for index, row in enumerate(worksheet.rows):
-        value = row[value_column_num].value
-        if not isinstance(row[value_column_num].value, int):
-            continue
-
-        dttm = row[time_column_num].value
-        if '.' not in dttm or ':' not in dttm:
-            continue
-        if not isinstance(dttm, datetime):
-            try:
-                dttm = datetime.strptime(dttm, datetime_format)
-            except ValueError:
-                return JsonResponse.value_error('Невозможно преобразовать время. Пожалуйста введите формат {}'.format(datetime_format))
-
-        cashtype_name = row[cash_column_num].value
-        cashtype_name = cashtype_name[:1].upper() + cashtype_name[1:].lower()  # учет регистра чтобы нормально в бд было
-
-        ct_to_search = list(filter(lambda ct: ct.name == cashtype_name, cashbox_types))  # возвращает фильтр по типам
-        if len(ct_to_search) == 1:
-            PeriodClients.objects.filter(
-                dttm_forecast=dttm,
-                cashbox_type=ct_to_search[0],
-                type=PeriodClients.FACT_TYPE
-            ).delete()
-            create_demand_objs(
-                PeriodClients(
-                    dttm_forecast=dttm,
-                    cashbox_type=ct_to_search[0],
-                    value=value,
-                    type=PeriodClients.FACT_TYPE
-                )
-            )
-        else:
-            return JsonResponse.internal_error('Невозможно прочитать тип работ на строке №{}.'.format(index))
-
-    ####################################################################################################################
-
-    create_demand_objs(None)
-
-    from_dt_to_create = PeriodClients.objects.filter(
-        type=PeriodClients.FACT_TYPE,
-        cashbox_type__shop_id=shop_id
-    ).order_by('dttm_forecast').last().dttm_forecast.date() + relativedelta(days=1)
-
-    result_of_func = create_predbills_request_function(shop_id=shop_id, dt=from_dt_to_create)
-
-    return JsonResponse.success() if result_of_func is True else result_of_func
+    return JsonResponse.success(return_dict)
 
 
 @api_method('POST', CreatePredictBillsRequestForm)
