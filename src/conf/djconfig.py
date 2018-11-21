@@ -28,8 +28,7 @@ SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['*',
-                 ]
+ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -44,7 +43,6 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'django_celery_results',
     'src.celery',
-    # 'rest_framework',
 ]
 
 MIDDLEWARE = [
@@ -250,6 +248,11 @@ CELERY_BEAT_SCHEDULE = {
     'task-clean-camera-stats': {
         'task': 'src.celery.tasks.clean_camera_stats',
         'schedule': crontab(day_of_week=6, hour=0, minute=15),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-update-visitors-info': {
+        'task': 'src.celery.tasks.update_visitors_info',
+        'schedule': crontab(minute='0,30'),
         'options': {'queue': BACKEND_QUEUE}
     },
 }

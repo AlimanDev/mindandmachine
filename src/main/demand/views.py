@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, time, date
 
-from django.apps import apps
 from src.db.models import (
     PeriodClients,
     PeriodProducts,
@@ -8,14 +7,12 @@ from src.db.models import (
     CashboxType,
     PeriodDemandChangeLog,
     Shop,
-    User,
 )
 from dateutil.relativedelta import relativedelta
-from django.http.response import HttpResponse
 from django.db.models import Sum
 from src.util.collection import range_u
 from src.util.models_converter import BaseConverter, PeriodDemandChangeLogConverter
-from src.util.utils import api_method, JsonResponse, get_uploaded_file
+from src.util.utils import api_method, JsonResponse
 from .forms import (
     GetForecastForm,
     SetDemandForm,
@@ -23,12 +20,12 @@ from .forms import (
     SetPredictBillsForm,
     CreatePredictBillsRequestForm,
     GetDemandChangeLogsForm,
-    UploadDemandForm,
+    GetVisitorsInfoForm,
 )
 from .utils import create_predbills_request_function, set_pred_bills_function
 from django.views.decorators.csrf import csrf_exempt
 from src.util.forms import FormUtil
-from django.core.exceptions import EmptyResultSet, ImproperlyConfigured
+from django.apps import apps
 
 
 @api_method('GET', GetIndicatorsForm)
@@ -318,19 +315,59 @@ def get_demand_change_logs(request, form):
     })
 
 
-@api_method(
-    'POST',
-    UploadDemandForm,
-    groups=[User.GROUP_SUPERVISOR, User.GROUP_SUPERVISOR]
-)
-def upload_demand(request, form):
-    demand_file = get_uploaded_file(request)
-    if isinstance(demand_file, HttpResponse):
-        return demand_file
+@api_method('GET', GetVisitorsInfoForm)
+def get_visitors_info(request, form):
+    """
+    Отдает информацию с камер по количеству посетителей
 
-    print(type(demand_file))
+    Args:
+        method: GET
+        url: /api/demand/get_visitors_info
+        from_dt(QOS_DATE): с какой даты смотрим
+        to_dt(QOS_DATE):
+        shop_id(int): чисто для api_method'a
+    Returns:
+        {
+            'IncomeVisitors': [], |
+            'PurchasesOutcomeVisitors': [], |
+            'EmptyOutcomeVisitors': []
+        }
+    """
+    def filter_qs(query_set, dttm):
+        value_dttm_tuple = list(filter(lambda item_in_qs: item_in_qs[0] == dttm, query_set))
+        return value_dttm_tuple[0][1] if value_dttm_tuple else 0
 
-    return JsonResponse.success()
+    dttm_from = datetime.combine(form['from_dt'], time())
+    dttm_to = datetime.combine(form['to_dt'] + timedelta(days=1), time())
+
+    filter_dict = {
+        'type': PeriodClients.FACT_TYPE,
+        'dttm_forecast__gte': dttm_from,
+        'dttm_forecast__lte': dttm_to,
+    }
+
+    return_dict = {
+        'IncomeVisitors': [],
+        'PurchasesOutcomeVisitors': [],
+        'EmptyOutcomeVisitors': []
+    }
+    query_sets = {}
+
+    for model_name in return_dict.keys():
+        query_sets[model_name] = apps.get_model('db', model_name).objects.filter(**filter_dict).values_list(
+            'dttm_forecast', 'value'
+        )
+
+    dttm = dttm_from
+    while dttm < dttm_to:
+        for model_name, qs in query_sets.items():
+            return_dict[model_name].append({
+                'dttm': BaseConverter.convert_datetime(dttm),
+                'value': filter_qs(qs, dttm)
+            })
+        dttm += timedelta(minutes=30)
+
+    return JsonResponse.success(return_dict)
 
 
 @api_method('POST', CreatePredictBillsRequestForm)
@@ -353,16 +390,9 @@ def create_predbills_request(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     dt = form['dt']
 
-    try:
-        create_predbills_request_function(shop_id, dt)
-    except ValueError as error_message:
-        return JsonResponse.value_error(str(error_message))
-    except EmptyResultSet as empty_error:
-        return JsonResponse.internal_error(str(empty_error))
-    except ImproperlyConfigured:
-        return JsonResponse.algo_internal_error()
+    result = create_predbills_request_function(shop_id, dt)
 
-    return JsonResponse.success()
+    return JsonResponse.success() if result is True else result
 
 
 @csrf_exempt

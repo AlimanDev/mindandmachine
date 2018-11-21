@@ -424,7 +424,21 @@ class PeriodQueues(PeriodDemand):
     value = models.FloatField(default=0)
 
 
-class PeriodVisitors(PeriodDemand):
+class IncomeVisitors(PeriodDemand):
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
+
+    value = models.FloatField(default=0)
+
+
+class EmptyOutcomeVisitors(PeriodDemand):
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
+
+    value = models.FloatField(default=0)
+
+
+class PurchasesOutcomeVisitors(PeriodDemand):
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
 
@@ -721,7 +735,6 @@ class OfficialHolidays(models.Model):
     country = models.CharField(max_length=4)
     date = models.DateField()
 
-
 class LevelType(models.Model):
     class Type(utils.Enum):
         LOW = 1
@@ -853,5 +866,40 @@ class CameraCashboxStat(models.Model):
 
     def __str__(self):
         return '{}, {}, {}'.format(self.dttm, self.camera_cashbox.name, self.id)
+
+
+class CameraClientGate(models.Model):
+    TYPE_ENTRY = 'E'
+    TYPE_OUT = 'O'
+    TYPE_SERVICE = 'S'
+
+    GATE_TYPES = (
+        (TYPE_ENTRY, 'entry'),
+        (TYPE_OUT, 'exit'),
+        (TYPE_SERVICE, 'service')
+    )
+
+    name = models.CharField(max_length=64)
+    type = models.CharField(max_length=1, choices=GATE_TYPES)
+
+    def __str__(self):
+        return '{}, {}'.format(self.type, self.name)
+
+
+class CameraClientEvent(models.Model):
+    TYPE_TOWARD = 'T'
+    TYPE_BACKWARD = 'B'
+
+    DIRECTION_TYPES = (
+        (TYPE_TOWARD, 'toward'),
+        (TYPE_BACKWARD, 'backward')
+    )
+
+    dttm = models.DateTimeField()
+    gate = models.ForeignKey(CameraClientGate, on_delete=models.PROTECT)
+    type = models.CharField(max_length=1, choices=DIRECTION_TYPES)
+
+    def __str__(self):
+        return 'id {}: {}, {}, {}'.format(self.id, self.dttm, self.type, self.gate.name)
 
 

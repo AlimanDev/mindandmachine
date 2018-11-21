@@ -10,6 +10,7 @@ from src.db.models import (
     User,
     Shop
 )
+from django.views.decorators.csrf import csrf_exempt
 
 
 class JsonResponse(object):
@@ -245,12 +246,53 @@ def check_group_hierarchy(changed_user, user_who_changes):
         return JsonResponse.access_forbidden('You are not allowed to edit this user')
 
 
-def get_uploaded_file(request):
-    file = request.FILES['file']
+def test_algo_server_connection():
+    """
 
-    if not file:
-        return JsonResponse.value_error('Файл не был загружен.')
-    if not file.name.split('.', 1)[1] in ALLOWED_UPLOAD_EXTENSIONS:
-        return JsonResponse.value_error('Файлы с таким расширением не поддерживается.')
+    Returns:
+        True -- если есть соединение с "алго" серваком. Если нет, вовзращаем всякие __base_error_response
+    """
+    from urllib import error, request
 
-    return file
+    req = request.Request('http://{}/test'.format(settings.TIMETABLE_IP))
+    try:
+        response = request.urlopen(req).read().decode('utf-8')
+    except error.URLError:
+        return JsonResponse.algo_internal_error('Сервер для обработки алгоритма недоступен.')
+    if json.loads(response)['status'] == 'ok':
+        return True
+    else:
+        return JsonResponse.algo_internal_error('Что-то не так при подключении к серверу с алгоритмом')
+
+
+def outer_server(func):
+    """
+    Декоратор для приема данных со сторонних серваков. Обязательно должен быть ключ в body реквеста (формта json)
+    т.е. body['key']. И все данные должны быть запиханы в body['data'].
+
+    Args:
+        func(function): функция, которую надо выполнить
+    """
+    @csrf_exempt
+    def wrapper(request, *args, **kwargs):
+        if request.method != 'POST':
+            return JsonResponse.method_error(request.method, 'POST')
+        try:
+            json_data = json.loads(request.body.decode('utf-8'))
+        except ValueError:
+            return JsonResponse.value_error('cannot decode body')
+        if isinstance(json_data, str):
+            return JsonResponse.value_error('did not convert json data properly. output json data has type string')
+
+        if settings.QOS_CAMERA_KEY is not None and json_data['key'] != settings.QOS_CAMERA_KEY:
+            return JsonResponse.access_forbidden('invalid key')
+
+        try:
+            return func(request, json_data['data'], *args, **kwargs)
+        except Exception as e:
+            print(e)
+            if settings.DEBUG:
+                raise e
+            else:
+                return JsonResponse.internal_error()
+    return wrapper

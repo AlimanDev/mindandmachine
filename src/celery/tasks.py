@@ -25,6 +25,11 @@ from src.db.models import (
     User,
     ProductionDay,
     WorkerCashboxInfo,
+    CameraClientGate,
+    CameraClientEvent,
+    IncomeVisitors,
+    EmptyOutcomeVisitors,
+    PurchasesOutcomeVisitors,
 )
 from src.celery.celery import app
 
@@ -79,6 +84,56 @@ def update_queue(till_dttm=None):
 
 
 @app.task
+def update_visitors_info():
+    timestep = datetime.timedelta(minutes=30)
+    dttm_now = now()
+    # todo: исправить потом. пока делаем такую привязку
+    # вообще хорошей идеей наверное будет просто cashbox_type blank=True, null=True сделать в PeriodDemand
+    ct = CashboxType.objects.get(name='Кассы', shop_id=1)
+    create_dict = {
+        'cashbox_type': ct,
+        'dttm_forecast': dttm_now.replace(minute=(0 if dttm_now.minute < 30 else 30), second=0, microsecond=0),
+        'type': IncomeVisitors.FACT_TYPE
+    }
+
+    events_qs = CameraClientEvent.objects.filter(
+        dttm__gte=dttm_now - timestep,
+        dttm__lte=dttm_now
+    )
+
+    income_visitors_value = events_qs.filter(
+        gate__type=CameraClientGate.TYPE_ENTRY,
+        type=CameraClientEvent.TYPE_TOWARD,
+    ).count()
+    empty_outcome_visitors_value = events_qs.filter(
+        gate__type=CameraClientGate.TYPE_ENTRY,
+        type=CameraClientEvent.TYPE_BACKWARD,
+    ).count()
+    purchases_outcome_visitors_value = events_qs.filter(
+        gate__type=CameraClientGate.TYPE_OUT,
+        type=CameraClientEvent.TYPE_TOWARD,
+    ).count() - events_qs.filter(
+        gate__type=CameraClientGate.TYPE_OUT,
+        type=CameraClientEvent.TYPE_BACKWARD,
+    ).count()
+
+    IncomeVisitors.objects.create(
+        value=income_visitors_value,
+        **create_dict
+    )
+    EmptyOutcomeVisitors.objects.create(
+        value=empty_outcome_visitors_value,
+        **create_dict
+    )
+    PurchasesOutcomeVisitors.objects.create(
+        value=purchases_outcome_visitors_value,
+        **create_dict
+    )
+
+    print('успешно создал стату по покупателям')
+
+
+@app.task
 def release_all_workers():
     """
     Отпускает всех работников с касс
@@ -92,7 +147,6 @@ def release_all_workers():
         worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
         dttm_to__isnull=True,
     )
-
 
     for obj in worker_day_cashbox_objs:
         obj.on_cashbox = None
@@ -327,6 +381,7 @@ def create_pred_bills():
     Note:
         Выполняется первого числа каждого месяца
     """
+    # todo: переписать
     for shop in Shop.objects.all():
         create_predbills_request_function(shop.id)
     print('создал спрос на месяц')

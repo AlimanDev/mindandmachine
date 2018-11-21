@@ -1,10 +1,15 @@
-from src.db.models import CameraCashboxStat, CameraCashbox
-from src.util.utils import api_method, JsonResponse
+from src.db.models import (
+    CameraCashboxStat,
+    CameraCashbox,
+    CameraClientGate,
+    CameraClientEvent,
+)
+import datetime
+from src.util.utils import outer_server, JsonResponse, api_method
 from .forms import CameraStatFrom, CamRequestForm
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 import json
-from .forms import CameraStatFrom
 
 
 @csrf_exempt
@@ -58,4 +63,57 @@ def set_queue(request):
 
     if len(bad_csf):
         return JsonResponse.value_error(json.dumps(bad_csf))
+    return JsonResponse.success()
+
+
+@outer_server
+def set_events(request, json_data):
+    """
+    Получает данные по посетителям с камер, заносит их в бд
+
+    Args:
+        method: POST
+        url: /api/camera/set_events
+        key(str): ключ
+        data(str): payload
+    """
+    DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+
+    list_to_create = []
+
+    def bulk_create_camera_event(obj=None):
+        if obj is None:
+            CameraClientEvent.objects.bulk_create(list_to_create)
+        elif len(list_to_create) == 999:
+            list_to_create.append(obj)
+            CameraClientEvent.objects.bulk_create(list_to_create)
+            list_to_create[:] = []
+        else:
+            list_to_create.append(obj)
+
+    for data_value in json_data:
+        dttm = datetime.datetime.strptime(data_value['dttm'], DATETIME_FORMAT)
+        event_type = data_value['type']
+        if event_type not in [CameraClientEvent.TYPE_BACKWARD, CameraClientEvent.TYPE_TOWARD]:
+            return JsonResponse.value_error(
+                'no such direction types for gates. Use {} for toward direction, {} for backward'.\
+                format(CameraClientEvent.TYPE_TOWARD, CameraClientEvent.TYPE_BACKWARD)
+            )
+        try:
+            gate_name = data_value['gate']
+            gate_type = data_value['gate_type']
+            gate = CameraClientGate.objects.get(name=gate_name, type=gate_type)
+        except CameraClientGate.DoesNotExist:
+            return JsonResponse.value_error(
+                'cannot get gate for gate with name:{} and type: {}'.format(gate_name, gate_type)
+            )
+        bulk_create_camera_event(
+            CameraClientEvent(
+                dttm=dttm,
+                gate=gate,
+                type=event_type
+            )
+        )
+    bulk_create_camera_event(obj=None)
+
     return JsonResponse.success()

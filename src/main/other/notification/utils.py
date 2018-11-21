@@ -11,6 +11,7 @@ from src.db.models import (
 )
 from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
+from src.util.months import month_dict
 
 work_types = {
     WorkerDay.Type.TYPE_WORKDAY.value: 'рабочий день',
@@ -30,20 +31,6 @@ def get_month_name(dt):
     Returns:
         (char): название месяца
     """
-    month_dict = {
-        1: 'январь',
-        2: 'февраль',
-        3: 'март',
-        4: 'апрель',
-        5: 'май',
-        6: 'июнь',
-        7: 'июль',
-        8: 'август',
-        9: 'сентябрь',
-        10: 'октябрь',
-        11: 'ноябрь',
-        12: 'декабрь',
-    }
     return month_dict[dt.month]
 
 
