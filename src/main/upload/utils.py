@@ -3,6 +3,7 @@ from src.conf.djconfig import ALLOWED_UPLOAD_EXTENSIONS
 from django.utils.datastructures import MultiValueDictKeyError
 from django.conf import settings
 from src.db.models import WorkerDay
+from functools import wraps
 
 
 WORK_TYPES = {
@@ -22,6 +23,7 @@ def get_uploaded_file(func):
     Returns:
         file
     """
+    @wraps(func)
     def wrapper(request, form, *args, **kwargs):
         try:
             file = request.FILES['file']
@@ -34,7 +36,7 @@ def get_uploaded_file(func):
             return JsonResponse.value_error('Файлы с таким расширением не поддерживается.')
 
         try:
-            return func(request, form, file, *args, **kwargs)
+            return func(request, form, *args, **kwargs)
         except Exception as e:
             print(e)
             if settings.DEBUG:
