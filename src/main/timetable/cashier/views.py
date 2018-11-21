@@ -769,6 +769,7 @@ def get_worker_day_logs(request, form):
         )
 
     response_data['change_logs'] = [WorkerDayConverter.convert(worker_day) for worker_day in child_worker_days]
+    #  todo: после изменений на фронте удалить total_count
     response_data['total_count'] = child_worker_days.count()
     for one_wd in response_data['change_logs']:
         one_wd['prev_dttm_work_start'] = BaseConverter.convert_datetime(

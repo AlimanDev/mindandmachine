@@ -342,3 +342,13 @@ class SlotConverter(BaseConverter):
             'name': obj.name
         }
 
+
+class AttendanceRecordsConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'dttm': cls.convert_datetime(obj.dttm),
+            'worker_id': obj.worker_id,
+            'type': obj.type,
+        }

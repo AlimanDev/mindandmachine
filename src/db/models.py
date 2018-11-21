@@ -903,3 +903,22 @@ class CameraClientEvent(models.Model):
         return 'id {}: {}, {}, {}'.format(self.id, self.dttm, self.type, self.gate.name)
 
 
+class AttendanceRecords(models.Model):
+    TYPE_COMING = 'C'
+    TYPE_LEAVING = 'L'
+    TYPE_BREAK_START = 'S'
+    TYPE_BREAK_END = 'E'
+
+    RECORD_TYPES = (
+        (TYPE_COMING, 'coming'),
+        (TYPE_LEAVING, 'leaving'),
+        (TYPE_BREAK_START, 'break start'),
+        (TYPE_BREAK_END, 'break_end')
+    )
+
+    dttm = models.DateTimeField()
+    type = models.CharField(max_length=1, choices=RECORD_TYPES)
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
+
+    def __str__(self):
+        return 'userID: {}, type: {}, dttm: {}'.format(self.worker_id, self.type, self.dttm)
