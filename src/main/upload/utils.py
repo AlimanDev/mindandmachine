@@ -36,7 +36,7 @@ def get_uploaded_file(func):
             return JsonResponse.value_error('Файлы с таким расширением не поддерживается.')
 
         try:
-            return func(request, form, *args, **kwargs)
+            return func(request, form, file, *args, **kwargs)
         except Exception as e:
             print(e)
             if settings.DEBUG:
