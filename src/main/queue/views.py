@@ -209,4 +209,13 @@ def set_parameters(request, form):
     lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def process_forecast(request, form):
+    """
+
+    Args:
+         method: POST
+         url: /api/queue/process_forecast
+         shop_id(int): required = True
+    Returns:
+        None
+    """
     return JsonResponse.success()
