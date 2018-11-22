@@ -11,7 +11,7 @@ from .forms import UploadForm
 from src.db.models import (
     User,
     PeriodClients,
-    Cashbox,
+    CashboxType,
     Notifications,
     WorkerDay,
     WorkerDayCashboxDetails,
@@ -28,14 +28,27 @@ from src.util.models_converter import BaseConverter
 @get_uploaded_file
 def upload_demand(request, form, demand_file):
     """
-    Принимает от клиента экселевский файл и загружает из него данные в бд
+    Принимает от клиента экселевский файл в формате из TPNET (для леруа специально) и загружает из него данные в бд
 
     Args:
          method: POST
          url: /api/upload/upload_demand
          shop_id(int): required = True
     """
+    try:
+        worksheet = load_workbook(demand_file).active
+    except KeyError:
+        return JsonResponse.internal_error('Не удалось открыть активный лист.')
+
     list_to_create = []
+
+    shop_id = form['shop_id']
+    cash_column_num = 0
+    time_column_num = 1
+    value_column_num = 2
+    datetime_format = '%d.%m.%Y %H:%M:%S'
+    processed_rows = 0  # счетчик "обработынных" строк
+    checked_rows = 0  # счетчик "проверенных" строк
 
     def create_demand_objs(obj=None):
         if obj is None:
@@ -47,97 +60,58 @@ def upload_demand(request, form, demand_file):
         else:
             list_to_create.append(obj)
 
-    def qs_on_date(dt):
-        return PeriodClients.objects.filter(
-            type=PeriodClients.FACT_TYPE,
-            dttm_forecast__date=dt,
-            cashbox_type__shop_id=shop_id
-        )
-
-    df = pd.read_excel(demand_file)
-    df = df.fillna('')
-    df = df.values
+    cashbox_types = list(CashboxType.objects.filter(shop_id=shop_id))
 
     ######################### сюда писать логику чтения из экселя ######################################################
 
-    shop_id = form['shop_id']
-    date_format = '%m/%d/%Y'
-    summ = '∑'
-    hours_row = 8  # 10 - 2
-    first_date_row = 111  # 113 - 2
-    cashbox_col = 2
-    values_start_col = 4
-
-    date_to_create = datetime.datetime.strptime(df[first_date_row][0], date_format).date()
-
-    cashboxes = Cashbox.objects.select_related('type').filter(
-        type__shop_id=shop_id
-    )
-    cashboxes_numbers = list(cashboxes.values_list('number', flat=True))
-    cashboxes_not_found = []
-    cashbox_types = {}
-    for cashbox in cashboxes:
-        cashbox_types[cashbox.number] = cashbox.type_id
-
-    hours = []
-    for hour in df[hours_row]:
-        if hour and hour != summ:
-            hours.append(datetime.time(int(hour), 0))
-            hours.append(datetime.time(int(hour), 30))
-    hours.pop(1)  # pop 0:30
-
-
-    start = datetime.datetime.now()
-
-    for row_ind, row in enumerate(df[hours_row + 1:]):
-        if row_ind % 3 != 0:
+    for index, row in enumerate(worksheet.rows):
+        value = row[value_column_num].value
+        if not isinstance(row[value_column_num].value, int):
+            #  может быть 'Нет данных'
             continue
-        cashbox_num = row[cashbox_col]
-        if cashbox_num == summ:
+        checked_rows += 1
+        dttm = row[time_column_num].value
+        if '.' not in dttm or ':' not in dttm:
             continue
-        if not len(cashbox_num):  # нашли дату
-            if '.' in row[0] or '/' in row[0]:  # проверим, что она похожа на формат даты
-                date_to_create = datetime.datetime.strptime(row[0], date_format).date()
-            continue
+        if not isinstance(dttm, datetime.datetime):
+            try:
+                dttm = datetime.datetime.strptime(dttm, datetime_format)
+            except ValueError:
+                return JsonResponse.value_error('Невозможно преобразовать время. Пожалуйста введите формат {}'.format(datetime_format))
+
+        cashtype_name = row[cash_column_num].value
+        cashtype_name = cashtype_name[:1].upper() + cashtype_name[1:].lower()  # учет регистра чтобы нормально в бд было
+
+        ct_to_search = list(filter(lambda ct: ct.name == cashtype_name, cashbox_types))  # возвращает фильтр по типам
+        if len(ct_to_search) == 1:
+            PeriodClients.objects.filter(
+                dttm_forecast=dttm,
+                cashbox_type=ct_to_search[0],
+                type=PeriodClients.FACT_TYPE
+            ).delete()
+            create_demand_objs(
+                PeriodClients(
+                    dttm_forecast=dttm,
+                    cashbox_type=ct_to_search[0],
+                    value=value,
+                    type=PeriodClients.FACT_TYPE
+                )
+            )
+            processed_rows += 1
+
         else:
-            cashbox_num = int(cashbox_num)
+            return JsonResponse.internal_error('Невозможно прочитать тип работ на строке №{}.'.format(index))
 
-        if cashbox_num in cashboxes_numbers:
-            cashbox_type_id = cashbox_types[cashbox_num]
-            qs_on_date(date_to_create).filter(cashbox_type_id=cashbox_type_id).delete()
-            for hour_ind, hour in enumerate(hours):
-                df_hour_index = values_start_col + int((hour_ind+1)/2)
-                value = row[df_hour_index]
-                if hour_ind != 0 and hour_ind % 2 == 0 and hour_ind != len(hours) - 1:
-                    value = value + row[df_hour_index + 1] / 2
-                create_dict = {
-                    'type': PeriodClients.FACT_TYPE,
-                    'dttm_forecast': datetime.datetime.combine(date_to_create, hour),
-                    'cashbox_type_id': cashbox_type_id
-                }
-                filtered_list = list(filter(lambda x:
-                                            x.dttm_forecast == datetime.datetime.combine(date_to_create, hour)
-                                            and x.cashbox_type_id == cashbox_type_id,
-                                            list_to_create))
-                if filtered_list:
-                    filtered_list[0].value += value
-                else:
-                    create_demand_objs(PeriodClients(value=value, **create_dict))
-        else:
-            cashboxes_not_found.append(cashbox_num)
+    if processed_rows == 0 or processed_rows < checked_rows / 2:  # если было обработано, меньше половины строк, че-то пошло не так
+        return JsonResponse.internal_error(
+            'Было обработано {}/{} строк. Пожалуйста, проверьте формат данных в файле.'.format(
+                processed_rows, worksheet.max_row
+            )
+        )
+
     ####################################################################################################################
 
     create_demand_objs(None)
-
-    cashboxes_not_found = list(set(cashboxes_not_found))
-
-    if cashboxes_not_found:
-        for u in User.objects.filter(shop_id=shop_id, group__in=User.__except_cashiers__):
-            Notifications.objects.create(
-                to_worker_id=u.id,
-                text='Был составлен прогноз по клиентам. Кассы с номера {} не были найдены в базе данных.'.format(cashboxes_not_found),
-                type=Notifications.TYPE_INFO
-            )
 
     from_dt_to_create = PeriodClients.objects.filter(
         type=PeriodClients.FACT_TYPE,
