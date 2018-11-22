@@ -7,4 +7,5 @@ urlpatterns = [
     path('get_time_distribution', views.get_time_distribution),
     path('get_parameters', views.get_parameters),
     path('set_parameters', views.set_parameters),
+    path('process_forecast', views.process_forecast),
 ]
