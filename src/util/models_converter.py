@@ -349,6 +349,8 @@ class AttendanceRecordsConverter(BaseConverter):
         return {
             'id': obj.id,
             'dttm': cls.convert_datetime(obj.dttm),
-            'worker_id': obj.worker_id,
+            'worker_id': obj.identifier.worker_id,
             'type': obj.type,
+            'is_verified': obj.verified,
         }
+    

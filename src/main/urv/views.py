@@ -24,15 +24,31 @@ def get_user_urv(request, form):
     Returns:
         {}
     """
+
+    PER_PAGE = 20
+
     worker_ids = form['worker_ids']
     from_dt = form['from_dt']
     to_dt = form['to_dt']
+    offset = form['offset']
 
-    user_records = AttendanceRecords.objects.filter(
-        worker_id__in=worker_ids,
+    if offset is None:
+        offset = 0
+
+    if len(worker_ids):
+        worker_ids = list(User.objects.qos_filter_active(
+            to_dt,
+            from_dt,
+            shop_id=request.user.shop_id
+        ).values_list('id', flat=True))
+
+    user_records = AttendanceRecords.objects.select_related('identifier').filter(
+        identifier__worker_id__in=worker_ids,
         dttm__date__gte=from_dt,
         dttm__date__lte=to_dt,
-    )
+    ).order_by(
+        '-dttm',
+    )[offset * PER_PAGE: (offset + 1) * PER_PAGE]
 
     return JsonResponse.success([
         AttendanceRecordsConverter.convert(record) for record in user_records
