@@ -29,18 +29,11 @@ def get_user_urv(request, form):
     Returns:
         {}
     """
-
-    PER_PAGE = 20
-
     worker_ids = form['worker_ids']
     from_dt = form['from_dt']
     to_dt = form['to_dt']
-    offset = form['offset']
 
-    if offset is None or offset < 0:
-        offset = 0
-
-    if len(worker_ids):
+    if not len(worker_ids):
         worker_ids = list(User.objects.qos_filter_active(
             to_dt,
             from_dt,
@@ -60,6 +53,8 @@ def get_user_urv(request, form):
         user_records = user_records.filter(dttm__time__gte=form['from_tm'])
     if form['to_tm']:
         user_records = user_records.filter(dttm__time__lte=form['to_tm'])
+    if form['type']:
+        user_records = user_records.filter(type=form['type'])
 
     select_not_verified = False
     select_not_detected = False
@@ -83,12 +78,8 @@ def get_user_urv(request, form):
         extra_filters = functools.reduce(lambda x, y: x|y, extra_filters)
         user_records = user_records.filter(extra_filters)
 
-    page_user_records = user_records.order_by(
-        '-dttm',
-    )[offset * PER_PAGE: (offset + 1) * PER_PAGE]
-
     return JsonResponse.success([
-        AttendanceRecordsConverter.convert(record) for record in page_user_records
+        AttendanceRecordsConverter.convert(record) for record in user_records.order_by('-dttm')
     ])
 
 

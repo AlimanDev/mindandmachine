@@ -9,6 +9,7 @@ class GetUserUrvForm(forms.Form):
     shop = forms.IntegerField(required=False)
     offset = forms.IntegerField(required=False)
 
+    type = forms.CharField(required=False)
     from_tm = util_forms.TimeField(required=False)
     to_tm = util_forms.TimeField(required=False)
     show_not_verified = forms.BooleanField(required=False)
