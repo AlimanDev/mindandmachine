@@ -1,6 +1,7 @@
 import datetime
 
 from openpyxl import load_workbook
+import pandas as pd
 import re
 from openpyxl.utils import column_index_from_string
 from dateutil.relativedelta import relativedelta
@@ -11,6 +12,7 @@ from src.db.models import (
     User,
     PeriodClients,
     CashboxType,
+    Notifications,
     WorkerDay,
     WorkerDayCashboxDetails,
 )
@@ -26,7 +28,7 @@ from src.util.models_converter import BaseConverter
 @get_uploaded_file
 def upload_demand(request, form, demand_file):
     """
-    Принимает от клиента экселевский файл и загружает из него данные в бд
+    Принимает от клиента экселевский файл в формате из TPNET (для леруа специально) и загружает из него данные в бд
 
     Args:
          method: POST

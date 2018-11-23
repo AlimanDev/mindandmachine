@@ -14,6 +14,7 @@ from .forms import (
     GetIndicatorsForm,
     GetParametersForm,
     SetParametersForm,
+    ProcessForecastForm,
 )
 
 
@@ -200,3 +201,21 @@ def set_parameters(request, form):
         'max_queue_length': shop.max_queue_length,
         'dead_time_part': shop.dead_time_part
     })
+
+
+@api_method(
+    'POST',
+    ProcessForecastForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
+def process_forecast(request, form):
+    """
+
+    Args:
+         method: POST
+         url: /api/queue/process_forecast
+         shop_id(int): required = True
+    Returns:
+        None
+    """
+    return JsonResponse.success()

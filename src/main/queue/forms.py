@@ -26,3 +26,7 @@ class SetParametersForm(forms.Form):
     mean_queue_length = forms.FloatField()
     max_queue_length = forms.FloatField()
     dead_time_part = forms.FloatField()
+
+
+class ProcessForecastForm(forms.Form):
+    shop_id = forms.IntegerField()

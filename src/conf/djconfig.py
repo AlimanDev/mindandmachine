@@ -184,7 +184,7 @@ QOS_DATE_FORMAT = '%d.%m.%Y'
 QOS_TIME_FORMAT = '%H:%M:%S'
 QOS_SHORT_TIME_FORMAT = '%H:%M'
 
-ALLOWED_UPLOAD_EXTENSIONS = ['xlsx',]
+ALLOWED_UPLOAD_EXTENSIONS = ['xlsx', 'xls']
 
 
 CELERY_IMPORTS = ('src.celery.tasks',)
