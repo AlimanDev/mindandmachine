@@ -93,7 +93,7 @@ def change_user_urv(request, form):
     if not form['to_user_id'] and not form['is_outsource']:
         return JsonResponse.value_error('to_user_id and is_outsource both are empty')
 
-    identifier = UserIdentifier.objects.get(attendance__id=form['attendance_id'])
+    identifier = UserIdentifier.objects.get(attendancerecords__id=form['attendance_id'])
 
     if form['to_user_id']:
         user = User.objects.get(
