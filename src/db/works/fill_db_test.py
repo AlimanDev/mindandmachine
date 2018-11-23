@@ -214,12 +214,14 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     dttm=dttm_work_start,
                     type=AttendanceRecords.TYPE_COMING,
                     identifier=worker_ident,
+                    super_shop=shop.super_shop_id,
                 ))
 
                 add_models(models_attendance, AttendanceRecords, AttendanceRecords(
                     dttm=dttm_work_end,
                     type=AttendanceRecords.TYPE_LEAVING,
                     identifier=worker_ident,
+                    super_shop=shop.super_shop_id,
                 ))
 
 
@@ -246,12 +248,15 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         dttm=dttm_work_start,
         type=AttendanceRecords.TYPE_COMING,
         identifier=worker_ident,
+        super_shop=shop.super_shop_id,
     ))
 
     add_models(models_attendance, AttendanceRecords, AttendanceRecords(
         dttm=dttm_work_end,
         type=AttendanceRecords.TYPE_LEAVING,
         identifier=worker_ident,
+        super_shop=shop.super_shop_id,
+
     ))
 
     add_models(details, WorkerDayCashboxDetails, None)

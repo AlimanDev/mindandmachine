@@ -353,4 +353,3 @@ class AttendanceRecordsConverter(BaseConverter):
             'type': obj.type,
             'is_verified': obj.verified,
         }
-    

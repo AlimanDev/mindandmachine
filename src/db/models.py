@@ -928,5 +928,7 @@ class AttendanceRecords(models.Model):
     identifier = models.ForeignKey(UserIdentifier, on_delete=models.PROTECT)
     verified = models.BooleanField(default=True)
 
+    super_shop = models.ForeignKey(SuperShop, on_delete=models.PROTECT) # todo: or should be to shop? fucking logic
+
     def __str__(self):
-        return 'userID: {}, type: {}, dttm: {}'.format(self.worker_id, self.type, self.dttm)
+        return 'UserIdentID: {}, type: {}, dttm: {}'.format(self.identifier_id, self.type, self.dttm)
