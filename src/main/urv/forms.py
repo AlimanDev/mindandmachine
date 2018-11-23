@@ -15,3 +15,9 @@ class GetUserUrvForm(forms.Form):
     show_not_detected = forms.BooleanField(required=False)
     show_workers = forms.BooleanField(required=False)
     show_outstaff = forms.BooleanField(required=False)
+
+
+class ChangeAttendanceForm(forms.Form):
+    attendance_id = forms.IntegerField()
+    to_user_id = forms.IntegerField(required=False)
+    is_outsource = forms.BooleanField(required=False)

@@ -1,12 +1,15 @@
 from src.db.models import (
     User,
     AttendanceRecords,
+    UserIdentifier,
 )
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import AttendanceRecordsConverter
-from .forms import GetUserUrvForm
+from .forms import GetUserUrvForm, ChangeAttendanceForm
 from django.db.models import Q
 import functools
+from django.utils import timezone
+
 
 @api_method(
     'GET',
@@ -87,3 +90,42 @@ def get_user_urv(request, form):
     return JsonResponse.success([
         AttendanceRecordsConverter.convert(record) for record in page_user_records
     ])
+
+
+@api_method(
+    'POST',
+    ChangeAttendanceForm,
+    check_permissions=False,
+    lambda_func=None,  # lambda x: User.objects.get(id=x['worker_ids'][0])
+)
+def change_user_urv(request, form):
+    if not form['to_user_id'] and not form['is_outsource']:
+        return JsonResponse.value_error('to_user_id and is_outsource both are empty')
+
+    identifier = UserIdentifier.objects.get(attendance__id=form['attendance_id'])
+
+    if form['to_user_id']:
+        user = User.objects.get(
+            id=form['to_user_id'],
+            shop_id=request.user.shop_id,
+        )
+    else:
+        dt = timezone.now().date()
+        outsourcer_number = User.objects.filter(
+            attachment_group=User.GROUP_OUTSOURCE,
+            date_joined=dt,
+        ).count()
+        user = User.objects.create(
+            shop_id=request.user.shop_id,
+            attachment_group=User.GROUP_OUTSOURCE,
+            first_name='№ ' + outsourcer_number,
+            last_name='Наемный сотрудник',
+            dt_hired=dt,
+            dt_fired=dt,
+            username='outsourcer_{}_{}'.format(dt, outsourcer_number),
+            auto_timetable=False
+        )
+
+    identifier.worker = user
+    identifier.save()
+    return JsonResponse.success()
