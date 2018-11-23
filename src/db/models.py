@@ -129,10 +129,10 @@ class WorkerManager(UserManager):
         """
 
         return self.filter(
-            models.Q(dt_hired__lte=dt_from) | models.Q(dt_hired__isnull=True),
+            models.Q(dt_hired__date__lte=dt_from) | models.Q(dt_hired__date__isnull=True),
             attachment_group=User.GROUP_STAFF
         ).filter(
-            models.Q(dt_fired__gte=dt_to) | models.Q(dt_fired__isnull=True),
+            models.Q(dt_fired__date__gte=dt_to) | models.Q(dt_fired__date__isnull=True),
             attachment_group=User.GROUP_STAFF
         ).filter(*args, **kwargs)
 
@@ -254,9 +254,9 @@ class CashboxTypeManager(models.Manager):
         """
 
         return self.filter(
-            models.Q(dttm_added__lte=dttm_from) | models.Q(dttm_added__isnull=True)
+            models.Q(dttm_added__date__lte=dttm_from) | models.Q(dttm_added__date__isnull=True)
         ).filter(
-            models.Q(dttm_deleted__gte=dttm_to) | models.Q(dttm_deleted__isnull=True)
+            models.Q(dttm_deleted__date__gte=dttm_to) | models.Q(dttm_deleted__date__isnull=True)
         ).filter(*args, **kwargs)
 
 
@@ -356,9 +356,9 @@ class CashboxManager(models.Manager):
         """
 
         return self.filter(
-            models.Q(dttm_added__lte=dt_from) | models.Q(dttm_added__isnull=True)
+            models.Q(dttm_added__date__lte=dt_from) | models.Q(dttm_added__date__isnull=True)
         ).filter(
-            models.Q(dttm_deleted__gte=dt_to) | models.Q(dttm_deleted__isnull=True)
+            models.Q(dttm_deleted__date__gte=dt_to) | models.Q(dttm_deleted__date__isnull=True)
         ).filter(*args, **kwargs)
 
 
