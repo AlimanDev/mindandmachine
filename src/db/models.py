@@ -129,10 +129,10 @@ class WorkerManager(UserManager):
         """
 
         return self.filter(
-            models.Q(dt_hired__date__lte=dt_from) | models.Q(dt_hired__date__isnull=True),
+            models.Q(dt_hired__lte=dt_from) | models.Q(dt_hired__isnull=True),
             attachment_group=User.GROUP_STAFF
         ).filter(
-            models.Q(dt_fired__date__gte=dt_to) | models.Q(dt_fired__date__isnull=True),
+            models.Q(dt_fired__gte=dt_to) | models.Q(dt_fired__isnull=True),
             attachment_group=User.GROUP_STAFF
         ).filter(*args, **kwargs)
 
@@ -907,7 +907,9 @@ class UserIdentifier(models.Model):
     dttm_added = models.DateTimeField(auto_now_add=True)
     identifier = models.CharField(max_length=256, unique=True)
     worker = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True)
-    # is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return 'id: {}, identifier: {}, worker: {}'.format(self.id, self.identifier, self.worker_id)
 
 
 class AttendanceRecords(models.Model):

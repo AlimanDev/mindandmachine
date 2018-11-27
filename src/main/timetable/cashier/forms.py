@@ -234,12 +234,16 @@ class PasswordChangeForm(forms.Form):
 
 class ChangeCashierInfo(forms.Form):
     user_id = forms.IntegerField()
+    password = forms.CharField()
     first_name = forms.CharField(max_length=30, required=False)
     middle_name = forms.CharField(max_length=64, required=False)
     last_name = forms.CharField(max_length=150, required=False)
-    avatar = forms.ImageField(required=False)
+    dt_hired = util_forms.DateField(required=False)
+    dt_fired = util_forms.DateField(required=False)
+    email = forms.CharField(max_length=128, required=False)
+    phone_number = forms.CharField(max_length=32, required=False)
+    tabel_code = forms.CharField(max_length=15, required=False)
     group = forms.CharField(max_length=1, required=False)
-    birthday = forms.DateField(required=False)
 
 
 class GetWorkerDayChangeLogsForm(forms.Form):

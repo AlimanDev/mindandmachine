@@ -1,6 +1,12 @@
 import datetime
 
-from src.db.models import User, WorkerDay, Timetable, CashboxType
+from src.db.models import (
+    User,
+    WorkerDay,
+    Timetable,
+    CashboxType,
+    UserIdentifier,
+)
 from src.conf.djconfig import (
     QOS_DATE_FORMAT,
     QOS_DATETIME_FORMAT,
@@ -55,6 +61,7 @@ class UserConverter(BaseConverter):
 
     @classmethod
     def convert(cls, obj):
+        user_identifier = UserIdentifier.objects.filter(worker_id=obj.id).first()
         return {
             'id': obj.id,
             'username': obj.username,
@@ -62,6 +69,7 @@ class UserConverter(BaseConverter):
             'work_type': cls.convert_work_type(obj.work_type),
             'first_name': obj.first_name,
             'last_name': obj.last_name,
+            'middle_name': obj.middle_name,
             'avatar_url': obj.avatar.url if obj.avatar else None,
             'dt_hired': cls.convert_date(obj.dt_hired),
             'dt_fired': cls.convert_date(obj.dt_fired),
@@ -71,10 +79,12 @@ class UserConverter(BaseConverter):
             'is_fixed_hours': obj.is_fixed_hours,
             'is_fixed_days': obj.is_fixed_days,
             'phone_number': obj.phone_number,
+            'email': obj.email,
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
             'group': obj.group,
-            'attachment_group': obj.attachment_group
+            'attachment_group': obj.attachment_group,
+            'identifier': user_identifier.identifier if user_identifier else None,
         }
 
 

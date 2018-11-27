@@ -2,7 +2,6 @@ import json
 
 from django.conf import settings
 from functools import wraps
-from src.conf.djconfig import ALLOWED_UPLOAD_EXTENSIONS
 from django.contrib.auth import authenticate, login
 from django.http import HttpResponse
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
@@ -11,6 +10,15 @@ from src.db.models import (
     Shop
 )
 from django.views.decorators.csrf import csrf_exempt
+
+
+GROUP_HIERARCHY = {
+    User.GROUP_CASHIER: 0,
+    User.GROUP_HQ: 0,
+    User.GROUP_MANAGER: 1,
+    User.GROUP_SUPERVISOR: 2,
+    User.GROUP_DIRECTOR: 3,
+}
 
 
 class JsonResponse(object):
@@ -107,6 +115,7 @@ def api_method(
         check_permissions=True,
         groups=None,
         lambda_func=None,
+        check_password=False,
     ):
     """
 
@@ -155,6 +164,10 @@ def api_method(
                 kwargs['form'] = form.cleaned_data
             else:
                 kwargs.pop('form', None)
+
+            if check_password:
+                if not request.user.check_password(form.cleaned_data['password']):
+                    return JsonResponse.access_forbidden('Неверный пароль')
 
             if check_permissions:  # for signout
                 if auth_required and request.user.is_authenticated:
@@ -217,7 +230,9 @@ def api_method(
                                     )
 
                         else:
-                            return JsonResponse.access_forbidden('Your group is {}'.format(user_group))
+                            return JsonResponse.access_forbidden(
+                                'У вас недостаточно прав для выполнения операции. Ваша группа {}'.format(user_group)
+                            )
 
             try:
                 return func(request, *args, **kwargs)
@@ -235,14 +250,7 @@ def api_method(
 
 
 def check_group_hierarchy(changed_user, user_who_changes):
-    group_hierarchy = {
-        User.GROUP_CASHIER: 0,
-        User.GROUP_HQ: 0,
-        User.GROUP_MANAGER: 1,
-        User.GROUP_SUPERVISOR: 2,
-        User.GROUP_DIRECTOR: 3,
-    }
-    if group_hierarchy[user_who_changes.group] <= group_hierarchy[changed_user.group]:
+    if GROUP_HIERARCHY[user_who_changes.group] <= GROUP_HIERARCHY[changed_user.group]:
         return JsonResponse.access_forbidden('You are not allowed to edit this user')
 
 

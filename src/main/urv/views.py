@@ -41,14 +41,17 @@ def get_user_urv(request, form):
         ).values_list('id', flat=True))
 
     user_records = AttendanceRecords.objects.select_related('identifier').filter(
-        # identifier__worker_id__in=worker_ids,
         dttm__date__gte=from_dt,
         dttm__date__lte=to_dt,
         super_shop_id=request.user.shop.super_shop_id,
     )
 
     if len(worker_ids):
-        user_records = user_records.filter(identifier__worker_id__in=worker_ids,)
+        user_records = user_records.filter(
+            Q(identifier__worker_id__in=worker_ids) |
+            Q(identifier__worker_id__isnull=True) |
+            Q(identifier__worker__attachment_group=User.GROUP_OUTSOURCE)
+        )
     if form['from_tm']:
         user_records = user_records.filter(dttm__time__gte=form['from_tm'])
     if form['to_tm']:
@@ -75,7 +78,7 @@ def get_user_urv(request, form):
 
     extra_filters = list(filter(lambda x: x, [select_not_verified, select_not_detected, select_workers, select_outstaff]))
     if len(extra_filters):
-        extra_filters = functools.reduce(lambda x, y: x|y, extra_filters)
+        extra_filters = functools.reduce(lambda x, y: x | y, extra_filters)
         user_records = user_records.filter(extra_filters)
 
     return JsonResponse.success([
@@ -91,30 +94,31 @@ def get_user_urv(request, form):
 )
 def change_user_urv(request, form):
     if not form['to_user_id'] and not form['is_outsource']:
-        return JsonResponse.value_error('to_user_id and is_outsource both are empty')
+        return JsonResponse.value_error('Выберите, пожалуйста, либо сотрудника, либо вариант аутсорса.')
 
     identifier = UserIdentifier.objects.get(attendancerecords__id=form['attendance_id'])
 
-    if form['to_user_id']:
-        user = User.objects.get(
-            id=form['to_user_id'],
-            shop_id=request.user.shop_id,
-        )
-    else:
+    if form['is_outsource']:
         dt = timezone.now().date()
         outsourcer_number = User.objects.filter(
             attachment_group=User.GROUP_OUTSOURCE,
-            date_joined=dt,
+            dt_hired=dt,
+            dt_fired=dt,
         ).count()
         user = User.objects.create(
             shop_id=request.user.shop_id,
             attachment_group=User.GROUP_OUTSOURCE,
-            first_name='№ ' + outsourcer_number,
+            first_name='№{}'.format(outsourcer_number + 1),
             last_name='Наемный сотрудник',
             dt_hired=dt,
             dt_fired=dt,
-            username='outsourcer_{}_{}'.format(dt, outsourcer_number),
+            username='outsourcer_{}_{}'.format(dt, outsourcer_number + 1),
             auto_timetable=False
+        )
+    else:
+        user = User.objects.get(
+            id=form['to_user_id'],
+            shop_id=request.user.shop_id,
         )
 
     identifier.worker = user
