@@ -16,19 +16,23 @@ from src.db.models import (
     Shop,
     Notifications,
 )
-from src.util.utils import JsonResponse, api_method, check_group_hierarchy
+from src.util.utils import (
+    JsonResponse,
+    api_method,
+    check_group_hierarchy,
+    GROUP_HIERARCHY,
+)
 from src.util.forms import FormUtil
 from src.util.models_converter import (
     UserConverter,
     WorkerDayConverter,
-    WorkerDayChangeRequestConverter,
     WorkerConstraintConverter,
     WorkerCashboxInfoConverter,
     CashboxTypeConverter,
     BaseConverter,
     WorkerDayChangeLogConverter,
 )
-from src.util.collection import group_by, count, range_u, group_by_object
+from src.util.collection import group_by, count, range_u
 
 from .forms import (
     GetCashierTimetableForm,
@@ -769,6 +773,7 @@ def get_worker_day_logs(request, form):
         )
 
     response_data['change_logs'] = [WorkerDayConverter.convert(worker_day) for worker_day in child_worker_days]
+    #  todo: после изменений на фронте удалить total_count
     response_data['total_count'] = child_worker_days.count()
     for one_wd in response_data['change_logs']:
         one_wd['prev_dttm_work_start'] = BaseConverter.convert_datetime(
@@ -1238,7 +1243,9 @@ def password_edit(request, form):
     'POST',
     ChangeCashierInfo,
     groups=User.__allowed_to_modify__,
-    lambda_func=lambda x: User.objects.get(id=x['user_id']))
+    lambda_func=lambda x: User.objects.get(id=x['user_id']),
+    check_password=True,
+)
 def change_cashier_info(request, form):
     """
 
@@ -1249,23 +1256,16 @@ def change_cashier_info(request, form):
         first_name(str): required = False
         middle_name(str): required = False
         last_name(str): required = False
-        avatar(img): required = False
+        phone_number(str): required = False
+        email(str): required = False
+        dt_hired(QOS_DATE): required = False
+        dt_fired(QOS_DATE): required = False
         group(str): required = False. Группа пользователя ('C'/'S'/'M'/'D'/'H')
-        birthday(QOS_DATE): required = False
 
     Returns:
          сложный дикт
     """
     user_id = form['user_id']
-
-    response = {}
-    group_hierarchy = {
-        User.GROUP_CASHIER: 0,
-        User.GROUP_HQ: 0,
-        User.GROUP_MANAGER: 1,
-        User.GROUP_SUPERVISOR: 2,
-        User.GROUP_DIRECTOR: 3,
-    }
 
     if user_id != request.user.id:
         try:
@@ -1279,32 +1279,30 @@ def change_cashier_info(request, form):
         user = request.user
 
     if form['group']:
-        if group_hierarchy[request.user.group] <= group_hierarchy[form['group']]:
-            return JsonResponse.access_forbidden('You are not allowed to edit this group')
+        if GROUP_HIERARCHY[request.user.group] < GROUP_HIERARCHY[form['group']]:
+            return JsonResponse.access_forbidden('У вас недостаточно прав доступа для изменения данной группы.')
+        user.group = form['group']
 
     if form['first_name']:
         user.first_name = form['first_name']
-        response['new_first_name'] = user.first_name
-
     if form['middle_name']:
         user.middle_name = form['middle_name']
-        response['new_middle_name'] = form['middle_name']
-
     if form['last_name']:
         user.last_name = form['last_name']
-        response['new_last_name'] = form['last_name']
-
-    if form['avatar']:
-        user.avatar = form['avatar']
-        response['new_avatar'] = 'True'
-
-    if form['birthday']:
-        user.birthday = form['birthday']
-        response['new_birthday'] = str(form['birthday'])
+    if form['tabel_code']:
+        user.tabel_code = form['tabel_code']
+    if form['phone_number']:
+        user.phone_number = form['phone_number']
+    if form['email']:
+        user.email = form['email']
+    if form['dt_hired']:
+        user.dt_hired = form['dt_hired']
+    if form['dt_fired']:
+        user.dt_fired = form['dt_fired']
 
     user.save()
 
-    return JsonResponse.success(response)
+    return JsonResponse.success()
 
 # views for making requests for changing worker day from mobile application
 

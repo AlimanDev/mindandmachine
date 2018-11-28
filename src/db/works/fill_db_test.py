@@ -15,7 +15,9 @@ from ..models import (
     WorkerDayCashboxDetails,
     WorkerCashboxInfo,
     CashboxType,
-    Cashbox
+    Cashbox,
+    UserIdentifier,
+    AttendanceRecords,
 )
 from src.util.models_converter import (
     WorkerDayConverter,
@@ -132,6 +134,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
 
     details = []
     models = []
+    models_attendance = []
     infos = []
 
     for worker_ind, worker_d in enumerate(workers, start=1):
@@ -176,6 +179,15 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         dt_diff = start_dt - wds.iloc[0]['dt']
         day = 0
         day_ind = 0
+
+        worker_id = None
+        if np.random.randint(4):
+            worker_id = worker.id
+        worker_ident = UserIdentifier.objects.create(
+            identifier='{}-{}'.format(shop.id, worker.id),
+            worker_id=worker_id,
+        )
+
         while day < days:
             wd = wds.iloc[day_ind]
             dt = wd['dt'] + dt_diff
@@ -200,6 +212,22 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     dttm_from=dttm_work_start,
                     dttm_to=dttm_work_end,
                 ))
+
+                add_models(models_attendance, AttendanceRecords, AttendanceRecords(
+                    dttm=dttm_work_start,
+                    type=AttendanceRecords.TYPE_COMING,
+                    identifier=worker_ident,
+                    super_shop_id=shop.super_shop_id,
+                ))
+
+                add_models(models_attendance, AttendanceRecords, AttendanceRecords(
+                    dttm=dttm_work_end,
+                    type=AttendanceRecords.TYPE_LEAVING,
+                    identifier=worker_ident,
+                    super_shop_id=shop.super_shop_id,
+                ))
+
+
             else:
                 add_models(models, WorkerDay, WorkerDay(
                     worker=worker,
@@ -214,10 +242,30 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             if day_ind == 0:
                 dt_diff = start_dt - wds.iloc[0]['dt'] + timezone.timedelta(days=day)
 
+    worker_ident = UserIdentifier.objects.create(
+        identifier='{}-{}'.format(shop.id, 'random'),
+        # worker=worker,
+    )
+
+    add_models(models_attendance, AttendanceRecords, AttendanceRecords(
+        dttm=dttm_work_start,
+        type=AttendanceRecords.TYPE_COMING,
+        identifier=worker_ident,
+        super_shop_id=shop.super_shop_id,
+    ))
+
+    add_models(models_attendance, AttendanceRecords, AttendanceRecords(
+        dttm=dttm_work_end,
+        type=AttendanceRecords.TYPE_LEAVING,
+        identifier=worker_ident,
+        super_shop_id=shop.super_shop_id,
+
+    ))
 
     add_models(details, WorkerDayCashboxDetails, None)
     add_models(models, WorkerDay, None)
     add_models(infos, WorkerCashboxInfo, None)
+    add_models(models_attendance, AttendanceRecords, None)
 
     if shop_size in ['small', 'normal']:
         if shop_size == 'small':

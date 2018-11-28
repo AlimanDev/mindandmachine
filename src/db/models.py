@@ -129,10 +129,10 @@ class WorkerManager(UserManager):
         """
 
         return self.filter(
-            models.Q(dt_hired__date__lte=dt_from) | models.Q(dt_hired__date__isnull=True),
+            models.Q(dt_hired__lte=dt_from) | models.Q(dt_hired__isnull=True),
             attachment_group=User.GROUP_STAFF
         ).filter(
-            models.Q(dt_fired__date__gte=dt_to) | models.Q(dt_fired__date__isnull=True),
+            models.Q(dt_fired__gte=dt_to) | models.Q(dt_fired__isnull=True),
             attachment_group=User.GROUP_STAFF
         ).filter(*args, **kwargs)
 
@@ -903,3 +903,34 @@ class CameraClientEvent(models.Model):
         return 'id {}: {}, {}, {}'.format(self.id, self.dttm, self.type, self.gate.name)
 
 
+class UserIdentifier(models.Model):
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    identifier = models.CharField(max_length=256, unique=True)
+    worker = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True)
+
+    def __str__(self):
+        return 'id: {}, identifier: {}, worker: {}'.format(self.id, self.identifier, self.worker_id)
+
+
+class AttendanceRecords(models.Model):
+    TYPE_COMING = 'C'
+    TYPE_LEAVING = 'L'
+    TYPE_BREAK_START = 'S'
+    TYPE_BREAK_END = 'E'
+
+    RECORD_TYPES = (
+        (TYPE_COMING, 'coming'),
+        (TYPE_LEAVING, 'leaving'),
+        (TYPE_BREAK_START, 'break start'),
+        (TYPE_BREAK_END, 'break_end')
+    )
+
+    dttm = models.DateTimeField()
+    type = models.CharField(max_length=1, choices=RECORD_TYPES)
+    identifier = models.ForeignKey(UserIdentifier, on_delete=models.PROTECT)
+    verified = models.BooleanField(default=True)
+
+    super_shop = models.ForeignKey(SuperShop, on_delete=models.PROTECT) # todo: or should be to shop? fucking logic
+
+    def __str__(self):
+        return 'UserIdentID: {}, type: {}, dttm: {}'.format(self.identifier_id, self.type, self.dttm)

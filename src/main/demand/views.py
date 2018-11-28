@@ -303,7 +303,6 @@ def get_demand_change_logs(request, form):
     ).order_by('dttm_added')
 
     return JsonResponse.success({
-        'total_count': change_logs.count(),
         'demand_change_logs': [{
             'dttm_added': BaseConverter.convert_datetime(x.dttm_added),
             'dttm_from': BaseConverter.convert_datetime(x.dttm_from),
