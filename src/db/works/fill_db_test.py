@@ -180,9 +180,12 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         day = 0
         day_ind = 0
 
+        worker_id = None
+        if np.random.randint(4):
+            worker_id = worker.id
         worker_ident = UserIdentifier.objects.create(
             identifier='{}-{}'.format(shop.id, worker.id),
-            worker=worker,
+            worker_id=worker_id,
         )
 
         while day < days:
