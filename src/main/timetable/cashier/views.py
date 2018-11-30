@@ -734,7 +734,6 @@ def get_worker_day_logs(request, form):
         from_dt(QOS_DATE): required = True. от какой даты брать логи
         to_dt(QOS_DATE): required = True. до какой даты
         worker_day_id(int): required = False
-        pointer(int): для пагинации. начиная с какого элемента, отдаваемого списка, показывать. required = True
         size(int): сколько записей отдавать (то есть отдаст срез [pointer: pointer + size]. required = False (default 10)
 
     Returns:
@@ -746,8 +745,6 @@ def get_worker_day_logs(request, form):
         JsonResponse.does_not_exist_error: если рабочего дня с worker_day_id нет
     """
     shop_id = FormUtil.get_shop_id(request, form)
-    pointer = form['pointer']
-    size = form['size'] if form['size'] else 10
     worker_day_id = form['worker_day_id']
 
     worker_day_desired = None
@@ -773,25 +770,17 @@ def get_worker_day_logs(request, form):
         )
 
     response_data['change_logs'] = [WorkerDayConverter.convert(worker_day) for worker_day in child_worker_days]
-    #  todo: после изменений на фронте удалить total_count
-    response_data['total_count'] = child_worker_days.count()
     for one_wd in response_data['change_logs']:
-        one_wd['prev_dttm_work_start'] = BaseConverter.convert_datetime(
-            WorkerDay.objects.get(
-                id=child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
-            ).dttm_work_start
-        )
-        one_wd['prev_dttm_work_end'] = BaseConverter.convert_datetime(
-            WorkerDay.objects.get(
-                id=child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
-            ).dttm_work_end
-        )
-        one_wd['prev_type'] = WorkerDayConverter.convert_type(
-            WorkerDay.objects.get(
-                id=child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
-            ).type
-        )
-    response_data['change_logs'] = response_data['change_logs'][pointer:pointer + size]
+        parent_id = child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
+        parent_wd = WorkerDay.objects.get(id=parent_id)
+        parent_wd_type = parent_wd.type
+        one_wd['prev_type'] = WorkerDayConverter.convert_type(parent_wd_type)
+        if parent_wd_type == WorkerDay.Type.TYPE_WORKDAY.value:
+            one_wd['prev_dttm_work_start'] = BaseConverter.convert_datetime(parent_wd.dttm_work_start)
+            one_wd['prev_dttm_work_end'] = BaseConverter.convert_datetime(parent_wd.dttm_work_end)
+        else:
+            one_wd['prev_dttm_work_start'] = None
+            one_wd['prev_dttm_work_end'] = None
 
     return JsonResponse.success(response_data)
 

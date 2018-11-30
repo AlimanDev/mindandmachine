@@ -6,6 +6,7 @@ from src.db.models import (
     Timetable,
     CashboxType,
     UserIdentifier,
+    AttendanceRecords,
 )
 from src.conf.djconfig import (
     QOS_DATE_FORMAT,
@@ -354,6 +355,17 @@ class SlotConverter(BaseConverter):
 
 
 class AttendanceRecordsConverter(BaseConverter):
+    __TYPES = {
+        AttendanceRecords.TYPE_COMING: 'пришел',
+        AttendanceRecords.TYPE_LEAVING: 'ушел',
+        AttendanceRecords.TYPE_BREAK_START: 'ушел на перерыв',
+        AttendanceRecords.TYPE_BREAK_END: 'вернулся с перерыва',
+    }
+
+    @classmethod
+    def convert_type(cls, obj):
+        return cls.__TYPES.get(obj.type, '')
+
     @classmethod
     def convert(cls, obj):
         return {
