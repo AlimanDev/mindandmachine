@@ -7,6 +7,7 @@ from src.db.models import (
     CameraCashboxStat,
     CashboxType,
     PeriodDemand,
+    PeriodClients,
     Shop,
     SuperShop,
     Cashbox,
@@ -40,14 +41,12 @@ class LocalTestCase(TestCase):
             id=1,
             super_shop=self.superShop,
             title='Shop1',
-            hidden_title='Shop1',
             break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]]
         )
         self.shop2 = Shop.objects.create(
             id=2,
             super_shop=self.superShop,
             title='Shop2',
-            hidden_title='Shop2',
         )
         self.user1 = User.objects.create_user(self.USER_USERNAME, self.USER_EMAIL, self.USER_PASSWORD, id=1,
                                               shop=self.shop,
@@ -122,9 +121,9 @@ class LocalTestCase(TestCase):
         # create_period_demand(datetime.datetime(2018, 5, 6, 0, 0), 10, 50, 1, 4, 3, self.cashboxType)
 
         for i in range(1, 21):
-            create_period_demand(datetime.datetime(2018, 7, i, 0, 0), 10, 50, 1, 4, 3, self.cashboxType1)
-            create_period_demand(datetime.datetime(2018, 6, i, 7, 30), i * 2, i, 1, 4, 3, self.cashboxType1)
-            create_period_demand(datetime.datetime(2018, 6, 18, 7, 30), i, i * 3, 1, i * 4, i, self.cashboxType2)
+            create_period_demand(datetime.datetime(2018, 7, i, 0, 0), 10, 1, self.cashboxType1)
+            create_period_demand(datetime.datetime(2018, 6, i, 7, 30), i * 2, 1, self.cashboxType1)
+            create_period_demand(datetime.datetime(2018, 6, 18, 7, 30), i, 1, self.cashboxType2)
 
             # self.worker_day = create_work_day(self.shop.id, self.user1, dt=datetime.datetime(2018, 7, i))
             self.worker_day1 = create_work_day(self.user1, dt=datetime.datetime(2018, 6, i))
@@ -294,15 +293,10 @@ def create_cashbox_type(shop, name, dttm_last_update_queue=None, dttm_deleted=No
     return cashbox_type
 
 
-def create_period_demand(dttm_forecast, clients, products, type, queue_wait_time,
-                         queue_wait_length,
-                         cashbox_type):
-    PeriodDemand.objects.create(
+def create_period_demand(dttm_forecast, clients, type, cashbox_type):
+    PeriodClients.objects.create(
         dttm_forecast=dttm_forecast,
-        clients=clients,
-        products=products,
+        value=clients,
         type=type,
-        queue_wait_time=queue_wait_time,
-        queue_wait_length=queue_wait_length,
         cashbox_type=cashbox_type
     )

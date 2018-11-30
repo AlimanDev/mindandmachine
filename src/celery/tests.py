@@ -11,7 +11,6 @@ class TestCelery(LocalTestCase):
         super().setUp()
         for i in range(1, 21):
             try:
-
                 WorkerDayCashboxDetails.objects.create(
                     status=WorkerDayCashboxDetails.TYPE_WORK,
                     worker_day=self.worker_day4,
