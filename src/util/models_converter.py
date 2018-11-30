@@ -363,3 +363,14 @@ class AttendanceRecordsConverter(BaseConverter):
             'type': obj.type,
             'is_verified': obj.verified,
         }
+
+
+class ProductionDayConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'dt': cls.convert_date(obj.dt),
+            'type': obj.type,
+            'is_celebration': obj.is_celebration,
+        }

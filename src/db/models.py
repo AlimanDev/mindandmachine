@@ -299,7 +299,7 @@ class CashboxType(models.Model):
 
     period_demand_params = models.CharField(
         max_length=1024,
-        default='{"max_depth":-1,"eta":-1,"min_split_loss":-1,"reg_lambda":-1,"silent":-1,"is_main_type":-1}'
+        default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 200, "reg_lambda": 2, "silent": 1}'
     )
 
 
