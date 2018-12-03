@@ -111,13 +111,12 @@ def create_predbills_request_function(shop_id, dt=None):
         # todo: aa: месяца один тип закрылся, а потом новый открылся... трешшшшшш
         work_types_dict = {}
         for cashbox_type in CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD):
-            type_dict = {
+            work_types_dict[cashbox_type.id] = {
                 'id': cashbox_type.id,
-                'predict_demand_params':  {'1': 2}, # todo: temp, json.loads(cashbox_type.period_demand_params),
+                'predict_demand_params':  json.loads(cashbox_type.period_demand_params),
                 'name': cashbox_type.name
 
             }
-            work_types_dict[cashbox_type.id] = type_dict
     except ValueError as error_message:
         return JsonResponse.internal_error(error_message)
 

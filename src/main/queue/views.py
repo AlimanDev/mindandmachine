@@ -1,14 +1,16 @@
 from datetime import timedelta, datetime, time
 
+from src.main.timetable.cashier_demand.utils import get_worker_timetable
+
 from src.db.models import (
     WaitTimeInfo,
-    PeriodQueues,
+    ProductionDay,
     CashboxType,
     Shop,
     PeriodDemand,
     Notifications,
     User,
-
+    PeriodQueues,
 )
 from src.util.models_converter import BaseConverter
 from src.util.forms import FormUtil
@@ -20,6 +22,13 @@ from .forms import (
     SetParametersForm,
     ProcessForecastForm,
 )
+import json
+import urllib
+from src.util.utils import JsonResponse
+from django.conf import settings
+
+from src.util.models_converter import BaseConverter, ProductionDayConverter
+
 
 
 @api_method('GET', GetIndicatorsForm)
@@ -214,7 +223,7 @@ def set_parameters(request, form):
 )
 def process_forecast(request, form):
     """
-
+    на основания объема работ и составленного расписания отправляет запрос на составления расписания
     Args:
          method: POST
          url: /api/queue/process_forecast
@@ -223,8 +232,121 @@ def process_forecast(request, form):
         None
     """
 
-    
+    predict2days = 62
 
+    shop_id = FormUtil.get_shop_id(request, form)
+    shop = Shop.objects.get(id=shop_id)
+    dt_now = datetime.now().date()
+    cashbox_type = CashboxType.objects.filter(shop_id=shop_id, is_main_type=True).first()
+
+    day_info = ProductionDay.objects.filter(
+        dt__gte=dt_now - timedelta(days=366),
+        dt__lte=dt_now + timedelta(days=predict2days),
+    )
+
+    queue = PeriodQueues.objects.filter(
+        cashbox_type__id=cashbox_type.id,
+        type=PeriodQueues.FACT_TYPE,
+        dttm_forecast__date__gte=dt_now - timedelta(days=366),
+        dttm_forecast__lte=dt_now + timedelta(days=1)
+    ).order_by('dttm_forecast')
+
+    from_dt = queue[0].dttm_forecast.date()
+    form_tt_prev = {
+        'from_dt': from_dt,
+        'to_dt': dt_now + timedelta(days=1),
+        'cashbox_type_ids': [cashbox_type.id],
+        'position_id': False,
+    }
+
+    form_tt_predict = {
+        'from_dt': dt_now,
+        'to_dt': dt_now + timedelta(days=predict2days),
+        'cashbox_type_ids': [cashbox_type.id],
+        'position_id': False,
+    }
+
+
+    data_prev = get_worker_timetable(shop_id, form_tt_prev)
+    data_predict = get_worker_timetable(shop_id, form_tt_predict)
+
+    if type(data_prev) == dict and type(data_predict) == dict:
+        # train set
+        prev_data = []
+        it_needs = 0
+        it_real = 0
+
+        needs = data_prev['tt_periods']['predict_cashier_needs']
+        real_tt = data_prev['tt_periods']['real_cashiers']
+        for queue_period in queue:
+            elem = {
+                'value': queue_period.value,
+                'dttm': BaseConverter.convert_datetime(queue_period.dttm_forecast),
+                'work_type': queue_period.cashbox_type_id,
+            }
+            while needs[it_needs]['dttm'] != elem['dttm']:  # needs and queue are ordered
+                it_needs += 1
+
+            while real_tt[it_real]['dttm'] != elem['dttm']:  # needs and queue are ordered
+                it_real += 1
+
+            elem['work_amount'] = needs[it_needs]['amount']
+            elem['n_cashiers'] = real_tt[it_real]['amount']
+            prev_data.append(elem)
+
+        # predict
+        prediction_data = []
+
+        needs = data_predict['tt_periods']['predict_cashier_needs']
+        real_tt = data_predict['tt_periods']['real_cashiers']
+        for it_needs, real_period in enumerate(real_tt):
+            prediction_data.append({
+                'n_cashiers': real_period['amount'],
+                'work_amount': needs[it_needs]['amount'],
+                'dttm': real_period['dttm'],
+                'work_type': cashbox_type.id,
+            })
+
+        aggregation_dict = {
+            'IP': settings.HOST_IP,
+            'algo_params': {
+                'days_info': [ProductionDayConverter.convert(day) for day in day_info],
+                'dt_from': BaseConverter.convert_date(dt_now),
+                'dt_to': BaseConverter.convert_date(dt_now + timedelta(days=predict2days)),
+                # 'dt_start': BaseConverter.convert_date(dt),
+                # 'days': predict2days,
+                'period_step': BaseConverter.convert_time(shop.forecast_step_minutes),
+                'tm_start': BaseConverter.convert_time(shop.super_shop.tm_start),
+                'tm_end': BaseConverter.convert_time(shop.super_shop.tm_end),
+            },
+            'prediction_data': prediction_data,
+            'prev_data': prev_data,
+            'work_types': {
+                cashbox_type.id:  {
+                    'id': cashbox_type.id,
+                    'predict_demand_params':  json.loads(cashbox_type.period_queue_params),
+                    'name': cashbox_type.name
+
+                }
+            },
+            'shop_id': shop.id,
+        }
+
+        data = json.dumps(aggregation_dict).encode('ascii')
+        req = urllib.request.Request('http://{}/create_queue'.format(settings.TIMETABLE_IP), data=data,
+                              headers={'content-type': 'application/json'})
+        try:
+            response = urllib.request.urlopen(req)
+        except urllib.request.HTTPError:
+            raise JsonResponse.algo_internal_error('Ошибка при чтении ответа от второго сервера.')
+        except urllib.error.URLError:
+            return JsonResponse.algo_internal_error('Сервер для обработки алгоритма недоступен.')
+        task_id = json.loads(response.read().decode('utf-8')).get('task_id')
+        if task_id is None:
+            return JsonResponse.algo_internal_error('Ошибка при создании задачи на исполненение.')
+
+    else:
+        return JsonResponse.value_error('что-то пошло не по плану')
     return JsonResponse.success()
 
 
@@ -267,7 +389,7 @@ def set_predict_queue(request, data):
         cashbox_type__shop_id=shop.id,
     ).delete()
 
-    for period_demand_value in data['demand']:
+    for period_demand_value in data['queue_len']:
         clients = period_demand_value['value']
         clients = 0 if clients < 0 else clients
         save_models(
