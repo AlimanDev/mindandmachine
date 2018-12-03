@@ -5,10 +5,14 @@ from src.db.models import (
     PeriodQueues,
     CashboxType,
     Shop,
-    PeriodDemand
+    PeriodDemand,
+    Notifications,
+    User,
+
 )
+from src.util.models_converter import BaseConverter
 from src.util.forms import FormUtil
-from src.util.utils import api_method, JsonResponse
+from src.util.utils import api_method, JsonResponse, outer_server
 from .forms import (
     GetTimeDistributionForm,
     GetIndicatorsForm,
@@ -218,4 +222,72 @@ def process_forecast(request, form):
     Returns:
         None
     """
+
+    
+
+    return JsonResponse.success()
+
+
+@outer_server(is_camera=False, decode_body=False)
+def set_predict_queue(request, data):
+    """
+    ждет request'a от qos_algo. когда получает, записывает данные из data в базу данных
+
+    Args:
+        method: POST
+        url: /api/queue/set_predict_queue
+        data(dict):  data от qos_algo
+        key(str): ключ
+    """
+    # уведомляшки всем
+
+    models_list = []
+
+    def save_models(lst, model):
+        commit = False
+        if model:
+            lst.append(model)
+            if len(lst) > 1000:
+                commit = True
+        else:
+            commit = True
+
+        if commit:
+            PeriodQueues.objects.bulk_create(lst)
+            lst[:] = []
+
+    shop = Shop.objects.get(id=data['shop_id'])
+    dt_from = BaseConverter.parse_date(data['dt_from'])
+    dt_to = BaseConverter.parse_date(data['dt_to'])
+
+    PeriodQueues.objects.filter(
+        type=PeriodQueues.LONG_FORECASE_TYPE,
+        dttm_forecast__date__gte=dt_from,
+        dttm_forecast__date__lte=dt_to,
+        cashbox_type__shop_id=shop.id,
+    ).delete()
+
+    for period_demand_value in data['demand']:
+        clients = period_demand_value['value']
+        clients = 0 if clients < 0 else clients
+        save_models(
+            models_list,
+            PeriodQueues(
+                type=PeriodQueues.LONG_FORECASE_TYPE,
+                dttm_forecast=BaseConverter.parse_datetime(period_demand_value['dttm']),
+                cashbox_type_id=period_demand_value['work_type'],
+                value=clients,
+            )
+        )
+
+    save_models(models_list, None)
+
+    # уведомляшки всем
+    for u in User.objects.filter(shop=shop, group__in=User.__except_cashiers__):
+        Notifications.objects.create(
+            type=Notifications.TYPE_SUCCESS,
+            to_worker=u,
+            text='Был составлен новый прогноз очереди на период с {} по {}'.format(data['dt_from'], data['dt_to'])
+        )
+
     return JsonResponse.success()
