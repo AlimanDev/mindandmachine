@@ -29,7 +29,7 @@ class LocalTestCase(TestCase):
 
     def setUp(self):
         super().setUp()
-        dttm_now = now() + datetime.timedelta(hours=3)
+        dttm_now = now()
 
         self.superShop = SuperShop.objects.create(
             title='SuperShop1',
@@ -62,13 +62,13 @@ class LocalTestCase(TestCase):
                                  group=User.GROUP_DIRECTOR,
                                  )
         self.cashboxType1 = create_cashbox_type(self.shop, 'тип_кассы_1', id=1,
-                                                dttm_last_update_queue=datetime.datetime(2018, 6, 18, 8, 30, 0))
+                                                dttm_last_update_queue=datetime.datetime(2018, 12, 1, 8, 30, 0))
 
         self.cashboxType2 = create_cashbox_type(self.shop, 'тип_кассы_2', id=2,
-                                                dttm_last_update_queue=datetime.datetime(2018, 6, 18, 9, 0, 0))
+                                                dttm_last_update_queue=datetime.datetime(2018, 12, 1, 9, 0, 0))
 
         self.cashboxType3 = create_cashbox_type(self.shop, 'тип_кассы_3', id=3,
-                                                dttm_last_update_queue=datetime.datetime(2018, 6, 18, 8, 30, 0),
+                                                dttm_last_update_queue=None,
                                                 dttm_deleted=dttm_now - datetime.timedelta(days=1))
 
         self.cashboxType4 = create_cashbox_type(self.shop2, 'тип_кассы_4', id=4)
@@ -101,7 +101,7 @@ class LocalTestCase(TestCase):
             type=self.cashboxType4,
             number=4,
             id=4,
-            dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0)
+            dttm_added=datetime.datetime(2018, 12, 1, 8, 30, 0)
         )
 
         for i in range(5, 10):
@@ -109,7 +109,7 @@ class LocalTestCase(TestCase):
                 type=self.cashboxType3,
                 number=i,
                 id=i,
-            dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0)
+            dttm_added=datetime.datetime(2018, 12, 1, 8, 30, 0)
 
             )
 
@@ -121,20 +121,20 @@ class LocalTestCase(TestCase):
         # create_period_demand(datetime.datetime(2018, 5, 6, 0, 0), 10, 50, 1, 4, 3, self.cashboxType)
 
         for i in range(1, 21):
-            create_period_demand(datetime.datetime(2018, 7, i, 0, 0), 10, 1, self.cashboxType1)
-            create_period_demand(datetime.datetime(2018, 6, i, 7, 30), i * 2, 1, self.cashboxType1)
-            create_period_demand(datetime.datetime(2018, 6, 18, 7, 30), i, 1, self.cashboxType2)
+            create_period_demand(datetime.datetime(2018, 11, i, 0, 0), 10, 1, self.cashboxType1)
+            create_period_demand(datetime.datetime(2018, 11, i, 7, 30), i * 2, 1, self.cashboxType1)
+            create_period_demand(datetime.datetime(2018, 1, 18, 7, 30), i, 1, self.cashboxType2)
 
             # self.worker_day = create_work_day(self.shop.id, self.user1, dt=datetime.datetime(2018, 7, i))
-            self.worker_day1 = create_work_day(self.user1, dt=datetime.datetime(2018, 6, i))
-            self.worker_day2 = create_work_day(self.user2, dt=datetime.datetime(2018, 6, i))
-            self.worker_day3 = create_work_day(self.user3, dt=datetime.datetime(2018, 6, i))
-            self.worker_day4 = create_work_day(self.user1, dt=datetime.datetime(2018, 7, i))
+            self.worker_day1 = create_work_day(self.user1, dt=datetime.datetime(2018, 11, i))
+            self.worker_day2 = create_work_day(self.user2, dt=datetime.datetime(2018, 11, i))
+            self.worker_day3 = create_work_day(self.user3, dt=datetime.datetime(2018, 11, i))
+            self.worker_day4 = create_work_day(self.user1, dt=datetime.datetime(2018, 11, i))
 
             if i < 10:
-                self.worker_day3 = create_work_day(self.user3, dt=datetime.datetime(2018, 7, i), type=5)
+                self.worker_day3 = create_work_day(self.user3, dt=datetime.datetime(2018, 11, i), type=5)
             else:
-                self.worker_day3 = create_work_day(self.user3, dt=datetime.datetime(2018, 7, i))
+                self.worker_day3 = create_work_day(self.user3, dt=datetime.datetime(2018, 11, i))
 
             WorkerDayCashboxDetails.objects.create(
                 status=WorkerDayCashboxDetails.TYPE_WORK,
@@ -142,8 +142,8 @@ class LocalTestCase(TestCase):
                 on_cashbox=self.cashbox1,
                 cashbox_type=self.cashboxType1,
                 is_tablet=True,
-                dttm_from=datetime.datetime(2018, 6, i, 9, 0, 0),
-                dttm_to=datetime.datetime(2018, 6, i, 18, 0, 0),
+                dttm_from=datetime.datetime(2018, 11, i, 9, 0, 0),
+                dttm_to=datetime.datetime(2018, 11, i, 18, 0, 0),
             )
 
             WorkerDayCashboxDetails.objects.create(
@@ -162,10 +162,10 @@ class LocalTestCase(TestCase):
                 cashbox_type=self.cashboxType2,
                 is_tablet=True,
                 dttm_from=datetime.datetime.combine(
-                    datetime.date(2018, 6, i),
+                    datetime.date(2018, 11, i),
                     (dttm_now - datetime.timedelta(hours=3)).time()),
                 dttm_to=datetime.datetime.combine(
-                    datetime.date(2018, 6, i),
+                    datetime.date(2018, 11, i),
                     (dttm_now + datetime.timedelta(hours=3)).time()),
                 status=WorkerDayCashboxDetails.TYPE_WORK,
             )
@@ -184,7 +184,7 @@ class LocalTestCase(TestCase):
         self.cameracashbox = CameraCashbox.objects.create(name='Camera_1', cashbox=self.cashbox1)
         test_time = dttm_now
         for i in range(1, 20):
-            create_camera_cashbox_stat(self.cameracashbox, test_time, i)
+            create_camera_cashbox_stat(self.cameracashbox, test_time - datetime.timedelta(minutes=30*i), i)
             test_time -= datetime.timedelta(seconds=10)
 
         self.slot1 = Slot.objects.create(
