@@ -582,7 +582,7 @@ class WorkerDay(models.Model):
     cashbox_types = models.ManyToManyField(CashboxType, through='WorkerDayCashboxDetails')
 
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
-    parent_worker_day = models.OneToOneField('self', on_delete=models.PROTECT, blank=True, null=True, related_name='child')
+    parent_worker_day = models.OneToOneField('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child')
 
     @classmethod
     def is_type_with_tm_range(cls, t):
