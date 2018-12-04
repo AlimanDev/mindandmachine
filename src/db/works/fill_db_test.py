@@ -43,14 +43,14 @@ def create_shop(shop_ind):
 def create_work_types(work_types, shop):
     wt_dict = {}
     for wt in work_types:
-        wt = CashboxType.objects.create(
+        wt_m = CashboxType.objects.create(
             shop=shop,
             **wt,
         )
-        wt_dict[wt.name] = wt
-        Cashbox.objects.create(type=wt, number=1)
-        Cashbox.objects.create(type=wt, number=2)
-        Cashbox.objects.create(type=wt, number=3)
+        wt_dict[wt.name] = wt_m
+        Cashbox.objects.create(type=wt_m, number=1)
+        Cashbox.objects.create(type=wt_m, number=2)
+        Cashbox.objects.create(type=wt_m, number=3)
     return wt_dict
 
 

@@ -7,23 +7,24 @@ from src.db.models import (
     CashboxType,
     PeriodDemandChangeLog,
     Shop,
+    Notifications,
+    User,
+    Slot,
 )
 from dateutil.relativedelta import relativedelta
 from django.db.models import Sum
 from src.util.collection import range_u
 from src.util.models_converter import BaseConverter, PeriodDemandChangeLogConverter
-from src.util.utils import api_method, JsonResponse
+from src.util.utils import api_method, JsonResponse, outer_server
 from .forms import (
     GetForecastForm,
     SetDemandForm,
     GetIndicatorsForm,
-    SetPredictBillsForm,
     CreatePredictBillsRequestForm,
     GetDemandChangeLogsForm,
     GetVisitorsInfoForm,
 )
-from .utils import create_predbills_request_function, set_pred_bills_function
-from django.views.decorators.csrf import csrf_exempt
+from .utils import create_predbills_request_function
 from src.util.forms import FormUtil
 from django.apps import apps
 
@@ -394,18 +395,92 @@ def create_predbills_request(request, form):
     return JsonResponse.success() if result is True else result
 
 
-@csrf_exempt
-@api_method('POST', SetPredictBillsForm, auth_required=False, check_permissions=False)
-def set_pred_bills(request, form):
+# @csrf_exempt
+# @api_method('POST', SetPredictBillsForm, auth_required=False, check_permissions=False)
+@outer_server(is_camera=False, decode_body=False)
+def set_pred_bills(request, data):
     """
     ждет request'a от qos_algo. когда получает, записывает данные из data в базу данных
 
     Args:
         method: POST
         url: /api/demand/set_predbills
-        data(str): json data от qos_algo
+        data(dict):  data от qos_algo
         key(str): ключ
     """
-    set_pred_bills_function(form['data'], form['key'])
+
+    models_list = []
+    def save_models(lst, model):
+        commit = False
+        if model:
+            lst.append(model)
+            if len(lst) > 1000:
+                commit = True
+        else:
+            commit = True
+
+        if commit:
+            PeriodClients.objects.bulk_create(lst)
+            lst[:] = []
+
+
+
+    shop = Shop.objects.get(id=data['shop_id'])
+    dt_from = BaseConverter.parse_date(data['dt_from'])
+    dt_to = BaseConverter.parse_date(data['dt_to'])
+
+    PeriodClients.objects.filter(
+        type=PeriodClients.LONG_FORECASE_TYPE,
+        dttm_forecast__date__gte=dt_from,
+        dttm_forecast__date__lte=dt_to,
+        cashbox_type__shop_id=shop.id,
+    ).delete()
+
+    for period_demand_value in data['demand']:
+        clients = period_demand_value['value']
+        clients = 0 if clients < 0 else clients
+        save_models(
+            models_list,
+            PeriodClients(
+                type=PeriodClients.LONG_FORECASE_TYPE,
+                dttm_forecast=BaseConverter.parse_datetime(period_demand_value['dttm']),
+                cashbox_type_id=period_demand_value['work_type'],
+                value=clients,
+            )
+        )
+
+        # # блок для составления спроса на слотовые типы касс (никак не зависит от data с qos_algo)
+        # # todo: возможно не лучшее решение размещать этот блок здесь, потому что он зависит от dttm_forecast
+        # for sloted_cashbox in sloted_cashbox_types:
+        #     workers_needed = Slot.objects.filter(
+        #         cashbox_type=sloted_cashbox,
+        #         tm_start__lte=dttm_forecast.time(),
+        #         tm_end__gte=dttm_forecast.time(),
+        #     ).aggregate(Sum('workers_needed'))['workers_needed__sum']
+        #
+        #     if workers_needed is None:
+        #         workers_needed = 0
+        #     try:
+        #         PeriodClients.objects.update_or_create(
+        #             type=PeriodClients.LONG_FORECASE_TYPE,
+        #             dttm_forecast=dttm_forecast,
+        #             cashbox_type=sloted_cashbox,
+        #             defaults={
+        #                 'value': workers_needed
+        #             }
+        #         )
+        #     except PeriodClients.MultipleObjectsReturned as exc:
+        #         print('here', exc)
+        #         raise Exception('error upon creating period demands for sloted types')
+
+    save_models(models_list, None)
+
+    # уведомляшки всем
+    for u in User.objects.filter(shop=shop, group__in=User.__except_cashiers__):
+        Notifications.objects.create(
+            type=Notifications.TYPE_SUCCESS,
+            to_worker=u,
+            text='Был составлен новый спрос на период с {} по {}'.format(data['dt_from'], data['dt_to'])
+        )
 
     return JsonResponse.success()
