@@ -412,7 +412,7 @@ class PeriodDemand(models.Model):
     id = models.BigAutoField(primary_key=True)
     dttm_forecast = models.DateTimeField()
     type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
-    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT, blank=True, null=True)
+    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
 
 
 class PeriodClients(PeriodDemand):
