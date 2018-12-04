@@ -306,7 +306,12 @@ class CashboxType(models.Model):
 
     period_demand_params = models.CharField(
         max_length=1024,
-        default='{"max_depth":-1,"eta":-1,"min_split_loss":-1,"reg_lambda":-1,"silent":-1,"is_main_type":-1}'
+        default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 200, "reg_lambda": 2, "silent": 1, "iterations": 20}'
+    )
+
+    period_queue_params = models.CharField(
+        max_length=1024,
+        default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 1, "reg_lambda": 0.1, "silent": 1, "iterations": 20}'
     )
 
 
@@ -589,7 +594,7 @@ class WorkerDay(models.Model):
     cashbox_types = models.ManyToManyField(CashboxType, through='WorkerDayCashboxDetails')
 
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
-    parent_worker_day = models.OneToOneField('self', on_delete=models.PROTECT, blank=True, null=True, related_name='child')
+    parent_worker_day = models.OneToOneField('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child')
 
     @classmethod
     def is_type_with_tm_range(cls, t):

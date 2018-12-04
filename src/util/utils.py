@@ -273,7 +273,7 @@ def test_algo_server_connection():
         return JsonResponse.algo_internal_error('Что-то не так при подключении к серверу с алгоритмом')
 
 
-def outer_server(func):
+def outer_server(is_camera=True, decode_body=True):
     """
     Декоратор для приема данных со сторонних серваков. Обязательно должен быть ключ в body реквеста (формта json)
     т.е. body['key']. И все данные должны быть запиханы в body['data'].
@@ -281,26 +281,39 @@ def outer_server(func):
     Args:
         func(function): функция, которую надо выполнить
     """
-    @csrf_exempt
-    def wrapper(request, *args, **kwargs):
-        if request.method != 'POST':
-            return JsonResponse.method_error(request.method, 'POST')
-        try:
-            json_data = json.loads(request.body.decode('utf-8'))
-        except ValueError:
-            return JsonResponse.value_error('cannot decode body')
-        if isinstance(json_data, str):
-            return JsonResponse.value_error('did not convert json data properly. output json data has type string')
-
-        if settings.QOS_CAMERA_KEY is not None and json_data['key'] != settings.QOS_CAMERA_KEY:
-            return JsonResponse.access_forbidden('invalid key')
-
-        try:
-            return func(request, json_data['data'], *args, **kwargs)
-        except Exception as e:
-            print(e)
-            if settings.DEBUG:
-                raise e
+    def decor(func):
+        @csrf_exempt
+        def wrapper(request, *args, **kwargs):
+            if is_camera:
+                access_key = settings.QOS_CAMERA_KEY
             else:
-                return JsonResponse.internal_error()
-    return wrapper
+                access_key = settings.QOS_SET_TIMETABLE_KEY
+
+            if request.method != 'POST':
+                return JsonResponse.method_error(request.method, 'POST')
+            try:
+                if decode_body:
+                    json_data = json.loads(request.body.decode('utf-8'))
+                    request_key = json_data['key']
+                    request_data = json_data['data']
+                else:
+                    request_key = request.POST['key']
+                    request_data = json.loads(request.POST['data'])
+            except (ValueError, TypeError):
+                return JsonResponse.value_error('cannot decode body')
+            # if isinstance(json_data, str):
+            #     return JsonResponse.value_error('did not convert json data properly. output json data has type string')
+
+            if access_key is not None and request_key != access_key:
+                return JsonResponse.access_forbidden('invalid key')
+
+            try:
+                return func(request, request_data, *args, **kwargs)
+            except Exception as e:
+                print(e)
+                if settings.DEBUG:
+                    raise e
+                else:
+                    return JsonResponse.internal_error()
+        return wrapper
+    return decor

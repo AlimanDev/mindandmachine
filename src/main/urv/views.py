@@ -33,12 +33,12 @@ def get_user_urv(request, form):
     from_dt = form['from_dt']
     to_dt = form['to_dt']
 
-    if not len(worker_ids):
-        worker_ids = list(User.objects.qos_filter_active(
-            to_dt,
-            from_dt,
-            shop_id=request.user.shop_id
-        ).values_list('id', flat=True))
+    # if not len(worker_ids):
+    #     worker_ids = list(User.objects.qos_filter_active(
+    #         to_dt,
+    #         from_dt,
+    #         shop_id=request.user.shop_id
+    #     ).values_list('id', flat=True))
 
     user_records = AttendanceRecords.objects.select_related('identifier').filter(
         dttm__date__gte=from_dt,
