@@ -50,8 +50,9 @@ class LocalTestCase(TestCase):
         )
         self.user1 = User.objects.create_user(self.USER_USERNAME, self.USER_EMAIL, self.USER_PASSWORD, id=1,
                                               shop=self.shop,
+                                              last_name='Иванов',
+                                              first_name='Иван',
                                               group=User.GROUP_SUPERVISOR)
-        # self.user1 = create_user(user_id=1, shop_id=self.shop, username='user1')
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2')
         self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3')
         self.user4 = create_user(user_id=4, shop_id=self.shop, username='user4',
@@ -61,7 +62,7 @@ class LocalTestCase(TestCase):
                                  shop=self.shop,
                                  group=User.GROUP_DIRECTOR,
                                  )
-        self.cashboxType1 = create_cashbox_type(self.shop, 'тип_кассы_1', id=1,
+        self.cashboxType1 = create_cashbox_type(self.shop, 'Кассы', id=1,
                                                 dttm_last_update_queue=datetime.datetime(2018, 12, 1, 8, 30, 0))
 
         self.cashboxType2 = create_cashbox_type(self.shop, 'тип_кассы_2', id=2,
@@ -109,16 +110,8 @@ class LocalTestCase(TestCase):
                 type=self.cashboxType3,
                 number=i,
                 id=i,
-            dttm_added=datetime.datetime(2018, 12, 1, 8, 30, 0)
-
+                dttm_added=datetime.datetime(2018, 12, 1, 8, 30, 0)
             )
-
-        # create_period_demand(dttm_now, 10, 50, 1, 4, 3, self.cashboxType)
-        # create_period_demand(datetime.datetime(2018, 5, 10, 0, 0), 10, 50, 1, 4, 3, self.cashboxType)
-        # create_period_demand(datetime.datetime(2018, 6, 18, 7, 30), 100, 50, 1, 4, 3, self.cashboxType)
-        # create_period_demand(datetime.datetime(2018, 6, 18, 7, 30), 101, 23, 1, 4, 3, self.cashboxType)
-        # create_period_demand(datetime.datetime(2018, 6, 18, 7, 30), 10, 50, 1, 4, 3, self.cashboxType2)
-        # create_period_demand(datetime.datetime(2018, 5, 6, 0, 0), 10, 50, 1, 4, 3, self.cashboxType)
 
         for i in range(1, 21):
             create_period_demand(datetime.datetime(2018, 11, i, 0, 0), 10, 1, self.cashboxType1)
@@ -257,7 +250,7 @@ def create_user(user_id, shop_id, username, dt_hired=None,
         username=username,
         shop=shop_id,
         dt_hired=dt_hired,
-        dt_fired=dt_fired
+        dt_fired=dt_fired,
     )
     return user
 

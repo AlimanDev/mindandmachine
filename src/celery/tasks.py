@@ -1,5 +1,6 @@
 import datetime
 import json
+from dateutil.relativedelta import relativedelta
 
 from django.db.models import Avg
 from django.utils.timezone import now
@@ -91,7 +92,10 @@ def update_visitors_info():
     dttm_now = now()
     # todo: исправить потом. пока делаем такую привязку
     # вообще хорошей идеей наверное будет просто cashbox_type blank=True, null=True сделать в PeriodDemand
-    ct = CashboxType.objects.get(name='Кассы', shop_id=1)
+    try:
+        ct = CashboxType.objects.get(name='Кассы', shop_id=1)
+    except CashboxType.DoesNotExist:
+        raise ValueError('Такого типа касс нет в базе данных.')
     create_dict = {
         'cashbox_type': ct,
         'dttm_forecast': dttm_now.replace(minute=(0 if dttm_now.minute < 30 else 30), second=0, microsecond=0),
@@ -143,10 +147,7 @@ def release_all_workers():
     Note:
         Выполняется каждую ночь
     """
-
-    dttm_now = now() + datetime.timedelta(hours=3)
     worker_day_cashbox_objs = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
-        worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
         dttm_to__isnull=True,
     )
 
@@ -154,8 +155,6 @@ def release_all_workers():
         obj.on_cashbox = None
         obj.dttm_to = obj.worker_day.dttm_work_end
         obj.save()
-
-    print('отпустил всех домой')
 
 
 @app.task
@@ -257,16 +256,18 @@ def notify_cashiers_lack():
     """
     for shop in Shop.objects.all():
         dttm_now = now()
-        notify_to = dttm_now + datetime.timedelta(days=7)
+        notify_days = 7
         shop_id = shop.id
-        dttm = datetime.datetime.combine(
-            dttm_now.date(),
-            datetime.time(dttm_now.hour, 0 if dttm_now.minute < 30 else 30, 0)
-        )
+        dttm = dttm_now.replace(minute=0 if dttm_now.minute < 30 else 30, second=0, microsecond=0)
         init_params_dict = get_init_params(dttm_now, shop_id)
         cashbox_types = init_params_dict['cashbox_types_dict']
-        period_demands = init_params_dict['predict_demand']
         mean_bills_per_step = init_params_dict['mean_bills_per_step']
+        period_demands = []
+        for i in range(notify_days):
+            period_demands += get_init_params(dttm_now + datetime.timedelta(days=i), shop_id)['predict_demand']
+
+        managers_dir_list = []
+        users_with_such_notes = []
         # пока что есть магазы в которых нет касс с ForecastHard
         if cashbox_types and period_demands:
             return_dict = has_deficiency(
@@ -274,9 +275,8 @@ def notify_cashiers_lack():
                 mean_bills_per_step,
                 cashbox_types,
                 dttm,
-                notify_to
+                dttm_now + datetime.timedelta(days=notify_days)
             )
-
             notifications_list = []
             for dttm_converted in return_dict.keys():
                 to_notify = False  # есть ли вообще нехватка
@@ -314,8 +314,6 @@ def notify_cashiers_lack():
 
             Notifications.objects.bulk_create(notifications_list)
 
-    print('уведомил о нехватке')
-
 
 @app.task
 def allocation_of_time_for_work_on_cashbox():
@@ -330,12 +328,9 @@ def allocation_of_time_for_work_on_cashbox():
         ).update(duration=round(duration, 3))
 
     dt = now().date().replace(day=1)
+    prev_month = dt - relativedelta(months=1)
 
-    delta = datetime.timedelta(days=20)
-    prev_month = (dt - delta).replace(day=1)
-    shops = Shop.objects.all()
-
-    for shop in shops:
+    for shop in Shop.objects.all():
         # Todo: может нужно сделать qos_filter на типы касс?
         cashbox_types = CashboxType.objects.filter(shop=shop)
         last_user = None
@@ -358,7 +353,7 @@ def allocation_of_time_for_work_on_cashbox():
                 ).order_by('worker_day__worker')
 
                 for detail in worker_day_cashbox_details:
-
+                    print(detail)
                     if last_user is None:
                         last_cashbox_type = cashbox_type
                         last_user = detail.worker_day.worker

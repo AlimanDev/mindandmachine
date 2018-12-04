@@ -400,7 +400,7 @@ class PeriodDemand(models.Model):
     id = models.BigAutoField(primary_key=True)
     dttm_forecast = models.DateTimeField()
     type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
-    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT, blank=True, null=True)
 
 
 class PeriodClients(PeriodDemand):
@@ -655,12 +655,14 @@ class WorkerDayCashboxDetails(models.Model):
     dttm_to = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return '{}, {}, {}, {}, {}'.format(
+        return '{}, {}, {}, {}-{}, id: {}'.format(
             self.worker_day.worker.last_name,
-            self.worker_day.worker.shop.super_shop.title,
             self.worker_day.dt,
             self.cashbox_type.name if self.cashbox_type else None,
-            self.id)
+            self.dttm_from.replace(microsecond=0).time() if self.dttm_from else self.dttm_from,
+            self.dttm_to.replace(microsecond=0).time() if self.dttm_to else self.dttm_to,
+            self.id,
+        )
 
     objects = WorkerDayCashboxDetailsManager()
 
@@ -710,9 +712,13 @@ class Notifications(models.Model):
     )
 
     def __str__(self):
-        return '{}, {}, {}, {}, {}'.format(self.to_worker.last_name, self.to_worker.shop.title, self.to_worker.shop.super_shop.title, self.dttm_added, self.id)
-        # return f'{self.to_worker.last_name}, {self.to_worker.shop.title}, {self.to_worker.shop.super_shop.title}, ' \
-        #        f'{self.dttm_added}, {self.id}'
+        return '{}, {}, {}, text: {}, id: {}'.format(
+            self.to_worker.last_name,
+            self.to_worker.shop.title,
+            self.dttm_added,
+            self.text[:30],
+            self.id
+        )
 
     id = models.BigAutoField(primary_key=True)
 
