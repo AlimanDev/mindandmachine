@@ -92,7 +92,7 @@ def get_init_params(dttm_exchange, shop_id):
 
     cashbox_types_dict = group_by(
         CashboxType.objects.
-            qos_filter_active(dttm_from=day_begin_dttm, dttm_to=day_end_dttm).
+            qos_filter_active(dt_from=day_begin_dttm.date(), dt_to=day_end_dttm.date()).
             filter(shop_id=shop_id).
             exclude(do_forecast=CashboxType.FORECAST_NONE).
             order_by('id'),

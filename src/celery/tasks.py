@@ -384,8 +384,7 @@ def create_pred_bills():
     """
     # todo: переписать
     for shop in Shop.objects.all():
-        res = create_predbills_request_function(shop.id)
-        print(res)
+        create_predbills_request_function(shop.id)
     print('создал спрос на месяц')
 
 

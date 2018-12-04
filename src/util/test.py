@@ -142,6 +142,9 @@ class LocalTestCase(TestCase):
             create_period_clients(
                 dttm_forecast=dttm_from, value=randint(50, 150), type=PeriodClients.LONG_FORECASE_TYPE, cashbox_type=self.cashbox_type3
             )
+            create_period_clients(
+                dttm_forecast=dttm_from - relativedelta(months=1), value=randint(50, 150), type=PeriodClients.FACT_TYPE, cashbox_type=self.cashbox_type3
+            )
             dttm_from += datetime.timedelta(minutes=30)
 
         # Timetable
