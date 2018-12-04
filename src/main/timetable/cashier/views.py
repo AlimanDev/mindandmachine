@@ -744,11 +744,30 @@ def get_worker_day_logs(request, form):
     Raises:
         JsonResponse.does_not_exist_error: если рабочего дня с worker_day_id нет
     """
+
+    def convert_change_log(obj):
+        def __work_dttm(__field):
+            return BaseConverter.convert_datetime(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+
+        return {
+            'id': obj.id,
+            'dttm_added': BaseConverter.convert_datetime(obj.dttm_added),
+            'dt': BaseConverter.convert_date(obj.dt),
+            'worker': obj.worker_id,
+            'type': WorkerDayConverter.convert_type(obj.type),
+            'dttm_work_start': __work_dttm(obj.dttm_work_start),
+            'dttm_work_end': __work_dttm(obj.dttm_work_end),
+            'created_by': obj.created_by_id,
+            'prev_type': WorkerDayConverter.convert_type(obj.parent_worker_day.type),
+            'prev_dttm_work_start': __work_dttm(obj.parent_worker_day.dttm_work_start),
+            'prev_dttm_work_end': __work_dttm(obj.parent_worker_day.dttm_work_end),
+        }
+
     shop_id = FormUtil.get_shop_id(request, form)
     worker_day_id = form['worker_day_id']
 
     worker_day_desired = None
-    response_data = {}
+    response_data = []
 
     if worker_day_id:
         try:
@@ -756,7 +775,7 @@ def get_worker_day_logs(request, form):
         except WorkerDay.DoesNotExist:
             return JsonResponse.does_not_exists_error('Ошибка. Такого рабочего дня в расписании нет.')
 
-    child_worker_days = WorkerDay.objects.select_related('worker').filter(
+    child_worker_days = WorkerDay.objects.select_related('worker', 'parent_worker_day').filter(
         parent_worker_day_id__isnull=False,
         worker__shop_id=shop_id,
         worker__attachment_group=User.GROUP_STAFF,
@@ -769,18 +788,8 @@ def get_worker_day_logs(request, form):
             worker_id=worker_day_desired.worker_id,
         )
 
-    response_data['change_logs'] = [WorkerDayConverter.convert(worker_day) for worker_day in child_worker_days]
-    for one_wd in response_data['change_logs']:
-        parent_id = child_worker_days.filter(id=one_wd.get('id')).first().parent_worker_day_id
-        parent_wd = WorkerDay.objects.get(id=parent_id)
-        parent_wd_type = parent_wd.type
-        one_wd['prev_type'] = WorkerDayConverter.convert_type(parent_wd_type)
-        if parent_wd_type == WorkerDay.Type.TYPE_WORKDAY.value:
-            one_wd['prev_dttm_work_start'] = BaseConverter.convert_datetime(parent_wd.dttm_work_start)
-            one_wd['prev_dttm_work_end'] = BaseConverter.convert_datetime(parent_wd.dttm_work_end)
-        else:
-            one_wd['prev_dttm_work_start'] = None
-            one_wd['prev_dttm_work_end'] = None
+    for child in child_worker_days:
+        response_data.append(convert_change_log(child))
 
     return JsonResponse.success(response_data)
 
