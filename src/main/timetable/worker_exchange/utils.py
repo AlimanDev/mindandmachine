@@ -91,7 +91,11 @@ def get_init_params(dttm_exchange, shop_id):
     day_end_dttm = datetime.combine(dttm_exchange.date() + timedelta(days=1), time(2, 0))
 
     cashbox_types_dict = group_by(
-        CashboxType.objects.filter(shop_id=shop_id).exclude(do_forecast=CashboxType.FORECAST_NONE).order_by('id'),
+        CashboxType.objects.
+            qos_filter_active(dttm_from=day_begin_dttm, dttm_to=day_end_dttm).
+            filter(shop_id=shop_id).
+            exclude(do_forecast=CashboxType.FORECAST_NONE).
+            order_by('id'),
         group_key=lambda x: x.id
     )
 

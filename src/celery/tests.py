@@ -1,21 +1,17 @@
 import datetime
 from django.utils.timezone import now
-from src.util.test import LocalTestCase, create_user
+from dateutil.relativedelta import relativedelta
+from src.util.test import LocalTestCase
 from src.db.models import (
-    WorkerMonthStat,
     WorkerCashboxInfo,
     CashboxType,
     WorkerDayCashboxDetails,
     PeriodQueues,
-    CameraClientEvent,
-    CameraClientGate,
     IncomeVisitors,
     EmptyOutcomeVisitors,
     PurchasesOutcomeVisitors,
-    WorkerDay,
-    PeriodClients,
-    User,
     Notifications,
+    CameraCashboxStat,
 )
 from .tasks import (
     update_worker_month_stat,
@@ -24,6 +20,8 @@ from .tasks import (
     update_visitors_info,
     release_all_workers,
     notify_cashiers_lack,
+    clean_camera_stats,
+    create_pred_bills,
 )
 
 
@@ -31,80 +29,14 @@ class TestCelery(LocalTestCase):
 
     def setUp(self):
         super().setUp()
-        dttm_now = now()
-        dttm_start = datetime.datetime(2018, 12, 1, 9, 0, 0)
-        dttm_end = datetime.datetime(2018, 12, 1, 18, 0, 0)
 
-        entry_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_ENTRY, name='Вход')
-        exit_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_OUT, name='Выход')
-
-        worker_day = WorkerDay.objects.create(
-            worker=self.user1,
-            dt=(dttm_now - datetime.timedelta(days=1)).date(),
-            type=WorkerDay.Type.TYPE_WORKDAY.value,
-            dttm_work_start=dttm_start,
-            dttm_work_end=dttm_end
-        )
-
-        gates = [entry_gate, exit_gate]
-
-        amount = 10
-
-        dt_from = dttm_now.date() - datetime.timedelta(days=amount / 2)
-        dt_to = dttm_now.date() + datetime.timedelta(days=amount / 2)
-        for i in range(amount):
-            user = User.objects.create(
-                id=1000+i,
-                last_name='user_{}'.format(1000+i),
-                shop=self.shop,
-                first_name='Иван',
-                username='user_{}'.format(1000+i),
+        months_ago = now() - relativedelta(months=3)
+        for i in range(100):
+            CameraCashboxStat.objects.create(
+                camera_cashbox=self.camera_cashbox,
+                dttm=months_ago - datetime.timedelta(hours=i),
+                queue=i
             )
-            for j in range(amount):
-                dt = dt_from + datetime.timedelta(days=j)
-                wd = WorkerDay.objects.create(
-                    dttm_work_start=datetime.datetime.combine(dt, dttm_start.time()),
-                    dttm_work_end=datetime.datetime.combine(dt, dttm_end.time()),
-                    type=WorkerDay.Type.TYPE_WORKDAY.value,
-                    dt=dt,
-                    worker=user
-                )
-                WorkerDayCashboxDetails.objects.create(
-                    worker_day=wd,
-                    on_cashbox=self.cashbox1,
-                    cashbox_type=self.cashboxType1,
-                    dttm_from=wd.dttm_work_start,
-                    dttm_to=wd.dttm_work_end
-                )
-
-        while dt_from < dt_to:
-            start_dttm = datetime.datetime.combine(dt_from, datetime.time(hour=7, minute=0))
-            for i in range(15*2 + 1):  # 15 hours => from 7:00 till 7+15=22:00
-                PeriodClients.objects.create(
-                    dttm_forecast=start_dttm + datetime.timedelta(minutes=30*i),
-                    cashbox_type=self.cashboxType1,
-                    type=PeriodClients.LONG_FORECASE_TYPE,
-                    value=100 + (-1)**(i % 2) * i
-                )
-            dt_from += datetime.timedelta(days=1)
-        for i in range(15):
-            try:
-                WorkerDayCashboxDetails.objects.create(
-                    status=WorkerDayCashboxDetails.TYPE_WORK,
-                    worker_day=worker_day,
-                    on_cashbox=self.cashbox2,
-                    cashbox_type=self.cashboxType1,
-                    is_tablet=True,
-                    dttm_from=dttm_start,
-                    dttm_to=dttm_end if i % 5 != 0 else None,
-                )
-                CameraClientEvent.objects.create(
-                    dttm=dttm_now - datetime.timedelta(minutes=2*i),
-                    gate=gates[i % 2],
-                    type=CameraClientEvent.DIRECTION_TYPES[i % 2][0],  # TOWARD / BACKWARD
-                )
-            except Exception:
-                pass
 
     # def test_update_worker_month_stat(self):
     #     update_worker_month_stat()
@@ -144,9 +76,12 @@ class TestCelery(LocalTestCase):
 
         update_queue()
 
-        updated_cashbox_types = CashboxType.objects.qos_filter_active(dttm_now + datetime.timedelta(minutes=30), dttm_now).filter(
-            dttm_last_update_queue__isnull=False,
-        )
+        updated_cashbox_types = CashboxType.objects.\
+            qos_filter_active(
+                dttm_now + datetime.timedelta(minutes=30), dttm_now).\
+            filter(
+                dttm_last_update_queue__isnull=False,
+            )
         for update_time in updated_cashbox_types.values_list('dttm_last_update_queue', flat=True):
             self.assertEqual(
                 update_time,
@@ -174,18 +109,34 @@ class TestCelery(LocalTestCase):
         self.assertEqual(amount_of_unreleased_workers, 0)
 
     def test_notify_cashiers_lack(self):
+        dt_now = now().date()
         existing_notifications = Notifications.objects.all()  # если где-то в тестах еще будут уведомления
         Notifications.objects.all().delete()
-        notify_cashiers_lack()
+
+        notify_cashiers_lack()  # при стандартном наборе тестовых данных будет хотя бы 1 уведомление
         self.assertGreater(Notifications.objects.count(), 0)
+        Notifications.objects.all().delete()
+        # терь добавим 100 сотрудников, чтобы точно перекрыть нехватку
+        self.create_many_users(100, dt_now - datetime.timedelta(days=15), dt_now + datetime.timedelta(days=15))
+        self.assertEqual(Notifications.objects.count(), 0)  # уведомление о нехватке должно стать 0
+
         Notifications.objects.all().delete()  # удаляем только что созданные
         Notifications.objects.bulk_create(existing_notifications)  # возвращаем те, которые были до этого
 
     def test_allocation_of_time_for_work_on_cashbox(self):
         allocation_of_time_for_work_on_cashbox()
         x = WorkerCashboxInfo.objects.all()
-        print(x.values_list('duration', flat=True))
-        # self.assertEqual(x[0].duration, 0)
-        # self.assertEqual(x[1].duration, 0)
-        # self.assertEqual(x[2].duration, 0)
-        # self.assertEqual(x[3].duration, 180)
+        self.assertEqual(x[0].duration, 0)
+        self.assertEqual(x[1].duration, 0)
+        self.assertEqual(x[2].duration, 0)
+        self.assertGreater(x[3].duration, 0)
+
+    def test_create_pred_bills(self):
+        create_pred_bills()
+
+    def test_clean_camera_stats(self):
+        stats = CameraCashboxStat.objects.filter(dttm__lt=now() - relativedelta(months=3))
+        self.assertEqual(stats.count(), 100)
+        clean_camera_stats()
+        stats = CameraCashboxStat.objects.filter(dttm__lt=now() - relativedelta(months=3))
+        self.assertEqual(stats.count(), 0)
