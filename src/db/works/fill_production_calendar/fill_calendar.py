@@ -1,3 +1,15 @@
+"""
+launch from shell
+
+./manage.py shell
+from src.db.works.fill_production_calendar import fill_calendar
+
+Examples:
+    fill_calendar.fill_month(2018, 2019) -- only for months
+    fill_calendar.fill_days('2018.1.1', '2019.1.1')  -- onlu for production days
+    fill_calendar.main('2018.1.1', '2019.1.1') -- for both months and days
+
+"""
 import pandas as pd
 import datetime
 from calendar import monthrange
@@ -11,7 +23,13 @@ from src.db.models import (
 # https://data.gov.ru/opendata/7708660670-proizvcalendar (мб со временем ссылка поменяется,но все равно сайт тотже)
 
 
-def fill_months(from_year, to_year):  # all including boundaries, e.g. 2015<=year<=2019
+def fill_months(from_year, to_year):
+    """
+    including boundaries (from_year <= year <= to_year)
+    Args:
+         from_year(int): e.g. 2018
+         to_year(int): e.g. 2020
+    """
     file = pd.read_csv(
         'src/db/works/fill_production_calendar/work_data.csv',
         index_col=False,
@@ -54,9 +72,10 @@ def fill_months(from_year, to_year):  # all including boundaries, e.g. 2015<=yea
 
 def fill_days(from_date, to_date):
     """
+    including boundaries
     Args:
-        from_date(str): '2018.1.1', including
-        to_date(str): '2019.1.1' , including
+        from_date(str): e.g. '2018.1.1'
+        to_date(str): e.g. '2019.1.1'
     """
     file = pd.read_csv(
         'src/db/works/fill_production_calendar/work_data.csv',
@@ -116,9 +135,10 @@ def fill_days(from_date, to_date):
 
 def main(from_date, to_date):
     """
+    including boundaries
     Args:
-        from_date(str): '2018.1.1', including
-        to_date(str): '2019.1.1' , including
+        from_date(str): e.g. '2018.1.1'
+        to_date(str): e.g. '2019.1.1'
     """
     fill_days(from_date=from_date, to_date=to_date)
 
