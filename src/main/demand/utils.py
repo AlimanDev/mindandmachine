@@ -83,11 +83,11 @@ def create_predbills_request_function(shop_id, dt=None):
 
 
     if dt is None:
-        dt_now = datetime.now().date()
-        dt = (PeriodClients.objects.all().order_by('dttm_forecast').last().dttm_forecast).date() + timedelta(days=1)
-        diff_dt = dt_now - dt
-        if diff_dt.days < 0:
-            predict2days += -diff_dt.days
+        dt = datetime.now().date()
+        # dt = (PeriodClients.objects.all().order_by('dttm_forecast').last().dttm_forecast).date() + timedelta(days=1)
+        # diff_dt = dt_now - dt
+        # if  -30 < diff_dt.days < 0:
+        #     predict2days += -diff_dt.days
 
     day_info = ProductionDay.objects.filter(
         dt__gte=dt - relativedelta(years=YEARS_TO_COLLECT),

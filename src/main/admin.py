@@ -164,7 +164,7 @@ class CashboxAdmin(admin.ModelAdmin):
 class PeriodClientsAdmin(admin.ModelAdmin):
     list_display = ('cashbox_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
     search_fields = ('cashbox_type__name', 'cashbox_type__shop__title', 'id')
-    list_filter = ('cashbox_type__shop', )
+    list_filter = ('cashbox_type_id', 'type')
 
     @staticmethod
     def cashbox_type_name(instance: PeriodClients):

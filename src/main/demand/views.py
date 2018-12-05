@@ -92,7 +92,7 @@ def get_indicators(request, form):
         growth = None
 
     def __div_safe(__a, __b):
-        return __a / __b if (__b > 0 and __b and __a) else None
+        return __a / __b if ( __b and __a and __b > 0) else None
     return JsonResponse.success({
         'total_bills': clients if clients else 0,  # может вернуть None
         'total_codes': products if products else 0,  # аналогично
