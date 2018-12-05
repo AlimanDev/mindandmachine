@@ -198,6 +198,10 @@ CELERYD_CONCURRENCY = 2
 CELERYD_PREFETCH_MULTIPLIER = 1
 BACKEND_QUEUE = 'backend_queue'
 
+# for change celery configs must be before (for BACKEND_QUEUE)
+# todo: do normal parameters changer
+if is_config_exists('djconfig_local.py'):
+    from .djconfig_local import *
 
 CELERY_QUEUES = {
     "backend_queue": {
@@ -257,6 +261,3 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-
-if is_config_exists('djconfig_local.py'):
-    from .djconfig_local import *
