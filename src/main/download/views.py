@@ -1,16 +1,22 @@
 from src.util.utils import api_method
 from .utils import xlsx_method
-from .forms import GetTable, GetDemandXlsxForm
+from .forms import (
+    GetTable,
+    GetDemandXlsxForm,
+    GetUrvXlsxForm,
+)
 from src.db.models import (
     Shop,
     User,
     WorkerDay,
     PeriodClients,
     CashboxType,
+    AttendanceRecords,
 )
 from datetime import time, timedelta, datetime
 from django.apps import apps
 from src.util.utils import JsonResponse
+from src.util.models_converter import AttendanceRecordsConverter
 
 from .xlsx.tabel import Tabel_xlsx
 from src.util.forms import FormUtil
@@ -171,3 +177,59 @@ def get_demand_xlsx(request, workbook, form):
             dttm += timedelta(minutes=timestep)
 
     return workbook, '{} {}-{}'.format(model.__name__, from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))
+
+
+@api_method(
+    'GET',
+    GetUrvXlsxForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
+@xlsx_method
+def get_urv_xlsx(request, workbook, form):
+    """
+    Скачивает записи по урв за запрошенную дату
+
+    Args:
+        method: GET
+        url: /api/download/get_urv_xlsx
+        from_dt(QOS_DATE): с какой даты скачивать
+        to_dt(QOS_DATE): по какую дату скачивать
+        shop_id(int): в каком магазинеde
+
+    Returns:
+        эксель файл с форматом Дата | Фамилия Имя сотрудника, табельный номер | Время | Тип
+    """
+    shop_id = form['shop_id']
+    from_dt = form['from_dt']
+    to_dt = form['to_dt']
+
+    worksheet = workbook.add_worksheet('{}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d')))
+
+    worksheet.write(0, 0, 'Дата')
+    worksheet.write(0, 1, 'Фамилия Имя, табельный номер')
+    worksheet.set_column(0, 1, 30)
+    worksheet.write(0, 2, 'Время')
+    worksheet.write(0, 3, 'Тип')
+
+    records = list(AttendanceRecords.objects.select_related('identifier', 'identifier__worker').filter(
+        dttm__date__gte=from_dt,
+        dttm__date__lte=to_dt,
+        identifier__worker__shop_id=shop_id,
+    ).order_by('dttm', 'identifier__worker'))
+
+    prev_date = None
+    prev_worker = None
+
+    for index, record in enumerate(records):
+        record_date = record.dttm.date()
+        record_worker = record.identifier.worker
+        if prev_date != record_date:
+            worksheet.write(index + 1, 0, record_date.strftime('%d.%m.%Y'))
+            prev_date = record_date
+        if prev_worker != record_worker:
+            worksheet.write(index + 1, 1, '{} {}'.format(record_worker.last_name, record_worker.first_name))
+            prev_worker = record_worker
+        worksheet.write(index + 1, 2, record.dttm.strftime('%H:%M'))
+        worksheet.write(index + 1, 3, AttendanceRecordsConverter.convert_type(record))
+
+    return workbook, 'URV {}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))

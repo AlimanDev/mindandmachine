@@ -13,3 +13,9 @@ class GetDemandXlsxForm(forms.Form):
     to_dt = util_forms.DateField()
     shop_id = forms.IntegerField()
     demand_model = forms.CharField()
+
+
+class GetUrvXlsxForm(forms.Form):
+    from_dt = util_forms.DateField()
+    to_dt = util_forms.DateField()
+    shop_id = forms.IntegerField()
