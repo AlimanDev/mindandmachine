@@ -114,7 +114,7 @@ EMAIL_PORT = 587
 
 EMAIL_HOST = 'smtp.yandex.ru'
 EMAIL_HOST_USER = 'robot@mindandmachine.ru'
-EMAIL_HOST_PASSWORD = 'twtdtcgztorfruwz'
+EMAIL_HOST_PASSWORD = 'TjP6szfJe0PpLNH'
 
 SERVER_EMAIL = EMAIL_HOST_USER
 
