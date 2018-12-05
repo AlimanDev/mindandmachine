@@ -45,9 +45,9 @@ def update_queue(till_dttm=None):
     Note:
         Выполняется каждые полчаса
     """
-    time_step = datetime.timedelta(seconds=1800)
+    time_step = datetime.timedelta(seconds=1800)  # todo: change to supershop step
     if till_dttm is None:
-        till_dttm = now()
+        till_dttm = now()  + datetime.timedelta(hours=3) # moscow time
 
     cashbox_types = CashboxType.objects.filter(
         dttm_last_update_queue__isnull=False,
@@ -56,14 +56,18 @@ def update_queue(till_dttm=None):
         dif_time = till_dttm - cashbox_type.dttm_last_update_queue
         print('начал работать в функции update_queue')
         while dif_time > time_step:
-            mean_queue = CameraCashboxStat.objects.filter(
+            mean_queue = list(CameraCashboxStat.objects.filter(
                 camera_cashbox__cashbox__type__id=cashbox_type.id,
                 dttm__gte=cashbox_type.dttm_last_update_queue,
                 dttm__lt=cashbox_type.dttm_last_update_queue + time_step
-            ).values('camera_cashbox_id').annotate(mean_queue=Avg('queue')).filter(mean_queue__gte=0.6)
+            ).values('camera_cashbox_id').annotate(mean_queue=Avg('queue')).values_list('mean_queue', flat=True)) #.filter(mean_queue__gte=0.5)
+            # todo: mean_queue__gte seems stupid -- need to change and look only open
 
             if len(mean_queue):
-                mean_queue = sum([el['mean_queue'] for el in mean_queue]) / len(mean_queue) * 1.4
+
+                min_possible_period_len = max(mean_queue) * 0.17
+                mean_queue = list([el for el in mean_queue if el > min_possible_period_len and el > 0.4])
+                mean_queue = sum(mean_queue) / len(mean_queue)
 
                 changed_amount = PeriodQueues.objects.filter(
                     dttm_forecast=cashbox_type.dttm_last_update_queue,
