@@ -54,7 +54,6 @@ def update_queue(till_dttm=None):
     )
     for cashbox_type in cashbox_types:
         dif_time = till_dttm - cashbox_type.dttm_last_update_queue
-        print('начал работать в функции update_queue')
         while dif_time > time_step:
             mean_queue = list(CameraCashboxStat.objects.filter(
                 camera_cashbox__cashbox__type__id=cashbox_type.id,
@@ -67,7 +66,7 @@ def update_queue(till_dttm=None):
 
                 min_possible_period_len = max(mean_queue) * 0.17
                 mean_queue = list([el for el in mean_queue if el > min_possible_period_len and el > 0.4])
-                mean_queue = sum(mean_queue) / len(mean_queue)
+                mean_queue = sum(mean_queue) / (len(mean_queue) + 0.000001)
 
                 changed_amount = PeriodQueues.objects.filter(
                     dttm_forecast=cashbox_type.dttm_last_update_queue,
