@@ -115,7 +115,7 @@ def get_demand_xlsx(request, workbook, form):
     timestep = 30  # minutes
 
     if (to_dt - from_dt).days > 90:
-        return JsonResponse.internal_error('Выберите, пожалуйста, более короткий период.')
+        return JsonResponse.internal_error('Выберите, пожалуйста, более короткий период.'), 'error'
 
     worksheet = workbook.add_worksheet('{}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d')))
     worksheet.set_column(0, 3, 30)
@@ -127,7 +127,7 @@ def get_demand_xlsx(request, workbook, form):
     try:
         model = apps.get_model('db', 'period{}'.format(form['demand_model']))
     except LookupError:
-        return JsonResponse.internal_error('incorrect demand model')
+        return JsonResponse.internal_error('incorrect demand model'), 'error'
 
     period_demands = list(model.objects.select_related('cashbox_type').filter(
         cashbox_type__shop_id=form['shop_id'],
@@ -140,15 +140,19 @@ def get_demand_xlsx(request, workbook, form):
     amount_cashbox_types = len(cashbox_types)
 
     dttm = datetime.combine(from_dt, time(0, 0))
-    expected_record_amount = (to_dt - from_dt).days * amount_cashbox_types * 24 * 60 / timestep
+    expected_record_amount = (to_dt - from_dt).days * amount_cashbox_types * 24 * 60 // timestep
 
     demand_index = 0
+    period_demands_len = len(period_demands)
+    if period_demands_len == 0:
+        demand = PeriodClients()  # null model if no data
 
-    for index in range(int(expected_record_amount)):
+    for index in range(expected_record_amount):
         cashbox_type_index = index % amount_cashbox_types
         cashbox_type_name = cashbox_types[cashbox_type_index].name
 
-        demand = period_demands[demand_index]
+        if period_demands_len > demand_index:
+            demand = period_demands[demand_index]
 
         worksheet.write(index + 1, 0, cashbox_type_name)
         worksheet.write(index + 1, 1, dttm.strftime('%d.%m.%Y %H:%M:%S'))
