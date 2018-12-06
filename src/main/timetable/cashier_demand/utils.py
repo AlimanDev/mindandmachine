@@ -225,7 +225,7 @@ def get_worker_timetable(shop_id, form):
         ],
         cashbox_type_id__in=cashbox_types.keys()
     ).order_by(
-        'type',
+        '-type',
         'dttm_forecast',
         'cashbox_type_id'
     )
