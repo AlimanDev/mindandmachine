@@ -66,7 +66,7 @@ def set_queue(request):
     return JsonResponse.success()
 
 
-@outer_server
+@outer_server()
 def set_events(request, json_data):
     """
     Получает данные по посетителям с камер, заносит их в бд
@@ -99,14 +99,13 @@ def set_events(request, json_data):
                 'no such direction types for gates. Use {} for toward direction, {} for backward'.\
                 format(CameraClientEvent.TYPE_TOWARD, CameraClientEvent.TYPE_BACKWARD)
             )
-        try:
-            gate_name = data_value['gate']
-            gate_type = data_value['gate_type']
-            gate = CameraClientGate.objects.get(name=gate_name, type=gate_type)
-        except CameraClientGate.DoesNotExist:
-            return JsonResponse.value_error(
-                'cannot get gate for gate with name:{} and type: {}'.format(gate_name, gate_type)
-            )
+
+        gate_name = data_value['gate']
+        gate_type = data_value['gate_type']
+        gate, _ = CameraClientGate.objects.get_or_create(name=gate_name, type=gate_type)
+            # return JsonResponse.value_error(
+            #     'cannot get gate for gate with name:{} and type: {}'.format(gate_name, gate_type)
+            # )
         bulk_create_camera_event(
             CameraClientEvent(
                 dttm=dttm,

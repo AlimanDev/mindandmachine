@@ -23,6 +23,9 @@ from src.db.models import (
     WorkerMonthStat,
     CameraCashboxStat,
     CameraCashbox,
+
+    CameraClientGate,
+    CameraClientEvent,
 )
 
 
@@ -347,3 +350,12 @@ class CameraCashboxStatAdmin(admin.ModelAdmin):
 @admin.register(CameraCashbox)
 class CameraCashboxStatAdmin(admin.ModelAdmin):
     list_display = ('name', 'cashbox')
+
+@admin.register(CameraClientGate)
+class CameraClientGateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'type')
+
+@admin.register(CameraClientEvent)
+class CameraClientEventAdmin(admin.ModelAdmin):
+    list_display = ('dttm', 'gate', 'type')
+    list_filter = ('gate', 'type')
