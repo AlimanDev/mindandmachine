@@ -93,18 +93,23 @@ def get_cashiers_list(request, form):
         ]}
 
     """
-    users = []
+    response_users = []
     attachment_groups = [User.GROUP_STAFF, User.GROUP_OUTSOURCE if form['consider_outsource'] else None]
     shop_id = FormUtil.get_shop_id(request, form)
-    for u in User.objects.filter(
-            shop_id=shop_id,
-            attachment_group__in=attachment_groups
-    ).order_by('last_name', 'first_name'):
-        if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
-            if u.dt_fired is None or u.dt_fired > form['dt_fired_after']:
-                users.append(u)
+    users_qs = User.objects.filter(
+        shop_id=shop_id,
+        attachment_group__in=attachment_groups
+    ).order_by('id')
 
-    return JsonResponse.success([UserConverter.convert(x) for x in users])
+    if form['show_all']:
+        response_users = users_qs
+    else:
+        for u in users_qs:
+            if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
+                if u.dt_fired is None or u.dt_fired > form['dt_fired_after']:
+                    response_users.append(u)
+
+    return JsonResponse.success([UserConverter.convert(x) for x in response_users])
 
 
 @api_method('GET', GetCashiersListForm)
@@ -780,7 +785,8 @@ def get_worker_day_logs(request, form):
         worker__shop_id=shop_id,
         worker__attachment_group=User.GROUP_STAFF,
         dt__gte=form['from_dt'],
-        dt__lte=form['to_dt']
+        dt__lte=form['to_dt'],
+        worker__dt_fired__lte=form['from_dt']
     ).order_by('-dttm_added')
     if worker_day_desired:
         child_worker_days = child_worker_days.filter(
