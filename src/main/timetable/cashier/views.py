@@ -1,5 +1,5 @@
 from datetime import time, datetime, timedelta
-from django.db.models import Avg
+from django.db.models import Avg, Q
 from django.core.exceptions import ObjectDoesNotExist
 import json
 
@@ -780,13 +780,18 @@ def get_worker_day_logs(request, form):
         except WorkerDay.DoesNotExist:
             return JsonResponse.does_not_exists_error('Ошибка. Такого рабочего дня в расписании нет.')
 
+    active_users = User.objects.qos_filter_active(
+        dt_from=form['from_dt'],
+        dt_to=form['to_dt'],
+        shop_id=shop_id,
+        attachment_group=User.GROUP_STAFF
+    )
+
     child_worker_days = WorkerDay.objects.select_related('worker', 'parent_worker_day').filter(
+        worker__in=active_users,
         parent_worker_day_id__isnull=False,
-        worker__shop_id=shop_id,
-        worker__attachment_group=User.GROUP_STAFF,
         dt__gte=form['from_dt'],
         dt__lte=form['to_dt'],
-        worker__dt_fired__lte=form['from_dt']
     ).order_by('-dttm_added')
     if worker_day_desired:
         child_worker_days = child_worker_days.filter(
