@@ -105,7 +105,7 @@ def get_demand_xlsx(request, workbook, form):
         from_dt(QOS_DATE): с какой даты скачивать
         to_dt(QOS_DATE): по какую дату скачивать
         shop_id(int): в каком магазинеde
-        demand_model(char): !! attention !! передавать что-то из clients/queue/products (см. окончание моделей Period..)
+        demand_model(char): 'C'/'Q'/'P'
 
     Returns:
         эксель файл с форматом Тип работ | Время | Значение
@@ -113,6 +113,12 @@ def get_demand_xlsx(request, workbook, form):
     from_dt = form['from_dt']
     to_dt = form['to_dt']
     timestep = 30  # minutes
+
+    model_form_dict = {
+        'C': 'clients',
+        'Q': 'queues',
+        'P': 'products'
+    }
 
     if (to_dt - from_dt).days > 90:
         return JsonResponse.internal_error('Выберите, пожалуйста, более короткий период.'), 'error'
@@ -125,7 +131,9 @@ def get_demand_xlsx(request, workbook, form):
     worksheet.write(0, 3, 'Значение(фактический)')
 
     try:
-        model = apps.get_model('db', 'period{}'.format(form['demand_model']))
+        model = apps.get_model('db', 'period{}'.format(
+            model_form_dict[form['demand_model']]
+        ))
     except LookupError:
         return JsonResponse.internal_error('incorrect demand model'), 'error'
 
@@ -145,7 +153,7 @@ def get_demand_xlsx(request, workbook, form):
     demand_index = 0
     period_demands_len = len(period_demands)
     if period_demands_len == 0:
-        demand = PeriodClients()  # null model if no data
+        demand = model()  # null model if no data
 
     for index in range(expected_record_amount):
         cashbox_type_index = index % amount_cashbox_types
@@ -180,7 +188,11 @@ def get_demand_xlsx(request, workbook, form):
         if index % amount_cashbox_types == amount_cashbox_types - 1 and index != 0:
             dttm += timedelta(minutes=timestep)
 
-    return workbook, '{} {}-{}'.format(model.__name__, from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))
+    return workbook, '{} {}-{}'.format(
+        model_form_dict[form['demand_model']],
+        from_dt.strftime('%Y.%m.%d'),
+        to_dt.strftime('%Y.%m.%d'),
+    )
 
 
 @api_method(

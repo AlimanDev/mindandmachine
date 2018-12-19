@@ -207,7 +207,6 @@ def get_worker_timetable(shop_id, form):
     # mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
 
     mean_bills_per_step = {m: PERIOD_MINUTES / cashbox_types[m][0].speed_coef for m in cashbox_types.keys()}
-    print(mean_bills_per_step)
 
     worker_amount = len(set([w.worker_id for w in worker_cashbox_info]))
     worker_cashbox_info = group_by(

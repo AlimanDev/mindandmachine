@@ -35,10 +35,10 @@ class SetDemandForm(forms.Form):
             return
 
         if self.cleaned_data['from_dttm'] > self.cleaned_data['to_dttm']:
-            raise ValidationError('cannot from_dt be gt to_dt')
+            raise ValidationError('дата начала не может быть больше даты окончания')
 
         if self.cleaned_data['from_dttm'].date() < datetime.date.today():
-            raise ValidationError('cannot change past data')
+            raise ValidationError('невозможно изменять спрос за предыдущий период')
 
         m_exists = self.cleaned_data.get('multiply_coef') is not None
         v_exists = self.cleaned_data.get('set_value') is not None
