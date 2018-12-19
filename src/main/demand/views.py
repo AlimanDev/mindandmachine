@@ -261,7 +261,7 @@ def set_demand(request, form):
         if multiply_coef is not None:
             x.value *= multiply_coef
         else:
-            x.value += set_value
+            x.value = set_value
 
         x.save()
 
