@@ -77,12 +77,11 @@ class TestCelery(LocalTestCase):
 
         update_queue()
 
-        updated_cashbox_types = CashboxType.objects.\
-            qos_filter_active(
-                dttm_now + datetime.timedelta(minutes=30), dttm_now).\
-            filter(
-                dttm_last_update_queue__isnull=False,
-            )
+        updated_cashbox_types = CashboxType.objects.qos_filter_active(
+            dttm_now + datetime.timedelta(minutes=30),
+            dttm_now,
+            dttm_last_update_queue__isnull=False,
+        )
         for update_time in updated_cashbox_types.values_list('dttm_last_update_queue', flat=True):
             self.assertEqual(
                 update_time,
