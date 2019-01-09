@@ -80,8 +80,6 @@ def create_predbills_request_function(shop_id, dt=None):
     YEARS_TO_COLLECT = 3  # за последние YEARS_TO_COLLECT лет
     predict2days = 62  # на N дней прогноз
 
-
-
     if dt is None:
         dt = datetime.now().date()
         # dt = (PeriodClients.objects.all().order_by('dttm_forecast').last().dttm_forecast).date() + timedelta(days=1)
