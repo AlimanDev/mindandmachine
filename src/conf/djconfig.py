@@ -100,7 +100,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-ADMINS = [('Robot', 'robot@mindandmachine.ru'), ]
+ADMINS = [('Robot', 'robot@mindandmachine.ru'),  ('alex', 'a.aleskin@mindandmachine.ru'),]
 MANAGERS = ADMINS
 
 # To send messages, you must put in the mode DEBUG = False
@@ -114,7 +114,7 @@ EMAIL_PORT = 587
 
 EMAIL_HOST = 'smtp.yandex.ru'
 EMAIL_HOST_USER = 'robot@mindandmachine.ru'
-EMAIL_HOST_PASSWORD = 'twtdtcgztorfruwz'
+EMAIL_HOST_PASSWORD = 'TjP6szfJe0PpLNH'
 
 SERVER_EMAIL = EMAIL_HOST_USER
 
@@ -198,6 +198,10 @@ CELERYD_CONCURRENCY = 2
 CELERYD_PREFETCH_MULTIPLIER = 1
 BACKEND_QUEUE = 'backend_queue'
 
+# for change celery configs must be before (for BACKEND_QUEUE)
+# todo: do normal parameters changer
+if is_config_exists('djconfig_local.py'):
+    from .djconfig_local import *
 
 CELERY_QUEUES = {
     "backend_queue": {
@@ -257,6 +261,3 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-
-if is_config_exists('djconfig_local.py'):
-    from .djconfig_local import *

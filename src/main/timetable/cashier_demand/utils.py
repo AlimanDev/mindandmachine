@@ -1,7 +1,7 @@
 from datetime import datetime, time, timedelta
 
-from django.db.models import Max, Q
-
+from django.db.models import Q
+# from django.db.models.functions import Coalesce
 from src.db.models import (
     WorkerDay,
     User,
@@ -9,6 +9,7 @@ from src.db.models import (
     WorkerCashboxInfo,
     WorkerDayCashboxDetails,
     PeriodClients,
+    Shop,
 )
 from src.util.collection import group_by
 from src.util.models_converter import BaseConverter
@@ -69,7 +70,7 @@ def check_time_is_between_boarders(tm, borders):
     return False
 
 
-def count_diff(dttm, period_clients, demand_ind, mean_bills_per_step, cashbox_types, PERIOD_MINUTES = 30):
+def count_diff(dttm, period_clients, demand_ind, mean_bills_per_step, cashbox_types):
     """
     Функция, которая считает нехватку
 
@@ -111,14 +112,14 @@ def count_diff(dttm, period_clients, demand_ind, mean_bills_per_step, cashbox_ty
             if (ind < dem_len) and (period_clients[ind].dttm_forecast == dttm):
                 ct_id = period_clients[ind].cashbox_type_id
                 if ct_id in cashbox_types.keys():
-                    need_amount_dict[ct_id] = period_clients[ind].value / cashbox_types[ct_id][0].speed_coef \
-                               / (PERIOD_MINUTES / mean_bills_per_step[ct_id])
+                    need_amount_dict[ct_id] = period_clients[ind].value / mean_bills_per_step[ct_id]
 
     return need_amount_dict, demand_ind
 
 
 def get_worker_timetable(shop_id, form):
-    PERIOD_MINUTES = 30
+    shop = Shop.objects.get(id=shop_id)
+    PERIOD_MINUTES = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
     PERIOD_STEP = timedelta(minutes=PERIOD_MINUTES)
     TOTAL_PERIOD_SECONDS = PERIOD_STEP.total_seconds()
 
@@ -199,11 +200,13 @@ def get_worker_timetable(shop_id, form):
         cashbox_type_id__in=cashbox_types.keys()
     ).distinct())
 
-    mean_bills_per_step = WorkerCashboxInfo.objects.filter(
-        is_active=True,
-        cashbox_type_id__in=cashbox_types.keys()
-    ).values('cashbox_type_id').annotate(speed_usual=Max('mean_speed'))
-    mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
+    # mean_bills_per_step = WorkerCashboxInfo.objects.filter(
+    #     is_active=True,
+    #     cashbox_type_id__in=cashbox_types.keys()
+    # ).values('cashbox_type_id').annotate(speed_usual=Coalesce(Avg('mean_speed'), 1))
+    # mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
+
+    mean_bills_per_step = {m: PERIOD_MINUTES / cashbox_types[m][0].speed_coef for m in cashbox_types.keys()}
 
     worker_amount = len(set([w.worker_id for w in worker_cashbox_info]))
     worker_cashbox_info = group_by(
@@ -221,7 +224,7 @@ def get_worker_timetable(shop_id, form):
         ],
         cashbox_type_id__in=cashbox_types.keys()
     ).order_by(
-        'type',
+        '-type',
         'dttm_forecast',
         'cashbox_type_id'
     )

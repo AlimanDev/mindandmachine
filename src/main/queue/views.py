@@ -251,6 +251,9 @@ def process_forecast(request, form):
         dttm_forecast__lte=dt_now + timedelta(days=1)
     ).order_by('dttm_forecast')
 
+    if not queue:
+        return JsonResponse.value_error('В базе данных нет данных по фактическому спросу для составления.')
+
     from_dt = queue[0].dttm_forecast.date()
     form_tt_prev = {
         'from_dt': from_dt,

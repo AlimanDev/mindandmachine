@@ -144,6 +144,7 @@ def create_timetable(request, form):
         auto_timetable=True,
     )
     shop = Shop.objects.get(id=shop_id)
+    period_step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
     super_shop = shop.super_shop
 
     # проверка что у всех юзеров указаны специализации
@@ -334,17 +335,17 @@ def create_timetable(request, form):
 
     user_info = count_difference_of_normal_days(dt_end=dt_from, usrs=users)
 
-    mean_bills_per_step = WorkerCashboxInfo.objects.filter(
-        is_active=True,
-        cashbox_type__shop_id=shop_id,
-    ).values('cashbox_type_id').annotate(speed_usual=Avg('mean_speed'))
-    mean_bills_per_step = {m['cashbox_type_id']: 30 / m['speed_usual'] for m in mean_bills_per_step}
+    # mean_bills_per_step = WorkerCashboxInfo.objects.filter(
+    #     is_active=True,
+    #     cashbox_type__shop_id=shop_id,
+    # ).values('cashbox_type_id').annotate(speed_usual=Avg('mean_speed'))
+    # mean_bills_per_step = {m['cashbox_type_id']: 30 / m['speed_usual'] for m in mean_bills_per_step}
 
     cashboxes_dict = {cb['id']: cb for cb in cashboxes}
 
     demands = [PeriodClientsConverter.convert(x) for x in periods]
     for demand in demands:
-        demand['clients'] = demand['clients'] / mean_bills_per_step[demand['cashbox_type']] / cashboxes_dict[demand['cashbox_type']]['speed_coef']
+        demand['clients'] = demand['clients'] / (period_step / cashboxes_dict[demand['cashbox_type']]['speed_coef'])
         if cashboxes_dict[demand['cashbox_type']]['do_forecast'] == CashboxType.FORECAST_LITE:
             demand['clients'] = 1
 

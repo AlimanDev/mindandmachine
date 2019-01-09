@@ -284,7 +284,7 @@ class CashboxType(models.Model):
     dttm_last_update_queue = models.DateTimeField(null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     name = models.CharField(max_length=128)
-    speed_coef = models.FloatField(default=1)
+    speed_coef = models.FloatField(default=1)  # time for do 1 operation of cashboxtype
     is_stable = models.BooleanField(default=False)
     FORECAST_HARD = 'H'
     FORECAST_LITE = 'L'

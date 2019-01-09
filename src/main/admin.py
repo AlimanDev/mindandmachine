@@ -6,6 +6,8 @@ from src.db.models import (
     Shop,
     WorkerDay,
     PeriodClients,
+    PeriodQueues,
+    PeriodProducts,
     PeriodDemandChangeLog,
     CashboxType,
     Cashbox,
@@ -21,6 +23,9 @@ from src.db.models import (
     WorkerMonthStat,
     CameraCashboxStat,
     CameraCashbox,
+
+    CameraClientGate,
+    CameraClientEvent,
 )
 
 
@@ -164,7 +169,7 @@ class CashboxAdmin(admin.ModelAdmin):
 class PeriodClientsAdmin(admin.ModelAdmin):
     list_display = ('cashbox_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
     search_fields = ('cashbox_type__name', 'cashbox_type__shop__title', 'id')
-    list_filter = ('cashbox_type__shop', )
+    list_filter = ('cashbox_type_id', 'type')
 
     @staticmethod
     def cashbox_type_name(instance: PeriodClients):
@@ -173,6 +178,37 @@ class PeriodClientsAdmin(admin.ModelAdmin):
     @staticmethod
     def shop_title(instance: PeriodClients):
         return instance.cashbox_type.shop.title
+
+
+@admin.register(PeriodQueues)
+class PeriodQueuesAdmin(admin.ModelAdmin):
+    list_display = ('cashbox_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
+    search_fields = ('cashbox_type__name', 'cashbox_type__shop__title', 'id')
+    list_filter = ('cashbox_type_id', 'type')
+
+    @staticmethod
+    def cashbox_type_name(instance: PeriodClients):
+        return instance.cashbox_type.name
+
+    @staticmethod
+    def shop_title(instance: PeriodClients):
+        return instance.cashbox_type.shop.title
+
+
+@admin.register(PeriodProducts)
+class PeriodProductsAdmin(admin.ModelAdmin):
+    list_display = ('cashbox_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
+    search_fields = ('cashbox_type__name', 'cashbox_type__shop__title', 'id')
+    list_filter = ('cashbox_type_id', 'type')
+
+    @staticmethod
+    def cashbox_type_name(instance: PeriodClients):
+        return instance.cashbox_type.name
+
+    @staticmethod
+    def shop_title(instance: PeriodClients):
+        return instance.cashbox_type.shop.title
+
 
 
 @admin.register(PeriodDemandChangeLog)
@@ -314,3 +350,12 @@ class CameraCashboxStatAdmin(admin.ModelAdmin):
 @admin.register(CameraCashbox)
 class CameraCashboxStatAdmin(admin.ModelAdmin):
     list_display = ('name', 'cashbox')
+
+@admin.register(CameraClientGate)
+class CameraClientGateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'type')
+
+@admin.register(CameraClientEvent)
+class CameraClientEventAdmin(admin.ModelAdmin):
+    list_display = ('dttm', 'gate', 'type')
+    list_filter = ('gate', 'type')

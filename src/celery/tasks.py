@@ -46,9 +46,9 @@ def update_queue(till_dttm=None):
     Note:
         Выполняется каждые полчаса
     """
-    time_step = datetime.timedelta(seconds=1800)
+    time_step = datetime.timedelta(seconds=1800)  # todo: change to supershop step
     if till_dttm is None:
-        till_dttm = now()
+        till_dttm = now()  + datetime.timedelta(hours=3) # moscow time
 
     cashbox_types = CashboxType.objects.qos_filter_active(till_dttm + datetime.timedelta(minutes=30), till_dttm).filter(
         dttm_last_update_queue__isnull=False,
@@ -58,27 +58,30 @@ def update_queue(till_dttm=None):
     for cashbox_type in cashbox_types:
         dif_time = till_dttm - cashbox_type.dttm_last_update_queue
         while dif_time > time_step:
-            mean_queue = CameraCashboxStat.objects.filter(
+            mean_queue = list(CameraCashboxStat.objects.filter(
                 camera_cashbox__cashbox__type__id=cashbox_type.id,
                 dttm__gte=cashbox_type.dttm_last_update_queue,
                 dttm__lt=cashbox_type.dttm_last_update_queue + time_step
-            ).annotate(mean_queue=Avg('queue')).filter(mean_queue__gte=0.6).values_list('mean_queue', flat=True)
+            ).values('camera_cashbox_id').annotate(mean_queue=Avg('queue')).values_list('mean_queue', flat=True)) #.filter(mean_queue__gte=0.5)
+            # todo: mean_queue__gte seems stupid -- need to change and look only open
+
             if len(mean_queue):
-                mean_queue = sum(mean_queue) / len(mean_queue) * 1.4
-                try:
-                    PeriodQueues.objects.update_or_create(
-                        type=PeriodQueues.FACT_TYPE,
+
+                min_possible_period_len = max(mean_queue) * 0.17
+                mean_queue = list([el for el in mean_queue if el > min_possible_period_len and el > 0.4])
+                mean_queue = sum(mean_queue) / (len(mean_queue) + 0.000001)
+
+                changed_amount = PeriodQueues.objects.filter(
+                    dttm_forecast=cashbox_type.dttm_last_update_queue,
+                    cashbox_type_id=cashbox_type.id,
+                    type=PeriodQueues.FACT_TYPE,
+                ).update(value=mean_queue)
+                if changed_amount == 0:
+                    PeriodQueues.objects.create(
                         dttm_forecast=cashbox_type.dttm_last_update_queue,
+                        type=PeriodQueues.FACT_TYPE,
+                        value=mean_queue,
                         cashbox_type_id=cashbox_type.id,
-                        defaults={
-                            'value': mean_queue
-                        }
-                    )
-                except PeriodQueues.MultipleObjectsReturned:
-                    raise ValueError('there are multiple objects for {} for cashboxType: {}'.format(
-                            cashbox_type.dttm_last_update_queue,
-                            cashbox_type.id
-                        )
                     )
 
             cashbox_type.dttm_last_update_queue += time_step

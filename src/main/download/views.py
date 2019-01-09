@@ -1,16 +1,22 @@
 from src.util.utils import api_method
 from .utils import xlsx_method
-from .forms import GetTable, GetDemandXlsxForm
+from .forms import (
+    GetTable,
+    GetDemandXlsxForm,
+    GetUrvXlsxForm,
+)
 from src.db.models import (
     Shop,
     User,
     WorkerDay,
     PeriodClients,
     CashboxType,
+    AttendanceRecords,
 )
 from datetime import time, timedelta, datetime
 from django.apps import apps
 from src.util.utils import JsonResponse
+from src.util.models_converter import AttendanceRecordsConverter
 
 from .xlsx.tabel import Tabel_xlsx
 from src.util.forms import FormUtil
@@ -99,7 +105,7 @@ def get_demand_xlsx(request, workbook, form):
         from_dt(QOS_DATE): с какой даты скачивать
         to_dt(QOS_DATE): по какую дату скачивать
         shop_id(int): в каком магазинеde
-        demand_model(char): !! attention !! передавать что-то из clients/queue/products (см. окончание моделей Period..)
+        demand_model(char): 'C'/'Q'/'P'
 
     Returns:
         эксель файл с форматом Тип работ | Время | Значение
@@ -108,8 +114,14 @@ def get_demand_xlsx(request, workbook, form):
     to_dt = form['to_dt']
     timestep = 30  # minutes
 
+    model_form_dict = {
+        'C': 'clients',
+        'Q': 'queues',
+        'P': 'products'
+    }
+
     if (to_dt - from_dt).days > 90:
-        return JsonResponse.internal_error('Выберите, пожалуйста, более короткий период.')
+        return JsonResponse.internal_error('Выберите, пожалуйста, более короткий период.'), 'error'
 
     worksheet = workbook.add_worksheet('{}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d')))
     worksheet.set_column(0, 3, 30)
@@ -119,9 +131,11 @@ def get_demand_xlsx(request, workbook, form):
     worksheet.write(0, 3, 'Значение(фактический)')
 
     try:
-        model = apps.get_model('db', 'period{}'.format(form['demand_model']))
+        model = apps.get_model('db', 'period{}'.format(
+            model_form_dict[form['demand_model']]
+        ))
     except LookupError:
-        return JsonResponse.internal_error('incorrect demand model')
+        return JsonResponse.internal_error('incorrect demand model'), 'error'
 
     period_demands = list(model.objects.select_related('cashbox_type').filter(
         cashbox_type__shop_id=form['shop_id'],
@@ -134,15 +148,19 @@ def get_demand_xlsx(request, workbook, form):
     amount_cashbox_types = len(cashbox_types)
 
     dttm = datetime.combine(from_dt, time(0, 0))
-    expected_record_amount = (to_dt - from_dt).days * amount_cashbox_types * 24 * 60 / timestep
+    expected_record_amount = (to_dt - from_dt).days * amount_cashbox_types * 24 * 60 // timestep
 
     demand_index = 0
+    period_demands_len = len(period_demands)
+    if period_demands_len == 0:
+        demand = model()  # null model if no data
 
-    for index in range(int(expected_record_amount)):
+    for index in range(expected_record_amount):
         cashbox_type_index = index % amount_cashbox_types
         cashbox_type_name = cashbox_types[cashbox_type_index].name
 
-        demand = period_demands[demand_index]
+        if period_demands_len > demand_index:
+            demand = period_demands[demand_index]
 
         worksheet.write(index + 1, 0, cashbox_type_name)
         worksheet.write(index + 1, 1, dttm.strftime('%d.%m.%Y %H:%M:%S'))
@@ -170,4 +188,64 @@ def get_demand_xlsx(request, workbook, form):
         if index % amount_cashbox_types == amount_cashbox_types - 1 and index != 0:
             dttm += timedelta(minutes=timestep)
 
-    return workbook, '{} {}-{}'.format(model.__name__, from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))
+    return workbook, '{} {}-{}'.format(
+        model_form_dict[form['demand_model']],
+        from_dt.strftime('%Y.%m.%d'),
+        to_dt.strftime('%Y.%m.%d'),
+    )
+
+
+@api_method(
+    'GET',
+    GetUrvXlsxForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
+@xlsx_method
+def get_urv_xlsx(request, workbook, form):
+    """
+    Скачивает записи по урв за запрошенную дату
+
+    Args:
+        method: GET
+        url: /api/download/get_urv_xlsx
+        from_dt(QOS_DATE): с какой даты скачивать
+        to_dt(QOS_DATE): по какую дату скачивать
+        shop_id(int): в каком магазинеde
+
+    Returns:
+        эксель файл с форматом Дата | Фамилия Имя сотрудника, табельный номер | Время | Тип
+    """
+    shop_id = form['shop_id']
+    from_dt = form['from_dt']
+    to_dt = form['to_dt']
+
+    worksheet = workbook.add_worksheet('{}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d')))
+
+    worksheet.write(0, 0, 'Дата')
+    worksheet.write(0, 1, 'Фамилия Имя, табельный номер')
+    worksheet.set_column(0, 1, 30)
+    worksheet.write(0, 2, 'Время')
+    worksheet.write(0, 3, 'Тип')
+
+    records = list(AttendanceRecords.objects.select_related('identifier', 'identifier__worker').filter(
+        dttm__date__gte=from_dt,
+        dttm__date__lte=to_dt,
+        identifier__worker__shop_id=shop_id,
+    ).order_by('dttm', 'identifier__worker'))
+
+    prev_date = None
+    prev_worker = None
+
+    for index, record in enumerate(records):
+        record_date = record.dttm.date()
+        record_worker = record.identifier.worker
+        if prev_date != record_date:
+            worksheet.write(index + 1, 0, record_date.strftime('%d.%m.%Y'))
+            prev_date = record_date
+        if prev_worker != record_worker:
+            worksheet.write(index + 1, 1, '{} {}'.format(record_worker.last_name, record_worker.first_name))
+            prev_worker = record_worker
+        worksheet.write(index + 1, 2, record.dttm.strftime('%H:%M'))
+        worksheet.write(index + 1, 3, AttendanceRecordsConverter.convert_type(record))
+
+    return workbook, 'URV {}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))

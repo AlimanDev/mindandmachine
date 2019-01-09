@@ -92,7 +92,7 @@ def get_indicators(request, form):
         growth = None
 
     def __div_safe(__a, __b):
-        return __a / __b if (__b > 0 and __b and __a) else None
+        return __a / __b if ( __b and __a and __b > 0) else None
     return JsonResponse.success({
         'total_bills': clients if clients else 0,  # может вернуть None
         'total_codes': products if products else 0,  # аналогично
@@ -233,14 +233,18 @@ def set_demand(request, form):
 
     """
     cashbox_type_ids = form['cashbox_type_id']
-
-    multiply_coef = form.get('multiply_coef')
-    set_value = form.get('set_value')
-
     dttm_from = form['from_dttm']
     dttm_to = form['to_dttm']
-
+    multiply_coef = form.get('multiply_coef')
+    set_value = form.get('set_value')
     shop_id = FormUtil.get_shop_id(request, form)
+
+    if not len(cashbox_type_ids):
+        cashbox_type_ids = CashboxType.objects.qos_filter_active(
+            dttm_from=dttm_from,
+            dttm_to=dttm_to,
+            shop_id=shop_id
+        )
 
     period_clients = PeriodClients.objects.select_related(
         'cashbox_type'
@@ -252,7 +256,7 @@ def set_demand(request, form):
         cashbox_type_id__in=cashbox_type_ids
     )
 
-    cashboxes_types = []
+    changed_ct_ids = []
     for x in period_clients:
         if multiply_coef is not None:
             x.value *= multiply_coef
@@ -260,10 +264,11 @@ def set_demand(request, form):
             x.value = set_value
 
         x.save()
-        cashboxes_types.append(x.cashbox_type_id)
-    cashboxes_types = list(set(cashboxes_types))
 
-    for x in cashboxes_types:
+        if x.cashbox_type_id not in changed_ct_ids:
+            changed_ct_ids.append(x.cashbox_type_id)
+
+    for x in changed_ct_ids:
         PeriodDemandChangeLog.objects.create(
             dttm_from=dttm_from,
             dttm_to=dttm_to,
