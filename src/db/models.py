@@ -66,9 +66,17 @@ class SuperShop(models.Model):
 # на самом деле это отдел
 class Shop(models.Model):
     class Meta(object):
-        unique_together = (('super_shop', 'title'))
+        unique_together = ('super_shop', 'title')
         verbose_name = 'Отдел'
         verbose_name_plural = 'Отделы'
+
+    PRODUCTION_CAL = 'P'
+    YEAR_NORM = 'N'
+
+    PROCESS_TYPE = (
+        (PRODUCTION_CAL, 'production calendar'),
+        (YEAR_NORM, 'norm per year')
+    )
 
     id = models.BigAutoField(primary_key=True)
 
@@ -79,7 +87,6 @@ class Shop(models.Model):
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
     title = models.CharField(max_length=64)
-    # hidden_title = models.CharField(max_length=64)
 
     mean_queue_length = models.FloatField(default=3)
     max_queue_length = models.FloatField(default=7)
@@ -99,6 +106,22 @@ class Shop(models.Model):
     cost_weights   = models.CharField(max_length=4096, default='{}')
     init_params    = models.CharField(max_length=2048, default='{"n_working_days_optimal": 20}')
     break_triplets = models.CharField(max_length=1024, default='[]')
+
+    # added on 21.12.2018
+    idle = models.SmallIntegerField(default=0)  # percents
+    fot = models.IntegerField(default=0)
+    less_norm = models.SmallIntegerField(default=0)  # percents
+    more_norm = models.SmallIntegerField(default=0)  # percents
+    tm_shop_opens = models.TimeField(default=datetime.time(6, 0))
+    tm_shop_closes = models.TimeField(default=datetime.time(23, 0))
+    restricted_start_times = models.CharField(max_length=1024, default='[]')
+    restricted_end_times = models.CharField(max_length=1024, default='[]')
+    min_change_time = models.IntegerField(default=0)
+    even_shift_morning_evening = models.BooleanField(default=False)
+    paired_weekday = models.BooleanField(default=False)
+    exit1day = models.BooleanField(default=False)
+    exit42hours = models.BooleanField(default=False)
+    process_type = models.CharField(max_length=1, choices=PROCESS_TYPE, default=YEAR_NORM)
 
     def __str__(self):
         return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)

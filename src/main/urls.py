@@ -13,6 +13,7 @@ from .download import urls as download_urls
 from .tablet import urls as tablet_urls
 from .upload import urls as upload_urls
 from .urv import urls as urv_urls
+from .shop import urls as shop_urls
 from django.conf.urls import include, url
 from src.conf.djconfig import DEBUG
 
@@ -29,6 +30,7 @@ api_urlpatterns = [
     path('tablet/', include(tablet_urls)),
     path('upload/', include(upload_urls)),
     path('urv/', include(urv_urls)),
+    path('shop/', include(shop_urls)),
 ]
 
 urlpatterns = [
