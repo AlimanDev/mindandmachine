@@ -30,7 +30,6 @@ from django.conf import settings
 from src.util.models_converter import BaseConverter, ProductionDayConverter
 
 
-
 @api_method('GET', GetIndicatorsForm)
 def get_indicators(request, form):
     """
@@ -146,74 +145,6 @@ def get_time_distribution(request, form):
             result[cashbox_type.id][forecast_type[0]] = arr
 
     return JsonResponse.success(result)
-
-
-@api_method(
-    'GET',
-    GetParametersForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
-)
-def get_parameters(request, form):
-    """
-    Возвращает параметры по очереди для указанного магазина
-
-    Args:
-        method: GET
-        url: /api/queue/get_parameters
-        shop_id(int): required = False
-
-    Returns:
-        {
-            | 'mean_queue_length': float,
-            | 'max_queue_length': float,
-            | 'dead_time_part': float
-        }
-    """
-    shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
-
-    return JsonResponse.success({
-        'mean_queue_length': shop.mean_queue_length,
-        'max_queue_length': shop.max_queue_length,
-        'dead_time_part': shop.dead_time_part
-    })
-
-
-@api_method(
-    'POST',
-    SetParametersForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
-)
-def set_parameters(request, form):
-    """
-        Задает параметры для магазина
-
-        Args:
-            method: GET
-            url: /api/queue/get_parameters
-            shop_id(int): required = True
-            mean_queue_length(float): required = True
-            max_queue_length(float): required = True
-            dead_time_part(float): required = True
-
-        Returns:
-            {
-                | 'mean_queue_length': float,
-                | 'max_queue_length': float,
-                | 'dead_time_part': float
-            }
-    """
-    shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
-
-    shop.mean_queue_length = form['mean_queue_length']
-    shop.max_queue_length = form['max_queue_length']
-    shop.dead_time_part = form['dead_time_part']
-    shop.save()
-
-    return JsonResponse.success({
-        'mean_queue_length': shop.mean_queue_length,
-        'max_queue_length': shop.max_queue_length,
-        'dead_time_part': shop.dead_time_part
-    })
 
 
 @api_method(

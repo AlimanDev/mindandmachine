@@ -53,15 +53,30 @@ class SuperShop(models.Model):
 
     def __str__(self):
         return '{}, {}, {}'.format(self.title, self.code, self.id)
-        # return f'{self.title}, {self.code}, {self.id}'
 
+    def is_supershop_open_at(self, tm):
+        if self.tm_start < self.tm_end:
+            return self.tm_start < tm < self.tm_end
+        else:
+            if tm > self.tm_start:
+                return True
+            else:
+                return tm < self.tm_end
 
 # на самом деле это отдел
 class Shop(models.Model):
     class Meta(object):
-        unique_together = (('super_shop', 'title'))
+        unique_together = ('super_shop', 'title')
         verbose_name = 'Отдел'
         verbose_name_plural = 'Отделы'
+
+    PRODUCTION_CAL = 'P'
+    YEAR_NORM = 'N'
+
+    PROCESS_TYPE = (
+        (PRODUCTION_CAL, 'production calendar'),
+        (YEAR_NORM, 'norm per year')
+    )
 
     id = models.BigAutoField(primary_key=True)
 
@@ -72,7 +87,6 @@ class Shop(models.Model):
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
     title = models.CharField(max_length=64)
-    # hidden_title = models.CharField(max_length=64)
 
     mean_queue_length = models.FloatField(default=3)
     max_queue_length = models.FloatField(default=7)
@@ -92,6 +106,22 @@ class Shop(models.Model):
     cost_weights   = models.CharField(max_length=4096, default='{}')
     init_params    = models.CharField(max_length=2048, default='{"n_working_days_optimal": 20}')
     break_triplets = models.CharField(max_length=1024, default='[]')
+
+    # added on 21.12.2018
+    idle = models.SmallIntegerField(default=0)  # percents
+    fot = models.IntegerField(default=0)
+    less_norm = models.SmallIntegerField(default=0)  # percents
+    more_norm = models.SmallIntegerField(default=0)  # percents
+    tm_shop_opens = models.TimeField(default=datetime.time(6, 0))
+    tm_shop_closes = models.TimeField(default=datetime.time(23, 0))
+    restricted_start_times = models.CharField(max_length=1024, default='[]')
+    restricted_end_times = models.CharField(max_length=1024, default='[]')
+    min_change_time = models.IntegerField(default=0)
+    even_shift_morning_evening = models.BooleanField(default=False)
+    paired_weekday = models.BooleanField(default=False)
+    exit1day = models.BooleanField(default=False)
+    exit42hours = models.BooleanField(default=False)
+    process_type = models.CharField(max_length=1, choices=PROCESS_TYPE, default=YEAR_NORM)
 
     def __str__(self):
         return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)
@@ -243,7 +273,7 @@ class User(DjangoAbstractUser):
 
 
 class CashboxTypeManager(models.Manager):
-    def qos_filter_active(self, dttm_from, dttm_to, *args, **kwargs):
+    def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
         """
         added earlier then dt_from, deleted later then dt_to
         :param dttm_from:
@@ -254,9 +284,9 @@ class CashboxTypeManager(models.Manager):
         """
 
         return self.filter(
-            models.Q(dttm_added__date__lte=dttm_from) | models.Q(dttm_added__date__isnull=True)
+            models.Q(dttm_added__date__lte=dt_from) | models.Q(dttm_added__isnull=True)
         ).filter(
-            models.Q(dttm_deleted__date__gte=dttm_to) | models.Q(dttm_deleted__date__isnull=True)
+            models.Q(dttm_deleted__date__gte=dt_to) | models.Q(dttm_deleted__isnull=True)
         ).filter(*args, **kwargs)
 
 
@@ -361,7 +391,7 @@ class CashboxManager(models.Manager):
         """
 
         return self.filter(
-            models.Q(dttm_added__date__lte=dt_from) | models.Q(dttm_added__date__isnull=True)
+            models.Q(dttm_added__date__lte=dt_from) | models.Q(dttm_added__isnull=True)
         ).filter(
             models.Q(dttm_deleted__date__gt=dt_to) | models.Q(dttm_deleted__date__isnull=True)
         ).filter(*args, **kwargs)
@@ -660,12 +690,14 @@ class WorkerDayCashboxDetails(models.Model):
     dttm_to = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return '{}, {}, {}, {}, {}'.format(
+        return '{}, {}, {}, {}-{}, id: {}'.format(
             self.worker_day.worker.last_name,
-            self.worker_day.worker.shop.super_shop.title,
             self.worker_day.dt,
             self.cashbox_type.name if self.cashbox_type else None,
-            self.id)
+            self.dttm_from.replace(microsecond=0).time() if self.dttm_from else self.dttm_from,
+            self.dttm_to.replace(microsecond=0).time() if self.dttm_to else self.dttm_to,
+            self.id,
+        )
 
     objects = WorkerDayCashboxDetailsManager()
 
@@ -715,9 +747,13 @@ class Notifications(models.Model):
     )
 
     def __str__(self):
-        return '{}, {}, {}, {}, {}'.format(self.to_worker.last_name, self.to_worker.shop.title, self.to_worker.shop.super_shop.title, self.dttm_added, self.id)
-        # return f'{self.to_worker.last_name}, {self.to_worker.shop.title}, {self.to_worker.shop.super_shop.title}, ' \
-        #        f'{self.dttm_added}, {self.id}'
+        return '{}, {}, {}, text: {}, id: {}'.format(
+            self.to_worker.last_name,
+            self.to_worker.shop.title,
+            self.dttm_added,
+            self.text[:60],
+            self.id
+        )
 
     id = models.BigAutoField(primary_key=True)
 

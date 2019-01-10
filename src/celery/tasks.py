@@ -1,5 +1,6 @@
 import datetime
 import json
+from dateutil.relativedelta import relativedelta
 
 from django.db.models import Avg
 from django.utils.timezone import now
@@ -49,9 +50,11 @@ def update_queue(till_dttm=None):
     if till_dttm is None:
         till_dttm = now()  + datetime.timedelta(hours=3) # moscow time
 
-    cashbox_types = CashboxType.objects.filter(
+    cashbox_types = CashboxType.objects.qos_filter_active(till_dttm + datetime.timedelta(minutes=30), till_dttm).filter(
         dttm_last_update_queue__isnull=False,
     )
+    if not len(cashbox_types):
+        raise ValueError('CashboxType EmptyQuerySet with dttm_last_update_queue')
     for cashbox_type in cashbox_types:
         dif_time = till_dttm - cashbox_type.dttm_last_update_queue
         while dif_time > time_step:
@@ -92,7 +95,10 @@ def update_visitors_info():
     dttm_now = now()
     # todo: исправить потом. пока делаем такую привязку
     # вообще хорошей идеей наверное будет просто cashbox_type blank=True, null=True сделать в PeriodDemand
-    ct = CashboxType.objects.get(name='Кассы', shop_id=1)
+    try:
+        ct = CashboxType.objects.get(name='Кассы', shop_id=1)
+    except CashboxType.DoesNotExist:
+        raise ValueError('Такого типа касс нет в базе данных.')
     create_dict = {
         'cashbox_type': ct,
         'dttm_forecast': dttm_now.replace(minute=(0 if dttm_now.minute < 30 else 30), second=0, microsecond=0),
@@ -144,10 +150,7 @@ def release_all_workers():
     Note:
         Выполняется каждую ночь
     """
-
-    dttm_now = now() + datetime.timedelta(hours=3)
     worker_day_cashbox_objs = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
-        worker_day__dt=dttm_now.date() - datetime.timedelta(days=1),
         dttm_to__isnull=True,
     )
 
@@ -155,8 +158,6 @@ def release_all_workers():
         obj.on_cashbox = None
         obj.dttm_to = obj.worker_day.dttm_work_end
         obj.save()
-
-    print('отпустил всех домой')
 
 
 @app.task
@@ -258,16 +259,17 @@ def notify_cashiers_lack():
     """
     for shop in Shop.objects.all():
         dttm_now = now()
-        notify_to = dttm_now + datetime.timedelta(days=7)
-        shop_id = shop.id
-        dttm = datetime.datetime.combine(
-            dttm_now.date(),
-            datetime.time(dttm_now.hour, 0 if dttm_now.minute < 30 else 30, 0)
-        )
-        init_params_dict = get_init_params(dttm_now, shop_id)
+        notify_days = 7
+        dttm = dttm_now.replace(minute=0, second=0, microsecond=0)
+        init_params_dict = get_init_params(dttm_now, shop.id)
         cashbox_types = init_params_dict['cashbox_types_dict']
-        period_demands = init_params_dict['predict_demand']
         mean_bills_per_step = init_params_dict['mean_bills_per_step']
+        period_demands = []
+        for i in range(notify_days):
+            period_demands += get_init_params(dttm_now + datetime.timedelta(days=i), shop.id)['predict_demand']
+
+        managers_dir_list = []
+        users_with_such_notes = []
         # пока что есть магазы в которых нет касс с ForecastHard
         if cashbox_types and period_demands:
             return_dict = has_deficiency(
@@ -275,23 +277,24 @@ def notify_cashiers_lack():
                 mean_bills_per_step,
                 cashbox_types,
                 dttm,
-                notify_to
+                dttm_now + datetime.timedelta(days=notify_days)
             )
-
             notifications_list = []
             for dttm_converted in return_dict.keys():
                 to_notify = False  # есть ли вообще нехватка
-                hrs, minutes, other = dttm_converted.split(':')
-                notification_text = '{}:{} {}:\n'.format(hrs, minutes, other[3:])
-                if return_dict[dttm_converted]:
+                hrs, minutes, other = dttm_converted.split(':')  # дропаем секунды
+                if not shop.super_shop.is_supershop_open_at(datetime.time(hour=int(hrs), minute=int(minutes), second=0)):
+                    continue
+                if sum(return_dict[dttm_converted].values()) > 0:
                     to_notify = True
+                    notification_text = '{}:{} {}:\n'.format(hrs, minutes, other[3:])
                     for cashbox_type in return_dict[dttm_converted].keys():
                         if return_dict[dttm_converted][cashbox_type]:
                             notification_text += '{} будет не хватать сотрудников: {}. '.format(
                                 CashboxType.objects.get(id=cashbox_type).name,
                                 return_dict[dttm_converted][cashbox_type]
                             )
-                    managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop_id)
+                    managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop.id)
                     users_with_such_notes = []
 
                     notes = Notifications.objects.filter(
@@ -315,8 +318,6 @@ def notify_cashiers_lack():
 
             Notifications.objects.bulk_create(notifications_list)
 
-    print('уведомил о нехватке')
-
 
 @app.task
 def allocation_of_time_for_work_on_cashbox():
@@ -331,14 +332,15 @@ def allocation_of_time_for_work_on_cashbox():
         ).update(duration=round(duration, 3))
 
     dt = now().date().replace(day=1)
+    prev_month = dt - relativedelta(months=1)
 
-    delta = datetime.timedelta(days=20)
-    prev_month = (dt - delta).replace(day=1)
-    shops = Shop.objects.all()
-
-    for shop in shops:
+    for shop in Shop.objects.all():
         # Todo: может нужно сделать qos_filter на типы касс?
-        cashbox_types = CashboxType.objects.filter(shop=shop)
+        cashbox_types = CashboxType.objects.qos_filter_active(
+            dt_from=prev_month,
+            dt_to=dt,
+            shop=shop
+        )
         last_user = None
         last_cashbox_type = None
         duration = 0
@@ -355,11 +357,10 @@ def allocation_of_time_for_work_on_cashbox():
                     worker_day__dt__gte=prev_month,
                     worker_day__dt__lt=dt,
                     dttm_to__isnull=False,
-                    is_tablet=True,
-                ).order_by('worker_day__worker')
+                    worker_day__worker__dt_fired__isnull=True
+                ).order_by('worker_day__worker', 'worker_day__dt')
 
                 for detail in worker_day_cashbox_details:
-
                     if last_user is None:
                         last_cashbox_type = cashbox_type
                         last_user = detail.worker_day.worker
