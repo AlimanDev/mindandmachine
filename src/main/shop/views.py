@@ -84,7 +84,6 @@ def set_parameters(request, form):
 
     """
     shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
-    Shop.objects.get(id=102)
 
     shop.mean_queue_length = form['queue_length']
     shop.idle = form['idle']
