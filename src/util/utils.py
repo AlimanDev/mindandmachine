@@ -1,5 +1,8 @@
 import json
 
+import sys
+from django.core import mail
+from django.views.debug import ExceptionReporter
 from django.conf import settings
 from functools import wraps
 from django.contrib.auth import authenticate, login
@@ -19,6 +22,31 @@ GROUP_HIERARCHY = {
     User.GROUP_SUPERVISOR: 2,
     User.GROUP_DIRECTOR: 3,
 }
+
+
+def manually_mail_admins(request):
+    exc_info = sys.exc_info()
+    reporter = ExceptionReporter(request, *exc_info, is_email=True)
+
+    def exception_name():
+        if exc_info[0]:
+            return exc_info[0].__name__
+        return 'Exception'
+
+    def subject():
+        if request:
+            return '{} at {}'.format(
+                exception_name(),
+                request.path_info
+            )
+        return exception_name()
+
+    mail.mail_admins(
+        subject=subject(),
+        message=reporter.get_traceback_text(),
+        fail_silently=True,
+        html_message=reporter.get_traceback_html()
+    )
 
 
 class JsonResponse(object):
@@ -241,7 +269,7 @@ def api_method(
                 if settings.DEBUG:
                     raise e
                 else:
-                    # todo: add logging at DEBUG = False
+                    manually_mail_admins(request)
                     return JsonResponse.internal_error()
 
         return wrapper

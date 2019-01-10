@@ -100,7 +100,10 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-ADMINS = [('Robot', 'robot@mindandmachine.ru'),  ('alex', 'a.aleskin@mindandmachine.ru'),]
+ADMINS = [
+    ('Robot', 'robot@mindandmachine.ru'),
+    ('alex', 'a.aleskin@mindandmachine.ru'),
+]
 MANAGERS = ADMINS
 
 # To send messages, you must put in the mode DEBUG = False
@@ -126,6 +129,11 @@ LOGGING = {
             'format': '%(levelname)s %(asctime)s %(message)s'
         },
     },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse'
+        }
+    },
     'handlers': {
         'file': {
             'level': 'INFO',  # use INFO for not logging sql queries
@@ -140,6 +148,8 @@ LOGGING = {
             'class': 'django.utils.log.AdminEmailHandler',
             'email_backend': 'django.core.mail.backends.smtp.EmailBackend',
             'formatter': 'simple',
+            'filters': ['require_debug_false'],
+            'include_html': True
         },
     },
     'loggers': {
@@ -149,10 +159,10 @@ LOGGING = {
             'propagate': True,
         },
         'django.request': {
-                'handlers': ['mail_admins'],
-                'level': 'ERROR',
-                'propagate': True,
-            },
+            'handlers': ['mail_admins'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
     },
 }
 

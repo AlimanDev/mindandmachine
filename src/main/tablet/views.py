@@ -355,7 +355,10 @@ def change_cashier_status(request, form):
     dt = (dttm_now-timedelta(hours=3)).date()
     time = dttm_now.time() #if is_current_time else form['tm_changing']
     # todo: пока что так. потом исправить
-    tm_work_end = tm_work_end if tm_work_end else (datetime.combine(dt, time) + timedelta(hours=9)).time()
+    dttm_work_end = datetime.combine(
+        dttm_now.date() if tm_work_end > time else (dttm_now + timedelta(days=1)).date(),
+        tm_work_end,
+    )
 
     cashbox_id = cashbox_id if new_user_status == WorkerDayCashboxDetails.TYPE_WORK else None
     cashbox_type = None if cashbox_id is None else CashboxType.objects.get(cashbox__id=cashbox_id)
@@ -426,8 +429,8 @@ def change_cashier_status(request, form):
 
         if (new_user_status == WorkerDayCashboxDetails.TYPE_WORK) and (worker_day.type != WorkerDay.Type.TYPE_WORKDAY.value):
             worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
-            worker_day.dttm_work_start.replace(hour=time.hour, minute=time.minute, second=time.second)
-            worker_day.dttm_work_end.replace(hour=tm_work_end.hour, minute=tm_work_end.minute, second=tm_work_end.second)
+            worker_day.dttm_work_start = dttm_now
+            worker_day.dttm_work_end = dttm_work_end
             worker_day.save()
     else:
         return JsonResponse.value_error('can not change the status to {}'.format(new_user_status))

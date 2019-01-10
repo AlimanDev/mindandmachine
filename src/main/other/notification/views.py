@@ -41,7 +41,7 @@ def get_notifications(request, form):
     notifications = list(notifications[:count])
 
     result = {
-        'get_noty_pointer': notifications[-1].id if len(notifications) > 0 else None,
+        'get_noty_pointer': notifications[-1].id if (len(notifications) > 0 and len(notifications) == count) else None,
         'notifications': [
             NotificationConverter.convert(notification) for notification in notifications
     ]}

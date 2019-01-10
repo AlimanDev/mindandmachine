@@ -114,6 +114,8 @@ class Shop(models.Model):
     more_norm = models.SmallIntegerField(default=0)  # percents
     tm_shop_opens = models.TimeField(default=datetime.time(6, 0))
     tm_shop_closes = models.TimeField(default=datetime.time(23, 0))
+    shift_start = models.SmallIntegerField(default=0)
+    shift_end = models.SmallIntegerField(default=0)
     restricted_start_times = models.CharField(max_length=1024, default='[]')
     restricted_end_times = models.CharField(max_length=1024, default='[]')
     min_change_time = models.IntegerField(default=0)
@@ -393,7 +395,7 @@ class CashboxManager(models.Manager):
         return self.filter(
             models.Q(dttm_added__date__lte=dt_from) | models.Q(dttm_added__isnull=True)
         ).filter(
-            models.Q(dttm_deleted__date__gte=dt_to) | models.Q(dttm_deleted__isnull=True)
+            models.Q(dttm_deleted__date__gt=dt_to) | models.Q(dttm_deleted__isnull=True)
         ).filter(*args, **kwargs)
 
 
