@@ -53,6 +53,16 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='shop',
+            name='shift_start',
+            field=models.SmallIntegerField(default=0),
+        ),
+        migrations.AddField(
+            model_name='shop',
+            name='shift_end',
+            field=models.SmallIntegerField(default=0),
+        ),
+        migrations.AddField(
+            model_name='shop',
             name='paired_weekday',
             field=models.BooleanField(default=False),
         ),

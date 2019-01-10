@@ -56,6 +56,8 @@ def get_parameters(request, form):
         'more_norm': shop.more_norm,
         'tm_shop_opens': BaseConverter.convert_time(shop.tm_shop_opens),
         'tm_shop_closes': BaseConverter.convert_time(shop.tm_shop_closes),
+        'shift_start': shop.shift_start,
+        'shift_end': shop.shift_end,
         'restricted_start_times': shop.restricted_start_times,
         'restricted_end_times': shop.restricted_end_times,
         'min_change_time': shop.min_change_time,
@@ -92,6 +94,8 @@ def set_parameters(request, form):
     shop.more_norm = form['more_norm']
     shop.tm_shop_opens = form['tm_shop_opens']
     shop.tm_shop_closes = form['tm_shop_closes']
+    shop.shift_start = form['shift_start']
+    shop.shift_end = form['shift_end']
     shop.restricted_start_times = form['restricted_start_times']
     shop.restricted_end_times = form['restricted_end_times']
     shop.min_change_time = form['min_change_time']

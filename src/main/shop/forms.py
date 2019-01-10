@@ -16,6 +16,8 @@ class SetParametersForm(forms.Form):
     more_norm = forms.IntegerField()
     tm_shop_opens = util_forms.TimeField()
     tm_shop_closes = util_forms.TimeField()
+    shift_start = forms.IntegerField()
+    shift_end = forms.IntegerField()
     restricted_start_times = forms.CharField()
     restricted_end_times = forms.CharField()
     min_change_time = forms.IntegerField()
