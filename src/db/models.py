@@ -393,7 +393,7 @@ class CashboxManager(models.Manager):
         return self.filter(
             models.Q(dttm_added__date__lte=dt_from) | models.Q(dttm_added__isnull=True)
         ).filter(
-            models.Q(dttm_deleted__date__gt=dt_to) | models.Q(dttm_deleted__date__isnull=True)
+            models.Q(dttm_deleted__date__gt=dt_to) | models.Q(dttm_deleted__isnull=True)
         ).filter(*args, **kwargs)
 
 
