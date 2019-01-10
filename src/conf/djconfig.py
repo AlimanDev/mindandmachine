@@ -100,7 +100,11 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-ADMINS = [('Robot', 'robot@mindandmachine.ru'),  ('alex', 'a.aleskin@mindandmachine.ru'),]
+ADMINS = [
+    ('Robot', 'robot@mindandmachine.ru'),
+    ('alex', 'a.aleskin@mindandmachine.ru'),
+    ('vasili', 'vasili4396@mail.ru'),
+]
 MANAGERS = ADMINS
 
 # To send messages, you must put in the mode DEBUG = False
