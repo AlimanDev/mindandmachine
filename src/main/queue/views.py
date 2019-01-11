@@ -1,5 +1,5 @@
 from datetime import timedelta, datetime, time
-
+from dateutil.relativedelta import relativedelta
 from src.main.timetable.cashier_demand.utils import get_worker_timetable
 
 from src.db.models import (
@@ -12,19 +12,15 @@ from src.db.models import (
     User,
     PeriodQueues,
 )
-from src.util.models_converter import BaseConverter
 from src.util.forms import FormUtil
 from src.util.utils import api_method, JsonResponse, outer_server
 from .forms import (
     GetTimeDistributionForm,
     GetIndicatorsForm,
-    GetParametersForm,
-    SetParametersForm,
     ProcessForecastForm,
 )
 import json
 import urllib
-from src.util.utils import JsonResponse
 from django.conf import settings
 
 from src.util.models_converter import BaseConverter, ProductionDayConverter
@@ -54,37 +50,45 @@ def get_indicators(request, form):
         JsonResponse.internal_error: если нет типов касс с is_main_type = True, либо с именем == 'Возврат'
 
     """
-    dt_from = form['from_dt']
-    dt_to = form['to_dt']
+    def filter_dttm(qs, from_dttm, to_dttm):
+        return qs.filter(dttm_forecast__gte=from_dttm, dttm_forecast__lte=to_dttm)
 
     forecast_type = form['type']
-
     shop_id = FormUtil.get_shop_id(request, form)
+    from_dttm = datetime.combine(form['from_dt'], time())
+    to_dttm = datetime.combine(form['to_dt'], time())
 
     try:
         linear_cashbox_type = CashboxType.objects.get(shop_id=shop_id, is_main_type=True)
     except:
         return JsonResponse.internal_error('Cannot get linear cashbox')
 
-    period_queues = PeriodQueues.objects.filter(
+    period_queues = PeriodQueues.objects.select_related('cashbox_type').filter(
         cashbox_type_id=linear_cashbox_type.id,
+        cashbox_type__shop_id=shop_id,
         type=forecast_type,
-        dttm_forecast__gte=datetime.combine(dt_from, time()),
-        dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1)
     )
+    current_period_queues = filter_dttm(period_queues, from_dttm, to_dttm)
+    prev_queues = filter_dttm(period_queues, from_dttm - relativedelta(months=1), to_dttm - relativedelta(months=1))
 
     queue_wait_length = 0
-    for x in period_queues:
+    for x in current_period_queues:
         queue_wait_length += x.value
+    prev_queue_wait_length = 0
+    for x in prev_queues:
+        prev_queue_wait_length += x.value
 
-    mean_length_usual = queue_wait_length / len(period_queues) if len(period_queues) > 0 else None
-    mean_wait_time_usual = None
-    dead_time_part_usual = None
+    mean_length = queue_wait_length / len(period_queues) if len(period_queues) > 0 else None
+    mean_wait_time = None
+    if prev_queue_wait_length:
+        length_change = (queue_wait_length - prev_queue_wait_length) / prev_queue_wait_length * 100
+    else:
+        length_change = None
 
     return JsonResponse.success({
-        'mean_length_usual': mean_length_usual,
-        'mean_wait_time_usual': mean_wait_time_usual,
-        'dead_time_part_usual': dead_time_part_usual,
+        'mean_length': mean_length,
+        'mean_wait_time': mean_wait_time,
+        'length_change': length_change,
     })
 
 

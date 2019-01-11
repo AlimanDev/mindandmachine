@@ -438,18 +438,18 @@ def get_worker_timetable(shop_id, form):
     max_of_cashiers_lack_morning = max(cashiers_lack_on_period_morning)
     max_of_cashiers_lack_evening = max(cashiers_lack_on_period_evening)
 
-    changed_amount = WorkerDay.objects.select_related('worker').filter(
-        dt__gte=form['from_dt'],
-        dt__lte=form['to_dt'],
-        worker__shop_id=shop_id,
-        worker__attachment_group=User.GROUP_STAFF,
-    ).count() - WorkerDay.objects.select_related('worker').filter(
-        dt__gte=form['from_dt'],
-        dt__lte=form['to_dt'],
-        worker__shop_id=shop_id,
-        parent_worker_day__isnull=True,
-        worker__attachment_group=User.GROUP_STAFF,
-    ).count()
+    # changed_amount = WorkerDay.objects.select_related('worker').filter(
+    #     dt__gte=form['from_dt'],
+    #     dt__lte=form['to_dt'],
+    #     worker__shop_id=shop_id,
+    #     worker__attachment_group=User.GROUP_STAFF,
+    # ).count() - WorkerDay.objects.select_related('worker').filter(
+    #     dt__gte=form['from_dt'],
+    #     dt__lte=form['to_dt'],
+    #     worker__shop_id=shop_id,
+    #     parent_worker_day__isnull=True,
+    #     worker__attachment_group=User.GROUP_STAFF,
+    # ).count()
 
     response = {
         'indicators': {
@@ -458,7 +458,7 @@ def get_worker_timetable(shop_id, form):
             'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': None,
             'need_cashier_amount': round((max_of_cashiers_lack_morning + max_of_cashiers_lack_evening)),  # * 1.4
-            'change_amount': changed_amount,
+            'revenue': None,
             'covering_part': round(100 * covering_time_numerator / (covering_time_denominator + 1e-8), 1)
         },
         'period_step': PERIOD_MINUTES,
