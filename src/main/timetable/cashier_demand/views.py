@@ -17,7 +17,7 @@ from src.conf.djconfig import QOS_DATETIME_FORMAT
 from src.db.works.printer.run import run as get_xlsx
 from dateutil.relativedelta import relativedelta
 
-from .utils import get_worker_timetable
+from .utils import get_worker_timetable2 as get_worker_timetable
 import xlsxwriter
 import io
 

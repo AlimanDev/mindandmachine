@@ -1,6 +1,6 @@
 from datetime import timedelta, datetime, time
 
-from src.main.timetable.cashier_demand.utils import get_worker_timetable
+from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_worker_timetable
 
 from src.db.models import (
     WaitTimeInfo,
