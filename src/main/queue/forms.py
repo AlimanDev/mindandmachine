@@ -17,16 +17,5 @@ class GetTimeDistributionForm(forms.Form):
     shop_id = forms.IntegerField(required=False)
 
 
-class GetParametersForm(forms.Form):
-    shop_id = forms.IntegerField(required=False)
-
-
-class SetParametersForm(forms.Form):
-    shop_id = forms.IntegerField()
-    mean_queue_length = forms.FloatField()
-    max_queue_length = forms.FloatField()
-    dead_time_part = forms.FloatField()
-
-
 class ProcessForecastForm(forms.Form):
     shop_id = forms.IntegerField()

@@ -118,7 +118,6 @@ def count_diff(dttm, period_clients, demand_ind, mean_bills_per_step, cashbox_ty
     return need_amount_dict, demand_ind
 
 
-
 def get_worker_timetable2(shop_id, form):
     def dttm2index(dt_init, dttm, period_in_day, period_lengths_minutes):
         days = (dttm.date() - dt_init).days
@@ -228,15 +227,7 @@ def get_worker_timetable2(shop_id, form):
         fact_cashier_needs.append({'dttm': dttm_converted, 'amount': fact_needs[index]})
         predict_cashier_needs.append({'dttm': dttm_converted, 'amount': predict_needs[index]})
 
-    workerdays = WorkerDay.objects.filter(
-        dt__gte=form['from_dt'],
-        dt__lte=form['to_dt'],
-        worker__shop_id=shop_id,
-        worker__attachment_group=User.GROUP_STAFF,
-    )
-
     # statistics
-    changed_amount = workerdays.count() - workerdays.filter(parent_worker_day__isnull=True).count()
     worker_amount = len(set([x.worker_day.worker_id for x in finite_workdetails]))
     deadtime_part = round(100 * np.maximum(finite_work - predict_needs, 0).sum() / (finite_work.sum() +1e-8), 1)
     covering_part = round(100 * np.maximum(predict_needs - finite_work, 0).sum() / (predict_needs.sum() +1e-8), 1)
@@ -246,11 +237,11 @@ def get_worker_timetable2(shop_id, form):
     response = {
         'indicators': {
             'deadtime_part': deadtime_part,
-            'big_demand_persent': 0,  # big_demand_persent,
             'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': None,
             'need_cashier_amount': need_cashier_amount,  # * 1.4
-            'change_amount': changed_amount,
+            'revenue': None,
+            # 'change_amount': changed_amount,
             'covering_part': covering_part,
         },
         'period_step': period_lengths_minutes,

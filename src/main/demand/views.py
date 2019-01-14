@@ -9,7 +9,6 @@ from src.db.models import (
     Shop,
     Notifications,
     User,
-    Slot,
 )
 from dateutil.relativedelta import relativedelta
 from django.db.models import Sum
@@ -38,68 +37,60 @@ def get_indicators(request, form):
         url: /api/demand/get_indicators
         from_dt(QOS_DATE): required = True
         to_dt(QOS_DATE): required = True
-        type(str): тип forecast'a (L/S/F)
+        cashbox_type_id(int): required = True
         shop_id(int): required = False
-        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
         {
-            | 'mean_bills': int or None,
-            | 'mean_codes': int or None,
-            | 'mean_income': None,
-            | 'mean_bill_codes': int or None,
-            | 'mean_hour_bills': int or None,
-            | 'mean_hour_codes': int or None,
-            | 'mean_hour_income': None,
-            | 'growth': int or None,
-            | 'total_people': None,
-            | 'total_bills': int,
-            | 'total_codes': int,
-            | 'total_income': None
+            | 'overall_operations': int or None,
+            | 'overall_growth': int or None,
+            | 'fact_overall_operations': int or None,
         }
 
     """
     dt_from = form['from_dt']
     dt_to = form['to_dt']
-
-    forecast_type = form['type']
-
     shop_id = FormUtil.get_shop_id(request, form)
-    # checkpoint = FormUtil.get_checkpoint(form)
+    cashbox_type_id = form['cashbox_type_id']
+
+    if not cashbox_type_id:
+        cashbox_type_filter_list = CashboxType.objects.qos_filter_active(dt_from, dt_to).values_list('id', flat=True)
+    else:
+        cashbox_type_filter_list = [cashbox_type_id]
+
+    if not len(cashbox_type_filter_list):
+        return JsonResponse.internal_error('Нет активных касс в данный период')
 
     period_filter_dict = {
         'cashbox_type__shop_id': shop_id,
-        'type': forecast_type,
+        'cashbox_type_id__in': cashbox_type_filter_list,
         'dttm_forecast__gte': datetime.combine(dt_from, time()),
         'dttm_forecast__lt': datetime.combine(dt_to, time()) + timedelta(days=1)
     }
 
-    clients = PeriodClients.objects.select_related('cashbox_type').filter(**period_filter_dict).aggregate(Sum('value'))['value__sum']
-    products = PeriodProducts.objects.select_related('cashbox_type').filter(**period_filter_dict).aggregate(Sum('value'))['value__sum']
+    clients = PeriodClients.objects.select_related('cashbox_type').filter(**period_filter_dict)
+    long_type_clients = clients.filter(type=PeriodClients.LONG_FORECASE_TYPE).aggregate(Sum('value'))['value__sum']
+    fact_type_clients = clients.filter(type=PeriodClients.FACT_TYPE).aggregate(Sum('value'))['value__sum']
 
     prev_clients = PeriodClients.objects.select_related(
         'cashbox_type'
     ).filter(
         cashbox_type__shop_id=shop_id,
-        type=forecast_type,
-        dttm_forecast__gte=datetime.combine(dt_from, time()) - timedelta(days=30),
-        dttm_forecast__lt=datetime.combine(dt_to, time()) + timedelta(days=1) - timedelta(days=30)
+        cashbox_type_id__in=cashbox_type_filter_list,
+        dttm_forecast__gte=datetime.combine(dt_from, time()) - relativedelta(months=1),
+        dttm_forecast__lt=datetime.combine(dt_to, time()) - relativedelta(months=1),
+        type=PeriodClients.LONG_FORECASE_TYPE,
     ).aggregate(Sum('value'))['value__sum']
 
-    if prev_clients and prev_clients != 0:
-        growth = (clients - prev_clients) / prev_clients * 100
+    if long_type_clients and prev_clients and prev_clients != 0:
+        growth = (long_type_clients - prev_clients) / prev_clients * 100
     else:
         growth = None
 
-    def __div_safe(__a, __b):
-        return __a / __b if ( __b and __a and __b > 0) else None
     return JsonResponse.success({
-        'total_bills': clients if clients else 0,  # может вернуть None
-        'total_codes': products if products else 0,  # аналогично
-        'total_income': None,
-        'mean_bill_codes': __div_safe(products, clients),
-        'growth': growth,
-        'total_people': None,
+        'overall_operations': long_type_clients / 1000 if long_type_clients else None,  # в тысячах
+        'operations_growth': growth,
+        'fact_overall_operations': fact_type_clients / 1000 if fact_type_clients else None,
     })
 
 
@@ -293,19 +284,21 @@ def get_demand_change_logs(request, form):
          method: GET
          url: /api/demand/get_demand_change_logs
          cashbox_type_ids(list): required = True
+         from_dt(QOS_DATE): required = True
+         to_dt(QOS_DATE): required = True
     """
-    dt_from = date.today().replace(day=1)
-    dt_to = dt_from + relativedelta(months=1) - relativedelta(days=1)
+    from_dt = form['from_dt']
+    to_dt = form['to_dt']
 
-    if form['cashbox_type_id'] == 0:
+    if not form['cashbox_type_id']:
         cashbox_type_ids = CashboxType.objects.filter(shop_id=form['shop_id'])
     else:
         cashbox_type_ids = [form['cashbox_type_id']]
 
     change_logs = PeriodDemandChangeLog.objects.filter(
         cashbox_type_id__in=cashbox_type_ids,
-        dttm_from__date__gte=dt_from,
-        dttm_to__date__lte=dt_to,
+        dttm_from__date__gte=from_dt,
+        dttm_to__date__lte=to_dt,
     ).order_by('dttm_added')
 
     return JsonResponse.success({

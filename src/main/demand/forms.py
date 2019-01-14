@@ -9,9 +9,8 @@ from src.util import forms as util_forms
 class GetIndicatorsForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
-    type = forms.CharField(max_length=1)
+    cashbox_type_id = forms.IntegerField(required=False)
     shop_id = forms.IntegerField(required=False)
-    checkpoint = forms.IntegerField(required=False)
 
 
 class GetForecastForm(forms.Form):
@@ -51,6 +50,8 @@ class SetDemandForm(forms.Form):
 
 class GetDemandChangeLogsForm(forms.Form):
     cashbox_type_id = forms.IntegerField()
+    from_dt = util_forms.DateField()
+    to_dt = util_forms.DateField()
     shop_id = forms.IntegerField()
 
 
