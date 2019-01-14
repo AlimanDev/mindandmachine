@@ -53,9 +53,6 @@ def get_indicators(request, form):
         JsonResponse.internal_error: если нет типов касс с is_main_type = True, либо с именем == 'Возврат'
 
     """
-    def filter_dttm(qs, from_dttm, to_dttm):
-        return qs.filter(dttm_forecast__gte=from_dttm, dttm_forecast__lte=to_dttm)
-
     forecast_type = form['type']
     shop_id = FormUtil.get_shop_id(request, form)
     from_dttm = datetime.combine(form['from_dt'], time())
@@ -71,8 +68,11 @@ def get_indicators(request, form):
         cashbox_type__shop_id=shop_id,
         type=forecast_type,
     )
-    current_period_queues = filter_dttm(period_queues, from_dttm, to_dttm)
-    prev_queues = filter_dttm(period_queues, from_dttm - relativedelta(months=1), to_dttm - relativedelta(months=1))
+    current_period_queues = period_queues.filter(dttm_forecast__gte=from_dttm, dttm_forecast__lte=to_dttm)
+    prev_queues = period_queues.filter(
+        dttm_forecast__gte=from_dttm - relativedelta(months=1),
+        dttm_forecast__lte=to_dttm - relativedelta(months=1)
+    )
 
     queue_wait_length = 0
     for x in current_period_queues:

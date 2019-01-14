@@ -64,7 +64,7 @@ def get_indicators(request, form):
     period_filter_dict = {
         'cashbox_type__shop_id': shop_id,
         'cashbox_type_id__in': cashbox_type_filter_list,
-        'dttm_forecast__date__gte': datetime.combine(dt_from, time()),
+        'dttm_forecast__gte': datetime.combine(dt_from, time()),
         'dttm_forecast__lt': datetime.combine(dt_to, time()) + timedelta(days=1)
     }
 
