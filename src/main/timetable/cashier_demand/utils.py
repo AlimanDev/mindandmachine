@@ -454,7 +454,6 @@ def get_worker_timetable(shop_id, form):
     response = {
         'indicators': {
             'deadtime_part': round(100 * idle_time_numerator / (idle_time_denominator + 1e-8), 1),
-            'big_demand_persent': 0,  # big_demand_persent,
             'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': None,
             'need_cashier_amount': round((max_of_cashiers_lack_morning + max_of_cashiers_lack_evening)),  # * 1.4
