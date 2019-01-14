@@ -124,7 +124,7 @@ def create_timetable(request, form):
         Отправляет уведомление о том, что расписание начало составляться
     """
     shop_id = form['shop_id']
-    dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
+    dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1).date()
     dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
 
     try:
@@ -225,32 +225,32 @@ def create_timetable(request, form):
         group_key=lambda x: x.worker_id
     )
 
+    if shop.process_type == Shop.YEAR_NORM:
+        max_work_coef = (1 + shop.more_norm / 100)
+        min_work_coef = (1 - shop.less_norm / 100)
+    else:
+        max_work_coef = 1
+        min_work_coef = 1
+
     shop_dict = {
         'shop_type': shop.full_interface,
         'mean_queue_length': shop.mean_queue_length,
         'max_queue_length': shop.max_queue_length,
         'dead_time_part': shop.dead_time_part,
         # 'shop_count_lack': shop.count_lack,
-
-        'period_step': 30,
-        'tm_start_work': '07:00:00',
-        'tm_end_work': '00:30:00',
-        'min_work_period': 60 * 9,
-        'max_work_period': 60 * 9,
-        'tm_lock_start': [
-            '21:00:00', '21:30:00',
-            '22:00:00', '22:30:00',
-            '23:00:00', '23:30:00',
-            '00:00:00', '00:30:00',
-        ],
-        'tm_lock_end': [
-            '06:30:00',
-            '07:00:00', '07:30:00',
-            '08:00:00', '08:30:00',
-            '09:00:00', '09:30:00',
-            '10:00:00', '10:30:00',
-            '11:00:00', '11:30:00',
-        ],
+        'max_work_coef': max_work_coef,
+        'min_work_coef': min_work_coef,
+        'period_step': shop.forecast_step_minutes.minute,
+        'tm_start_work': BaseConverter.convert_time(shop.tm_shop_opens),
+        'tm_end_work': BaseConverter.convert_time(shop.tm_shop_closes),
+        'min_work_period': shop.shift_start * 60,
+        'max_work_period': shop.shift_end * 60,
+        'tm_lock_start': list(map(lambda x: x + ':00', json.loads(shop.restricted_start_times))),
+        'tm_lock_end': list(map(lambda x: x + ':00', json.loads(shop.restricted_end_times))),
+        'hours_between_slots': shop.min_change_time,
+        'morning_evening_same': shop.even_shift_morning_evening,
+        '1day_holiday': int(shop.exit1day),
+        'paired_weekday': shop.paired_weekday,
 
         'max_outsourcing_day': 3,
     }
@@ -373,6 +373,7 @@ def create_timetable(request, form):
             for u in users
         ],
         'algo_params': {
+            'min_add_coef': shop.mean_queue_length,
             'cost_weights': json.loads(shop.cost_weights),
             'method_params': json.loads(shop.method_params),
             'breaks_triplets': json.loads(shop.break_triplets),
