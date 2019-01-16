@@ -50,7 +50,7 @@ def get_indicators(request, form):
     """
     dt_from = form['from_dt']
     dt_to = form['to_dt']
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     cashbox_type_id = form['cashbox_type_id']
 
     if not cashbox_type_id:
