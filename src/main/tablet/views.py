@@ -355,10 +355,10 @@ def change_cashier_status(request, form):
     dt = (dttm_now-timedelta(hours=3)).date()
     time = dttm_now.time() #if is_current_time else form['tm_changing']
     # todo: пока что так. потом исправить
-    dttm_work_end = datetime.combine(
-        dttm_now.date() if tm_work_end > time else (dttm_now + timedelta(days=1)).date(),
-        tm_work_end,
-    )
+    # dttm_work_end = datetime.combine(
+    #     dttm_now.date() if tm_work_end > time else (dttm_now + timedelta(days=1)).date(),
+    #     tm_work_end,
+    # )
 
     cashbox_id = cashbox_id if new_user_status == WorkerDayCashboxDetails.TYPE_WORK else None
     cashbox_type = None if cashbox_id is None else CashboxType.objects.get(cashbox__id=cashbox_id)
@@ -375,6 +375,13 @@ def change_cashier_status(request, form):
         return JsonResponse.does_not_exists_error('Такого дня нет в расписании.')
     except WorkerDay.MultipleObjectsReturned:
         return JsonResponse.multiple_objects_returned()
+
+    dttm_work_end = worker_day.dttm_work_end
+    if form['tm_work_end']:
+        if form['tm_work_end'] > dttm_now.time():
+            dttm_work_end = datetime.combine(dttm_now.date(), tm_work_end)
+        else:
+            dttm_work_end = datetime.combine((dttm_now + timedelta(days=1)).date(), tm_work_end)
 
     cashbox_worked = WorkerDayCashboxDetails.objects.qos_current_version().filter(
         Q(dttm_to__isnull=True) | Q(dttm_to__gt=dttm_now),
