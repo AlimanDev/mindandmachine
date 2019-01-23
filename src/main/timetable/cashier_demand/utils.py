@@ -220,12 +220,17 @@ def get_worker_timetable2(shop_id, form):
     real_cashiers_initial = []
     fact_cashier_needs = []
     predict_cashier_needs = []
+    lack_of_cashiers_on_period = []
     for index, dttm in enumerate(dttms):
         dttm_converted = BaseConverter.convert_datetime(dttm)
         real_cashiers.append({'dttm': dttm_converted, 'amount': finite_work[index]})
         real_cashiers_initial.append({'dttm': dttm_converted,'amount': init_work[index]})
         fact_cashier_needs.append({'dttm': dttm_converted, 'amount': fact_needs[index]})
         predict_cashier_needs.append({'dttm': dttm_converted, 'amount': predict_needs[index]})
+        lack_of_cashiers_on_period.append({
+            'dttm': dttm_converted,
+            'lack_of_cashiers': max(0, predict_needs[index] - finite_work[index])
+        })
 
     # statistics
     worker_amount = len(set([x.worker_day.worker_id for x in finite_workdetails]))
@@ -251,7 +256,7 @@ def get_worker_timetable2(shop_id, form):
             'predict_cashier_needs': predict_cashier_needs,
             'fact_cashier_needs': fact_cashier_needs,
         },
-        # 'lack_of_cashiers_on_period': lack_of_cashiers_on_period
+        'lack_of_cashiers_on_period': lack_of_cashiers_on_period
     }
     return response
 
