@@ -32,6 +32,10 @@ import datetime
 # ]
 
 
+class Region(models.Model):
+    title = models.CharField(max_length=256, unique=True, default='Москва')
+
+
 # магазин
 class SuperShop(models.Model):
     class Meta:
@@ -40,9 +44,15 @@ class SuperShop(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    title = models.CharField(max_length=64, unique=True)
-    # hidden_title = models.CharField(max_length=64, unique=True)
+    TYPE_HYPERMARKET = 'H'
+    TYPE_COMMON = 'C'
 
+    SIZE_TYPES = (
+        (TYPE_HYPERMARKET, 'hypermarket'),
+        (TYPE_COMMON, 'common supershop'),
+    )
+
+    title = models.CharField(max_length=64, unique=True)
     code = models.CharField(max_length=64, null=True, blank=True)
 
     dt_opened = models.DateField(null=True, blank=True)
@@ -50,6 +60,9 @@ class SuperShop(models.Model):
 
     tm_start = models.TimeField(null=True, blank=True, default=datetime.time(hour=7))
     tm_end = models.TimeField(null=True, blank=True, default=datetime.time(hour=23, minute=59, second=59))
+    type = models.CharField(max_length=1, choices=SIZE_TYPES, default=TYPE_COMMON)
+    region = models.ForeignKey(Region, blank=True, null=True, on_delete=models.PROTECT)
+    address = models.CharField(max_length=256, blank=True, null=True)
 
     def __str__(self):
         return '{}, {}, {}'.format(self.title, self.code, self.id)
@@ -62,6 +75,7 @@ class SuperShop(models.Model):
                 return True
             else:
                 return tm < self.tm_end
+
 
 # на самом деле это отдел
 class Shop(models.Model):

@@ -187,6 +187,8 @@ def api_method(
 
                 form = form_cls(form_params)
                 if not form.is_valid():
+                    if '__all__' in form.errors.keys():
+                        return JsonResponse.value_error(form.errors['__all__'][0])
                     return JsonResponse.value_error(str(list(form.errors.items())))
 
                 kwargs['form'] = form.cleaned_data
