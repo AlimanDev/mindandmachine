@@ -84,6 +84,42 @@ class BooleanField(forms.BooleanField):
         super().__init__(required=required)
 
 
+class RangeField(forms.CharField):
+    def __init__(self, required=False, **kwargs):
+        kwargs['required'] = required
+        super().__init__(**kwargs)
+
+    def clean(self, value, **kwargs):
+        value = super().clean(value)
+
+        if value is None or len(value) < 3:
+            if self.required:
+                raise ValidationError('required range from-to')
+            return []
+
+        if '-' not in value:
+            raise ValidationError('unsatisfied range form, should be from-to')
+
+        value = value.split('-')
+
+        if len(value) != 2:
+            raise ValidationError('there should be 2 numbers')
+        try:
+            from_value = int(value[0])
+            to_value = int(value[1])
+        except ValueError:
+            raise ValidationError('first or second value is not a number')
+
+        # is_percents = kwargs.pop('is_percents', None)
+        # if is_percents:
+        #     if not 0 <= from_value <= 100:
+        #         raise ValidationError('first value should be in range 0-100')
+        #     if not 0 <= to_value <= 100:
+        #         raise ValidationError('second value should be in range 0-100')
+
+        return from_value, to_value
+
+
 class IntegersList(forms.CharField):
     def __init__(self, required=False, **kwargs):
         kwargs['required'] = required

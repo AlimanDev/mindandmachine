@@ -1,11 +1,214 @@
-from src.db.models import Shop
+from src.db.models import (
+    Shop,
+    SuperShop,
+    User,
+    Region,
+)
+from math import ceil
 from src.util.utils import api_method, JsonResponse
 from src.util.forms import FormUtil
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import (
+    ShopConverter,
+    SuperShopConverter,
+    BaseConverter,
+)
 from .forms import (
+    GetDepartmentForm,
+    GetSuperShopForm,
+    GetSuperShopListForm,
+    AddSuperShopForm,
     GetParametersForm,
     SetParametersForm,
 )
+
+
+@api_method('GET', GetDepartmentForm)
+def get_department(request, form):
+    """
+    Возвращает информацию об отделе
+
+    Args:
+        method: GET
+        url: api/shop/get_department
+        shop_id(int): required=False
+
+    Returns:
+        {
+            'shop': {
+                | 'id': id отдела,
+                | 'super_shop': id магазина,
+                | 'full_interface'(bool): ,
+                | 'title': название отдела
+            | },
+            | 'shops': [Список отделов, которые есть в этом магазине в таком формате как выше],
+            'super_shop':{
+                | 'id': id магазина,
+                | 'title': название магазина,
+                | 'code': код магазина,
+                | 'dt_opened': дата открытия,
+                | 'dt_closed': дата закрытия (null)
+            }
+        }
+
+    """
+    shop_id = FormUtil.get_shop_id(request, form)
+
+    try:
+        shop = Shop.objects.select_related('super_shop').get(id=shop_id)
+    except:
+        return JsonResponse.does_not_exists_error('shop')
+
+    all_shops = Shop.objects.filter(super_shop_id=shop.super_shop_id)
+
+    return JsonResponse.success({
+        'shop': ShopConverter.convert(shop),
+        'all_shops': [ShopConverter.convert(x) for x in all_shops],
+        'super_shop': SuperShopConverter.convert(shop.super_shop)
+    })
+
+
+@api_method('GET', GetSuperShopForm, check_permissions=False)
+def get_super_shop(request, form):
+    """
+    Возвращает информацию о магазине
+
+    Args:
+        method: GET
+        url: api/shop/get_super_shop
+        super_shop_id(int): required=True
+
+    Returns:
+         {
+            'shops': [список магазинов в формате как выше],\n
+            'super_shop':{
+                | 'id': id магазина,
+                | 'title': название магазина,
+                | 'code': код магазина,
+                | 'dt_opened': дата открытия,
+                | 'dt_closed': дата закрытия (null)
+            }
+         }
+    """
+    super_shop_id = form['super_shop_id']
+
+    try:
+        super_shop = SuperShop.objects.get(id=super_shop_id)
+    except SuperShop.DoesNotExist:
+        return JsonResponse.does_not_exists_error()
+
+    shops = Shop.objects.filter(super_shop=super_shop)
+
+    return_list = []
+    dynamic_values = dict(
+        revenue_fot=dict(prev=1, curr=1, change=-17),
+        fot=dict(prev=1, curr=1, change=13),
+        idle=dict(prev=1, curr=1, change=-1),
+        lack=dict(prev=1, curr=1, change=40),
+        workers=dict(prev=20, curr=30, change=10)
+    )
+    for shop in shops:
+        converted = ShopConverter.convert(shop)
+        converted.update(dynamic_values)
+        return_list.append(converted)
+
+    return JsonResponse.success({
+        'shops': return_list,
+        'super_shop': SuperShopConverter.convert(super_shop)
+    })
+
+
+@api_method(
+    'GET',
+    GetSuperShopListForm,
+    groups=[User.GROUP_HQ],
+    lambda_func=lambda x: False
+)
+def get_super_shop_list(request, form):
+    """
+    Возвращает список магазинов, которые подходят под параметры (см. args)
+
+    Args:
+        method: GET
+        url: api/shop/get_super_shop_list
+        pointer(int): указывает с айдишника какого магазина в querysete всех магазов будем инфу отдавать
+        items_per_page(int): сколько шопов будем на фронте показывать
+        title(str): required = False, название магазина
+        super_shop_type(['H', 'C']): type of supershop
+        region(str): title of region
+        closed_before_dt(QOS_DATE): closed before this date
+        opened_after_dt(QOS_DATE): opened after this date
+        revenue_fot(str): range in format '123-345'
+        revenue(str): range
+        lack(str): range, percents
+        fot(str): range
+        idle(str): range, percents
+        workers_amount(str): range
+        sort_type(str): по какому параметру сортируем
+    Returns:
+        {
+            'super_shops': [список магазинов],
+            'amount': количество магазинов
+        }
+    """
+    pointer = form['pointer']
+    amount = form['items_per_page']
+    sort_type = form['sort_type']
+    filter_dict = {
+        'title__icontains': form['title'],
+        'type': form['super_shop_type'],
+        'region__title': form['region'],
+        'dt_opened__gte': form['opened_after_dt'],
+        'dt_closed__lte': form['closed_before_dt']
+    }
+    filter_dict = {k: v for k, v in filter_dict.items() if v}
+
+    super_shops = SuperShop.objects.select_related('region').filter(**filter_dict)
+    if sort_type:
+        # todo: make work
+        super_shops.order_by(sort_type)
+    total = super_shops.count()
+    super_shops = super_shops[amount*pointer:amount*(pointer + 1)]
+    return_list = []
+    dynamic_values = dict(
+        revenue_fot=dict(prev=1, curr=1, change=-17),
+        fot=dict(prev=1, curr=1, change=13),
+        idle=dict(prev=1, curr=1, change=-1),
+        lack=dict(prev=1, curr=1, change=40),
+        workers=dict(prev=1, curr=1, change=40),
+    )
+    for ss in super_shops:
+        # НЕ ТРОГАТЬ. работает только так
+        converted_ss = SuperShopConverter.convert(ss)
+        converted_ss.update(dynamic_values)
+
+        return_list.append(converted_ss)
+
+    return JsonResponse.success({
+        'pages': ceil(total / amount),
+        'shops': return_list
+    })
+
+
+@api_method(
+    'POST',
+    AddSuperShopForm,
+    groups=[User.GROUP_HQ],
+    lambda_func=lambda x: False
+)
+def add_supershop(request, form):
+    try:
+        SuperShop.objects.create(
+            title=form['title'],
+            code=form['code'],
+            address=form['address'],
+            dt_opened=form['open_dt'],
+            region=Region.objects.get(title=form['region']),
+            tm_start=form['tm_start'],
+            tm_end=form['tm_end']
+        )
+    except Exception:
+        return JsonResponse.internal_error('Error while creating shop')
+    return JsonResponse.success()
 
 
 @api_method(
