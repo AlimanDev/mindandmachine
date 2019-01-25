@@ -176,83 +176,11 @@ def get_super_shop_list(request, form):
         lack=dict(prev=1, curr=1, change=40),
         workers=dict(prev=1, curr=1, change=40),
     )
-    print('here')
-    for ss in super_shops:
-        # НЕ ТРОГАТЬ. работает только так
-        converted_ss = SuperShopConverter.convert(ss)
-        print(converted_ss)
-        converted_ss.update(dynamic_values)
-
-        return_list.append(converted_ss)
-
-    return JsonResponse.success({
-        'pages': ceil(total / amount),
-        'shops': return_list
-    })
-
-
-@api_method(
-    'GET',
-    GetSuperShopListForm,
-    groups=[User.GROUP_HQ],
-    lambda_func=lambda x: False
-)
-def get_super_shop_list(request, form):
-    """
-    Возвращает список магазинов, которые подходят под параметры (см. args)
-
-    Args:
-        method: GET
-        url: api/shop/get_super_shop_list
-        pointer(int): указывает с айдишника какого магазина в querysete всех магазов будем инфу отдавать
-        items_per_page(int): сколько шопов будем на фронте показывать
-        title(str): required = False, название магазина
-        super_shop_type(['H', 'C']): type of supershop
-        region(str): title of region
-        closed_before_dt(QOS_DATE): closed before this date
-        opened_after_dt(QOS_DATE): opened after this date
-        revenue_fot(str): range in format '123-345'
-        revenue(str): range
-        lack(str): range, percents
-        fot(str): range
-        idle(str): range, percents
-        workers_amount(str): range
-        sort_type(str): по какому параметру сортируем
-    Returns:
-        {
-            'super_shops': [список магазинов],
-            'amount': количество магазинов
-        }
-    """
-    pointer = form['pointer']
-    amount = form['items_per_page']
-    sort_type = form['sort_type']
-    filter_dict = {
-        'title__icontains': form['title'],
-        'type': form['super_shop_type'],
-        'region__title': form['region'],
-        'dt_opened__gte': form['opened_after_dt'],
-        'dt_closed__lte': form['closed_before_dt']
-    }
-    filter_dict = {k: v for k, v in filter_dict.items() if v}
-
-    super_shops = SuperShop.objects.select_related('region').filter(**filter_dict)
-    if sort_type:
-        # todo: make work
-        super_shops.order_by(sort_type)
-    total = super_shops.count()
-    super_shops = super_shops[amount*pointer:amount*(pointer + 1)]
-    return_list = []
-    dynamic_values = dict(
-        revenue_fot=dict(prev=1, curr=1, change=-17),
-        fot=dict(prev=1, curr=1, change=13),
-        idle=dict(prev=1, curr=1, change=-1),
-        lack=dict(prev=1, curr=1, change=40),
-    )
     for ss in super_shops:
         # НЕ ТРОГАТЬ. работает только так
         converted_ss = SuperShopConverter.convert(ss)
         converted_ss.update(dynamic_values)
+
         return_list.append(converted_ss)
 
     return JsonResponse.success({
