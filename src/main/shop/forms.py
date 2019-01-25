@@ -1,6 +1,7 @@
 from django import forms
 from src.util import forms as util_forms
 from django.core.exceptions import ValidationError
+from src.db.models import SuperShop
 
 
 class GetDepartmentForm(forms.Form):
@@ -12,10 +13,30 @@ class GetSuperShopForm(forms.Form):
 
 
 class GetSuperShopListForm(forms.Form):
-    closed_after_dt = util_forms.DateField(required=False)
-    opened_before_dt = util_forms.DateField(required=False)
-    min_worker_amount = forms.IntegerField(required=False)
-    max_worker_amount = forms.IntegerField(required=False)
+    pointer = forms.IntegerField()
+    items_per_page = forms.IntegerField()
+    title = forms.CharField(required=False, max_length=256)
+    super_shop_type = util_forms.ChoiceField([SuperShop.TYPE_COMMON, SuperShop.TYPE_HYPERMARKET], '')
+    region = forms.CharField(required=False, max_length=256)
+    closed_before_dt = util_forms.DateField(required=False)
+    opened_after_dt = util_forms.DateField(required=False)
+    revenue_fot = util_forms.RangeField(required=False)
+    revenue = util_forms.RangeField(required=False)
+    lack = util_forms.RangeField(required=False)
+    fot = util_forms.RangeField(required=False)
+    idle = util_forms.RangeField(required=False)
+    workers_amount = util_forms.RangeField(required=False)
+    sort_type = forms.CharField(required=False)
+
+
+class AddSuperShopForm(forms.Form):
+    title = forms.CharField(max_length=128)
+    code = forms.CharField(max_length=64)
+    address = forms.CharField(max_length=256)
+    open_dt = util_forms.DateField()
+    region = forms.CharField()
+    tm_start = util_forms.TimeField()
+    tm_end = util_forms.TimeField()
 
 
 class GetParametersForm(forms.Form):
