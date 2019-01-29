@@ -29,14 +29,25 @@ class GetSuperShopListForm(forms.Form):
     sort_type = forms.CharField(required=False)
 
 
-class AddSuperShopForm(forms.Form):
+class AddEditSuperShopForm(forms.Form):
     title = forms.CharField(max_length=128)
     code = forms.CharField(max_length=64)
     address = forms.CharField(max_length=256)
-    open_dt = util_forms.DateField()
     region = forms.CharField()
     tm_start = util_forms.TimeField()
     tm_end = util_forms.TimeField()
+
+    class Meta:
+        abstract = True
+
+
+class AddSuperShopForm(AddEditSuperShopForm):
+    open_dt = util_forms.DateField()
+
+
+class EditSuperShopForm(AddEditSuperShopForm):
+    supershop_id = forms.IntegerField()
+    close_dt = util_forms.DateField(required=False)
 
 
 class GetParametersForm(forms.Form):
@@ -77,3 +88,6 @@ class SetParametersForm(forms.Form):
             if value > 100 or value < 0:
                 raise ValidationError('Значение {} должно быть указано в процентах (0-100)'.format(value))
 
+
+class GetSuperShopStatsForm(forms.Form):
+    supershop_id = forms.IntegerField()

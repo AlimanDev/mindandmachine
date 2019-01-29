@@ -298,7 +298,9 @@ class SuperShopConverter(BaseConverter):
             'type': obj.type,
             'region': obj.region.title if obj.region else None,
             'dt_opened': cls.convert_date(obj.dt_opened),
-            'dt_closed': cls.convert_date(obj.dt_closed)
+            'dt_closed': cls.convert_date(obj.dt_closed),
+            'tm_start': cls.convert_time(obj.tm_start),
+            'tm_end': cls.convert_time(obj.tm_end),
         }
 
 
