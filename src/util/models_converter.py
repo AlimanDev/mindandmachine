@@ -4,7 +4,7 @@ from src.db.models import (
     User,
     WorkerDay,
     Timetable,
-    CashboxType,
+    WorkType,
     UserIdentifier,
     AttendanceRecords,
 )
@@ -127,9 +127,7 @@ class WorkerDayConverter(BaseConverter):
             'type': cls.convert_type(obj.type),
             'dttm_work_start': __work_tm(obj.dttm_work_start),
             'dttm_work_end': __work_tm(obj.dttm_work_end),
-            'tm_break_start': __work_tm(obj.tm_break_start),
-            'is_manual_tuning': obj.is_manual_tuning,
-            'cashbox_types': list(set(obj.cashbox_types_ids)) if hasattr(obj, 'cashbox_types_ids') else [],
+            'work_types': list(set(obj.work_types_ids)) if hasattr(obj, 'work_types_ids') else [],
             'created_by': obj.created_by_id,
         }
 
@@ -147,11 +145,9 @@ class WorkerDayChangeLogConverter(BaseConverter):
                 'dttm_changed': WorkerDayConverter.convert_datetime(obj.dttm_added),
                 'changed_by': obj.created_by.id,
                 'comment': '',
-                'from_tm_break_start': __work_tm(parent.tm_break_start),
                 'from_tm_work_start': __work_tm(parent.dttm_work_start),
                 'from_tm_work_end': __work_tm(parent.dttm_work_end),
                 'from_type': WorkerDayConverter.convert_type(parent.type),
-                'to_tm_break_start': __work_tm(obj.tm_break_start),
                 'to_tm_work_start': __work_tm(obj.dttm_work_start),
                 'to_tm_work_end': __work_tm(obj.dttm_work_end),
                 'to_type': WorkerDayConverter.convert_type(obj.type),
@@ -173,43 +169,47 @@ class WorkerDayChangeRequestConverter(BaseConverter):
             'type': WorkerDayConverter.convert_type(obj.type),
             'dttm_work_start': __work_tm(obj.dttm_work_start),
             'dttm_work_end': __work_tm(obj.dttm_work_end),
-            'tm_break_start': __work_tm(obj.tm_break_start),
         }
 
 
-class CashboxTypeConverter(BaseConverter):
-    __FORECAST_TYPE = {
-        CashboxType.FORECAST_HARD: 1,
-        CashboxType.FORECAST_LITE: 2,
-        CashboxType.FORECAST_NONE: 0,
-    }
-
-    __FORECAST_TYPE_REVERSED = {v: k for k, v in __FORECAST_TYPE.items()}
+class WorkTypeConverter(BaseConverter):
+    @classmethod
+    def convert_operation_type(cls, obj):
+        return {
+            'id': obj.id,
+            'name': obj.name,
+            'speed_coef': obj.speed_coef,
+            'do_forecast': obj.do_forecast,
+            'work_type_id': obj.work_type.id
+        }
 
     @classmethod
-    def convert_type(cls, obj_type):
-        return cls.__FORECAST_TYPE.get(obj_type, '')
-
-    @classmethod
-    def convert(cls, obj, add_algo_params=False):
-        vals = {
+    def convert(cls, obj, convert_operations=False):
+        converted_dict = {
             'id': obj.id,
             'dttm_added': cls.convert_datetime(obj.dttm_added),
             'dttm_deleted': cls.convert_datetime(obj.dttm_deleted),
             'shop': obj.shop_id,
+            'priority': obj.priority,
             'name': obj.name,
-            'is_stable': obj.is_stable,
+            'prob': obj.probability,
+            'prior_weight': obj.prior_weight,
+        }
+        if convert_operations:
+            converted_dict['operation_types'] = [cls.convert_operation_type(x) for x in obj.work_type_reversed.all()]
+
+        return converted_dict
+
+class OperationTypeConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'name': obj.name,
             'speed_coef': obj.speed_coef,
             'do_forecast': obj.do_forecast,
-            'is_main_type': obj.is_main_type,
+            'work_type_id': obj.work_type.id
         }
-        if add_algo_params:
-            vals.update({
-                'prob': obj.probability,
-                'prior_weight': obj.prior_weight,
-                'prediction': cls.convert_type(obj.do_forecast),
-            })
-        return vals
 
 
 class CashboxConverter(BaseConverter):
@@ -231,7 +231,7 @@ class WorkerCashboxInfoConverter(BaseConverter):
         return {
             'id': obj.id,
             'worker': obj.worker_id,
-            'cashbox_type': obj.cashbox_type_id,
+            'work_type': obj.work_type_id,
             'mean_speed': obj.mean_speed,
             'bills_amount': obj.bills_amount,
             'period': obj.period,
@@ -259,7 +259,7 @@ class PeriodClientsConverter(BaseConverter):
             'dttm_forecast': cls.convert_datetime(obj.dttm_forecast),
             'clients': obj.value,
             'type': obj.type,
-            'cashbox_type': obj.cashbox_type_id
+            'work_type': obj.work_type_id
         }
 
 
@@ -270,7 +270,8 @@ class PeriodDemandChangeLogConverter(BaseConverter):
             'id': obj.id,
             'dttm_from': cls.convert_datetime(obj.dttm_from),
             'dttm_to': cls.convert_datetime(obj.dttm_to),
-            'cashbox_type': obj.cashbox_type_id,
+            'operation_type': obj.operation_type.id,
+            'work_type': obj.operation_type.work_type.id,
             'multiply_coef': obj.multiply_coef,
             'set_value': obj.set_value
         }

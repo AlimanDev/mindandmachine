@@ -1,4 +1,4 @@
-class CashboxTypeUtil(object):
+class WorkTypeUtil(object):
     @staticmethod
     def sort(types):
         types = {x.name: x for x in types}

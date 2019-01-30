@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
 from src.db.models import (
     User,
     SuperShop,
@@ -9,12 +8,11 @@ from src.db.models import (
     PeriodQueues,
     PeriodProducts,
     PeriodDemandChangeLog,
-    CashboxType,
+    WorkType,
     Cashbox,
     WorkerCashboxInfo,
     WorkerDayCashboxDetails,
     Notifications,
-    WorkerPosition,
     Slot,
     UserWeekdaySlot,
     WorkerConstraint,
@@ -23,7 +21,6 @@ from src.db.models import (
     WorkerMonthStat,
     CameraCashboxStat,
     CameraCashbox,
-
     CameraClientGate,
     CameraClientEvent,
 )
@@ -31,8 +28,8 @@ from src.db.models import (
 
 @admin.register(User)
 class QsUserAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'super_shop_title', 'cashbox_type_name', 'position_title', 'id', 'group')
-    search_fields = ('first_name', 'last_name', 'shop__super_shop__title', 'workercashboxinfo__cashbox_type__name', 'position__title', 'id')
+    list_display = ('first_name', 'last_name', 'super_shop_title', 'work_type_name', 'id', 'group')
+    search_fields = ('first_name', 'last_name', 'shop__super_shop__title', 'workercashboxinfo__work_type__name', 'id')
     list_filter = ('shop', )
 
     @staticmethod
@@ -42,13 +39,9 @@ class QsUserAdmin(admin.ModelAdmin):
         return 'без магазина'
 
     @staticmethod
-    def position_title(instance: User):
-        return instance.position.title if instance.position else ''
-
-    @staticmethod
-    def cashbox_type_name(instance: User):
+    def work_type_name(instance: User):
         cashboxinfo_set = instance.workercashboxinfo_set.all()
-        return ' '.join(['"{}"'.format(cbi.cashbox_type.name) for cbi in cashboxinfo_set])
+        return ' '.join(['"{}"'.format(cbi.work_type.name) for cbi in cashboxinfo_set])
 
 
 @admin.register(SuperShop)
@@ -67,39 +60,24 @@ class ShopAdmin(admin.ModelAdmin):
         return instance.super_shop.title
 
 
-@admin.register(WorkerPosition)
-class WorkerPositionAdmin(admin.ModelAdmin):
-    list_display = ('title', 'department_title', 'super_shop_title', 'id')
-    search_fields = ('title', 'department__title', 'department__super_shop__title', 'id')
-    list_filter = ('department', )
-
-    @staticmethod
-    def super_shop_title(instance: WorkerPosition):
-        return instance.department.super_shop.title
-
-    @staticmethod
-    def department_title(instance: WorkerPosition):
-        return instance.department.title
-
-
-@admin.register(CashboxType)
-class CashboxTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'shop_title', 'super_shop_title', 'dttm_added', 'do_forecast', 'id')
+@admin.register(WorkType)
+class WorkTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'shop_title', 'super_shop_title', 'dttm_added', 'id')
     search_fields = ('name', 'shop__title', 'shop__super_shop__title', 'id')
     list_filter = ('shop', )
 
     @staticmethod
-    def shop_title(instance: CashboxType):
+    def shop_title(instance: WorkType):
         return instance.shop.title
 
     @staticmethod
-    def super_shop_title(instance: CashboxType):
+    def super_shop_title(instance: WorkType):
         return instance.shop.super_shop.title
 
 
 @admin.register(Slot)
 class SlotAdmin(admin.ModelAdmin):
-    list_display = ('name', 'cashbox_type_name', 'shop_title', 'super_shop_title', 'tm_start', 'tm_end', 'id')
+    list_display = ('name', 'work_type_name', 'shop_title', 'super_shop_title', 'tm_start', 'tm_end', 'id')
     search_fields = ('name', 'shop__title', 'shop__super_shop__title', 'id')
     list_filter = ('shop', )
 
@@ -112,9 +90,9 @@ class SlotAdmin(admin.ModelAdmin):
         return instance.shop.super_shop.title
 
     @staticmethod
-    def cashbox_type_name(instance: Slot):
-        if instance.cashbox_type:
-            return instance.cashbox_type.name
+    def work_type_name(instance: Slot):
+        if instance.work_type:
+            return instance.work_type.name
 
 
 @admin.register(UserWeekdaySlot)
@@ -165,80 +143,79 @@ class CashboxAdmin(admin.ModelAdmin):
         return instance.type.shop.super_shop.title
 
 
-@admin.register(PeriodClients)
-class PeriodClientsAdmin(admin.ModelAdmin):
-    list_display = ('cashbox_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
-    search_fields = ('cashbox_type__name', 'cashbox_type__shop__title', 'id')
-    list_filter = ('cashbox_type_id', 'type')
-
-    @staticmethod
-    def cashbox_type_name(instance: PeriodClients):
-        return instance.cashbox_type.name
-
-    @staticmethod
-    def shop_title(instance: PeriodClients):
-        return instance.cashbox_type.shop.title
-
-
-@admin.register(PeriodQueues)
-class PeriodQueuesAdmin(admin.ModelAdmin):
-    list_display = ('cashbox_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
-    search_fields = ('cashbox_type__name', 'cashbox_type__shop__title', 'id')
-    list_filter = ('cashbox_type_id', 'type')
-
-    @staticmethod
-    def cashbox_type_name(instance: PeriodClients):
-        return instance.cashbox_type.name
-
-    @staticmethod
-    def shop_title(instance: PeriodClients):
-        return instance.cashbox_type.shop.title
-
-
-@admin.register(PeriodProducts)
-class PeriodProductsAdmin(admin.ModelAdmin):
-    list_display = ('cashbox_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
-    search_fields = ('cashbox_type__name', 'cashbox_type__shop__title', 'id')
-    list_filter = ('cashbox_type_id', 'type')
-
-    @staticmethod
-    def cashbox_type_name(instance: PeriodClients):
-        return instance.cashbox_type.name
-
-    @staticmethod
-    def shop_title(instance: PeriodClients):
-        return instance.cashbox_type.shop.title
-
-
-
-@admin.register(PeriodDemandChangeLog)
-class PeriodDemandChangeLogAdmin(admin.ModelAdmin):
-    list_display = ('cashbox_type_name', 'shop_title', 'dttm_from', 'dttm_to')
-    search_fields = ('cashbox_type__name', 'cashbox_type__shop__title', 'id')
-    list_filter = ('cashbox_type__shop', )
-
-    @staticmethod
-    def cashbox_type_name(instance: PeriodDemandChangeLog):
-        return instance.cashbox_type.name
-
-    @staticmethod
-    def shop_title(instance: PeriodDemandChangeLog):
-        return instance.cashbox_type.shop.title
+# @admin.register(PeriodClients)
+# class PeriodClientsAdmin(admin.ModelAdmin):
+#     list_display = ('operation_type__work_type', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
+#     search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
+#     list_filter = ('operation_type__work_type_id', 'type')
+#
+#     @staticmethod
+#     def work_type_name(instance: PeriodClients):
+#         return instance.operation_type.work_type.name
+#
+#     @staticmethod
+#     def shop_title(instance: PeriodClients):
+#         return instance.operation_type.work_type.shop.title
+#
+#
+# @admin.register(PeriodQueues)
+# class PeriodQueuesAdmin(admin.ModelAdmin):
+#     list_display = ('operation_type__work_type__name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
+#     search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
+#     list_filter = ('operation_type__work_type_id', 'type')
+#
+#     @staticmethod
+#     def work_type_name(instance: PeriodQueues):
+#         return instance.operation_type.work_type.name
+#
+#     @staticmethod
+#     def shop_title(instance: PeriodQueues):
+#         return instance.operation_type.work_type.shop.title
+#
+#
+# @admin.register(PeriodProducts)
+# class PeriodProductsAdmin(admin.ModelAdmin):
+#     list_display = ('operation_type__work_type__name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
+#     search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
+#     list_filter = ('operation_type__work_type_id', 'type')
+#
+#     @staticmethod
+#     def work_type_name(instance: PeriodProducts):
+#         return instance.operation_type.work_type.name
+#
+#     @staticmethod
+#     def shop_title(instance: PeriodProducts):
+#         return instance.operation_type.work_type.shop.title
+#
+#
+# @admin.register(PeriodDemandChangeLog)
+# class PeriodDemandChangeLogAdmin(admin.ModelAdmin):
+#     list_display = ('operation_type__name', 'dttm_from', 'dttm_to')
+#     search_fields = ('operation_type__name', 'operation_type__work_type__shop__title', 'id')
+#     list_filter = ('operation_type__shop', )
+#
+#     @staticmethod
+#     def work_type_name(instance: PeriodDemandChangeLog):
+#         return instance.operation_type.name
+#
+#     @staticmethod
+#     def shop_title(instance: PeriodDemandChangeLog):
+#         return instance.operation_type.work_type.shop.title
 
 
 @admin.register(WorkerCashboxInfo)
 class WorkerCashboxInfoAdmin(admin.ModelAdmin):
-    list_display = ('worker_last_name', 'cashbox_type_name', 'id')
-    search_fields = ('worker__last_name', 'cashbox_type__name', 'id')
-    list_filter = ('cashbox_type__shop',)
+    list_display = ('worker_last_name', 'work_type_name', 'id')
+    search_fields = ('worker__last_name', 'work_type__name', 'id')
+    list_filter = ('work_type__shop',)
 
     @staticmethod
     def worker_last_name(instance: WorkerCashboxInfo):
         return instance.worker.last_name
 
     @staticmethod
-    def cashbox_type_name(instance: WorkerCashboxInfo):
-        return instance.cashbox_type.name
+    def work_type_name(instance: WorkerCashboxInfo):
+        return instance.work_type.name
 
 
 @admin.register(WorkerConstraint)
@@ -276,7 +253,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
 class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
     # todo: upd: сервак просто падает если туда зайти
-    list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_cashbox_type', 'id', 'dttm_from', 'dttm_to')
+    list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_work_type', 'id', 'dttm_from', 'dttm_to')
     search_fields = ('worker_day__worker__last_name', 'worker_day__worker__shop__title', 'id')
     list_filter = ('worker_day__worker__shop',)
 
@@ -293,8 +270,8 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
         return instance.worker_day.dt
 
     @staticmethod
-    def on_cashbox_type(instance: WorkerDayCashboxDetails):
-        return instance.cashbox_type.name if instance.cashbox_type else ''
+    def on_work_type(instance: WorkerDayCashboxDetails):
+        return instance.work_type.name if instance.work_type else ''
 
 
 @admin.register(Notifications)
@@ -331,7 +308,6 @@ class TimetableAdmin(admin.ModelAdmin):
         return instance.shop.title
 
 
-
 @admin.register(ProductionDay)
 class ProductionDayAdmin(admin.ModelAdmin):
     list_display = ('dt', 'type')
@@ -351,9 +327,11 @@ class CameraCashboxStatAdmin(admin.ModelAdmin):
 class CameraCashboxStatAdmin(admin.ModelAdmin):
     list_display = ('name', 'cashbox')
 
+
 @admin.register(CameraClientGate)
 class CameraClientGateAdmin(admin.ModelAdmin):
     list_display = ('name', 'type')
+
 
 @admin.register(CameraClientEvent)
 class CameraClientEventAdmin(admin.ModelAdmin):

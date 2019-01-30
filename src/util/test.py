@@ -6,7 +6,7 @@ from src.db.models import (
     User,
     WorkerDay,
     CameraCashboxStat,
-    CashboxType,
+    WorkType,
     PeriodDemand,
     PeriodClients,
     Shop,
@@ -77,49 +77,49 @@ class LocalTestCase(TestCase):
             last_name='Петров'
         )
 
-        # cashbox_types
-        self.cashbox_type1 = create_cashbox_type(
+        # work_types
+        self.work_type1 = create_work_type(
             self.shop,
             'Кассы',
             id=1,
             dttm_last_update_queue=datetime.datetime(2018, 12, 1, 8, 30, 0)
         )
-        self.cashbox_type2 = create_cashbox_type(
+        self.work_type2 = create_work_type(
             self.shop,
             'тип_кассы_2',
             id=2,
             dttm_last_update_queue=datetime.datetime(2018, 12, 1, 9, 0, 0)
         )
-        self.cashbox_type3 = create_cashbox_type(
+        self.work_type3 = create_work_type(
             self.shop,
             'тип_кассы_3',
             id=3,
             dttm_last_update_queue=None,
             dttm_deleted=dttm_now - datetime.timedelta(days=1)
         )
-        self.cashbox_type4 = create_cashbox_type(self.shop2, 'тип_кассы_4', id=4)
-        CashboxType.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 9, 0, 0))
+        self.work_type4 = create_work_type(self.shop2, 'тип_кассы_4', id=4)
+        WorkType.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 9, 0, 0))
 
         # cashboxes
         self.cashbox1 = Cashbox.objects.create(
-            type=self.cashbox_type1,
+            type=self.work_type1,
             number=1,
             id=1,
         )
         self.cashbox2 = Cashbox.objects.create(
-            type=self.cashbox_type2,
+            type=self.work_type2,
             number=2,
             id=2,
         )
         self.cashbox3 = Cashbox.objects.create(
-            type=self.cashbox_type3,
+            type=self.work_type3,
             dttm_deleted=dttm_now - datetime.timedelta(days=3),
             number=3,
             id=3,
         )
         for i in range(4, 10):
             Cashbox.objects.create(
-                type=self.cashbox_type4,
+                type=self.work_type4,
                 number=i,
                 id=i,
             )
@@ -134,16 +134,16 @@ class LocalTestCase(TestCase):
         dttm_to = dttm_from + relativedelta(months=1)
         while dttm_from < dttm_to:
             create_period_clients(
-                dttm_forecast=dttm_from, value=randint(50, 150), type=PeriodClients.LONG_FORECASE_TYPE, cashbox_type=self.cashbox_type1
+                dttm_forecast=dttm_from, value=randint(50, 150), type=PeriodClients.LONG_FORECASE_TYPE, work_type=self.work_type1
             )
             create_period_clients(
-                dttm_forecast=dttm_from, value=randint(50, 150), type=PeriodClients.LONG_FORECASE_TYPE, cashbox_type=self.cashbox_type2
+                dttm_forecast=dttm_from, value=randint(50, 150), type=PeriodClients.LONG_FORECASE_TYPE, work_type=self.work_type2
             )
             create_period_clients(
-                dttm_forecast=dttm_from, value=randint(50, 150), type=PeriodClients.LONG_FORECASE_TYPE, cashbox_type=self.cashbox_type3
+                dttm_forecast=dttm_from, value=randint(50, 150), type=PeriodClients.LONG_FORECASE_TYPE, work_type=self.work_type3
             )
             create_period_clients(
-                dttm_forecast=dttm_from - relativedelta(months=1), value=randint(50, 150), type=PeriodClients.FACT_TYPE, cashbox_type=self.cashbox_type3
+                dttm_forecast=dttm_from - relativedelta(months=1), value=randint(50, 150), type=PeriodClients.FACT_TYPE, work_type=self.work_type3
             )
             dttm_from += datetime.timedelta(minutes=30)
 
@@ -197,22 +197,22 @@ class LocalTestCase(TestCase):
         WorkerCashboxInfo.objects.create(
             id=1,
             worker=self.user1,
-            cashbox_type=self.cashbox_type1,
+            work_type=self.work_type1,
         )
         WorkerCashboxInfo.objects.create(
             id=2,
             worker=self.user2,
-            cashbox_type=self.cashbox_type3,
+            work_type=self.work_type3,
         )
         WorkerCashboxInfo.objects.create(
             id=3,
             worker=self.user3,
-            cashbox_type=self.cashbox_type2,
+            work_type=self.work_type2,
         )
         WorkerCashboxInfo.objects.create(
             id=4,
             worker=self.user4,
-            cashbox_type=self.cashbox_type1,
+            work_type=self.work_type1,
         )
 
         # CameraClientEvent
@@ -268,7 +268,7 @@ class LocalTestCase(TestCase):
                 WorkerDayCashboxDetails.objects.create(
                     worker_day=wd,
                     on_cashbox=cashbox,
-                    cashbox_type=cashbox.type,
+                    work_type=cashbox.type,
                     dttm_from=wd.dttm_work_start,
                     dttm_to=wd.dttm_work_end,
                     is_tablet=True
@@ -307,7 +307,7 @@ def create_worker_day(
     WorkerDayCashboxDetails.objects.create(
         worker_day=worker_day,
         on_cashbox=cashbox,
-        cashbox_type=cashbox.type,
+        work_type=cashbox.type,
         dttm_from=worker_day.dttm_work_start,
         dttm_to=worker_day.dttm_work_end,
     )
@@ -322,21 +322,21 @@ def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
     )
 
 
-def create_cashbox_type(shop, name, dttm_last_update_queue=None, dttm_deleted=None, id=None):
-    cashbox_type = CashboxType.objects.create(
+def create_work_type(shop, name, dttm_last_update_queue=None, dttm_deleted=None, id=None):
+    work_type = WorkType.objects.create(
         id=id,
         shop=shop,
         name=name,
         dttm_deleted=dttm_deleted,
         dttm_last_update_queue=dttm_last_update_queue
     )
-    return cashbox_type
+    return work_type
 
 
-def create_period_clients(dttm_forecast, value, type, cashbox_type):
+def create_period_clients(dttm_forecast, value, type, work_type):
     PeriodClients.objects.create(
         dttm_forecast=dttm_forecast,
         value=value,
         type=type,
-        cashbox_type=cashbox_type
+        work_type=work_type
     )

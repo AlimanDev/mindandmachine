@@ -1,27 +1,23 @@
 import xlsxwriter
 import datetime
 import io
-import calendar
 from dateutil.relativedelta import relativedelta
 
 from django.http import HttpResponse
-from django.db.models.functions import Coalesce
 from functools import reduce
-from django.db.models import Sum, Q
 from src.db.models import (
     User,
     WorkerCashboxInfo,
     WorkerDay,
     WorkerDayCashboxDetails,
     PeriodClients,
-    CashboxType,
-    Shop
+    WorkType,
+    OperationType,
 )
 from src.util.forms import FormUtil
 from src.util.models_converter import (
     UserConverter,
     BaseConverter,
-    WorkerDayConverter,
 )
 from src.util.utils import api_method, JsonResponse
 from .forms import (
@@ -31,7 +27,6 @@ from .forms import (
 from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
 from .utils import (
     count_work_month_stats,
-    count_normal_days,
 )
 
 from src.main.download.forms import GetTable
@@ -44,7 +39,7 @@ def select_cashiers(request, form):
     Args:
         method: GET
         url: /api/timetable/table/select_cashiers
-        cashbox_types(list): required = True
+        work_types(list): required = True
         cashier_ids(list): required = True
         work_types(str): required = False
         workday_type(str): required = False
@@ -61,11 +56,11 @@ def select_cashiers(request, form):
 
     users = User.objects.filter(shop_id=shop_id, attachment_group=User.GROUP_STAFF)
 
-    cashboxes_type_ids = set(form.get('cashbox_types', []))
+    cashboxes_type_ids = set(form.get('work_types', []))
     if len(cashboxes_type_ids) > 0:
         users_hits = set()
-        for x in WorkerCashboxInfo.objects.select_related('cashbox_type').filter(cashbox_type__shop_id=shop_id, is_active=True):
-            if x.cashbox_type_id in cashboxes_type_ids:
+        for x in WorkerCashboxInfo.objects.select_related('work_type').filter(work_type__shop_id=shop_id, is_active=True):
+            if x.work_type_id in cashboxes_type_ids:
                 users_hits.add(x.worker_id)
 
         users = [x for x in users if x.id in users_hits]
@@ -228,13 +223,13 @@ def get_table(request, form):
 
         for workerday in workerdays:
             day_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related(
-                    'cashbox_type'
+                    'work_type'
                 ).filter(
                     worker_day=workerday
                 ).first()
 
             is_working_or_main_type = False
-            if day_detail is None or (day_detail.cashbox_type and not day_detail.cashbox_type.is_main_type):
+            if day_detail is None or day_detail.work_type:
                 is_working_or_main_type = True
 
             bg_color_format = {'bg_color': '#D9D9D9'} if is_working_or_main_type else None
@@ -265,8 +260,8 @@ def get_table(request, form):
                     worksheet.write_blank(row, 2, '', mix_formats(workbook, bold_right_cell_format, bold_format, bg_color_format, size_format))
                     raise WorkerDayCashboxDetails.DoesNotExist
 
-                if workerday_cashbox_details_first.cashbox_type:
-                    worksheet.write(row, 1, workerday_cashbox_details_first.cashbox_type.name, mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
+                if workerday_cashbox_details_first.work_type:
+                    worksheet.write(row, 1, workerday_cashbox_details_first.work_type.name, mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
                 worksheet.write_blank(row, 2, '', mix_formats(workbook, bold_right_cell_format, bg_color_format, size_format))
             except WorkerDayCashboxDetails.DoesNotExist:
                 pass
@@ -309,14 +304,17 @@ def get_table(request, form):
                 datetime.datetime.combine(weekday, datetime.time()),
                 datetime.datetime.combine(weekday, datetime.time(hour=23, minute=59))
             ),
-            cashbox_type__shop_id=shop_id,
-            cashbox_type__do_forecast=CashboxType.FORECAST_HARD,
+            work_type__shop_id=shop_id,
+            operation_type__work_type__do_forecast=OperationType.FORECAST_HARD,
         )
 
         inds = list(stats)
         inds.sort()
 
-        ct_add = CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_LITE).count()
+        ct_add = WorkType.objects.filter(
+            shop_id=shop_id,
+            work_type_reversed__do_forecast=OperationType.FORECAST_LITE
+        ).count()
 
         for tm in inds:
             worksheet.write(row, col, tm.strftime(QOS_SHORT_TIME_FORMAT), mix_formats(workbook, border, size_format))
@@ -330,9 +328,9 @@ def get_table(request, form):
             ))
             result_prediction = 0
             for prediction in predicted:
-                if prediction.cashbox_type.is_main_type:
-                    result_prediction += prediction.value / 14
-                else:
+                # if prediction.work_type.is_main_type:
+                #     result_prediction += prediction.value / 14
+                # else:
                     result_prediction += prediction.value / 4
             if tm_st_ad4 < tm < tm_end_ad4:
                 result_prediction += 4

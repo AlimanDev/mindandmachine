@@ -8,29 +8,6 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from . import utils
 import datetime
 
-# __all__ = [
-#     'SuperShop',
-#     'Shop',
-#     'WorkerPosition',
-#     'User',
-#     'CashboxType',
-#     'UserWeekdaySlot',
-#     'Slot',
-#     'Cashbox',
-#     'PeriodDemand',
-#     'PeriodDemandChangeLog',
-#     'WorkerCashboxInfo',
-#     'WorkerConstraint',
-#     'WorkerDay',
-#     'WorkerDayCashboxDetails',
-#     'WorkerDayChangeRequest',
-#     'Notifications',
-#     'OfficialHolidays',
-#     'LevelType',
-#     'WaitTimeInfo',
-#     'Timetable',
-# ]
-
 
 class Region(models.Model):
     title = models.CharField(max_length=256, unique=True, default='Москва')
@@ -141,7 +118,6 @@ class Shop(models.Model):
 
     def __str__(self):
         return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)
-        # return f'{self.title}, {self.super_shop.title}, {self.id}'
 
 
 class WorkerPosition(models.Model):
@@ -160,7 +136,6 @@ class WorkerPosition(models.Model):
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.title, self.department.title, self.department.super_shop.title, self.id)
-        # return f'{self.title}, {self.department.title}, {# self.department.super_shop.title}, {self.id}'
 
 
 class WorkerManager(UserManager):
@@ -195,7 +170,6 @@ class User(DjangoAbstractUser):
         else:
             ss_title = None
         return '{}, {}, {}, {}'.format(self.first_name, self.last_name, ss_title, self.id)
-        # return f'{self.first_name}, {self.last_name}, {ss_title}, {self.id}'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -237,9 +211,8 @@ class User(DjangoAbstractUser):
     __allowed_to_modify__ = [GROUP_SUPERVISOR, GROUP_DIRECTOR]
 
     id = models.BigAutoField(primary_key=True)
-
-    shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable
     position = models.ForeignKey(WorkerPosition, null=True, blank=True, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable
     work_type = utils.EnumField(WorkType, null=True, blank=True)
     is_fixed_hours = models.BooleanField(default=False)
     is_fixed_days = models.BooleanField(default=False)
@@ -288,7 +261,7 @@ class User(DjangoAbstractUser):
     objects = WorkerManager()
 
 
-class CashboxTypeManager(models.Manager):
+class WorkTypeManager(models.Manager):
     def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
         """
         added earlier then dt_from, deleted later then dt_to
@@ -306,14 +279,13 @@ class CashboxTypeManager(models.Manager):
         ).filter(*args, **kwargs)
 
 
-class CashboxType(models.Model):
+class WorkType(models.Model):
     class Meta:
-        verbose_name = 'Тип кассы'
-        verbose_name_plural = 'Типы касс'
+        verbose_name = 'Тип работ'
+        verbose_name_plural = 'Типы работ'
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.name, self.shop.title, self.shop.super_shop.title, self.id)
-        # return f'{self.name}, {self.shop.title}, {self.shop.super_shop.title}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
 
@@ -323,8 +295,21 @@ class CashboxType(models.Model):
     dttm_last_update_queue = models.DateTimeField(null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     name = models.CharField(max_length=128)
-    speed_coef = models.FloatField(default=1)  # time for do 1 operation of cashboxtype
-    is_stable = models.BooleanField(default=False)
+
+    probability = models.FloatField(default=1.0)
+    prior_weight = models.FloatField(default=1.0)
+    objects = WorkTypeManager()
+
+    period_queue_params = models.CharField(
+        max_length=1024,
+        default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 1, "reg_lambda": 0.1, "silent": 1, "iterations": 20}'
+    )
+
+
+class OperationType(models.Model):
+    def __str__(self):
+        return 'id: {}, name: {}, work type: {}'.format(self.id, self.name, self.work_type)
+
     FORECAST_HARD = 'H'
     FORECAST_LITE = 'L'
     FORECAST_NONE = 'N'
@@ -333,30 +318,24 @@ class CashboxType(models.Model):
         (FORECAST_LITE, 'Lite',),
         (FORECAST_NONE, 'None',),
     )
+
+    work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, related_name='work_type_reversed')
+    name = models.CharField(max_length=128)
+    speed_coef = models.FloatField(default=1)  # time for do 1 operation
     do_forecast = models.CharField(
         max_length=1,
         default=FORECAST_LITE,
         choices=FORECAST_CHOICES,
     )
-    probability = models.FloatField(default=1.0)
-    prior_weight = models.FloatField(default=1.0)
-    is_main_type = models.BooleanField(default=False)
-    objects = CashboxTypeManager()
 
     period_demand_params = models.CharField(
         max_length=1024,
         default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 200, "reg_lambda": 2, "silent": 1, "iterations": 20}'
     )
 
-    period_queue_params = models.CharField(
-        max_length=1024,
-        default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 1, "reg_lambda": 0.1, "silent": 1, "iterations": 20}'
-    )
-
 
 class UserWeekdaySlot(models.Model):
     def __str__(self):
-        # return f'{self.worker.last_name}, {self.slot.name}, {self.weekday}, {self.id}'
         return '{}, {}, {}, {}'.format(self.worker.last_name, self.slot.name, self.weekday, self.id)
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
@@ -371,8 +350,8 @@ class Slot(models.Model):
         verbose_name_plural = 'Слоты'
 
     def __str__(self):
-        if self.cashbox_type:
-            cbt_name = self.cashbox_type.name
+        if self.work_type:
+            cbt_name = self.work_type.name
         else:
             cbt_name = None
         return '{}, начало: {}, конец: {}, {}, {}, {}'.format(
@@ -389,7 +368,7 @@ class Slot(models.Model):
     tm_end = models.TimeField(default=datetime.time(hour=23, minute=59, second=59))
     name = models.CharField(max_length=32, null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
-    cashbox_type = models.ForeignKey(CashboxType, null=True, blank=True, on_delete=models.PROTECT)
+    work_type = models.ForeignKey(WorkType, null=True, blank=True, on_delete=models.PROTECT)
     workers_needed = models.IntegerField(default=1)
 
     worker = models.ManyToManyField(User, through=UserWeekdaySlot)
@@ -419,15 +398,20 @@ class Cashbox(models.Model):
         verbose_name_plural = 'Кассы'
 
     def __str__(self):
-        return '{}, {}, {}, {}, {}'.format(self.type.name, self.type.shop.title, self.type.shop.super_shop.title, self.id, self.number)
-        # return f'{self.type.name}, {self.type.shop.title}, {self.type.shop.super_shop.title}, {self.id}'
+        return '{}, {}, {}, {}, {}'.format(
+            self.type.name,
+            self.type.shop.title,
+            self.type.shop.super_shop.title,
+            self.id,
+            self.number
+        )
 
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
-    type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
 
     number = models.PositiveIntegerField(blank=True, null=True)
     bio = models.CharField(max_length=512, default='', blank=True)
@@ -451,47 +435,67 @@ class PeriodDemand(models.Model):
     id = models.BigAutoField(primary_key=True)
     dttm_forecast = models.DateTimeField()
     type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
-    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT)
 
 
 class PeriodClients(PeriodDemand):
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
     value = models.FloatField(default=0)
 
 
 class PeriodProducts(PeriodDemand):
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
     value = models.FloatField(default=0)
 
 
 class PeriodQueues(PeriodDemand):
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
     value = models.FloatField(default=0)
 
 
-class IncomeVisitors(PeriodDemand):
+class PeriodVisitors(models.Model):
+    LONG_FORECASE_TYPE = 'L'
+    SHORT_FORECAST_TYPE = 'S'
+    FACT_TYPE = 'F'
+
+    FORECAST_TYPES = (
+        (LONG_FORECASE_TYPE, 'Long'),
+        (SHORT_FORECAST_TYPE, 'Short'),
+        (FACT_TYPE, 'Fact'),
+    )
+
+    class Meta:
+        abstract = True
+
+    id = models.BigAutoField(primary_key=True)
+    dttm_forecast = models.DateTimeField()
+    type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
+    work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
+
+
+class IncomeVisitors(PeriodVisitors):
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.work_type, self.value)
 
     value = models.FloatField(default=0)
 
 
-class EmptyOutcomeVisitors(PeriodDemand):
+class EmptyOutcomeVisitors(PeriodVisitors):
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.work_type, self.value)
 
     value = models.FloatField(default=0)
 
 
-class PurchasesOutcomeVisitors(PeriodDemand):
+class PurchasesOutcomeVisitors(PeriodVisitors):
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.cashbox_type, self.value)
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.work_type, self.value)
 
     value = models.FloatField(default=0)
 
@@ -499,8 +503,8 @@ class PurchasesOutcomeVisitors(PeriodDemand):
 class PeriodDemandChangeLog(models.Model):
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(
-            self.cashbox_type.name,
-            self.cashbox_type.shop.title,
+            self.operation_type.name,
+            self.operation_type.work_type.shop.title,
             self.dttm_from,
             self.dttm_to,
             self.id
@@ -511,23 +515,22 @@ class PeriodDemandChangeLog(models.Model):
 
     dttm_from = models.DateTimeField()
     dttm_to = models.DateTimeField()
-    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT)
     multiply_coef = models.FloatField(null=True, blank=True)
     set_value = models.FloatField(null=True, blank=True)
 
 
 class WorkerCashboxInfo(models.Model):
     class Meta(object):
-        unique_together = (('worker', 'cashbox_type'),)
+        unique_together = (('worker', 'work_type'),)
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.worker.last_name, self.cashbox_type.name, self.id)
-        # return f'{self.worker.last_name}, {self.cashbox_type.name}, {self.id}'
+        return '{}, {}, {}'.format(self.worker.last_name, self.work_type.name, self.id)
 
     id = models.BigAutoField(primary_key=True)
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
-    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
 
     is_active = models.BooleanField(default=True)
 
@@ -547,7 +550,6 @@ class WorkerConstraint(models.Model):
 
     def __str__(self):
         return '{} {}, {}, {}, {}'.format(self.worker.last_name, self.worker.id, self.weekday, self.tm, self.id)
-        # return f'{self.worker.last_name}, {self.weekday}, {self.tm}, {self.id}'
 
     id = models.BigAutoField(primary_key=True)
 
@@ -613,7 +615,14 @@ class WorkerDay(models.Model):
     ]
 
     def __str__(self):
-        return '{}, {}, {}, {}, {}, {}'.format(self.worker.last_name, self.worker.shop.title, self.worker.shop.super_shop.title, self.dt, self.Type.get_name_by_value(self.type), self.id)
+        return '{}, {}, {}, {}, {}, {}'.format(
+            self.worker.last_name,
+            self.worker.shop.title,
+            self.worker.shop.super_shop.title,
+            self.dt,
+            self.Type.get_name_by_value(self.type),
+            self.id
+        )
 
     def __repr__(self):
         return self.__str__()
@@ -621,16 +630,14 @@ class WorkerDay(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
-    worker = models.ForeignKey(User, on_delete=models.PROTECT)  # todo: make immutable
     dt = models.DateField()  # todo: make immutable
-    type = utils.EnumField(Type)
-
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
-    tm_break_start = models.TimeField(null=True, blank=True)
 
-    is_manual_tuning = models.BooleanField(default=False)
-    cashbox_types = models.ManyToManyField(CashboxType, through='WorkerDayCashboxDetails')
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)  # todo: make immutable
+    type = utils.EnumField(Type)
+
+    work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')
 
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
     parent_worker_day = models.OneToOneField('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child')
@@ -696,7 +703,7 @@ class WorkerDayCashboxDetails(models.Model):
 
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT)
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
-    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT, null=True, blank=True)
+    work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, null=True, blank=True)
 
     status = models.CharField(max_length=1, choices=DETAILS_TYPES, default=TYPE_WORK)
 
@@ -709,7 +716,7 @@ class WorkerDayCashboxDetails(models.Model):
         return '{}, {}, {}, {}-{}, id: {}'.format(
             self.worker_day.worker.last_name,
             self.worker_day.dt,
-            self.cashbox_type.name if self.cashbox_type else None,
+            self.work_type.name if self.work_type else None,
             self.dttm_from.replace(microsecond=0).time() if self.dttm_from else self.dttm_from,
             self.dttm_to.replace(microsecond=0).time() if self.dttm_to else self.dttm_to,
             self.id,
@@ -745,7 +752,6 @@ class WorkerDayChangeRequest(models.Model):
 
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
-    tm_break_start = models.TimeField(null=True, blank=True)
     wish_text = models.CharField(null=True, blank=True, max_length=512)
 
 
@@ -792,6 +798,7 @@ class OfficialHolidays(models.Model):
     country = models.CharField(max_length=4)
     date = models.DateField()
 
+
 class LevelType(models.Model):
     class Type(utils.Enum):
         LOW = 1
@@ -811,7 +818,7 @@ class WaitTimeInfo(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     dt = models.DateField()
-    cashbox_type = models.ForeignKey(CashboxType, on_delete=models.PROTECT)
+    work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
     wait_time = models.PositiveIntegerField()
     proportion = models.FloatField()
     type = models.CharField(max_length=1, choices=PeriodDemand.FORECAST_TYPES)
@@ -883,8 +890,6 @@ class ProductionDay(models.Model):
     is_celebration = models.BooleanField(default=False)
 
     def __str__(self):
-        # return f'{self.worker.last_name}, {self.worker.shop.title}, {self.worker.shop.super_shop.title}, {self.dt},' \
-        #        f' {self.Type.get_name_by_value(self.type)}, {self.id}'
 
         for tp in self.TYPES:
             if tp[0] == self.type:
@@ -893,11 +898,6 @@ class ProductionDay(models.Model):
             tp = ('', 'bad_bal')
 
         return '(dt {}, type {}, id {})'.format(self.dt, self.type, self.id)
-
-    def __repr__(self):
-        return self.__str__()
-
-    # is it enough or work hours also needs?
 
 
 class WorkerMonthStat(models.Model):

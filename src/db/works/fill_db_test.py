@@ -14,7 +14,8 @@ from ..models import (
     WorkerConstraint,
     WorkerDayCashboxDetails,
     WorkerCashboxInfo,
-    CashboxType,
+    WorkType,
+    OperationType,
     Cashbox,
     UserIdentifier,
     AttendanceRecords,
@@ -33,7 +34,6 @@ def create_shop(shop_ind):
     shop = Shop.objects.create(
         super_shop=supershop,
         title='',
-        # hidden_title='',
         forecast_step_minutes=time(minute=30),
         break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]]]'
     )
@@ -43,9 +43,17 @@ def create_shop(shop_ind):
 def create_work_types(work_types, shop):
     wt_dict = {}
     for wt in work_types:
-        wt_m = CashboxType.objects.create(
+        wt_m = WorkType.objects.create(
             shop=shop,
-            **wt,
+            name=wt['name'],
+            probability=wt['probability'],
+            prior_weight=wt['prior_weight']
+        )
+        OperationType.objects.create(
+            name='operation for ' + wt['name'],
+            speed_coef=wt['speed_coef'],
+            do_forecast=wt['do_forecast'],
+            work_type=wt_m
         )
         wt_dict[wt_m.name] = wt_m
         Cashbox.objects.create(type=wt_m, number=1)
@@ -87,7 +95,7 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datet
 
     for wt_key in work_types_dict.keys():
         wt = work_types_dict[wt_key]
-        wt_df = df[df['cashbox_type'] == wt_key]
+        wt_df = df[df['work_type'] == wt_key]
         dt_diff = start_dt - df.iloc[0]['dttm_forecast'].date()
         day = 0
         prev_dt = wt_df.iloc[0]['dttm_forecast'].date()
@@ -98,13 +106,13 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datet
                 value=item['clients'] * (1 + (np.random.rand() - 0.5) / 5) / 50,
                 dttm_forecast=item['dttm_forecast'] + dt_diff,
                 type=PeriodQueues.LONG_FORECASE_TYPE,
-                cashbox_type=wt,
+                operation_type=wt.operationtype_set.all()[0],
             ))
             add_clients_models(PeriodClients(
                 value=item['clients'] * (1 + (np.random.rand() - 0.5) / 10),
                 dttm_forecast=item['dttm_forecast'] + dt_diff,
                 type=PeriodClients.LONG_FORECASE_TYPE,
-                cashbox_type=wt,
+                operation_type=wt.operationtype_set.all()[0],
             ))
             wt_df_index = (wt_df_index + 1) % wt_df.shape[0]
             if prev_dt != item['dttm_forecast'].date():
@@ -166,7 +174,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         for info in worker_d['worker_cashbox_info']:
             add_models(infos, WorkerCashboxInfo, WorkerCashboxInfo(
                 worker=worker,
-                cashbox_type=work_types_dict[info['work_type']],
+                work_type=work_types_dict[info['work_type']],
                 mean_speed=info['mean_speed'],
             ))
 
@@ -208,7 +216,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                 )
                 add_models(details, WorkerDayCashboxDetails, WorkerDayCashboxDetails(
                     worker_day=wd_model,
-                    cashbox_type=work_types_dict[wd['work_type']],
+                    work_type=work_types_dict[wd['work_type']],
                     dttm_from=dttm_work_start,
                     dttm_to=dttm_work_end,
                 ))
@@ -279,7 +287,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         for wt_key in work_types_dict.keys():
             wt_type = work_types_dict[wt_key]
             wt_users = list(User.objects.filter(
-                workerday__workerdaycashboxdetails__cashbox_type=wt_type,
+                workerday__workerdaycashboxdetails__work_type=wt_type,
                 shop=shop,
             ).distinct().values_list('id', flat=True))
             wt_users_id = wt_users[:int(len(wt_users) / coef + 0.5)]
@@ -314,6 +322,6 @@ def main(date=None, shops=None):
 
     for shop_ind, shop_size in enumerate(shops, start=1):
         supershop, shop = create_shop(shop_ind)
-        work_types_dict = create_work_types(data['cashbox_types'], shop)
+        work_types_dict = create_work_types(data['work_types'], shop)
         create_forecast(data['demand'], work_types_dict, start_date, demand_days)
         create_users_workdays(data['cashiers'], work_types_dict, start_date, worker_days, shop, shop_size)

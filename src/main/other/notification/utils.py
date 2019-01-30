@@ -2,7 +2,7 @@ from src.db.models import Notifications
 from django.utils.timezone import now
 from datetime import timedelta
 from src.db.models import (
-    CashboxType,
+    WorkType,
     Cashbox,
     User,
     Timetable,
@@ -57,8 +57,8 @@ def create_notification(action, instance):
         elif isinstance(instance, Cashbox):
             notification_text = 'На тип {} была добавлена касса с номером {}.'.format(instance.type.name,
                                                                                       instance.number)
-        elif isinstance(instance, CashboxType):
-            notification_text = 'Был добавлен тип касс {}.'.format(instance.name)
+        elif isinstance(instance, WorkType):
+            notification_text = 'Был добавлен тип работ {}.'.format(instance.name)
         elif isinstance(instance, Timetable):
             if instance.status == Timetable.Status.PROCESSING.value:
                 notification_text = 'Расписание на ' + get_month_name(instance.dt) + ' начало составляться.'
@@ -90,8 +90,8 @@ def create_notification(action, instance):
             notification_text = 'Пользователь {} {} был удален.'.format(instance.first_name, instance.last_name)
         elif isinstance(instance, Cashbox) and instance.dttm_deleted:
             notification_text = 'Касса с номером {} была удалена с типа {}.'.format(instance.number, instance.type.name)
-        elif isinstance(instance, CashboxType) and instance.dttm_deleted:
-            notification_text = 'Тип касс {} был удален.'.format(instance.name)
+        elif isinstance(instance, WorkType) and instance.dttm_deleted:
+            notification_text = 'Тип работ {} был удален.'.format(instance.name)
         elif isinstance(instance, Timetable):
             notification_text = 'Расписание на ' + get_month_name(instance.dt) + ' было успешно удалено.'
 

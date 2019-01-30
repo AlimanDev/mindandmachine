@@ -35,7 +35,7 @@ class SetSlot(forms.Form):
 
 
 class CreateSlotForm(forms.Form):
-    cashbox_type_id = forms.IntegerField()
+    work_type_id = forms.IntegerField()
     tm_start = util_forms.TimeField()
     tm_end = util_forms.TimeField()
 

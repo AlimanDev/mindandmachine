@@ -8,7 +8,7 @@ from src.util.models_converter import UserConverter, WorkerDayConverter, BaseCon
 
 
 class SelectCashiersForm(forms.Form):
-    cashbox_types = util_forms.IntegersList()
+    work_types = util_forms.IntegersList()
     cashier_ids = util_forms.IntegersList()
     work_types = forms.CharField(required=False)
     workday_type = forms.CharField(required=False)

@@ -8,7 +8,7 @@ from src.db.models import (
     WorkerDayCashboxDetails,
     WorkerCashboxInfo,
     WorkerDay,
-    CashboxType,
+    WorkType,
     Shop,
     User
 )
@@ -34,7 +34,7 @@ def get_cashboxes_info(request, form):
 
     Returns:
         {
-            cashbox_type_id (int) :{
+            work_type_id (int) :{
                 'cashbox' : {
                     [
                         {
@@ -53,7 +53,7 @@ def get_cashboxes_info(request, form):
                     | для экспресс касс -- 3,
                     | для остальных -- 100 (по дефолту)
                 | 'with_queue': True/False,
-                | 'name': имя cashbox_type_id
+                | 'name': имя work_type_id
             }
         }
     """
@@ -150,11 +150,11 @@ def get_cashiers_info(request, form):
                 | 'cashbox_dttm_deleted': время, когда была удалена касса (либо null),
                 | 'cashbox_id': id кассы за которой сидит сотрудник, либо null (если сотрудник на перерыве, например),
                 | 'cashbox_number': номер кассы, либо null,
-                | 'cashbox_type': id типа касы за которой сегодня сотрудник работает,
-                'cashbox_types': [
+                | 'work_type': id типа касы за которой сегодня сотрудник работает,
+                'work_types': [
                     {
                         | 'bills_amount': количество чеков,
-                        | 'cashbox_type: id типа кассы,
+                        | 'work_type: id типа кассы,
                         | 'id': id объекта WorkerCashboxInfo,
                         | 'mean_speed': средняя скорость,
                         | 'period': ,
@@ -256,7 +256,7 @@ def get_cashiers_info(request, form):
         cashbox_dttm_added = None
         cashbox_dttm_deleted = None
         cashbox_number = None
-        cashbox_type = item.cashbox_type_id
+        work_type = item.work_type_id
 
         if item.on_cashbox_id:
             cashbox_dttm_added = str(item.on_cashbox.dttm_added)
@@ -276,16 +276,16 @@ def get_cashiers_info(request, form):
                 "cashbox_id": item.on_cashbox_id,
                 "cashbox_dttm_added": cashbox_dttm_added,
                 "cashbox_dttm_deleted": cashbox_dttm_deleted,
-                "cashbox_type": cashbox_type,
+                "work_type": work_type,
                 "cashbox_number": cashbox_number,
             }
 
         else:
             tm_work_end = item.dttm_to if item.status == WorkerDayCashboxDetails.TYPE_FINISH else item.worker_day.dttm_work_end
             if not item.on_cashbox_id is None:
-                cashbox_type = item.cashbox_type_id
+                work_type = item.work_type_id
             else:
-                cashbox_type = response[item.worker_day.worker_id]["cashbox_type"]
+                work_type = response[item.worker_day.worker_id]["work_type"]
 
             response[item.worker_day.worker_id].update({
                 "status": item.status,
@@ -295,16 +295,16 @@ def get_cashiers_info(request, form):
                 "time_without_rest": time_without_rest[item.worker_day.worker_id],
                 "default_break_triplets": str(default_break_triplets),
                 "tm_work_end": str(tm_work_end.time()),
-                "cashbox_type": cashbox_type,
+                "work_type": work_type,
             })
 
     user_ids = response.keys()
-    worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('cashbox_type').filter(worker_id__in=user_ids, is_active=True)
+    worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('work_type').filter(worker_id__in=user_ids, is_active=True)
     worker_cashboxes_types = group_by(list(worker_cashboxes_types), group_key=lambda _: _.worker_id,)
 
     for user_id in response.keys():
         if user_id in worker_cashboxes_types.keys():
-            response[user_id]['cashbox_types'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashboxes_types.get(user_id)]
+            response[user_id]['work_types'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashboxes_types.get(user_id)]
 
     return JsonResponse.success(response)
 
@@ -361,7 +361,7 @@ def change_cashier_status(request, form):
     # )
 
     cashbox_id = cashbox_id if new_user_status == WorkerDayCashboxDetails.TYPE_WORK else None
-    cashbox_type = None if cashbox_id is None else CashboxType.objects.get(cashbox__id=cashbox_id)
+    work_type = None if cashbox_id is None else WorkType.objects.get(cashbox__id=cashbox_id)
     wdcd = None
 
     workerday_detail_obj = WorkerDayCashboxDetails.objects.qos_current_version().filter(
@@ -428,7 +428,7 @@ def change_cashier_status(request, form):
         wdcd = WorkerDayCashboxDetails.objects.create(
             worker_day=worker_day,
             on_cashbox_id=cashbox_id,
-            cashbox_type=cashbox_type,
+            work_type=work_type,
             dttm_from=dttm_now,
             status=new_user_status,
             is_tablet=True,

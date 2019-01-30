@@ -10,7 +10,7 @@ from src.db.models import (
     ProductionDay,
     WorkerCashboxInfo,
     WorkerConstraint,
-    CashboxType,
+    WorkType,
     WorkerDayCashboxDetails,
     WorkerPosition,
     Shop,
@@ -28,7 +28,7 @@ from src.util.models_converter import (
     WorkerDayConverter,
     WorkerConstraintConverter,
     WorkerCashboxInfoConverter,
-    CashboxTypeConverter,
+    WorkTypeConverter,
     BaseConverter,
     WorkerDayChangeLogConverter,
 )
@@ -211,9 +211,7 @@ def get_cashier_timetable(request, form):
                         | 'type': тип worker_day'a,
                         | 'dttm_work_start': дата-время начала работы,
                         | 'dttm_work_end': дата-время конца рабочего дня,
-                        | 'tm_break_start': время начала перерыва,
-                        | 'is_manual_tuning': True/False,
-                        | 'cashbox_types': [список id'шников типов касс, на которых сотрудник работает в этот день],
+                        | 'work_types': [список id'шников типов касс, на которых сотрудник работает в этот день],
                     },\n
                     | 'change_requests': [список change_request'ов],
                 }
@@ -246,17 +244,15 @@ def get_cashier_timetable(request, form):
             'worker_id',
             'dttm_work_start',
             'dttm_work_end',
-            'tm_break_start',
-            'is_manual_tuning',
-            'cashbox_types__id',
+            'work_types__id',
         )
 
         worker_days = []
         worker_days_mask = {}
         for wd in worker_days_db:
-            if (wd['id'] in worker_days_mask) and wd['cashbox_types__id']:
+            if (wd['id'] in worker_days_mask) and wd['work_types__id']:
                 ind = worker_days_mask[wd['id']]
-                worker_days[ind].cashbox_types_ids.append(wd['cashbox_types__id'])
+                worker_days[ind].work_types_ids.append(wd['work_types__id'])
             else:
                 worker_days_mask[wd['id']] = len(worker_days)
                 wd_m = WorkerDay(
@@ -267,10 +263,8 @@ def get_cashier_timetable(request, form):
                     worker_id=wd['worker_id'],
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
-                    tm_break_start=wd['tm_break_start'] if wd['tm_break_start'] else None,
-                    is_manual_tuning=wd['is_manual_tuning'],
                 )
-                wd_m.cashbox_types_ids = [wd['cashbox_types__id']] if wd['cashbox_types__id'] else []
+                wd_m.work_types_ids = [wd['work_types__id']] if wd['work_types__id'] else []
                 worker_days.append(
                     wd_m
                 )
@@ -352,7 +346,7 @@ def get_cashier_info(request, form):
         method: GET
         url: /api/timetable/cashier/get_cashier_info
         worker_id(int): required = True
-        info(str): general_info/cashbox_type_info/constraints_info/work_hours
+        info(str): general_info/work_type_info/constraints_info/work_hours
 
     Returns:
         {
@@ -391,8 +385,8 @@ def get_cashier_info(request, form):
                     | 'tm': время когда сотрудник не может работать
                 }
             ],
-            'cashbox_type_info': {
-                | 'cashbox_type': [список типов касс в магазине],
+            'work_type_info': {
+                | 'work_type': [список типов касс в магазине],
                 | 'worker_cashbox_info': [список касс за которыми может работать сотрудник]
             }
 
@@ -409,12 +403,12 @@ def get_cashier_info(request, form):
     if 'general_info' in form['info']:
         response['general_info'] = UserConverter.convert(worker)
 
-    if 'cashbox_type_info' in form['info']:
+    if 'work_type_info' in form['info']:
         worker_cashbox_info = WorkerCashboxInfo.objects.filter(worker_id=worker.id, is_active=True)
-        cashbox_types = CashboxType.objects.filter(shop_id=worker.shop_id)
-        response['cashbox_type_info'] = {
+        work_types = WorkType.objects.filter(shop_id=worker.shop_id)
+        response['work_type_info'] = {
             'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info],
-            'cashbox_type': {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types}
+            'work_type': {x.id: WorkTypeConverter.convert(x) for x in work_types}
         }
 
     if 'constraints_info' in form['info']:
@@ -485,15 +479,14 @@ def get_worker_day(request, form):
                 {
                     | 'tm_to': до какого времени объект WorkerDayCashboxDetails,
                     | 'tm_from': от какого времени,
-                    | 'cashbox_type': id типа кассы за которым работает сотрудник (либо null)
+                    | 'work_type': id типа кассы за которым работает сотрудник (либо null)
                 }
             ],\n
-            'cashbox_types': [
-                cashbox_type_id: {
+            'work_types': [
+                work_type_id: {
                     | 'id': id типа кассы
                     | 'dttm_added': дата добавления кассы,
                     | 'dttm_deleted': дата удаления,
-                    | 'is_stable': True/False
                     | 'speed_coef': int,
                     | 'shop':	id магазина,
                     | 'name': имя типа
@@ -503,12 +496,10 @@ def get_worker_day(request, form):
                 | 'id': id worker_day'a,
                 | 'tm_work_end': ,
                 | 'worker': id worker'a,
-                | 'cashbox_types': [],
+                | 'work_types': [],
                 | 'type': тип worker_day'a,
                 | 'dttm_work_start': ,
                 | 'dttm_work_end': ,
-                | 'is_manual_tuning': True/False,
-                | 'tm_break_start': время начала перерыва,
                 | 'dttm_added': ,
                 | 'dt': дата создания worker_day'a
             },\n
@@ -564,20 +555,20 @@ def get_worker_day(request, form):
     details = []
     cashboxes_types = {}
     for x in WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint). \
-            select_related('on_cashbox', 'cashbox_type'). \
+            select_related('on_cashbox', 'work_type'). \
             filter(worker_day=wd):
         details.append({
             'dttm_from': BaseConverter.convert_time(x.dttm_from.time()) if x.dttm_to else None,
             'dttm_to': BaseConverter.convert_time(x.dttm_to.time()) if x.dttm_to else None,
-            'cashbox_type': x.cashbox_type_id,
+            'work_type': x.work_type_id,
         })
-        cashboxes_types[x.cashbox_type_id] = CashboxTypeConverter.convert(x.cashbox_type)
+        cashboxes_types[x.work_type_id] = WorkTypeConverter.convert(x.work_type)
 
     return JsonResponse.success({
         'day': WorkerDayConverter.convert(wd),
         'work_hours': work_hours,
         'details': details,
-        'cashbox_types': cashboxes_types
+        'work_types': cashboxes_types
     })
 
 
@@ -598,8 +589,7 @@ def set_worker_day(request, form):
         type(str): required = True. новый тип рабочего дня
         dttm_work_start(QOS_TIME): новое время начала рабочего дня
         dttm_work_end(QOS_TIME): новое время конца рабочего дня
-        tm_break_start(QOS_TIME): required = False
-        cashbox_type(int): required = False. на какой специализации он будет работать
+        work_type(int): required = False. на какой специализации он будет работать
         comment(str): max_length=128, required = False
         details(srt): детали рабочего дня (заносятся в WorkerDayCashboxDetails)
 
@@ -613,9 +603,7 @@ def set_worker_day(request, form):
                 | 'type': тип,
                 | 'dttm_work_start': время начала рабочего дня,
                 | 'dttm_work_end': время конца рабочего дня,
-                | 'tm_break_start': начало перерыва,
-                | 'is_manual_tuning': True,
-                | 'cashbox_types'(list): специализации (id'шники типов касс)
+                | 'work_types'(list): специализации (id'шники типов касс)
             },\n
             'action': 'update'/'create',\n
             'cashbox_updated': True/False
@@ -649,13 +637,11 @@ def set_worker_day(request, form):
         wd_args.update({
             'dttm_work_start': dttm_work_start,
             'dttm_work_end': dttm_work_end,
-            'tm_break_start': form['tm_break_start']
         })
     else:
         wd_args.update({
             'dttm_work_start': None,
             'dttm_work_end': None,
-            'tm_break_start': None
         })
 
     try:
@@ -687,7 +673,6 @@ def set_worker_day(request, form):
         new_worker_day = WorkerDay.objects.create(
             worker_id=worker.id,
             parent_worker_day=old_wd,
-            is_manual_tuning=True,
             created_by=request.user,
             **wd_args
         )
@@ -698,16 +683,16 @@ def set_worker_day(request, form):
                     dttm_to = BaseConverter.parse_time(item['dttm_to'])
                     dttm_from = BaseConverter.parse_time(item['dttm_from'])
                     WorkerDayCashboxDetails.objects.create(
-                        cashbox_type_id=item['cashBox_type'],
+                        work_type_id=item['cashBox_type'],
                         worker_day=new_worker_day,
                         dttm_from=datetime.combine(dt, dttm_from),
                         dttm_to=datetime.combine(dt, dttm_to) if dttm_to > dttm_from\
                             else datetime.combine(dt + timedelta(days=1), dttm_to)
                     )
             else:
-                cashbox_type_id = form.get('cashbox_type')
+                work_type_id = form.get('work_type')
                 WorkerDayCashboxDetails.objects.create(
-                    cashbox_type_id=cashbox_type_id,
+                    work_type_id=work_type_id,
                     worker_day=new_worker_day,
                     dttm_from=new_worker_day.dttm_work_start,
                     dttm_to=new_worker_day.dttm_work_end
@@ -923,30 +908,29 @@ def set_cashier_info(request, form, is_lite=False):
     worker.save()
 
     if form.get('cashbox_info'):
-        cashbox_types = {
-            x.id: x for x in CashboxType.objects.filter(
-            shop_id=worker.shop_id
-        )
+        work_types = {
+            x.id: x for x in WorkType.objects.filter(shop_id=worker.shop_id)
         }
 
         new_active_cashboxes = []
         for obj in form['cashbox_info']:
-            cb = cashbox_types.get(obj.get('cashbox_type_id'))
+            cb = work_types.get(obj.get('work_type_id'))
             if cb is not None:
                 new_active_cashboxes.append((cb, obj.get('priority')))
 
         worker_cashbox_info = []
         WorkerCashboxInfo.objects.filter(worker_id=worker.id).update(is_active=False)
         for cashbox, priority in new_active_cashboxes:
-            cashboxtype_forecast = CashboxType.objects.get(id=cashbox.id)
-            mean_speed = 1
-            if cashboxtype_forecast.do_forecast == CashboxType.FORECAST_HARD:
-                mean_speed = WorkerCashboxInfo.objects.filter(
-                    cashbox_type__id=cashbox.id
-                ).aggregate(Avg('mean_speed'))['mean_speed__avg']
+            # worktype_forecast = WorkType.objects.get(id=cashbox.id)
+            # mean_speed = 1
+            # if worktype_forecast.do_forecast == WorkType.FORECAST_HARD:
+            mean_speed = WorkerCashboxInfo.objects.filter(
+                work_type__id=cashbox.id
+            ).aggregate(Avg('mean_speed'))['mean_speed__avg']
+
             obj, created = WorkerCashboxInfo.objects.update_or_create(
                 worker_id=worker.id,
-                cashbox_type_id=cashbox.id,
+                work_type_id=cashbox.id,
                 defaults={
                     'is_active': True,
                 },
@@ -960,8 +944,8 @@ def set_cashier_info(request, form, is_lite=False):
                 obj.save()
             worker_cashbox_info.append(obj)
 
-        response['cashbox_type'] = {x.id: CashboxTypeConverter.convert(x) for x in cashbox_types.values()}
-        response['cashbox_type_info'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info]
+        response['work_type'] = {x.id: WorkTypeConverter.convert(x) for x in work_types.values()}
+        response['work_type_info'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info]
 
     if form.get('constraint'):
         constraints = []
@@ -1005,19 +989,6 @@ def set_cashier_info(request, form, is_lite=False):
     if form.get('tabel_code'):
         worker.tabel_code = form['tabel_code']
         response['tabel_code'] = worker.tabel_code
-
-    if form.get('position_title') \
-            and form.get('position_department'):
-        department = Shop.objects.get(id=form['position_department'])
-        position, created = WorkerPosition.objects.get_or_create(
-            title=form['position_title'],
-            department=department,
-        )
-        worker.position = position
-        response['position'] = {
-            'title': form['position_title'],
-            'department': form['position_department'],
-        }
 
     worker.save()
 
@@ -1138,7 +1109,6 @@ def dublicate_cashier_table(request, form):
                 type=blank_day.type,
                 dttm_work_start=blank_day.dttm_work_start,
                 dttm_work_end=blank_day.dttm_work_end,
-                tm_break_start=blank_day.tm_break_start
             )
             wds_list_to_create.append(new_wd)
             new_wdcds = main_worker_days_details.filter(worker_day=new_wd).order_by('id').first()
@@ -1147,7 +1117,7 @@ def dublicate_cashier_table(request, form):
                     WorkerDayCashboxDetails(
                         worker_day=new_wd,
                         on_cashbox=new_wdcds.on_cashbox,
-                        cashbox_type=new_wdcds.cashbox_type,
+                        work_type=new_wdcds.work_type,
                         dttm_from=new_wdcds.dttm_from,
                         dttm_to=new_wdcds.dttm_to
                     )

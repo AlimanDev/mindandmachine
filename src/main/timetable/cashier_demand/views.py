@@ -26,14 +26,14 @@ import io
 def get_cashiers_timetable(request, form):
     """
     Отображает информацию о расписании кассиров с from_dt до to_dt на типах касс с id'шинками \
-    cashbox_types_ids
+    work_types_ids
 
     Args:
         method: GET
         url: /api/timetable/cashier_demand/get_cashiers_timetable
         from_dt(QOS_DATE): required = True
         to_dt(QOS_DATE): required = True
-        cashbox_type_ids(list): required = True (либо [] -- если для всех типов касс)
+        work_type_ids(list): required = True (либо [] -- если для всех типов касс)
         format(str): 'raw' или 'excel'. default = 'raw'
         position_id(int): required = False
         shop_id(int): required = False
@@ -56,7 +56,7 @@ def get_cashiers_timetable(request, form):
                 'real_cashiers': [сколько сидит кассиров в период]
             },\n
             'lack_of_cashiers_on_period': {
-                cashbox_type_id(int): [
+                work_type_id(int): [
                     {
                         | 'dttm_start'(QOS_DATETIME): ,
                         | 'lack_of_cashiers'(float): ,
@@ -107,7 +107,7 @@ def get_workers(request, form):
         url: /api/timetable/cashier_demand/get_workers
         from_dttm(QOS_DATETIME): required = True
         to_dttm(QOS_DATETIME): required = True
-        cashbox_type_ids(list): required = True ([] -- если для всех)
+        work_type_ids(list): required = True ([] -- если для всех)
         shop_id(int): required = True
         checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
@@ -137,9 +137,9 @@ def get_workers(request, form):
         ]
     )
 
-    cashbox_type_ids = form['cashbox_type_ids']
-    if len(cashbox_type_ids) > 0:
-        worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.cashbox_type_id in cashbox_type_ids]
+    work_type_ids = form['work_type_ids']
+    if len(work_type_ids) > 0:
+        worker_day_cashbox_detail = [x for x in worker_day_cashbox_detail if x.work_type_id in work_type_ids]
 
     for x in worker_day_cashbox_detail:
         response[x.worker_day.worker_id] = {
@@ -147,7 +147,7 @@ def get_workers(request, form):
             'from_dttm': BaseConverter.convert_datetime(x.dttm_from),
             'to_dttm': BaseConverter.convert_datetime(x.dttm_to),
             'on_cashbox': x.on_cashbox_id,
-            'cashbox_type': x.cashbox_type_id,
+            'work_type': x.work_type_id,
             'status': x.status,
             'user_info': UserConverter.convert(x.worker_day.worker)
         }
@@ -165,7 +165,7 @@ def get_timetable_xlsx(request, form):
         url: /api/timetable/cashier_demand/get_timetable_xlsx
         from_dt(QOS_DATE): required = True
         to_dt(QOS_DATE): required = True
-        cashbox_type_ids(list): required = True (либо [] -- если для всех типов касс)
+        work_type_ids(list): required = True (либо [] -- если для всех типов касс)
         format(str): 'raw' или 'excel'. default = 'raw'
         position_id(int): required = False
         shop_id(int): required = False
@@ -204,14 +204,14 @@ def get_timetable_xlsx(request, form):
             worksheet.write_string(row, col + 3 * int(wd.dt.day) - 3, cell_1)
             worksheet.write_string(row, col + 3 * int(wd.dt.day) - 2, cell_2)
 
-        for wd in WorkerDayCashboxDetails.objects.select_related('cashbox_type', 'worker_day').filter(
+        for wd in WorkerDayCashboxDetails.objects.select_related('work_type', 'worker_day').filter(
                 worker_day__worker=user,
                 worker_day__dt__gte=dt_from,
                 worker_day__dt__lte=dt_to
         ).order_by('worker_day__dt'):
             cell_1 = wd.worker_day.dttm_work_start.strftime(QOS_DATETIME_FORMAT)
             cell_2 = wd.worker_day.dttm_work_end.strftime(QOS_DATETIME_FORMAT)
-            cell_3 = wd.cashbox_type.name
+            cell_3 = wd.work_type.name
 
             worksheet.write_string(row, col + 3 * int(wd.worker_day.dt.day) - 3, cell_1)
             worksheet.write_string(row, col + 3 * int(wd.worker_day.dt.day) - 2, cell_2)

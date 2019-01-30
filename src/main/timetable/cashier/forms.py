@@ -75,7 +75,7 @@ class DublicateCashierTimetableForm(forms.Form):
 
 class GetCashierInfoForm(forms.Form):
     worker_id = forms.IntegerField()
-    info = util_forms.MultipleChoiceField(['general_info', 'cashbox_type_info', 'constraints_info', 'work_hours'])
+    info = util_forms.MultipleChoiceField(['general_info', 'work_type_info', 'constraints_info', 'work_hours'])
 
 
 class GetWorkerDayForm(forms.Form):
@@ -93,7 +93,7 @@ class SetWorkerDaysForm(forms.Form):
     dttm_work_end = util_forms.TimeField(required=False)
     checkpoint = forms.IntegerField(required=False)
 
-    cashbox_type = forms.IntegerField(required=False)
+    work_type = forms.IntegerField(required=False)
     comment = forms.CharField(max_length=128, required=False)
 
     def clean_worker_id(self):
@@ -127,10 +127,9 @@ class SetWorkerDayForm(forms.Form):
     type = forms.CharField()
     tm_work_start = util_forms.TimeField(required=False)
     tm_work_end = util_forms.TimeField(required=False)
-    tm_break_start = util_forms.TimeField(required=False)
     wish_text = forms.CharField(required=False, max_length=512)
 
-    cashbox_type = forms.IntegerField(required=False)
+    work_type = forms.IntegerField(required=False)
     comment = forms.CharField(max_length=128, required=False)
     details = forms.CharField(required=False)
 

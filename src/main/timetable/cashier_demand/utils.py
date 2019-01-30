@@ -4,7 +4,7 @@ from django.db.models import Q, F
 from src.db.models import (
     WorkerDay,
     User,
-    CashboxType,
+    WorkType,
     WorkerCashboxInfo,
     WorkerDayCashboxDetails,
     PeriodClients,
@@ -71,7 +71,7 @@ def check_time_is_between_boarders(tm, borders):
     return False
 
 
-def count_diff(dttm, period_clients, demand_ind, mean_bills_per_step, cashbox_types):
+def count_diff(dttm, period_clients, demand_ind, mean_bills_per_step, work_types):
     """
     Функция, которая считает нехватку
 
@@ -80,7 +80,7 @@ def count_diff(dttm, period_clients, demand_ind, mean_bills_per_step, cashbox_ty
         period_demands(PeriodDemand QuerySet): список PeriodDemand'ов
         demand_ind(int): индекс
         mean_bills_per_step:
-        cashbox_types(dict): словарь типов касс. по ключу -- id типа, по значению -- объект
+        work_types(dict): словарь типов касс. по ключу -- id типа, по значению -- объект
         PERIOD_MINUTES(int):
 
     Returns:
@@ -93,9 +93,9 @@ def count_diff(dttm, period_clients, demand_ind, mean_bills_per_step, cashbox_ty
     # period_demand is sorted by dttm_forecast, so find the dttm
     # mean_bills_per_step = WorkerCashboxInfo.objects.filter(
     #     is_active=True,
-    #     cashbox_type_id__in=cashbox_types.keys()
-    # ).values('cashbox_type_id').annotate(speed_usual=Max('mean_speed'))
-    # mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
+    #     work_type_id__in=work_types.keys()
+    # ).values('work_type_id').annotate(speed_usual=Max('mean_speed'))
+    # mean_bills_per_step = {m['work_type_id']: m['speed_usual'] for m in mean_bills_per_step}
     # edge_ind = 0
     # while (edge_ind < len(period_demand)) and (period_demand[edge_ind].type != PeriodDemand.Type.FACT.value):
     #     edge_ind += 1
@@ -108,11 +108,11 @@ def count_diff(dttm, period_clients, demand_ind, mean_bills_per_step, cashbox_ty
         demand_ind += 1
 
     if demand_ind < dem_len:
-        for ind_shift in range(len(cashbox_types)):
+        for ind_shift in range(len(work_types)):
             ind = demand_ind + ind_shift
             if (ind < dem_len) and (period_clients[ind].dttm_forecast == dttm):
-                ct_id = period_clients[ind].cashbox_type_id
-                if ct_id in cashbox_types.keys():
+                ct_id = period_clients[ind].operation_type.work_type_id
+                if ct_id in work_types.keys():
                     need_amount_dict[ct_id] = period_clients[ind].value / mean_bills_per_step[ct_id]
 
     return need_amount_dict, demand_ind
@@ -150,20 +150,20 @@ def get_worker_timetable2(shop_id, form):
     finite_work = np.zeros(len(dttms))
 
     # check cashboxes
-    cashbox_types = CashboxType.objects.filter(shop_id=shop_id).order_by('id')
-    if len(form['cashbox_type_ids']) > 0:
-        cashbox_types = cashbox_types.filter(id__in=form['cashbox_type_ids'])
-        if len(cashbox_types) != len(form['cashbox_type_ids']):
-            return 'bad cashbox_type_ids'
-    cashbox_types = group_by(cashbox_types, group_key=lambda x: x.id)
+    work_types = WorkType.objects.filter(shop_id=shop_id).order_by('id')
+    if len(form['work_type_ids']) > 0:
+        work_types = work_types.filter(id__in=form['work_type_ids'])
+        if len(work_types) != len(form['work_type_ids']):
+            return 'bad work_type_ids'
+    work_types = group_by(work_types, group_key=lambda x: x.id)
 
     # query selecting PeriodClients
     need_workers = PeriodClients.objects.annotate(
-        need_workers=F('value') * F('cashbox_type__speed_coef') / period_lengths_minutes,
+        need_workers=F('value') * F('operation_type__speed_coef') / period_lengths_minutes,
     ).filter(
         dttm_forecast__gte=form['from_dt'],
         dttm_forecast__lte=form['to_dt'] + datetime.timedelta(days=1),
-        cashbox_type_id__in=cashbox_types.keys()
+        operation_type__work_type_id__in=work_types.keys()
     )
 
     lambda_index_periodclients = lambda x: [dttm2index(from_dt, x.dttm_forecast, period_in_day, period_lengths_minutes)]
@@ -189,7 +189,7 @@ def get_worker_timetable2(shop_id, form):
         Q(worker_day__worker__dt_hired__lt=form['from_dt']) | Q(worker_day__worker__dt_fired__isnull=True),
         worker_day__dt__gte=from_dt,
         worker_day__dt__lte=to_dt,
-        cashbox_type_id__in=cashbox_types.keys(),
+        work_type_id__in=work_types.keys(),
         dttm_to__isnull=False,
     ).exclude(
         status=WorkerDayCashboxDetails.TYPE_BREAK
@@ -268,45 +268,45 @@ def get_worker_timetable2(shop_id, form):
 #     TOTAL_PERIOD_SECONDS = PERIOD_STEP.total_seconds()
 #
 #     # get data from db
-#     cashbox_types = CashboxType.objects.filter(shop_id=shop_id).order_by('id')
-#     if len(form['cashbox_type_ids']) > 0:
-#         cashbox_types = cashbox_types.filter(id__in=form['cashbox_type_ids'])
-#         if len(cashbox_types) != len(form['cashbox_type_ids']):
-#             return 'bad cashbox_type_ids'  # todo: aa:fix bad code - raise standart error bad idea(could new error_type)
-#     cashbox_types = group_by(cashbox_types, group_key=lambda x: x.id)
+#     work_types = WorkType.objects.filter(shop_id=shop_id).order_by('id')
+#     if len(form['work_type_ids']) > 0:
+#         work_types = work_types.filter(id__in=form['work_type_ids'])
+#         if len(work_types) != len(form['work_type_ids']):
+#             return 'bad work_type_ids'  # todo: aa:fix bad code - raise standart error bad idea(could new error_type)
+#     work_types = group_by(work_types, group_key=lambda x: x.id)
 #
-#     if len(form['cashbox_type_ids']) == 0:
-#         cashbox_types_hard = CashboxType.objects.filter(shop_id=shop_id, is_main_type=True)
-#         if not cashbox_types_hard:
-#             cashbox_types_hard = CashboxType.objects.filter(
+#     if len(form['work_type_ids']) == 0:
+#         work_types_hard = WorkType.objects.filter(shop_id=shop_id, is_main_type=True)
+#         if not work_types_hard:
+#             work_types_hard = WorkType.objects.filter(
 #                 shop_id=shop_id,
-#                 do_forecast=CashboxType.FORECAST_HARD
+#                 do_forecast=WorkType.FORECAST_HARD
 #             )[:1]
 #     else:
-#         cashbox_types_hard = CashboxType.objects.filter(
+#         work_types_hard = WorkType.objects.filter(
 #             shop_id=shop_id,
-#             id__in=form['cashbox_type_ids'],
-#             do_forecast=CashboxType.FORECAST_HARD
+#             id__in=form['work_type_ids'],
+#             do_forecast=WorkType.FORECAST_HARD
 #         )
-#     # cashbox_types_hard = []
-#     # for cashbox_type in cashbox_types.values():
-#     #     if cashbox_type[0].do_forecast == CashboxType.FORECAST_HARD:
-#     #         cashbox_types_hard.append(cashbox_type[0])
-#     cashbox_types_hard = group_by(cashbox_types_hard, group_key=lambda x: x.id)
+#     # work_types_hard = []
+#     # for work_type in work_types.values():
+#     #     if work_type[0].do_forecast == WorkType.FORECAST_HARD:
+#     #         work_types_hard.append(work_type[0])
+#     work_types_hard = group_by(work_types_hard, group_key=lambda x: x.id)
 #
-#     cashbox_types_main = []
-#     for cashbox_type in cashbox_types.values():
-#         if cashbox_type[0].is_main_type:
-#             cashbox_types_main.append(cashbox_type[0])
-#     cashbox_types_main = group_by(cashbox_types_main, group_key=lambda x: x.id)
+#     work_types_main = []
+#     for work_type in work_types.values():
+#         if work_type[0].is_main_type:
+#             work_types_main.append(work_type[0])
+#     work_types_main = group_by(work_types_main, group_key=lambda x: x.id)
 #
-#     for ind in range(1, len(cashbox_types) - len(cashbox_types_main) + 1):
-#         cashbox_types_main[-ind] = None
+#     for ind in range(1, len(work_types) - len(work_types_main) + 1):
+#         work_types_main[-ind] = None
 #
 #     worker_day_cashbox_detail_filter = {
 #         'worker_day__dt__gte': form['from_dt'],
 #         'worker_day__dt__lte': form['to_dt'],
-#         'cashbox_type_id__in': cashbox_types.keys(),
+#         'work_type_id__in': work_types.keys(),
 #         'dttm_to__isnull': False,
 #     }
 #     if form['position_id']:
@@ -341,36 +341,36 @@ def get_worker_timetable2(shop_id, form):
 #         is_active=True,
 #         worker__workerday__dt__gte=form['from_dt'],
 #         worker__workerday__dt__lte=form['to_dt'],
-#         cashbox_type_id__in=cashbox_types.keys()
+#         work_type_id__in=work_types.keys()
 #     ).distinct())
 #
 #     # mean_bills_per_step = WorkerCashboxInfo.objects.filter(
 #     #     is_active=True,
-#     #     cashbox_type_id__in=cashbox_types.keys()
-#     # ).values('cashbox_type_id').annotate(speed_usual=Coalesce(Avg('mean_speed'), 1))
-#     # mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
+#     #     work_type_id__in=work_types.keys()
+#     # ).values('work_type_id').annotate(speed_usual=Coalesce(Avg('mean_speed'), 1))
+#     # mean_bills_per_step = {m['work_type_id']: m['speed_usual'] for m in mean_bills_per_step}
 #
-#     mean_bills_per_step = {m: PERIOD_MINUTES / cashbox_types[m][0].speed_coef for m in cashbox_types.keys()}
+#     mean_bills_per_step = {m: PERIOD_MINUTES / work_types[m][0].speed_coef for m in work_types.keys()}
 #
 #     worker_amount = len(set([w.worker_id for w in worker_cashbox_info]))
 #     worker_cashbox_info = group_by(
 #         worker_cashbox_info,
-#         group_key=lambda x: (x.worker_id, x.cashbox_type_id)
+#         group_key=lambda x: (x.worker_id, x.work_type_id)
 #     )
 #
 #     period_clients = PeriodClients.objects.filter(
-#         cashbox_type__shop_id=shop_id,
+#         work_type__shop_id=shop_id,
 #         dttm_forecast__gte=form['from_dt'],
 #         dttm_forecast__lte=form['to_dt'] + datetime.timedelta(days=1),
 #         type__in=[
 #             PeriodClients.LONG_FORECASE_TYPE,
 #             PeriodClients.FACT_TYPE,
 #         ],
-#         cashbox_type_id__in=cashbox_types.keys()
+#         work_type_id__in=work_types.keys()
 #     ).order_by(
 #         '-type',
 #         'dttm_forecast',
-#         'cashbox_type_id'
+#         'work_type_id'
 #     )
 #
 #     # supershop = SuperShop.objects.get(shop__id=shop_id)
@@ -381,8 +381,8 @@ def get_worker_timetable2(shop_id, form):
 #     predict_cashier_needs = []
 #     fact_cashier_needs = []
 #     lack_of_cashiers_on_period = {}
-#     for cashbox_type in cashbox_types:
-#         lack_of_cashiers_on_period[cashbox_type] = []
+#     for work_type in work_types:
+#         lack_of_cashiers_on_period[work_type] = []
 #     dttm_start = datetime.datetime.combine(form['from_dt'], datetime.time(3, 0))
 #     periods = 48
 #     # dttm_start = datetime.combine(form['from_dt'], supershop.tm_start) - PERIOD_STEP
@@ -436,8 +436,8 @@ def get_worker_timetable2(shop_id, form):
 #             #             cashier_working_now.append(cashier)
 #             # todo: неправильно учитывается время от 23:30
 #             # for cashier in cashier_working_now:
-#             #     if cashier.cashbox_type is not None:
-#             #         cashiers_on_cashbox_type[cashier.cashbox_type.id] += 1  # shift to first model, which has intersection
+#             #     if cashier.work_type is not None:
+#             #         cashiers_on_work_type[cashier.work_type.id] += 1  # shift to first model, which has intersection
 #             while (ind_b_current < wdcds_current_len) and (dttm_ind_current <= dttm) and wdcds_current[
 #                 ind_b_current].dttm_to:
 #                 dttm_ind_current = dttm_combine(wdcds_current[ind_b_current].worker_day.dt,
@@ -453,7 +453,7 @@ def get_worker_timetable2(shop_id, form):
 #
 #             ind_e_current = ind_b_current
 #             ind_e_initial = ind_b_initial
-#             period_bills = {i: 0 for i in cashbox_types.keys()}
+#             period_bills = {i: 0 for i in work_types.keys()}
 #             period_cashiers_current = 0.0
 #             period_cashiers_initial = 0.0
 #             period_cashiers_hard = 0.0
@@ -478,16 +478,16 @@ def get_worker_timetable2(shop_id, form):
 #                         TOTAL_PERIOD_SECONDS
 #                     ) / TOTAL_PERIOD_SECONDS
 #                     if wdcds_current[ind_e_current].worker_day.worker_id in worker_cashbox_info.keys():
-#                         period_bills[wdcds_current[ind_e_current].cashbox_type_id] += proportion * \
+#                         period_bills[wdcds_current[ind_e_current].work_type_id] += proportion * \
 #                                                                                       (PERIOD_MINUTES /
 #                                                                                        worker_cashbox_info[(
 #                                                                                        wdcds_current[
 #                                                                                            ind_e_current].worker_day.worker_id,
 #                                                                                        wdcds_current[
-#                                                                                            ind_e_current].cashbox_type_id)][
+#                                                                                            ind_e_current].work_type_id)][
 #                                                                                            0].mean_speed)
 #                     period_cashiers_current += 1 * proportion
-#                     if wdcds_current[ind_e_current].cashbox_type_id in cashbox_types_main.keys():
+#                     if wdcds_current[ind_e_current].work_type_id in work_types_main.keys():
 #                         period_cashiers_hard += 1 * proportion
 #
 #                 ind_e_current += 1
@@ -505,9 +505,9 @@ def get_worker_timetable2(shop_id, form):
 #                         TOTAL_PERIOD_SECONDS
 #                     ) / TOTAL_PERIOD_SECONDS
 #                     if wdcds_initial[ind_e_initial].worker_day.worker_id in worker_cashbox_info.keys():
-#                         period_bills[wdcds_initial[ind_e_initial].cashbox_type_id] += proportion * \
+#                         period_bills[wdcds_initial[ind_e_initial].work_type_id] += proportion * \
 #                             (PERIOD_MINUTES / worker_cashbox_info[(wdcds_initial[ind_e_initial].worker_day.worker_id,
-#                                                                    wdcds_initial[ind_e_initial].cashbox_type_id)][0].mean_speed)
+#                                                                    wdcds_initial[ind_e_initial].work_type_id)][0].mean_speed)
 #                     period_cashiers_initial += 1 * proportion
 #
 #                 ind_e_initial += 1
@@ -529,19 +529,19 @@ def get_worker_timetable2(shop_id, form):
 #             })
 #
 #             predict_diff_dict, demand_ind_2 = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step,
-#                                                          cashbox_types)
+#                                                          work_types)
 #             predict_cashier_needs.append({
 #                 'dttm': dttm_converted,
 #                 'amount': sum(predict_diff_dict.values()),
 #             })
 #
-#             real_diff_dict, fact_ind = count_diff(dttm, fact_demand, fact_ind, mean_bills_per_step, cashbox_types)
+#             real_diff_dict, fact_ind = count_diff(dttm, fact_demand, fact_ind, mean_bills_per_step, work_types)
 #             fact_cashier_needs.append({
 #                 'dttm': dttm_converted,
 #                 'amount': sum(real_diff_dict.values()),
 #             })
 #
-#             # predict_diff_hard_dict, _ = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types_main)
+#             # predict_diff_hard_dict, _ = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, work_types_main)
 #             difference_of_pred_real = period_cashiers_current - sum(predict_diff_dict.values())
 #             if difference_of_pred_real > 0:
 #                 idle_time_numerator += difference_of_pred_real
@@ -556,16 +556,16 @@ def get_worker_timetable2(shop_id, form):
 #             need_amount_evening = 0
 #             # need_total = 0
 #
-#             for cashbox_type in cashbox_types:
+#             for work_type in work_types:
 #                 check_time = check_time_is_between_boarders(dttm.time(), time_borders)
-#                 if cashbox_type in cashbox_types_main.keys():
+#                 if work_type in work_types_main.keys():
 #                     if check_time == 'morning':
-#                         need_amount_morning += predict_diff_dict.get(cashbox_type, 0)
+#                         need_amount_morning += predict_diff_dict.get(work_type, 0)
 #                     elif check_time == 'evening':
-#                         need_amount_evening += predict_diff_dict.get(cashbox_type, 0)
-#                 if cashbox_type in cashbox_types.keys():
-#                     # need_total += predict_diff_dict.get(cashbox_type, 0)
-#                     lack_of_cashiers_on_period[cashbox_type].append({
+#                         need_amount_evening += predict_diff_dict.get(work_type, 0)
+#                 if work_type in work_types.keys():
+#                     # need_total += predict_diff_dict.get(work_type, 0)
+#                     lack_of_cashiers_on_period[work_type].append({
 #                         'lack_of_cashiers': max(0, sum(predict_diff_dict.values()) - period_cashiers_current),
 #                         'dttm_start': dttm_converted,
 #                     })
