@@ -11,6 +11,7 @@ class GetSlots(forms.Form):
 
 class GetAllSlots(forms.Form):
     shop_id = forms.IntegerField(required=True)
+    work_type_id = forms.IntegerField(required=False)
 
 
 class SetSlot(forms.Form):

@@ -1,4 +1,5 @@
 import datetime
+import json
 
 from src.db.models import (
     WorkType,
@@ -6,6 +7,7 @@ from src.db.models import (
     User,
     Shop,
     OperationType,
+    Slot,
     WorkerDayCashboxDetails,
 )
 from src.util.db import WorkTypeUtil
@@ -414,7 +416,72 @@ def delete_work_type(request, form):
     lambda_func=lambda x: WorkType.objects.get(id=x['work_type_id']).shop
 )
 def edit_work_type(request, form):
-    pass
+    work_type_id = form['work_type_id']
+    work_type = WorkType.objects.get(id=work_type_id)
+    shop_id = work_type.shop_id
+
+    worker_amount = form['workers_amount']
+    if worker_amount:
+        work_type.min_workers_amount = worker_amount[0]
+        work_type.max_workers_amount = worker_amount[1]
+
+    if form['new_title']:
+        work_type.name = form['new_title']
+
+    front_operations = json.loads(form['operation_types'])
+    existing_operation_types = {
+        x.id: x for x in OperationType.objects.filter(work_type=work_type, dttm_deleted__isnull=True)
+    }
+    if front_operations:
+        for oper_dict in front_operations:
+            if 'id' in oper_dict.keys() and oper_dict['id'] in existing_operation_types.keys():
+                ot = existing_operation_types[oper_dict['id']]
+                ot.name = oper_dict['name']
+                ot.speed_coef = oper_dict['speed_coef']
+                ot.do_forecast = oper_dict['do_forecast']
+                ot.save()
+                existing_operation_types.pop(oper_dict['id'])
+            else:
+                oper_dict.update({'work_type_id': work_type_id})
+                try:
+                    OperationType.objects.create(**oper_dict)
+                except Exception:
+                    return JsonResponse.internal_error('Error while creating new operation type')
+
+        for operation_type in existing_operation_types.values():  # удаляем старые операции
+            operation_type.dttm_deleted = datetime.datetime.now()
+            operation_type.save()
+
+    front_slots = json.loads(form['slots'])
+    existing_slots = {
+        x.id: x for x in Slot.objects.filter(work_type=work_type, dttm_deleted__isnull=True)
+    }
+    for slot_dict in front_slots:
+        if 'id' in slot_dict.keys() and slot_dict['id'] in existing_slots.keys():
+            existing_slot = existing_slots[slot_dict['id']]
+            existing_slot.name = slot_dict['name']
+            existing_slot.tm_start = slot_dict['tm_start']
+            existing_slot.tm_end = slot_dict['tm_end']
+            existing_slot.save()
+            existing_slots.pop(slot_dict['id'])
+        else:
+            slot_dict.update({
+                'work_type_id': work_type_id,
+                'shop_id': shop_id
+            })
+            try:
+                Slot.objects.create(**slot_dict)
+            except Exception:
+                return JsonResponse.internal_error('Error while creating new slot')
+
+    for slot in existing_slots.values():    # удаляем старые слоты (если с фронта пришел [], то соответственно там
+                                            # поставили произвольные, и удаляем все слоты
+        slot.dttm_deleted = datetime.datetime.now()
+        slot.save()
+
+    work_type.save()
+
+    return JsonResponse.success()
 
 
 @api_method('GET', CashboxesOpenTime)

@@ -196,7 +196,9 @@ class WorkTypeConverter(BaseConverter):
             'prior_weight': obj.prior_weight,
         }
         if convert_operations:
-            converted_dict['operation_types'] = [cls.convert_operation_type(x) for x in obj.work_type_reversed.all()]
+            converted_dict['operation_types'] = [
+                cls.convert_operation_type(x) for x in obj.work_type_reversed.filter(dttm_deleted__isnull=True)
+            ]
 
         return converted_dict
 

@@ -295,6 +295,8 @@ class WorkType(models.Model):
     dttm_last_update_queue = models.DateTimeField(null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     name = models.CharField(max_length=128)
+    min_workers_amount = models.IntegerField(default=10)
+    max_workers_amount = models.IntegerField(default=20)
 
     probability = models.FloatField(default=1.0)
     prior_weight = models.FloatField(default=1.0)
@@ -309,6 +311,9 @@ class WorkType(models.Model):
 class OperationType(models.Model):
     def __str__(self):
         return 'id: {}, name: {}, work type: {}'.format(self.id, self.name, self.work_type)
+
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    dttm_deleted = models.DateTimeField(blank=True, null=True)
 
     FORECAST_HARD = 'H'
     FORECAST_LITE = 'L'
@@ -351,18 +356,22 @@ class Slot(models.Model):
 
     def __str__(self):
         if self.work_type:
-            cbt_name = self.work_type.name
+            work_type_name = self.work_type.name
         else:
-            cbt_name = None
+            work_type_name = None
         return '{}, начало: {}, конец: {}, {}, {}, {}'.format(
-            cbt_name,
+            work_type_name,
             self.tm_start,
             self.tm_end,
             self.shop.title,
             self.shop.super_shop.title,
-            self.id)
+            self.id
+        )
 
     id = models.BigAutoField(primary_key=True)
+
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    dttm_deleted = models.DateTimeField(blank=True, null=True)
 
     tm_start = models.TimeField(default=datetime.time(hour=7))
     tm_end = models.TimeField(default=datetime.time(hour=23, minute=59, second=59))

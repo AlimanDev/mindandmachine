@@ -85,9 +85,8 @@ class BooleanField(forms.BooleanField):
 
 
 class RangeField(forms.CharField):
-    def __init__(self, required=False, **kwargs):
-        kwargs['required'] = required
-        super().__init__(**kwargs)
+    def __init__(self, required=False):
+        super().__init__(required=required)
 
     def clean(self, value, **kwargs):
         value = super().clean(value)

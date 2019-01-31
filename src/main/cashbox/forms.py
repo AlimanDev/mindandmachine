@@ -42,6 +42,10 @@ class DeleteWorkTypeForm(forms.Form):
 
 class EditWorkTypeForm(forms.Form):
     work_type_id = forms.IntegerField()
+    workers_amount = util_forms.RangeField(required=False)
+    new_title = forms.CharField(required=False, max_length=128)
+    operation_types = forms.CharField(max_length=8096)
+    slots = forms.CharField(max_length=8096)
 
 
 class CashboxesOpenTime(forms.Form):
