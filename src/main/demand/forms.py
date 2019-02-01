@@ -16,7 +16,7 @@ class GetIndicatorsForm(forms.Form):
 class GetForecastForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
-    work_type_ids = util_forms.IntegersList()
+    operation_type_ids = util_forms.IntegersList()
     format = util_forms.ChoiceField(choices=['raw', 'excel'], default='raw')
     shop_id = forms.IntegerField(required=False)
 

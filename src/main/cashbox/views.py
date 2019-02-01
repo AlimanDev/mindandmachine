@@ -433,20 +433,29 @@ def edit_work_type(request, form):
         x.id: x for x in OperationType.objects.filter(work_type=work_type, dttm_deleted__isnull=True)
     }
     if front_operations:
-        for oper_dict in front_operations:
-            if 'id' in oper_dict.keys() and oper_dict['id'] in existing_operation_types.keys():
-                ot = existing_operation_types[oper_dict['id']]
-                ot.name = oper_dict['name']
-                ot.speed_coef = oper_dict['speed_coef']
-                ot.do_forecast = oper_dict['do_forecast']
-                ot.save()
-                existing_operation_types.pop(oper_dict['id'])
-            else:
-                oper_dict.update({'work_type_id': work_type_id})
-                try:
-                    OperationType.objects.create(**oper_dict)
-                except Exception:
-                    return JsonResponse.internal_error('Error while creating new operation type')
+        if len(front_operations) == 1 and len(existing_operation_types.keys()) == 1:  # была 1 , стала 1 => та же самая
+            operation_type = list(existing_operation_types.values())[0]
+            operation_type.name = front_operations[0]['name']
+            operation_type.speed_coef = front_operations[0]['speed_coef']
+            operation_type.do_forecast = front_operations[0]['do_forecast']
+            operation_type.save()
+            existing_operation_types = dict()
+
+        else:
+            for oper_dict in front_operations:
+                if 'id' in oper_dict.keys() and oper_dict['id'] in existing_operation_types.keys():
+                    ot = existing_operation_types[oper_dict['id']]
+                    ot.name = oper_dict['name']
+                    ot.speed_coef = oper_dict['speed_coef']
+                    ot.do_forecast = oper_dict['do_forecast']
+                    ot.save()
+                    existing_operation_types.pop(oper_dict['id'])
+                else:
+                    oper_dict.update({'work_type_id': work_type_id})
+                    try:
+                        OperationType.objects.create(**oper_dict)
+                    except Exception:
+                        return JsonResponse.internal_error('Error while creating new operation type')
 
         for operation_type in existing_operation_types.values():  # удаляем старые операции
             operation_type.dttm_deleted = datetime.datetime.now()

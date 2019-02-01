@@ -131,6 +131,7 @@ def get_worker_timetable2(shop_id, form):
     shop = Shop.objects.get(id=shop_id)
     period_lengths_minutes = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
     period_in_day = MINUTES_IN_DAY // period_lengths_minutes
+    absenteeism_coef = shop.absenteeism / 100
 
     from_dt = form['from_dt']
     to_dt = form['to_dt']
@@ -160,10 +161,11 @@ def get_worker_timetable2(shop_id, form):
     # query selecting PeriodClients
     need_workers = PeriodClients.objects.annotate(
         need_workers=F('value') * F('operation_type__speed_coef') / period_lengths_minutes,
-    ).filter(
+    ).select_related('operation_type').filter(
         dttm_forecast__gte=form['from_dt'],
         dttm_forecast__lte=form['to_dt'] + datetime.timedelta(days=1),
-        operation_type__work_type_id__in=work_types.keys()
+        operation_type__work_type_id__in=work_types.keys(),
+        operation_type__dttm_deleted__isnull=True,
     )
 
     lambda_index_periodclients = lambda x: [dttm2index(from_dt, x.dttm_forecast, period_in_day, period_lengths_minutes)]
@@ -223,13 +225,13 @@ def get_worker_timetable2(shop_id, form):
     lack_of_cashiers_on_period = []
     for index, dttm in enumerate(dttms):
         dttm_converted = BaseConverter.convert_datetime(dttm)
-        real_cashiers.append({'dttm': dttm_converted, 'amount': finite_work[index]})
-        real_cashiers_initial.append({'dttm': dttm_converted,'amount': init_work[index]})
-        fact_cashier_needs.append({'dttm': dttm_converted, 'amount': fact_needs[index]})
-        predict_cashier_needs.append({'dttm': dttm_converted, 'amount': predict_needs[index]})
+        real_cashiers.append({'dttm': dttm_converted, 'amount': absenteeism_coef * finite_work[index]})
+        real_cashiers_initial.append({'dttm': dttm_converted,'amount': absenteeism_coef * init_work[index]})
+        fact_cashier_needs.append({'dttm': dttm_converted, 'amount': absenteeism_coef * fact_needs[index]})
+        predict_cashier_needs.append({'dttm': dttm_converted, 'amount': absenteeism_coef * predict_needs[index]})
         lack_of_cashiers_on_period.append({
             'dttm': dttm_converted,
-            'lack_of_cashiers': max(0, predict_needs[index] - finite_work[index])
+            'lack_of_cashiers': max(0, absenteeism_coef * (predict_needs[index] - finite_work[index]))
         })
 
     # statistics

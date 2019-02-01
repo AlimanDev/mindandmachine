@@ -107,7 +107,7 @@ def get_forecast(request, form):
         url: /api/demand/get_forecast
         from_dt(QOS_DATE): required = True
         to_dt(QOS_DATE): required = True
-        work_type_ids(list): список типов касс (либо [] -- для всех типов)
+        operation_type_ids(list): список типов касс (либо [] -- для всех типов)
         format(str): 'raw' или 'excel' , default='raw'
         shop_id(int): required = False
 
@@ -131,7 +131,7 @@ def get_forecast(request, form):
     if form['format'] == 'excel':
         return JsonResponse.value_error('Excel is not supported yet')
 
-    work_type_ids = form['work_type_ids']
+    operation_type_ids = form['operation_type_ids']
 
     shop_id = FormUtil.get_shop_id(request, form)
 
@@ -145,10 +145,10 @@ def get_forecast(request, form):
         operation_type__work_type__shop_id=shop_id
     )
 
-    if len(work_type_ids) > 0:
-        period_clients = [x for x in period_clients if x.operation_type.work_type_id in work_type_ids]
-        period_products = [x for x in period_products if x.operation_type.work_type_id in work_type_ids]
-        period_queues = [x for x in period_queues if x.operation_type.work_type_id in work_type_ids]
+    if len(operation_type_ids) > 0:
+        period_clients = [x for x in period_clients if x.operation_type_id in operation_type_ids]
+        period_products = [x for x in period_products if x.operation_type_id in operation_type_ids]
+        period_queues = [x for x in period_queues if x.operation_type_id in operation_type_ids]
 
     period_clients = _create_demands_dict(period_clients)
     period_products = _create_demands_dict(period_products)
@@ -186,24 +186,7 @@ def get_forecast(request, form):
                 'queue': queue_wait_length
             })
 
-    period_demand_change_log = PeriodDemandChangeLog.objects.select_related(
-        'operation_type__work_type'
-    ).filter(
-        operation_type__work_type__shop_id=shop_id
-    )
-
-    if len(work_type_ids) > 0:
-        period_demand_change_log = [x for x in period_demand_change_log if x.operation_type.work_type_id in work_type_ids]
-
-    period_demand_change_log = [x for x in period_demand_change_log if dttm_from < x.dttm_to or dttm_to > x.dttm_from]
-
-    response = {
-        'period_step': 30,
-        'forecast_periods': {k: v for k, v in forecast_periods.items()},
-        'demand_changes': [PeriodDemandChangeLogConverter.convert(x) for x in period_demand_change_log]
-    }
-
-    return JsonResponse.success(response)
+    return JsonResponse.success({k: v for k, v in forecast_periods.items()})
 
 
 @api_method(

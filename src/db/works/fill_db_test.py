@@ -50,7 +50,7 @@ def create_work_types(work_types, shop):
             prior_weight=wt['prior_weight']
         )
         OperationType.objects.create(
-            name='operation for ' + wt['name'],
+            name='',
             speed_coef=wt['speed_coef'],
             do_forecast=wt['do_forecast'],
             work_type=wt_m
@@ -106,13 +106,13 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datet
                 value=item['clients'] * (1 + (np.random.rand() - 0.5) / 5) / 50,
                 dttm_forecast=item['dttm_forecast'] + dt_diff,
                 type=PeriodQueues.LONG_FORECASE_TYPE,
-                operation_type=wt.operationtype_set.all()[0],
+                operation_type=wt.work_type_reversed.all()[0],
             ))
             add_clients_models(PeriodClients(
                 value=item['clients'] * (1 + (np.random.rand() - 0.5) / 10),
                 dttm_forecast=item['dttm_forecast'] + dt_diff,
                 type=PeriodClients.LONG_FORECASE_TYPE,
-                operation_type=wt.operationtype_set.all()[0],
+                operation_type=wt.work_type_reversed.all()[0],
             ))
             wt_df_index = (wt_df_index + 1) % wt_df.shape[0]
             if prev_dt != item['dttm_forecast'].date():

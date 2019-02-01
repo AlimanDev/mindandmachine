@@ -115,6 +115,7 @@ class Shop(models.Model):
     exit1day = models.BooleanField(default=False)
     exit42hours = models.BooleanField(default=False)
     process_type = models.CharField(max_length=1, choices=PROCESS_TYPE, default=YEAR_NORM)
+    absenteeism = models.SmallIntegerField(default=0)  # percents
 
     def __str__(self):
         return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)

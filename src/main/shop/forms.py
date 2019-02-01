@@ -68,6 +68,7 @@ class SetParametersForm(forms.Form):
     restricted_start_times = forms.CharField()
     restricted_end_times = forms.CharField()
     min_change_time = forms.IntegerField()
+    absenteeism = forms.IntegerField()
     even_shift_morning_evening = util_forms.BooleanField()
     paired_weekday = util_forms.BooleanField()
     exit1day = util_forms.BooleanField()
@@ -82,6 +83,7 @@ class SetParametersForm(forms.Form):
             self.cleaned_data['idle'],
             self.cleaned_data['less_norm'],
             self.cleaned_data['more_norm'],
+            self.cleaned_data['absenteeism'],
         ]
 
         for value in percent_values:

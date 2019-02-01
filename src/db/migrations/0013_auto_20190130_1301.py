@@ -15,6 +15,8 @@ class Migration(migrations.Migration):
             name='OperationType',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('dttm_added', models.DateTimeField(auto_now_add=True)),
+                ('dttm_deleted', models.DateTimeField(blank=True, null=True)),
                 ('name', models.CharField(max_length=128)),
                 ('speed_coef', models.FloatField(default=1)),
                 ('do_forecast', models.CharField(choices=[('H', 'Hard'), ('L', 'Lite'), ('N', 'None')], default='L', max_length=1)),
@@ -34,6 +36,8 @@ class Migration(migrations.Migration):
                 ('prior_weight', models.FloatField(default=1.0)),
                 ('period_queue_params', models.CharField(default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 1, "reg_lambda": 0.1, "silent": 1, "iterations": 20}', max_length=1024)),
                 ('shop', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='db.Shop')),
+                ('max_workers_amount', models.IntegerField(default=20)),
+                ('min_workers_amount', models.IntegerField(default=10)),
             ],
             options={
                 'verbose_name': 'Тип работ',
@@ -77,10 +81,6 @@ class Migration(migrations.Migration):
             name='cashbox_type',
         ),
         migrations.RemoveField(
-            model_name='user',
-            name='position',
-        ),
-        migrations.RemoveField(
             model_name='waittimeinfo',
             name='cashbox_type',
         ),
@@ -112,7 +112,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='operationtype',
             name='work_type',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='db.WorkType'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='work_type_reversed', to='db.WorkType'),
         ),
         migrations.AddField(
             model_name='emptyoutcomevisitors',
@@ -162,6 +162,17 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='db.WorkType'),
         ),
         migrations.AddField(
+            model_name='slot',
+            name='dttm_added',
+            field=models.DateTimeField(auto_now_add=True),
+            preserve_default=False,
+        ),
+        migrations.AddField(
+            model_name='slot',
+            name='dttm_deleted',
+            field=models.DateTimeField(blank=True, null=True),
+        ),
+        migrations.AddField(
             model_name='waittimeinfo',
             name='work_type',
             field=models.ForeignKey(default=None, on_delete=django.db.models.deletion.PROTECT, to='db.WorkType'),
@@ -191,7 +202,11 @@ class Migration(migrations.Migration):
             name='work_type',
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='db.WorkType'),
         ),
-
+        migrations.AddField(
+            model_name='shop',
+            name='absenteeism',
+            field=models.SmallIntegerField(default=100),
+        ),
         migrations.DeleteModel(
             name='CashboxType',
         ),

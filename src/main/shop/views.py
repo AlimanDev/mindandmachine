@@ -275,6 +275,7 @@ def get_parameters(request, form):
                 '10:00', '12:00', '14:00'
             ],
             | min_change_time: int,
+            | absenteeism: int,
             | even_shift_morning_evening: Boolean,
             | paired_weekday: Boolean,
             | exit1day: Boolean,
@@ -297,6 +298,7 @@ def get_parameters(request, form):
         'restricted_start_times': shop.restricted_start_times,
         'restricted_end_times': shop.restricted_end_times,
         'min_change_time': shop.min_change_time,
+        'absenteeism': shop.absenteeism,
         'even_shift': shop.even_shift_morning_evening,
         'paired_weekday': shop.paired_weekday,
         'exit1day': shop.exit1day,
@@ -335,6 +337,7 @@ def set_parameters(request, form):
     shop.restricted_start_times = form['restricted_start_times']
     shop.restricted_end_times = form['restricted_end_times']
     shop.min_change_time = form['min_change_time']
+    shop.absenteeism = form['absenteeism']
     shop.even_shift_morning_evening = form['even_shift_morning_evening']
     shop.paired_weekday = form['paired_weekday']
     shop.exit1day = form['exit1day']
