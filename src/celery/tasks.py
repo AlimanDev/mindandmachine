@@ -1,6 +1,5 @@
 import datetime
 import json
-from dateutil.relativedelta import relativedelta
 
 from django.db.models import Avg
 from django.utils.timezone import now
@@ -15,7 +14,7 @@ from src.main.demand.utils import create_predbills_request_function
 
 from src.db.models import (
     PeriodQueues,
-    CashboxType,
+    WorkType,
     CameraCashboxStat,
     WorkerDayCashboxDetails,
     WorkerMonthStat,
@@ -50,11 +49,11 @@ def update_queue(till_dttm=None):
     if till_dttm is None:
         till_dttm = now()  + datetime.timedelta(hours=3) # moscow time
 
-    cashbox_types = CashboxType.objects.qos_filter_active(till_dttm + datetime.timedelta(minutes=30), till_dttm).filter(
+    cashbox_types = WorkType.objects.qos_filter_active(till_dttm + datetime.timedelta(minutes=30), till_dttm).filter(
         dttm_last_update_queue__isnull=False,
     )
     if not len(cashbox_types):
-        raise ValueError('CashboxType EmptyQuerySet with dttm_last_update_queue')
+        raise ValueError('WorkType EmptyQuerySet with dttm_last_update_queue')
     for cashbox_type in cashbox_types:
         dif_time = till_dttm - cashbox_type.dttm_last_update_queue
         while dif_time > time_step:
@@ -96,8 +95,8 @@ def update_visitors_info():
     # todo: исправить потом. пока делаем такую привязку
     # вообще хорошей идеей наверное будет просто cashbox_type blank=True, null=True сделать в PeriodDemand
     try:
-        ct = CashboxType.objects.get(name='Кассы', shop_id=1)
-    except CashboxType.DoesNotExist:
+        ct = WorkType.objects.get(name='Кассы', shop_id=1)
+    except WorkType.DoesNotExist:
         raise ValueError('Такого типа касс нет в базе данных.')
     create_dict = {
         'cashbox_type': ct,
@@ -291,7 +290,7 @@ def notify_cashiers_lack():
                     for cashbox_type in return_dict[dttm_converted].keys():
                         if return_dict[dttm_converted][cashbox_type]:
                             notification_text += '{} будет не хватать сотрудников: {}. '.format(
-                                CashboxType.objects.get(id=cashbox_type).name,
+                                WorkType.objects.get(id=cashbox_type).name,
                                 return_dict[dttm_converted][cashbox_type]
                             )
                     managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop.id)
@@ -336,7 +335,7 @@ def allocation_of_time_for_work_on_cashbox():
 
     for shop in Shop.objects.all():
         # Todo: может нужно сделать qos_filter на типы касс?
-        cashbox_types = CashboxType.objects.qos_filter_active(
+        cashbox_types = WorkType.objects.qos_filter_active(
             dt_from=prev_month,
             dt_to=dt,
             shop=shop

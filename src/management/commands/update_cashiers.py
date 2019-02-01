@@ -1,16 +1,16 @@
 import joblib
 import datetime
 from django.core.management.base import BaseCommand, CommandError
-from src.db.models import User, WorkerCashboxInfo, WorkerConstraint, CashboxType
+from src.db.models import User, WorkerCashboxInfo, WorkerConstraint, WorkType
 
 class Command(BaseCommand):
     help = 'Update cashier info'
 
     def __update_cashbox_type(self):
-        CashboxType.objects.filter(name='Линия').update(speed_coef=0.88)
-        CashboxType.objects.filter(name='Возврат').update(speed_coef=0.6)
-        CashboxType.objects.filter(name='Доставка').update(speed_coef=0.8)
-        CashboxType.objects.filter(name='Информация').update(speed_coef=0.8)
+        WorkType.objects.filter(name='Линия').update(speed_coef=0.88)
+        WorkType.objects.filter(name='Возврат').update(speed_coef=0.6)
+        WorkType.objects.filter(name='Доставка').update(speed_coef=0.8)
+        WorkType.objects.filter(name='Информация').update(speed_coef=0.8)
 
     def __update_speed(self, cashier, speeds):
         for speed_type, speed_value in speeds.items():

@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from src.util.test import LocalTestCase
 from src.db.models import (
     WorkerCashboxInfo,
-    CashboxType,
+    WorkType,
     WorkerDayCashboxDetails,
     PeriodQueues,
     IncomeVisitors,
@@ -70,14 +70,14 @@ class TestCelery(LocalTestCase):
     def test_update_queue(self):
         dttm_now = now()
 
-        if not len(CashboxType.objects.filter(dttm_last_update_queue__isnull=False)):
+        if not len(WorkType.objects.filter(dttm_last_update_queue__isnull=False)):
             with self.assertRaises(ValueError) as cm:
                 update_queue()
             raise Exception(cm.exception)
 
         update_queue()
 
-        updated_cashbox_types = CashboxType.objects.qos_filter_active(
+        updated_cashbox_types = WorkType.objects.qos_filter_active(
             dttm_now + datetime.timedelta(minutes=30),
             dttm_now,
             dttm_last_update_queue__isnull=False,
@@ -87,7 +87,7 @@ class TestCelery(LocalTestCase):
                 update_time,
                 dttm_now.replace(minute=0 if dttm_now.minute < 30 else 30, second=0, microsecond=0)
             )
-        for cashbox_type in CashboxType.objects.filter(dttm_deleted__isnull=False):
+        for cashbox_type in WorkType.objects.filter(dttm_deleted__isnull=False):
             self.assertEqual(cashbox_type.dttm_last_update_queue, None)
         self.assertGreater(PeriodQueues.objects.count(), 0)
 
