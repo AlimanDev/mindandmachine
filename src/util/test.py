@@ -8,6 +8,7 @@ from src.db.models import (
     CameraCashboxStat,
     WorkType,
     PeriodDemand,
+    OperationType,
     PeriodClients,
     Shop,
     SuperShop,
@@ -100,6 +101,8 @@ class LocalTestCase(TestCase):
         self.work_type4 = create_work_type(self.shop2, 'тип_кассы_4', id=4)
         WorkType.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 9, 0, 0))
 
+        create_operation_type(OperationType.FORECAST_HARD)
+
         # cashboxes
         self.cashbox1 = Cashbox.objects.create(
             type=self.work_type1,
@@ -132,18 +135,31 @@ class LocalTestCase(TestCase):
         # PeriodClients
         dttm_from = (dttm_now - relativedelta(days=15)).replace(hour=6, minute=30, second=0, microsecond=0)
         dttm_to = dttm_from + relativedelta(months=1)
+        operation_types = OperationType.objects.all()
         while dttm_from < dttm_to:
             create_period_clients(
-                dttm_forecast=dttm_from, value=randint(50, 150), type=PeriodClients.LONG_FORECASE_TYPE, work_type=self.work_type1
+                dttm_forecast=dttm_from,
+                value=randint(50, 150),
+                type=PeriodClients.LONG_FORECASE_TYPE,
+                operation_type=operation_types[0]
             )
             create_period_clients(
-                dttm_forecast=dttm_from, value=randint(50, 150), type=PeriodClients.LONG_FORECASE_TYPE, work_type=self.work_type2
+                dttm_forecast=dttm_from,
+                value=randint(50, 150),
+                type=PeriodClients.LONG_FORECASE_TYPE,
+                operation_type=operation_types[1]
             )
             create_period_clients(
-                dttm_forecast=dttm_from, value=randint(50, 150), type=PeriodClients.LONG_FORECASE_TYPE, work_type=self.work_type3
+                dttm_forecast=dttm_from,
+                value=randint(50, 150),
+                type=PeriodClients.LONG_FORECASE_TYPE,
+                operation_type=operation_types[2]
             )
             create_period_clients(
-                dttm_forecast=dttm_from - relativedelta(months=1), value=randint(50, 150), type=PeriodClients.FACT_TYPE, work_type=self.work_type3
+                dttm_forecast=dttm_from - relativedelta(months=1),
+                value=randint(50, 150),
+                type=PeriodClients.FACT_TYPE,
+                operation_type=operation_types[3]
             )
             dttm_from += datetime.timedelta(minutes=30)
 
@@ -333,10 +349,20 @@ def create_work_type(shop, name, dttm_last_update_queue=None, dttm_deleted=None,
     return work_type
 
 
-def create_period_clients(dttm_forecast, value, type, work_type):
+def create_operation_type(do_forecast, dttm_deleted=None):
+    for work_type in WorkType.objects.all():
+        OperationType.objects.create(
+            name='operation type №{}'.format(work_type.id),
+            work_type=work_type,
+            do_forecast=do_forecast,
+            dttm_deleted=dttm_deleted,
+        )
+
+
+def create_period_clients(dttm_forecast, value, type, operation_type):
     PeriodClients.objects.create(
         dttm_forecast=dttm_forecast,
         value=value,
         type=type,
-        work_type=work_type
+        operation_type=operation_type
     )

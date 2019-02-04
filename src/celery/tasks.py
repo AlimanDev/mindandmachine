@@ -47,20 +47,20 @@ def update_queue(till_dttm=None):
     """
     time_step = datetime.timedelta(seconds=1800)  # todo: change to supershop step
     if till_dttm is None:
-        till_dttm = now()  + datetime.timedelta(hours=3) # moscow time
+        till_dttm = now() + datetime.timedelta(hours=3)  # moscow time
 
-    cashbox_types = WorkType.objects.qos_filter_active(till_dttm + datetime.timedelta(minutes=30), till_dttm).filter(
+    work_types = WorkType.objects.qos_filter_active(till_dttm + datetime.timedelta(minutes=30), till_dttm).filter(
         dttm_last_update_queue__isnull=False,
     )
-    if not len(cashbox_types):
+    if not len(work_types):
         raise ValueError('WorkType EmptyQuerySet with dttm_last_update_queue')
-    for cashbox_type in cashbox_types:
-        dif_time = till_dttm - cashbox_type.dttm_last_update_queue
+    for work_type in work_types:
+        dif_time = till_dttm - work_type.dttm_last_update_queue
         while dif_time > time_step:
             mean_queue = list(CameraCashboxStat.objects.filter(
-                camera_cashbox__cashbox__type__id=cashbox_type.id,
-                dttm__gte=cashbox_type.dttm_last_update_queue,
-                dttm__lt=cashbox_type.dttm_last_update_queue + time_step
+                camera_cashbox__cashbox__type__id=work_type.id,
+                dttm__gte=work_type.dttm_last_update_queue,
+                dttm__lt=work_type.dttm_last_update_queue + time_step
             ).values('camera_cashbox_id').annotate(mean_queue=Avg('queue')).values_list('mean_queue', flat=True)) #.filter(mean_queue__gte=0.5)
             # todo: mean_queue__gte seems stupid -- need to change and look only open
 
@@ -71,21 +71,21 @@ def update_queue(till_dttm=None):
                 mean_queue = sum(mean_queue) / (len(mean_queue) + 0.000001)
 
                 changed_amount = PeriodQueues.objects.filter(
-                    dttm_forecast=cashbox_type.dttm_last_update_queue,
-                    cashbox_type_id=cashbox_type.id,
+                    dttm_forecast=work_type.dttm_last_update_queue,
+                    operation_type_id=work_type.work_type_reversed.all()[0].id,
                     type=PeriodQueues.FACT_TYPE,
                 ).update(value=mean_queue)
                 if changed_amount == 0:
                     PeriodQueues.objects.create(
-                        dttm_forecast=cashbox_type.dttm_last_update_queue,
+                        dttm_forecast=work_type.dttm_last_update_queue,
                         type=PeriodQueues.FACT_TYPE,
                         value=mean_queue,
-                        cashbox_type_id=cashbox_type.id,
+                        operation_type_id=work_type.work_type_reversed.all()[0].id,
                     )
 
-            cashbox_type.dttm_last_update_queue += time_step
+            work_type.dttm_last_update_queue += time_step
             dif_time -= time_step
-        cashbox_type.save()
+        work_type.save()
 
 
 @app.task
@@ -95,11 +95,11 @@ def update_visitors_info():
     # todo: исправить потом. пока делаем такую привязку
     # вообще хорошей идеей наверное будет просто cashbox_type blank=True, null=True сделать в PeriodDemand
     try:
-        ct = WorkType.objects.get(name='Кассы', shop_id=1)
+        work_type = WorkType.objects.get(name='Кассы', shop_id=1)
     except WorkType.DoesNotExist:
         raise ValueError('Такого типа касс нет в базе данных.')
     create_dict = {
-        'cashbox_type': ct,
+        'work_type': work_type,
         'dttm_forecast': dttm_now.replace(minute=(0 if dttm_now.minute < 30 else 30), second=0, microsecond=0),
         'type': IncomeVisitors.FACT_TYPE
     }
@@ -261,7 +261,7 @@ def notify_cashiers_lack():
         notify_days = 7
         dttm = dttm_now.replace(minute=0, second=0, microsecond=0)
         init_params_dict = get_init_params(dttm_now, shop.id)
-        cashbox_types = init_params_dict['cashbox_types_dict']
+        work_types = init_params_dict['work_types_dict']
         mean_bills_per_step = init_params_dict['mean_bills_per_step']
         period_demands = []
         for i in range(notify_days):
@@ -270,11 +270,11 @@ def notify_cashiers_lack():
         managers_dir_list = []
         users_with_such_notes = []
         # пока что есть магазы в которых нет касс с ForecastHard
-        if cashbox_types and period_demands:
+        if work_types and period_demands:
             return_dict = has_deficiency(
                 period_demands,
                 mean_bills_per_step,
-                cashbox_types,
+                work_types,
                 dttm,
                 dttm_now + datetime.timedelta(days=notify_days)
             )
@@ -287,11 +287,11 @@ def notify_cashiers_lack():
                 if sum(return_dict[dttm_converted].values()) > 0:
                     to_notify = True
                     notification_text = '{}:{} {}:\n'.format(hrs, minutes, other[3:])
-                    for cashbox_type in return_dict[dttm_converted].keys():
-                        if return_dict[dttm_converted][cashbox_type]:
+                    for work_type in return_dict[dttm_converted].keys():
+                        if return_dict[dttm_converted][work_type]:
                             notification_text += '{} будет не хватать сотрудников: {}. '.format(
-                                WorkType.objects.get(id=cashbox_type).name,
-                                return_dict[dttm_converted][cashbox_type]
+                                WorkType.objects.get(id=work_type).name,
+                                return_dict[dttm_converted][work_type]
                             )
                     managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop.id)
                     users_with_such_notes = []
@@ -324,34 +324,33 @@ def allocation_of_time_for_work_on_cashbox():
     Update the number of worked hours last month for each user in WorkerCashboxInfo
     """
 
-    def update_duration(last_user, last_cashbox_type, duration):
+    def update_duration(last_user, last_work_type, duration):
         WorkerCashboxInfo.objects.filter(
             worker=last_user,
-            cashbox_type=last_cashbox_type,
+            work_type=last_work_type,
         ).update(duration=round(duration, 3))
 
     dt = now().date().replace(day=1)
     prev_month = dt - relativedelta(months=1)
 
     for shop in Shop.objects.all():
-        # Todo: может нужно сделать qos_filter на типы касс?
-        cashbox_types = WorkType.objects.qos_filter_active(
+        work_types = WorkType.objects.qos_filter_active(
             dt_from=prev_month,
             dt_to=dt,
             shop=shop
         )
         last_user = None
-        last_cashbox_type = None
+        last_work_type = None
         duration = 0
 
-        if len(cashbox_types):
-            for cashbox_type in cashbox_types:
+        if len(work_types):
+            for work_type in work_types:
                 worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related(
                     'worker_day__worker',
                     'worker_day'
                 ).filter(
                     status=WorkerDayCashboxDetails.TYPE_WORK,
-                    cashbox_type=cashbox_type,
+                    work_type=work_type,
                     on_cashbox__isnull=False,
                     worker_day__dt__gte=prev_month,
                     worker_day__dt__lt=dt,
@@ -361,19 +360,19 @@ def allocation_of_time_for_work_on_cashbox():
 
                 for detail in worker_day_cashbox_details:
                     if last_user is None:
-                        last_cashbox_type = cashbox_type
+                        last_work_type = work_type
                         last_user = detail.worker_day.worker
 
                     if last_user != detail.worker_day.worker:
-                        update_duration(last_user, last_cashbox_type, duration)
+                        update_duration(last_user, last_work_type, duration)
                         last_user = detail.worker_day.worker
-                        last_cashbox_type = cashbox_type
+                        last_work_type = work_type
                         duration = 0
 
                     duration += (detail.dttm_to - detail.dttm_from).total_seconds() / 3600
 
             if last_user:
-                update_duration(last_user, last_cashbox_type, duration)
+                update_duration(last_user, last_work_type, duration)
 
 
 @app.task

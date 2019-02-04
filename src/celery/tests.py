@@ -68,7 +68,7 @@ class TestCelery(LocalTestCase):
     #     self.assertEqual(worker_month_stat[4].work_hours, 179.25)
 
     def test_update_queue(self):
-        dttm_now = now()
+        dttm_now = now() + datetime.timedelta(hours=3)
 
         if not len(WorkType.objects.filter(dttm_last_update_queue__isnull=False)):
             with self.assertRaises(ValueError) as cm:
