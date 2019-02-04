@@ -183,7 +183,7 @@ def get_cashier_timetable(request, form):
     Args:
         method: GET
         url: /api/timetable/cashier/get_cashier_timetable
-        worker_id(int): required = True
+        worker_id(list): required = True
         from_dt(QOS_DATE): с какого числа смотреть расписание
         to_dt(QOS_DATE): по какое число
         format(str): 'raw' или 'excel'
@@ -277,17 +277,6 @@ def get_cashier_timetable(request, form):
             )
         ]
 
-        # worker_day_change_requests = group_by(
-        #     WorkerDayChangeRequest.objects.filter(
-        #         worker_day_worker_id=worker_id,
-        #         worker_day_dt__gte=from_dt,
-        #         worker_day_dt__lte=to_dt
-        #     ),
-        #     group_key=lambda _: _.worker_day_id,
-        #     sort_key=lambda _: _.worker_day_dt,
-        #     sort_reverse=True
-        # )
-
         worker_day_change_log = group_by(
             WorkerDay.objects.select_related('worker').filter(
                 worker_id=worker_id,
@@ -296,8 +285,8 @@ def get_cashier_timetable(request, form):
                 parent_worker_day__isnull=False,
                 worker__attachment_group=User.GROUP_STAFF
             ),
-            group_key=lambda _: _.id,
-            sort_key=lambda _: _.dt,
+            group_key=lambda _: WorkerDay.objects.qos_get_current_worker_day(_).id,
+            sort_key=lambda _: _.id,
             sort_reverse=True
         )
 
@@ -316,7 +305,7 @@ def get_cashier_timetable(request, form):
             days_response.append({
                 'day': WorkerDayConverter.convert(obj),
                 'change_log': [WorkerDayChangeLogConverter.convert(x) for x in
-                               worker_day_change_log.get(obj.id, [])[:10]],
+                               worker_day_change_log.get(obj.id, [])],
                 'change_requests': []
                 # 'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in
                 #                     worker_day_change_requests.get(obj.id, [])[:10]]

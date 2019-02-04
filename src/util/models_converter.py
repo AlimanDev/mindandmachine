@@ -138,15 +138,19 @@ class WorkerDayChangeLogConverter(BaseConverter):
         def __work_tm(__field):
             return cls.convert_time(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
 
+        def __parent_work_tm(__tm):
+            return cls.convert_time(__tm) if\
+                obj.parent_worker_day and obj.parent_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+
         parent = obj.parent_worker_day
         if parent:
             return {
                 'worker_day': obj.id,
-                'dttm_changed': WorkerDayConverter.convert_datetime(obj.dttm_added),
+                'dttm_changed': BaseConverter.convert_datetime(obj.dttm_added),
                 'changed_by': obj.created_by.id,
                 'comment': '',
-                'from_tm_work_start': __work_tm(parent.dttm_work_start),
-                'from_tm_work_end': __work_tm(parent.dttm_work_end),
+                'from_tm_work_start': __parent_work_tm(parent.dttm_work_start),
+                'from_tm_work_end': __parent_work_tm(parent.dttm_work_end),
                 'from_type': WorkerDayConverter.convert_type(parent.type),
                 'to_tm_work_start': __work_tm(obj.dttm_work_start),
                 'to_tm_work_end': __work_tm(obj.dttm_work_end),

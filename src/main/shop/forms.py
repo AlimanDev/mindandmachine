@@ -32,8 +32,8 @@ class GetSuperShopListForm(forms.Form):
 class AddEditSuperShopForm(forms.Form):
     title = forms.CharField(max_length=128)
     code = forms.CharField(max_length=64)
-    address = forms.CharField(max_length=256)
-    region = forms.CharField()
+    address = forms.CharField(max_length=256, required=False)
+    region = forms.CharField(required=False)
     tm_start = util_forms.TimeField()
     tm_end = util_forms.TimeField()
 

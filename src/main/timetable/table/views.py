@@ -304,8 +304,8 @@ def get_table(request, form):
                 datetime.datetime.combine(weekday, datetime.time()),
                 datetime.datetime.combine(weekday, datetime.time(hour=23, minute=59))
             ),
-            work_type__shop_id=shop_id,
-            operation_type__work_type__do_forecast=OperationType.FORECAST_HARD,
+            operation_type__work_type__shop_id=shop_id,
+            operation_type__do_forecast=OperationType.FORECAST_HARD,
         )
 
         inds = list(stats)

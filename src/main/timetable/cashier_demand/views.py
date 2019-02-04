@@ -86,7 +86,12 @@ def get_cashiers_timetable(request, form):
 
         response = HttpResponse(content_type='application/force-download')
         response['Content-Disposition'] = 'attachment; filename={}.xlsx'.format(__file_name(form['from_dt']))
-        response.write(get_xlsx(shop_id=shop_id, dt_from=form['from_dt']).read())
+        response.write(
+            get_xlsx(
+                shop_id=shop_id,
+                dt_from=form['from_dt'],
+                inspection_version=form.get('inspection_version', False)).read()
+        )
         return response
 
     res = get_worker_timetable(shop_id, form)

@@ -202,17 +202,21 @@ def get_super_shop_list(request, form):
 )
 def add_supershop(request, form):
     try:
+        region = Region.objects.get(title=form['region'])
+    except Region.DoesNotExist:
+        region = None
+    try:
         SuperShop.objects.create(
             title=form['title'],
             code=form['code'],
             address=form['address'],
             dt_opened=form['open_dt'],
-            region=Region.objects.get(title=form['region']),
+            region=region,
             tm_start=form['tm_start'],
             tm_end=form['tm_end']
         )
-    except Exception:
-        return JsonResponse.internal_error('Error while creating shop')
+    except Exception as exc:
+        return JsonResponse.internal_error('Error while creating shop: {}'.format(str(exc)))
     return JsonResponse.success()
 
 

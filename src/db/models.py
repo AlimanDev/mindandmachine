@@ -586,6 +586,16 @@ class WorkerDayManager(models.Manager):
         else:
             return self.qos_initial_version()
 
+    @staticmethod
+    def qos_get_current_worker_day(worker_day):
+        while True:
+            current_worker_day = worker_day
+            try:
+                worker_day = worker_day.child
+            except WorkerDay.child.RelatedObjectDoesNotExist:
+                break
+        return current_worker_day
+
 
 class WorkerDay(models.Model):
     class Type(utils.Enum):

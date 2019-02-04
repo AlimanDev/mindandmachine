@@ -62,10 +62,13 @@ def get_tabel(request, workbook, form):
     breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
     workdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
-        worker__shop=shop,
+        worker__in=users,
         dt__gte=tabel.prod_days[0].dt,
         dt__lte=tabel.prod_days[-1].dt,
     ).order_by('worker__position_id', 'worker__last_name', 'worker__first_name', 'worker__tabel_code', 'dt')
+
+    if form.get('inspection_version', False):
+        tabel.change_for_inspection(tabel.prod_month.norm_work_hours, workdays)
 
     tabel.format_cells(len(users))
     tabel.add_main_info()
@@ -84,6 +87,7 @@ def get_tabel(request, workbook, form):
     tabel.fill_table(workdays, users, breaktimes, 16, 6)
 
     tabel.add_xlsx_functions(len(users), 12, 37)
+
     tabel.add_sign(16 + len(users) + 2)
 
     return workbook, 'Tabel'

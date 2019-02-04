@@ -1,8 +1,10 @@
 from .base_class import Xlsx_base
+from math import ceil, floor
 from src.db.models import (
     ProductionDay,
-    WorkerDay
+    WorkerDay,
 )
+from src.util.collection import group_by
 from .colors import *
 import datetime
 
@@ -114,8 +116,7 @@ class Tabel_xlsx(Xlsx_base):
             'align': 'fill',
             'font_color': COLOR_RED,
         })
-        self.worksheet.write_string(1, 1, 'ООО "ЛЕРУА МЕРЛЕН ВОСТОК"', text_top)
-        self.worksheet.write_string(2, 1, 'Магазин {}'.format(self.super_shop.title), text_top)
+        self.worksheet.write_string(2, 1, 'Магазин: {}'.format(self.super_shop.title), text_top)
         self.worksheet.write_rich_string(3, 1,
                                          text_top, 'ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ ',
                                          text_top_red, '{}  {}г.'.format(
@@ -178,11 +179,7 @@ class Tabel_xlsx(Xlsx_base):
             'border': 1,
         })
         self.worksheet.write_string('C11', 'Запланированные часы', text_f)
-        self.worksheet.write_number(
-            'D11',
-            sum(map(lambda x: ProductionDay.WORK_NORM_HOURS[x.type], self.prod_days)),
-            number_f
-        )
+        self.worksheet.write_number('D11', self.prod_month.norm_work_hours, number_f)
 
         #
         # add workday types:
@@ -420,7 +417,7 @@ class Tabel_xlsx(Xlsx_base):
             'COUNTIF(G{0}:AK{0},"В5")*5+COUNTIF(G{0}:AK{0},"В6")*6+COUNTIF(G{0}:AK{0},"В7")*7+COUNTIF(G{0}:AK{0},"В8")*8+'
             'COUNTIF(G{0}:AK{0},"7")*7+COUNTIF(G{0}:AK{0},"8")*8+COUNTIF(G{0}:AK{0},"9")*9+COUNTIF(G{0}:AK{0},"10")*10+'
             'COUNTIF(G{0}:AK{0},"11")*11+COUNTIF(G{0}:AK{0},"12")*12+COUNTIF(G{0}:AK{0},"К")*8+COUNTIF(G{0}:AK{0},"8_1")*8+'
-            'COUNTIF(G{0}:AK{0},"8_2")*8+COUNTIF(G{0}:AK{0},"11_1")*11+COUNTIF(G{0}:AK{0},"11_7")*11',
+            'COUNTIF(G{0}:AK{0},"8_2")*8+COUNTIF(G{0}:AK{0},"11_1")*11+COUNTIF(G{0}:AK{0},"11_7")*11+COUNTIF(G{0}:AK{0},"11_2")*11',
             cell_f
         )
 
@@ -621,3 +618,70 @@ class Tabel_xlsx(Xlsx_base):
             'Руководитель  отдела   /  __________________  /  ___________________________ / ',
             self.workbook.add_format(self.default_text_settings)
         )
+
+    @staticmethod
+    def change_for_inspection(month_norm_hours, workdays):
+        workdays = group_by(workdays, group_key=lambda _: _.worker_id)
+        actual_hours = {}
+
+        def from_workday_to_holiday(wd):
+            wd.type = WorkerDay.Type.TYPE_HOLIDAY.value
+            wd.dttm_work_start = None
+            wd.dttm_work_end = None
+
+        for worker_id in workdays.keys():
+            actual_hours[worker_id] = 0
+            for wd in workdays[worker_id]:
+                if wd.dttm_work_start and wd.dttm_work_end:
+                    hours_on_day = round((wd.dttm_work_end - wd.dttm_work_start).total_seconds() / 3600)
+                    if hours_on_day > 8:
+                        hours_on_day = hours_on_day - 1  # 1 hour break
+                    actual_hours[worker_id] += hours_on_day
+            if actual_hours[worker_id] > month_norm_hours:
+                diff = actual_hours[worker_id] - month_norm_hours
+                diff_days = diff / 8
+
+                worker_workdays_len = len(workdays[worker_id])
+                each = worker_workdays_len // ceil(diff_days)
+                days_to_change = ceil(diff_days)
+
+                for i in range(1, worker_workdays_len):
+                    if days_to_change == 1 and diff_days != int(diff_days):
+                        for j in range(i, worker_workdays_len):
+                            worker_day = workdays[worker_id][j]
+                            if worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
+                                worker_day.type = WorkerDay.Type.TYPE_HOLIDAY_WORK.value
+                                wd_duration = (worker_day.dttm_work_end - worker_day.dttm_work_start).total_seconds() / 60
+                                worker_day.dttm_work_end = worker_day.dttm_work_start + datetime.timedelta(
+                                    minutes=(((wd_duration * (1 - (diff_days - int(diff_days)))) // 60) + 1) * 60
+                                )
+                                days_to_change -= 1
+                                break
+                            if j == worker_workdays_len - 1:
+                                worker_day.type = WorkerDay.Type.TYPE_HOLIDAY_WORK.value
+                                worker_day.dttm_work_start = workdays[worker_id][j - 1].dttm_work_start
+                                worker_day.dttm_work_end = worker_day.dttm_work_start + datetime.timedelta(
+                                    minutes=(((540 * (1 - (diff_days - int(diff_days)))) // 60) + 1) * 60
+                                )
+                                days_to_change -= 1
+                                break
+                    if days_to_change == 0:
+                        break
+                    if i % each == 0:
+                        if workdays[worker_id][i].type == WorkerDay.Type.TYPE_WORKDAY.value:
+                            from_workday_to_holiday(workdays[worker_id][i])
+                            days_to_change -= 1
+                        else:
+                            for j in range(i, worker_workdays_len - days_to_change):
+                                if workdays[worker_id][j].type == WorkerDay.Type.TYPE_WORKDAY.value:
+                                    from_workday_to_holiday(workdays[worker_id][j])
+                                    days_to_change -= 1
+                                    break
+                            each = worker_workdays_len - days_to_change
+
+        work_days_list = []
+        for worker_id in workdays.keys():
+            for worker_day in workdays[worker_id]:
+                work_days_list.append(worker_day)
+
+        return work_days_list
