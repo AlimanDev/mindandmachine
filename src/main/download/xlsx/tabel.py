@@ -7,6 +7,7 @@ from src.db.models import (
 from src.util.collection import group_by
 from .colors import *
 import datetime
+import json
 
 
 class Tabel_xlsx(Xlsx_base):
@@ -295,7 +296,7 @@ class Tabel_xlsx(Xlsx_base):
                 datetime.time(6, 0),
             )
 
-        total = str(int(self.__time2hours(tm_start, tm_end, breaks) + 0.5))
+        total = str(int(self.__time2hours(tm_start, tm_end, breaks) + 0.75))
         night_hs = 'all'
         if night_edges[0] > tm_start:
             # day_hs = self.__time2hours(tm_start, night_edges[0])
@@ -331,7 +332,7 @@ class Tabel_xlsx(Xlsx_base):
                             text = str(total_h)
 
                     elif wd.type == WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
-                        total_h = int(self.__time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), triplets))
+                        total_h = ceil(self.__time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), triplets))
                         text = 'В{}'.format(total_h)
 
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
@@ -621,6 +622,8 @@ class Tabel_xlsx(Xlsx_base):
 
     @staticmethod
     def change_for_inspection(month_norm_hours, workdays):
+        break_triplets = json.loads(workdays[0].worker.shop.break_triplets)
+
         workdays = group_by(workdays, group_key=lambda _: _.worker_id)
         actual_hours = {}
 
@@ -629,17 +632,35 @@ class Tabel_xlsx(Xlsx_base):
             wd.dttm_work_start = None
             wd.dttm_work_end = None
 
+        def concat_breaks(duration, concat_type='sub'):
+            """
+
+            :param duration: worker day duration, in minutes
+            :param concat_type: 'sub'/'add', add or subtract breaks to wd_duration
+            :return: worker day duration minus breaks
+            """
+            needed_triplet = None
+            for triplet in break_triplets:
+                if triplet[0] < duration <= triplet[1]:
+                    needed_triplet = triplet
+
+            if needed_triplet:
+                for break_item in needed_triplet[2]:
+                    if concat_type == 'sub':
+                        duration -= break_item
+                    else:
+                        duration += break_item
+            return duration
+
         for worker_id in workdays.keys():
             actual_hours[worker_id] = 0
             for wd in workdays[worker_id]:
                 if wd.dttm_work_start and wd.dttm_work_end:
-                    hours_on_day = round((wd.dttm_work_end - wd.dttm_work_start).total_seconds() / 3600)
-                    if hours_on_day > 8:
-                        hours_on_day = hours_on_day - 1  # 1 hour break
+                    hours_on_day = concat_breaks((wd.dttm_work_end - wd.dttm_work_start).total_seconds() / 60) / 60
                     actual_hours[worker_id] += hours_on_day
             if actual_hours[worker_id] > month_norm_hours:
                 diff = actual_hours[worker_id] - month_norm_hours
-                diff_days = diff / 8
+                diff_days = ceil(diff) / 8
 
                 worker_workdays_len = len(workdays[worker_id])
                 each = worker_workdays_len // ceil(diff_days)
@@ -652,16 +673,22 @@ class Tabel_xlsx(Xlsx_base):
                             if worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
                                 worker_day.type = WorkerDay.Type.TYPE_HOLIDAY_WORK.value
                                 wd_duration = (worker_day.dttm_work_end - worker_day.dttm_work_start).total_seconds() / 60
+                                no_breaks_duration = concat_breaks(wd_duration)
+                                new_duration = no_breaks_duration * (1 - diff_days + int(diff_days))
                                 worker_day.dttm_work_end = worker_day.dttm_work_start + datetime.timedelta(
-                                    minutes=(((wd_duration * (1 - (diff_days - int(diff_days)))) // 60) + 1) * 60
+                                    minutes=concat_breaks(new_duration, 'add')
                                 )
+
                                 days_to_change -= 1
                                 break
                             if j == worker_workdays_len - 1:
                                 worker_day.type = WorkerDay.Type.TYPE_HOLIDAY_WORK.value
                                 worker_day.dttm_work_start = workdays[worker_id][j - 1].dttm_work_start
+                                wd_duration = 540
+                                no_breaks_duration = concat_breaks(wd_duration)
+                                new_duration = no_breaks_duration * (1 - diff_days + int(diff_days))
                                 worker_day.dttm_work_end = worker_day.dttm_work_start + datetime.timedelta(
-                                    minutes=(((540 * (1 - (diff_days - int(diff_days)))) // 60) + 1) * 60
+                                    minutes=concat_breaks(new_duration, 'add')
                                 )
                                 days_to_change -= 1
                                 break
