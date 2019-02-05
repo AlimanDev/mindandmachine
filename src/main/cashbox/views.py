@@ -428,6 +428,11 @@ def edit_work_type(request, form):
     if form['new_title']:
         work_type.name = form['new_title']
 
+    try:
+        work_type.save()
+    except ValueError:
+        return JsonResponse.value_error('Error upon saving work type instance. One of the parameters is invalid')
+
     front_operations = json.loads(form['operation_types'])
     existing_operation_types = {
         x.id: x for x in OperationType.objects.filter(work_type=work_type, dttm_deleted__isnull=True)
@@ -438,7 +443,12 @@ def edit_work_type(request, form):
             operation_type.name = front_operations[0]['name']
             operation_type.speed_coef = front_operations[0]['speed_coef']
             operation_type.do_forecast = front_operations[0]['do_forecast']
-            operation_type.save()
+            try:
+                operation_type.save()
+            except ValueError:
+                return JsonResponse.value_error(
+                    'Error upon saving operation type instance. One of the parameters is invalid'
+                )
             existing_operation_types = dict()
 
         else:
@@ -448,18 +458,32 @@ def edit_work_type(request, form):
                     ot.name = oper_dict['name']
                     ot.speed_coef = oper_dict['speed_coef']
                     ot.do_forecast = oper_dict['do_forecast']
-                    ot.save()
+                    try:
+                        ot.save()
+                    except ValueError:
+                        return JsonResponse.value_error(
+                            'Error upon saving operation type instance. One of the parameters is invalid'
+                        )
                     existing_operation_types.pop(oper_dict['id'])
                 else:
-                    oper_dict.update({'work_type_id': work_type_id})
                     try:
-                        OperationType.objects.create(**oper_dict)
-                    except Exception:
-                        return JsonResponse.internal_error('Error while creating new operation type')
+                        OperationType.objects.create(
+                            work_type_id=work_type_id,
+                            name=oper_dict['name'],
+                            speed_coef=oper_dict['speed_coef'],
+                            do_forecast=oper_dict['do_forecast'],
+                        )
+                    except TypeError:
+                        return JsonResponse.internal_error('One of the parameters is invalid')
 
         for operation_type in existing_operation_types.values():  # удаляем старые операции
             operation_type.dttm_deleted = datetime.datetime.now()
-            operation_type.save()
+            try:
+                operation_type.save()
+            except ValueError:
+                return JsonResponse.value_error(
+                    'Error upon saving operation type instance. One of the parameters is invalid'
+                )
 
     front_slots = json.loads(form['slots'])
     existing_slots = {
@@ -486,9 +510,10 @@ def edit_work_type(request, form):
     for slot in existing_slots.values():    # удаляем старые слоты (если с фронта пришел [], то соответственно там
                                             # поставили произвольные, и удаляем все слоты
         slot.dttm_deleted = datetime.datetime.now()
-        slot.save()
-
-    work_type.save()
+        try:
+            slot.save()
+        except ValueError:
+            return JsonResponse.value_error('Error upon saving slot instance. dttm_deleted is invalid')
 
     return JsonResponse.success()
 
