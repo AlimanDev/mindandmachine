@@ -91,10 +91,8 @@ class RangeField(forms.CharField):
     def clean(self, value, **kwargs):
         value = super().clean(value)
 
-        if value is None or len(value) < 3:
-            if self.required:
-                raise ValidationError('required range from-to')
-            return []
+        if value is None and self.required:
+            raise ValidationError('required range from-to')
 
         if '-' not in value:
             raise ValidationError('unsatisfied range form, should be from-to')
@@ -104,8 +102,8 @@ class RangeField(forms.CharField):
         if len(value) != 2:
             raise ValidationError('there should be 2 numbers')
         try:
-            from_value = int(value[0])
-            to_value = int(value[1])
+            from_value = int(value[0]) if len(value[0]) != 0 else None
+            to_value = int(value[1]) if len(value[1]) != 0 else None
         except ValueError:
             raise ValidationError('first or second value is not a number')
 

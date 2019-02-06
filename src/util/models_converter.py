@@ -198,6 +198,8 @@ class WorkTypeConverter(BaseConverter):
             'name': obj.name,
             'prob': obj.probability,
             'prior_weight': obj.prior_weight,
+            'min_workers_amount': obj.min_workers_amount,
+            'max_workers_amount': obj.max_workers_amount,
         }
         if convert_operations:
             converted_dict['operation_types'] = [
