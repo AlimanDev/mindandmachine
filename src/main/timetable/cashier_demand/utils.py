@@ -131,7 +131,7 @@ def get_worker_timetable2(shop_id, form):
     shop = Shop.objects.get(id=shop_id)
     period_lengths_minutes = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
     period_in_day = MINUTES_IN_DAY // period_lengths_minutes
-    absenteeism_coef = shop.absenteeism / 100
+    absenteeism_coef = 1 + shop.absenteeism / 100
 
     from_dt = form['from_dt']
     to_dt = form['to_dt']
@@ -177,6 +177,7 @@ def get_worker_timetable2(shop_id, form):
         lambda_index_periodclients,
         lambda_add_periodclients,
     )
+    predict_needs = absenteeism_coef * predict_needs
 
     fill_array(
         fact_needs,
@@ -225,13 +226,13 @@ def get_worker_timetable2(shop_id, form):
     lack_of_cashiers_on_period = []
     for index, dttm in enumerate(dttms):
         dttm_converted = BaseConverter.convert_datetime(dttm)
-        real_cashiers.append({'dttm': dttm_converted, 'amount': absenteeism_coef * finite_work[index]})
-        real_cashiers_initial.append({'dttm': dttm_converted,'amount': absenteeism_coef * init_work[index]})
-        fact_cashier_needs.append({'dttm': dttm_converted, 'amount': absenteeism_coef * fact_needs[index]})
-        predict_cashier_needs.append({'dttm': dttm_converted, 'amount': absenteeism_coef * predict_needs[index]})
+        real_cashiers.append({'dttm': dttm_converted, 'amount': finite_work[index]})
+        real_cashiers_initial.append({'dttm': dttm_converted,'amount': init_work[index]})
+        fact_cashier_needs.append({'dttm': dttm_converted, 'amount': fact_needs[index]})
+        predict_cashier_needs.append({'dttm': dttm_converted, 'amount': predict_needs[index]})
         lack_of_cashiers_on_period.append({
             'dttm': dttm_converted,
-            'lack_of_cashiers': max(0, absenteeism_coef * (predict_needs[index] - finite_work[index]))
+            'lack_of_cashiers': max(0,  predict_needs[index] - finite_work[index])
         })
 
     # statistics
