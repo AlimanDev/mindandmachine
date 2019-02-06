@@ -369,6 +369,7 @@ def create_timetable(request, form):
                 'prev_data': [WorkerDayConverter.convert(x) for x in prev_data.get(u.id, [])],
                 'overworking_hours': user_info[u.id].get('diff_prev_paid_hours', 0),
                 'overworking_days': user_info[u.id].get('diff_prev_paid_days', 0),
+                # 'norm_work_amount': 160, #TODO (as)
             }
             for u in users
         ],
