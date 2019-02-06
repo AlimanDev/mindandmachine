@@ -416,6 +416,7 @@ class Tabel_xlsx(Xlsx_base):
             row + 4, n_users, col + 1,
             '=COUNTIF(G{0}:AK{0}, "В1")*1 + COUNTIF(G{0}:AK{0},"В2")*2+COUNTIF(G{0}:AK{0},"В3")*3+COUNTIF(G{0}:AK{0},"В4")*4+'
             'COUNTIF(G{0}:AK{0},"В5")*5+COUNTIF(G{0}:AK{0},"В6")*6+COUNTIF(G{0}:AK{0},"В7")*7+COUNTIF(G{0}:AK{0},"В8")*8+'
+            'COUNTIF(G{0}:AK{0},"5")*5+COUNTIF(G{0}:AK{0},"6")*6+'
             'COUNTIF(G{0}:AK{0},"7")*7+COUNTIF(G{0}:AK{0},"8")*8+COUNTIF(G{0}:AK{0},"9")*9+COUNTIF(G{0}:AK{0},"10")*10+'
             'COUNTIF(G{0}:AK{0},"11")*11+COUNTIF(G{0}:AK{0},"12")*12+COUNTIF(G{0}:AK{0},"К")*8+COUNTIF(G{0}:AK{0},"8_1")*8+'
             'COUNTIF(G{0}:AK{0},"8_2")*8+COUNTIF(G{0}:AK{0},"11_1")*11+COUNTIF(G{0}:AK{0},"11_7")*11+COUNTIF(G{0}:AK{0},"11_2")*11',
@@ -671,7 +672,6 @@ class Tabel_xlsx(Xlsx_base):
                         for j in range(i, worker_workdays_len):
                             worker_day = workdays[worker_id][j]
                             if worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
-                                worker_day.type = WorkerDay.Type.TYPE_HOLIDAY_WORK.value
                                 wd_duration = (worker_day.dttm_work_end - worker_day.dttm_work_start).total_seconds() / 60
                                 no_breaks_duration = concat_breaks(wd_duration)
                                 new_duration = no_breaks_duration * (1 - diff_days + int(diff_days))
@@ -682,7 +682,7 @@ class Tabel_xlsx(Xlsx_base):
                                 days_to_change -= 1
                                 break
                             if j == worker_workdays_len - 1:
-                                worker_day.type = WorkerDay.Type.TYPE_HOLIDAY_WORK.value
+                                worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
                                 worker_day.dttm_work_start = workdays[worker_id][j - 1].dttm_work_start
                                 wd_duration = 540
                                 no_breaks_duration = concat_breaks(wd_duration)
