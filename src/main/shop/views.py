@@ -385,7 +385,7 @@ def get_supershop_stats(request, form):
             'dt': BaseConverter.convert_date(dt_from),
             'value': random.randint(40, 60)
         })
-        dt_from += relativedelta(days=1)
+        dt_from += relativedelta(months=1)
 
     return JsonResponse.success({
         'shop_tts': '{}/{}'.format(successful_tts, shops.count()),
