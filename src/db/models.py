@@ -377,7 +377,7 @@ class Slot(models.Model):
     tm_start = models.TimeField(default=datetime.time(hour=7))
     tm_end = models.TimeField(default=datetime.time(hour=23, minute=59, second=59))
     name = models.CharField(max_length=32, null=True, blank=True)
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo delete this by cashbox_type
     work_type = models.ForeignKey(WorkType, null=True, blank=True, on_delete=models.PROTECT)
     workers_needed = models.IntegerField(default=1)
 
@@ -810,28 +810,6 @@ class Notifications(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, blank=True, null=True)
     object_id = models.PositiveIntegerField(blank=True, null=True)
     object = GenericForeignKey(ct_field='content_type', fk_field='object_id')
-
-
-class OfficialHolidays(models.Model):
-    id = models.BigAutoField(primary_key=True)
-
-    country = models.CharField(max_length=4)
-    date = models.DateField()
-
-
-class LevelType(models.Model):
-    class Type(utils.Enum):
-        LOW = 1
-        MIDDLE = 2
-        HIGH = 3
-
-    id = models.BigAutoField(primary_key=True)
-
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
-    type = utils.EnumField(Type)
-    weekday = models.PositiveSmallIntegerField()
-    tm_from = models.TimeField()
-    tm_to = models.TimeField()
 
 
 class WaitTimeInfo(models.Model):

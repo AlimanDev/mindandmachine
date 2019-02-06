@@ -120,7 +120,7 @@ class Migration(migrations.Migration):
             name='LevelType',
             fields=[
                 ('id', models.BigAutoField(primary_key=True, serialize=False)),
-                ('type', src.db.utils.EnumField(to_enum=src.db.models.LevelType.Type)),
+                ('type', src.db.utils.EnumField(to_enum=[0, 1])),
                 ('weekday', models.PositiveSmallIntegerField()),
                 ('tm_from', models.TimeField()),
                 ('tm_to', models.TimeField()),
