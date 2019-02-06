@@ -1,10 +1,13 @@
 from .base_class import Xlsx_base
+from math import ceil, floor
 from src.db.models import (
     ProductionDay,
-    WorkerDay
+    WorkerDay,
 )
+from src.util.collection import group_by
 from .colors import *
 import datetime
+import json
 
 
 class Tabel_xlsx(Xlsx_base):
@@ -114,8 +117,7 @@ class Tabel_xlsx(Xlsx_base):
             'align': 'fill',
             'font_color': COLOR_RED,
         })
-        self.worksheet.write_string(1, 1, 'ООО "ЛЕРУА МЕРЛЕН ВОСТОК"', text_top)
-        self.worksheet.write_string(2, 1, 'Магазин {}'.format(self.super_shop.title), text_top)
+        self.worksheet.write_string(2, 1, 'Магазин: {}'.format(self.super_shop.title), text_top)
         self.worksheet.write_rich_string(3, 1,
                                          text_top, 'ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ ',
                                          text_top_red, '{}  {}г.'.format(
@@ -178,11 +180,7 @@ class Tabel_xlsx(Xlsx_base):
             'border': 1,
         })
         self.worksheet.write_string('C11', 'Запланированные часы', text_f)
-        self.worksheet.write_number(
-            'D11',
-            sum(map(lambda x: ProductionDay.WORK_NORM_HOURS[x.type], self.prod_days)),
-            number_f
-        )
+        self.worksheet.write_number('D11', self.prod_month.norm_work_hours, number_f)
 
         #
         # add workday types:
@@ -298,7 +296,7 @@ class Tabel_xlsx(Xlsx_base):
                 datetime.time(6, 0),
             )
 
-        total = str(int(self.__time2hours(tm_start, tm_end, breaks) + 0.5))
+        total = str(int(self.__time2hours(tm_start, tm_end, breaks) + 0.75))
         night_hs = 'all'
         if night_edges[0] > tm_start:
             # day_hs = self.__time2hours(tm_start, night_edges[0])
@@ -334,7 +332,7 @@ class Tabel_xlsx(Xlsx_base):
                             text = str(total_h)
 
                     elif wd.type == WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
-                        total_h = int(self.__time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), triplets))
+                        total_h = ceil(self.__time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), triplets))
                         text = 'В{}'.format(total_h)
 
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
@@ -418,9 +416,10 @@ class Tabel_xlsx(Xlsx_base):
             row + 4, n_users, col + 1,
             '=COUNTIF(G{0}:AK{0}, "В1")*1 + COUNTIF(G{0}:AK{0},"В2")*2+COUNTIF(G{0}:AK{0},"В3")*3+COUNTIF(G{0}:AK{0},"В4")*4+'
             'COUNTIF(G{0}:AK{0},"В5")*5+COUNTIF(G{0}:AK{0},"В6")*6+COUNTIF(G{0}:AK{0},"В7")*7+COUNTIF(G{0}:AK{0},"В8")*8+'
+            'COUNTIF(G{0}:AK{0},"5")*5+COUNTIF(G{0}:AK{0},"6")*6+'
             'COUNTIF(G{0}:AK{0},"7")*7+COUNTIF(G{0}:AK{0},"8")*8+COUNTIF(G{0}:AK{0},"9")*9+COUNTIF(G{0}:AK{0},"10")*10+'
             'COUNTIF(G{0}:AK{0},"11")*11+COUNTIF(G{0}:AK{0},"12")*12+COUNTIF(G{0}:AK{0},"К")*8+COUNTIF(G{0}:AK{0},"8_1")*8+'
-            'COUNTIF(G{0}:AK{0},"8_2")*8+COUNTIF(G{0}:AK{0},"11_1")*11+COUNTIF(G{0}:AK{0},"11_7")*11',
+            'COUNTIF(G{0}:AK{0},"8_2")*8+COUNTIF(G{0}:AK{0},"11_1")*11+COUNTIF(G{0}:AK{0},"11_7")*11+COUNTIF(G{0}:AK{0},"11_2")*11',
             cell_f
         )
 
@@ -621,3 +620,95 @@ class Tabel_xlsx(Xlsx_base):
             'Руководитель  отдела   /  __________________  /  ___________________________ / ',
             self.workbook.add_format(self.default_text_settings)
         )
+
+    @staticmethod
+    def change_for_inspection(month_norm_hours, workdays):
+        break_triplets = json.loads(workdays[0].worker.shop.break_triplets)
+
+        workdays = group_by(workdays, group_key=lambda _: _.worker_id)
+        actual_hours = {}
+
+        def from_workday_to_holiday(wd):
+            wd.type = WorkerDay.Type.TYPE_HOLIDAY.value
+            wd.dttm_work_start = None
+            wd.dttm_work_end = None
+
+        def concat_breaks(duration, concat_type='sub'):
+            """
+
+            :param duration: worker day duration, in minutes
+            :param concat_type: 'sub'/'add', add or subtract breaks to wd_duration
+            :return: worker day duration minus breaks
+            """
+            needed_triplet = None
+            for triplet in break_triplets:
+                if triplet[0] < duration <= triplet[1]:
+                    needed_triplet = triplet
+
+            if needed_triplet:
+                for break_item in needed_triplet[2]:
+                    if concat_type == 'sub':
+                        duration -= break_item
+                    else:
+                        duration += break_item
+            return duration
+
+        for worker_id in workdays.keys():
+            actual_hours[worker_id] = 0
+            for wd in workdays[worker_id]:
+                if wd.dttm_work_start and wd.dttm_work_end:
+                    hours_on_day = concat_breaks((wd.dttm_work_end - wd.dttm_work_start).total_seconds() / 60) / 60
+                    actual_hours[worker_id] += hours_on_day
+            if actual_hours[worker_id] > month_norm_hours:
+                diff = actual_hours[worker_id] - month_norm_hours
+                diff_days = ceil(diff) / 8
+
+                worker_workdays_len = len(workdays[worker_id])
+                each = worker_workdays_len // ceil(diff_days)
+                days_to_change = ceil(diff_days)
+
+                for i in range(1, worker_workdays_len):
+                    if days_to_change == 1 and diff_days != int(diff_days):
+                        for j in range(i, worker_workdays_len):
+                            worker_day = workdays[worker_id][j]
+                            if worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
+                                wd_duration = (worker_day.dttm_work_end - worker_day.dttm_work_start).total_seconds() / 60
+                                no_breaks_duration = concat_breaks(wd_duration)
+                                new_duration = no_breaks_duration * (1 - diff_days + int(diff_days))
+                                worker_day.dttm_work_end = worker_day.dttm_work_start + datetime.timedelta(
+                                    minutes=concat_breaks(new_duration, 'add')
+                                )
+
+                                days_to_change -= 1
+                                break
+                            if j == worker_workdays_len - 1:
+                                worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
+                                worker_day.dttm_work_start = workdays[worker_id][j - 1].dttm_work_start
+                                wd_duration = 540
+                                no_breaks_duration = concat_breaks(wd_duration)
+                                new_duration = no_breaks_duration * (1 - diff_days + int(diff_days))
+                                worker_day.dttm_work_end = worker_day.dttm_work_start + datetime.timedelta(
+                                    minutes=concat_breaks(new_duration, 'add')
+                                )
+                                days_to_change -= 1
+                                break
+                    if days_to_change == 0:
+                        break
+                    if i % each == 0:
+                        if workdays[worker_id][i].type == WorkerDay.Type.TYPE_WORKDAY.value:
+                            from_workday_to_holiday(workdays[worker_id][i])
+                            days_to_change -= 1
+                        else:
+                            for j in range(i, worker_workdays_len - days_to_change):
+                                if workdays[worker_id][j].type == WorkerDay.Type.TYPE_WORKDAY.value:
+                                    from_workday_to_holiday(workdays[worker_id][j])
+                                    days_to_change -= 1
+                                    break
+                            each = worker_workdays_len - days_to_change
+
+        work_days_list = []
+        for worker_id in workdays.keys():
+            for worker_day in workdays[worker_id]:
+                work_days_list.append(worker_day)
+
+        return work_days_list

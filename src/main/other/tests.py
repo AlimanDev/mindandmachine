@@ -2,7 +2,7 @@ from src.util.test import LocalTestCase
 import json
 
 
-class TestCashboxTypes(LocalTestCase):
+class TestWorkTypes(LocalTestCase):
     def setUp(self):
         super().setUp()
 

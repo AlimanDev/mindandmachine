@@ -8,7 +8,8 @@ from django.conf import settings
 
 from src.db.models import (
     PeriodClients,
-    CashboxType,
+    WorkType,
+    OperationType,
     ProductionDay,
     Shop,
 
@@ -26,17 +27,16 @@ from django.core.exceptions import EmptyResultSet
 #         shop_id(int): id отдела
 #
 #     Warning:
-#         учитывает только типы касс с do_forecast = CashboxType.FORECAST_HARD
+#         учитывает только типы касс с do_forecast = WorkType.FORECAST_HARD
 #
 #     Returns:
 #         {
-#             cashbox_type_id: {
+#             work_type_id: {
 #                 | 'max_depth': int,
 #                 | 'eta': int,
 #                 | 'min_split_loss': int,
 #                 | 'reg_lambda': int,
-#                 | 'silent': int,
-#                 | 'is_main_type': 0/1
+#                 | 'silent': int
 #             }, ...
 #         }
 #     """
@@ -44,19 +44,19 @@ from django.core.exceptions import EmptyResultSet
 #     # todo: aa: нужно qos_filter_active -- но это треш какой-то, как можно запрогнозировать, если там там по середине
 #     # todo: aa: месяца один тип закрылся, а потом новый открылся... трешшшшшш
 #
-#     for cashbox_type in CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD):
-#         params_dict[cashbox_type.id = json.loads(cashbox_type.period_demand_params)
+#     for work_type in WorkType.objects.filter(shop_id=shop_id, do_forecast=WorkType.FORECAST_HARD):
+#         params_dict[work_type.id = json.loads(work_type.period_demand_params)
 #         # checks
 #         if len(period_params) == 6:
 #             for parameter in period_params.values():
 #                 if parameter >= 0:
 #                     pass
 #                 else:
-#                     raise ValueError('invalid parameter {} for {}'.format(parameter, cashbox_type.name))
+#                     raise ValueError('invalid parameter {} for {}'.format(parameter, work_type.name))
 #         else:
-#             raise ValueError('invalid number of params for {}'.format(cashbox_type.name))
+#             raise ValueError('invalid number of params for {}'.format(work_type.name))
 #
-#         params_dict[cashbox_type.id] = period_params
+#         params_dict[work_type.id] = period_params
 #
 #     return params_dict
 
@@ -94,8 +94,8 @@ def create_predbills_request_function(shop_id, dt=None):
 
     shop = Shop.objects.select_related('super_shop').filter(id=shop_id).first()
 
-    period_clients = PeriodClients.objects.select_related('cashbox_type').filter(
-        cashbox_type__shop_id=shop_id,
+    period_clients = PeriodClients.objects.select_related('operation_type__work_type__shop').filter(
+        operation_type__work_type__shop_id=shop_id,
         type=PeriodClients.FACT_TYPE,
         dttm_forecast__date__gt=dt - relativedelta(years=YEARS_TO_COLLECT),
         dttm_forecast__date__lt=dt,
@@ -107,13 +107,16 @@ def create_predbills_request_function(shop_id, dt=None):
     try:
         # todo: aa: нужно qos_filter_active -- но это треш какой-то, как можно запрогнозировать, если там там по середине
         # todo: aa: месяца один тип закрылся, а потом новый открылся... трешшшшшш
-        work_types_dict = {}
-        for cashbox_type in CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD):
-            work_types_dict[cashbox_type.id] = {
-                'id': cashbox_type.id,
-                'predict_demand_params':  json.loads(cashbox_type.period_demand_params),
-                'name': cashbox_type.name
-
+        operation_types_dict = {}
+        for operation_type in OperationType.objects.select_related('work_type').filter(
+                work_type__shop_id=shop_id,
+                do_forecast=OperationType.FORECAST_HARD
+        ):
+            operation_types_dict[operation_type.id] = {
+                'id': operation_type.id,
+                'predict_demand_params':  json.loads(operation_type.period_demand_params),
+                'name': operation_type.name,
+                'work_type': operation_type.work_type.id
             }
     except ValueError as error_message:
         return JsonResponse.internal_error(error_message)
@@ -130,12 +133,12 @@ def create_predbills_request_function(shop_id, dt=None):
             'tm_start': BaseConverter.convert_time(shop.super_shop.tm_start),
             'tm_end': BaseConverter.convert_time(shop.super_shop.tm_end),
         },
-        'work_types': work_types_dict,
+        'work_types': operation_types_dict,
         'period_demands': [
             {
                 'value': period_demand.value,
                 'dttm': BaseConverter.convert_datetime(period_demand.dttm_forecast),
-                'work_type': period_demand.cashbox_type_id,
+                'work_type': period_demand.work_type_id,
             } for period_demand in period_clients
         ],
         'shop_id': shop.id,

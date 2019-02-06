@@ -12,7 +12,7 @@ Note:
         | 'ct_type'(int): на какую специализацию ищем замену,
         | 'predict_demand'(list): QuerySet PeriodDemand'ов,
         | 'mean_bills_per_step'(dict): по ключу -- id типа кассы, по значению -- средняя скорость,
-        | 'cashbox_types_dict'(dict): по ключу -- id типа кассы, по значению -- объект
+        | 'work_types_dict'(dict): по ключу -- id типа кассы, по значению -- объект
         | 'users_who_can_work(list): список пользователей, которые могут работать на ct_type
     }
 
@@ -32,11 +32,12 @@ Note:
 from src.db.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
-    CashboxType,
+    WorkType,
     WorkerCashboxInfo,
     WorkerConstraint,
     User,
     PeriodClients,
+    OperationType
 )
 
 from django.db.models import Q
@@ -83,44 +84,44 @@ def get_init_params(dttm_exchange, shop_id):
         {
             | 'predict_demand': QuerySet PeriodDemand'ов,
             | 'mean_bills_per_step'(dict): по ключу -- id типа кассы, по значению -- средняя скорость,
-            | 'cashbox_types_dict'(dict): по ключу -- id типа кассы, по значению -- объект
+            | 'work_types_dict'(dict): по ключу -- id типа кассы, по значению -- объект
         }
     """
 
     day_begin_dttm = datetime.combine(dttm_exchange.date(), time(6, 30))
     day_end_dttm = datetime.combine(dttm_exchange.date() + timedelta(days=1), time(2, 0))
 
-    cashbox_types_dict = group_by(
-        CashboxType.objects.
+    work_types_dict = group_by(
+        WorkType.objects.
             qos_filter_active(dt_from=day_begin_dttm.date(), dt_to=day_end_dttm.date()).
             filter(shop_id=shop_id).
-            exclude(do_forecast=CashboxType.FORECAST_NONE).
+            exclude(work_type_reversed__do_forecast=OperationType.FORECAST_NONE).
             order_by('id'),
         group_key=lambda x: x.id
     )
 
     predict_demand = PeriodClients.objects.filter(
-        cashbox_type__shop_id=shop_id,
+        operation_type__work_type__shop_id=shop_id,
         dttm_forecast__gte=day_begin_dttm,
         dttm_forecast__lte=day_end_dttm,
         type=PeriodClients.LONG_FORECASE_TYPE,
-        cashbox_type_id__in=list(cashbox_types_dict.keys())
+        operation_type__work_type_id__in=list(work_types_dict.keys())
     ).order_by(
         'type',
         'dttm_forecast',
-        'cashbox_type_id'
+        'operation_type_id'
     )
 
     mean_bills_per_step = WorkerCashboxInfo.objects.filter(
         is_active=True,
-        cashbox_type_id__in=list(cashbox_types_dict.keys())
-    ).values('cashbox_type_id').annotate(speed_usual=Max('mean_speed'))
-    mean_bills_per_step = {m['cashbox_type_id']: m['speed_usual'] for m in mean_bills_per_step}
+        work_type_id__in=list(work_types_dict.keys())
+    ).values('work_type_id').annotate(speed_usual=Max('mean_speed'))
+    mean_bills_per_step = {m['work_type_id']: m['speed_usual'] for m in mean_bills_per_step}
 
     return {
         'predict_demand': predict_demand,
         'mean_bills_per_step': mean_bills_per_step,
-        'cashbox_types_dict': cashbox_types_dict
+        'work_types_dict': work_types_dict
     }
 
 
@@ -150,7 +151,7 @@ def get_cashiers_working_at_time_on(dttm, ct_ids):
 
     Returns:
         {
-            cashbox_type_id: [QuerySet юзеров, которые работают в это время за cashbox_type_id]
+            work_type_id: [QuerySet юзеров, которые работают в это время за work_type_id]
         }
     """
     if not isinstance(ct_ids, list):
@@ -159,13 +160,13 @@ def get_cashiers_working_at_time_on(dttm, ct_ids):
         worker_day__dttm_work_end__gt=dttm,
         worker_day__dttm_work_start__lt=dttm,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
-        worker_day__worker__shop=CashboxType.objects.get(id=ct_ids[0]).shop,
+        worker_day__worker__shop=WorkType.objects.get(id=ct_ids[0]).shop,
         worker_day__dt=dttm.date(),
     )
 
     ct_user_dict = {}
     for ct_type_id in ct_ids:
-        filtered_against_ct_type = worker_day_cashbox_details.filter(cashbox_type=ct_type_id)
+        filtered_against_ct_type = worker_day_cashbox_details.filter(work_type=ct_type_id)
         ct_user_dict[ct_type_id] = []
         for worker_day_cashbox_details_obj in filtered_against_ct_type:
             if worker_day_cashbox_details_obj.worker_day.worker not in ct_user_dict[ct_type_id]:
@@ -181,11 +182,11 @@ def get_cashiers_working_at_time_on(dttm, ct_ids):
 #     Args:
 #         dttm_start(datetime.datetime): начало интервала
 #         dttm_end(datetime.datetime): конец интервала
-#         ct_ids(list/CashboxType obj): какие специалазии интересуют
+#         ct_ids(list/WorkType obj): какие специалазии интересуют
 #
 #     Returns:
 #         {
-#             cashbox_type_id: [users], ...
+#             work_type_id: [users], ...
 #         }
 #     """
 #     if not isinstance(ct_ids, list):
@@ -194,13 +195,13 @@ def get_cashiers_working_at_time_on(dttm, ct_ids):
 #         Q(worker_day__dttm_work_start__lte=dttm_start) & Q(worker_day__dttm_work_end__lte=dttm_end) |
 #         Q(worker_day__dttm_work_start__gte=dttm_start) & Q(worker_day__dttm_work_end__gte=dttm_end),
 #         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
-#         worker_day__worker__shop=CashboxType.objects.get(id=ct_ids[0]).shop,
+#         worker_day__worker__shop=WorkType.objects.get(id=ct_ids[0]).shop,
 #         worker_day__dt=dttm_start.date(),
 #     )
 #
 #     ct_user_dict = {}
 #     for ct_type_id in ct_ids:
-#         filtered_against_ct_type = worker_day_cashbox_details.filter(cashbox_type=ct_type_id)
+#         filtered_against_ct_type = worker_day_cashbox_details.filter(work_type=ct_type_id)
 #         ct_user_dict[ct_type_id] = []
 #         for worker_day_cashbox_details_obj in filtered_against_ct_type:
 #             if worker_day_cashbox_details_obj.worker_day.worker not in ct_user_dict[ct_type_id]:
@@ -215,11 +216,11 @@ def get_cashier_on_interval(dttm_start, dttm_end, ct_ids):
     Args:
         dttm_start(datetime.datetime): начало интервала
         dttm_end(datetime.datetime): конец интервала
-        ct_ids(list/CashboxType obj): какие специалазии интересуют
+        ct_ids(list/WorkType obj): какие специалазии интересуют
 
     Returns:
         {
-            cashbox_type_id: [users], ...
+            work_type_id: [users], ...
         }
     """
     if not isinstance(ct_ids, list):
@@ -228,13 +229,13 @@ def get_cashier_on_interval(dttm_start, dttm_end, ct_ids):
         worker_day__dttm_work_start__lte=dttm_start,
         worker_day__dttm_work_end__gte=dttm_end,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
-        worker_day__worker__shop=CashboxType.objects.get(id=ct_ids[0]).shop,
+        worker_day__worker__shop=WorkType.objects.get(id=ct_ids[0]).shop,
         worker_day__dt=dttm_start.date(),
     )
 
     ct_user_dict = {}
     for ct_type_id in ct_ids:
-        filtered_against_ct_type = worker_day_cashbox_details.filter(cashbox_type=ct_type_id)
+        filtered_against_ct_type = worker_day_cashbox_details.filter(work_type=ct_type_id)
         ct_user_dict[ct_type_id] = []
         for worker_day_cashbox_details_obj in filtered_against_ct_type:
             if worker_day_cashbox_details_obj.worker_day.worker not in ct_user_dict[ct_type_id]:
@@ -255,7 +256,7 @@ def get_users_who_can_work_on_ct_type(ct_id, dttm_exchange):
     """
     wci = WorkerCashboxInfo.objects.select_related('worker').filter(
         Q(worker__dt_fired__gt=dttm_exchange.date()) | Q(worker__dt_fired__isnull=True),
-        cashbox_type_id=ct_id,
+        work_type_id=ct_id,
         is_active=True,
     )
     users = []
@@ -294,7 +295,7 @@ def get_intervals_with_excess(arguments_dict):
 
     Returns:
         {
-            cashbox_type_id: [dttm_start, dttm_end, dttm_start2, dttm_end2, ..],..
+            work_type_id: [dttm_start, dttm_end, dttm_start2, dttm_end2, ..],..
         }
     """
     to_collect = {}  # { cashbox type: [amount of intervals] }
@@ -308,59 +309,59 @@ def get_intervals_with_excess(arguments_dict):
 
     dttm = day_begin_dttm
     while dttm <= day_end_dttm:
-        predict_diff_dict, demand_ind = count_diff(dttm, arguments_dict['predict_demand'], demand_ind, arguments_dict['mean_bills_per_step'], arguments_dict['cashbox_types'])
-        users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list(arguments_dict['cashbox_types'].keys()))  # dict {ct_id: users}
-        for cashbox_type in predict_diff_dict.keys():
-            if cashbox_type not in to_collect.keys():
-                to_collect[cashbox_type] = [0]
-            if cashbox_type not in dttm_to_collect.keys():
-                dttm_to_collect[cashbox_type] = [None]
-            number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
-            if int(predict_diff_dict[cashbox_type]) + 1 < number_of_workers and number_of_workers > 1:
-                if to_collect[cashbox_type][-1] == 0:
-                    dttm_to_collect[cashbox_type][-1] = dttm
-                to_collect[cashbox_type][-1] += 1
+        predict_diff_dict, demand_ind = count_diff(dttm, arguments_dict['predict_demand'], demand_ind, arguments_dict['mean_bills_per_step'], arguments_dict['work_types'])
+        users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list(arguments_dict['work_types'].keys()))  # dict {ct_id: users}
+        for work_type in predict_diff_dict.keys():
+            if work_type not in to_collect.keys():
+                to_collect[work_type] = [0]
+            if work_type not in dttm_to_collect.keys():
+                dttm_to_collect[work_type] = [None]
+            number_of_workers = len(users_working_on_hard_cts_at_dttm[work_type])
+            if int(predict_diff_dict[work_type]) + 1 < number_of_workers and number_of_workers > 1:
+                if to_collect[work_type][-1] == 0:
+                    dttm_to_collect[work_type][-1] = dttm
+                to_collect[work_type][-1] += 1
 
             else:
-                amount_of_intervals = to_collect[cashbox_type][-1]
+                amount_of_intervals = to_collect[work_type][-1]
                 if amount_of_intervals >= amount_of_hours_to_count_deficiency * 2:
-                    to_collect[cashbox_type].append(0)
-                    dttm_to_collect[cashbox_type].append(dttm)
-                    dttm_to_collect[cashbox_type].append(None)
+                    to_collect[work_type].append(0)
+                    dttm_to_collect[work_type].append(dttm)
+                    dttm_to_collect[work_type].append(None)
                 else:
-                    to_collect[cashbox_type][-1] = 0
-                    dttm_to_collect[cashbox_type][-1] = None
+                    to_collect[work_type][-1] = 0
+                    dttm_to_collect[work_type][-1] = None
         dttm += timedelta(minutes=standard_tm_interval)
 
     return dttm_to_collect
 
 
-def has_deficiency(predict_demand, mean_bills_per_step, cashbox_types, dttm, notify_to):
+def has_deficiency(predict_demand, mean_bills_per_step, work_types, dttm, notify_to):
     """
-    Проверяет есть ли нехватка кассиров в dttm за типами касс cashbox_types
+    Проверяет есть ли нехватка кассиров в dttm за типами касс work_types
 
     Returns:
         {
-            cashbox_type_id: количество кассиров, сколько не хватает(либо False, если нехватки нет)
+            work_type_id: количество кассиров, сколько не хватает(либо False, если нехватки нет)
         }
     """
     ct_deficieny_dict = {}
 
     demand_ind = 0
     while dttm <= notify_to:
-        predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types)
-        users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list(cashbox_types.keys()))
+        predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, work_types)
+        users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list(work_types.keys()))
         dttm_converted = BaseConverter.convert_datetime(dttm)
         ct_deficieny_dict[dttm_converted] = {}
 
-        for cashbox_type in predict_diff_dict.keys():
-            if cashbox_type not in ct_deficieny_dict[dttm_converted]:
-                ct_deficieny_dict[dttm_converted][cashbox_type] = 0
-            number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
-            if int(predict_diff_dict[cashbox_type]) > number_of_workers:
-                ct_deficieny_dict[dttm_converted][cashbox_type] = int(predict_diff_dict[cashbox_type]) - number_of_workers
+        for work_type in predict_diff_dict.keys():
+            if work_type not in ct_deficieny_dict[dttm_converted]:
+                ct_deficieny_dict[dttm_converted][work_type] = 0
+            number_of_workers = len(users_working_on_hard_cts_at_dttm[work_type])
+            if int(predict_diff_dict[work_type]) > number_of_workers:
+                ct_deficieny_dict[dttm_converted][work_type] = int(predict_diff_dict[work_type]) - number_of_workers
             else:
-                ct_deficieny_dict[dttm_converted][cashbox_type] = 0
+                ct_deficieny_dict[dttm_converted][work_type] = 0
 
         dttm += datetime_module.timedelta(hours=1)
 
@@ -396,7 +397,7 @@ def shift_user_times(dttm_exchange, user):
     # максимальное время, когда может заканчиваться рабочий день
     threshold_time_end = datetime.combine((dttm_exchange + timedelta(days=1)).date(), datetime_module.time(0, 30))
     # минимальное время, когда может начинаться рабочий день
-    threshold_time_start = datetime.combine(dttm_exchange.date(), datetime_module.time(7, 0))
+    threshold_time_start = datetime.combine(dttm_exchange.date(), datetime_module.time(6, 0))
 
     times_to_consider = []  # список подходящих времен [(9:00, 18:00), (9:30, 18:30), ...]
 
@@ -407,7 +408,7 @@ def shift_user_times(dttm_exchange, user):
         return None, None
 
     dttm = dttm_exchange
-    while dttm >= dttm_exchange + timedelta(minutes=standard_tm_interval) - timedelta(hours=9) and dttm > threshold_time_start:
+    while dttm >= dttm_exchange + timedelta(minutes=standard_tm_interval) - timedelta(hours=9) and dttm >= threshold_time_start:
         user_new_dttm_work_start = dttm - timedelta(minutes=standard_tm_interval)
 
         # для выходных
@@ -453,8 +454,8 @@ def from_other_spec(arguments_dict):
     demand_ind = 0
     predict_demand = arguments_dict['predict_demand']
     mean_bills_per_step = arguments_dict['mean_bills_per_step']
-    cashbox_types = arguments_dict['cashbox_types']
-    list_of_cashbox_type = sorted(list(cashbox_types.keys()))
+    work_types = arguments_dict['work_types']
+    list_of_work_type = sorted(list(work_types.keys()))
     excess_percent = 0.5
     dttm_exchange = arguments_dict['dttm_exchange']
     users_for_exchange = {}
@@ -470,22 +471,22 @@ def from_other_spec(arguments_dict):
         tm += timedelta(minutes=standard_tm_interval)
 
     to_consider = {}  # рассматривать ли вообще тип касс или нет
-    for hard_ct in list_of_cashbox_type:
+    for hard_ct in list_of_work_type:
         if hard_ct == arguments_dict['ct_type']:
             to_consider[hard_ct] = False
         else:
             to_consider[hard_ct] = True
 
     for dttm in dttm_sections:
-        predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types)
-        users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list_of_cashbox_type)  # dict {ct_id: users}
-        for cashbox_type in predict_diff_dict.keys():
-            number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
-            if int(predict_diff_dict[cashbox_type]) + 1 < number_of_workers and number_of_workers > 1 and to_consider[cashbox_type]:
-                for user in users_working_on_hard_cts_at_dttm[cashbox_type]:
+        predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, work_types)
+        users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list_of_work_type)  # dict {ct_id: users}
+        for work_type in predict_diff_dict.keys():
+            number_of_workers = len(users_working_on_hard_cts_at_dttm[work_type])
+            if int(predict_diff_dict[work_type]) + 1 < number_of_workers and number_of_workers > 1 and to_consider[work_type]:
+                for user in users_working_on_hard_cts_at_dttm[work_type]:
                     if user in arguments_dict['users_who_can_work']:
                         worker_day_obj = WorkerDay.objects.qos_current_version().get(dt=dttm_exchange.date(), worker=user)
-                        if (number_of_workers - int(predict_diff_dict[cashbox_type])) / number_of_workers > excess_percent:
+                        if (number_of_workers - int(predict_diff_dict[work_type])) / number_of_workers > excess_percent:
                             users_for_exchange[user.id] = set_response_dict(
                                 ChangeType.from_other_spec_part.value,
                                 worker_day_obj.dttm_work_start,
@@ -499,7 +500,7 @@ def from_other_spec(arguments_dict):
                             )
 
             else:
-                to_consider[cashbox_type] = False
+                to_consider[work_type] = False
 
     return users_for_exchange
 
@@ -651,8 +652,8 @@ def from_evening_line(arguments_dict):
     demand_ind = 0
     predict_demand = arguments_dict['predict_demand']
     mean_bills_per_step = arguments_dict['mean_bills_per_step']
-    cashbox_types = arguments_dict['cashbox_types']
-    list_of_cashbox_type = sorted(list(cashbox_types.keys()))
+    work_types = arguments_dict['work_types']
+    list_of_work_type = sorted(list(work_types.keys()))
     users_for_exchange = {}
 
     #tm settings
@@ -661,38 +662,38 @@ def from_evening_line(arguments_dict):
         datetime.combine(dttm_exchange.date(), datetime_module.time(23, 0))
     ]
 
-    dttm = evening_period[0]
-    while dttm <= evening_period[1]:
-        predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, cashbox_types)
-        users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list_of_cashbox_type)  # dict {ct_id: users}
-        for cashbox_type in predict_diff_dict.keys():
-            number_of_workers = len(users_working_on_hard_cts_at_dttm[cashbox_type])
-            if cashbox_types[cashbox_type][0].is_main_type:
-                if 0 < int(predict_diff_dict[cashbox_type]) - number_of_workers < deficit_threshold:
-                    for user in users_working_on_hard_cts_at_dttm[cashbox_type]:
-                        if user in arguments_dict['users_who_can_work']:
-                            if user.id not in users_for_exchange.keys():
-                                user_new_dttm_work_start, user_new_dttm_work_end = shift_user_times(dttm_exchange, user)
-                                if user_new_dttm_work_start is not None and user_new_dttm_work_end is not None:
-                                    users_for_exchange[user.id] = set_response_dict(
-                                        ChangeType.from_evening_line.value,
-                                        user_new_dttm_work_start,
-                                        user_new_dttm_work_end
-                                    )
-            else:
-                if number_of_workers > 1 and (number_of_workers - int(predict_diff_dict[cashbox_type])) / number_of_workers > excess_percent:
-                    for user in users_working_on_hard_cts_at_dttm[cashbox_type]:
-                        if user in arguments_dict['users_who_can_work']:
-                            if user.id not in users_for_exchange.keys():
-                                user_new_dttm_work_start, user_new_dttm_work_end = shift_user_times(dttm_exchange, user)
-                                if user_new_dttm_work_start is not None and user_new_dttm_work_end is not None:
-                                    users_for_exchange[user.id] = set_response_dict(
-                                        ChangeType.from_evening_line.value,
-                                        user_new_dttm_work_start,
-                                        user_new_dttm_work_end
-                                    )
-
-        dttm += timedelta(minutes=30)
+    # dttm = evening_period[0]
+    # while dttm <= evening_period[1]:
+    #     predict_diff_dict, demand_ind = count_diff(dttm, predict_demand, demand_ind, mean_bills_per_step, work_types)
+    #     users_working_on_hard_cts_at_dttm = get_cashiers_working_at_time_on(dttm, list_of_work_type)  # dict {ct_id: users}
+    #     for work_type in predict_diff_dict.keys():
+    #         number_of_workers = len(users_working_on_hard_cts_at_dttm[work_type])
+    #         if work_types[work_type][0].is_main_type:
+    #             if 0 < int(predict_diff_dict[work_type]) - number_of_workers < deficit_threshold:
+    #                 for user in users_working_on_hard_cts_at_dttm[work_type]:
+    #                     if user in arguments_dict['users_who_can_work']:
+    #                         if user.id not in users_for_exchange.keys():
+    #                             user_new_dttm_work_start, user_new_dttm_work_end = shift_user_times(dttm_exchange, user)
+    #                             if user_new_dttm_work_start is not None and user_new_dttm_work_end is not None:
+    #                                 users_for_exchange[user.id] = set_response_dict(
+    #                                     ChangeType.from_evening_line.value,
+    #                                     user_new_dttm_work_start,
+    #                                     user_new_dttm_work_end
+    #                                 )
+    #         else:
+    #             if number_of_workers > 1 and (number_of_workers - int(predict_diff_dict[work_type])) / number_of_workers > excess_percent:
+    #                 for user in users_working_on_hard_cts_at_dttm[work_type]:
+    #                     if user in arguments_dict['users_who_can_work']:
+    #                         if user.id not in users_for_exchange.keys():
+    #                             user_new_dttm_work_start, user_new_dttm_work_end = shift_user_times(dttm_exchange, user)
+    #                             if user_new_dttm_work_start is not None and user_new_dttm_work_end is not None:
+    #                                 users_for_exchange[user.id] = set_response_dict(
+    #                                     ChangeType.from_evening_line.value,
+    #                                     user_new_dttm_work_start,
+    #                                     user_new_dttm_work_end
+    #                                 )
+    #
+    #     dttm += timedelta(minutes=30)
 
     return users_for_exchange
 
@@ -737,21 +738,21 @@ def sos_group(arguments_dict):
     shop_id = arguments_dict['shop_id']
     users_for_exchange = {}
 
-    try:
-        line_ct_id = CashboxType.objects.get(is_main_type=True, shop_id=shop_id).id
-    except ObjectDoesNotExist:
-        return users_for_exchange
+    # try:
+    #     line_ct_id = WorkType.objects.get(is_main_type=True, shop_id=shop_id).id
+    # except ObjectDoesNotExist:
+    #     return users_for_exchange
 
-    if ct_type == line_ct_id:
-        users_working_on_lines = get_cashiers_working_at_time_on(dttm_exchange, line_ct_id)  # dict {ct_id: users}
-        for user in users_working_on_lines[line_ct_id]:
-            if user.work_type == User.WorkType.TYPE_SOS.value:
-                worker_day_obj = WorkerDay.objects.qos_current_version().get(dt=dttm_exchange.date(), worker=user)
-                users_for_exchange[user.id] = set_response_dict(
-                    ChangeType.sos_group.value,
-                    worker_day_obj.dttm_work_start,
-                    worker_day_obj.dttm_work_end
-                )
+    # if ct_type == line_ct_id:
+    #     users_working_on_lines = get_cashiers_working_at_time_on(dttm_exchange, line_ct_id)  # dict {ct_id: users}
+    #     for user in users_working_on_lines[line_ct_id]:
+    #         if user.work_type == User.WorkType.TYPE_SOS.value:
+    #             worker_day_obj = WorkerDay.objects.qos_current_version().get(dt=dttm_exchange.date(), worker=user)
+    #             users_for_exchange[user.id] = set_response_dict(
+    #                 ChangeType.sos_group.value,
+    #                 worker_day_obj.dttm_work_start,
+    #                 worker_day_obj.dttm_work_end
+    #             )
 
     return users_for_exchange
 

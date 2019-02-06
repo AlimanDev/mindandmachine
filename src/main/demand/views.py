@@ -4,7 +4,7 @@ from src.db.models import (
     PeriodClients,
     PeriodProducts,
     PeriodQueues,
-    CashboxType,
+    WorkType,
     PeriodDemandChangeLog,
     Shop,
     Notifications,
@@ -37,7 +37,7 @@ def get_indicators(request, form):
         url: /api/demand/get_indicators
         from_dt(QOS_DATE): required = True
         to_dt(QOS_DATE): required = True
-        cashbox_type_id(int): required = True
+        work_type_id(int): required = True
         shop_id(int): required = False
 
     Returns:
@@ -51,32 +51,35 @@ def get_indicators(request, form):
     dt_from = form['from_dt']
     dt_to = form['to_dt']
     shop_id = form['shop_id']
-    cashbox_type_id = form['cashbox_type_id']
+    work_type_id = form['work_type_id']
 
-    if not cashbox_type_id:
-        cashbox_type_filter_list = CashboxType.objects.qos_filter_active(dt_from, dt_to).values_list('id', flat=True)
+    if not work_type_id:
+        work_type_filter_list = WorkType.objects.qos_filter_active(dt_from, dt_to).values_list('id', flat=True)
     else:
-        cashbox_type_filter_list = [cashbox_type_id]
+        work_type_filter_list = [work_type_id]
 
-    if not len(cashbox_type_filter_list):
+    if not len(work_type_filter_list):
         return JsonResponse.internal_error('Нет активных касс в данный период')
 
     period_filter_dict = {
-        'cashbox_type__shop_id': shop_id,
-        'cashbox_type_id__in': cashbox_type_filter_list,
+        'operation_type__work_type__shop_id': shop_id,
+        'operation_type__work_type_id__in': work_type_filter_list,
         'dttm_forecast__gte': datetime.combine(dt_from, time()),
         'dttm_forecast__lt': datetime.combine(dt_to, time()) + timedelta(days=1)
     }
 
-    clients = PeriodClients.objects.select_related('cashbox_type').filter(**period_filter_dict)
+    clients = PeriodClients.objects.select_related(
+        'operation_type',
+        'operation_type__work_type'
+    ).filter(**period_filter_dict)
     long_type_clients = clients.filter(type=PeriodClients.LONG_FORECASE_TYPE).aggregate(Sum('value'))['value__sum']
     fact_type_clients = clients.filter(type=PeriodClients.FACT_TYPE).aggregate(Sum('value'))['value__sum']
 
     prev_clients = PeriodClients.objects.select_related(
-        'cashbox_type'
+        'operation_type__work_type'
     ).filter(
-        cashbox_type__shop_id=shop_id,
-        cashbox_type_id__in=cashbox_type_filter_list,
+        operation_type__work_type__shop_id=shop_id,
+        operation_type__work_type_id__in=work_type_filter_list,
         dttm_forecast__gte=datetime.combine(dt_from, time()) - relativedelta(months=1),
         dttm_forecast__lt=datetime.combine(dt_to, time()) - relativedelta(months=1),
         type=PeriodClients.LONG_FORECASE_TYPE,
@@ -104,7 +107,7 @@ def get_forecast(request, form):
         url: /api/demand/get_forecast
         from_dt(QOS_DATE): required = True
         to_dt(QOS_DATE): required = True
-        cashbox_type_ids(list): список типов касс (либо [] -- для всех типов)
+        operation_type_ids(list): список типов касс (либо [] -- для всех типов)
         format(str): 'raw' или 'excel' , default='raw'
         shop_id(int): required = False
 
@@ -128,24 +131,24 @@ def get_forecast(request, form):
     if form['format'] == 'excel':
         return JsonResponse.value_error('Excel is not supported yet')
 
-    cashbox_type_ids = form['cashbox_type_ids']
+    operation_type_ids = form['operation_type_ids']
 
     shop_id = FormUtil.get_shop_id(request, form)
 
-    period_clients = PeriodClients.objects.select_related('cashbox_type').filter(
-        cashbox_type__shop_id=shop_id
+    period_clients = PeriodClients.objects.select_related('operation_type__work_type').filter(
+        operation_type__work_type__shop_id=shop_id
     )
-    period_products = PeriodProducts.objects.select_related('cashbox_type').filter(
-        cashbox_type__shop_id=shop_id
+    period_products = PeriodProducts.objects.select_related('operation_type__work_type').filter(
+        operation_type__work_type__shop_id=shop_id
     )
-    period_queues = PeriodQueues.objects.select_related('cashbox_type').filter(
-        cashbox_type__shop_id=shop_id
+    period_queues = PeriodQueues.objects.select_related('operation_type__work_type').filter(
+        operation_type__work_type__shop_id=shop_id
     )
 
-    if len(cashbox_type_ids) > 0:
-        period_clients = [x for x in period_clients if x.cashbox_type_id in cashbox_type_ids]
-        period_products = [x for x in period_products if x.cashbox_type_id in cashbox_type_ids]
-        period_queues = [x for x in period_queues if x.cashbox_type_id in cashbox_type_ids]
+    if len(operation_type_ids) > 0:
+        period_clients = [x for x in period_clients if x.operation_type_id in operation_type_ids]
+        period_products = [x for x in period_products if x.operation_type_id in operation_type_ids]
+        period_queues = [x for x in period_queues if x.operation_type_id in operation_type_ids]
 
     period_clients = _create_demands_dict(period_clients)
     period_products = _create_demands_dict(period_products)
@@ -183,24 +186,7 @@ def get_forecast(request, form):
                 'queue': queue_wait_length
             })
 
-    period_demand_change_log = PeriodDemandChangeLog.objects.select_related(
-        'cashbox_type'
-    ).filter(
-        cashbox_type__shop_id=shop_id
-    )
-
-    if len(cashbox_type_ids) > 0:
-        period_demand_change_log = [x for x in period_demand_change_log if x.cashbox_type_id in cashbox_type_ids]
-
-    period_demand_change_log = [x for x in period_demand_change_log if dttm_from < x.dttm_to or dttm_to > x.dttm_from]
-
-    response = {
-        'period_step': 30,
-        'forecast_periods': {k: v for k, v in forecast_periods.items()},
-        'demand_changes': [PeriodDemandChangeLogConverter.convert(x) for x in period_demand_change_log]
-    }
-
-    return JsonResponse.success(response)
+    return JsonResponse.success({k: v for k, v in forecast_periods.items()})
 
 
 @api_method(
@@ -217,37 +203,37 @@ def set_demand(request, form):
         url: /api/demand/set_forecast
         from_dttm(QOS_DATETIME): required = True
         to_dttm(QOS_DATETIME): required = True
-        cashbox_type_id(list): список типов касс (либо [] -- если для всех)
+        work_type_id(list): список типов касс (либо [] -- если для всех)
         multiply_coef(float): required = False
         set_value(float): required = False
         shop_id(int): required = True
 
     """
-    cashbox_type_ids = form['cashbox_type_id']
+    work_type_ids = form['work_type_id']
     dttm_from = form['from_dttm']
     dttm_to = form['to_dttm']
     multiply_coef = form.get('multiply_coef')
     set_value = form.get('set_value')
     shop_id = FormUtil.get_shop_id(request, form)
 
-    if not len(cashbox_type_ids):
-        cashbox_type_ids = CashboxType.objects.qos_filter_active(
+    if not len(work_type_ids):
+        work_type_ids = WorkType.objects.qos_filter_active(
             dttm_from=dttm_from,
             dttm_to=dttm_to,
             shop_id=shop_id
         )
 
     period_clients = PeriodClients.objects.select_related(
-        'cashbox_type'
+        'operation_type__work_type'
     ).filter(
-        cashbox_type__shop_id=shop_id,
+        operation_type__work_type__shop_id=shop_id,
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__gte=dttm_from,
         dttm_forecast__lte=dttm_to,
-        cashbox_type_id__in=cashbox_type_ids
+        operation_type__work_type_id__in=work_type_ids
     )
 
-    changed_ct_ids = []
+    changed_operation_type_ids = []
     for x in period_clients:
         if multiply_coef is not None:
             x.value *= multiply_coef
@@ -256,14 +242,14 @@ def set_demand(request, form):
 
         x.save()
 
-        if x.cashbox_type_id not in changed_ct_ids:
-            changed_ct_ids.append(x.cashbox_type_id)
+        if x.operation_type_id not in changed_operation_type_ids:
+            changed_operation_type_ids.append(x.operation_type_id)
 
-    for x in changed_ct_ids:
+    for x in changed_operation_type_ids:
         PeriodDemandChangeLog.objects.create(
             dttm_from=dttm_from,
             dttm_to=dttm_to,
-            cashbox_type_id=x,
+            operation_type_id=x,
             multiply_coef=multiply_coef,
             set_value=set_value
         )
@@ -283,20 +269,20 @@ def get_demand_change_logs(request, form):
     Args:
          method: GET
          url: /api/demand/get_demand_change_logs
-         cashbox_type_ids(list): required = True
+         work_type_ids(list): required = True
          from_dt(QOS_DATE): required = True
          to_dt(QOS_DATE): required = True
     """
     from_dt = form['from_dt']
     to_dt = form['to_dt']
 
-    if not form['cashbox_type_id']:
-        cashbox_type_ids = CashboxType.objects.filter(shop_id=form['shop_id'])
+    if not form['work_type_id']:
+        work_type_ids = WorkType.objects.filter(shop_id=form['shop_id'])
     else:
-        cashbox_type_ids = [form['cashbox_type_id']]
+        work_type_ids = [form['work_type_id']]
 
     change_logs = PeriodDemandChangeLog.objects.filter(
-        cashbox_type_id__in=cashbox_type_ids,
+        operation_type__work_type_id__in=work_type_ids,
         dttm_from__date__gte=from_dt,
         dttm_to__date__lte=to_dt,
     ).order_by('dttm_added')
@@ -306,7 +292,7 @@ def get_demand_change_logs(request, form):
             'dttm_added': BaseConverter.convert_datetime(x.dttm_added),
             'dttm_from': BaseConverter.convert_datetime(x.dttm_from),
             'dttm_to': BaseConverter.convert_datetime(x.dttm_to),
-            'cashbox_type_id': x.cashbox_type_id,
+            'work_type_id': x.operation_type.work_type_id,
             'multiply_coef': x.multiply_coef,
             'set_value': x.set_value,
         } for x in change_logs],
@@ -408,6 +394,7 @@ def set_pred_bills(request, data):
     """
 
     models_list = []
+
     def save_models(lst, model):
         commit = False
         if model:
@@ -421,17 +408,15 @@ def set_pred_bills(request, data):
             PeriodClients.objects.bulk_create(lst)
             lst[:] = []
 
-
-
     shop = Shop.objects.get(id=data['shop_id'])
     dt_from = BaseConverter.parse_date(data['dt_from'])
     dt_to = BaseConverter.parse_date(data['dt_to'])
 
-    PeriodClients.objects.filter(
+    PeriodClients.objects.select_related('operation_type__work_type').filter(
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to,
-        cashbox_type__shop_id=shop.id,
+        operation_type__work_type__shop_id=shop.id,
     ).delete()
 
     for period_demand_value in data['demand']:
@@ -442,16 +427,16 @@ def set_pred_bills(request, data):
             PeriodClients(
                 type=PeriodClients.LONG_FORECASE_TYPE,
                 dttm_forecast=BaseConverter.parse_datetime(period_demand_value['dttm']),
-                cashbox_type_id=period_demand_value['work_type'],
+                operation_type__work_type_id=period_demand_value['work_type'],
                 value=clients,
             )
         )
 
         # # блок для составления спроса на слотовые типы касс (никак не зависит от data с qos_algo)
         # # todo: возможно не лучшее решение размещать этот блок здесь, потому что он зависит от dttm_forecast
-        # for sloted_cashbox in sloted_cashbox_types:
+        # for sloted_cashbox in sloted_work_types:
         #     workers_needed = Slot.objects.filter(
-        #         cashbox_type=sloted_cashbox,
+        #         work_type=sloted_cashbox,
         #         tm_start__lte=dttm_forecast.time(),
         #         tm_end__gte=dttm_forecast.time(),
         #     ).aggregate(Sum('workers_needed'))['workers_needed__sum']
@@ -462,7 +447,7 @@ def set_pred_bills(request, data):
         #         PeriodClients.objects.update_or_create(
         #             type=PeriodClients.LONG_FORECASE_TYPE,
         #             dttm_forecast=dttm_forecast,
-        #             cashbox_type=sloted_cashbox,
+        #             work_type=sloted_cashbox,
         #             defaults={
         #                 'value': workers_needed
         #             }

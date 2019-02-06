@@ -6,6 +6,7 @@ class GetTable(forms.Form):
     shop_id = forms.IntegerField(required=False)
     weekday = util_forms.DateField()
     checkpoint = forms.IntegerField(required=False)
+    inspection_version = forms.BooleanField(required=False)
 
 
 class GetDemandXlsxForm(forms.Form):

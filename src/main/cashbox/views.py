@@ -1,18 +1,32 @@
 import datetime
+import json
 
-from src.db.models import CashboxType, Cashbox, User, Shop, WorkerDayCashboxDetails
-from src.util.db import CashboxTypeUtil
+from src.db.models import (
+    WorkType,
+    Cashbox,
+    User,
+    Shop,
+    OperationType,
+    Slot,
+    WorkerDayCashboxDetails,
+)
+from src.util.db import WorkTypeUtil
 from src.util.forms import FormUtil
 from src.util.utils import JsonResponse, api_method
-from src.util.models_converter import CashboxTypeConverter, CashboxConverter
+from src.util.models_converter import (
+    WorkTypeConverter,
+    CashboxConverter,
+    OperationTypeConverter,
+)
 from .forms import (
     GetTypesForm,
     GetCashboxesForm,
     CreateCashboxForm,
     DeleteCashboxForm,
     UpdateCashboxForm,
-    CreateCashboxTypeForm,
-    DeleteCashboxTypeForm,
+    CreateWorkTypeForm,
+    EditWorkTypeForm,
+    DeleteWorkTypeForm,
     CashboxesOpenTime,
     CashboxesUsedResource,
 )
@@ -33,10 +47,9 @@ def get_types(request, form):
     Returns:
         [
             {
-                | 'id': cashbox_type_id,
+                | 'id': work_type_id,
                 | 'dttm_deleted': дата удаления(здесь везде null),
                 | 'shop': shop_id,
-                | 'is_stable': True/False,
                 | 'dttm_added': дата добавления,
                 | 'speed_coef': int,
                 | 'name': имя типа
@@ -45,21 +58,20 @@ def get_types(request, form):
     """
     shop_id = FormUtil.get_shop_id(request, form)
 
-    # todo: add selecting in time period
-    types = CashboxType.objects.filter(
+    types = WorkType.objects.filter(
         shop_id=shop_id,
         dttm_deleted__isnull=True,
     )
 
-    return JsonResponse.success(
-        [CashboxTypeConverter.convert(x) for x in CashboxTypeUtil.sort(types)]
-    )
+    return JsonResponse.success([
+        WorkTypeConverter.convert(x, True) for x in types
+    ])
 
 
 @api_method('GET', GetCashboxesForm, groups=User.__all_groups__)
 def get_cashboxes(request, form):
     """
-    Возвращает список касс для заданных в cashbox_types_ids типов
+    Возвращает список касс для заданных в work_types_ids типов
 
     Args:
         method: GET
@@ -67,17 +79,16 @@ def get_cashboxes(request, form):
         shop_id(int): required = False
         from_dt(QOS_DATE): required = False
         to_dt(QOS_DATE): required = False
-        cashbox_type_ids(list): список типов касс
+        work_type_ids(list): список типов касс
 
     Returns:
         {
-            'cashbox_types':{
-                cashbox_type_id: {
+            'work_types':{
+                work_type_id: {
                     | 'dttm_deleted': дата-время удаления (null),
                     | 'dttm_added': дата-время добавления,
                     | 'shop': shop_id,
                     | 'id': id типа кассы,
-                    | 'is_stable': True/False,
                     | 'name': имя типа кассы,
                     | 'speed_coef': int
                 }
@@ -97,7 +108,7 @@ def get_cashboxes(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     dt_from = FormUtil.get_dt_from(form)
     dt_to = FormUtil.get_dt_to(form)
-    cashbox_type_ids = form['cashbox_type_ids']
+    work_type_ids = form['work_type_ids']
 
     cashboxes = Cashbox.objects.select_related(
         'type'
@@ -105,16 +116,16 @@ def get_cashboxes(request, form):
         type__shop_id=shop_id,
     )
 
-    types = CashboxTypeUtil.fetch_from_cashboxes(cashboxes)
+    types = WorkTypeUtil.fetch_from_cashboxes(cashboxes)
 
-    if len(cashbox_type_ids) > 0:
-        cashboxes = [x for x in cashboxes if x.type_id in cashbox_type_ids]
+    if len(work_type_ids) > 0:
+        cashboxes = [x for x in cashboxes if x.type_id in work_type_ids]
 
     cashboxes = [x for x in cashboxes if
                  dt_from <= x.dttm_added.date() <= dt_to or dt_from <= x.dttm_deleted.date() <= dt_to]
 
     return JsonResponse.success({
-        'cashboxes_types': {x.id: CashboxTypeConverter.convert(x) for x in CashboxTypeUtil.sort(types)},
+        'work_types': {x.id: WorkTypeConverter.convert(x) for x in WorkTypeUtil.sort(types)},
         'cashboxes': [CashboxConverter.convert(x) for x in cashboxes]
     })
 
@@ -122,7 +133,7 @@ def get_cashboxes(request, form):
 @api_method(
     'POST',
     CreateCashboxForm,
-    lambda_func=lambda x: CashboxType.objects.get(id=x['cashbox_type_id']).shop
+    lambda_func=lambda x: WorkType.objects.get(id=x['work_type_id']).shop
 )
 def create_cashbox(request, form):
     """
@@ -131,18 +142,17 @@ def create_cashbox(request, form):
     Args:
         method: POST
         url: /api/cashbox/create_cashbox
-        cashbox_type_id(int): id типа кассы, к которой будет привязана созданная касса
+        work_type_id(int): id типа кассы, к которой будет привязана созданная касса
         number(str): номер кассы
 
     Returns:
         {
-            'cashbox_type': {
+            'work_type': {
                 | 'id': id типа кассы,
                 | 'dttm_added': ,
                 | 'dttm_deleted': ,
                 | 'shop': shop_id,
                 | 'name': название типа кассы,
-                | 'is_stable': True/False,
                 | 'speed_coef': int
             },\n
             'cashbox': {
@@ -158,32 +168,32 @@ def create_cashbox(request, form):
     Note:
         Отправляет уведомление о созданной кассе
     """
-    cashbox_type_id = form['cashbox_type_id']
+    work_type_id = form['work_type_id']
     cashbox_number = form['number']
 
     try:
-        cashbox_type = CashboxType.objects.get(id=cashbox_type_id)
-    except CashboxType.DoesNotExist:
-        return JsonResponse.does_not_exists_error('cashbox_type does not exist')
+        work_type = WorkType.objects.get(id=work_type_id)
+    except WorkType.DoesNotExist:
+        return JsonResponse.does_not_exists_error('work_type does not exist')
 
     cashboxes_count = Cashbox.objects.select_related(
         'type'
     ).filter(
-        type__shop_id=cashbox_type.shop_id,
+        type__shop_id=work_type.shop_id,
         dttm_deleted=None,
         number=cashbox_number,
-        type_id=cashbox_type_id
+        type_id=work_type_id
     ).count()
 
     if cashboxes_count > 0:
         return JsonResponse.already_exists_error('Касса с таким номером уже существует')
 
-    cashbox = Cashbox.objects.create(type=cashbox_type, number=cashbox_number)
+    cashbox = Cashbox.objects.create(type=work_type, number=cashbox_number)
 
     send_notification('C', cashbox, sender=request.user)
 
     return JsonResponse.success({
-        'cashbox_type': CashboxTypeConverter.convert(cashbox_type),
+        'work_type': WorkTypeConverter.convert(work_type),
         'cashbox': CashboxConverter.convert(cashbox)
     })
 
@@ -201,7 +211,7 @@ def delete_cashbox(request, form):
         method: POST
         url: /api/cashbox/delete_cashbox
         shop_id(int): required = True
-        cashbox_type_id(int): required = True
+        work_type_id(int): required = True
         number(str): номер кассы которую удаляем
         bio(str): доп инфа
 
@@ -224,7 +234,7 @@ def delete_cashbox(request, form):
         cashbox = Cashbox.objects.select_related(
             'type'
         ).get(
-            type__id=form['cashbox_type_id'],
+            type__id=form['work_type_id'],
             type__shop_id=shop_id,
             dttm_deleted=None,
             number=form['number']
@@ -248,7 +258,7 @@ def delete_cashbox(request, form):
 @api_method(
     'POST',
     UpdateCashboxForm,
-    lambda_func=lambda x: CashboxType.objects.get(id=x['to_cashbox_type_id'].shop)
+    lambda_func=lambda x: WorkType.objects.get(id=x['to_work_type_id'].shop)
 )
 def update_cashbox(request, form):
     """
@@ -257,8 +267,8 @@ def update_cashbox(request, form):
     Args:
         method: POST
         url: /api/cashbox/update_cashbox
-        from_cashbox_type_id(int): с какого типа меняем
-        to_cashbox_type_id(int): на какой
+        from_work_type_id(int): с какого типа меняем
+        to_work_type_id(int): на какой
         number(str): номер кассы
 
     Returns:
@@ -272,7 +282,7 @@ def update_cashbox(request, form):
         }
 
     Raises:
-        JsonResponse.does_not_exists_error: если тип кассы с from/to_cashbox_type_id не существует\
+        JsonResponse.does_not_exists_error: если тип кассы с from/to_work_type_id не существует\
         или если кассы с заданным номером и привязанной к данному типу не существует
         JsonResponse.multiple_objects_returned: если вернулось несколько объектов в QuerySet'e
 
@@ -280,21 +290,21 @@ def update_cashbox(request, form):
     cashbox_number = form['number']
 
     try:
-        from_cashbox_type = CashboxType.objects.get(id=form['from_cashbox_type_id'])
-    except CashboxType.DoesNotExist:
-        return JsonResponse.does_not_exists_error('from_cashbox_type')
+        from_work_type = WorkType.objects.get(id=form['from_work_type_id'])
+    except WorkType.DoesNotExist:
+        return JsonResponse.does_not_exists_error('from_work_type')
 
     try:
-        to_cashbox_type = CashboxType.objects.get(id=form['to_cashbox_type_id'])
-    except CashboxType.DoesNotExist:
-        return JsonResponse.does_not_exists_error('to_cashbox_type')
+        to_work_type = WorkType.objects.get(id=form['to_work_type_id'])
+    except WorkType.DoesNotExist:
+        return JsonResponse.does_not_exists_error('to_work_type')
 
     try:
         cashbox = Cashbox.objects.select_related(
             'type'
         ).filter(
-            type__id=from_cashbox_type.id,
-            type__shop_id=from_cashbox_type.shop_id,
+            type__id=from_work_type.id,
+            type__shop_id=from_work_type.shop_id,
             dttm_deleted=None,
             number=cashbox_number
         )
@@ -306,24 +316,23 @@ def update_cashbox(request, form):
     cashbox.dttm_deleted = datetime.datetime.now()
     cashbox.save()
 
-    cashbox = Cashbox.objects.create(type=to_cashbox_type, number=cashbox_number)
+    cashbox = Cashbox.objects.create(type=to_work_type, number=cashbox_number)
 
     return JsonResponse.success(
         CashboxConverter.convert(cashbox)
     )
 
 
-@api_method('POST', CreateCashboxTypeForm)
-def create_cashbox_type(request, form):
+@api_method('POST', CreateWorkTypeForm)
+def create_work_type(request, form):
     """
     Создает тип касс с заданным именем
 
     Args:
         method: POST
-        url: /api/cashbox/create_cashbox_type
+        url: /api/cashbox/create_work_type
         shop_id(int): required = True
         name(str): max_length=128
-        is_main_type(boolean): делать новый тип касс главным или нет, required = False
 
     Note:
         Также отправлет уведомление о том, что тип касс был создан
@@ -335,7 +344,6 @@ def create_cashbox_type(request, form):
             | 'dttm_deleted': null,
             | 'shop': id shop'a,
             | 'name': имя,
-            | 'is_stable': True,
             | 'speed_coef': 1
         }
 
@@ -344,40 +352,36 @@ def create_cashbox_type(request, form):
     """
     shop_id = FormUtil.get_shop_id(request, form)
     name = form['name']
-    is_main_type = form['is_main_type']
 
-    if CashboxType.objects.filter(name=name, shop_id=shop_id, dttm_deleted__isnull=True).count() > 0:
-        return JsonResponse.already_exists_error('Такой тип кассы уже существует')
-    if is_main_type is True:
-        CashboxType.objects.filter(shop_id=shop_id, is_main_type=True).update(is_main_type=False)
+    if WorkType.objects.filter(name=name, shop_id=shop_id, dttm_deleted__isnull=True).count() > 0:
+        return JsonResponse.already_exists_error('Такой тип работ уже существует')
 
-    new_cashbox_type = CashboxType.objects.create(
+    new_work_type = WorkType.objects.create(
         name=name,
         shop_id=shop_id,
-        is_main_type=is_main_type
     )
 
-    send_notification('C', new_cashbox_type, sender=request.user)
+    send_notification('C', new_work_type, sender=request.user)
 
-    return JsonResponse.success(CashboxTypeConverter.convert(new_cashbox_type))
+    return JsonResponse.success(WorkTypeConverter.convert(new_work_type))
 
 
 @api_method(
     'POST',
-    DeleteCashboxTypeForm,
-    lambda_func=lambda x: CashboxType.objects.get(id=x['cashbox_type_id']).shop
+    DeleteWorkTypeForm,
+    lambda_func=lambda x: WorkType.objects.get(id=x['work_type_id']).shop
 )
-def delete_cashbox_type(request, form):
+def delete_work_type(request, form):
     """
     Удаляет тип касс с заданным id'шником
 
     Args:
         method: POST
-        url: /api/cashbox/delete_cashbox_type
-        cashbox_type_id(int): required = True
+        url: /api/cashbox/delete_work_type
+        work_type_id(int): required = True
 
     Note:
-        Также отправлет уведомление о том, что тип касс был удален
+        Также отправлет уведомление о том, что тип работ был удален
 
     Returns:
         {
@@ -385,27 +389,133 @@ def delete_cashbox_type(request, form):
             | 'dttm_added': дата добавления,
             | 'dttm_deleted': дата удаления(сейчас),
             | 'shop': id shop'a,
-            | 'name': имя,
-            | 'is_stable': True/False,
-            | 'speed_coef': int
+            | 'name': имя
         }
 
     Raises:
         JsonResponse.internal_error: если к данному типу касс привязаны какие-то кассы
     """
-    cashbox_type = CashboxType.objects.get(id=form['cashbox_type_id'])
+    work_type = WorkType.objects.get(id=form['work_type_id'])
 
-    attached_cashboxes = Cashbox.objects.filter(type=cashbox_type, dttm_deleted__isnull=True)
+    attached_cashboxes = Cashbox.objects.filter(type=work_type, dttm_deleted__isnull=True)
 
     if attached_cashboxes.count() > 0:
         return JsonResponse.internal_error('there are cashboxes on this type')
 
-    cashbox_type.dttm_deleted = datetime.datetime.now()
-    cashbox_type.save()
+    work_type.dttm_deleted = datetime.datetime.now()
+    work_type.save()
 
-    send_notification('D', cashbox_type, sender=request.user)
+    send_notification('D', work_type, sender=request.user)
 
-    return JsonResponse.success(CashboxTypeConverter.convert(cashbox_type))
+    return JsonResponse.success(WorkTypeConverter.convert(work_type))
+
+
+@api_method(
+    'POST',
+    EditWorkTypeForm,
+    lambda_func=lambda x: WorkType.objects.get(id=x['work_type_id']).shop
+)
+def edit_work_type(request, form):
+    work_type_id = form['work_type_id']
+    work_type = WorkType.objects.get(id=work_type_id)
+    shop_id = work_type.shop_id
+
+    worker_amount = form['workers_amount']
+    if worker_amount:
+        work_type.min_workers_amount = worker_amount[0]
+        work_type.max_workers_amount = worker_amount[1]
+
+    if form['new_title']:
+        work_type.name = form['new_title']
+
+    try:
+        work_type.save()
+    except ValueError:
+        return JsonResponse.value_error('Error upon saving work type instance. One of the parameters is invalid')
+
+    # front_operations = json.loads(form['operation_types'])
+    # existing_operation_types = {
+    #     x.id: x for x in OperationType.objects.filter(work_type=work_type, dttm_deleted__isnull=True)
+    # }
+    # if front_operations:
+    #     if len(front_operations) == 1 and len(existing_operation_types.keys()) == 1:  # была 1 , стала 1 => та же самая
+    #         operation_type = list(existing_operation_types.values())[0]
+    #         operation_type.name = front_operations[0]['name']
+    #         operation_type.speed_coef = front_operations[0]['speed_coef']
+    #         operation_type.do_forecast = front_operations[0]['do_forecast']
+    #         try:
+    #             operation_type.save()
+    #         except ValueError:
+    #             return JsonResponse.value_error(
+    #                 'Error upon saving operation type instance. One of the parameters is invalid'
+    #             )
+    #         existing_operation_types = dict()
+    #
+    #     else:
+    #         for oper_dict in front_operations:
+    #             if 'id' in oper_dict.keys() and oper_dict['id'] in existing_operation_types.keys():
+    #                 ot = existing_operation_types[oper_dict['id']]
+    #                 ot.name = oper_dict['name']
+    #                 ot.speed_coef = oper_dict['speed_coef']
+    #                 ot.do_forecast = oper_dict['do_forecast']
+    #                 try:
+    #                     ot.save()
+    #                 except ValueError:
+    #                     return JsonResponse.value_error(
+    #                         'Error upon saving operation type instance. One of the parameters is invalid'
+    #                     )
+    #                 existing_operation_types.pop(oper_dict['id'])
+    #             else:
+    #                 try:
+    #                     OperationType.objects.create(
+    #                         work_type_id=work_type_id,
+    #                         name=oper_dict['name'],
+    #                         speed_coef=oper_dict['speed_coef'],
+    #                         do_forecast=oper_dict['do_forecast'],
+    #                     )
+    #                 except TypeError:
+    #                     return JsonResponse.internal_error('One of the parameters is invalid')
+    #
+    #     for operation_type in existing_operation_types.values():  # удаляем старые операции
+    #         operation_type.dttm_deleted = datetime.datetime.now()
+    #         try:
+    #             operation_type.save()
+    #         except ValueError:
+    #             return JsonResponse.value_error(
+    #                 'Error upon saving operation type instance. One of the parameters is invalid'
+    #             )
+    #
+    # front_slots = json.loads(form['slots'])
+    # existing_slots = {
+    #     x.id: x for x in Slot.objects.filter(work_type=work_type, dttm_deleted__isnull=True)
+    # }
+    # for slot_dict in front_slots:
+    #     if 'id' in slot_dict.keys() and slot_dict['id'] in existing_slots.keys():
+    #         existing_slot = existing_slots[slot_dict['id']]
+    #         existing_slot.name = slot_dict['name']
+    #         existing_slot.tm_start = slot_dict['tm_start']
+    #         existing_slot.tm_end = slot_dict['tm_end']
+    #         existing_slot.save()
+    #         existing_slots.pop(slot_dict['id'])
+    #     else:
+    #         slot_dict.update({
+    #             'work_type_id': work_type_id,
+    #             'shop_id': shop_id
+    #         })
+    #         try:
+    #             Slot.objects.create(**slot_dict)
+    #         except Exception:
+    #             return JsonResponse.internal_error('Error while creating new slot')
+    #
+    # for slot in existing_slots.values():    # удаляем старые слоты (если с фронта пришел [], то соответственно там
+    #                                         # поставили произвольные, и удаляем все слоты
+    #     slot.dttm_deleted = datetime.datetime.now()
+    #     try:
+    #         slot.save()
+    #     except ValueError:
+    #         return JsonResponse.value_error('Error upon saving slot instance. dttm_deleted is invalid')
+
+    return JsonResponse.success()
 
 
 @api_method('GET', CashboxesOpenTime)
@@ -450,11 +560,11 @@ def get_cashboxes_open_time(request, form):
         }
 
     worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related(
-        'cashbox_type__shop',
+        'work_type__shop',
         'worker_day',
     ).filter(
         status=WorkerDayCashboxDetails.TYPE_WORK,
-        cashbox_type__shop=shop_id,
+        work_type__shop=shop_id,
         on_cashbox__isnull=False,
         worker_day__dt__gte=dt_from,
         worker_day__dt__lte=dt_to,
@@ -465,8 +575,8 @@ def get_cashboxes_open_time(request, form):
     if len(worker_day_cashbox_details):
         share_of_open_time = 0
         last_cashbox = worker_day_cashbox_details[0].on_cashbox
-        duration_of_the_shop = time_diff(worker_day_cashbox_details[0].cashbox_type.shop.super_shop.tm_start,
-                                         worker_day_cashbox_details[0].cashbox_type.shop.super_shop.tm_end) * (
+        duration_of_the_shop = time_diff(worker_day_cashbox_details[0].work_type.shop.super_shop.tm_start,
+                                         worker_day_cashbox_details[0].work_type.shop.super_shop.tm_end) * (
                                        (dt_to - dt_from).days + 1)
 
         for detail in worker_day_cashbox_details:
@@ -496,7 +606,7 @@ def get_cashboxes_used_resource(request, form):
 
     Returns:
         {
-            cashbox_type_id : {
+            work_type_id : {
                 | '20': int,
                 | '40': int,
                 | '60': int,
@@ -506,7 +616,7 @@ def get_cashboxes_used_resource(request, form):
         }
     """
 
-    def get_percent(response, cashbox_type_id, current_dttm, worker_day_cashbox_details, count_of_cashbox):
+    def get_percent(response, work_type_id, current_dttm, worker_day_cashbox_details, count_of_cashbox):
         count = 0
         for detail in worker_day_cashbox_details:
             if current_dttm < detail.dttm_from:
@@ -520,15 +630,15 @@ def get_cashboxes_used_resource(request, form):
 
         percent = count / count_of_cashbox * 100 if count_of_cashbox > 0 else 0
         if 0 < percent <= 20:
-            response[cashbox_type_id]['20'] += 1
+            response[work_type_id]['20'] += 1
         elif 20 < percent <= 40:
-            response[cashbox_type_id]['40'] += 1
+            response[work_type_id]['40'] += 1
         elif 40 < percent <= 60:
-            response[cashbox_type_id]['60'] += 1
+            response[work_type_id]['60'] += 1
         elif 60 < percent <= 80:
-            response[cashbox_type_id]['80'] += 1
+            response[work_type_id]['80'] += 1
         elif 80 < percent <= 100:
-            response[cashbox_type_id]['100'] += 1
+            response[work_type_id]['100'] += 1
         else:
             pass
     response = {}
@@ -537,12 +647,12 @@ def get_cashboxes_used_resource(request, form):
     dt_to = FormUtil.get_dt_to(form)
     time_delta = 300
 
-    cashbox_types = CashboxType.objects.qos_filter_active(
+    work_types = WorkType.objects.qos_filter_active(
         dttm_from=datetime.datetime.combine(dt_from, datetime.time(23, 59, 59)),
         dttm_to=datetime.datetime.combine(dt_to, datetime.time(0, 0, 0)),
         shop=shop_id,
     )
-    super_shop = cashbox_types[0].shop.super_shop if len(cashbox_types) else None
+    super_shop = work_types[0].shop.super_shop if len(work_types) else None
 
     duration_of_the_shop = time_diff(super_shop.tm_start, super_shop.tm_end) * ((dt_to - dt_from).days + 1) \
         if super_shop else None
@@ -551,10 +661,10 @@ def get_cashboxes_used_resource(request, form):
 
         start_time = datetime.datetime.combine(dt_from, super_shop.tm_start)
 
-        for cashbox_type in cashbox_types:
+        for work_type in work_types:
             current_dttm = start_time
-            count_of_cashbox = Cashbox.objects.filter(type=cashbox_type).count()
-            response[cashbox_type.id] = {
+            count_of_cashbox = Cashbox.objects.filter(type=work_type).count()
+            response[work_type.id] = {
                 '20': 0,
                 '40': 0,
                 '60': 0,
@@ -564,7 +674,7 @@ def get_cashboxes_used_resource(request, form):
 
             worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
                 status=WorkerDayCashboxDetails.TYPE_WORK,
-                cashbox_type=cashbox_type,
+                work_type=work_type,
                 is_tablet=True,
                 on_cashbox__isnull=False,
                 worker_day__dt__gte=dt_from,
@@ -575,11 +685,11 @@ def get_cashboxes_used_resource(request, form):
             if worker_day_cashbox_details:
                 details = list(worker_day_cashbox_details)
                 while current_dttm.date() <= dt_to:
-                    get_percent(response, cashbox_type.id, current_dttm, details, count_of_cashbox)
+                    get_percent(response, work_type.id, current_dttm, details, count_of_cashbox)
                     current_dttm += datetime.timedelta(seconds=time_delta)
 
-                for range_percentages in response[cashbox_type.id]:
-                    response[cashbox_type.id][range_percentages] = round(response[cashbox_type.id][range_percentages] /
+                for range_percentages in response[work_type.id]:
+                    response[work_type.id][range_percentages] = round(response[work_type.id][range_percentages] /
                                                                          (duration_of_the_shop / time_delta / 100), 3)
 
     return JsonResponse.success(response)

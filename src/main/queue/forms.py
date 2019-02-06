@@ -13,7 +13,7 @@ class GetIndicatorsForm(forms.Form):
 class GetTimeDistributionForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
-    cashbox_type_ids = util_forms.IntegersList()
+    work_type_ids = util_forms.IntegersList()
     shop_id = forms.IntegerField(required=False)
 
 

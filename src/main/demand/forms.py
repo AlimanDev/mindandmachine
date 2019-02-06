@@ -9,14 +9,14 @@ from src.util import forms as util_forms
 class GetIndicatorsForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
-    cashbox_type_id = forms.IntegerField(required=False)
+    work_type_id = forms.IntegerField(required=False)
     shop_id = forms.IntegerField(required=False)
 
 
 class GetForecastForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
-    cashbox_type_ids = util_forms.IntegersList()
+    operation_type_ids = util_forms.IntegersList()
     format = util_forms.ChoiceField(choices=['raw', 'excel'], default='raw')
     shop_id = forms.IntegerField(required=False)
 
@@ -24,7 +24,7 @@ class GetForecastForm(forms.Form):
 class SetDemandForm(forms.Form):
     from_dttm = util_forms.DatetimeField()
     to_dttm = util_forms.DatetimeField()
-    cashbox_type_id = util_forms.IntegersList()
+    work_type_id = util_forms.IntegersList()
     multiply_coef = forms.FloatField(required=False)
     set_value = forms.FloatField(required=False)
     shop_id = forms.IntegerField()
@@ -49,7 +49,7 @@ class SetDemandForm(forms.Form):
 
 
 class GetDemandChangeLogsForm(forms.Form):
-    cashbox_type_id = forms.IntegerField()
+    work_type_id = forms.IntegerField()
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
     shop_id = forms.IntegerField()
