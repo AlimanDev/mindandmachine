@@ -114,6 +114,8 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
                 if row['type'] != WorkerDay.Type.TYPE_WORKDAY.value:
                     worker['paid_hours'] += ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK]
                 else:
+                    # todo: из расписания перерывы вычитать
+
                     i = 0
                     while (i < len(times_borders)) and (row['dttm_work_start'].time() > times_borders[i][0]):
                         i += 1

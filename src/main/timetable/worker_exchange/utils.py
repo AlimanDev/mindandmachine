@@ -397,7 +397,7 @@ def shift_user_times(dttm_exchange, user):
     # максимальное время, когда может заканчиваться рабочий день
     threshold_time_end = datetime.combine((dttm_exchange + timedelta(days=1)).date(), datetime_module.time(0, 30))
     # минимальное время, когда может начинаться рабочий день
-    threshold_time_start = datetime.combine(dttm_exchange.date(), datetime_module.time(7, 0))
+    threshold_time_start = datetime.combine(dttm_exchange.date(), datetime_module.time(6, 0))
 
     times_to_consider = []  # список подходящих времен [(9:00, 18:00), (9:30, 18:30), ...]
 
@@ -408,7 +408,7 @@ def shift_user_times(dttm_exchange, user):
         return None, None
 
     dttm = dttm_exchange
-    while dttm >= dttm_exchange + timedelta(minutes=standard_tm_interval) - timedelta(hours=9) and dttm > threshold_time_start:
+    while dttm >= dttm_exchange + timedelta(minutes=standard_tm_interval) - timedelta(hours=9) and dttm >= threshold_time_start:
         user_new_dttm_work_start = dttm - timedelta(minutes=standard_tm_interval)
 
         # для выходных
