@@ -2,7 +2,7 @@ from src.db.models import (
     User,
     Slot,
     UserWeekdaySlot,
-    CashboxType,
+    WorkType,
     Region,
 )
 from src.util.forms import FormUtil
@@ -29,12 +29,13 @@ def get_regions(request):
 @api_method('GET', GetAllSlots)
 def get_all_slots(request, form):
     """
-    Возвращает список слотов в магазине
+    Возвращает список слотов в магазине (или на типе работ)
 
     Args:
         method: GET
         url: api/other/get_all_slots
         shop_id(int): required = True
+        work_type_id(int): required = False
 
     Returns:
         {
@@ -50,17 +51,21 @@ def get_all_slots(request, form):
 
     """
     result = []
-    slots = Slot.objects.filter(shop=form['shop_id'])
-    for slot in slots:
+    if form['work_type_id']:
+        slots = Slot.objects.filter(
+            work_type__in=WorkType.objects.filter(id=form['work_type_id'])
+        )
+    else:
+        slots = Slot.objects.filter(shop_id=form['shop_id'])
+    for slot in slots.filter(dttm_deleted__isnull=True):
         result.append({
             'id': slot.id,
             'name': slot.name,
             'tm_start': BaseConverter.convert_time(slot.tm_start),
             'tm_end': BaseConverter.convert_time(slot.tm_end),
+            'work_type_id': slot.work_type.id if slot.work_type else None,
         })
-    return JsonResponse.success({
-        'slots': result,
-    })
+    return JsonResponse.success(result)
 
 
 @api_method('POST', SetSlot, lambda_func=lambda x: User.objects.filter(id=x['user_id']).first())
@@ -149,7 +154,7 @@ def get_slots(request, form):
 @api_method(
     'POST',
     CreateSlotForm,
-    lambda_func=lambda x: CashboxType.objects.get(id=x['cashbox_type_id']).shop
+    lambda_func=lambda x: WorkType.objects.get(id=x['work_type_id']).shop
 )
 def create_slot(request, form):
     """
@@ -158,7 +163,7 @@ def create_slot(request, form):
     Args:
         method: POST
         url: /api/other/create_slot
-        cashbox_type_id(int): required = True
+        work_type_id(int): required = True
         tm_start(QOS_TIME): required = True
         tm_end(QOS_TIME): required = True
 
@@ -172,13 +177,13 @@ def create_slot(request, form):
         }
 
     Raises:
-        JsonResponse.already_exists_error: если слот с таким cashbox_type_id и временами уже существует
+        JsonResponse.already_exists_error: если слот с таким work_type_id и временами уже существует
     """
     shop_id = FormUtil.get_shop_id(request, form)
 
     slot_dict = {
         'shop_id': shop_id,
-        'cashbox_type_id': form['cashbox_type_id'],
+        'work_type_id': form['work_type_id'],
         'tm_start': form['tm_start'],
         'tm_end': form['tm_end']
     }

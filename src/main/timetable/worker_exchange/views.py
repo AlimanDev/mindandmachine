@@ -1,5 +1,5 @@
 from src.db.models import (
-    CashboxType,
+    WorkType,
     User,
     Shop
 )
@@ -18,7 +18,7 @@ from src.util.models_converter import UserConverter
 @api_method(
     'GET',
     GetWorkersToExchange,
-    lambda_func=lambda x: CashboxType.objects.get(id=x['specialization']).shop
+    lambda_func=lambda x: WorkType.objects.get(id=x['specialization']).shop
 )
 def get_workers_to_exchange(request, form):
     """
@@ -43,7 +43,7 @@ def get_workers_to_exchange(request, form):
     ct_type = form['specialization']
     dttm_exchange = form['dttm']
     try:
-        shop_id = CashboxType.objects.get(id=ct_type).shop.id
+        shop_id = WorkType.objects.get(id=ct_type).shop.id
     except Shop.DoesNotExist:
         shop_id = request.user.shop_id
 
@@ -57,7 +57,7 @@ def get_workers_to_exchange(request, form):
         'ct_type': ct_type,
         'predict_demand': init_params_dict['predict_demand'],
         'mean_bills_per_step': init_params_dict['mean_bills_per_step'],
-        'cashbox_types': init_params_dict['cashbox_types_dict'],
+        'work_types': init_params_dict['work_types_dict'],
         'users_who_can_work': users_who_can_work_on_ct
     }
 

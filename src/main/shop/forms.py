@@ -29,14 +29,25 @@ class GetSuperShopListForm(forms.Form):
     sort_type = forms.CharField(required=False)
 
 
-class AddSuperShopForm(forms.Form):
+class AddEditSuperShopForm(forms.Form):
     title = forms.CharField(max_length=128)
     code = forms.CharField(max_length=64)
-    address = forms.CharField(max_length=256)
-    open_dt = util_forms.DateField()
-    region = forms.CharField()
+    address = forms.CharField(max_length=256, required=False)
+    region = forms.CharField(required=False)
     tm_start = util_forms.TimeField()
     tm_end = util_forms.TimeField()
+
+    class Meta:
+        abstract = True
+
+
+class AddSuperShopForm(AddEditSuperShopForm):
+    open_dt = util_forms.DateField()
+
+
+class EditSuperShopForm(AddEditSuperShopForm):
+    supershop_id = forms.IntegerField()
+    close_dt = util_forms.DateField(required=False)
 
 
 class GetParametersForm(forms.Form):
@@ -57,6 +68,7 @@ class SetParametersForm(forms.Form):
     restricted_start_times = forms.CharField()
     restricted_end_times = forms.CharField()
     min_change_time = forms.IntegerField()
+    absenteeism = forms.IntegerField()
     even_shift_morning_evening = util_forms.BooleanField()
     paired_weekday = util_forms.BooleanField()
     exit1day = util_forms.BooleanField()
@@ -71,9 +83,13 @@ class SetParametersForm(forms.Form):
             self.cleaned_data['idle'],
             self.cleaned_data['less_norm'],
             self.cleaned_data['more_norm'],
+            self.cleaned_data['absenteeism'],
         ]
 
         for value in percent_values:
             if value > 100 or value < 0:
                 raise ValidationError('Значение {} должно быть указано в процентах (0-100)'.format(value))
 
+
+class GetSuperShopStatsForm(forms.Form):
+    supershop_id = forms.IntegerField()

@@ -13,5 +13,5 @@ class AddOutsourceWorkersForm(forms.Form):
     dt = util_forms.DateField()
     from_tm = util_forms.TimeField()
     to_tm = util_forms.TimeField()
-    cashbox_type_id = forms.IntegerField()
+    work_type_id = forms.IntegerField()
     amount = forms.IntegerField()

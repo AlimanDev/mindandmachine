@@ -23,7 +23,7 @@ class TestCashierDemand(LocalTestCase):
         time2 = datetime.datetime(2018, 6, 15, 12, 55, 0)
         time3 = datetime.datetime(2018, 6, 15, 16, 30, 0)
         time4 = datetime.datetime(2018, 6, 15, 16, 55, 0)
-        response = self.api_get('/api/timetable/needs/get_workers?shop_id=1&cashbox_type_ids=[]&from_dttm={}&to_dttm={}'
+        response = self.api_get('/api/timetable/needs/get_workers?shop_id=1&work_type_ids=[]&from_dttm={}&to_dttm={}'
                                 .format(BaseConverter.convert_datetime(time1), BaseConverter.convert_datetime(time2)))
         len_wdcd = get_count(self.shop, time1, time2)
         self.assertEqual(response.status_code, 200)
@@ -31,7 +31,7 @@ class TestCashierDemand(LocalTestCase):
         self.assertEqual(response.json['data']['users']['1']['u']['username'], 'user1')
         self.assertEqual(len(response.json['data']['users']), len_wdcd)
 
-        response = self.api_get('/api/timetable/needs/get_workers?shop_id=1&cashbox_type_ids=[]&from_dttm={}&to_dttm={}'
+        response = self.api_get('/api/timetable/needs/get_workers?shop_id=1&work_type_ids=[]&from_dttm={}&to_dttm={}'
                                 .format(BaseConverter.convert_datetime(time3), BaseConverter.convert_datetime(time4)))
         len_wdcd = get_count(self.shop, time3, time4)
         self.assertEqual(response.status_code, 200)

@@ -11,7 +11,8 @@ from django.db.models import Q, Avg
 from src.db.models import (
     Timetable,
     User,
-    CashboxType,
+    WorkType,
+    OperationType,
     PeriodClients,
     WorkerConstraint,
     WorkerCashboxInfo,
@@ -27,7 +28,7 @@ from src.util.collection import group_by
 from src.util.forms import FormUtil
 from src.util.models_converter import (
     TimetableConverter,
-    CashboxTypeConverter,
+    WorkTypeConverter,
     UserConverter,
     WorkerConstraintConverter,
     WorkerCashboxInfoConverter,
@@ -160,14 +161,14 @@ def create_timetable(request, form):
         return JsonResponse.value_error(status_message)
 
     # проверка что есть спрос на период
-    period_difference = {'cashbox_name': [], 'difference': []}
+    period_difference = {'work_type_name': [], 'difference': []}
     period_normal_count = (round((datetime.combine(date.today(), super_shop.tm_end) -
                                   datetime.combine(date.today(), super_shop.tm_start)).seconds/3600) * 2 + 1 - 1) * \
                           ((dt_to - dt_from).days + 1)
-    cashboxes = CashboxType.objects.filter(shop_id=shop_id, do_forecast=CashboxType.FORECAST_HARD)
-    for cashbox in cashboxes:
+    work_types = WorkType.objects.filter(shop_id=shop_id)
+    for work_type in work_types:
         periods = PeriodClients.objects.filter(
-            cashbox_type=cashbox,
+            operation_type__work_type=work_type,
             type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lt=dt_to + timedelta(days=1),
@@ -175,20 +176,20 @@ def create_timetable(request, form):
             dttm_forecast__time=time(0, 0),
         )
         if periods.count() != period_normal_count:
-            period_difference['cashbox_name'].append(cashbox.name)
+            period_difference['work_type_name'].append(work_type.name)
             period_difference['difference'].append(abs(period_normal_count - periods.count()))
-    if period_difference['cashbox_name']:
-        status_message = 'На типе касс {} не хватает объектов спроса {}.'.format(
-            ', '.join(period_difference['cashbox_name']),
+    if period_difference['work_type_name']:
+        status_message = 'На типе работ {} не хватает объектов спроса {}.'.format(
+            ', '.join(period_difference['work_type_name']),
             ', '.join(str(x) for x in period_difference['difference'])
         )
         tt.delete()
         return JsonResponse.value_error(status_message)
 
     periods = PeriodClients.objects.select_related(
-        'cashbox_type'
+        'operation_type__work_type'
     ).filter(
-        cashbox_type__shop_id=shop_id,
+        operation_type__work_type__shop_id=shop_id,
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to,
@@ -203,7 +204,7 @@ def create_timetable(request, form):
 
     # todo: tooooo slow
     worker_cashbox_info = group_by(
-        collection=WorkerCashboxInfo.objects.select_related('cashbox_type').filter(cashbox_type__shop_id=shop_id, is_active=True),
+        collection=WorkerCashboxInfo.objects.select_related('work_type').filter(work_type__shop_id=shop_id, is_active=True),
         group_key=lambda x: x.worker_id
     )
 
@@ -255,16 +256,21 @@ def create_timetable(request, form):
         'max_outsourcing_day': 3,
     }
 
-    cashboxes = [CashboxTypeConverter.convert(x, True) for x in
-                 CashboxType.objects.filter(shop_id=shop_id, ).exclude(do_forecast=CashboxType.FORECAST_NONE)]
+    cashboxes = [
+        WorkTypeConverter.convert(x) for x in WorkType.objects.filter(
+            shop_id=shop_id
+        ).exclude(
+            work_type_reversed__do_forecast=OperationType.FORECAST_NONE
+        )
+    ]
 
     if shop.full_interface:
-        lambda_func = lambda x: x.cashbox_type_id
+        lambda_func = lambda x: x.work_type_id
     else:
-        lambda_func = lambda x: periods[0].cashbox_type_id
+        lambda_func = lambda x: periods[0].work_type_id
 
         cashboxes = [{
-            'id': periods[0].cashbox_type_id,
+            'id': periods[0].work_type_id,
             'speed_coef': 1,
             'types_priority_weights': 1,
             'prob': 1,
@@ -337,24 +343,24 @@ def create_timetable(request, form):
 
     # mean_bills_per_step = WorkerCashboxInfo.objects.filter(
     #     is_active=True,
-    #     cashbox_type__shop_id=shop_id,
-    # ).values('cashbox_type_id').annotate(speed_usual=Avg('mean_speed'))
-    # mean_bills_per_step = {m['cashbox_type_id']: 30 / m['speed_usual'] for m in mean_bills_per_step}
+    #     work_type__shop_id=shop_id,
+    # ).values('work_type_id').annotate(speed_usual=Avg('mean_speed'))
+    # mean_bills_per_step = {m['work_type_id']: 30 / m['speed_usual'] for m in mean_bills_per_step}
 
     cashboxes_dict = {cb['id']: cb for cb in cashboxes}
 
     demands = [PeriodClientsConverter.convert(x) for x in periods]
     for demand in demands:
-        demand['clients'] = demand['clients'] / (period_step / cashboxes_dict[demand['cashbox_type']]['speed_coef'])
-        if cashboxes_dict[demand['cashbox_type']]['do_forecast'] == CashboxType.FORECAST_LITE:
-            demand['clients'] = 1
+        demand['clients'] = demand['clients'] / (period_step / cashboxes_dict[demand['work_type']]['speed_coef'])
+        # if cashboxes_dict[demand['work_type']]['do_forecast'] == WorkType.FORECAST_LITE:
+        demand['clients'] = 1
 
     data = {
         # 'start_dt': BaseConverter.convert_date(tt.dt),
         'IP': settings.HOST_IP,
         'timetable_id': tt.id,
         'forecast_step_minutes': shop.forecast_step_minutes.minute,
-        'cashbox_types': cashboxes,
+        'work_types': cashboxes,
         # 'slots': slots_periods_dict,
         'shop': shop_dict,
         # 'shop_type': shop.full_interface, # todo: remove when change in algo
@@ -458,7 +464,7 @@ def delete_timetable(request, form):
         worker_day__dt__year=dt_from.year,
         worker_day__worker__auto_timetable=True,
     ).filter(
-        Q(worker_day__is_manual_tuning=False) |
+        Q(worker_day__created_by__isnull=True) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
     ).delete()
 
@@ -468,7 +474,7 @@ def delete_timetable(request, form):
         dt__year=dt_from.year,
         worker__auto_timetable=True,
     ).filter(
-        Q(is_manual_tuning=False) |
+        Q(created_by__isnull=True) |
         Q(type=WorkerDay.Type.TYPE_EMPTY.value)
     ).delete()
 
@@ -524,13 +530,12 @@ def set_timetable(request, form):
             dt = BaseConverter.parse_date(wd['dt'])
             try:
                 wd_obj = WorkerDay.objects.get(worker_id=uid, dt=dt, child__id__isnull=True)
-                if wd_obj.is_manual_tuning or wd_obj.type != WorkerDay.Type.TYPE_EMPTY:
+                if wd_obj.created_by or wd_obj.type != WorkerDay.Type.TYPE_EMPTY:
                     continue
             except WorkerDay.DoesNotExist:
                 wd_obj = WorkerDay(
                     dt=BaseConverter.parse_date(wd['dt']),
                     worker_id=uid,
-
                 )
 
             wd_obj.worker.shop_id = users[int(uid)].shop_id
@@ -538,12 +543,8 @@ def set_timetable(request, form):
             if WorkerDay.is_type_with_tm_range(wd_obj.type):
                 wd_obj.dttm_work_start = BaseConverter.parse_datetime(wd['dttm_work_start'])
                 wd_obj.dttm_work_end = BaseConverter.parse_datetime(wd['dttm_work_end'])
-                # if wd['tm_break_start']:
-                #     wd_obj.tm_break_start = BaseConverter.parse_time(wd['tm_break_start'])
-                # else:
-                #     wd_obj.tm_break_start = None
-
                 wd_obj.save()
+
                 WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
                 wdd_list = []
 
@@ -554,7 +555,7 @@ def set_timetable(request, form):
                         dttm_to=BaseConverter.parse_datetime(wdd['dttm_to']),
                     )
                     if wdd['type'] > 0:
-                        wdd_el.cashbox_type_id = wdd['type']
+                        wdd_el.work_type_id = wdd['type']
                     else:
                         wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
 

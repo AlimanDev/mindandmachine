@@ -2,13 +2,20 @@ import os
 
 import io
 import xlsxwriter
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from dateutil.relativedelta import relativedelta
 
-from src.db.models import WorkerDay, User, Shop
+from src.db.models import (
+    WorkerDay,
+    User,
+    Shop,
+    ProductionMonth,
+)
+from src.main.download.xlsx.tabel import Tabel_xlsx
 from src.util.collection import range_u, count
 from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
+
 
 class Cell(object):
     def __init__(self, d, f=None):
@@ -123,7 +130,7 @@ class PrintHelper(object):
         if obj is None:
             return Cell('', fmts['default'])
 
-        if obj.type == WorkerDay.Type.TYPE_WORKDAY.value:
+        if obj.type in [WorkerDay.Type.TYPE_WORKDAY.value, WorkerDay.Type.TYPE_HOLIDAY_WORK.value]:
             return Cell(
                 '{}-{}'.format(obj.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT), obj.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT)),
                 fmts['default']
@@ -197,7 +204,7 @@ class PrintHelper(object):
 
 
 # noinspection PyTypeChecker
-def common_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
+def common_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to, workingdays):
     def __dt_range():
         return range_u(dt_from, dt_to, timedelta(days=1))
 
@@ -210,7 +217,7 @@ def common_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
     format_holiday_debt = workbook.add_format(fmt(font_size=10, border=1, bg_color='#FEFF99'))
 
     for worker in User.objects.qos_filter_active(dt_from, dt_to, shop_id=shop_id).select_related('position').order_by('id'):
-        worker_days = {x.dt: x for x in WorkerDay.objects.qos_current_version().filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
+        worker_days = {x.dt: x for x in workingdays if x.worker_id == worker.id}
         row = [
             Cell(worker.tabel_code, format_text),
             Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_text),
@@ -219,7 +226,7 @@ def common_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
         ] + [
             PrintHelper.common_get_worker_day_cell(worker_days.get(dttm.date()), format_days) for dttm in __dt_range()
         ] + [
-            Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value), format_text),
+            Cell(count(worker_days.values(), lambda x: x.type in [WorkerDay.Type.TYPE_WORKDAY.value, WorkerDay.Type.TYPE_HOLIDAY_WORK.value]), format_text),
             Cell('', format_text),
             Cell('', format_text),
             Cell(count(worker_days.values(), lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value), format_text),
@@ -231,7 +238,7 @@ def common_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
 
 
 # noinspection PyTypeChecker
-def common_fill_sheet_one(workbook, shop, dt_from, dt_to):
+def common_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays):
     def __dt_range():
         return range_u(dt_from, dt_to, timedelta(days=1))
 
@@ -267,7 +274,8 @@ def common_fill_sheet_one(workbook, shop, dt_from, dt_to):
         data_size=data_size,
         shop_id=shop.id,
         dt_from=dt_from,
-        dt_to=dt_to
+        dt_to=dt_to,
+        workingdays=workingdays
     )
 
     for row_index, row_size in enumerate(data_size['rows']):
@@ -355,7 +363,7 @@ def common_fill_sheet_one(workbook, shop, dt_from, dt_to):
     __wt(8, 'aa', '', format_meta_bold_bottom)
 
 
-def common_add_workers_two(workbook, shop_id, dt_from, dt_to):
+def common_add_workers_two(workbook, shop_id, dt_from, dt_to, workingdays):
     def __transpose(__data):
         return list(map(list, zip(*__data)))
 
@@ -387,7 +395,7 @@ def common_add_workers_two(workbook, shop_id, dt_from, dt_to):
     workers = User.objects.qos_filter_active(dt_to, dt_from, shop_id=shop_id).order_by('id')
     last_worker = len(workers) - 1
     for i, worker in enumerate(workers):
-        worker_days = {x.dt: x for x in WorkerDay.objects.qos_current_version().filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
+        worker_days = {x.dt: x for x in workingdays if x.worker_id == worker.id}
         user_data = [weekdays]
         dt = dt_from - timedelta(days=dt_from.weekday())
         while dt <= dt_to:
@@ -449,11 +457,11 @@ def common_add_workers_two(workbook, shop_id, dt_from, dt_to):
 
 
 # noinspection PyTypeChecker
-def common_fill_sheet_two(workbook, shop, dt_from, dt_to):
+def common_fill_sheet_two(workbook, shop, dt_from, dt_to, workingdays):
     worksheet = workbook.add_worksheet('На печать')
     format_default = workbook.add_format(fmt(font_size=10))
 
-    data, data_size = common_add_workers_two(workbook, shop.id, dt_from, dt_to)
+    data, data_size = common_add_workers_two(workbook, shop.id, dt_from, dt_to, workingdays=workingdays)
 
     for row_index, row_size in enumerate(data_size['rows']):
         worksheet.set_row(row_index, row_size)
@@ -473,7 +481,7 @@ def common_fill_sheet_two(workbook, shop, dt_from, dt_to):
 
 # !!!
 # noinspection PyTypeChecker
-def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
+def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to, workingdays):
     def __dt_range():
         return range_u(dt_from, dt_to, timedelta(days=1))
 
@@ -495,7 +503,7 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
 
     timetable_raw = {}
     for worker in cache_workers:
-        worker_days = {x.dt: x for x in WorkerDay.objects.qos_current_version().filter(worker_id=worker.id, dt__gte=dt_from, dt__lte=dt_to)}
+        worker_days = {x.dt: x for x in workingdays if x.worker_id == worker.id}
         cache_worker_days[worker.id] = worker_days
 
         for wd in worker_days.values():
@@ -553,7 +561,7 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to):
 
 # !!!
 # noinspection PyTypeChecker
-def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
+def depart_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays):
     def __dt_range():
         return range_u(dt_from, dt_to, timedelta(days=1))
 
@@ -589,7 +597,8 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
         data_size=data_size,
         shop_id=shop.id,
         dt_from=dt_from,
-        dt_to=dt_to
+        dt_to=dt_to,
+        workingdays=workingdays
     )
 
     for row_index, row_size in enumerate(data_size['rows']):
@@ -837,23 +846,23 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to):
 
 
 # noinspection PyTypeChecker
-def print_to_file(file, shop_id, dt_from, dt_to):
+def print_to_file(file, shop_id, dt_from, dt_to, workingdays):
     shop = Shop.objects.get(id=shop_id)
 
     workbook = xlsxwriter.Workbook(filename=file)
 
     if shop.full_interface:
-        common_fill_sheet_one(workbook, shop, dt_from, dt_to)
-        common_fill_sheet_two(workbook, shop, dt_from, dt_to)
+        common_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays=workingdays)
+        common_fill_sheet_two(workbook, shop, dt_from, dt_to, workingdays=workingdays)
     else:
-        depart_fill_sheet_one(workbook, shop, dt_from, dt_to)
+        depart_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays=workingdays)
 
     workbook.close()
 
     return file
 
 
-def run(shop_id, dt_from, debug=False):
+def run(shop_id, dt_from, debug=False, inspection_version=False):
     dt_from = datetime(year=dt_from.year, month=dt_from.month, day=1)
     dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
 
@@ -867,11 +876,23 @@ def run(shop_id, dt_from, debug=False):
 
         file = file_path
 
+    usrs = User.objects.qos_filter_active(dt_from, dt_to, shop_id=shop_id)
+    prod_month = ProductionMonth.objects.filter(
+        dt_first__month=dt_from.month,
+        dt_first__year=dt_from.year
+    ).first()
+    worker_days = WorkerDay.objects.qos_current_version().filter(
+        dt__gte=dt_from, dt__lte=dt_to, worker__in=usrs
+    ).order_by('worker__position_id', 'worker__last_name', 'worker__first_name', 'worker__tabel_code', 'dt')
+    if inspection_version:
+        worker_days = Tabel_xlsx.change_for_inspection(prod_month.norm_work_hours, worker_days)
+
     result = print_to_file(
         file=file,
         shop_id=shop_id,
         dt_from=dt_from,
-        dt_to=dt_to
+        dt_to=dt_to,
+        workingdays=worker_days
     )
 
     if not debug:

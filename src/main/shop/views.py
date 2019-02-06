@@ -3,9 +3,12 @@ from src.db.models import (
     SuperShop,
     User,
     Region,
+    Timetable,
 )
 from math import ceil
 from src.util.utils import api_method, JsonResponse
+import datetime
+from dateutil.relativedelta import relativedelta
 from src.util.forms import FormUtil
 from src.util.models_converter import (
     ShopConverter,
@@ -17,8 +20,10 @@ from .forms import (
     GetSuperShopForm,
     GetSuperShopListForm,
     AddSuperShopForm,
+    EditSuperShopForm,
     GetParametersForm,
     SetParametersForm,
+    GetSuperShopStatsForm,
 )
 
 
@@ -197,18 +202,50 @@ def get_super_shop_list(request, form):
 )
 def add_supershop(request, form):
     try:
+        region = Region.objects.get(title=form['region'])
+    except Region.DoesNotExist:
+        region = None
+    try:
         SuperShop.objects.create(
             title=form['title'],
             code=form['code'],
             address=form['address'],
             dt_opened=form['open_dt'],
-            region=Region.objects.get(title=form['region']),
+            region=region,
             tm_start=form['tm_start'],
             tm_end=form['tm_end']
         )
-    except Exception:
-        return JsonResponse.internal_error('Error while creating shop')
+    except Exception as exc:
+        return JsonResponse.internal_error('Error while creating shop: {}'.format(str(exc)))
     return JsonResponse.success()
+
+
+@api_method(
+    'POST',
+    EditSuperShopForm,
+    groups=[User.GROUP_HQ],
+    lambda_func=lambda x: False
+)
+def edit_supershop(request, form):
+    try:
+        ss = SuperShop.objects.get(id=form['supershop_id'])
+    except SuperShop.DoesNotExist:
+        return JsonResponse.internal_error('No such supershop')
+
+    ss.title = form['title']
+    ss.code = form['code']
+    ss.address = form['address']
+    ss.dt_closed = form['close_dt']
+    try:
+        region = Region.objects.get(title=form['region'])
+    except Region.DoesNotExist:
+        return JsonResponse.internal_error('No such region')
+    ss.region = region
+    ss.tm_start = form['tm_start']
+    ss.tm_end = form['tm_end']
+    ss.save()
+
+    return JsonResponse.success(SuperShopConverter.convert(ss))
 
 
 @api_method(
@@ -242,6 +279,7 @@ def get_parameters(request, form):
                 '10:00', '12:00', '14:00'
             ],
             | min_change_time: int,
+            | absenteeism: int,
             | even_shift_morning_evening: Boolean,
             | paired_weekday: Boolean,
             | exit1day: Boolean,
@@ -264,6 +302,7 @@ def get_parameters(request, form):
         'restricted_start_times': shop.restricted_start_times,
         'restricted_end_times': shop.restricted_end_times,
         'min_change_time': shop.min_change_time,
+        'absenteeism': shop.absenteeism,
         'even_shift': shop.even_shift_morning_evening,
         'paired_weekday': shop.paired_weekday,
         'exit1day': shop.exit1day,
@@ -302,6 +341,7 @@ def set_parameters(request, form):
     shop.restricted_start_times = form['restricted_start_times']
     shop.restricted_end_times = form['restricted_end_times']
     shop.min_change_time = form['min_change_time']
+    shop.absenteeism = form['absenteeism']
     shop.even_shift_morning_evening = form['even_shift_morning_evening']
     shop.paired_weekday = form['paired_weekday']
     shop.exit1day = form['exit1day']
@@ -314,3 +354,57 @@ def set_parameters(request, form):
         return JsonResponse.internal_error('Один из параметров задан неверно.')
 
     return JsonResponse.success()
+
+
+@api_method(
+    'GET',
+    GetSuperShopStatsForm,
+    groups=[User.GROUP_HQ],
+    lambda_func=lambda x: False
+)
+def get_supershop_stats(request, form):
+    try:
+        super_shop = SuperShop.objects.get(id=form['supershop_id'])
+    except SuperShop.DoesNotExist:
+        return JsonResponse.internal_error('No such SuperShop in database')
+    shops = Shop.objects.select_related('super_shop').filter(super_shop=super_shop)
+    dt_now = datetime.date.today()
+    dt_from = dt_now - relativedelta(months=6)
+
+    successful_tts = Timetable.objects.select_related('shop').filter(
+        dt=(dt_now + relativedelta(months=1)).replace(day=1),
+        shop_id__in=shops.values_list('id', flat=True),
+        status=Timetable.Status.READY.value,
+    ).count()
+
+    fot_revenue_stats = []
+
+    import random
+    while dt_from <= dt_now:
+        fot_revenue_stats.append({
+            'dt': BaseConverter.convert_date(dt_from),
+            'value': random.randint(40, 60)
+        })
+        dt_from += relativedelta(months=1)
+
+    return JsonResponse.success({
+        'shop_tts': '{}/{}'.format(successful_tts, shops.count()),
+        'fot_revenue': fot_revenue_stats,
+        'stats': {
+            'curr': {
+                'fot_revenue': random.randint(40, 60),
+                'idle': random.randint(40, 60),
+                'lack': random.randint(40, 60),
+                'revenue': random.randint(1000000, 2000000),
+                'workers': random.randint(100, 120)
+            },
+            'next': {} if not successful_tts else {
+                'fot_revenue': random.randint(40, 60),
+                'idle': random.randint(40, 60),
+                'lack': random.randint(40, 60),
+                'revenue': random.randint(1000000, 2000000),
+                'revenue_growth': random.randint(10, 20),
+                'workers': random.randint(100, 120)
+            }
+        }
+    })

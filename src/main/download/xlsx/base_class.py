@@ -1,5 +1,5 @@
 import datetime
-from src.db.models import ProductionDay
+from src.db.models import ProductionDay, ProductionMonth
 from .colors import *
 from src.util.models_converter import BaseConverter
 
@@ -55,6 +55,11 @@ class Xlsx_base:
                 dt__year=self.month.year,
                 dt__month=self.month.month
             ).order_by('dt'))
+
+        self.prod_month = ProductionMonth.objects.filter(
+            dt_first__month=self.month.month,
+            dt_first__year=self.month.year
+        ).first()
 
     def construct_dates(self, format, row, col, xlsx_format=str):
         """
@@ -138,7 +143,7 @@ class Xlsx_base:
             'code': (lambda u: u.tabel_code, text_format, self.worksheet.write_string),
             'fio': (lambda u: '{} {} {}'.format(u.last_name, u.first_name, u.middle_name), text_format,
                     self.worksheet.write_string),
-            'position': (lambda u: u.position.title if u.position else '', text_format, self.worksheet.write_string),
+            'position': (lambda u: u.position.title if u.position else 'Кассир-консультант', text_format, self.worksheet.write_string),
             'hired': (lambda u: BaseConverter.convert_date(u.dt_hired), date_format, self.worksheet.write_datetime),
         }
 

@@ -1,11 +1,11 @@
-from src.util.test import LocalTestCase, CashboxType, datetime
+from src.util.test import LocalTestCase, WorkType, datetime
 
 
 class TestCashbox(LocalTestCase):
 
     def setUp(self):
         super().setUp()
-        CashboxType.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 0, 0, 0))
+        WorkType.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 0, 0, 0))
 
     def test_get_cashboxes_open_time(self):
         self.auth()
@@ -37,14 +37,15 @@ class TestCashbox(LocalTestCase):
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data'], [
             {'id': 2, 'dttm_added': '00:00:00 01.01.2018', 'dttm_deleted': None, 'shop': 1, 'name': 'тип_кассы_2',
-             'is_stable': True, 'speed_coef': 1.0},
+             ''
+             'speed_coef': 1.0},
             {'id': 1, 'dttm_added': '00:00:00 01.01.2018', 'dttm_deleted': None, 'shop': 1, 'name': 'тип_кассы_1',
-             'is_stable': True, 'speed_coef': 1.0}
+             'speed_coef': 1.0}
         ])
 
     def test_get_cashboxes(self):
         self.auth()
-        response = self.api_get('/api/cashbox/get_cashboxes?shop_id=1&cashbox_type_ids=[]')
+        response = self.api_get('/api/cashbox/get_cashboxes?shop_id=1&work_type_ids=[]')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(len(response.json['data']['cashboxes_types']), 3)
@@ -53,7 +54,7 @@ class TestCashbox(LocalTestCase):
     def test_create_cashbox(self):
         self.auth()
         response = self.api_post('/api/cashbox/create_cashbox', {
-            'cashbox_type_id': 1,
+            'work_type_id': 1,
             'number': 1
         })
         self.assertEqual(response.status_code, 200)
@@ -61,7 +62,7 @@ class TestCashbox(LocalTestCase):
         self.assertEqual(response.json['data']['error_type'], 'AlreadyExist')
 
         # response = self.api_post('/api/cashbox/create_cashbox', {
-        #     'cashbox_type_id': 1,
+        #     'work_type_id': 1,
         #     'number': 100
         # })
         # print(response.json)

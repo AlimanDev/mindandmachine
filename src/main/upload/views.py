@@ -11,7 +11,7 @@ from .forms import UploadForm
 from src.db.models import (
     User,
     PeriodClients,
-    CashboxType,
+    WorkType,
     Notifications,
     WorkerDay,
     WorkerDayCashboxDetails,
@@ -60,7 +60,7 @@ def upload_demand(request, form, demand_file):
         else:
             list_to_create.append(obj)
 
-    cashbox_types = list(CashboxType.objects.filter(shop_id=shop_id))
+    work_types = list(WorkType.objects.filter(shop_id=shop_id))
 
     ######################### сюда писать логику чтения из экселя ######################################################
 
@@ -82,17 +82,17 @@ def upload_demand(request, form, demand_file):
         cashtype_name = row[cash_column_num].value
         cashtype_name = cashtype_name[:1].upper() + cashtype_name[1:].lower()  # учет регистра чтобы нормально в бд было
 
-        ct_to_search = list(filter(lambda ct: ct.name == cashtype_name, cashbox_types))  # возвращает фильтр по типам
+        ct_to_search = list(filter(lambda ct: ct.name == cashtype_name, work_types))  # возвращает фильтр по типам
         if len(ct_to_search) == 1:
             PeriodClients.objects.filter(
                 dttm_forecast=dttm,
-                cashbox_type=ct_to_search[0],
+                operation_type__work_type=ct_to_search[0],
                 type=PeriodClients.FACT_TYPE
             ).delete()
             create_demand_objs(
                 PeriodClients(
                     dttm_forecast=dttm,
-                    cashbox_type=ct_to_search[0],
+                    work_type=ct_to_search[0],
                     value=value,
                     type=PeriodClients.FACT_TYPE
                 )
@@ -115,7 +115,7 @@ def upload_demand(request, form, demand_file):
 
     from_dt_to_create = PeriodClients.objects.filter(
         type=PeriodClients.FACT_TYPE,
-        cashbox_type__shop_id=shop_id
+        work_type__shop_id=shop_id
     ).order_by('dttm_forecast').last().dttm_forecast.date() + relativedelta(days=1)
 
     result_of_func = create_predbills_request_function(shop_id=shop_id, dt=from_dt_to_create)

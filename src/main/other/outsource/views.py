@@ -79,9 +79,9 @@ def get_outsource_workers(request, form):
                             if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None,
                         'dttm_work_end': BaseConverter.convert_time(wd.dttm_work_end.time())\
                             if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None,
-                        'cashbox_type': WorkerDayCashboxDetails.objects.filter(
+                        'work_type': WorkerDayCashboxDetails.objects.filter(
                             worker_day=wd
-                        ).first().cashbox_type_id if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+                        ).first().work_type_id if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None
                     })
                 except ObjectDoesNotExist:
                     return JsonResponse.does_not_exists_error(
@@ -109,7 +109,7 @@ def add_outsource_workers(request, form):
          dt(QOS_DATE): required = True
          from_tm(QOS_TIME): required = True
          to_tm(QOS_TIME): required = True
-         cashbox_type_id(int): required = True
+         work_type_id(int): required = True
          amount(int): количество аутсорсеров, которое будет в этот день
 
     Returns:
@@ -122,7 +122,7 @@ def add_outsource_workers(request, form):
     dt = form['dt']
     from_tm = form['from_tm']
     to_tm = form['to_tm']
-    cashbox_type_id = form['cashbox_type_id']
+    work_type_id = form['work_type_id']
 
     if not amount or amount < 1:
         return JsonResponse.value_error('Некоректное число работников: {}'.format(amount))
@@ -171,7 +171,7 @@ def add_outsource_workers(request, form):
         )
         WorkerDayCashboxDetails.objects.create(
             worker_day=outsourcer_worker_day,
-            cashbox_type_id=cashbox_type_id,
+            work_type_id=work_type_id,
             dttm_from=dttm_work_start,
             dttm_to=dttm_work_end
         )
