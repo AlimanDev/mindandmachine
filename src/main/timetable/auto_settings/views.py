@@ -23,7 +23,6 @@ from src.db.models import (
     Slot,
     UserWeekdaySlot,
     ProductionDay,
-    ProductionMonth,
 )
 from src.util.collection import group_by
 from src.util.forms import FormUtil
@@ -429,8 +428,6 @@ def create_timetable(request, form):
             # 'n_working_days_optimal': working_days, # Very kostil, very hot fix, we should take this param from proizvodstveny calendar'
         },
     }
-    # with open('C:/Users/ashch/OneDrive/Документы/GitHub/QoS_backend_algo/data/test_algo_data/data_back_test.json', 'w') as f:
-    #     json.dump(data, f)
 
     tt.save()
     try:
