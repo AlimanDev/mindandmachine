@@ -23,6 +23,7 @@ from src.db.models import (
     Slot,
     UserWeekdaySlot,
     ProductionDay,
+    ProductionMonth,
 )
 from src.util.collection import group_by
 from src.util.forms import FormUtil
@@ -47,6 +48,8 @@ from .forms import (
 import requests
 from ..table.utils import count_difference_of_normal_days
 from src.main.other.notification.utils import send_notification
+from django.db.models import F
+from calendar import monthrange
 
 
 @api_method('GET', GetStatusForm)
@@ -174,6 +177,8 @@ def create_timetable(request, form):
             dttm_forecast__date__lt=dt_to + timedelta(days=1),
         ).exclude(
             dttm_forecast__time=time(0, 0),
+        ).annotate(
+            clients=F('value') / (period_step / F('operation_type__speed_coef'))
         )
         if periods.count() != period_normal_count:
             period_difference['work_type_name'].append(work_type.name)
@@ -217,6 +222,40 @@ def create_timetable(request, form):
         group_key=lambda x: x.worker_id
     )
 
+    prev_month_num = (dt_from - timedelta(days=1)).month
+    year_num = (dt_from - timedelta(days=1)).year
+    prev_days_amount = monthrange(year_num, prev_month_num)[1]
+
+    prev_month_data = group_by(
+        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
+            worker__shop_id=shop_id,
+            dt__gte=dt_from - timedelta(days=prev_days_amount),
+            dt__lt=dt_from,
+        ),
+        group_key=lambda x: x.worker_id
+    )
+
+    required_coupled_hol_in_hol = dict()
+    for u in users:
+        if shop.paired_weekday:
+            coupled_weekdays = 0
+            month_info = [WorkerDayConverter.convert(x) for x in prev_month_data.get(u.id, [])]
+            for day in range(len(month_info)):
+                resting_states_list = ['H']  # TODO(as)
+                day_info = month_info[day]
+                if datetime.strptime(day_info['dt'], '%d.%m.%Y').weekday() == 5 and day_info['type'] in resting_states_list:
+                    try:
+                        if month_info[day + 1]['type'] in resting_states_list:
+                            coupled_weekdays += 1
+                    except IndexError:
+                        pass
+
+            required_coupled_hol_in_hol[u.id] = 0 if coupled_weekdays else 1
+        else:
+            required_coupled_hol_in_hol[u.id] = 0
+
+    # print(required_coupled_hol_in_hol.values())
+
     prev_data = group_by(
         collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
             worker__shop_id=shop_id,
@@ -250,9 +289,9 @@ def create_timetable(request, form):
         'tm_lock_end': list(map(lambda x: x + ':00', json.loads(shop.restricted_end_times))),
         'hours_between_slots': shop.min_change_time,
         'morning_evening_same': shop.even_shift_morning_evening,
+        'workdays_holidays_same': False, #TODO(as): флаг, учитывать ли равномерность по работе чуваков в будни и выхи при составлении (нет на фронте)
         '1day_holiday': int(shop.exit1day),
-        'paired_weekday': shop.paired_weekday,
-
+        # 'paired_weekday': shop.paired_weekday,
         'max_outsourcing_day': 3,
     }
 
@@ -265,12 +304,12 @@ def create_timetable(request, form):
     ]
 
     if shop.full_interface:
-        lambda_func = lambda x: x.work_type_id
+        lambda_func = lambda x: x.operation_type.work_type_id
     else:
-        lambda_func = lambda x: periods[0].work_type_id
+        lambda_func = lambda x: periods[0].operation_type.work_type_id
 
         cashboxes = [{
-            'id': periods[0].work_type_id,
+            'id': periods[0].operation_type.work_type_id,
             'speed_coef': 1,
             'types_priority_weights': 1,
             'prob': 1,
@@ -350,17 +389,18 @@ def create_timetable(request, form):
     cashboxes_dict = {cb['id']: cb for cb in cashboxes}
 
     demands = [PeriodClientsConverter.convert(x) for x in periods]
-    for demand in demands:
-        demand['clients'] = demand['clients'] / (period_step / cashboxes_dict[demand['work_type']]['speed_coef'])
-        # if cashboxes_dict[demand['work_type']]['do_forecast'] == WorkType.FORECAST_LITE:
-        demand['clients'] = 1
+    # for demand in demands:
+    #     demand['clients'] = demand['clients'] / (period_step / cashboxes_dict[demand['work_type']]['speed_coef'])
+    #     # if cashboxes_dict[demand['work_type']]['do_forecast'] == WorkType.FORECAST_LITE:
+    #     demand['clients'] = 1
+
 
     data = {
         # 'start_dt': BaseConverter.convert_date(tt.dt),
         'IP': settings.HOST_IP,
         'timetable_id': tt.id,
         'forecast_step_minutes': shop.forecast_step_minutes.minute,
-        'work_types': cashboxes,
+        'cashbox_types': cashboxes,
         # 'slots': slots_periods_dict,
         'shop': shop_dict,
         # 'shop_type': shop.full_interface, # todo: remove when change in algo
@@ -376,6 +416,7 @@ def create_timetable(request, form):
                 'overworking_hours': user_info[u.id].get('diff_prev_paid_hours', 0),
                 'overworking_days': user_info[u.id].get('diff_prev_paid_days', 0),
                 # 'norm_work_amount': 160, #TODO (as)
+                'required_coupled_hol_in_hol': required_coupled_hol_in_hol[u.id],
             }
             for u in users
         ],
@@ -388,6 +429,8 @@ def create_timetable(request, form):
             # 'n_working_days_optimal': working_days, # Very kostil, very hot fix, we should take this param from proizvodstveny calendar'
         },
     }
+    # with open('C:/Users/ashch/OneDrive/Документы/GitHub/QoS_backend_algo/data/test_algo_data/data_back_test.json', 'w') as f:
+    #     json.dump(data, f)
 
     tt.save()
     try:

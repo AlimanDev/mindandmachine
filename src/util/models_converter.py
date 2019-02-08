@@ -239,7 +239,7 @@ class WorkerCashboxInfoConverter(BaseConverter):
         return {
             'id': obj.id,
             'worker': obj.worker_id,
-            'work_type': obj.work_type_id,
+            'cashbox_type': obj.work_type_id,
             'mean_speed': obj.mean_speed,
             'bills_amount': obj.bills_amount,
             'period': obj.period,
@@ -265,9 +265,9 @@ class PeriodClientsConverter(BaseConverter):
         return {
             'id': obj.id,
             'dttm_forecast': cls.convert_datetime(obj.dttm_forecast),
-            'clients': obj.value,
+            'clients': obj.clients if hasattr(obj, 'clients') else obj.value,
             'type': obj.type,
-            'work_type': obj.work_type_id
+            'cashbox_type': obj.operation_type.work_type.id
         }
 
 
