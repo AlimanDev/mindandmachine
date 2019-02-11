@@ -177,7 +177,7 @@ def create_timetable(request, form):
         ).exclude(
             dttm_forecast__time=time(0, 0),
         ).annotate(
-            clients=F('value') / (period_step / F('operation_type__speed_coef')) * shop.demand_coef
+            clients=F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + shop.absenteeism)
         )
         if periods.count() != period_normal_count:
             period_difference['work_type_name'].append(work_type.name)
@@ -355,23 +355,24 @@ def create_timetable(request, form):
             dt__gte=dt_from - timedelta(days=prev_days_amount),
             dt__lt=dt_from,
         ),
-        group_key=lambda x: x.worker_id
+        group_key=lambda x: x.worker_id,
     )
-    shop.paired_weekday = True
 
-    resting_states_list = [ProductionDay.TYPE_HOLIDAY]
+    # shop.paired_weekday = True
+    resting_states_list = [WorkerDay.Type.TYPE_HOLIDAY.value]
     if shop.paired_weekday:
         for user in users:
             coupled_weekdays = 0
-            month_info = [WorkerDayConverter.convert(x) for x in prev_month_data.get(user.id, [])]
+            month_info = sorted(prev_month_data.get(user.id, []), key=lambda x: x.dt)
             for day in range(len(month_info) - 1):
                 day_info = month_info[day]
-                if datetime.strptime(day_info['dt'], '%d.%m.%Y').weekday() == 5 and day_info['type'] in resting_states_list:
+                if day_info.dt.weekday() == 5 and day_info.type in resting_states_list:
                     next_day_info = month_info[day + 1]
-                    if datetime.strptime(next_day_info['dt'], '%d.%m.%Y').weekday() == 6 and next_day_info['type'] in resting_states_list:
+                    if next_day_info.dt.weekday() == 6 and next_day_info.type in resting_states_list:
                         coupled_weekdays += 1
 
             user_info[user.id]['required_coupled_hol_in_hol'] = 0 if coupled_weekdays else 1
+            # print(user_info[user.id]['required_coupled_hol_in_hol'])
 
     # mean_bills_per_step = WorkerCashboxInfo.objects.filter(
     #     is_active=True,
