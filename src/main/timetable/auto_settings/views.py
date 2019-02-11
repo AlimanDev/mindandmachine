@@ -177,7 +177,7 @@ def create_timetable(request, form):
         ).exclude(
             dttm_forecast__time=time(0, 0),
         ).annotate(
-            clients=F('value') / (period_step / F('operation_type__speed_coef'))
+            clients=F('value') / (period_step / F('operation_type__speed_coef')) * shop.demand_coef
         )
         if periods.count() != period_normal_count:
             period_difference['work_type_name'].append(work_type.name)
@@ -220,40 +220,6 @@ def create_timetable(request, form):
         ),
         group_key=lambda x: x.worker_id
     )
-
-    prev_month_num = (dt_from - timedelta(days=1)).month
-    year_num = (dt_from - timedelta(days=1)).year
-    prev_days_amount = monthrange(year_num, prev_month_num)[1]
-
-    prev_month_data = group_by(
-        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
-            worker__shop_id=shop_id,
-            dt__gte=dt_from - timedelta(days=prev_days_amount),
-            dt__lt=dt_from,
-        ),
-        group_key=lambda x: x.worker_id
-    )
-
-    required_coupled_hol_in_hol = dict()
-    for u in users:
-        if shop.paired_weekday:
-            coupled_weekdays = 0
-            month_info = [WorkerDayConverter.convert(x) for x in prev_month_data.get(u.id, [])]
-            for day in range(len(month_info)):
-                resting_states_list = ['H']  # TODO(as)
-                day_info = month_info[day]
-                if datetime.strptime(day_info['dt'], '%d.%m.%Y').weekday() == 5 and day_info['type'] in resting_states_list:
-                    try:
-                        if month_info[day + 1]['type'] in resting_states_list:
-                            coupled_weekdays += 1
-                    except IndexError:
-                        pass
-
-            required_coupled_hol_in_hol[u.id] = 0 if coupled_weekdays else 1
-        else:
-            required_coupled_hol_in_hol[u.id] = 0
-
-    # print(required_coupled_hol_in_hol.values())
 
     prev_data = group_by(
         collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
@@ -379,6 +345,34 @@ def create_timetable(request, form):
 
     user_info = count_difference_of_normal_days(dt_end=dt_from, usrs=users)
 
+    prev_month_num = (dt_from - timedelta(days=1)).month
+    year_num = (dt_from - timedelta(days=1)).year
+    prev_days_amount = monthrange(year_num, prev_month_num)[1]
+
+    prev_month_data = group_by(
+        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
+            worker__shop_id=shop_id,
+            dt__gte=dt_from - timedelta(days=prev_days_amount),
+            dt__lt=dt_from,
+        ),
+        group_key=lambda x: x.worker_id
+    )
+    shop.paired_weekday = True
+
+    resting_states_list = [ProductionDay.TYPE_HOLIDAY]
+    if shop.paired_weekday:
+        for user in users:
+            coupled_weekdays = 0
+            month_info = [WorkerDayConverter.convert(x) for x in prev_month_data.get(user.id, [])]
+            for day in range(len(month_info) - 1):
+                day_info = month_info[day]
+                if datetime.strptime(day_info['dt'], '%d.%m.%Y').weekday() == 5 and day_info['type'] in resting_states_list:
+                    next_day_info = month_info[day + 1]
+                    if datetime.strptime(next_day_info['dt'], '%d.%m.%Y').weekday() == 6 and next_day_info['type'] in resting_states_list:
+                        coupled_weekdays += 1
+
+            user_info[user.id]['required_coupled_hol_in_hol'] = 0 if coupled_weekdays else 1
+
     # mean_bills_per_step = WorkerCashboxInfo.objects.filter(
     #     is_active=True,
     #     work_type__shop_id=shop_id,
@@ -399,7 +393,7 @@ def create_timetable(request, form):
         'IP': settings.HOST_IP,
         'timetable_id': tt.id,
         'forecast_step_minutes': shop.forecast_step_minutes.minute,
-        'cashbox_types': cashboxes,
+        'work_types': cashboxes,
         # 'slots': slots_periods_dict,
         'shop': shop_dict,
         # 'shop_type': shop.full_interface, # todo: remove when change in algo
@@ -415,7 +409,7 @@ def create_timetable(request, form):
                 'overworking_hours': user_info[u.id].get('diff_prev_paid_hours', 0),
                 'overworking_days': user_info[u.id].get('diff_prev_paid_days', 0),
                 # 'norm_work_amount': 160, #TODO (as)
-                'required_coupled_hol_in_hol': required_coupled_hol_in_hol[u.id],
+                'required_coupled_hol_in_hol': user_info[u.id].get('required_coupled_hol_in_hol', 0)
             }
             for u in users
         ],
