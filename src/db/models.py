@@ -296,7 +296,7 @@ class WorkType(models.Model):
     dttm_last_update_queue = models.DateTimeField(null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     name = models.CharField(max_length=128)
-    min_workers_amount = models.IntegerField(default=10, blank=True, null=True)
+    min_workers_amount = models.IntegerField(default=0, blank=True, null=True)
     max_workers_amount = models.IntegerField(default=20, blank=True, null=True)
 
     probability = models.FloatField(default=1.0)

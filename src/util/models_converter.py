@@ -265,9 +265,9 @@ class PeriodClientsConverter(BaseConverter):
         return {
             'id': obj.id,
             'dttm_forecast': cls.convert_datetime(obj.dttm_forecast),
-            'clients': obj.value,
+            'clients': obj.clients if hasattr(obj, 'clients') else obj.value,
             'type': obj.type,
-            'work_type': obj.work_type_id
+            'work_type': obj.operation_type.work_type.id
         }
 
 
