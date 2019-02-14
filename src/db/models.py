@@ -235,6 +235,7 @@ class User(DjangoAbstractUser):
 
     dt_hired = models.DateField(null=True, blank=True)
     dt_fired = models.DateField(null=True, blank=True)
+    salary = models.DecimalField(max_digits=10, decimal_places=2)
 
     birthday = models.DateField(null=True, blank=True)
     SEX_FEMALE = 'F'
@@ -831,6 +832,13 @@ class Timetable(models.Model):
         PROCESSING = 2
         ERROR = 3
 
+    def __str__(self):
+        return 'id: {}, shop: {}, status: {}'.format(
+            self.id,
+            self.shop,
+            self.status
+        )
+
     id = models.BigAutoField(primary_key=True)
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
@@ -838,6 +846,14 @@ class Timetable(models.Model):
     dt = models.DateField()
     status = utils.EnumField(Status)
     dttm_status_change = models.DateTimeField()
+
+    # statistics
+    fot = models.IntegerField(default=0, blank=True, null=True)
+    lack = models.SmallIntegerField(default=0, blank=True, null=True)
+    idle = models.SmallIntegerField(default=0, blank=True, null=True)
+    workers_amount = models.IntegerField(default=0, blank=True, null=True)
+    revenue = models.IntegerField(default=0, blank=True, null=True)
+    fot_revenue = models.IntegerField(default=0, blank=True, null=True)
 
     task_id = models.CharField(max_length=256, null=True, blank=True)
 

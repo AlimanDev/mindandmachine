@@ -122,7 +122,8 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
                     str_name = '{}_days_periods'.format(times_borders[i][1])
                     worker[str_name] += 1
 
-                if prod_days_list[dt.day - 1] == ProductionDay.TYPE_HOLIDAY:
+                # todo: вообще бред полный написан, поправил чисто чтобы exception'ы не вылетали
+                if dt.day - 1 < len(prod_days_list) and prod_days_list[dt.day - 1] == ProductionDay.TYPE_HOLIDAY:
                     worker['work_in_holidays'] += 1
 
         if row['workerdaycashboxdetails__dttm_from'] and row['workerdaycashboxdetails__dttm_to']:

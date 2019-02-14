@@ -20,13 +20,19 @@ class GetSuperShopListForm(forms.Form):
     region = forms.CharField(required=False, max_length=256)
     closed_before_dt = util_forms.DateField(required=False)
     opened_after_dt = util_forms.DateField(required=False)
-    revenue_fot = util_forms.RangeField(required=False)
+    fot_revenue = util_forms.RangeField(required=False)
     revenue = util_forms.RangeField(required=False)
     lack = util_forms.RangeField(required=False)
     fot = util_forms.RangeField(required=False)
     idle = util_forms.RangeField(required=False)
     workers_amount = util_forms.RangeField(required=False)
     sort_type = forms.CharField(required=False)
+    format = forms.CharField()
+
+    def clean(self):
+        available_formats = ('raw', 'excel', )
+        if self.cleaned_data['format'] not in available_formats:
+            raise ValidationError('unknown format')
 
 
 class AddEditSuperShopForm(forms.Form):
@@ -48,6 +54,21 @@ class AddSuperShopForm(AddEditSuperShopForm):
 class EditSuperShopForm(AddEditSuperShopForm):
     supershop_id = forms.IntegerField()
     close_dt = util_forms.DateField(required=False)
+
+
+class AddEditShopForm(forms.Form):
+    title = forms.CharField(max_length=64)
+    tm_shop_opens = util_forms.TimeField()
+    tm_shop_closes = util_forms.TimeField()
+
+
+class AddShopForm(AddEditShopForm):
+    super_shop_id = forms.IntegerField()
+
+
+class EditShopForm(AddEditShopForm):
+    shop_id = forms.IntegerField()
+    to_delete = util_forms.BooleanField(required=False)
 
 
 class GetParametersForm(forms.Form):

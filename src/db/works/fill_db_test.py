@@ -2,8 +2,10 @@ import json
 from django.utils import timezone
 from django.db.models import F
 import pandas as pd
+from random import randint
 import numpy as np
-from datetime import time
+from datetime import time, datetime
+from dateutil.relativedelta import relativedelta
 from ..models import (
     SuperShop,
     Shop,
@@ -19,6 +21,7 @@ from ..models import (
     Cashbox,
     UserIdentifier,
     AttendanceRecords,
+    Timetable,
 )
 from src.util.models_converter import (
     WorkerDayConverter,
@@ -26,18 +29,29 @@ from src.util.models_converter import (
 
 
 def create_shop(shop_ind):
-    supershop = SuperShop.objects.create(
-        title='Магазин № {}'.format(shop_ind),
-        # hidden_title='Магазин № {}'.format(shop_ind),
-
-    )
+    supershop = SuperShop.objects.create(title='Магазин № {}'.format(shop_ind))
     shop = Shop.objects.create(
         super_shop=supershop,
-        title='',
+        title='department №1',
         forecast_step_minutes=time(minute=30),
         break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]]]'
     )
     return supershop, shop
+
+
+def create_timetable(shop_id, dttm):
+    tt = Timetable.objects.create(
+        status=Timetable.Status.READY.value,
+        shop_id=shop_id,
+        dt=dttm.date(),
+        dttm_status_change=dttm,
+        fot=randint(400000, 1000000),
+        lack=randint(20, 80),
+        idle=randint(20, 40),
+        workers_amount=randint(20, 100),
+        revenue=randint(700000, 1500000),
+        fot_revenue=randint(10, 70)
+    )
 
 
 def create_work_types(work_types, shop):
@@ -150,7 +164,8 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             worker = User.objects.create_user(
                 username='test{}'.format(shop.id),
                 email='q@q.com',
-                password='test{}'.format(shop.id)
+                password='test{}'.format(shop.id),
+                salary=60000
             )
             worker.first_name = 'Иван'
             worker.last_name = 'Иванов'
@@ -164,6 +179,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                 last_name=worker_d['general_info']['first_name'],
                 password='a',
                 tabel_code='{}{}'.format(shop.id, worker_ind),
+                salary=40000,
                 shop=shop,
             )
 
@@ -325,3 +341,11 @@ def main(date=None, shops=None):
         work_types_dict = create_work_types(data['work_types'], shop)
         create_forecast(data['demand'], work_types_dict, start_date, demand_days)
         create_users_workdays(data['cashiers'], work_types_dict, start_date, worker_days, shop, shop_size)
+
+    dttm_curr = datetime.now().replace(day=1)
+    dttm_prev = dttm_curr - relativedelta(months=1)
+    for shop_ind in range(4, 2000):
+        supershop, shop = create_shop(shop_ind)
+        shop_id = shop.id
+        create_timetable(shop_id, dttm_curr)
+        create_timetable(shop_id, dttm_prev)

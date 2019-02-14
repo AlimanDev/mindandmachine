@@ -136,6 +136,7 @@ def get_not_working_cashiers_list(request, form):
                 | 'avatar_url': аватар,
                 | 'dt_hired': дата найма,
                 | 'dt_fired': дата увольнения,
+                | 'salary': зарплата,
                 | 'auto_timetable': True/False,
                 | 'comment': доп инфа,
                 | 'sex': пол,
@@ -612,21 +613,21 @@ def set_worker_day(request, form):
     except User.DoesNotExist:
         return JsonResponse.value_error('Invalid worker_id')
 
-    dttm_work_start = datetime.combine(dt,
-                                       form['tm_work_start'])  # на самом деле с фронта приходят время а не дата-время
-    tm_work_end = form['tm_work_end']
-    dttm_work_end = datetime.combine(form['dt'], tm_work_end) if tm_work_end > form['tm_work_start'] else \
-        datetime.combine(dt + timedelta(days=1), tm_work_end)
-
     wd_args = {
         'dt': dt,
         'type': form['type'],
     }
+
     if WorkerDay.is_type_with_tm_range(form['type']):
+        dttm_work_start = datetime.combine(dt, form['tm_work_start'])  # на самом деле с фронта приходят время а не дата-время
+        tm_work_end = form['tm_work_end']
+        dttm_work_end = datetime.combine(form['dt'], tm_work_end) if tm_work_end > form['tm_work_start'] else \
+            datetime.combine(dt + timedelta(days=1), tm_work_end)
         wd_args.update({
             'dttm_work_start': dttm_work_start,
             'dttm_work_end': dttm_work_end,
         })
+
     else:
         wd_args.update({
             'dttm_work_start': None,
@@ -1259,6 +1260,10 @@ def change_cashier_info(request, form):
         user.last_name = form['last_name']
     if form['tabel_code']:
         user.tabel_code = form['tabel_code']
+    if form['salary']:
+        if GROUP_HIERARCHY[request.user.group] <= GROUP_HIERARCHY[form['group']]:
+            return JsonResponse.access_forbidden('У вас недостаточно прав доступа для изменения данной группы.')
+        user.salary = form['salary']
     if form['phone_number']:
         user.phone_number = form['phone_number']
     if form['email']:

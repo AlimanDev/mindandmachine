@@ -1,3 +1,4 @@
+import datetime
 from src.db.models import (
     Shop,
     SuperShop,
@@ -7,7 +8,10 @@ from src.db.models import (
 )
 from math import ceil
 from src.util.utils import api_method, JsonResponse
-import datetime
+from .utils import (
+    calculate_supershop_stats,
+    get_super_shop_list_stats,
+)
 from dateutil.relativedelta import relativedelta
 from src.util.forms import FormUtil
 from src.util.models_converter import (
@@ -21,9 +25,11 @@ from .forms import (
     GetSuperShopListForm,
     AddSuperShopForm,
     EditSuperShopForm,
+    EditShopForm,
     GetParametersForm,
     SetParametersForm,
     GetSuperShopStatsForm,
+    AddShopForm,
 )
 
 
@@ -94,6 +100,7 @@ def get_super_shop(request, form):
             }
          }
     """
+    dt_now = datetime.date.today().replace(day=1)
     super_shop_id = form['super_shop_id']
 
     try:
@@ -101,18 +108,26 @@ def get_super_shop(request, form):
     except SuperShop.DoesNotExist:
         return JsonResponse.does_not_exists_error()
 
-    shops = Shop.objects.filter(super_shop=super_shop)
+    shops = Shop.objects.filter(super_shop=super_shop, dttm_deleted__isnull=True)
 
     return_list = []
-    dynamic_values = dict(
-        revenue_fot=dict(prev=1, curr=1, change=-17),
-        fot=dict(prev=1, curr=1, change=13),
-        idle=dict(prev=1, curr=1, change=-1),
-        lack=dict(prev=1, curr=1, change=40),
-        workers=dict(prev=20, curr=30, change=10)
-    )
+    dynamic_values = dict()
+
     for shop in shops:
+        shop_id = shop.id
         converted = ShopConverter.convert(shop)
+        curr_stats = calculate_supershop_stats(dt_now, shop_id)
+        prev_stats = calculate_supershop_stats(dt_now - relativedelta(months=1), shop_id)
+        curr_stats.pop('revenue')
+        prev_stats.pop('revenue')
+
+        for key in curr_stats.keys():
+            dynamic_values[key] = {
+                'prev': prev_stats[key],
+                'curr': curr_stats[key],
+                'change': round((curr_stats[key] / prev_stats[key] - 1) * 100) if prev_stats[key] else 0
+            }
+
         converted.update(dynamic_values)
         return_list.append(converted)
 
@@ -149,47 +164,17 @@ def get_super_shop_list(request, form):
         idle(str): range, percents
         workers_amount(str): range
         sort_type(str): по какому параметру сортируем
+        format(str): 'excel'/'raw'
     Returns:
         {
             'super_shops': [список магазинов],
             'amount': количество магазинов
         }
     """
-    pointer = form['pointer']
-    amount = form['items_per_page']
-    sort_type = form['sort_type']
-    filter_dict = {
-        'title__icontains': form['title'],
-        'type': form['super_shop_type'],
-        'region__title': form['region'],
-        'dt_opened__gte': form['opened_after_dt'],
-        'dt_closed__lte': form['closed_before_dt']
-    }
-    filter_dict = {k: v for k, v in filter_dict.items() if v}
-
-    super_shops = SuperShop.objects.select_related('region').filter(**filter_dict)
-    if sort_type:
-        # todo: make work
-        super_shops.order_by(sort_type)
-    total = super_shops.count()
-    super_shops = super_shops[amount*pointer:amount*(pointer + 1)]
-    return_list = []
-    dynamic_values = dict(
-        revenue_fot=dict(prev=1, curr=1, change=-17),
-        fot=dict(prev=1, curr=1, change=13),
-        idle=dict(prev=1, curr=1, change=-1),
-        lack=dict(prev=1, curr=1, change=40),
-        workers=dict(prev=1, curr=1, change=40),
-    )
-    for ss in super_shops:
-        # НЕ ТРОГАТЬ. работает только так
-        converted_ss = SuperShopConverter.convert(ss)
-        converted_ss.update(dynamic_values)
-
-        return_list.append(converted_ss)
+    return_list, total = get_super_shop_list_stats(form)
 
     return JsonResponse.success({
-        'pages': ceil(total / amount),
+        'pages': ceil(total / form['items_per_page']),
         'shops': return_list
     })
 
@@ -205,18 +190,56 @@ def add_supershop(request, form):
         region = Region.objects.get(title=form['region'])
     except Region.DoesNotExist:
         region = None
+
+    SuperShop.objects.create(
+        title=form['title'],
+        code=form['code'],
+        address=form['address'],
+        dt_opened=form['open_dt'],
+        region=region,
+        tm_start=form['tm_start'],
+        tm_end=form['tm_end']
+    )
+    return JsonResponse.success()
+
+
+@api_method(
+    'POST',
+    AddShopForm,
+    groups=[User.GROUP_HQ],
+    lambda_func=lambda x: False
+)
+def add_shop(request, form):
+    super_shop_id = form['super_shop_id']
+    created = Shop.objects.create(
+        title=form['title'],
+        tm_shop_opens=form['tm_shop_opens'],
+        tm_shop_closes=form['tm_shop_closes'],
+        super_shop_id=super_shop_id
+    )
+    return JsonResponse.success(ShopConverter.convert(created))
+
+
+@api_method(
+    'POST',
+    EditShopForm,
+    groups=[User.GROUP_HQ],
+    lambda_func=lambda x: False
+)
+def edit_shop(request, form):
     try:
-        SuperShop.objects.create(
-            title=form['title'],
-            code=form['code'],
-            address=form['address'],
-            dt_opened=form['open_dt'],
-            region=region,
-            tm_start=form['tm_start'],
-            tm_end=form['tm_end']
-        )
-    except Exception as exc:
-        return JsonResponse.internal_error('Error while creating shop: {}'.format(str(exc)))
+        shop = Shop.objects.get(id=form['shop_id'])
+    except Shop.DoesNotExist:
+        return JsonResponse.internal_error('No such shop')
+
+    if form['to_delete']:
+        shop.dttm_deleted = datetime.datetime.now()
+    else:
+        shop.title = form['title']
+        shop.tm_shop_opens = form['tm_shop_opens']
+        shop.tm_shop_closes = form['tm_shop_closes']
+    shop.save()
+
     return JsonResponse.success()
 
 
@@ -236,11 +259,12 @@ def edit_supershop(request, form):
     ss.code = form['code']
     ss.address = form['address']
     ss.dt_closed = form['close_dt']
-    try:
-        region = Region.objects.get(title=form['region'])
-    except Region.DoesNotExist:
-        return JsonResponse.internal_error('No such region')
-    ss.region = region
+    if form['region']:
+        try:
+            region = Region.objects.get(title=form['region'])
+        except Region.DoesNotExist:
+            return JsonResponse.internal_error('No such region')
+        ss.region = region
     ss.tm_start = form['tm_start']
     ss.tm_end = form['tm_end']
     ss.save()
@@ -367,44 +391,46 @@ def get_supershop_stats(request, form):
         super_shop = SuperShop.objects.get(id=form['supershop_id'])
     except SuperShop.DoesNotExist:
         return JsonResponse.internal_error('No such SuperShop in database')
-    shops = Shop.objects.select_related('super_shop').filter(super_shop=super_shop)
-    dt_now = datetime.date.today()
+    shops = Shop.objects.filter(
+        super_shop=super_shop,
+        dttm_deleted__isnull=True
+    )
+    shop_ids = shops.values_list('id', flat=True)
+    dt_now = datetime.date.today().replace(day=1)
     dt_from = dt_now - relativedelta(months=6)
 
     successful_tts = Timetable.objects.select_related('shop').filter(
-        dt=(dt_now + relativedelta(months=1)).replace(day=1),
+        dt=dt_now + relativedelta(months=1),
         shop_id__in=shops.values_list('id', flat=True),
         status=Timetable.Status.READY.value,
     ).count()
 
     fot_revenue_stats = []
 
-    import random
     while dt_from <= dt_now:
         fot_revenue_stats.append({
             'dt': BaseConverter.convert_date(dt_from),
-            'value': random.randint(40, 60)
+            'value': calculate_supershop_stats(dt_from, shop_ids).pop('fot_revenue')
         })
         dt_from += relativedelta(months=1)
+
+    curr_month_stats = calculate_supershop_stats(dt_now, shop_ids)
+    curr_month_stats.pop('fot')
+    next_month_stats = calculate_supershop_stats(dt_now + relativedelta(months=1), shop_ids)
+    next_month_stats.pop('fot')
+    if curr_month_stats['revenue']:
+        revenue_growth = round(next_month_stats['revenue'] / curr_month_stats['revenue'] - 1, 2) * 100
+    else:
+        revenue_growth = -100
+    next_month_stats.update({
+        'revenue_growth': revenue_growth
+    })
 
     return JsonResponse.success({
         'shop_tts': '{}/{}'.format(successful_tts, shops.count()),
         'fot_revenue': fot_revenue_stats,
         'stats': {
-            'curr': {
-                'fot_revenue': random.randint(40, 60),
-                'idle': random.randint(40, 60),
-                'lack': random.randint(40, 60),
-                'revenue': random.randint(1000000, 2000000),
-                'workers': random.randint(100, 120)
-            },
-            'next': {} if not successful_tts else {
-                'fot_revenue': random.randint(40, 60),
-                'idle': random.randint(40, 60),
-                'lack': random.randint(40, 60),
-                'revenue': random.randint(1000000, 2000000),
-                'revenue_growth': random.randint(10, 20),
-                'workers': random.randint(100, 120)
-            }
+            'curr': curr_month_stats,
+            'next': next_month_stats if successful_tts else {}
         }
     })

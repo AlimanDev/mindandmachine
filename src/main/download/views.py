@@ -5,6 +5,8 @@ from .forms import (
     GetDemandXlsxForm,
     GetUrvXlsxForm,
 )
+from src.main.shop.forms import GetSuperShopListForm
+from src.main.shop.utils import get_super_shop_list_stats
 from src.db.models import (
     Shop,
     User,
@@ -13,7 +15,8 @@ from src.db.models import (
     WorkType,
     AttendanceRecords,
 )
-from datetime import time, timedelta, datetime
+from datetime import time, timedelta, datetime, date
+from dateutil.relativedelta import relativedelta
 from django.apps import apps
 from src.util.utils import JsonResponse
 from src.util.models_converter import AttendanceRecordsConverter
@@ -253,3 +256,67 @@ def get_urv_xlsx(request, workbook, form):
         worksheet.write(index + 1, 3, AttendanceRecordsConverter.convert_type(record))
 
     return workbook, 'URV {}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))
+
+
+@api_method(
+    'GET',
+    GetSuperShopListForm,
+    groups=[User.GROUP_HQ],
+    lambda_func=lambda x: False
+)
+@xlsx_method
+def get_supershops_stats(request, workbook, form):
+    """
+    Скачивает статистику по магазинам за пред/текущий периоды
+
+    Args:
+        method: GET
+        url: /api/download/get_supershops_stats
+        pointer(int): указывает с айдишника какого магазина в querysete всех магазов будем инфу отдавать
+        items_per_page(int): сколько шопов будем на фронте показывать
+        title(str): required = False, название магазина
+        super_shop_type(['H', 'C']): type of supershop
+        region(str): title of region
+        closed_before_dt(QOS_DATE): closed before this date
+        opened_after_dt(QOS_DATE): opened after this date
+        revenue_fot(str): range in format '123-345'
+        revenue(str): range
+        lack(str): range, percents
+        fot(str): range
+        idle(str): range, percents
+        workers_amount(str): range
+        sort_type(str): по какому параметру сортируем
+        format(str): 'excel'/'raw'
+
+    Returns:
+        эксель файл с форматом Магазин | ФОТ/Выручка | ФОТ | Простой | Нехватка | Количество сотрудников
+    """
+    dt_now = date.today().replace(day=1)
+    dt_prev = date.today().replace(day=1) - relativedelta(months=1)
+    data, amount = get_super_shop_list_stats(form, display_format='excel')
+
+    def write_stats(row_index, col_index, value_dict_name):
+        worksheet.write(row_index, col_index, '{}/{} ({}%)'.format(
+            round(super_shop_data[value_dict_name]['prev']),
+            round(super_shop_data[value_dict_name]['curr']),
+            round(super_shop_data[value_dict_name]['change']),
+        ))
+
+    worksheet = workbook.add_worksheet('Показатели по магазину')
+    worksheet.set_column(0, 5, 20)
+    worksheet.write(0, 0, 'Магазин')
+    worksheet.write(0, 1, 'ФОТ/Выручка')
+    worksheet.write(0, 2, 'ФОТ')
+    worksheet.write(0, 3, 'Простой, %')
+    worksheet.write(0, 4, 'Нехватка, %')
+    worksheet.write(0, 5, 'Сотрудники')
+
+    for index, super_shop_data in enumerate(data, start=1):
+        worksheet.write(index, 0, '{}, {}'.format(super_shop_data['title'], super_shop_data['code'] or ''))
+        write_stats(index, 1, 'fot_revenue')
+        write_stats(index, 2, 'fot')
+        write_stats(index, 3, 'idle')
+        write_stats(index, 4, 'lack')
+        write_stats(index, 5, 'workers_amount')
+
+    return workbook, 'Shop Indicators({}-{}).xlsx'.format(dt_now.strftime('%B'), dt_prev.strftime('%B'))

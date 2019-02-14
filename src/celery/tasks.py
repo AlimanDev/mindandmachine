@@ -11,6 +11,7 @@ from src.main.timetable.worker_exchange.utils import (
     has_deficiency
 )
 from src.main.demand.utils import create_predbills_request_function
+from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
 
 from src.db.models import (
     PeriodQueues,
@@ -27,6 +28,7 @@ from src.db.models import (
     WorkerCashboxInfo,
     CameraClientGate,
     CameraClientEvent,
+    Timetable,
     IncomeVisitors,
     EmptyOutcomeVisitors,
     PurchasesOutcomeVisitors,
@@ -401,3 +403,28 @@ def clean_camera_stats():
     dttm_to_delete = now() - relativedelta(months=for_past_months)
 
     CameraCashboxStat.objects.filter(dttm__lt=dttm_to_delete).delete()
+
+
+@app.task
+def update_shop_stats(dt=None):
+    if not dt:
+        dt = datetime.date.today().replace(day=1)
+    shops = Shop.objects.filter(dttm_deleted__isnull=True)
+    tts = Timetable.objects.filter(shop__in=shops, dt__gte=dt, status=Timetable.Status.READY.value)
+    for timetable in tts:
+        stats = get_shop_stats(
+            shop_id=timetable.shop_id,
+            form=dict(
+                from_dt=timetable.dt,
+                to_dt=timetable.dt + relativedelta(months=1, days=-1),
+                work_type_ids=[]
+            ),
+            indicators_only=True
+        )['indicators']
+        timetable.idle = stats['deadtime_part']
+        timetable.fot = stats['FOT']
+        timetable.workers_amount = stats['cashier_amount']
+        timetable.revenue = stats['revenue']
+        timetable.lack = stats['covering_part']
+        timetable.fot_revenue = stats['fot_revenue']
+        timetable.save()

@@ -238,6 +238,7 @@ class ChangeCashierInfo(forms.Form):
     first_name = forms.CharField(max_length=30, required=False)
     middle_name = forms.CharField(max_length=64, required=False)
     last_name = forms.CharField(max_length=150, required=False)
+    salary = forms.IntegerField(required=False)
     dt_hired = util_forms.DateField(required=False)
     dt_fired = util_forms.DateField(required=False)
     email = forms.CharField(max_length=128, required=False)

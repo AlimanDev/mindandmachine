@@ -77,6 +77,7 @@ class UserConverter(BaseConverter):
             'auto_timetable': obj.auto_timetable,
             'comment': obj.extra_info,
             'sex': obj.sex,
+            'salary': float(obj.salary),
             'is_fixed_hours': obj.is_fixed_hours,
             'is_fixed_days': obj.is_fixed_days,
             'phone_number': obj.phone_number,
@@ -208,6 +209,7 @@ class WorkTypeConverter(BaseConverter):
 
         return converted_dict
 
+
 class OperationTypeConverter(BaseConverter):
     @classmethod
     def convert(cls, obj):
@@ -292,7 +294,9 @@ class ShopConverter(BaseConverter):
             'id': obj.id,
             'super_shop': obj.super_shop_id,
             'full_interface': obj.full_interface,
-            'title': obj.title
+            'title': obj.title,
+            'tm_shop_opens': cls.convert_time(obj.tm_shop_opens),
+            'tm_shop_closes': cls.convert_time(obj.tm_shop_closes),
         }
 
 

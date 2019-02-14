@@ -146,21 +146,22 @@ def add_outsource_workers(request, form):
     for i in range(form['amount']):
         outsourcer_number = str(int(last_outsourcer_in_day_number) + i + 1)
         outsourcer_username = str(last_outsourcer_in_db_number + i + 1)
-        try:
-            added = User.objects.create(
-                shop_id=shop_id,
-                attachment_group=User.GROUP_OUTSOURCE,
-                first_name='№' + outsourcer_number,
-                last_name='Наемный сотрудник',
-                dt_hired=dt,
-                dt_fired=dt,
-                username='outsourcer_' + outsourcer_username,
-                auto_timetable=False
-            )
-            dttm_work_start = datetime.combine(dt, from_tm)
-            dttm_work_end = datetime.combine(dt, to_tm)
-        except IntegrityError:
-            return JsonResponse.internal_error('Не удалось добавить аутсорс сотрудника.')
+        # try:
+        added = User.objects.create(
+            shop_id=shop_id,
+            attachment_group=User.GROUP_OUTSOURCE,
+            first_name='№' + outsourcer_number,
+            last_name='Наемный сотрудник',
+            dt_hired=dt,
+            dt_fired=dt,
+            username='outsourcer_' + outsourcer_username,
+            auto_timetable=False,
+            salary=0
+        )
+        dttm_work_start = datetime.combine(dt, from_tm)
+        dttm_work_end = datetime.combine(dt, to_tm)
+        # except IntegrityError:
+        #     return JsonResponse.internal_error('Не удалось добавить аутсорс сотрудника.')
 
         outsourcer_worker_day = WorkerDay.objects.create(
             worker=added,

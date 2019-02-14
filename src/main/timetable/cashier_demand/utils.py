@@ -1,5 +1,5 @@
 import datetime
-from django.db.models import Q, F
+from django.db.models import Q, F, Sum
 # from django.db.models.functions import Coalesce
 from src.db.models import (
     WorkerDay,
@@ -8,11 +8,14 @@ from src.db.models import (
     WorkerCashboxInfo,
     WorkerDayCashboxDetails,
     PeriodClients,
+    ProductionMonth,
     Shop,
 )
 from src.util.collection import group_by
 from src.util.models_converter import BaseConverter
+from decimal import Decimal
 from ..utils import dttm_combine
+from src.main.timetable.table.utils import count_work_month_stats
 import numpy as np
 
 
@@ -118,7 +121,7 @@ def count_diff(dttm, period_clients, demand_ind, mean_bills_per_step, work_types
     return need_amount_dict, demand_ind
 
 
-def get_worker_timetable2(shop_id, form):
+def get_worker_timetable2(shop_id, form, indicators_only=False):
     def dttm2index(dt_init, dttm, period_in_day, period_lengths_minutes):
         days = (dttm.date() - dt_init).days
         return days * period_in_day + (dttm.hour * 60 + dttm.minute) // period_lengths_minutes
@@ -196,7 +199,7 @@ def get_worker_timetable2(shop_id, form):
         dttm_to__isnull=False,
     ).exclude(
         status=WorkerDayCashboxDetails.TYPE_BREAK
-    )
+    ).select_related('worker_day', 'worker_day__worker')
 
     lambda_index_work_details = lambda x: list(range(
             dttm2index(from_dt, x.dttm_from, period_in_day, period_lengths_minutes),
@@ -211,6 +214,20 @@ def get_worker_timetable2(shop_id, form):
         lambda_add_work_details,
     )
 
+    workers = list(User.objects.filter(id__in=cashbox_details.values_list('worker_day__worker')))
+    month_work_stat = count_work_month_stats(
+        dt_start=from_dt,
+        dt_end=to_dt,
+        users=workers
+    )
+    fot = 0
+    norm_work_hours = ProductionMonth.objects.get(dt_first=from_dt.replace(day=1)).norm_work_hours
+    for worker_id in month_work_stat.keys():
+        fot += round(
+            Decimal(month_work_stat[worker_id]['paid_hours']) *
+            list(filter(lambda x: x.id == worker_id, workers))[0].salary / Decimal(norm_work_hours)
+        )
+
     finite_workdetails = list(cashbox_details.filter(worker_day__child__id__isnull=True).select_related('worker_day'))
     fill_array(
         finite_work,
@@ -219,21 +236,34 @@ def get_worker_timetable2(shop_id, form):
         lambda_add_work_details,
     )
 
-    real_cashiers = []
-    real_cashiers_initial = []
-    fact_cashier_needs = []
-    predict_cashier_needs = []
-    lack_of_cashiers_on_period = []
-    for index, dttm in enumerate(dttms):
-        dttm_converted = BaseConverter.convert_datetime(dttm)
-        real_cashiers.append({'dttm': dttm_converted, 'amount': finite_work[index]})
-        real_cashiers_initial.append({'dttm': dttm_converted,'amount': init_work[index]})
-        fact_cashier_needs.append({'dttm': dttm_converted, 'amount': fact_needs[index]})
-        predict_cashier_needs.append({'dttm': dttm_converted, 'amount': predict_needs[index]})
-        lack_of_cashiers_on_period.append({
-            'dttm': dttm_converted,
-            'lack_of_cashiers': max(0,  predict_needs[index] - finite_work[index])
-        })
+    response = {}
+
+    if not indicators_only:
+        real_cashiers = []
+        real_cashiers_initial = []
+        fact_cashier_needs = []
+        predict_cashier_needs = []
+        lack_of_cashiers_on_period = []
+        for index, dttm in enumerate(dttms):
+            dttm_converted = BaseConverter.convert_datetime(dttm)
+            real_cashiers.append({'dttm': dttm_converted, 'amount': finite_work[index]})
+            real_cashiers_initial.append({'dttm': dttm_converted,'amount': init_work[index]})
+            fact_cashier_needs.append({'dttm': dttm_converted, 'amount': fact_needs[index]})
+            predict_cashier_needs.append({'dttm': dttm_converted, 'amount': predict_needs[index]})
+            lack_of_cashiers_on_period.append({
+                'dttm': dttm_converted,
+                'lack_of_cashiers': max(0,  predict_needs[index] - finite_work[index])
+            })
+        response = {
+            'period_step': period_lengths_minutes,
+            'tt_periods': {
+                'real_cashiers': real_cashiers,
+                'real_cashiers_initial': real_cashiers_initial,
+                'predict_cashier_needs': predict_cashier_needs,
+                'fact_cashier_needs': fact_cashier_needs,
+            },
+            'lack_of_cashiers_on_period': lack_of_cashiers_on_period
+        }
 
     # statistics
     worker_amount = len(set([x.worker_day.worker_id for x in finite_workdetails]))
@@ -242,25 +272,19 @@ def get_worker_timetable2(shop_id, form):
     days_diff = (predict_needs - finite_work).reshape(period_in_day, -1).sum(1) / (period_in_day / 3) # in workers
     need_cashier_amount = np.maximum(days_diff[np.argsort(days_diff)[-1:]], 0).sum() # todo: redo with logic
 
-    response = {
+    revenue = 1000000
+    response.update({
         'indicators': {
             'deadtime_part': deadtime_part,
             'cashier_amount': worker_amount,  # len(users_amount_set),
-            'FOT': None,
+            'FOT': fot,
             'need_cashier_amount': need_cashier_amount,  # * 1.4
-            'revenue': None,
+            'revenue': revenue,
+            'fot_revenue': round(fot / revenue, 2) * 100,
             # 'change_amount': changed_amount,
             'covering_part': covering_part,
         },
-        'period_step': period_lengths_minutes,
-        'tt_periods': {
-            'real_cashiers': real_cashiers,
-            'real_cashiers_initial': real_cashiers_initial,
-            'predict_cashier_needs': predict_cashier_needs,
-            'fact_cashier_needs': fact_cashier_needs,
-        },
-        'lack_of_cashiers_on_period': lack_of_cashiers_on_period
-    }
+    })
     return response
 
 
