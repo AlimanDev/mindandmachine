@@ -427,7 +427,7 @@ def set_pred_bills(request, data):
             PeriodClients(
                 type=PeriodClients.LONG_FORECASE_TYPE,
                 dttm_forecast=BaseConverter.parse_datetime(period_demand_value['dttm']),
-                operation_type__work_type_id=period_demand_value['work_type'],
+                operation_type_id=period_demand_value['work_type'],
                 value=clients,
             )
         )
