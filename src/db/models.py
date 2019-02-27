@@ -250,8 +250,6 @@ class User(DjangoAbstractUser):
         choices=SEX_CHOICES,
     )
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
-
-    comment = models.CharField(max_length=2048, default='', blank=True)
     extra_info = models.CharField(max_length=512, default='', blank=True)
 
     auto_timetable = models.BooleanField(default=True)
