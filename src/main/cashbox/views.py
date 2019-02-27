@@ -33,6 +33,7 @@ from .forms import (
 
 from src.main.tablet.utils import time_diff
 from src.main.other.notification.utils import send_notification
+from django.db import IntegrityError
 
 
 @api_method('GET', GetTypesForm, groups=User.__all_groups__)
@@ -416,6 +417,9 @@ def delete_work_type(request, form):
     lambda_func=lambda x: WorkType.objects.get(id=x['work_type_id']).shop
 )
 def edit_work_type(request, form):
+    err_operation = 'Указаны неверные данные для операций или типа работ. Обязательно укажите время нормативы по операциям.'
+    err_slot = 'Указаны неверные данные для смены. Проверьте время начала и окончания смены.'
+
     work_type_id = form['work_type_id']
     work_type = WorkType.objects.get(id=work_type_id)
     shop_id = work_type.shop_id
@@ -448,9 +452,7 @@ def edit_work_type(request, form):
                 # todo: aa: add check of params in form
                 operation_type.save()
             except ValueError:
-                return JsonResponse.value_error(
-                    'Error upon saving operation type instance. One of the parameters is invalid'
-                )
+                return JsonResponse.value_error(err_operation)
             existing_operation_types = dict()
 
         else:
@@ -464,9 +466,7 @@ def edit_work_type(request, form):
                         # todo: aa: add check of params in form
                         ot.save()
                     except ValueError:
-                        return JsonResponse.value_error(
-                            'Error upon saving operation type instance. One of the parameters is invalid'
-                        )
+                        return JsonResponse.value_error(err_operation)
                     existing_operation_types.pop(oper_dict['id'])
                 else:
                     try:
@@ -477,8 +477,8 @@ def edit_work_type(request, form):
                             speed_coef=oper_dict['speed_coef'],
                             do_forecast=oper_dict['do_forecast'],
                         )
-                    except TypeError:
-                        return JsonResponse.internal_error('One of the parameters is invalid')
+                    except (TypeError, IntegrityError) as e:
+                        return JsonResponse.internal_error(err_operation)
 
         OperationType.objects.filter(id__in=existing_operation_types.keys()).update(
             dttm_deleted=datetime.datetime.now())
@@ -495,8 +495,11 @@ def edit_work_type(request, form):
                 existing_slot.name = slot_dict['name']
                 existing_slot.tm_start = slot_dict['tm_start']
                 existing_slot.tm_end = slot_dict['tm_end']
-                existing_slot.save()  # todo: aa: add check of params in form
-                existing_slots.pop(slot_dict['id'])
+                try:
+                    existing_slot.save()  # todo: aa: add check of params in form
+                    existing_slots.pop(slot_dict['id'])
+                except Exception:
+                    return JsonResponse.internal_error(err_slot)
             else:
                 # todo: aa: fields in slot_dict not checked!!!
                 slot_dict.update({
@@ -506,7 +509,7 @@ def edit_work_type(request, form):
                 try:
                     Slot.objects.create(**slot_dict)
                 except Exception:
-                    return JsonResponse.internal_error('Error while creating new slot')
+                    return JsonResponse.internal_error(err_slot)
         # удаляем старые слоты
         Slot.objects.filter(id__in=existing_slots.keys()).update(dttm_deleted=datetime.datetime.now())
 
