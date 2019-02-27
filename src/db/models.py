@@ -235,7 +235,7 @@ class User(DjangoAbstractUser):
 
     dt_hired = models.DateField(null=True, blank=True)
     dt_fired = models.DateField(null=True, blank=True)
-    salary = models.DecimalField(max_digits=10, decimal_places=2)
+    salary = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     birthday = models.DateField(null=True, blank=True)
     SEX_FEMALE = 'F'

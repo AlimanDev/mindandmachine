@@ -15,6 +15,7 @@ from src.db.models import (
     Notifications,
     WorkerDay,
     WorkerDayCashboxDetails,
+    OperationType,
 )
 from src.main.demand.utils import create_predbills_request_function
 from src.util.models_converter import BaseConverter
@@ -60,13 +61,15 @@ def upload_demand(request, form, demand_file):
         else:
             list_to_create.append(obj)
 
-    work_types = list(WorkType.objects.filter(shop_id=shop_id))
-
+    # work_types = list(WorkType.objects.filter(shop_id=shop_id))
+    operation_types = list(OperationType.objects.filter(work_type__shop_id=shop_id).select_related('work_type'))
+    # todo: check conflicts in operation_types_names or user other format
+    operation_types = {op_type.name or op_type.work_type.name: op_type for op_type in operation_types}
     ######################### сюда писать логику чтения из экселя ######################################################
 
     for index, row in enumerate(worksheet.rows):
         value = row[value_column_num].value
-        if not isinstance(row[value_column_num].value, int):
+        if isinstance(row[value_column_num].value, str):
             #  может быть 'Нет данных'
             continue
         checked_rows += 1
@@ -82,17 +85,17 @@ def upload_demand(request, form, demand_file):
         cashtype_name = row[cash_column_num].value
         cashtype_name = cashtype_name[:1].upper() + cashtype_name[1:].lower()  # учет регистра чтобы нормально в бд было
 
-        ct_to_search = list(filter(lambda ct: ct.name == cashtype_name, work_types))  # возвращает фильтр по типам
-        if len(ct_to_search) == 1:
+        ct_to_search = operation_types.get(cashtype_name, None)
+        if ct_to_search:
             PeriodClients.objects.filter(
                 dttm_forecast=dttm,
-                operation_type__work_type=ct_to_search[0],
+                operation_type=ct_to_search,
                 type=PeriodClients.FACT_TYPE
             ).delete()
             create_demand_objs(
                 PeriodClients(
                     dttm_forecast=dttm,
-                    work_type=ct_to_search[0],
+                    operation_type=ct_to_search,
                     value=value,
                     type=PeriodClients.FACT_TYPE
                 )
@@ -115,7 +118,7 @@ def upload_demand(request, form, demand_file):
 
     from_dt_to_create = PeriodClients.objects.filter(
         type=PeriodClients.FACT_TYPE,
-        work_type__shop_id=shop_id
+        operation_type__work_type__shop_id=shop_id
     ).order_by('dttm_forecast').last().dttm_forecast.date() + relativedelta(days=1)
 
     result_of_func = create_predbills_request_function(shop_id=shop_id, dt=from_dt_to_create)
@@ -166,10 +169,17 @@ def upload_timetable(request, form, timetable_file):
             if column_index_from_string(cell.column) == fio_column:
                 first_last_names = cell.value.split(' ')
                 last_name_concated = ' '.join(first_last_names[:-2])
-                try:
-                    u = User.objects.get(shop_id=shop_id, last_name=last_name_concated, first_name=first_last_names[-2])
-                except User.DoesNotExist:
-                    return JsonResponse.value_error('Не могу найти пользователя на строке {}'.format(cell.row))
+                # try:
+                u, _ = User.objects.get_or_create(
+                    shop_id=shop_id,
+                    last_name=last_name_concated,
+                    first_name=first_last_names[0],
+                    defaults={
+                        'username': 'user-' + str(User.objects.count()),
+                    }
+                )
+                # except User.DoesNotExist:
+                #     return JsonResponse.value_error('Не могу найти пользователя на строке {}'.format(cell.row))
             column_index = column_index_from_string(cell.column)
             if dates_start_column <= column_index <= dates_end_column:
                 dt = work_dates[column_index - dates_start_column]
