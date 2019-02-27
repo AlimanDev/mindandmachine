@@ -166,7 +166,7 @@ def upload_timetable(request, form, timetable_file):
     if not work_dates:
         return JsonResponse.value_error('Не смог сгенерировать массив дат. Возможно они в формате строки.')
 
-    shop_work_types = {w.name: w for w in WorkType.objects.qos_filter_active(shop_id=shop_id)}
+    shop_work_types = {w.name: w for w in WorkType.objects.filter(shop_id=shop_id, dttm_deleted__isnull=True)}
     for row in worksheet.iter_rows(min_row=workers_start_row):
         user_work_type = None
         for cell in row:
