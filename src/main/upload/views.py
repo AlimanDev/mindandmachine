@@ -188,7 +188,7 @@ def upload_timetable(request, form, timetable_file):
             elif column_index == work_type_column:
                 user_work_type = shop_work_types.get(cell.value, None)
                 if user_work_type:
-                    WorkerCashboxInfo.objects.create(
+                    WorkerCashboxInfo.objects.get_or_create(
                         worker=u,
                         work_type=user_work_type,
                     )
