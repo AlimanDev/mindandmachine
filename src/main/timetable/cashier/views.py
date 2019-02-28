@@ -473,11 +473,16 @@ def get_cashier_info(request, form):
         work_types = WorkType.objects.filter(shop_id=worker.shop_id)
         response['work_type_info'] = {
             'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info],
-            'work_type': {x.id: WorkTypeConverter.convert(x) for x in work_types}
+            'work_type': {x.id: WorkTypeConverter.convert(x) for x in work_types},
+            'min_time_between_shifts': worker.min_time_btw_shifts,
+            'shift_length_min': worker.shift_hours_length_min,
+            'shift_length_max': worker.shift_hours_length_max,
+            'norm_work_hours': worker.norm_work_hours,
+            'week_availability': worker.week_availability,
         }
 
     if 'constraints_info' in form['info']:
-        constraints = WorkerConstraint.objects.filter(worker_id=worker.id, is_lite=request.is_mobile)
+        constraints = WorkerConstraint.objects.filter(worker_id=worker.id)
         response['constraints_info'] = [WorkerConstraintConverter.convert(x) for x in constraints]
         response['shop_times'] = {
             'tm_start': BaseConverter.convert_time(worker.shop.tm_shop_opens),

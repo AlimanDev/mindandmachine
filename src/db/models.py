@@ -248,6 +248,13 @@ class User(DjangoAbstractUser):
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
     extra_info = models.CharField(max_length=512, default='', blank=True)
 
+    # new worker restrictions
+    week_availability = models.SmallIntegerField(default=7)
+    norm_work_hours = models.SmallIntegerField(default=100)
+    shift_hours_length_min = models.SmallIntegerField(blank=True, null=True)
+    shift_hours_length_max = models.SmallIntegerField(blank=True, null=True)
+    min_time_btw_shifts = models.SmallIntegerField(blank=True, null=True)
+
     auto_timetable = models.BooleanField(default=True)
 
     tabel_code = models.CharField(max_length=15, null=True, blank=True)
