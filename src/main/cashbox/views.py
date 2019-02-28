@@ -36,7 +36,7 @@ from src.main.other.notification.utils import send_notification
 from django.db import IntegrityError
 
 
-@api_method('GET', GetTypesForm, groups=User.__all_groups__)
+@api_method('GET', GetTypesForm)
 def get_types(request, form):
     """
     Возвращает список рабочих типов касс для данного магазина
@@ -63,13 +63,12 @@ def get_types(request, form):
         shop_id=shop_id,
         dttm_deleted__isnull=True,
     )
-
     return JsonResponse.success([
         WorkTypeConverter.convert(x, True) for x in types
     ])
 
 
-@api_method('GET', GetCashboxesForm, groups=User.__all_groups__)
+@api_method('GET', GetCashboxesForm)
 def get_cashboxes(request, form):
     """
     Возвращает список касс для заданных в work_types_ids типов

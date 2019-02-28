@@ -9,6 +9,7 @@ from src.db.models import (
     Shop,
     Notifications,
     User,
+    FunctionGroup,
 )
 from dateutil.relativedelta import relativedelta
 from django.db.models import Sum
@@ -108,7 +109,6 @@ def get_forecast(request, form):
         from_dt(QOS_DATE): required = True
         to_dt(QOS_DATE): required = True
         operation_type_ids(list): список типов касс (либо [] -- для всех типов)
-        format(str): 'raw' или 'excel' , default='raw'
         shop_id(int): required = False
 
     Returns:
@@ -127,9 +127,6 @@ def get_forecast(request, form):
             tmp_dict[dt][tm].append(x)
 
         return tmp_dict
-
-    if form['format'] == 'excel':
-        return JsonResponse.value_error('Excel is not supported yet')
 
     operation_type_ids = form['operation_type_ids']
 
@@ -287,16 +284,16 @@ def get_demand_change_logs(request, form):
         dttm_to__date__lte=to_dt,
     ).order_by('dttm_added')
 
-    return JsonResponse.success({
-        'demand_change_logs': [{
+    return JsonResponse.success([
+        {
             'dttm_added': BaseConverter.convert_datetime(x.dttm_added),
             'dttm_from': BaseConverter.convert_datetime(x.dttm_from),
             'dttm_to': BaseConverter.convert_datetime(x.dttm_to),
             'work_type_id': x.operation_type.work_type_id,
             'multiply_coef': x.multiply_coef,
             'set_value': x.set_value,
-        } for x in change_logs],
-    })
+        } for x in change_logs
+    ])
 
 
 @api_method('GET', GetVisitorsInfoForm)
@@ -459,7 +456,10 @@ def set_pred_bills(request, data):
     save_models(models_list, None)
 
     # уведомляшки всем
-    for u in User.objects.filter(shop=shop, group__in=User.__except_cashiers__):
+    for u in User.objects.filter(
+            shop=shop,
+            function_group__allowed_functions__access_type__in=FunctionGroup.__INSIDE_SHOP_TYPES__
+    ):
         Notifications.objects.create(
             type=Notifications.TYPE_SUCCESS,
             to_worker=u,

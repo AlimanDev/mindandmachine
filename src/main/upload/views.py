@@ -22,11 +22,7 @@ from src.main.demand.utils import create_predbills_request_function
 from src.util.models_converter import BaseConverter
 
 
-@api_method(
-    'POST',
-    UploadForm,
-    groups=[User.GROUP_SUPERVISOR, User.GROUP_SUPERVISOR]
-)
+@api_method('POST', UploadForm)
 @get_uploaded_file
 def upload_demand(request, form, demand_file):
     """
@@ -127,11 +123,7 @@ def upload_demand(request, form, demand_file):
     return JsonResponse.success() if result_of_func is True else result_of_func
 
 
-@api_method(
-    'POST',
-    UploadForm,
-    groups=[User.GROUP_SUPERVISOR, User.GROUP_DIRECTOR]
-)
+@api_method('POST', UploadForm)
 @get_uploaded_file
 def upload_timetable(request, form, timetable_file):
     """

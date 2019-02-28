@@ -12,6 +12,7 @@ urlpatterns = [
     path('set_slot', views.set_slot),
     path('create_slot', views.create_slot),
     path('delete_slot', views.delete_slot),
+    path('get_user_allowed_funcs', views.get_user_allowed_funcs),
     path('notifications/', include(notification_urls)),
     path('outsource/', include(outsource_urls)),
 ]

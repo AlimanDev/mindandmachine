@@ -277,7 +277,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False):
         'indicators': {
             'deadtime_part': deadtime_part,
             'cashier_amount': worker_amount,  # len(users_amount_set),
-            'FOT': fot,
+            'FOT': fot if fot else None,
             'need_cashier_amount': need_cashier_amount,  # * 1.4
             'revenue': revenue,
             'fot_revenue': round(fot / revenue, 2) * 100,

@@ -14,8 +14,8 @@ from django.utils import timezone
 @api_method(
     'GET',
     GetUserUrvForm,
-    check_permissions=False,
-    lambda_func=None,  # lambda x: User.objects.get(id=x['worker_ids'][0])
+    # check_permissions=False,
+    # lambda_func=None,  # lambda x: User.objects.get(id=x['worker_ids'][0])
 )
 def get_user_urv(request, form):
     """
@@ -89,8 +89,8 @@ def get_user_urv(request, form):
 @api_method(
     'POST',
     ChangeAttendanceForm,
-    check_permissions=False,
-    lambda_func=None,  # lambda x: User.objects.get(id=x['worker_ids'][0])
+    # check_permissions=False,
+    # lambda_func=None,  # lambda x: User.objects.get(id=x['worker_ids'][0])
 )
 def change_user_urv(request, form):
     if not form['to_user_id'] and not form['is_outsource']:
@@ -112,6 +112,7 @@ def change_user_urv(request, form):
             last_name='Наемный сотрудник',
             dt_hired=dt,
             dt_fired=dt,
+            salary=0,
             username='outsourcer_{}_{}'.format(dt, outsourcer_number + 1),
             auto_timetable=False
         )

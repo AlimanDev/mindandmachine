@@ -4,6 +4,7 @@ from src.db.models import (
     UserWeekdaySlot,
     WorkType,
     Region,
+    FunctionGroup,
 )
 from src.util.forms import FormUtil
 from src.util.models_converter import (
@@ -16,7 +17,8 @@ from .forms import (
     GetAllSlots,
     SetSlot,
     CreateSlotForm,
-    DeleteSlotForm
+    DeleteSlotForm,
+    UserAllowedFuncsForm,
 )
 from collections import defaultdict
 
@@ -24,6 +26,17 @@ from collections import defaultdict
 @api_method('GET', auth_required=False, check_permissions=False)
 def get_regions(request):
     return JsonResponse.success(list(Region.objects.all().values_list('title', flat=True)))
+
+
+@api_method('GET', UserAllowedFuncsForm, check_permissions=False)
+def get_user_allowed_funcs(request, form):
+    allowed_functions = FunctionGroup.objects.filter(group__user__id=form['worker_id'])
+    return JsonResponse.success([
+        {
+            'name': x.func,
+            'access_type': x.access_type
+        } for x in allowed_functions
+    ])
 
 
 @api_method('GET', GetAllSlots)
@@ -118,7 +131,11 @@ def set_slot(request, form):
     return JsonResponse.value_error('there is no slot with id {} in the shop (id {})'.format(slot_id, user.shop_id))
 
 
-@api_method('GET', GetSlots)
+@api_method(
+    'GET',
+    GetSlots,
+    lambda_func=lambda x: User.objects.get(id=x['user_id'])
+)
 def get_slots(request, form):
     """
 
@@ -126,7 +143,6 @@ def get_slots(request, form):
         method: GET
         url: api/other/get_slots
         user_id(int): required = True
-        shop_id(int): required = False
 
     Returns:
 

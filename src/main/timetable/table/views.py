@@ -7,7 +7,6 @@ from django.http import HttpResponse
 from functools import reduce
 from src.db.models import (
     User,
-    WorkerCashboxInfo,
     WorkerDay,
     WorkerDayCashboxDetails,
     PeriodClients,
@@ -16,14 +15,10 @@ from src.db.models import (
 )
 from src.util.forms import FormUtil
 from src.util.models_converter import (
-    UserConverter,
     BaseConverter,
 )
 from src.util.utils import api_method, JsonResponse
-from .forms import (
-    SelectCashiersForm,
-    GetWorkerStatForm,
-)
+from .forms import GetWorkerStatForm
 from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
 from .utils import (
     count_work_month_stats,
@@ -31,90 +26,6 @@ from .utils import (
 
 from src.main.download.forms import GetTable
 from .utils import count_difference_of_normal_days
-
-
-@api_method('GET', SelectCashiersForm)
-def select_cashiers(request, form):
-    """
-    Args:
-        method: GET
-        url: /api/timetable/table/select_cashiers
-        work_types(list): required = True
-        cashier_ids(list): required = True
-        work_types(str): required = False
-        workday_type(str): required = False
-        workdays(str): required = False
-        shop_id(int): required = False
-        work_workdays(str): required = False
-        from_tm(QOS_TIME): required = False
-        to_tm(QOS_TIME): required = False
-        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
-
-    """
-    shop_id = FormUtil.get_shop_id(request, form)
-    checkpoint = FormUtil.get_checkpoint(form)
-
-    users = User.objects.filter(shop_id=shop_id, attachment_group=User.GROUP_STAFF)
-
-    cashboxes_type_ids = set(form.get('work_types', []))
-    if len(cashboxes_type_ids) > 0:
-        users_hits = set()
-        for x in WorkerCashboxInfo.objects.select_related('work_type').filter(work_type__shop_id=shop_id, is_active=True):
-            if x.work_type_id in cashboxes_type_ids:
-                users_hits.add(x.worker_id)
-
-        users = [x for x in users if x.id in users_hits]
-
-    cashier_ids = set(form.get('cashier_ids', []))
-    if len(cashier_ids) > 0:
-        users = [x for x in users if x.id in cashier_ids]
-
-    work_types = set(form.get('work_types', []))
-    if len(work_types) > 0:
-        users = [x for x in users if x.work_type in work_types]
-
-    worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(worker__shop_id=shop_id)
-
-    workday_type = form.get('workday_type')
-    if workday_type is not None:
-        worker_days = worker_days.filter(type=workday_type)
-
-    workdays = form.get('workdays')
-    if len(workdays) > 0:
-        worker_days = worker_days.filter(dt__in=workdays)
-
-    users = [x for x in users if x.id in set(y.worker_id for y in worker_days)]
-
-    work_workdays = form.get('work_workdays', [])
-    if len(work_workdays) > 0:
-        def __is_match_tm(__x, __tm_from, __tm_to):
-            if __x.dttm_work_start.time() < __x.dttm_work_end.time():
-                if __tm_from > __x.dttm_work_end.time():
-                    return False
-                if __tm_to < __x.dttm_work_start.time():
-                    return False
-                return True
-            else:
-                if __tm_from >= __x.dttm_work_start.time():
-                    return True
-                if __tm_to <= __x.dttm_work_end.time():
-                    return True
-                return False
-
-        worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
-            worker__shop_id=shop_id,
-            type=WorkerDay.Type.TYPE_WORKDAY.value,
-            dt__in=work_workdays
-        )
-
-        tm_from = form.get('from_tm')
-        tm_to = form.get('to_tm')
-        if tm_from is not None and tm_to is not None:
-            worker_days = [x for x in worker_days if __is_match_tm(x, tm_from, tm_to)]
-
-        users = [x for x in users if x.id in set(y.worker_id for y in worker_days)]
-
-    return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
 @api_method('GET', GetTable)

@@ -29,11 +29,84 @@ class GetCashiersListForm(forms.Form):
         return value
 
 
+class SelectCashiersForm(forms.Form):
+    work_types = util_forms.IntegersList()
+    worker_ids = util_forms.IntegersList()
+    work_types = forms.CharField(required=False)
+    workday_type = forms.CharField(required=False)
+    workdays = forms.CharField(required=False)
+    shop_id = forms.IntegerField(required=False)
+    checkpoint = forms.IntegerField(required=False)
+
+    work_workdays = forms.CharField(required=False)
+    from_tm = util_forms.TimeField(required=False)
+    to_tm = util_forms.TimeField(required=False)
+
+    def clean_work_types(self):
+        value = self.cleaned_data['work_types']
+        if value is None or value == '':
+            return []
+
+        try:
+            value = json.loads(value)
+        except:
+            raise ValidationError('invalid')
+
+        value = [UserConverter.parse_work_type(x) for x in value]
+        if None in value:
+            raise ValidationError('invalid')
+
+        return value
+
+    def clean_workday_type(self):
+        value = self.cleaned_data['workday_type']
+        if value is None or value == '':
+            return None
+
+        value = WorkerDayConverter.parse_type(value)
+        if value is None:
+            raise ValidationError('invalid')
+
+        return value
+
+    def clean_workdays(self):
+        value = self.cleaned_data['workdays']
+        if value is None or value == '':
+            return []
+
+        try:
+            value = json.loads(value)
+            value = [BaseConverter.parse_date(x) for x in value]
+        except:
+            raise ValidationError('invalid')
+
+        return value
+
+    def clean_work_workdays(self):
+        value = self.cleaned_data['work_workdays']
+        if value is None or value == '':
+            return []
+
+        try:
+            value = json.loads(value)
+            value = [BaseConverter.parse_date(x) for x in value]
+        except:
+            raise ValidationError('invalid')
+
+        return value
+
+    def clean(self):
+        has_wds = len(self.cleaned_data['workdays']) > 0
+        has_wd_type = self.cleaned_data['workday_type'] is not None
+
+        if has_wds and not has_wd_type:
+            raise ValidationError('workday_type have to be set')
+
+
 class GetCashierTimetableForm(forms.Form):
-    worker_id = util_forms.IntegersList(required=True)
+    worker_ids = util_forms.IntegersList(required=True)
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
-    format = util_forms.ChoiceField(['raw', 'excel'], 'raw')
     shop_id = forms.IntegerField()
     checkpoint = forms.IntegerField(required=False)
 
