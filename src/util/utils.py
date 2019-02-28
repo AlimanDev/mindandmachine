@@ -7,21 +7,17 @@ from django.conf import settings
 from functools import wraps
 from django.contrib.auth import authenticate, login
 from django.http import HttpResponse
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from django.core.exceptions import (
+    ObjectDoesNotExist,
+    MultipleObjectsReturned,
+)
 from src.db.models import (
     User,
-    Shop
+    Shop,
+    FunctionGroup,
 )
 from django.views.decorators.csrf import csrf_exempt
-
-
-GROUP_HIERARCHY = {
-    User.GROUP_CASHIER: 0,
-    User.GROUP_HQ: 0,
-    User.GROUP_MANAGER: 1,
-    User.GROUP_SUPERVISOR: 2,
-    User.GROUP_DIRECTOR: 3,
-}
+from django.db.models import QuerySet
 
 
 def manually_mail_admins(request):
@@ -66,6 +62,7 @@ class JsonResponse(object):
         algo_internal_error(msg): 500
 
     """
+
     @classmethod
     def success(cls, data=None, additional_info=None):
         return cls.__base_response(200, data, additional_info)
@@ -75,7 +72,7 @@ class JsonResponse(object):
         return cls.__base_error_response(
             400,
             'MethodException',
-            'Invalid method <{}>, expected <{}>'.format(current_method, expected_method)
+            'Invalid method {}, expected {}'.format(current_method, expected_method)
         )
 
     @classmethod
@@ -133,7 +130,10 @@ class JsonResponse(object):
             'data': data,
             'info': additional_info
         }
-        return HttpResponse(json.dumps(response_data, separators=(',', ':'), ensure_ascii=False), content_type='application/json')
+        return HttpResponse(
+            json.dumps(response_data, separators=(',', ':'), ensure_ascii=False),
+            content_type='application/json'
+        )
 
 
 def api_method(
@@ -141,11 +141,12 @@ def api_method(
         form_cls=None,
         auth_required=True,
         check_permissions=True,
-        groups=None,
         lambda_func=None,
         check_password=False,
-    ):
+):
     """
+    Note:
+        Новое правило: если нужно передать список айдишников пользователей, передаем его в поле worker_ids формы
 
     Args:
         method(str): 'GET' or 'POST'
@@ -154,6 +155,7 @@ def api_method(
         check_permissions(bool): нужно ли делать проверку на доступ
         groups(list): список групп, которым разрешен доступ
         lambda_func(function): функция которая исходя из данных формирует данные необходимые для проверки доступа. при создании объекта -- False
+        check_password(bool): запрашивать пароль на действие или нет
     """
 
     def decor(func):
@@ -201,10 +203,10 @@ def api_method(
 
             if check_permissions:  # for signout
                 if auth_required and request.user.is_authenticated:
-                    user_group = request.user.group
-
                     if lambda_func is None:
                         cleaned_data = Shop.objects.filter(id=form.cleaned_data['shop_id']).first()
+                        if not cleaned_data:
+                            return JsonResponse.internal_error('No such department')
                     else:
                         try:
                             cleaned_data = lambda_func(form.cleaned_data)
@@ -213,57 +215,58 @@ def api_method(
                         except MultipleObjectsReturned:
                             return JsonResponse.multiple_objects_returned()
 
-                    if groups is None:
-                        if method == 'GET':
-                            __groups = User.__except_cashiers__
-                        elif method == 'POST':
-                            __groups = User.__allowed_to_modify__
-                        else:
-                            return JsonResponse.method_error(method, '')
-                    else:
-                        __groups = groups
-
-                    shop_id = None
-                    super_shop_id = None
-
-                    if cleaned_data is not None:
-                        if user_group in __groups:
-                            if cleaned_data is False:
-                                pass
-                            elif user_group == User.GROUP_CASHIER:
-                                if request.user.id != cleaned_data.id:
-                                    return JsonResponse.access_forbidden(
-                                        'You are not allowed to get other cashiers information'
-                                    )
-                            elif user_group == User.GROUP_MANAGER:
-                                if isinstance(cleaned_data, User):
-                                    shop_id = cleaned_data.shop_id
-                                elif isinstance(cleaned_data, Shop):
-                                    shop_id = cleaned_data.id
-                                if request.user.shop_id != shop_id:
-                                    return JsonResponse.access_forbidden(
-                                        'You are not allowed to modify outside of your shop'
-                                    )
-                            elif user_group == User.GROUP_DIRECTOR or user_group == User.GROUP_SUPERVISOR:
-                                if isinstance(cleaned_data, User):
-                                    super_shop_id = cleaned_data.shop.super_shop_id
-                                elif isinstance(cleaned_data, Shop):
-                                    super_shop_id = cleaned_data.super_shop_id
-                                if request.user.shop.super_shop_id != super_shop_id:
-                                    return JsonResponse.access_forbidden(
-                                        'You are not allowed to modify outside of your super_shop'
-                                    )
-                            elif user_group == User.GROUP_HQ:
-                                if request.method != 'GET':
-                                    JsonResponse.access_forbidden(
-                                        'You are not allowed to modify any information'
-                                    )
-
-                        else:
-                            return JsonResponse.access_forbidden(
-                                'У вас недостаточно прав для выполнения операции. Ваша группа {}'.format(user_group)
+                    function_group_id = request.user.function_group_id
+                    if not function_group_id:
+                        return JsonResponse.internal_error(
+                            'У пользователя {} {} не указана группа'.format(
+                                request.user.first_name,
+                                request.user.last_name
                             )
+                        )
 
+                    function_to_check = FunctionGroup.objects.filter(group__id=function_group_id, func=func.__name__).first()
+                    if function_to_check is None:
+                        return JsonResponse.access_forbidden(
+                            'Для вашей группы пользователей не разрешено просматривать или изменять запрашиваемые данные.'
+                        )
+                    else:
+                        access_type = function_to_check.access_type
+
+                    if cleaned_data is False or access_type == FunctionGroup.TYPE_ALL:
+                        pass
+                    else:
+                        # todo: aa: делать проверку с QuerySet лучше, потому что QuerySet может быть магазинов и могут совпасть id просто
+                        # (но вроде сейчас нет QuerySet таких
+                        if access_type == FunctionGroup.TYPE_SELF:
+                            if isinstance(cleaned_data, QuerySet):
+                                if request.user.id not in cleaned_data:
+                                    return JsonResponse.access_forbidden(
+                                        'Вы не можете просматрировать информацию о других пользователях'
+                                    )
+                                else:
+                                    kwargs['form']['worker_ids'] = [request.user.id]
+                            elif not (isinstance(cleaned_data, User) and request.user.id == cleaned_data.id):
+                                return JsonResponse.access_forbidden(
+                                    'Вы не можете просматрировать информацию о других пользователях'
+                                )
+                        else:
+                            if isinstance(cleaned_data, User):
+                                cleaned_data = cleaned_data.shop
+                            elif isinstance(cleaned_data, QuerySet):
+                                # todo: сделать нормально во всех вьюхах
+                                cleaned_data = Shop.objects.filter(user__id=cleaned_data[0]).first()
+
+                            if access_type == FunctionGroup.TYPE_SHOP \
+                                    and request.user.shop_id != cleaned_data.id:
+                                return JsonResponse.access_forbidden(
+                                    'Вы не можете просматрировать информацию по другим отделам'
+                                )
+
+                            elif access_type == FunctionGroup.TYPE_SUPERSHOP \
+                                    and request.user.shop.super_shop_id != cleaned_data.super_shop_id:
+                                return JsonResponse.access_forbidden(
+                                    'Вы не можете просматрировать информацию по другим магазинам'
+                                )
             try:
                 return func(request, *args, **kwargs)
             except Exception as e:
@@ -271,17 +274,12 @@ def api_method(
                 if settings.DEBUG:
                     raise e
                 else:
-                    manually_mail_admins(request)
-                    return JsonResponse.internal_error()
+                    # manually_mail_admins(request)
+                    return JsonResponse.internal_error('Внутренняя ошибка сервера')
 
         return wrapper
 
     return decor
-
-
-def check_group_hierarchy(changed_user, user_who_changes):
-    if GROUP_HIERARCHY[user_who_changes.group] <= GROUP_HIERARCHY[changed_user.group]:
-        return JsonResponse.access_forbidden('You are not allowed to edit this user')
 
 
 def test_algo_server_connection():

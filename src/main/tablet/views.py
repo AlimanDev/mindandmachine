@@ -312,7 +312,6 @@ def get_cashiers_info(request, form):
 @api_method(
     'POST',
     ChangeCashierStatus,
-    groups=[User.GROUP_MANAGER, User.GROUP_SUPERVISOR, User.GROUP_DIRECTOR],
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
 def change_cashier_status(request, form):

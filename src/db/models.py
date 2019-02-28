@@ -5,6 +5,7 @@ from django.contrib.auth.models import (
 )
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
+from src.util.collection import group_by
 from . import utils
 import datetime
 
@@ -159,6 +160,24 @@ class WorkerManager(UserManager):
         ).filter(*args, **kwargs)
 
 
+class Group(models.Model):
+    class Meta:
+        verbose_name = 'Группа пользователей'
+        verbose_name_plural = 'Группы пользователей'
+
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    dttm_modified = models.DateTimeField(blank=True, null=True)
+    name = models.CharField(max_length=128)
+    subordinates = models.ManyToManyField("self", blank=True)
+
+    def __str__(self):
+        return '{}, {}, {}'.format(
+            self.id,
+            self.name,
+            self.subordinates.all() if self.subordinates.all() else ''
+        )
+
+
 class User(DjangoAbstractUser):
 
     class Meta:
@@ -185,20 +204,6 @@ class User(DjangoAbstractUser):
         # TYPE_DISABLED = 7
         # TYPE_PREGNANT = 8
 
-    GROUP_CASHIER = 'C'
-    GROUP_MANAGER = 'M'
-    GROUP_SUPERVISOR = 'S'
-    GROUP_DIRECTOR = 'D'
-    GROUP_HQ = 'H'
-
-    GROUP_TYPE = (
-        (GROUP_CASHIER, 'cashiers'),
-        (GROUP_MANAGER, 'manager'),
-        (GROUP_SUPERVISOR, 'supervisor'),
-        (GROUP_DIRECTOR, 'director'),
-        (GROUP_HQ, 'headquarter')
-    )
-
     GROUP_STAFF = 'S'
     GROUP_OUTSOURCE = 'O'
 
@@ -207,21 +212,13 @@ class User(DjangoAbstractUser):
         (GROUP_OUTSOURCE, 'outsource'),
     )
 
-    __all_groups__ = [x[0] for x in GROUP_TYPE]
-    __except_cashiers__ = [GROUP_MANAGER, GROUP_SUPERVISOR, GROUP_DIRECTOR, GROUP_HQ]
-    __allowed_to_modify__ = [GROUP_SUPERVISOR, GROUP_DIRECTOR]
-
     id = models.BigAutoField(primary_key=True)
     position = models.ForeignKey(WorkerPosition, null=True, blank=True, on_delete=models.PROTECT)
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable
     work_type = utils.EnumField(WorkType, null=True, blank=True)
     is_fixed_hours = models.BooleanField(default=False)
     is_fixed_days = models.BooleanField(default=False)
-    group = models.CharField(
-        max_length=1,
-        default=GROUP_CASHIER,
-        choices=GROUP_TYPE
-    )
+    function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
     attachment_group = models.CharField(
         max_length=1,
         default=GROUP_STAFF,
@@ -261,6 +258,135 @@ class User(DjangoAbstractUser):
     is_ready_for_overworkings = models.BooleanField(default=False)
 
     objects = WorkerManager()
+
+
+class FunctionGroup(models.Model):
+    class Meta:
+        verbose_name = 'Доступ к функциям'
+        unique_together = (('func', 'group'), )
+
+    TYPE_SELF = 'S'
+    TYPE_SHOP = 'TS'
+    TYPE_SUPERSHOP = 'TSS'
+    TYPE_ALL = 'A'
+
+    TYPES = (
+        (TYPE_SELF, 'self'),
+        (TYPE_SHOP, 'shop'),
+        (TYPE_SUPERSHOP, 'supershop'),
+        (TYPE_ALL, 'all')
+    )
+
+    FUNCS = (
+        'get_cashboxes_open_time',
+        'get_workers',
+        'get_demand_change_logs',
+        'edit_work_type',
+        'get_cashboxes_used_resource',
+        'set_slot',
+        'delete_slot',
+        'get_notifications',
+        'get_cashboxes_info',
+        'get_department',
+        'update_cashbox',
+        'delete_work_type',
+        'get_outsource_workers',
+        'add_supershop',
+        'change_cashier_info',
+        'get_demand_xlsx',
+        'get_not_working_cashiers_list',
+        'get_table',
+        'get_worker_day',
+        'create_cashbox',
+        'set_worker_day',
+        'signout',
+        'create_timetable',
+        'get_regions',
+        'get_slots',
+        'get_user_urv',
+        'get_cashboxes',
+        'get_cashier_timetable',
+        'select_cashiers',
+        'request_worker_day',
+        'add_outsource_workers',
+        'get_parameters',
+        'set_cashier_info_lite',
+        'create_cashier',
+        'get_urv_xlsx',
+        'get_cashiers_info',
+        'create_work_type',
+        'get_visitors_info',
+        'get_time_distribution',
+        'set_queue',
+        'set_notifications_read',
+        'get_status',
+        'get_forecast',
+        'set_parameters',
+        'get_cashiers_list',
+        'get_change_request',
+        'delete_timetable',
+        'get_types',
+        'create_slot',
+        'get_supershop_stats',
+        'set_cashier_info_hard',
+        'get_all_slots',
+        'get_cashiers_timetable',
+        'set_demand',
+        'dublicate_cashier_table',
+        'get_month_stat',
+        'handle_worker_day_request',
+        'get_workers_to_exchange',
+        'get_tabel',
+        'delete_cashier',
+        'get_worker_day_logs',
+        'password_edit',
+        'get_cashier_info',
+        'change_cashier_status',
+        'set_selected_cashiers',
+        'get_indicators',
+        'upload_demand',
+        'upload_timetable',
+        'change_user_urv',
+        'get_super_shop',
+        'delete_cashbox',
+        'set_timetable',
+        'get_super_shop_list',
+        'delete_worker_day',
+        'create_predbills_request',
+        'get_timetable_xlsx',
+        'process_forecast',
+        'edit_supershop',
+        'get_supershops_stats',
+        'edit_shop',
+        'add_shop',
+    )
+
+    FUNCS_TUPLE = ((f, f) for f in FUNCS)
+
+    __INSIDE_SHOP_TYPES__ = [TYPE_SHOP, TYPE_SUPERSHOP] # for notification
+
+    # __HQ_FUNCS__ = [
+    #     'get_super_shop_list',
+    #     'edit_supershop',
+    #     'get_supershop_stats',
+    #     'edit_shop',
+    #     'add_supershop',
+    #     'add_shop',
+    # ]
+
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    dttm_modified = models.DateTimeField(blank=True, null=True)
+    group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name='allowed_functions', blank=True, null=True)
+    func = models.CharField(max_length=128, choices=FUNCS_TUPLE)
+    access_type = models.CharField(choices=TYPES, max_length=32)
+
+    def __str__(self):
+        return 'id: {}, group: {}, access_type: {}, func name: {}'.format(
+            self.id,
+            self.group,
+            self.access_type,
+            self.func,
+        )
 
 
 class WorkTypeManager(models.Manager):

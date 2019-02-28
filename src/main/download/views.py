@@ -261,7 +261,6 @@ def get_urv_xlsx(request, workbook, form):
 @api_method(
     'GET',
     GetSuperShopListForm,
-    groups=[User.GROUP_HQ],
     lambda_func=lambda x: False
 )
 @xlsx_method

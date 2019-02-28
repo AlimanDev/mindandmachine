@@ -6,7 +6,7 @@ class GetUserUrvForm(forms.Form):
     worker_ids = util_forms.IntegersList()
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
-    shop = forms.IntegerField(required=False)
+    shop_id = forms.IntegerField(required=False)
     offset = forms.IntegerField(required=False)
 
     type = forms.CharField(required=False)
@@ -22,3 +22,4 @@ class ChangeAttendanceForm(forms.Form):
     attendance_id = forms.IntegerField()
     to_user_id = forms.IntegerField(required=False)
     is_outsource = forms.BooleanField(required=False)
+    shop_id = forms.IntegerField(required=False)

@@ -94,14 +94,13 @@ def set_selected_cashiers(request, form):
         url: /api/timetable/auto_settings/set_selected_cashiers
         cashier_ids(list): id'шники сотрудников которым проставлять
         shop_id(int): required = True
-        value(bool): required = True
 
     Note:
         Всем другим сотрудникам из этого магаза проставляется значение противоположное value
     """
-    shop = Shop.objects.get(id=form['shop_id'])
-    User.objects.filter(shop=shop, attachment_group=User.GROUP_STAFF).exclude(id__in=form['cashier_ids']).update(auto_timetable=False)
-    User.objects.filter(id__in=form['cashier_ids'], attachment_group=User.GROUP_STAFF).update(auto_timetable=True)
+    shop_workers = User.objects.filter(shop_id=form['shop_id'], attachment_group=User.GROUP_STAFF)
+    shop_workers.exclude(id__in=form['cashier_ids']).update(auto_timetable=False)
+    User.objects.filter(id__in=form['cashier_ids']).update(auto_timetable=True)
     return JsonResponse.success()
 
 

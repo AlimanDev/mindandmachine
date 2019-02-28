@@ -35,8 +35,7 @@ api_urlpatterns = [
 
 urlpatterns = [
     path('api/', include(api_urlpatterns)),
-    path('admin/', admin.site.urls),
-    url(r'^admin/statuscheck/', include('celerybeat_status.urls')),
+    path('admin/', admin.site.urls)
 ]
 
 if settings.QOS_DEV_STATIC_ENABLED:

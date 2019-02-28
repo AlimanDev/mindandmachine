@@ -21,6 +21,8 @@ from ..models import (
     Cashbox,
     UserIdentifier,
     AttendanceRecords,
+    Group,
+    FunctionGroup,
     Timetable,
 )
 from src.util.models_converter import (
@@ -159,8 +161,24 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
     models_attendance = []
     infos = []
 
+    cashier_group, created = Group.objects.get_or_create(name='Кассир')
+    supervisor_group, created = Group.objects.get_or_create(name='Руководитель')
+
+    for func in FunctionGroup.FUNCS:
+        FunctionGroup.objects.get_or_create(
+            access_type=FunctionGroup.TYPE_SUPERSHOP,
+            group=supervisor_group,
+            func=func,
+        )
+        if 'get' in func:
+            FunctionGroup.objects.get_or_create(
+                access_type=FunctionGroup.TYPE_SELF,
+                group=cashier_group,
+                func=func
+            )
+
     for worker_ind, worker_d in enumerate(workers, start=1):
-        if worker_d['general_info']['group'] == User.GROUP_SUPERVISOR:
+        if worker_d['general_info']['group'] == 'S':
             worker = User.objects.create_user(
                 username='test{}'.format(shop.id),
                 email='q@q.com',
@@ -169,14 +187,15 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             )
             worker.first_name = 'Иван'
             worker.last_name = 'Иванов'
-            worker.group = User.GROUP_SUPERVISOR
+            worker.function_group = supervisor_group
+
             worker.shop = shop
             worker.save()
         else:
             worker = User.objects.create(
                 username='u_{}_{}'.format(shop.id, worker_ind),
-                group=User.GROUP_CASHIER,
                 last_name=worker_d['general_info']['first_name'],
+                function_group=cashier_group,
                 password='a',
                 tabel_code='{}{}'.format(shop.id, worker_ind),
                 salary=40000,

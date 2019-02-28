@@ -33,7 +33,7 @@ from .forms import (
 )
 
 
-@api_method('GET', GetDepartmentForm)
+@api_method('GET', GetDepartmentForm, lambda_func=lambda x: False)
 def get_department(request, form):
     """
     Возвращает информацию об отделе
@@ -140,7 +140,6 @@ def get_super_shop(request, form):
 @api_method(
     'GET',
     GetSuperShopListForm,
-    groups=[User.GROUP_HQ],
     lambda_func=lambda x: False
 )
 def get_super_shop_list(request, form):
@@ -182,7 +181,6 @@ def get_super_shop_list(request, form):
 @api_method(
     'POST',
     AddSuperShopForm,
-    groups=[User.GROUP_HQ],
     lambda_func=lambda x: False
 )
 def add_supershop(request, form):
@@ -206,7 +204,6 @@ def add_supershop(request, form):
 @api_method(
     'POST',
     AddShopForm,
-    groups=[User.GROUP_HQ],
     lambda_func=lambda x: False
 )
 def add_shop(request, form):
@@ -223,7 +220,6 @@ def add_shop(request, form):
 @api_method(
     'POST',
     EditShopForm,
-    groups=[User.GROUP_HQ],
     lambda_func=lambda x: False
 )
 def edit_shop(request, form):
@@ -246,7 +242,6 @@ def edit_shop(request, form):
 @api_method(
     'POST',
     EditSuperShopForm,
-    groups=[User.GROUP_HQ],
     lambda_func=lambda x: False
 )
 def edit_supershop(request, form):
@@ -383,7 +378,6 @@ def set_parameters(request, form):
 @api_method(
     'GET',
     GetSuperShopStatsForm,
-    groups=[User.GROUP_HQ],
     lambda_func=lambda x: False
 )
 def get_supershop_stats(request, form):

@@ -46,7 +46,6 @@ class TestCashier(LocalTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
 
-        self.user1.group = User.GROUP_CASHIER
         self.user1.save()
         self.auth()
 
@@ -87,7 +86,6 @@ class TestCashier(LocalTestCase):
         response = self.api_post('/api/timetable/cashier/change_cashier_info', {
             'user_id': 1,
             'first_name': 'Viktor',
-            'group': User.GROUP_DIRECTOR,
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 403)
@@ -99,8 +97,6 @@ class TestCashier(LocalTestCase):
             'middle_name': 'middle_name',
             'last_name': 'last_name',
             'birthday': date(1990, 2, 3),
-            'group': User.GROUP_CASHIER,
-
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
