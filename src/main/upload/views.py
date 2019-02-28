@@ -201,7 +201,7 @@ def upload_timetable(request, form, timetable_file):
                         dt, BaseConverter.parse_time(times[1] + ':00')
                     )
                     if dttm_work_end < dttm_work_start:
-                        dttm_work_start += datetime.timedelta(days=1)
+                        dttm_work_end += datetime.timedelta(days=1)
                 else:
                     work_type = WORK_TYPES[cell.value]
 
