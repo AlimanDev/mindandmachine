@@ -295,7 +295,11 @@ def notify_cashiers_lack():
                                 WorkType.objects.get(id=work_type).name,
                                 return_dict[dttm_converted][work_type]
                             )
-                    managers_dir_list = User.objects.filter(Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER), shop_id=shop.id)
+                    managers_dir_list = User.objects.filter(
+                        function_group__allowed_functions__func='get_workers_to_exchange',
+                        dt_fired__isnull=True,
+                        shop_id=shop.id
+                    )
                     users_with_such_notes = []
 
                     notes = Notifications.objects.filter(

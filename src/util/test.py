@@ -65,7 +65,6 @@ class LocalTestCase(TestCase):
             shop=self.shop,
             last_name='Дурак',
             first_name='Иван',
-            group=User.GROUP_SUPERVISOR
         )
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2', first_name='Иван2', last_name='Иванов')
         self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3', first_name='Иван3', last_name='Сидоров')

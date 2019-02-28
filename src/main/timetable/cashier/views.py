@@ -19,8 +19,6 @@ from src.db.models import (
 from src.util.utils import (
     JsonResponse,
     api_method,
-    check_group_hierarchy,
-    GROUP_HIERARCHY,
 )
 from src.util.forms import FormUtil
 from src.util.models_converter import (
@@ -36,6 +34,7 @@ from src.util.collection import group_by, count, range_u
 
 from .forms import (
     GetCashierTimetableForm,
+    SelectCashiersForm,
     GetCashierInfoForm,
     SetWorkerDayForm,
     SetCashierInfoForm,
@@ -171,11 +170,95 @@ def get_not_working_cashiers_list(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users_not_working_today])
 
 
+@api_method('GET', SelectCashiersForm)
+def select_cashiers(request, form):
+    """
+    Args:
+        method: GET
+        url: /api/timetable/cashier/select_cashiers
+        work_types(list): required = True
+        workers_ids(list): required = True
+        work_types(str): required = False
+        workday_type(str): required = False
+        workdays(str): required = False
+        shop_id(int): required = False
+        work_workdays(str): required = False
+        from_tm(QOS_TIME): required = False
+        to_tm(QOS_TIME): required = False
+        checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
+
+    """
+    shop_id = FormUtil.get_shop_id(request, form)
+    checkpoint = FormUtil.get_checkpoint(form)
+
+    users = User.objects.filter(shop_id=shop_id, attachment_group=User.GROUP_STAFF)
+
+    cashboxes_type_ids = set(form.get('work_types', []))
+    if len(cashboxes_type_ids) > 0:
+        users_hits = set()
+        for x in WorkerCashboxInfo.objects.select_related('work_type').filter(work_type__shop_id=shop_id, is_active=True):
+            if x.work_type_id in cashboxes_type_ids:
+                users_hits.add(x.worker_id)
+
+        users = [x for x in users if x.id in users_hits]
+
+    cashier_ids = set(form.get('worker_ids', []))
+    if len(cashier_ids) > 0:
+        users = [x for x in users if x.id in cashier_ids]
+
+    work_types = set(form.get('work_types', []))
+    if len(work_types) > 0:
+        users = [x for x in users if x.work_type in work_types]
+
+    worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(worker__shop_id=shop_id)
+
+    workday_type = form.get('workday_type')
+    if workday_type is not None:
+        worker_days = worker_days.filter(type=workday_type)
+
+    workdays = form.get('workdays')
+    if len(workdays) > 0:
+        worker_days = worker_days.filter(dt__in=workdays)
+
+    users = [x for x in users if x.id in set(y.worker_id for y in worker_days)]
+
+    work_workdays = form.get('work_workdays', [])
+    if len(work_workdays) > 0:
+        def __is_match_tm(__x, __tm_from, __tm_to):
+            if __x.dttm_work_start.time() < __x.dttm_work_end.time():
+                if __tm_from > __x.dttm_work_end.time():
+                    return False
+                if __tm_to < __x.dttm_work_start.time():
+                    return False
+                return True
+            else:
+                if __tm_from >= __x.dttm_work_start.time():
+                    return True
+                if __tm_to <= __x.dttm_work_end.time():
+                    return True
+                return False
+
+        worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+            worker__shop_id=shop_id,
+            type=WorkerDay.Type.TYPE_WORKDAY.value,
+            dt__in=work_workdays
+        )
+
+        tm_from = form.get('from_tm')
+        tm_to = form.get('to_tm')
+        if tm_from is not None and tm_to is not None:
+            worker_days = [x for x in worker_days if __is_match_tm(x, tm_from, tm_to)]
+
+        users = [x for x in users if x.id in set(y.worker_id for y in worker_days)]
+
+    return JsonResponse.success([UserConverter.convert(x) for x in users])
+
+
+
 @api_method(
     'GET',
     GetCashierTimetableForm,
-    groups=User.__all_groups__,
-    lambda_func=lambda x: User.objects.filter(id__in=x['worker_id']).first()  # тут возможно будет косяк в будущем
+    lambda_func=lambda x: User.objects.filter(id__in=x['worker_ids']).values_list('id', flat=True)
 )
 def get_cashier_timetable(request, form):
     """
@@ -184,10 +267,9 @@ def get_cashier_timetable(request, form):
     Args:
         method: GET
         url: /api/timetable/cashier/get_cashier_timetable
-        worker_id(list): required = True
+        worker_ids(list): required = True
         from_dt(QOS_DATE): с какого числа смотреть расписание
         to_dt(QOS_DATE): по какое число
-        format(str): 'raw' или 'excel'
         shop_id(int): required = True
         checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
@@ -220,16 +302,13 @@ def get_cashier_timetable(request, form):
         }
 
     """
-    if form['format'] == 'excel':
-        return JsonResponse.value_error('Excel is not supported yet')
-
     from_dt = form['from_dt']
     to_dt = form['to_dt']
     checkpoint = FormUtil.get_checkpoint(form)
 
     response = {}
     # todo: rewrite with 1 request instead 80
-    for worker_id in form['worker_id']:
+    for worker_id in form['worker_ids']:
         worker_days_db = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
             worker_id=worker_id,
             worker__shop_id=form['shop_id'],
@@ -325,7 +404,6 @@ def get_cashier_timetable(request, form):
 @api_method(
     'GET',
     GetCashierInfoForm,
-    groups=User.__all_groups__,
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
 def get_cashier_info(request, form):
@@ -449,7 +527,6 @@ def get_cashier_info(request, form):
 @api_method(
     'GET',
     GetWorkerDayForm,
-    groups=User.__all_groups__,
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
 def get_worker_day(request, form):
@@ -673,7 +750,7 @@ def set_worker_day(request, form):
                     dttm_to = BaseConverter.parse_time(item['dttm_to'])
                     dttm_from = BaseConverter.parse_time(item['dttm_from'])
                     WorkerDayCashboxDetails.objects.create(
-                        work_type_id=item['cashBox_type'],
+                        work_type_id=item['work_type'],
                         worker_day=new_worker_day,
                         dttm_from=datetime.combine(dt, dttm_from),
                         dttm_to=datetime.combine(dt, dttm_to) if dttm_to > dttm_from\
@@ -1148,9 +1225,6 @@ def delete_cashier(request, form):
     """
     try:
         user = User.objects.get(id=form['user_id'])
-        errors = check_group_hierarchy(user, request.user)
-        if errors:
-            return errors
     except User.DoesNotExist:
         return JsonResponse.does_not_exists_error()
 
@@ -1166,7 +1240,6 @@ def delete_cashier(request, form):
 @api_method(
     'POST',
     PasswordChangeForm,
-    groups=User.__all_groups__,
     lambda_func=lambda x: User.objects.get(id=x['user_id'])
 )
 def password_edit(request, form):
@@ -1190,9 +1263,6 @@ def password_edit(request, form):
     if user_id != request.user.id:
         try:
             user = User.objects.get(id=user_id)
-            errors = check_group_hierarchy(user, request.user)
-            if errors:
-                return errors
         except User.DoesNotExist:
             return JsonResponse.does_not_exists_error()
     else:
@@ -1209,81 +1279,8 @@ def password_edit(request, form):
 
 
 @api_method(
-    'POST',
-    ChangeCashierInfo,
-    groups=User.__allowed_to_modify__,
-    lambda_func=lambda x: User.objects.get(id=x['user_id']),
-    check_password=True,
-)
-def change_cashier_info(request, form):
-    """
-
-    Args:
-        method: POST
-        api: /api/timetable/cashier/change_cashier_info
-        user_id(int): required = True
-        first_name(str): required = False
-        middle_name(str): required = False
-        last_name(str): required = False
-        phone_number(str): required = False
-        email(str): required = False
-        dt_hired(QOS_DATE): required = False
-        dt_fired(QOS_DATE): required = False
-        group(str): required = False. Группа пользователя ('C'/'S'/'M'/'D'/'H')
-
-    Returns:
-         сложный дикт
-    """
-    user_id = form['user_id']
-
-    if user_id != request.user.id:
-        try:
-            user = User.objects.get(id=user_id)
-            errors = check_group_hierarchy(user, request.user)
-            if errors:
-                return errors
-        except User.DoesNotExist:
-            return JsonResponse.does_not_exists_error()
-    else:
-        user = request.user
-
-    if form['group']:
-        if GROUP_HIERARCHY[request.user.group] < GROUP_HIERARCHY[form['group']]:
-            return JsonResponse.access_forbidden('У вас недостаточно прав доступа для изменения данной группы.')
-        user.group = form['group']
-
-    if form['first_name']:
-        user.first_name = form['first_name']
-    if form['middle_name']:
-        user.middle_name = form['middle_name']
-    if form['last_name']:
-        user.last_name = form['last_name']
-    if form['tabel_code']:
-        user.tabel_code = form['tabel_code']
-    if form['salary']:
-        if GROUP_HIERARCHY[request.user.group] <= GROUP_HIERARCHY[form['group']]:
-            return JsonResponse.access_forbidden('У вас недостаточно прав доступа для изменения данной группы.')
-        user.salary = form['salary']
-    if form['phone_number']:
-        user.phone_number = form['phone_number']
-    if form['email']:
-        user.email = form['email']
-    if form['dt_hired']:
-        user.dt_hired = form['dt_hired']
-    if form['dt_fired']:
-        user.dt_fired = form['dt_fired']
-
-    user.save()
-
-    return JsonResponse.success()
-
-# views for making requests for changing worker day from mobile application
-
-
-@api_method(
     'GET',
     GetWorkerChangeRequestsForm,
-    groups=User.__all_groups__,
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
 def get_change_request(request, form):
@@ -1322,6 +1319,67 @@ def get_change_request(request, form):
         return JsonResponse.success()
     except WorkerDayChangeRequest.MultipleObjectsReturned:
         return JsonResponse.internal_error('Существует несколько запросов на этот день. Не знаю какой выбрать.')
+
+# views for making requests for changing worker day from mobile application
+
+
+@api_method(
+    'POST',
+    ChangeCashierInfo,
+    lambda_func=lambda x: User.objects.get(id=x['user_id']),
+    check_password=True,
+)
+def change_cashier_info(request, form):
+    """
+
+    Args:
+        method: POST
+        api: /api/timetable/cashier/change_cashier_info
+        user_id(int): required = True
+        first_name(str): required = False
+        middle_name(str): required = False
+        last_name(str): required = False
+        phone_number(str): required = False
+        email(str): required = False
+        dt_hired(QOS_DATE): required = False
+        dt_fired(QOS_DATE): required = False
+        group(str): required = False. Группа пользователя ('C'/'S'/'M'/'D'/'H')
+
+    Returns:
+         сложный дикт
+    """
+    user_id = form['user_id']
+
+    if user_id != request.user.id:
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return JsonResponse.does_not_exists_error()
+    else:
+        user = request.user
+
+    if form['first_name']:
+        user.first_name = form['first_name']
+    if form['middle_name']:
+        user.middle_name = form['middle_name']
+    if form['last_name']:
+        user.last_name = form['last_name']
+    if form['tabel_code']:
+        user.tabel_code = form['tabel_code']
+    if form['salary']:
+        user.salary = form['salary']
+    if form['phone_number']:
+        user.phone_number = form['phone_number']
+    if form['email']:
+        user.email = form['email']
+    if form['dt_hired']:
+        user.dt_hired = form['dt_hired']
+    if form['dt_fired']:
+        user.dt_fired = form['dt_fired']
+
+    user.save()
+
+    return JsonResponse.success()
 
 
 @api_method(
@@ -1383,7 +1441,6 @@ def request_worker_day(request, form):
 @api_method(
     'POST',
     HandleWorkerDayRequestForm,
-    groups=User.__allowed_to_modify__,
     lambda_func=lambda x: WorkerDayChangeRequest.objects.get(id=x['request_id']).worker
 )
 def handle_worker_day_request(request, form):

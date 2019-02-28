@@ -33,9 +33,10 @@ from .forms import (
 
 from src.main.tablet.utils import time_diff
 from src.main.other.notification.utils import send_notification
+from django.db import IntegrityError
 
 
-@api_method('GET', GetTypesForm, groups=User.__all_groups__)
+@api_method('GET', GetTypesForm)
 def get_types(request, form):
     """
     Возвращает список рабочих типов касс для данного магазина
@@ -62,13 +63,12 @@ def get_types(request, form):
         shop_id=shop_id,
         dttm_deleted__isnull=True,
     )
-
     return JsonResponse.success([
         WorkTypeConverter.convert(x, True) for x in types
     ])
 
 
-@api_method('GET', GetCashboxesForm, groups=User.__all_groups__)
+@api_method('GET', GetCashboxesForm)
 def get_cashboxes(request, form):
     """
     Возвращает список касс для заданных в work_types_ids типов
@@ -416,6 +416,9 @@ def delete_work_type(request, form):
     lambda_func=lambda x: WorkType.objects.get(id=x['work_type_id']).shop
 )
 def edit_work_type(request, form):
+    err_operation = 'Указаны неверные данные для операций или типа работ. Обязательно укажите время нормативы по операциям.'
+    err_slot = 'Указаны неверные данные для смены. Проверьте время начала и окончания смены.'
+
     work_type_id = form['work_type_id']
     work_type = WorkType.objects.get(id=work_type_id)
     shop_id = work_type.shop_id
@@ -433,87 +436,81 @@ def edit_work_type(request, form):
     except ValueError:
         return JsonResponse.value_error('Error upon saving work type instance. One of the parameters is invalid')
 
-    # front_operations = json.loads(form['operation_types'])
-    # existing_operation_types = {
-    #     x.id: x for x in OperationType.objects.filter(work_type=work_type, dttm_deleted__isnull=True)
-    # }
-    # if front_operations:
-    #     if len(front_operations) == 1 and len(existing_operation_types.keys()) == 1:  # была 1 , стала 1 => та же самая
-    #         operation_type = list(existing_operation_types.values())[0]
-    #         operation_type.name = front_operations[0]['name']
-    #         operation_type.speed_coef = front_operations[0]['speed_coef']
-    #         operation_type.do_forecast = front_operations[0]['do_forecast']
-    #         try:
-    #             operation_type.save()
-    #         except ValueError:
-    #             return JsonResponse.value_error(
-    #                 'Error upon saving operation type instance. One of the parameters is invalid'
-    #             )
-    #         existing_operation_types = dict()
-    #
-    #     else:
-    #         for oper_dict in front_operations:
-    #             if 'id' in oper_dict.keys() and oper_dict['id'] in existing_operation_types.keys():
-    #                 ot = existing_operation_types[oper_dict['id']]
-    #                 ot.name = oper_dict['name']
-    #                 ot.speed_coef = oper_dict['speed_coef']
-    #                 ot.do_forecast = oper_dict['do_forecast']
-    #                 try:
-    #                     ot.save()
-    #                 except ValueError:
-    #                     return JsonResponse.value_error(
-    #                         'Error upon saving operation type instance. One of the parameters is invalid'
-    #                     )
-    #                 existing_operation_types.pop(oper_dict['id'])
-    #             else:
-    #                 try:
-    #                     OperationType.objects.create(
-    #                         work_type_id=work_type_id,
-    #                         name=oper_dict['name'],
-    #                         speed_coef=oper_dict['speed_coef'],
-    #                         do_forecast=oper_dict['do_forecast'],
-    #                     )
-    #                 except TypeError:
-    #                     return JsonResponse.internal_error('One of the parameters is invalid')
-    #
-    #     for operation_type in existing_operation_types.values():  # удаляем старые операции
-    #         operation_type.dttm_deleted = datetime.datetime.now()
-    #         try:
-    #             operation_type.save()
-    #         except ValueError:
-    #             return JsonResponse.value_error(
-    #                 'Error upon saving operation type instance. One of the parameters is invalid'
-    #             )
-    #
-    # front_slots = json.loads(form['slots'])
-    # existing_slots = {
-    #     x.id: x for x in Slot.objects.filter(work_type=work_type, dttm_deleted__isnull=True)
-    # }
-    # for slot_dict in front_slots:
-    #     if 'id' in slot_dict.keys() and slot_dict['id'] in existing_slots.keys():
-    #         existing_slot = existing_slots[slot_dict['id']]
-    #         existing_slot.name = slot_dict['name']
-    #         existing_slot.tm_start = slot_dict['tm_start']
-    #         existing_slot.tm_end = slot_dict['tm_end']
-    #         existing_slot.save()
-    #         existing_slots.pop(slot_dict['id'])
-    #     else:
-    #         slot_dict.update({
-    #             'work_type_id': work_type_id,
-    #             'shop_id': shop_id
-    #         })
-    #         try:
-    #             Slot.objects.create(**slot_dict)
-    #         except Exception:
-    #             return JsonResponse.internal_error('Error while creating new slot')
-    #
-    # for slot in existing_slots.values():    # удаляем старые слоты (если с фронта пришел [], то соответственно там
-    #                                         # поставили произвольные, и удаляем все слоты
-    #     slot.dttm_deleted = datetime.datetime.now()
-    #     try:
-    #         slot.save()
-    #     except ValueError:
-    #         return JsonResponse.value_error('Error upon saving slot instance. dttm_deleted is invalid')
+    front_operations = json.loads(form['operation_types'])
+    if front_operations:  # todo: aa: is else must exist? each worktype must have 1+ operation
+        existing_operation_types = {
+            x.id: x for x in OperationType.objects.filter(work_type=work_type, dttm_deleted__isnull=True)
+        }
+
+        if len(front_operations) == 1 and len(existing_operation_types.keys()) == 1:  # была 1 , стала 1 => та же самая
+            operation_type = list(existing_operation_types.values())[0]
+            operation_type.name = front_operations[0]['name']
+            operation_type.speed_coef = front_operations[0]['speed_coef']
+            operation_type.do_forecast = front_operations[0]['do_forecast']
+            try:
+                # todo: aa: add check of params in form
+                operation_type.save()
+            except ValueError:
+                return JsonResponse.value_error(err_operation)
+            existing_operation_types = dict()
+
+        else:
+            for oper_dict in front_operations:
+                if 'id' in oper_dict.keys() and oper_dict['id'] in existing_operation_types.keys():
+                    ot = existing_operation_types[oper_dict['id']]
+                    ot.name = oper_dict['name']
+                    ot.speed_coef = oper_dict['speed_coef']
+                    ot.do_forecast = oper_dict['do_forecast']
+                    try:
+                        # todo: aa: add check of params in form
+                        ot.save()
+                    except ValueError:
+                        return JsonResponse.value_error(err_operation)
+                    existing_operation_types.pop(oper_dict['id'])
+                else:
+                    try:
+                        # todo: aa: add check of params in form
+                        OperationType.objects.create(
+                            work_type_id=work_type_id,
+                            name=oper_dict['name'],
+                            speed_coef=oper_dict['speed_coef'],
+                            do_forecast=oper_dict['do_forecast'],
+                        )
+                    except (TypeError, IntegrityError) as e:
+                        return JsonResponse.internal_error(err_operation)
+
+        OperationType.objects.filter(id__in=existing_operation_types.keys()).update(
+            dttm_deleted=datetime.datetime.now())
+
+    front_slots = json.loads(form['slots'])
+    if front_slots:
+        existing_slots = {
+            x.id: x for x in Slot.objects.filter(work_type=work_type, dttm_deleted__isnull=True)
+        }
+
+        for slot_dict in front_slots:
+            if 'id' in slot_dict.keys() and slot_dict['id'] in existing_slots.keys():
+                existing_slot = existing_slots[slot_dict['id']]
+                existing_slot.name = slot_dict['name']
+                existing_slot.tm_start = slot_dict['tm_start']
+                existing_slot.tm_end = slot_dict['tm_end']
+                try:
+                    existing_slot.save()  # todo: aa: add check of params in form
+                    existing_slots.pop(slot_dict['id'])
+                except Exception:
+                    return JsonResponse.internal_error(err_slot)
+            else:
+                # todo: aa: fields in slot_dict not checked!!!
+                slot_dict.update({
+                    'work_type_id': work_type_id,
+                    'shop_id': shop_id
+                })
+                try:
+                    Slot.objects.create(**slot_dict)
+                except Exception:
+                    return JsonResponse.internal_error(err_slot)
+        # удаляем старые слоты
+        Slot.objects.filter(id__in=existing_slots.keys()).update(dttm_deleted=datetime.datetime.now())
 
     return JsonResponse.success()
 

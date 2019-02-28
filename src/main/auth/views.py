@@ -40,11 +40,9 @@ def signin(request, form):
             return JsonResponse.auth_error()
 
         login(request, user)
-
     user = User.objects.get(id=request.user.id)
-    data = UserConverter.convert(user)
 
-    return JsonResponse.success(data)
+    return JsonResponse.success(UserConverter.convert(user))
 
 
 @api_method('POST', check_permissions=False)

@@ -84,7 +84,6 @@ class UserConverter(BaseConverter):
             'email': obj.email,
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
-            'group': obj.group,
             'attachment_group': obj.attachment_group,
             'identifier': user_identifier.identifier if user_identifier else None,
         }

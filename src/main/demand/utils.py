@@ -138,7 +138,7 @@ def create_predbills_request_function(shop_id, dt=None):
             {
                 'value': period_demand.value,
                 'dttm': BaseConverter.convert_datetime(period_demand.dttm_forecast),
-                'work_type': period_demand.work_type_id,
+                'work_type': period_demand.operation_type_id,
             } for period_demand in period_clients
         ],
         'shop_id': shop.id,

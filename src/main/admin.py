@@ -23,12 +23,14 @@ from src.db.models import (
     CameraCashbox,
     CameraClientGate,
     CameraClientEvent,
+    Group,
+    FunctionGroup,
 )
 
 
 @admin.register(User)
 class QsUserAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'super_shop_title', 'work_type_name', 'id', 'group')
+    list_display = ('first_name', 'last_name', 'super_shop_title', 'work_type_name', 'id',)
     search_fields = ('first_name', 'last_name', 'shop__super_shop__title', 'workercashboxinfo__work_type__name', 'id')
     list_filter = ('shop', )
 
@@ -337,3 +339,16 @@ class CameraClientGateAdmin(admin.ModelAdmin):
 class CameraClientEventAdmin(admin.ModelAdmin):
     list_display = ('dttm', 'gate', 'type')
     list_filter = ('gate', 'type')
+
+
+@admin.register(Group)
+class GroupAdmin(admin.ModelAdmin):
+    list_dispaly = ('id', 'dttm_added', 'name', 'subordinates')
+    list_filter = ('id', 'name')
+
+
+@admin.register(FunctionGroup)
+class FunctionGroupAdmin(admin.ModelAdmin):
+    list_display = ('id', 'access_type', 'group', 'func')
+    list_filter = ('access_type', 'group', 'func')
+    search_fields = ('id',)

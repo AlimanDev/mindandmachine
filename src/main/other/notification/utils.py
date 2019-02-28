@@ -7,9 +7,9 @@ from src.db.models import (
     User,
     Timetable,
     WorkerDayChangeRequest,
-    WorkerDay
+    WorkerDay,
+    FunctionGroup
 )
-from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
 from src.util.months import month_dict
 
@@ -124,7 +124,7 @@ def send_notification(action, instance, recipient_list=None, sender=None):
 
     if recipient_list is None:
         recipient_list = User.objects.filter(
-            Q(group=User.GROUP_SUPERVISOR) | Q(group=User.GROUP_MANAGER),
+            function_group__allowed_functions__access_type__in=FunctionGroup.__INSIDE_SHOP_TYPES__,
             shop_id=shop_id
         )
 
