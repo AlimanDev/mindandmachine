@@ -79,7 +79,6 @@ class UserConverter(BaseConverter):
             'sex': obj.sex,
             'salary': float(obj.salary),
             'is_fixed_hours': obj.is_fixed_hours,
-            'is_fixed_days': obj.is_fixed_days,
             'phone_number': obj.phone_number,
             'email': obj.email,
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,

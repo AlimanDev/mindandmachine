@@ -217,7 +217,6 @@ class User(DjangoAbstractUser):
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable
     work_type = utils.EnumField(WorkType, null=True, blank=True)
     is_fixed_hours = models.BooleanField(default=False)
-    is_fixed_days = models.BooleanField(default=False)
     function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
     attachment_group = models.CharField(
         max_length=1,

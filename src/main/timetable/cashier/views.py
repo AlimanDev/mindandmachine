@@ -84,7 +84,6 @@ def get_cashiers_list(request, form):
                 | 'comment': доп инфа,
                 | 'sex': пол,
                 | 'is_fixed_hours': True/False,
-                | 'is_fixed_days': True/False,
                 | 'phone_number'(str): номер телефона,
                 | 'is_ready_for_overworkings': True/False (готов сотрудник к переработкам или нет),
                 | 'tabel_code': табельный номер,
@@ -140,7 +139,6 @@ def get_not_working_cashiers_list(request, form):
                 | 'comment': доп инфа,
                 | 'sex': пол,
                 | 'is_fixed_hours': True/False,
-                | 'is_fixed_days': True/False,
                 | 'phone_number'(str): номер телефона,
                 | 'is_ready_for_overworkings': True/False (готов сотрудник к переработкам или нет),
                 | 'tabel_code': табельный номер,
@@ -432,7 +430,6 @@ def get_cashier_info(request, form):
                 | 'comment': доп инфа,
                 | 'sex': пол,
                 | 'is_fixed_hours': True/False,
-                | 'is_fixed_days': True/False,
                 | 'phone_number'(str): номер телефона,
                 | 'is_ready_for_overworkings': True/False (готов сотрудник к переработкам или нет),
                 | 'tabel_code': табельный номер,
@@ -483,8 +480,8 @@ def get_cashier_info(request, form):
         constraints = WorkerConstraint.objects.filter(worker_id=worker.id, is_lite=request.is_mobile)
         response['constraints_info'] = [WorkerConstraintConverter.convert(x) for x in constraints]
         response['shop_times'] = {
-            'tm_start': BaseConverter.convert_time(worker.shop.super_shop.tm_start),
-            'tm_end': BaseConverter.convert_time(worker.shop.super_shop.tm_end)
+            'tm_start': BaseConverter.convert_time(worker.shop.tm_shop_opens),
+            'tm_end': BaseConverter.convert_time(worker.shop.tm_shop_closes)
         }
 
     if 'work_hours' in form['info']:
@@ -948,7 +945,6 @@ def set_cashier_info(request, form, is_lite=False):
         comment(str): required = False
         sex(str): required = False
         is_fixed_hours(bool) required = False
-        is_fixed_days(bool): required = False
         phone_number(str): required = False
         is_ready_for_overworkings(bool): required = False
         tabel_code(str): required = False
@@ -1041,10 +1037,6 @@ def set_cashier_info(request, form, is_lite=False):
         worker.is_fixed_hours = form['is_fixed_hours']
         response['is_fixed_hours'] = worker.is_fixed_hours
 
-    if form.get('is_fixed_days'):
-        worker.is_fixed_days = form['is_fixed_days']
-        response['is_fixed_days'] = worker.is_fixed_days
-
     if form.get('phone_number'):
         worker.phone_number = form['phone_number']
         response['phone_number'] = worker.phone_number
@@ -1100,7 +1092,6 @@ def create_cashier(request, form):
             | 'comment': ,
             | 'sex': ,
             | 'is_fixed_hours': ,
-            | 'is_fixed_days': ,
             | 'phone_number': ,
             | 'is_ready_for_overworkings': ,
             | 'tabel_code':
