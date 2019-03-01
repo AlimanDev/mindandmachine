@@ -287,8 +287,6 @@ class FunctionGroup(models.Model):
         'get_demand_change_logs',
         'edit_work_type',
         'get_cashboxes_used_resource',
-        'set_slot',
-        'delete_slot',
         'get_notifications',
         'get_cashboxes_info',
         'get_department',
@@ -314,7 +312,7 @@ class FunctionGroup(models.Model):
         'request_worker_day',
         'add_outsource_workers',
         'get_parameters',
-        'set_cashier_info_lite',
+        'set_worker_restrictions',
         'create_cashier',
         'get_urv_xlsx',
         'get_cashiers_info',
@@ -330,9 +328,7 @@ class FunctionGroup(models.Model):
         'get_change_request',
         'delete_timetable',
         'get_types',
-        'create_slot',
         'get_supershop_stats',
-        'set_cashier_info_hard',
         'get_all_slots',
         'get_cashiers_timetable',
         'set_demand',
@@ -368,15 +364,6 @@ class FunctionGroup(models.Model):
     FUNCS_TUPLE = ((f, f) for f in FUNCS)
 
     __INSIDE_SHOP_TYPES__ = [TYPE_SHOP, TYPE_SUPERSHOP] # for notification
-
-    # __HQ_FUNCS__ = [
-    #     'get_super_shop_list',
-    #     'edit_supershop',
-    #     'get_supershop_stats',
-    #     'edit_shop',
-    #     'add_supershop',
-    #     'add_shop',
-    # ]
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_modified = models.DateTimeField(blank=True, null=True)
@@ -478,6 +465,7 @@ class UserWeekdaySlot(models.Model):
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     slot = models.ForeignKey('Slot', on_delete=models.CASCADE)
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
+    is_suitable = models.BooleanField(default=True)
 
 
 class Slot(models.Model):
