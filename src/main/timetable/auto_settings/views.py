@@ -237,7 +237,7 @@ def create_timetable(request, form):
         min_work_coef = 1
 
     shop_dict = {
-        'shop_type': shop.full_interface,
+        # 'shop_type': shop.full_interface,
         'mean_queue_length': shop.mean_queue_length,
         'max_queue_length': shop.max_queue_length,
         'dead_time_part': shop.dead_time_part,
@@ -267,23 +267,9 @@ def create_timetable(request, form):
         )
     ]
 
-    if shop.full_interface:
-        lambda_func = lambda x: x.operation_type.work_type_id
-    else:
-        lambda_func = lambda x: periods[0].operation_type.work_type_id
-
-        cashboxes = [{
-            'id': periods[0].operation_type.work_type_id,
-            'speed_coef': 1,
-            'types_priority_weights': 1,
-            'prob': 1,
-            'prior_weight': 1,
-            'prediction': 1,
-        }]
-
     slots_all = group_by(
         collection=Slot.objects.filter(shop_id=shop_id),
-        group_key=lambda_func,
+        group_key=lambda x: x.work_type_id,
     )
 
     slots_periods_dict = {k['id']: [] for k in cashboxes}
@@ -304,36 +290,34 @@ def create_timetable(request, form):
         cashbox['slots'] = slots_periods_dict[cashbox['id']]
     extra_constr = {}
 
-    # todo: this params should be in db
-
-    if not shop.full_interface:
-
-        # todo: fix trash constraints slots
-        dttm_temp = datetime(2018, 1, 1, 0, 0)
-        tms = [(dttm_temp + timedelta(seconds=i * 1800)).time() for i in range(48)]
-        extra_constr = {}
-
-        for user in users:
-            constr = []
-            user_weekdays_slots = UserWeekdaySlot.objects.select_related('slot').filter(worker=user)
-            if len(user_weekdays_slots):
-                user_slots = group_by(
-                    collection=user_weekdays_slots,
-                    group_key=lambda x: x.weekday
-                )
-                for day in range(7):
-                    for tm in tms:
-                        for slot in user_slots.get(day, []):
-                            if tm >= slot.slot.tm_start and tm <= slot.slot.tm_end:
-                                break
-                        else:
-                            constr.append({
-                                'id': '',
-                                'worker': user.id,
-                                'weekday': day,
-                                'tm': BaseConverter.convert_time(tm),
-                            })
-            extra_constr[user.id] = constr
+    # todo: add UserWeekdaySlot
+    # if not shop.full_interface:
+    #     # todo: fix trash constraints slots
+    #     dttm_temp = datetime(2018, 1, 1, 0, 0)
+    #     tms = [(dttm_temp + timedelta(seconds=i * 1800)).time() for i in range(48)]
+    #     extra_constr = {}
+    #
+    #     for user in users:
+    #         constr = []
+    #         user_weekdays_slots = UserWeekdaySlot.objects.select_related('slot').filter(worker=user)
+    #         if len(user_weekdays_slots):
+    #             user_slots = group_by(
+    #                 collection=user_weekdays_slots,
+    #                 group_key=lambda x: x.weekday
+    #             )
+    #             for day in range(7):
+    #                 for tm in tms:
+    #                     for slot in user_slots.get(day, []):
+    #                         if tm >= slot.slot.tm_start and tm <= slot.slot.tm_end:
+    #                             break
+    #                     else:
+    #                         constr.append({
+    #                             'id': '',
+    #                             'worker': user.id,
+    #                             'weekday': day,
+    #                             'tm': BaseConverter.convert_time(tm),
+    #                         })
+    #         extra_constr[user.id] = constr
 
     init_params = json.loads(shop.init_params)
     init_params['n_working_days_optimal'] = ProductionDay.objects.filter(

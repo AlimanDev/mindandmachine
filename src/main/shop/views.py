@@ -48,7 +48,7 @@ def get_department(request, form):
             'shop': {
                 | 'id': id отдела,
                 | 'super_shop': id магазина,
-                | 'full_interface'(bool): ,
+                # | 'full_interface'(bool): ,
                 | 'title': название отдела
             | },
             | 'shops': [Список отделов, которые есть в этом магазине в таком формате как выше],
