@@ -173,11 +173,8 @@ def create_timetable(request, form):
             type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lt=dt_to + timedelta(days=1),
-        ).exclude(
-            dttm_forecast__time=time(0, 0),
-        ).annotate(
-            clients=F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + shop.absenteeism)
         )
+
         if periods.count() != period_normal_count:
             period_difference['work_type_name'].append(work_type.name)
             period_difference['difference'].append(abs(period_normal_count - periods.count()))
@@ -196,9 +193,9 @@ def create_timetable(request, form):
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to,
-    ).exclude(
-        dttm_forecast__time=time(0, 0)
-    )
+    ).annotate(
+        clients=F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + shop.absenteeism)
+    ) # TODO: FIXME: TODO: no group by work_type (send to algo operation types, not work_type
 
     constraints = group_by(
         collection=WorkerConstraint.objects.select_related('worker').filter(worker__shop_id=shop_id),
