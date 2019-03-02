@@ -1040,7 +1040,6 @@ def create_cashier(request, form):
         last_name(str): max_length = 150, required = True
         username(str): max_length = 150, required = True
         password(str): max_length = 64, required = True
-        work_type(str): max_length = 3, required = True
         dt_hired(QOS_DATE): дата найма, required = True
 
     Note:
@@ -1051,7 +1050,6 @@ def create_cashier(request, form):
             | 'id': id user'a,
             | 'username': ,
             | 'shop_id': ,
-            | 'work_type': ,
             | 'first_name': ,
             | 'last_name': ,
             | 'avatar_url': ,
@@ -1071,7 +1069,6 @@ def create_cashier(request, form):
         user.first_name = form['first_name']
         user.middle_name = form['middle_name']
         user.last_name = form['last_name']
-        user.work_type = form['work_type']
         user.shop = request.user.shop
         user.dt_hired = form['dt_hired']
         user.save()

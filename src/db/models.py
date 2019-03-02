@@ -194,16 +194,6 @@ class User(DjangoAbstractUser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    class WorkType(utils.Enum):
-        TYPE_5_2 = 1
-        TYPE_2_2 = 2
-        TYPE_HOUR = 3
-        TYPE_SOS = 4
-        TYPE_MANAGER = 5
-        # TYPE_3_3 = 6
-        # TYPE_DISABLED = 7
-        # TYPE_PREGNANT = 8
-
     GROUP_STAFF = 'S'
     GROUP_OUTSOURCE = 'O'
 
@@ -215,7 +205,6 @@ class User(DjangoAbstractUser):
     id = models.BigAutoField(primary_key=True)
     position = models.ForeignKey(WorkerPosition, null=True, blank=True, on_delete=models.PROTECT)
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable
-    work_type = utils.EnumField(WorkType, null=True, blank=True)
     is_fixed_hours = models.BooleanField(default=False)
     function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
     attachment_group = models.CharField(

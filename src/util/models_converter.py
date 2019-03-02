@@ -42,24 +42,6 @@ class BaseConverter(object):
 
 
 class UserConverter(BaseConverter):
-    __WORK_TYPE = {
-        User.WorkType.TYPE_5_2.value: '52',
-        User.WorkType.TYPE_2_2.value: '22',
-        User.WorkType.TYPE_HOUR.value: 'H',
-        User.WorkType.TYPE_SOS.value: 'S',
-        User.WorkType.TYPE_MANAGER.value: 'M',
-    }
-
-    __WORK_TYPE_REVERSED = {v: k for k, v in __WORK_TYPE.items()}
-
-    @classmethod
-    def convert_work_type(cls, obj_type):
-        return cls.__WORK_TYPE.get(obj_type, '')
-
-    @classmethod
-    def parse_work_type(cls, obj_type):
-        return cls.__WORK_TYPE_REVERSED.get(obj_type)
-
     @classmethod
     def convert(cls, obj):
         user_identifier = UserIdentifier.objects.filter(worker_id=obj.id).first()
@@ -67,7 +49,6 @@ class UserConverter(BaseConverter):
             'id': obj.id,
             'username': obj.username,
             'shop_id': obj.shop_id,
-            'work_type': cls.convert_work_type(obj.work_type),
             'first_name': obj.first_name,
             'last_name': obj.last_name,
             'middle_name': obj.middle_name,

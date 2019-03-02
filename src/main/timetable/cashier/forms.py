@@ -32,7 +32,6 @@ class GetCashiersListForm(forms.Form):
 class SelectCashiersForm(forms.Form):
     work_types = util_forms.IntegersList()
     worker_ids = util_forms.IntegersList()
-    work_types = forms.CharField(required=False)
     workday_type = forms.CharField(required=False)
     workdays = forms.CharField(required=False)
     shop_id = forms.IntegerField(required=False)
@@ -41,22 +40,6 @@ class SelectCashiersForm(forms.Form):
     work_workdays = forms.CharField(required=False)
     from_tm = util_forms.TimeField(required=False)
     to_tm = util_forms.TimeField(required=False)
-
-    def clean_work_types(self):
-        value = self.cleaned_data['work_types']
-        if value is None or value == '':
-            return []
-
-        try:
-            value = json.loads(value)
-        except:
-            raise ValidationError('invalid')
-
-        value = [UserConverter.parse_work_type(x) for x in value]
-        if None in value:
-            raise ValidationError('invalid')
-
-        return value
 
     def clean_workday_type(self):
         value = self.cleaned_data['workday_type']
@@ -281,18 +264,7 @@ class CreateCashierForm(forms.Form):
     last_name = forms.CharField(max_length=150)
     username = forms.CharField(max_length=150)
     password = forms.CharField(max_length=64)
-    work_type = forms.CharField(max_length=3)
     dt_hired = util_forms.DateField()
-
-    def clean_work_type(self):
-        value = self.cleaned_data.get('work_type')
-        if value is None or value == '':
-            raise ValidationError('Invalid value')
-
-        value = UserConverter.parse_work_type(value)
-        if value is None:
-            raise ValidationError('Invalid enum value')
-        return value
 
 
 class DeleteCashierForm(forms.Form):
