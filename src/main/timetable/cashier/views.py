@@ -723,8 +723,6 @@ def set_worker_day(request, form):
     except WorkerDay.MultipleObjectsReturned:
         return JsonResponse.multiple_objects_returned()
 
-    cashbox_updated = False
-
     # этот блок вводит логику относительно аутсорс сотрудников. у них выходных нет, поэтому их мы просто удаляем
     if old_wd and old_wd.worker.attachment_group == User.GROUP_OUTSOURCE:
         try:
@@ -743,7 +741,6 @@ def set_worker_day(request, form):
             created_by=request.user,
             **wd_args
         )
-
         if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
             if len(details):
                 for item in details:
@@ -764,7 +761,6 @@ def set_worker_day(request, form):
                     dttm_from=new_worker_day.dttm_work_start,
                     dttm_to=new_worker_day.dttm_work_end
                 )
-            cashbox_updated = True
 
             response['day'] = WorkerDayConverter.convert(new_worker_day)
 
@@ -772,8 +768,7 @@ def set_worker_day(request, form):
         worker.delete()
 
     response = {
-        'action': action,
-        'cashbox_updated': cashbox_updated
+        'action': action
     }
 
     return JsonResponse.success(response)
