@@ -1,4 +1,5 @@
-from datetime import time, datetime, timedelta
+from datetime import time, datetime, timedelta, date
+from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ObjectDoesNotExist
 import json
 
@@ -174,7 +175,6 @@ def select_cashiers(request, form):
         url: /api/timetable/cashier/select_cashiers
         work_types(list): required = True
         workers_ids(list): required = True
-        work_types(str): required = False
         workday_type(str): required = False
         workdays(str): required = False
         shop_id(int): required = False
@@ -187,7 +187,12 @@ def select_cashiers(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     checkpoint = FormUtil.get_checkpoint(form)
 
-    users = User.objects.filter(shop_id=shop_id, attachment_group=User.GROUP_STAFF)
+    users = User.objects.qos_filter_active(
+        dt_from=date.today(),
+        dt_to=date.today() + relativedelta(days=31),
+        shop_id=shop_id,
+        attachment_group=User.GROUP_STAFF,
+    )
 
     cashboxes_type_ids = set(form.get('work_types', []))
     if len(cashboxes_type_ids) > 0:
@@ -201,10 +206,6 @@ def select_cashiers(request, form):
     cashier_ids = set(form.get('worker_ids', []))
     if len(cashier_ids) > 0:
         users = [x for x in users if x.id in cashier_ids]
-
-    work_types = set(form.get('work_types', []))
-    if len(work_types) > 0:
-        users = [x for x in users if x.work_type in work_types]
 
     worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(worker__shop_id=shop_id)
 
