@@ -73,7 +73,7 @@ class Shop(models.Model):
     id = models.BigAutoField(primary_key=True)
 
     super_shop = models.ForeignKey(SuperShop, on_delete=models.PROTECT)
-    full_interface = models.BooleanField(default=True)
+    # full_interface = models.BooleanField(default=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)

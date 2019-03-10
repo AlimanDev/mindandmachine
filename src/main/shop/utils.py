@@ -79,7 +79,7 @@ def get_super_shop_list_stats(form, display_format='raw'):
     ).filter(**filter_dict)
 
     if sort_type:
-        super_shops = super_shops.order_by(sort_type + '_curr')
+        super_shops = super_shops.order_by(sort_type + '_curr' if 'title' not in sort_type else sort_type)
 
     total = super_shops.count()
     if display_format == 'raw':
