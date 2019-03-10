@@ -6,18 +6,11 @@ from src.db.models import (
     Region,
     FunctionGroup,
 )
-from src.util.forms import FormUtil
-from src.util.models_converter import (
-    BaseConverter,
-    SlotConverter
-)
+from src.util.models_converter import BaseConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import (
     GetSlots,
     GetAllSlots,
-    SetSlot,
-    CreateSlotForm,
-    DeleteSlotForm,
     UserAllowedFuncsForm,
 )
 from collections import defaultdict
@@ -81,56 +74,6 @@ def get_all_slots(request, form):
     return JsonResponse.success(result)
 
 
-@api_method('POST', SetSlot, lambda_func=lambda x: User.objects.filter(id=x['user_id']).first())
-def set_slot(request, form):
-    """
-
-    Args:
-        method: POST
-        url: api/other/set_slot
-        slots(str): список слотов (вроде)
-        user_id(int):
-
-    Returns:
-        JsonResponse.success
-
-    Raises:
-        JsonResponse.value_error
-
-    """
-    # weekday = form['weekday']
-    try:
-        user = User.objects.get(id=form['user_id'])
-    except User.DoesNotExist:
-        return JsonResponse.does_not_exists_error('user_id')
-
-    shop_slots = Slot.objects.filter(shop_id=user.shop_id).values_list('id', flat=True)
-
-    slots_list = []
-    bad_slot = False
-    for wd, slot_ids in form['slots'].items():
-        for slot_id in slot_ids:
-            if slot_id in shop_slots:
-                slots_list.append(
-                    UserWeekdaySlot(
-                        worker=user,
-                        weekday=wd,
-                        slot_id=slot_id,
-                    )
-                )
-            else:
-                bad_slot =True
-                break
-        if bad_slot:
-            break
-
-    if not bad_slot:
-        UserWeekdaySlot.objects.filter(worker=user).delete()
-        UserWeekdaySlot.objects.bulk_create(slots_list)
-        return JsonResponse.success()
-    return JsonResponse.value_error('there is no slot with id {} in the shop (id {})'.format(slot_id, user.shop_id))
-
-
 @api_method(
     'GET',
     GetSlots,
@@ -156,78 +99,11 @@ def get_slots(request, form):
     slots_by_weekday = defaultdict(list)
     for ws in weekday_slots:
         slots_by_weekday[ws.weekday].append({
-            'id': ws.slot.id,
+            'slot_id': ws.slot.id,
+            'is_suitable': ws.is_suitable,
             'name': ws.slot.name,
             'tm_start': BaseConverter.convert_time(ws.slot.tm_start),
             'tm_end': BaseConverter.convert_time(ws.slot.tm_end),
         })
 
-    return JsonResponse.success({
-        'slots': slots_by_weekday,
-    })
-
-
-@api_method(
-    'POST',
-    CreateSlotForm,
-    lambda_func=lambda x: WorkType.objects.get(id=x['work_type_id']).shop
-)
-def create_slot(request, form):
-    """
-    Создает новый слов
-
-    Args:
-        method: POST
-        url: /api/other/create_slot
-        work_type_id(int): required = True
-        tm_start(QOS_TIME): required = True
-        tm_end(QOS_TIME): required = True
-
-    Returns:
-        {
-            | 'id': id созданного слота,
-            | 'shop': id shop'a,
-            | 'tm_start': tm_start,
-            | 'tm_end':  tm_end,
-            | 'name': название слота
-        }
-
-    Raises:
-        JsonResponse.already_exists_error: если слот с таким work_type_id и временами уже существует
-    """
-    shop_id = FormUtil.get_shop_id(request, form)
-
-    slot_dict = {
-        'shop_id': shop_id,
-        'work_type_id': form['work_type_id'],
-        'tm_start': form['tm_start'],
-        'tm_end': form['tm_end']
-    }
-
-    is_exist = Slot.objects.filter(**slot_dict)
-    if is_exist.count() > 0:
-        return JsonResponse.already_exists_error('such slot already exists')
-
-    new_slot = Slot.objects.create(**slot_dict)
-
-    return JsonResponse.success(SlotConverter.convert(new_slot))
-
-
-@api_method(
-    'POST',
-    DeleteSlotForm,
-    lambda_func=lambda x: Slot.objects.get(id=x['slot_id']).shop
-)
-def delete_slot(request, form):
-    """
-    Warning:
-        Напрямую удаляет слот из бд(без всякого проставления dttm_deleted или чего-то еще)
-
-    Args:
-        method: POST
-        url: /api/other/delete_slot
-        slot_id(int): required = True
-    """
-    Slot.objects.get(id=form['slot_id']).delete()
-
-    return JsonResponse.success('slot was successfully deleted')
+    return JsonResponse.success(slots_by_weekday)

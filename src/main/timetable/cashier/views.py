@@ -1,5 +1,5 @@
-from datetime import time, datetime, timedelta
-from django.db.models import Avg, Q
+from datetime import time, datetime, timedelta, date
+from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ObjectDoesNotExist
 import json
 
@@ -12,8 +12,7 @@ from src.db.models import (
     WorkerConstraint,
     WorkType,
     WorkerDayCashboxDetails,
-    WorkerPosition,
-    Shop,
+    UserWeekdaySlot,
     Notifications,
 )
 from src.util.utils import (
@@ -37,7 +36,7 @@ from .forms import (
     SelectCashiersForm,
     GetCashierInfoForm,
     SetWorkerDayForm,
-    SetCashierInfoForm,
+    SetWorkerRestrictionsForm,
     GetWorkerDayForm,
     CreateCashierForm,
     DeleteCashierForm,
@@ -84,7 +83,6 @@ def get_cashiers_list(request, form):
                 | 'comment': доп инфа,
                 | 'sex': пол,
                 | 'is_fixed_hours': True/False,
-                | 'is_fixed_days': True/False,
                 | 'phone_number'(str): номер телефона,
                 | 'is_ready_for_overworkings': True/False (готов сотрудник к переработкам или нет),
                 | 'tabel_code': табельный номер,
@@ -140,7 +138,6 @@ def get_not_working_cashiers_list(request, form):
                 | 'comment': доп инфа,
                 | 'sex': пол,
                 | 'is_fixed_hours': True/False,
-                | 'is_fixed_days': True/False,
                 | 'phone_number'(str): номер телефона,
                 | 'is_ready_for_overworkings': True/False (готов сотрудник к переработкам или нет),
                 | 'tabel_code': табельный номер,
@@ -178,7 +175,6 @@ def select_cashiers(request, form):
         url: /api/timetable/cashier/select_cashiers
         work_types(list): required = True
         workers_ids(list): required = True
-        work_types(str): required = False
         workday_type(str): required = False
         workdays(str): required = False
         shop_id(int): required = False
@@ -191,7 +187,12 @@ def select_cashiers(request, form):
     shop_id = FormUtil.get_shop_id(request, form)
     checkpoint = FormUtil.get_checkpoint(form)
 
-    users = User.objects.filter(shop_id=shop_id, attachment_group=User.GROUP_STAFF)
+    users = User.objects.qos_filter_active(
+        dt_from=date.today(),
+        dt_to=date.today() + relativedelta(days=31),
+        shop_id=shop_id,
+        attachment_group=User.GROUP_STAFF,
+    )
 
     cashboxes_type_ids = set(form.get('work_types', []))
     if len(cashboxes_type_ids) > 0:
@@ -205,10 +206,6 @@ def select_cashiers(request, form):
     cashier_ids = set(form.get('worker_ids', []))
     if len(cashier_ids) > 0:
         users = [x for x in users if x.id in cashier_ids]
-
-    work_types = set(form.get('work_types', []))
-    if len(work_types) > 0:
-        users = [x for x in users if x.work_type in work_types]
 
     worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(worker__shop_id=shop_id)
 
@@ -432,7 +429,6 @@ def get_cashier_info(request, form):
                 | 'comment': доп инфа,
                 | 'sex': пол,
                 | 'is_fixed_hours': True/False,
-                | 'is_fixed_days': True/False,
                 | 'phone_number'(str): номер телефона,
                 | 'is_ready_for_overworkings': True/False (готов сотрудник к переработкам или нет),
                 | 'tabel_code': табельный номер,
@@ -476,15 +472,20 @@ def get_cashier_info(request, form):
         work_types = WorkType.objects.filter(shop_id=worker.shop_id)
         response['work_type_info'] = {
             'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info],
-            'work_type': {x.id: WorkTypeConverter.convert(x) for x in work_types}
+            'work_type': {x.id: WorkTypeConverter.convert(x) for x in work_types},
+            'min_time_between_shifts': worker.min_time_btw_shifts,
+            'shift_length_min': worker.shift_hours_length_min,
+            'shift_length_max': worker.shift_hours_length_max,
+            'norm_work_hours': worker.norm_work_hours,
+            'week_availability': worker.week_availability,
         }
 
     if 'constraints_info' in form['info']:
-        constraints = WorkerConstraint.objects.filter(worker_id=worker.id, is_lite=request.is_mobile)
+        constraints = WorkerConstraint.objects.filter(worker_id=worker.id)
         response['constraints_info'] = [WorkerConstraintConverter.convert(x) for x in constraints]
         response['shop_times'] = {
-            'tm_start': BaseConverter.convert_time(worker.shop.super_shop.tm_start),
-            'tm_end': BaseConverter.convert_time(worker.shop.super_shop.tm_end)
+            'tm_start': BaseConverter.convert_time(worker.shop.tm_shop_opens),
+            'tm_end': BaseConverter.convert_time(worker.shop.tm_shop_closes)
         }
 
     if 'work_hours' in form['info']:
@@ -723,8 +724,6 @@ def set_worker_day(request, form):
     except WorkerDay.MultipleObjectsReturned:
         return JsonResponse.multiple_objects_returned()
 
-    cashbox_updated = False
-
     # этот блок вводит логику относительно аутсорс сотрудников. у них выходных нет, поэтому их мы просто удаляем
     if old_wd and old_wd.worker.attachment_group == User.GROUP_OUTSOURCE:
         try:
@@ -743,7 +742,6 @@ def set_worker_day(request, form):
             created_by=request.user,
             **wd_args
         )
-
         if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
             if len(details):
                 for item in details:
@@ -764,7 +762,6 @@ def set_worker_day(request, form):
                     dttm_from=new_worker_day.dttm_work_start,
                     dttm_to=new_worker_day.dttm_work_end
                 )
-            cashbox_updated = True
 
             response['day'] = WorkerDayConverter.convert(new_worker_day)
 
@@ -772,8 +769,7 @@ def set_worker_day(request, form):
         worker.delete()
 
     response = {
-        'action': action,
-        'cashbox_updated': cashbox_updated
+        'action': action
     }
 
     return JsonResponse.success(response)
@@ -909,157 +905,118 @@ def delete_worker_day(request, form):
 
     return JsonResponse.success()
 
+#
+# @api_method(
+#     'POST',
+#     SetCashierInfoForm,
+#     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+# )
+# def set_cashier_info_hard(request, form):
+#     """
+#     url: /api/timetable/cashier/set_cashier_info_hard
+#     """
+#     return set_cashier_info(request, form, False)
+#
+#
+# @api_method(
+#     'POST',
+#     SetCashierInfoForm,
+#     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+# )
+# def set_cashier_info_lite(request, form):
+#     """
+#     url: /api/timetable/cashier/set_cashier_info_lite
+#     """
+#     return set_cashier_info(request, form, True)
+
 
 @api_method(
     'POST',
-    SetCashierInfoForm,
+    SetWorkerRestrictionsForm,
     lambda_func=lambda x: User.objects.get(id=x['worker_id'])
 )
-def set_cashier_info_hard(request, form):
-    """
-    url: /api/timetable/cashier/set_cashier_info_hard
-    """
-    return set_cashier_info(request, form, False)
-
-
-@api_method(
-    'POST',
-    SetCashierInfoForm,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
-)
-def set_cashier_info_lite(request, form):
-    """
-    url: /api/timetable/cashier/set_cashier_info_lite
-    """
-    return set_cashier_info(request, form, True)
-
-
-def set_cashier_info(request, form, is_lite=False):
+def set_worker_restrictions(request, form):
     """
     Устанавливает заданные параметры кассиру
 
     Args:
         method: POST
+        url: /api/timetable/cashier/set_worker_restrictions
         worker_id(int): required = True
-        is_lite(bool): False -- с фронта, True -- с мобилы
-        work_type(str): тип графика кассира (40часов, 5/2, etc). required = False
-        cashbox_info(str): за какими типами касс может рабоать? required = False
-        constraint(str):required = False
-        comment(str): required = False
-        sex(str): required = False
-        is_fixed_hours(bool) required = False
-        is_fixed_days(bool): required = False
-        phone_number(str): required = False
-        is_ready_for_overworkings(bool): required = False
-        tabel_code(str): required = False
-        position_department(int): required = False
-        position_title(str): required = False, max_length=64
+        # worker_sex(str): пол
+        # work_type_info(str): JSON за какими типами работ может работать
+        # constraints(str): JSON с ограничениями сотрудника
+        # is_ready_for_overworkings(bool): готов ли сотрудник к переработкам
+        # is_fixed_hours(bool): делать график фиксированным или нет
+        worker_slots(str): JSON со слотами на которых сотрудник может (или нежелательно работать)
+        # week_availability(int): сколько подряд может работать (например, если стоит 2, то считаем график 2через2)
+        # norm_work_hours(int): отклонение от нормы рабочих часов для сотрудника
+        # shift_hours_length(str): длина смен в часах в формате '5-12'
+        # min_time_btw_shifts(int): минимальное время между сменами
 
     Returns:
-        {
-            Сложный дикт
-        }
+        {}
     """
     try:
         worker = User.objects.get(id=form['worker_id'])
     except User.DoesNotExist:
         return JsonResponse.value_error('Invalid worker_id')
 
-    response = {}
-
-    if form.get('work_type'):
-        worker.work_type = form['work_type']
-        response['work_type'] = UserConverter.convert_work_type(worker.work_type)
-
-    worker.extra_info = form.get('comment', '')
-    worker.save()
-
-    if form.get('cashbox_info'):
-        work_types = {
-            x.id: x for x in WorkType.objects.filter(shop_id=worker.shop_id)
-        }
-
-        new_active_cashboxes = []
-        for obj in form['cashbox_info']:
-            cb = work_types.get(obj.get('work_type_id'))
-            if cb is not None:
-                new_active_cashboxes.append((cb, obj.get('priority')))
-
-        worker_cashbox_info = []
-        WorkerCashboxInfo.objects.filter(worker_id=worker.id).update(is_active=False)
-        for cashbox, priority in new_active_cashboxes:
-            # worktype_forecast = WorkType.objects.get(id=cashbox.id)
-            # mean_speed = 1
-            # if worktype_forecast.do_forecast == WorkType.FORECAST_HARD:
-            mean_speed = WorkerCashboxInfo.objects.filter(
-                work_type__id=cashbox.id
-            ).aggregate(Avg('mean_speed'))['mean_speed__avg']
-
-            obj, created = WorkerCashboxInfo.objects.update_or_create(
-                worker_id=worker.id,
-                work_type_id=cashbox.id,
+    if form.get('work_type_info'):
+        work_type_info = form['work_type_info']
+        for work_type in work_type_info:
+            WorkerCashboxInfo.objects.update_or_create(
+                worker=worker,
+                work_type_id=work_type['work_type_id'],
                 defaults={
-                    'is_active': True,
-                },
+                    'priority': work_type['priority']
+                }
             )
-            if priority is not None:
-                obj.priority = priority
-                obj.save()
 
-            if created:
-                obj.mean_speed = mean_speed
-                obj.save()
-            worker_cashbox_info.append(obj)
+    if form.get('constraints'):
+        new_constraints = form['constraints']
+        WorkerConstraint.objects.filter(worker=worker).delete()
+        constraints_to_create = []
 
-        response['work_type'] = {x.id: WorkTypeConverter.convert(x) for x in work_types.values()}
-        response['work_type_info'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info]
-
-    if form.get('constraint'):
-        constraints = []
-        WorkerConstraint.objects.filter(worker_id=worker.id).delete()
-        for wd, times in form['constraint'].items():
-            for tm in times:
-                c = WorkerConstraint.objects.create(
-                    worker_id=worker.id,
-                    is_lite=is_lite,
-                    weekday=wd,
-                    tm=tm,
+        for constraint in new_constraints:
+            constraints_to_create.append(
+                WorkerConstraint(
+                    tm=BaseConverter.parse_time(constraint['tm']),
+                    is_lite=constraint['is_lite'],
+                    weekday=constraint['weekday'],
+                    worker=worker
                 )
-                constraints.append(c)
+            )
+        WorkerConstraint.objects.bulk_create(constraints_to_create)
 
-        constraints_converted = {x: [] for x in range(7)}
-        for c in constraints:
-            constraints_converted[c.weekday].append(BaseConverter.convert_time(c.tm))
+    if form.get('worker_slots'):
+        new_slots = form['worker_slots']
+        UserWeekdaySlot.objects.filter(worker=worker).delete()
 
-        response['constraint'] = constraints_converted
+        slots_to_create = []
+        for user_slot in new_slots:
+            slots_to_create.append(
+                UserWeekdaySlot(
+                    worker=worker,
+                    slot_id=user_slot['slot_id'],
+                    is_suitable=user_slot['is_suitable'],
+                    weekday=user_slot['weekday']
+                )
+            )
+        UserWeekdaySlot.objects.bulk_create(slots_to_create)
 
-    if form.get('sex'):
-        worker.sex = form['sex']
-        response['sex'] = worker.sex
-
-    if form.get('is_fixed_hours'):
-        worker.is_fixed_hours = form['is_fixed_hours']
-        response['is_fixed_hours'] = worker.is_fixed_hours
-
-    if form.get('is_fixed_days'):
-        worker.is_fixed_days = form['is_fixed_days']
-        response['is_fixed_days'] = worker.is_fixed_days
-
-    if form.get('phone_number'):
-        worker.phone_number = form['phone_number']
-        response['phone_number'] = worker.phone_number
-
-    if form.get('is_ready_for_overworkings'):
-        worker.is_ready_for_overworkings = form['is_ready_for_overworkings']
-        response['is_ready_for_overworkings'] = worker.is_ready_for_overworkings
-
-    if form.get('tabel_code'):
-        worker.tabel_code = form['tabel_code']
-        response['tabel_code'] = worker.tabel_code
+    worker.sex = form['worker_sex']
+    worker.week_availability = form['week_availability']
+    worker.is_fixed_hours = form['is_fixed_hours']
+    worker.shift_hours_length_min = form['shift_hours_length'][0]
+    worker.shift_hours_length_max = form['shift_hours_length'][1]
+    worker.is_ready_for_overworkings = form['is_ready_for_overworkings']
+    worker.norm_work_hours = form['norm_work_hours']
+    worker.min_time_btw_shifts = form['min_time_btw_shifts']
 
     worker.save()
 
-    return JsonResponse.success(response)
+    return JsonResponse.success()
 
 
 @api_method(
@@ -1079,7 +1036,6 @@ def create_cashier(request, form):
         last_name(str): max_length = 150, required = True
         username(str): max_length = 150, required = True
         password(str): max_length = 64, required = True
-        work_type(str): max_length = 3, required = True
         dt_hired(QOS_DATE): дата найма, required = True
 
     Note:
@@ -1090,7 +1046,6 @@ def create_cashier(request, form):
             | 'id': id user'a,
             | 'username': ,
             | 'shop_id': ,
-            | 'work_type': ,
             | 'first_name': ,
             | 'last_name': ,
             | 'avatar_url': ,
@@ -1100,7 +1055,6 @@ def create_cashier(request, form):
             | 'comment': ,
             | 'sex': ,
             | 'is_fixed_hours': ,
-            | 'is_fixed_days': ,
             | 'phone_number': ,
             | 'is_ready_for_overworkings': ,
             | 'tabel_code':
@@ -1111,7 +1065,6 @@ def create_cashier(request, form):
         user.first_name = form['first_name']
         user.middle_name = form['middle_name']
         user.last_name = form['last_name']
-        user.work_type = form['work_type']
         user.shop = request.user.shop
         user.dt_hired = form['dt_hired']
         user.save()

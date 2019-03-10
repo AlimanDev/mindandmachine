@@ -35,7 +35,7 @@ class Migration(migrations.Migration):
                 ('is_active', models.BooleanField(default=True, help_text='Designates whether this user should be treated as active. Unselect this instead of deleting accounts.', verbose_name='active')),
                 ('date_joined', models.DateTimeField(default=django.utils.timezone.now, verbose_name='date joined')),
                 ('id', models.BigAutoField(primary_key=True, serialize=False)),
-                ('work_type', src.db.utils.EnumField(blank=True, null=True, to_enum=src.db.models.User.WorkType)),
+                ('work_type', src.db.utils.EnumField(blank=True, null=True, to_enum=[0, 1])),
                 ('is_fixed_hours', models.BooleanField(default=False)),
                 ('is_fixed_days', models.BooleanField(default=False)),
                 ('group', models.CharField(choices=[('C', 'cashiers'), ('M', 'manager'), ('S', 'supervisor'), ('D', 'director'), ('H', 'headquarter')], default='C', max_length=1)),
