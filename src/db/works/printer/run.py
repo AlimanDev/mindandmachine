@@ -851,11 +851,11 @@ def print_to_file(file, shop_id, dt_from, dt_to, workingdays):
 
     workbook = xlsxwriter.Workbook(filename=file)
 
-    if shop.full_interface:
-        common_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays=workingdays)
-        common_fill_sheet_two(workbook, shop, dt_from, dt_to, workingdays=workingdays)
-    else:
-        depart_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays=workingdays)
+    # if shop.full_interface:
+    common_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays=workingdays)
+    common_fill_sheet_two(workbook, shop, dt_from, dt_to, workingdays=workingdays)
+    # else:
+    #     depart_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays=workingdays)
 
     workbook.close()
 

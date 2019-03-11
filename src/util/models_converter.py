@@ -273,7 +273,6 @@ class ShopConverter(BaseConverter):
         return {
             'id': obj.id,
             'super_shop': obj.super_shop_id,
-            'full_interface': obj.full_interface,
             'title': obj.title,
             'tm_shop_opens': cls.convert_time(obj.tm_shop_opens),
             'tm_shop_closes': cls.convert_time(obj.tm_shop_closes),
