@@ -23,6 +23,7 @@ from src.db.models import (
     CameraCashbox,
     CameraClientGate,
     CameraClientEvent,
+    OperationType,
     Group,
     FunctionGroup,
 )
@@ -145,64 +146,64 @@ class CashboxAdmin(admin.ModelAdmin):
         return instance.type.shop.super_shop.title
 
 
-# @admin.register(PeriodClients)
-# class PeriodClientsAdmin(admin.ModelAdmin):
-#     list_display = ('operation_type__work_type', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
-#     search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
-#     list_filter = ('operation_type__work_type_id', 'type')
-#
-#     @staticmethod
-#     def work_type_name(instance: PeriodClients):
-#         return instance.operation_type.work_type.name
-#
-#     @staticmethod
-#     def shop_title(instance: PeriodClients):
-#         return instance.operation_type.work_type.shop.title
-#
-#
-# @admin.register(PeriodQueues)
-# class PeriodQueuesAdmin(admin.ModelAdmin):
-#     list_display = ('operation_type__work_type__name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
-#     search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
-#     list_filter = ('operation_type__work_type_id', 'type')
-#
-#     @staticmethod
-#     def work_type_name(instance: PeriodQueues):
-#         return instance.operation_type.work_type.name
-#
-#     @staticmethod
-#     def shop_title(instance: PeriodQueues):
-#         return instance.operation_type.work_type.shop.title
-#
-#
-# @admin.register(PeriodProducts)
-# class PeriodProductsAdmin(admin.ModelAdmin):
-#     list_display = ('operation_type__work_type__name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
-#     search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
-#     list_filter = ('operation_type__work_type_id', 'type')
-#
-#     @staticmethod
-#     def work_type_name(instance: PeriodProducts):
-#         return instance.operation_type.work_type.name
-#
-#     @staticmethod
-#     def shop_title(instance: PeriodProducts):
-#         return instance.operation_type.work_type.shop.title
-#
-#
-# @admin.register(PeriodDemandChangeLog)
-# class PeriodDemandChangeLogAdmin(admin.ModelAdmin):
-#     list_display = ('operation_type__name', 'dttm_from', 'dttm_to')
-#     search_fields = ('operation_type__name', 'operation_type__work_type__shop__title', 'id')
-#     list_filter = ('operation_type__shop', )
-#
-#     @staticmethod
-#     def work_type_name(instance: PeriodDemandChangeLog):
-#         return instance.operation_type.name
-#
-#     @staticmethod
-#     def shop_title(instance: PeriodDemandChangeLog):
-#         return instance.operation_type.work_type.shop.title
+@admin.register(PeriodClients)
+class PeriodClientsAdmin(admin.ModelAdmin):
+    list_display = ('work_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
+    search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
+    list_filter = ('type', 'operation_type__work_type')
+
+    @staticmethod
+    def work_type_name(instance: PeriodClients):
+        return instance.operation_type.work_type.name
+
+    @staticmethod
+    def shop_title(instance: PeriodClients):
+        return instance.operation_type.work_type.shop.title
+
+
+@admin.register(PeriodQueues)
+class PeriodQueuesAdmin(admin.ModelAdmin):
+    list_display = ('work_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
+    search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
+    list_filter = ('operation_type__work_type', 'type')
+
+    @staticmethod
+    def work_type_name(instance: PeriodQueues):
+        return instance.operation_type.work_type.name
+
+    @staticmethod
+    def shop_title(instance: PeriodQueues):
+        return instance.operation_type.work_type.shop.title
+
+
+@admin.register(PeriodProducts)
+class PeriodProductsAdmin(admin.ModelAdmin):
+    list_display = ('work_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
+    search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
+    list_filter = ('operation_type__work_type', 'type')
+
+    @staticmethod
+    def work_type_name(instance: PeriodProducts):
+        return instance.operation_type.work_type.name
+
+    @staticmethod
+    def shop_title(instance: PeriodProducts):
+        return instance.operation_type.work_type.shop.title
+
+
+@admin.register(PeriodDemandChangeLog)
+class PeriodDemandChangeLogAdmin(admin.ModelAdmin):
+    list_display = ('operation_type_name', 'dttm_from', 'dttm_to')
+    search_fields = ('operation_type_name', 'operation_type__work_type__shop__title', 'id')
+    list_filter = ('operation_type__work_type__shop', )
+
+    @staticmethod
+    def operation_type_name(instance: PeriodDemandChangeLog):
+        return instance.operation_type.name
+
+    @staticmethod
+    def shop_title(instance: PeriodDemandChangeLog):
+        return instance.operation_type.work_type.shop.title
 
 
 @admin.register(WorkerCashboxInfo)
@@ -297,7 +298,8 @@ class NotificationsAdmin(admin.ModelAdmin):
 
 @admin.register(Timetable)
 class TimetableAdmin(admin.ModelAdmin):
-    list_display = ('shop_title', 'super_shop_title', 'dt', 'status', 'dttm_status_change', 'id')
+    list_display = ('id', 'shop_title', 'super_shop_title', 'dt', 'status', 'dttm_status_change',
+                    'fot', 'idle', 'lack', 'workers_amount', 'revenue', 'fot_revenue',)
     search_fields = ('shop__title', 'shop__super_shop__title')
     list_filter = ('shop',)
 
@@ -352,3 +354,13 @@ class FunctionGroupAdmin(admin.ModelAdmin):
     list_display = ('id', 'access_type', 'group', 'func')
     list_filter = ('access_type', 'group', 'func')
     search_fields = ('id',)
+
+
+@admin.register(OperationType)
+class OperationTypeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'work_type_name', 'speed_coef', 'do_forecast')
+    list_filter = ('do_forecast', 'work_type__shop__title')
+
+    @staticmethod
+    def work_type_name(instance: OperationType):
+        return instance.work_type.name

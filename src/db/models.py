@@ -417,6 +417,10 @@ class WorkType(models.Model):
 
 
 class OperationType(models.Model):
+    class Meta:
+        verbose_name = 'Тип операции'
+        verbose_name_plural = 'Типы операций'
+
     def __str__(self):
         return 'id: {}, name: {}, work type: {}'.format(self.id, self.name, self.work_type)
 
