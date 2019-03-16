@@ -166,7 +166,11 @@ def create_timetable(request, form):
     period_normal_count = (round((datetime.combine(date.today(), super_shop.tm_end) -
                                   datetime.combine(date.today(), super_shop.tm_start)).seconds/3600) * 2 + 1 - 1) * \
                           ((dt_to - dt_from).days + 1)
-    work_types = WorkType.objects.filter(shop_id=shop_id)
+    work_types = WorkType.objects.qos_filter_active(
+        dt_from=dt_from,
+        dt_to=dt_to,
+        shop_id=shop_id
+    )
     for work_type in work_types:
         periods = PeriodClients.objects.filter(
             operation_type__work_type=work_type,
