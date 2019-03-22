@@ -11,6 +11,10 @@ import datetime
 
 
 class Region(models.Model):
+    class Meta(object):
+        verbose_name = 'Регион'
+        verbose_name_plural = 'Регионы'
+
     title = models.CharField(max_length=256, unique=True, default='Москва')
 
 
@@ -417,6 +421,10 @@ class WorkType(models.Model):
 
 
 class OperationType(models.Model):
+    class Meta(object):
+        verbose_name = 'Тип операции'
+        verbose_name_plural = 'Типы операций'
+
     def __str__(self):
         return 'id: {}, name: {}, work type: {}'.format(self.id, self.name, self.work_type)
 
@@ -448,6 +456,10 @@ class OperationType(models.Model):
 
 
 class UserWeekdaySlot(models.Model):
+    class Meta(object):
+        verbose_name = 'Пользовательский слот'
+        verbose_name_plural = 'Пользовательские слоты'
+
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.worker.last_name, self.slot.name, self.weekday, self.id)
 
@@ -459,7 +471,6 @@ class UserWeekdaySlot(models.Model):
 
 class Slot(models.Model):
     class Meta:
-        # FIXME: уточнить значение
         verbose_name = 'Слот'
         verbose_name_plural = 'Слоты'
 
@@ -557,6 +568,9 @@ class PeriodDemand(models.Model):
 
 
 class PeriodClients(PeriodDemand):
+    class Meta(object):
+        verbose_name = 'Спрос по клиентам'
+
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
@@ -564,6 +578,9 @@ class PeriodClients(PeriodDemand):
 
 
 class PeriodProducts(PeriodDemand):
+    class Meta(object):
+        verbose_name = 'Спрос по продуктам'
+
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
@@ -571,6 +588,9 @@ class PeriodProducts(PeriodDemand):
 
 
 class PeriodQueues(PeriodDemand):
+    class Meta(object):
+        verbose_name = 'Очереди'
+
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
@@ -598,6 +618,9 @@ class PeriodVisitors(models.Model):
 
 
 class IncomeVisitors(PeriodVisitors):
+    class Meta(object):
+        verbose_name = 'Входящие посетители (по периодам)'
+
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.work_type, self.value)
 
@@ -605,6 +628,9 @@ class IncomeVisitors(PeriodVisitors):
 
 
 class EmptyOutcomeVisitors(PeriodVisitors):
+    class Meta(object):
+        verbose_name = 'Выходящие без покупок посетители (по периодам)'
+
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.work_type, self.value)
 
@@ -612,6 +638,9 @@ class EmptyOutcomeVisitors(PeriodVisitors):
 
 
 class PurchasesOutcomeVisitors(PeriodVisitors):
+    class Meta(object):
+        verbose_name = 'Выходящие с покупками посетители (по периодам)'
+
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.work_type, self.value)
 
@@ -619,6 +648,9 @@ class PurchasesOutcomeVisitors(PeriodVisitors):
 
 
 class PeriodDemandChangeLog(models.Model):
+    class Meta(object):
+        verbose_name = 'Лог изменений спроса'
+
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(
             self.operation_type.name,
@@ -640,6 +672,7 @@ class PeriodDemandChangeLog(models.Model):
 
 class WorkerCashboxInfo(models.Model):
     class Meta(object):
+        verbose_name = 'Информация по сотруднику-типу работ'
         unique_together = (('worker', 'work_type'),)
 
     def __str__(self):
@@ -664,6 +697,7 @@ class WorkerCashboxInfo(models.Model):
 
 class WorkerConstraint(models.Model):
     class Meta(object):
+        verbose_name = 'Ограничения сотрудника'
         unique_together = (('worker', 'weekday', 'tm'),)
 
     def __str__(self):
@@ -706,6 +740,10 @@ class WorkerDayManager(models.Manager):
 
 
 class WorkerDay(models.Model):
+    class Meta:
+        verbose_name = 'Рабочий день сотрудника'
+        verbose_name_plural = 'Рабочие дни сотрудников'
+
     class Type(utils.Enum):
         TYPE_HOLIDAY = 1
         TYPE_WORKDAY = 2
@@ -796,6 +834,9 @@ class WorkerDayCashboxDetailsManager(models.Manager):
 
 
 class WorkerDayCashboxDetails(models.Model):
+    class Meta:
+        verbose_name = 'Детали в течение рабочего дня'
+
     TYPE_WORK = 'W'
     TYPE_WORK_TRADING_FLOOR = 'Z'
     TYPE_BREAK = 'B'
@@ -854,11 +895,12 @@ class WorkerDayCashboxDetails(models.Model):
 
 
 class WorkerDayChangeRequest(models.Model):
+    class Meta(object):
+        verbose_name = 'Запрос на изменения рабочего дня'
+        unique_together = ('worker', 'dt')
+
     def __str__(self):
         return '{}, {}, {}'.format(self.worker.id, self.dt, self.status_type)
-
-    class Meta(object):
-        unique_together = ('worker', 'dt')
 
     TYPE_APPROVED = 'A'
     TYPE_DECLINED = 'D'
@@ -884,6 +926,9 @@ class WorkerDayChangeRequest(models.Model):
 
 
 class Notifications(models.Model):
+    class Meta(object):
+        verbose_name = 'Уведомления'
+
     TYPE_SUCCESS = 'S'
     TYPE_INFO = 'I'
     TYPE_WARNING = 'W'
@@ -933,6 +978,8 @@ class WaitTimeInfo(models.Model):
 class Timetable(models.Model):
     class Meta(object):
         unique_together = (('shop', 'dt'),)
+        verbose_name = 'Расписание'
+        verbose_name_plural = 'Расписания'
 
     class Status(utils.Enum):
         READY = 1
@@ -970,14 +1017,14 @@ class ProductionMonth(models.Model):
     производственный календарь
 
     """
+    class Meta(object):
+        verbose_name = 'Производственный календарь'
+        ordering = ('dt_first',)
 
     dt_first = models.DateField()
     total_days = models.SmallIntegerField()
     norm_work_days = models.SmallIntegerField()
     norm_work_hours = models.FloatField()
-
-    class Meta:
-        ordering = ('dt_first',)
 
 
 class ProductionDay(models.Model):
@@ -985,6 +1032,9 @@ class ProductionDay(models.Model):
     день из производственного календаря короч.
 
     """
+    class Meta(object):
+        verbose_name = 'День производственного календаря'
+
 
     TYPE_WORK = 'W'
     TYPE_HOLIDAY = 'H'
@@ -1022,6 +1072,9 @@ class ProductionDay(models.Model):
 
 
 class WorkerMonthStat(models.Model):
+    class Meta(object):
+        verbose_name = 'Статистика по рабоче сотрудника за месяц'
+
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     month = models.ForeignKey(ProductionMonth, on_delete=models.PROTECT)
 
@@ -1030,6 +1083,9 @@ class WorkerMonthStat(models.Model):
 
 
 class CameraCashbox(models.Model):
+    class Meta(object):
+        verbose_name = 'Камеры-кассы'
+
     name = models.CharField(max_length=64)
     cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
 
@@ -1038,6 +1094,9 @@ class CameraCashbox(models.Model):
 
 
 class CameraCashboxStat(models.Model):
+    class Meta(object):
+        verbose_name = 'Статистика по модели камера-касса'
+
     camera_cashbox = models.ForeignKey(CameraCashbox, on_delete=models.PROTECT)
     dttm = models.DateTimeField()
     queue = models.FloatField()
@@ -1091,6 +1150,9 @@ class UserIdentifier(models.Model):
 
 
 class AttendanceRecords(models.Model):
+    class Meta(object):
+        verbose_name = 'Данные УРВ'
+
     TYPE_COMING = 'C'
     TYPE_LEAVING = 'L'
     TYPE_BREAK_START = 'S'
