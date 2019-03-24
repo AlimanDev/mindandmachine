@@ -32,7 +32,6 @@ class GetCashiersListForm(forms.Form):
 class SelectCashiersForm(forms.Form):
     work_types = util_forms.IntegersList()
     worker_ids = util_forms.IntegersList()
-    work_types = forms.CharField(required=False)
     workday_type = forms.CharField(required=False)
     workdays = forms.CharField(required=False)
     shop_id = forms.IntegerField(required=False)
@@ -41,22 +40,6 @@ class SelectCashiersForm(forms.Form):
     work_workdays = forms.CharField(required=False)
     from_tm = util_forms.TimeField(required=False)
     to_tm = util_forms.TimeField(required=False)
-
-    def clean_work_types(self):
-        value = self.cleaned_data['work_types']
-        if value is None or value == '':
-            return []
-
-        try:
-            value = json.loads(value)
-        except:
-            raise ValidationError('invalid')
-
-        value = [UserConverter.parse_work_type(x) for x in value]
-        if None in value:
-            raise ValidationError('invalid')
-
-        return value
 
     def clean_workday_type(self):
         value = self.cleaned_data['workday_type']
@@ -223,55 +206,56 @@ class SetWorkerDayForm(forms.Form):
                 raise ValidationError('tm_work_end is required')
 
 
-class SetCashierInfoForm(forms.Form):
+class SetWorkerRestrictionsForm(forms.Form):
     worker_id = forms.IntegerField()
-    work_type = forms.CharField(required=False)
-    cashbox_info = forms.CharField(required=False)
-    constraint = forms.CharField(required=False)
-    comment = forms.CharField(required=False)
-    sex = forms.CharField(required=False)
-    is_fixed_hours = forms.BooleanField(required=False)
-    is_fixed_days = forms.BooleanField(required=False)
-    phone_number = forms.CharField(required=False),
+    worker_sex = forms.CharField(required=False)
+    work_type_info = forms.CharField(required=False)
+    constraints = forms.CharField(required=False)
     is_ready_for_overworkings = forms.BooleanField(required=False)
-    tabel_code = forms.CharField(required=False)
-    position_department = forms.IntegerField(required=False)
-    position_title = forms.CharField(max_length=64, required=False)
+    is_fixed_hours = forms.BooleanField(required=False)
+    worker_slots = forms.CharField(required=False)
+    week_availability = forms.IntegerField(required=False)
+    norm_work_hours = forms.IntegerField(required=False)
+    shift_hours_length = util_forms.RangeField(required=False)
+    min_time_btw_shifts = forms.IntegerField(required=False)
 
-    def clean_work_type(self):
-        value = self.cleaned_data.get('work_type')
-        if value is None or value == '':
-            return None
-
-        value = UserConverter.parse_work_type(value)
-        if value is None:
-            raise ValidationError('Invalid enum value')
-        return value
-
-    def clean_cashbox_info(self):
+    def clean_work_type_info(self):
         try:
-            value = self.cleaned_data.get('cashbox_info')
+            value = self.cleaned_data.get('work_type_info')
             if value is None or value == '':
                 return None
             return json.loads(value)
         except:
-            raise ValidationError('Invalid data')
+            raise ValidationError('Invalid work_type_info data')
 
-    def clean_constraint(self):
+    def clean_norm_work_hours(self):
+        value = self.cleaned_data.get('norm_work_hours')
+        if value < 0 or value > 100:
+            raise ValidationError('norm_work_hours should be percents value (0 < val < 100)')
+        return value
+
+    def clean_constraints(self):
         try:
-            value = self.cleaned_data.get('constraint')
+            value = self.cleaned_data.get('constraints')
             if value is None or value == '':
                 return None
             value = json.loads(value)
-            value = {int(wd): [BaseConverter.parse_time(x) for x in tms] for wd, tms in value.items()}
+            for constr in value:
+                if constr['weekday'] > 6 or constr['weekday'] < 0:
+                    raise ValidationError('Invalid weekday')
         except:
-            raise ValidationError('Invalid data')
-
-        for wd in value:
-            if wd < 0 or wd > 6:
-                raise ValidationError('Invalid week day')
+            raise ValidationError('Invalid constrains data')
 
         return value
+
+    def clean_worker_slots(self):
+        try:
+            value = self.cleaned_data.get('worker_slots')
+            if value is None or value == '':
+                return None
+            return json.loads(value)
+        except:
+            raise ValidationError('Invalid worker slots data')
 
 
 class CreateCashierForm(forms.Form):
@@ -280,18 +264,7 @@ class CreateCashierForm(forms.Form):
     last_name = forms.CharField(max_length=150)
     username = forms.CharField(max_length=150)
     password = forms.CharField(max_length=64)
-    work_type = forms.CharField(max_length=3)
     dt_hired = util_forms.DateField()
-
-    def clean_work_type(self):
-        value = self.cleaned_data.get('work_type')
-        if value is None or value == '':
-            raise ValidationError('Invalid value')
-
-        value = UserConverter.parse_work_type(value)
-        if value is None:
-            raise ValidationError('Invalid enum value')
-        return value
 
 
 class DeleteCashierForm(forms.Form):

@@ -2,6 +2,7 @@ from src.db.models import (
     User,
     AttendanceRecords,
     UserIdentifier,
+    Shop
 )
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import AttendanceRecordsConverter
@@ -40,10 +41,12 @@ def get_user_urv(request, form):
     #         shop_id=request.user.shop_id
     #     ).values_list('id', flat=True))
 
+    super_shop = Shop.objects.get(id=form['shop_id']).super_shop
+
     user_records = AttendanceRecords.objects.select_related('identifier').filter(
         dttm__date__gte=from_dt,
         dttm__date__lte=to_dt,
-        super_shop_id=request.user.shop.super_shop_id,
+        super_shop=super_shop,
     )
 
     if len(worker_ids):

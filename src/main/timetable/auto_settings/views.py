@@ -234,7 +234,6 @@ def create_timetable(request, form):
         min_work_coef = 1
 
     shop_dict = {
-        # 'shop_type': shop.full_interface,
         'mean_queue_length': shop.mean_queue_length,
         'max_queue_length': shop.max_queue_length,
         'dead_time_part': shop.dead_time_part,
@@ -264,6 +263,8 @@ def create_timetable(request, form):
         )
     ]
 
+    lambda_func = lambda x: x.operation_type.work_type_id
+
     slots_all = group_by(
         collection=Slot.objects.filter(shop_id=shop_id),
         group_key=lambda x: x.work_type_id,
@@ -289,6 +290,9 @@ def create_timetable(request, form):
 
     # todo: add UserWeekdaySlot
     # if not shop.full_interface:
+    # todo: this params should be in db
+    # if not shop.full_interface:
+    #
     #     # todo: fix trash constraints slots
     #     dttm_temp = datetime(2018, 1, 1, 0, 0)
     #     tms = [(dttm_temp + timedelta(seconds=i * 1800)).time() for i in range(48)]

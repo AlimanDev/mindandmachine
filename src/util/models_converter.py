@@ -42,24 +42,6 @@ class BaseConverter(object):
 
 
 class UserConverter(BaseConverter):
-    __WORK_TYPE = {
-        User.WorkType.TYPE_5_2.value: '52',
-        User.WorkType.TYPE_2_2.value: '22',
-        User.WorkType.TYPE_HOUR.value: 'H',
-        User.WorkType.TYPE_SOS.value: 'S',
-        User.WorkType.TYPE_MANAGER.value: 'M',
-    }
-
-    __WORK_TYPE_REVERSED = {v: k for k, v in __WORK_TYPE.items()}
-
-    @classmethod
-    def convert_work_type(cls, obj_type):
-        return cls.__WORK_TYPE.get(obj_type, '')
-
-    @classmethod
-    def parse_work_type(cls, obj_type):
-        return cls.__WORK_TYPE_REVERSED.get(obj_type)
-
     @classmethod
     def convert(cls, obj):
         user_identifier = UserIdentifier.objects.filter(worker_id=obj.id).first()
@@ -67,7 +49,6 @@ class UserConverter(BaseConverter):
             'id': obj.id,
             'username': obj.username,
             'shop_id': obj.shop_id,
-            'work_type': cls.convert_work_type(obj.work_type),
             'first_name': obj.first_name,
             'last_name': obj.last_name,
             'middle_name': obj.middle_name,
@@ -75,11 +56,10 @@ class UserConverter(BaseConverter):
             'dt_hired': cls.convert_date(obj.dt_hired),
             'dt_fired': cls.convert_date(obj.dt_fired),
             'auto_timetable': obj.auto_timetable,
-            'comment': obj.extra_info,
+            'extra_info': obj.extra_info,
             'sex': obj.sex,
             'salary': float(obj.salary),
             'is_fixed_hours': obj.is_fixed_hours,
-            'is_fixed_days': obj.is_fixed_days,
             'phone_number': obj.phone_number,
             'email': obj.email,
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
@@ -256,7 +236,8 @@ class WorkerConstraintConverter(BaseConverter):
             'id': obj.id,
             'worker': obj.worker_id,
             'weekday': obj.weekday,
-            'tm': cls.convert_time(obj.tm)
+            'tm': cls.convert_time(obj.tm),
+            'is_lite': obj.is_lite,
         }
 
 
@@ -292,7 +273,6 @@ class ShopConverter(BaseConverter):
         return {
             'id': obj.id,
             'super_shop': obj.super_shop_id,
-            # 'full_interface': obj.full_interface,
             'title': obj.title,
             'tm_shop_opens': cls.convert_time(obj.tm_shop_opens),
             'tm_shop_closes': cls.convert_time(obj.tm_shop_closes),

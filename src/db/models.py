@@ -194,16 +194,6 @@ class User(DjangoAbstractUser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    class WorkType(utils.Enum):
-        TYPE_5_2 = 1
-        TYPE_2_2 = 2
-        TYPE_HOUR = 3
-        TYPE_SOS = 4
-        TYPE_MANAGER = 5
-        # TYPE_3_3 = 6
-        # TYPE_DISABLED = 7
-        # TYPE_PREGNANT = 8
-
     GROUP_STAFF = 'S'
     GROUP_OUTSOURCE = 'O'
 
@@ -215,9 +205,7 @@ class User(DjangoAbstractUser):
     id = models.BigAutoField(primary_key=True)
     position = models.ForeignKey(WorkerPosition, null=True, blank=True, on_delete=models.PROTECT)
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable
-    work_type = utils.EnumField(WorkType, null=True, blank=True)
     is_fixed_hours = models.BooleanField(default=False)
-    is_fixed_days = models.BooleanField(default=False)
     function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
     attachment_group = models.CharField(
         max_length=1,
@@ -247,9 +235,14 @@ class User(DjangoAbstractUser):
         choices=SEX_CHOICES,
     )
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
-
-    comment = models.CharField(max_length=2048, default='', blank=True)
     extra_info = models.CharField(max_length=512, default='', blank=True)
+
+    # new worker restrictions
+    week_availability = models.SmallIntegerField(default=7)
+    norm_work_hours = models.SmallIntegerField(default=100)
+    shift_hours_length_min = models.SmallIntegerField(blank=True, null=True)
+    shift_hours_length_max = models.SmallIntegerField(blank=True, null=True)
+    min_time_btw_shifts = models.SmallIntegerField(blank=True, null=True)
 
     auto_timetable = models.BooleanField(default=True)
 
@@ -283,8 +276,6 @@ class FunctionGroup(models.Model):
         'get_demand_change_logs',
         'edit_work_type',
         'get_cashboxes_used_resource',
-        'set_slot',
-        'delete_slot',
         'get_notifications',
         'get_cashboxes_info',
         'get_department',
@@ -310,7 +301,7 @@ class FunctionGroup(models.Model):
         'request_worker_day',
         'add_outsource_workers',
         'get_parameters',
-        'set_cashier_info_lite',
+        'set_worker_restrictions',
         'create_cashier',
         'get_urv_xlsx',
         'get_cashiers_info',
@@ -326,9 +317,7 @@ class FunctionGroup(models.Model):
         'get_change_request',
         'delete_timetable',
         'get_types',
-        'create_slot',
         'get_supershop_stats',
-        'set_cashier_info_hard',
         'get_all_slots',
         'get_cashiers_timetable',
         'set_demand',
@@ -364,15 +353,6 @@ class FunctionGroup(models.Model):
     FUNCS_TUPLE = ((f, f) for f in FUNCS)
 
     __INSIDE_SHOP_TYPES__ = [TYPE_SHOP, TYPE_SUPERSHOP] # for notification
-
-    # __HQ_FUNCS__ = [
-    #     'get_super_shop_list',
-    #     'edit_supershop',
-    #     'get_supershop_stats',
-    #     'edit_shop',
-    #     'add_supershop',
-    #     'add_shop',
-    # ]
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_modified = models.DateTimeField(blank=True, null=True)
@@ -474,6 +454,7 @@ class UserWeekdaySlot(models.Model):
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     slot = models.ForeignKey('Slot', on_delete=models.CASCADE)
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
+    is_suitable = models.BooleanField(default=True)
 
 
 class Slot(models.Model):
