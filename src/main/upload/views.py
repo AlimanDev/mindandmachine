@@ -16,6 +16,7 @@ from src.db.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     OperationType,
+    WorkerCashboxInfo,
 )
 from src.main.demand.utils import create_predbills_request_function
 from src.util.models_converter import BaseConverter
@@ -149,6 +150,7 @@ def upload_timetable(request, form, timetable_file):
 
     ######################### сюда писать логику чтения из экселя ######################################################
     fio_column = 2
+    work_type_column = 3
     workers_start_row = 19
     dates_row = 17
     dates_start_column = 5
@@ -163,9 +165,12 @@ def upload_timetable(request, form, timetable_file):
     if not work_dates:
         return JsonResponse.value_error('Не смог сгенерировать массив дат. Возможно они в формате строки.')
 
+    shop_work_types = {w.name: w for w in WorkType.objects.filter(shop_id=shop_id, dttm_deleted__isnull=True)}
     for row in worksheet.iter_rows(min_row=workers_start_row):
+        user_work_type = None
         for cell in row:
-            if column_index_from_string(cell.column) == fio_column:
+            column_index = column_index_from_string(cell.column)
+            if column_index == fio_column:
                 first_last_names = cell.value.split(' ')
                 last_name_concated = ' '.join(first_last_names[:-2])
                 # try:
@@ -179,7 +184,15 @@ def upload_timetable(request, form, timetable_file):
                 )
                 # except User.DoesNotExist:
                 #     return JsonResponse.value_error('Не могу найти пользователя на строке {}'.format(cell.row))
-            column_index = column_index_from_string(cell.column)
+            elif column_index == work_type_column:
+                user_work_type = shop_work_types.get(cell.value, None)
+                if user_work_type:
+                    WorkerCashboxInfo.objects.get_or_create(
+                        worker=u,
+                        work_type=user_work_type,
+                    )
+
+
             if dates_start_column <= column_index <= dates_end_column:
                 dt = work_dates[column_index - dates_start_column]
                 dttm_work_start = None
@@ -195,7 +208,7 @@ def upload_timetable(request, form, timetable_file):
                         dt, BaseConverter.parse_time(times[1] + ':00')
                     )
                     if dttm_work_end < dttm_work_start:
-                        dttm_work_start += datetime.timedelta(days=1)
+                        dttm_work_end += datetime.timedelta(days=1)
                 else:
                     work_type = WORK_TYPES[cell.value]
 
@@ -218,7 +231,7 @@ def upload_timetable(request, form, timetable_file):
                         dttm_from=dttm_work_start,
                         dttm_to=dttm_work_end,
                         status=WorkerDayCashboxDetails.TYPE_WORK,
-
+                        work_type=user_work_type,
                     )
 
     ####################################################################################################################
