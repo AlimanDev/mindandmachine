@@ -483,34 +483,33 @@ def edit_work_type(request, form):
             dttm_deleted=datetime.datetime.now())
 
     front_slots = json.loads(form['slots'])
-    if front_slots:
-        existing_slots = {
-            x.id: x for x in Slot.objects.filter(work_type=work_type, dttm_deleted__isnull=True)
-        }
+    existing_slots = {
+        x.id: x for x in Slot.objects.filter(work_type=work_type, dttm_deleted__isnull=True)
+    }
 
-        for slot_dict in front_slots:
-            if 'id' in slot_dict.keys() and slot_dict['id'] in existing_slots.keys():
-                existing_slot = existing_slots[slot_dict['id']]
-                existing_slot.name = slot_dict['name']
-                existing_slot.tm_start = slot_dict['tm_start']
-                existing_slot.tm_end = slot_dict['tm_end']
-                try:
-                    existing_slot.save()  # todo: aa: add check of params in form
-                    existing_slots.pop(slot_dict['id'])
-                except Exception:
-                    return JsonResponse.internal_error(err_slot)
-            else:
-                # todo: aa: fields in slot_dict not checked!!!
-                slot_dict.update({
-                    'work_type_id': work_type_id,
-                    'shop_id': shop_id
-                })
-                try:
-                    Slot.objects.create(**slot_dict)
-                except Exception:
-                    return JsonResponse.internal_error(err_slot)
-        # удаляем старые слоты
-        Slot.objects.filter(id__in=existing_slots.keys()).update(dttm_deleted=datetime.datetime.now())
+    for slot_dict in front_slots:
+        if 'id' in slot_dict.keys() and slot_dict['id'] in existing_slots.keys():
+            existing_slot = existing_slots[slot_dict['id']]
+            existing_slot.name = slot_dict['name']
+            existing_slot.tm_start = slot_dict['tm_start']
+            existing_slot.tm_end = slot_dict['tm_end']
+            try:
+                existing_slot.save()  # todo: aa: add check of params in form
+                existing_slots.pop(slot_dict['id'])
+            except Exception:
+                return JsonResponse.internal_error(err_slot)
+        else:
+            # todo: aa: fields in slot_dict not checked!!!
+            slot_dict.update({
+                'work_type_id': work_type_id,
+                'shop_id': shop_id
+            })
+            try:
+                Slot.objects.create(**slot_dict)
+            except Exception:
+                return JsonResponse.internal_error(err_slot)
+    # удаляем старые слоты
+    Slot.objects.filter(id__in=existing_slots.keys()).update(dttm_deleted=datetime.datetime.now())
 
     return JsonResponse.success()
 

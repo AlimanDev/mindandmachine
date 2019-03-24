@@ -421,7 +421,7 @@ class WorkType(models.Model):
 
 
 class OperationType(models.Model):
-    class Meta(object):
+    class Meta:
         verbose_name = 'Тип операции'
         verbose_name_plural = 'Типы операций'
 

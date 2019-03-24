@@ -166,18 +166,19 @@ def create_timetable(request, form):
     period_normal_count = (round((datetime.combine(date.today(), super_shop.tm_end) -
                                   datetime.combine(date.today(), super_shop.tm_start)).seconds/3600) * 2 + 1 - 1) * \
                           ((dt_to - dt_from).days + 1)
-    work_types = WorkType.objects.filter(shop_id=shop_id)
+    work_types = WorkType.objects.qos_filter_active(
+        dt_from=dt_from,
+        dt_to=dt_to,
+        shop_id=shop_id
+    )
     for work_type in work_types:
         periods = PeriodClients.objects.filter(
             operation_type__work_type=work_type,
             type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lt=dt_to + timedelta(days=1),
-        ).exclude(
-            dttm_forecast__time=time(0, 0),
-        ).annotate(
-            clients=F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + shop.absenteeism)
         )
+
         if periods.count() != period_normal_count:
             period_difference['work_type_name'].append(work_type.name)
             period_difference['difference'].append(abs(period_normal_count - periods.count()))
@@ -196,9 +197,9 @@ def create_timetable(request, form):
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to,
-    ).exclude(
-        dttm_forecast__time=time(0, 0)
-    )
+    ).annotate(
+        clients=F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + shop.absenteeism)
+    ) # TODO: FIXME: TODO: no group by work_type (send to algo operation types, not work_type
 
     constraints = group_by(
         collection=WorkerConstraint.objects.select_related('worker').filter(worker__shop_id=shop_id),
@@ -266,23 +267,11 @@ def create_timetable(request, form):
         )
     ]
 
-    # if shop.full_interface:
     lambda_func = lambda x: x.operation_type.work_type_id
-    # else:
-    #     lambda_func = lambda x: periods[0].operation_type.work_type_id
-    #
-    #     cashboxes = [{
-    #         'id': periods[0].operation_type.work_type_id,
-    #         'speed_coef': 1,
-    #         'types_priority_weights': 1,
-    #         'prob': 1,
-    #         'prior_weight': 1,
-    #         'prediction': 1,
-    #     }]
 
     slots_all = group_by(
         collection=Slot.objects.filter(shop_id=shop_id),
-        group_key=lambda_func,
+        group_key=lambda x: x.work_type_id,
     )
 
     slots_periods_dict = {k['id']: [] for k in cashboxes}
@@ -303,8 +292,9 @@ def create_timetable(request, form):
         cashbox['slots'] = slots_periods_dict[cashbox['id']]
     extra_constr = {}
 
+    # todo: add UserWeekdaySlot
+    # if not shop.full_interface:
     # todo: this params should be in db
-
     # if not shop.full_interface:
     #
     #     # todo: fix trash constraints slots

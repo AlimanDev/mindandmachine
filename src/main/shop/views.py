@@ -169,7 +169,7 @@ def get_super_shop_list(request, form):
             'amount': количество магазинов
         }
     """
-    return_list, total = get_super_shop_list_stats(form)
+    return_list, total = get_super_shop_list_stats(form, request=request)
 
     return JsonResponse.success({
         'pages': ceil(total / form['items_per_page']),

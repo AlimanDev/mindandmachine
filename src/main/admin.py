@@ -24,6 +24,7 @@ from src.db.models import (
     CameraCashbox,
     CameraClientGate,
     CameraClientEvent,
+    OperationType,
     Group,
     FunctionGroup,
     Region,
@@ -52,8 +53,8 @@ class WorkerPositionAdmin(admin.ModelAdmin):
 @admin.register(OperationType)
 class OperationTypeAdmin(admin.ModelAdmin):
     list_display = ('id', 'operation_type_name', 'name', 'speed_coef', 'do_forecast', 'period_demand_params')
-    list_filter = ('work_type__shop', )
-    search_fields = ('work_type__shop',)
+    list_filter = ('work_type__shop',)
+    search_fields = ('work_type__shop', 'name')
 
     @staticmethod
     def operation_type_name(instance: OperationType):
@@ -177,49 +178,30 @@ class CashboxAdmin(admin.ModelAdmin):
         return instance.type.shop.super_shop.title
 
 
-@admin.register(PeriodClients)
-class PeriodClientsAdmin(admin.ModelAdmin):
-    list_display = ('id', 'work_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
-    search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
+class PeriodDemandAdmin(admin.ModelAdmin):
+    list_display = ('id', 'operation_type_id', 'value', 'dttm_forecast', 'type',)
+    search_fields = ('dttm_forecast', 'id')
     list_filter = ('operation_type__work_type_id', 'type')
 
-    @staticmethod
-    def work_type_name(instance: PeriodClients):
-        return instance.operation_type.work_type.name
+    # @staticmethod
+    # def operation_type_id(instance: PeriodClients):
+    #     return instance.operation_type_id
 
-    @staticmethod
-    def shop_title(instance: PeriodClients):
-        return instance.operation_type.work_type.shop.title
+
+@admin.register(PeriodClients)
+class PeriodClientsAdmin(PeriodDemandAdmin):
+    pass
+
 
 
 @admin.register(PeriodQueues)
-class PeriodClientsAdmin(admin.ModelAdmin):
-    list_display = ('id', 'work_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
-    search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
-    list_filter = ('operation_type__work_type_id', 'type')
-
-    @staticmethod
-    def work_type_name(instance: PeriodQueues):
-        return instance.operation_type.work_type.name
-
-    @staticmethod
-    def shop_title(instance: PeriodQueues):
-        return instance.operation_type.work_type.shop.title
+class PeriodQueuesAdmin(PeriodDemandAdmin):
+    pass
 
 
 @admin.register(PeriodProducts)
-class PeriodClientsAdmin(admin.ModelAdmin):
-    list_display = ('id', 'work_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
-    search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
-    list_filter = ('operation_type__work_type_id', 'type')
-
-    @staticmethod
-    def work_type_name(instance: PeriodProducts):
-        return instance.operation_type.work_type.name
-
-    @staticmethod
-    def shop_title(instance: PeriodProducts):
-        return instance.operation_type.work_type.shop.title
+class PeriodClientsAdmin(PeriodDemandAdmin):
+    pass
 
 
 @admin.register(PeriodDemandChangeLog)
@@ -329,7 +311,8 @@ class NotificationsAdmin(admin.ModelAdmin):
 
 @admin.register(Timetable)
 class TimetableAdmin(admin.ModelAdmin):
-    list_display = ('shop_title', 'super_shop_title', 'dt', 'status', 'dttm_status_change', 'id')
+    list_display = ('id', 'shop_title', 'super_shop_title', 'dt', 'status', 'dttm_status_change',
+                    'fot', 'idle', 'lack', 'workers_amount', 'revenue', 'fot_revenue',)
     search_fields = ('shop__title', 'shop__super_shop__title')
     list_filter = ('shop',)
 
@@ -403,14 +386,15 @@ class PurchaseOutcomeVisitorsAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerDayChangeRequest)
 class WorkerDayChangeRequestAdmin(admin.ModelAdmin):
-    list_display = [f.name for f in WorkerDayChangeRequest._meta.get_fields()]
+    pass
 
 
 @admin.register(ProductionMonth)
 class ProductionMonthAdmin(admin.ModelAdmin):
-    list_display = [f.name for f in ProductionMonth._meta.get_fields()]
+    list_display = ('id', 'dt_first')
 
 
 @admin.register(AttendanceRecords)
 class AttendanceRecordsAdmin(admin.ModelAdmin):
-    list_display = [f.name for f in AttendanceRecords._meta.get_fields()]
+    list_display = ['id', 'dttm', 'type',]
+    list_filter = ('type', 'verified', 'type')

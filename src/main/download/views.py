@@ -292,7 +292,7 @@ def get_supershops_stats(request, workbook, form):
     """
     dt_now = date.today().replace(day=1)
     dt_prev = date.today().replace(day=1) - relativedelta(months=1)
-    data, amount = get_super_shop_list_stats(form, display_format='excel')
+    data, amount = get_super_shop_list_stats(form, request=request, display_format='excel')
 
     def write_stats(row_index, col_index, value_dict_name):
         worksheet.write(row_index, col_index, '{}/{} ({}%)'.format(

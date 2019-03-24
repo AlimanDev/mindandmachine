@@ -265,6 +265,7 @@ class CreateCashierForm(forms.Form):
     username = forms.CharField(max_length=150)
     password = forms.CharField(max_length=64)
     dt_hired = util_forms.DateField()
+    shop_id = forms.IntegerField()
 
 
 class DeleteCashierForm(forms.Form):
