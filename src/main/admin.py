@@ -18,6 +18,7 @@ from src.db.models import (
     WorkerConstraint,
     Timetable,
     ProductionDay,
+    ProductionMonth,
     WorkerMonthStat,
     CameraCashboxStat,
     CameraCashbox,
@@ -26,7 +27,38 @@ from src.db.models import (
     OperationType,
     Group,
     FunctionGroup,
+    Region,
+    WorkerPosition,
+    OperationType,
+    IncomeVisitors,
+    EmptyOutcomeVisitors,
+    PurchasesOutcomeVisitors,
+    WorkerDayChangeRequest,
+    AttendanceRecords,
 )
+
+
+@admin.register(Region)
+class RegionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title',)
+    search_fields = ('title',)
+
+
+@admin.register(WorkerPosition)
+class WorkerPositionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'department', 'title')
+    search_fields = ('department',)
+
+
+@admin.register(OperationType)
+class OperationTypeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'operation_type_name', 'name', 'speed_coef', 'do_forecast', 'period_demand_params')
+    list_filter = ('work_type__shop',)
+    search_fields = ('work_type__shop', 'name')
+
+    @staticmethod
+    def operation_type_name(instance: OperationType):
+        return instance.work_type.name if instance.work_type else 'Без типа работ'
 
 
 @admin.register(User)
@@ -146,49 +178,30 @@ class CashboxAdmin(admin.ModelAdmin):
         return instance.type.shop.super_shop.title
 
 
+class PeriodDemandAdmin(admin.ModelAdmin):
+    list_display = ('id', 'operation_type_id', 'value', 'dttm_forecast', 'type',)
+    search_fields = ('dttm_forecast', 'id')
+    list_filter = ('operation_type__work_type_id', 'type')
+
+    # @staticmethod
+    # def operation_type_id(instance: PeriodClients):
+    #     return instance.operation_type_id
+
+
 @admin.register(PeriodClients)
-class PeriodClientsAdmin(admin.ModelAdmin):
-    list_display = ('work_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
-    search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
-    list_filter = ('type', 'operation_type__work_type')
+class PeriodClientsAdmin(PeriodDemandAdmin):
+    pass
 
-    @staticmethod
-    def work_type_name(instance: PeriodClients):
-        return instance.operation_type.work_type.name
-
-    @staticmethod
-    def shop_title(instance: PeriodClients):
-        return instance.operation_type.work_type.shop.title
 
 
 @admin.register(PeriodQueues)
-class PeriodQueuesAdmin(admin.ModelAdmin):
-    list_display = ('work_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
-    search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
-    list_filter = ('operation_type__work_type', 'type')
-
-    @staticmethod
-    def work_type_name(instance: PeriodQueues):
-        return instance.operation_type.work_type.name
-
-    @staticmethod
-    def shop_title(instance: PeriodQueues):
-        return instance.operation_type.work_type.shop.title
+class PeriodQueuesAdmin(PeriodDemandAdmin):
+    pass
 
 
 @admin.register(PeriodProducts)
-class PeriodProductsAdmin(admin.ModelAdmin):
-    list_display = ('work_type_name', 'shop_title', 'value', 'dttm_forecast', 'type', 'id')
-    search_fields = ('operation_type__work_type__name', 'operation_type__work_type__shop__title', 'id')
-    list_filter = ('operation_type__work_type', 'type')
-
-    @staticmethod
-    def work_type_name(instance: PeriodProducts):
-        return instance.operation_type.work_type.name
-
-    @staticmethod
-    def shop_title(instance: PeriodProducts):
-        return instance.operation_type.work_type.shop.title
+class PeriodClientsAdmin(PeriodDemandAdmin):
+    pass
 
 
 @admin.register(PeriodDemandChangeLog)
@@ -356,11 +369,32 @@ class FunctionGroupAdmin(admin.ModelAdmin):
     search_fields = ('id',)
 
 
-@admin.register(OperationType)
-class OperationTypeAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'work_type_name', 'speed_coef', 'do_forecast')
-    list_filter = ('do_forecast', 'work_type__shop__title')
+@admin.register(IncomeVisitors)
+class IncomeVisitorsAdmin(admin.ModelAdmin):
+    list_display = [f.name for f in IncomeVisitors._meta.get_fields()]
 
-    @staticmethod
-    def work_type_name(instance: OperationType):
-        return instance.work_type.name
+
+@admin.register(EmptyOutcomeVisitors)
+class EmptyOutcomeVisitorsAdmin(admin.ModelAdmin):
+    list_display = [f.name for f in EmptyOutcomeVisitors._meta.get_fields()]
+
+
+@admin.register(PurchasesOutcomeVisitors)
+class PurchaseOutcomeVisitorsAdmin(admin.ModelAdmin):
+    list_display = [f.name for f in PurchasesOutcomeVisitors._meta.get_fields()]
+
+
+@admin.register(WorkerDayChangeRequest)
+class WorkerDayChangeRequestAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(ProductionMonth)
+class ProductionMonthAdmin(admin.ModelAdmin):
+    list_display = ('id', 'dt_first')
+
+
+@admin.register(AttendanceRecords)
+class AttendanceRecordsAdmin(admin.ModelAdmin):
+    list_display = ['id', 'dttm', 'type',]
+    list_filter = ('type', 'verified', 'type')
