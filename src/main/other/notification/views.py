@@ -34,21 +34,23 @@ def get_notifications(request, form):
     count = form['count']
     user = request.user
 
-    notifications = Notifications.objects.filter(to_worker=user).order_by('-id')
+    old_notifications = Notifications.objects.filter(to_worker=user, was_read=True).order_by('-id')
 
     if pointer is not None:
-        notifications = notifications.filter(id__lt=pointer)
-    notifications = list(notifications[:count])
+        old_notifications = old_notifications.filter(id__lt=pointer)
+    old_notifications = list(old_notifications[:count])
 
-    result = {
-        'get_noty_pointer': notifications[-1].id if (len(notifications) > 0 and len(notifications) == count) else None,
-        'notifications': [
-            NotificationConverter.convert(notification) for notification in notifications
-    ]}
+    result = dict(
+        get_noty_pointer=old_notifications[-1].id if (len(old_notifications) > 0 and len(old_notifications) == count) else None,
+        old_notifications=[NotificationConverter.convert(notification) for notification in old_notifications]
+    )
 
     if pointer is None:
-        result['get_new_noty_pointer'] = notifications[0].id if len(notifications) > 0 else -1
-        result['unread_count'] = Notifications.objects.filter(to_worker=user, was_read=False).count()
+        result['get_new_noty_pointer'] = old_notifications[0].id if len(old_notifications) > 0 else -1
+        # result['unread_count'] = Notifications.objects.filter(to_worker=user, was_read=False).count()
+    result['new_notifications'] = [
+        NotificationConverter.convert(note) for note in Notifications.objects.filter(to_worker=user, was_read=False)
+    ]
 
     return JsonResponse.success(result)
 

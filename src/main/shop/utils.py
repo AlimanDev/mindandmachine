@@ -2,7 +2,11 @@ import datetime
 from django.db.models import Avg, Sum, Q
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
-from src.db.models import Timetable, SuperShop
+from src.db.models import (
+    Timetable,
+    SuperShop,
+    FunctionGroup,
+)
 from dateutil.relativedelta import relativedelta
 from src.util.models_converter import SuperShopConverter
 from math import ceil
@@ -30,7 +34,7 @@ def calculate_supershop_stats(month, shop_ids):
     )
 
 
-def get_super_shop_list_stats(form, display_format='raw'):
+def get_super_shop_list_stats(form, request, display_format='raw'):
     dt_now = datetime.datetime.today().replace(day=1)
     dt_prev = dt_now - relativedelta(months=1)
     pointer = form['pointer']
@@ -43,6 +47,19 @@ def get_super_shop_list_stats(form, display_format='raw'):
         'dt_opened__gte': form['opened_after_dt'],
         'dt_closed__lte': form['closed_before_dt'],
     }
+
+    show_self = request.user.function_group.allowed_functions.filter(func='get_super_shop_list').first()
+    if show_self is None:
+        return [], 0
+    if show_self.access_type == FunctionGroup.TYPE_ALL:
+        pass
+    elif show_self.access_type == FunctionGroup.TYPE_SUPERSHOP:
+        filter_dict.update({
+            'id': request.user.shop.super_shop_id
+        })
+    else:
+        return [], 0
+
     filter_dict = {k: v for k, v in filter_dict.items() if v}
 
     super_shops = SuperShop.objects.select_related('region').filter(**filter_dict)

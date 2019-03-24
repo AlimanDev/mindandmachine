@@ -1065,7 +1065,7 @@ def create_cashier(request, form):
         user.first_name = form['first_name']
         user.middle_name = form['middle_name']
         user.last_name = form['last_name']
-        user.shop = request.user.shop
+        user.shop_id = form['shop_id']
         user.dt_hired = form['dt_hired']
         user.save()
     except:

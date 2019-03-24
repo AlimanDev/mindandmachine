@@ -274,7 +274,7 @@ def api_method(
                 if settings.DEBUG:
                     raise e
                 else:
-                    # manually_mail_admins(request)
+                    manually_mail_admins(request)
                     return JsonResponse.internal_error('Внутренняя ошибка сервера')
 
         return wrapper

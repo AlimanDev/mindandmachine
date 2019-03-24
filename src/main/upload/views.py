@@ -83,11 +83,6 @@ def upload_demand(request, form, demand_file):
 
         ct_to_search = operation_types.get(cashtype_name, None)
         if ct_to_search:
-            PeriodClients.objects.filter(
-                dttm_forecast=dttm,
-                operation_type=ct_to_search,
-                type=PeriodClients.FACT_TYPE
-            ).delete()
             create_demand_objs(
                 PeriodClients(
                     dttm_forecast=dttm,
@@ -111,6 +106,18 @@ def upload_demand(request, form, demand_file):
     ####################################################################################################################
 
     create_demand_objs(None)
+
+    # works only for postgres
+    unique_fact = list(PeriodClients.objects.filter(
+        type=PeriodClients.FACT_TYPE,
+        operation_type__work_type__shop_id=shop_id
+    ).order_by('dttm_forecast', 'operation_type_id', '-id').distinct('dttm_forecast', 'operation_type_id'))
+
+    PeriodClients.objects.filter(
+        type=PeriodClients.FACT_TYPE,
+        operation_type__work_type__shop_id=shop_id
+    ).delete()
+    PeriodClients.objects.bulk_create(unique_fact)
 
     from_dt_to_create = PeriodClients.objects.filter(
         type=PeriodClients.FACT_TYPE,

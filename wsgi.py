@@ -10,10 +10,10 @@ https://docs.djangoproject.com/en/2.0/howto/deployment/wsgi/
 import os
 
 from django.core.wsgi import get_wsgi_application
-from src.db.utils import check_func_groups
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "src.conf.djconfig")
 
-check_func_groups()
-
 application = get_wsgi_application()
+
+from src.db.utils import check_func_groups
+check_func_groups()
