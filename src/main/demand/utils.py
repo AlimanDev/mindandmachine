@@ -96,6 +96,7 @@ def create_predbills_request_function(shop_id, dt=None):
 
     period_clients = PeriodClients.objects.select_related('operation_type__work_type__shop').filter(
         operation_type__work_type__shop_id=shop_id,
+        operation_type__do_forecast=OperationType.FORECAST_HARD,
         type=PeriodClients.FACT_TYPE,
         dttm_forecast__date__gt=dt - relativedelta(years=YEARS_TO_COLLECT),
         dttm_forecast__date__lt=dt,
