@@ -10,6 +10,7 @@ from src.db.models import (
     Notifications,
     User,
     FunctionGroup,
+    OperationType,
 )
 from dateutil.relativedelta import relativedelta
 from django.db.models import Sum
@@ -414,6 +415,7 @@ def set_pred_bills(request, data):
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to,
         operation_type__work_type__shop_id=shop.id,
+        operation_type__do_forecast__in=[OperationType.FORECAST_HARD, OperationType.FORECAST_LITE],
     ).delete()
 
     for period_demand_value in data['demand']:
@@ -429,29 +431,27 @@ def set_pred_bills(request, data):
             )
         )
 
-        # # блок для составления спроса на слотовые типы касс (никак не зависит от data с qos_algo)
-        # # todo: возможно не лучшее решение размещать этот блок здесь, потому что он зависит от dttm_forecast
-        # for sloted_cashbox in sloted_work_types:
-        #     workers_needed = Slot.objects.filter(
-        #         work_type=sloted_cashbox,
-        #         tm_start__lte=dttm_forecast.time(),
-        #         tm_end__gte=dttm_forecast.time(),
-        #     ).aggregate(Sum('workers_needed'))['workers_needed__sum']
-        #
-        #     if workers_needed is None:
-        #         workers_needed = 0
-        #     try:
-        #         PeriodClients.objects.update_or_create(
-        #             type=PeriodClients.LONG_FORECASE_TYPE,
-        #             dttm_forecast=dttm_forecast,
-        #             work_type=sloted_cashbox,
-        #             defaults={
-        #                 'value': workers_needed
-        #             }
-        #         )
-        #     except PeriodClients.MultipleObjectsReturned as exc:
-        #         print('here', exc)
-        #         raise Exception('error upon creating period demands for sloted types')
+    # блок для составления спроса на слотовые типы касс (никак не зависит от data с qos_algo) -- всегда 1
+    work_time_seconds = (shop.tm_shop_closes.hour - shop.tm_shop_opens.hour) * 3600 +\
+                        (shop.tm_shop_closes.minute - shop.tm_shop_opens.minute) * 60
+    if work_time_seconds <= 0:
+        work_time_seconds += 3600 * 24
+
+    time_step = shop.forecast_step_minutes.hour * 3600 + shop.forecast_step_minutes.minute * 60
+
+    for operation in OperationType.objects.filter(work_type__shop_id=shop.id, do_forecast=OperationType.FORECAST_LITE):
+        for dt_offset in range((dt_to - dt_from).days + 1):
+            dttm_start = datetime.combine(dt_from + timedelta(days=dt_offset), shop.tm_shop_opens)
+            for tm_offset in range(0, work_time_seconds, time_step):
+                save_models(
+                    models_list,
+                    PeriodClients(
+                        type=PeriodClients.LONG_FORECASE_TYPE,
+                        dttm_forecast=dttm_start + timedelta(seconds=tm_offset),
+                        operation_type=operation,
+                        value=1,
+                    )
+                )
 
     save_models(models_list, None)
 
