@@ -1,55 +1,21 @@
 from django.db import migrations
-import pandas as pd
-
-from src.conf.djconfig import QOS_DATE_FORMAT
+from src.db.works.fill_production_calendar import fill_calendar
 
 
 def fill_days(apps, schema_editor):
-    # We can't import the Person model directly as it may be a newer
-    # version than this migration expects. We use the historical version.
     ProductionMonth = apps.get_model('db', 'ProductionMonth')
     ProductionDay = apps.get_model('db', 'ProductionDay')
 
-    # months 2018 creating
-    months = pd.read_csv(
-        'src/db/works/months_2018.csv',
-        index_col=False,
-        sep=';',
-        names=['months', 'days', 'workdays', 'workhours'],
-    )
+    ProductionMonth.objects.all().delete()
+    ProductionDay.objects.all().delete()
 
-    months['months'] = pd.to_datetime(months['months'], format=QOS_DATE_FORMAT)
-    for row in months.iterrows():
-        el = row[1]
-        ProductionMonth.objects.get_or_create(
-            dt_first=el['months'].date(),
-            total_days=el['days'],
-            norm_work_days=el['workdays'],
-            norm_work_hours=el['workhours'],
-        )
-
-    days = pd.read_csv(
-        'src/db/works/days_2018.csv',
-        index_col=False,
-        sep=';',
-        names=['dts', 'types']
-    )
-
-    days['dts'] = pd.to_datetime(days['dts'], format=QOS_DATE_FORMAT)
-    for row in days.iterrows():
-        el = row[1]
-        ProductionDay.objects.get_or_create(
-            dt=el['dts'].date(),
-            type=el['types'],
-        )
+    fill_calendar.main('2016.1.1', '2020.1.1')
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('db', '0001_initial'),
     ]
-
     operations = [
         migrations.RunPython(fill_days)
     ]

@@ -92,7 +92,7 @@ class Shop(models.Model):
 
     demand_coef = models.FloatField(default=1)  # unknown trend for algorithm
 
-    forecast_step_minutes = models.TimeField(default=datetime.time(minute=15))
+    forecast_step_minutes = models.TimeField(default=datetime.time(minute=30))
     # man_presence = models.FloatField(default=0)
 
     count_lack = models.BooleanField(default=False)
@@ -570,6 +570,7 @@ class PeriodDemand(models.Model):
 class PeriodClients(PeriodDemand):
     class Meta(object):
         verbose_name = 'Спрос по клиентам'
+        unique_together = ('operation_type', 'type', 'dttm_forecast')
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
@@ -580,6 +581,7 @@ class PeriodClients(PeriodDemand):
 class PeriodProducts(PeriodDemand):
     class Meta(object):
         verbose_name = 'Спрос по продуктам'
+        unique_together = ('operation_type', 'type', 'dttm_forecast')
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
@@ -590,6 +592,7 @@ class PeriodProducts(PeriodDemand):
 class PeriodQueues(PeriodDemand):
     class Meta(object):
         verbose_name = 'Очереди'
+        unique_together = ('operation_type', 'type', 'dttm_forecast')
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)

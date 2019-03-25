@@ -1,10 +1,8 @@
 import datetime
 
 from src.db.models import (
-    User,
     WorkerDay,
     Timetable,
-    WorkType,
     UserIdentifier,
     AttendanceRecords,
 )
