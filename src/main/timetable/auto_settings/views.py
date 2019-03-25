@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, date, time
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Q, Avg
+from django.db.models import Q, Avg, Sum
 
 from src.db.models import (
     Timetable,
@@ -190,16 +190,21 @@ def create_timetable(request, form):
         tt.delete()
         return JsonResponse.value_error(status_message)
 
-    periods = PeriodClients.objects.select_related(
-        'operation_type__work_type'
-    ).filter(
+    periods = PeriodClients.objects.filter(
         operation_type__work_type__shop_id=shop_id,
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to,
+    ).values(
+        'dttm_forecast',
+        'operation_type__work_type_id',
     ).annotate(
-        clients=F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + shop.absenteeism)
-    ) # TODO: FIXME: TODO: no group by work_type (send to algo operation types, not work_type
+        clients=Sum(F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + shop.absenteeism))
+    ).values_list(
+        'dttm_forecast',
+        'operation_type__work_type_id',
+        'clients'
+    )
 
     constraints = group_by(
         collection=WorkerConstraint.objects.select_related('worker').filter(worker__shop_id=shop_id),
@@ -370,12 +375,11 @@ def create_timetable(request, form):
 
     cashboxes_dict = {cb['id']: cb for cb in cashboxes}
 
-    demands = [PeriodClientsConverter.convert(x) for x in periods]
-    # for demand in demands:
-    #     demand['clients'] = demand['clients'] / (period_step / cashboxes_dict[demand['work_type']]['speed_coef'])
-    #     # if cashboxes_dict[demand['work_type']]['do_forecast'] == WorkType.FORECAST_LITE:
-    #     demand['clients'] = 1
-
+    demands = [{
+        'dttm_forecast': BaseConverter.convert_datetime(x[0]),
+        'work_type': x[1],
+        'clients': x[2],
+    } for x in periods]
 
     data = {
         # 'start_dt': BaseConverter.convert_date(tt.dt),
