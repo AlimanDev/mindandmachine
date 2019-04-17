@@ -306,10 +306,10 @@ def common_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays):
     def __wt(__row, __col, __data, __fmt):
         worksheet.write(SheetIndexHelper.get_row(__row), SheetIndexHelper.get_column(__col), __data, __fmt)
 
-    __wt(2, 'b', 'ООО "ЛЕРУА МЕРЛЕН ВОСТОК"', format_meta_bold)
+    # __wt(2, 'b', 'ООО "ЛЕРУА МЕРЛЕН ВОСТОК"', format_meta_bold)
     __wt(3, 'b', 'Магазин {}'.format(shop.super_shop.title), format_meta_bold)
     __wt(4, 'b', 'График работы отдела', format_meta_bold_bottom_2)
-    __wt(4, 'c', 'сектор по обслуживанию клиентов', format_meta_bold_bottom_2)
+    # __wt(4, 'c', 'сектор по обслуживанию клиентов', format_meta_bold_bottom_2)
     __wt(4, 'd', '', format_meta_bold_bottom_2)
 
     __wt(6, 'c', '{} 2018'.format(PrintHelper.get_month_name(dt_from)), format_meta_bold)
