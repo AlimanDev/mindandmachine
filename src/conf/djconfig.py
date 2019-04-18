@@ -184,7 +184,7 @@ USE_L10N = False
 
 USE_TZ = False
 
-STATIC_ROOT = '/var/www/qos/static'
+
 STATIC_URL = '/static/'
 
 MEDIA_URL = '/_i/media/'

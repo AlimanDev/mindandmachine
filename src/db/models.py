@@ -570,7 +570,6 @@ class PeriodDemand(models.Model):
 class PeriodClients(PeriodDemand):
     class Meta(object):
         verbose_name = 'Спрос по клиентам'
-        unique_together = ('operation_type', 'type', 'dttm_forecast')
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
@@ -581,7 +580,6 @@ class PeriodClients(PeriodDemand):
 class PeriodProducts(PeriodDemand):
     class Meta(object):
         verbose_name = 'Спрос по продуктам'
-        unique_together = ('operation_type', 'type', 'dttm_forecast')
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
@@ -592,7 +590,6 @@ class PeriodProducts(PeriodDemand):
 class PeriodQueues(PeriodDemand):
     class Meta(object):
         verbose_name = 'Очереди'
-        unique_together = ('operation_type', 'type', 'dttm_forecast')
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
