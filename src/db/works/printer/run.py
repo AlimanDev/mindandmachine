@@ -221,7 +221,7 @@ def common_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to, w
         row = [
             Cell(worker.tabel_code, format_text),
             Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_text),
-            Cell(worker.position.title if worker.position else 'кассир-консультант', format_text),
+            Cell(worker.position.title if worker.position else 'Не указано', format_text),
             Cell('', format_holiday_debt)
         ] + [
             PrintHelper.common_get_worker_day_cell(worker_days.get(dttm.date()), format_days) for dttm in __dt_range()

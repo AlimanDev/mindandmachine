@@ -143,7 +143,7 @@ class Xlsx_base:
             'code': (lambda u: u.tabel_code, text_format, self.worksheet.write_string),
             'fio': (lambda u: '{} {} {}'.format(u.last_name, u.first_name, u.middle_name), text_format,
                     self.worksheet.write_string),
-            'position': (lambda u: u.position.title if u.position else 'Кассир-консультант', text_format, self.worksheet.write_string),
+            'position': (lambda u: u.position.title if u.position else 'Не указано', text_format, self.worksheet.write_string),
             'hired': (lambda u: BaseConverter.convert_date(u.dt_hired), date_format, self.worksheet.write_datetime),
         }
 
