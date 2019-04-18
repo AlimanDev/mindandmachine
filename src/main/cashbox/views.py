@@ -480,7 +480,8 @@ def edit_work_type(request, form):
                         return JsonResponse.internal_error(err_operation)
 
         OperationType.objects.filter(id__in=existing_operation_types.keys()).update(
-            dttm_deleted=datetime.datetime.now())
+            dttm_deleted=datetime.datetime.now()
+        )
 
     front_slots = json.loads(form['slots'])
     existing_slots = {
@@ -511,7 +512,13 @@ def edit_work_type(request, form):
     # удаляем старые слоты
     Slot.objects.filter(id__in=existing_slots.keys()).update(dttm_deleted=datetime.datetime.now())
 
-    return JsonResponse.success()
+    return JsonResponse.success({
+        'active_operation_types': [
+            OperationTypeConverter.convert(ot) for ot in OperationType.objects.filter(
+                work_type_id=work_type_id, dttm_deleted__isnull=True
+            )
+        ]
+    })
 
 
 @api_method('GET', CashboxesOpenTime)

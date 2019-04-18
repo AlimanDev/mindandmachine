@@ -184,7 +184,8 @@ USE_L10N = False
 
 USE_TZ = False
 
-STATIC_URL = '/_i/static/'
+
+STATIC_URL = '/static/'
 
 MEDIA_URL = '/_i/media/'
 

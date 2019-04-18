@@ -14,6 +14,7 @@ from src.db.models import (
     WorkerDayCashboxDetails,
     Notifications,
     Slot,
+    PeriodDemand,
     UserWeekdaySlot,
     WorkerConstraint,
     Timetable,
@@ -24,7 +25,6 @@ from src.db.models import (
     CameraCashbox,
     CameraClientGate,
     CameraClientEvent,
-    OperationType,
     Group,
     FunctionGroup,
     Region,
@@ -52,12 +52,12 @@ class WorkerPositionAdmin(admin.ModelAdmin):
 
 @admin.register(OperationType)
 class OperationTypeAdmin(admin.ModelAdmin):
-    list_display = ('id', 'operation_type_name', 'name', 'speed_coef', 'do_forecast', 'period_demand_params')
+    list_display = ('id', 'work_type_name', 'name', 'speed_coef', 'do_forecast', 'period_demand_params')
     list_filter = ('work_type__shop',)
     search_fields = ('work_type__shop', 'name')
 
     @staticmethod
-    def operation_type_name(instance: OperationType):
+    def work_type_name(instance: OperationType):
         return instance.work_type.name if instance.work_type else 'Без типа работ'
 
 
@@ -179,13 +179,13 @@ class CashboxAdmin(admin.ModelAdmin):
 
 
 class PeriodDemandAdmin(admin.ModelAdmin):
-    list_display = ('id', 'operation_type_id', 'value', 'dttm_forecast', 'type',)
+    list_display = ('id', 'operation_type_name', 'value', 'dttm_forecast', 'type',)
     search_fields = ('dttm_forecast', 'id')
     list_filter = ('operation_type__work_type_id', 'type')
 
-    # @staticmethod
-    # def operation_type_id(instance: PeriodClients):
-    #     return instance.operation_type_id
+    @staticmethod
+    def operation_type_name(instance: PeriodDemand):
+        return instance.operation_type.name or instance.operation_type.id
 
 
 @admin.register(PeriodClients)
@@ -391,7 +391,7 @@ class WorkerDayChangeRequestAdmin(admin.ModelAdmin):
 
 @admin.register(ProductionMonth)
 class ProductionMonthAdmin(admin.ModelAdmin):
-    list_display = ('id', 'dt_first')
+    list_display = ('id', 'dt_first', 'total_days', 'norm_work_days', 'norm_work_hours')
 
 
 @admin.register(AttendanceRecords)

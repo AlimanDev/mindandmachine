@@ -56,12 +56,13 @@ def get_indicators(request, form):
     work_type_id = form['work_type_id']
 
     if not work_type_id:
-        work_type_filter_list = WorkType.objects.qos_filter_active(dt_from, dt_to).values_list('id', flat=True)
+        # work_type_filter_list = WorkType.objects.qos_filter_active(dt_from, dt_to).values_list('id', flat=True)
+        work_type_filter_list = WorkType.objects.values_list('id', flat=True)
     else:
         work_type_filter_list = [work_type_id]
 
-    if not len(work_type_filter_list):
-        return JsonResponse.internal_error('Нет активных касс в данный период')
+    # if not len(work_type_filter_list):
+    #     return JsonResponse.internal_error('Нет активных касс в данный период')
 
     period_filter_dict = {
         'operation_type__work_type__shop_id': shop_id,
