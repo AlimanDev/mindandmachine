@@ -230,7 +230,7 @@ class SetWorkerRestrictionsForm(forms.Form):
 
     def clean_norm_work_hours(self):
         value = self.cleaned_data.get('norm_work_hours')
-        if value < 0 or value > 100:
+        if value < 0 or value > 500:
             raise ValidationError('norm_work_hours should be percents value (0 < val < 100)')
         return value
 

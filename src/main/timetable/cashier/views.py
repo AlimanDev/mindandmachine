@@ -640,6 +640,7 @@ def get_worker_day(request, form):
     })
 
 
+# todo: refactor this function
 @api_method(
     'POST',
     SetWorkerDayForm,
@@ -679,6 +680,7 @@ def set_worker_day(request, form):
     Raises:
         JsonResponse.multiple_objects_returned
     """
+
     if form['details']:
         details = json.loads(form['details'])
     else:
@@ -1101,14 +1103,16 @@ def dublicate_cashier_table(request, form):
     from_dt = form['from_dt']
     to_dt = form['to_dt']
 
-    main_worker_days = WorkerDay.objects.qos_current_version().filter(
+    main_worker_days = list(WorkerDay.objects.qos_current_version().filter(
         worker_id=from_worker_id,
         dt__gte=from_dt,
         dt__lte=to_dt
-    )
+    ))
     main_worker_days_details = WorkerDayCashboxDetails.objects.qos_current_version().filter(
-        worker_day__in=main_worker_days
+        worker_day__in=list(map(lambda x: x.id, main_worker_days)),
     )
+    # todo: add several details, not last
+    main_worker_days_details = {wdds.worker_day_id: wdds for wdds in main_worker_days_details}
 
     trainee_worker_days = WorkerDay.objects.qos_current_version().filter(
         worker_id=to_worker_id,
@@ -1118,36 +1122,28 @@ def dublicate_cashier_table(request, form):
     WorkerDayCashboxDetails.objects.filter(worker_day__in=trainee_worker_days).delete()
     trainee_worker_days.delete()
 
-    wds_list_to_create = []
     wdcds_list_to_create = []
-
-    try:
-        for blank_day in main_worker_days:
-            new_wd = WorkerDay(
-                worker_id=to_worker_id,
-                dt=blank_day.dt,
-                type=blank_day.type,
-                dttm_work_start=blank_day.dttm_work_start,
-                dttm_work_end=blank_day.dttm_work_end,
-            )
-            wds_list_to_create.append(new_wd)
-            new_wdcds = main_worker_days_details.filter(worker_day=new_wd).order_by('id').first()
-            if new_wdcds:
-                wdcds_list_to_create.append(
-                    WorkerDayCashboxDetails(
-                        worker_day=new_wd,
-                        on_cashbox=new_wdcds.on_cashbox,
-                        work_type=new_wdcds.work_type,
-                        dttm_from=new_wdcds.dttm_from,
-                        dttm_to=new_wdcds.dttm_to
-                    )
+    for blank_day in main_worker_days:
+        new_wd = WorkerDay.objects.create(
+            worker_id=to_worker_id,
+            dt=blank_day.dt,
+            type=blank_day.type,
+            dttm_work_start=blank_day.dttm_work_start,
+            dttm_work_end=blank_day.dttm_work_end,
+        )
+        new_wdcds = main_worker_days_details.get(blank_day.id)
+        if new_wdcds:
+            wdcds_list_to_create.append(
+                WorkerDayCashboxDetails(
+                    worker_day=new_wd,
+                    on_cashbox=new_wdcds.on_cashbox,
+                    work_type=new_wdcds.work_type,
+                    dttm_from=new_wdcds.dttm_from,
+                    dttm_to=new_wdcds.dttm_to
                 )
+            )
 
-        WorkerDay.objects.bulk_create(wds_list_to_create)
-        WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
-    except Exception:
-        return JsonResponse.internal_error('Ошибка при дублировании расписания.')
-
+    WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
     return JsonResponse.success()
 
 
@@ -1335,6 +1331,8 @@ def change_cashier_info(request, form):
     return JsonResponse.success()
 
 
+# todo: drop not used method (check mobile)
+# запрос на изменение рабочего дня возможно с мобильного устройства приходит)
 @api_method(
     'POST',
     SetWorkerDayForm,

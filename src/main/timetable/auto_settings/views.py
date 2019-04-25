@@ -177,11 +177,11 @@ def create_timetable(request, form):
             type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lt=dt_to + timedelta(days=1),
-        )
+        ).count()
 
-        if periods.count() != period_normal_count:
+        if periods % period_normal_count:
             period_difference['work_type_name'].append(work_type.name)
-            period_difference['difference'].append(abs(period_normal_count - periods.count()))
+            period_difference['difference'].append(abs(periods % period_normal_count))
     if period_difference['work_type_name']:
         status_message = 'На типе работ {} не хватает объектов спроса {}.'.format(
             ', '.join(period_difference['work_type_name']),
