@@ -51,6 +51,7 @@ from .forms import (
 )
 from src.main.other.notification.utils import send_notification
 from django.contrib.auth import update_session_auth_hash
+from django.db import IntegrityError
 
 
 @api_method('GET', GetCashiersListForm)
@@ -472,7 +473,7 @@ def get_cashier_info(request, form):
         work_types = WorkType.objects.filter(shop_id=worker.shop_id)
         response['work_type_info'] = {
             'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info],
-            'work_type': {x.id: WorkTypeConverter.convert(x) for x in work_types},
+            'work_type': {x.id: WorkTypeConverter.convert(x) for x in work_types}, # todo: delete this -- seems not needed
             'min_time_between_shifts': worker.min_time_btw_shifts,
             'shift_length_min': worker.shift_hours_length_min,
             'shift_length_max': worker.shift_hours_length_max,
@@ -964,18 +965,29 @@ def set_worker_restrictions(request, form):
     except User.DoesNotExist:
         return JsonResponse.value_error('Invalid worker_id')
 
-    if form.get('work_type_info'):
-        work_type_info = form['work_type_info']
-        for work_type in work_type_info:
-            WorkerCashboxInfo.objects.update_or_create(
-                worker=worker,
-                work_type_id=work_type['work_type_id'],
-                defaults={
-                    'priority': work_type['priority']
-                }
-            )
 
-    if form.get('constraints'):
+    # WorkTypes
+    work_type_info = form.get('work_type_info', [])
+    curr_work_types = {wci.work_type_id: wci for wci in WorkerCashboxInfo.objects.filter(worker=worker,)}
+    for work_type in work_type_info:
+        wci = curr_work_types.pop(work_type['work_type_id'], None)
+        if wci:
+            wci.priority = work_type['priority']
+            wci.save()
+        else:
+            try:
+                WorkerCashboxInfo.objects.create(
+                    worker=worker,
+                    work_type_id=work_type['work_type_id'],
+                    priority=work_type['priority'],
+                )
+            except IntegrityError:
+                pass
+            
+    del_old_wcis_ids = [wci.id for wci in curr_work_types.values()]
+    WorkerCashboxInfo.objects.filter(id__in=del_old_wcis_ids).delete()
+
+    if type(form.get('constraints')) == list:
         new_constraints = form['constraints']
         WorkerConstraint.objects.filter(worker=worker).delete()
         constraints_to_create = []
@@ -991,7 +1003,7 @@ def set_worker_restrictions(request, form):
             )
         WorkerConstraint.objects.bulk_create(constraints_to_create)
 
-    if form.get('worker_slots'):
+    if type(form.get('worker_slots')) == list:
         new_slots = form['worker_slots']
         UserWeekdaySlot.objects.filter(worker=worker).delete()
 
