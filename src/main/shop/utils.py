@@ -1,5 +1,5 @@
 import datetime
-from django.db.models import Avg, Sum, Q
+from django.db.models import Avg, Sum, Q, Case, When, F, FloatField, Value, IntegerField
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from src.db.models import (
@@ -62,10 +62,6 @@ def get_super_shop_list_stats(form, request, display_format='raw'):
 
     filter_dict = {k: v for k, v in filter_dict.items() if v}
 
-    super_shops = SuperShop.objects.select_related('region').filter(**filter_dict)
-
-    filter_dict = dict()
-
     range_filters = ['revenue', 'lack', 'fot', 'idle', 'workers_amount', 'fot_revenue']
     for range_filter in range_filters:
         tuple_values = form[range_filter]
@@ -74,26 +70,35 @@ def get_super_shop_list_stats(form, request, display_format='raw'):
         if tuple_values[1] is not None:
             filter_dict.update({range_filter + '_curr__lte': tuple_values[0]})
 
-    def calculate(func, field, period):
-        return Coalesce(func('shop__timetable__' + field, filter=Q(shop__timetable__dt=period)), 0)
+    def aggr_constructor(func, field, field_type, **filter_kwargs):
+        return func(Case(
+            When(then=F(field), **filter_kwargs),
+            default=Value(0),
+            output_field=field_type(),
+        ))
 
-    super_shops = super_shops.prefetch_related('shop_set', 'shop_set__timetable_set').filter(
-        Q(shop__timetable__dt__range=(dt_prev, dt_now)) | Q(shop__timetable__dt__isnull=True), # todo: actually needs to add condition Q(shop__timetable__dt__range=(dt_prev, dt_now)) to left join, not for where
+    st = 'shop__timetable__'  # short alias
+    prev_filters = {st + 'dt': dt_prev}
+    curr_filters = {st + 'dt': dt_now}
+
+    super_shops = SuperShop.objects.select_related('region').annotate(
+        workers_amount_prev=aggr_constructor(Sum, st + 'workers_amount', IntegerField, **prev_filters),
+        lack_prev=aggr_constructor(Avg, st + 'lack', FloatField, **prev_filters),
+        idle_prev=aggr_constructor(Avg, st + 'idle', FloatField, **prev_filters),
+        fot_prev=aggr_constructor(Sum, st + 'fot', FloatField, **prev_filters),
+        revenue_prev=aggr_constructor(Sum, st + 'revenue', FloatField, **prev_filters),
+        fot_revenue_prev=aggr_constructor(Avg, st + 'fot_revenue', FloatField, **prev_filters),
+
+        workers_amount_curr=aggr_constructor(Sum, st + 'workers_amount', IntegerField, **curr_filters),
+        lack_curr=aggr_constructor(Avg, st + 'lack', FloatField, **curr_filters),
+        idle_curr=aggr_constructor(Avg, st + 'idle', FloatField, **curr_filters),
+        fot_curr=aggr_constructor(Sum, st + 'fot', FloatField, **curr_filters),
+        revenue_curr=aggr_constructor(Sum, st + 'revenue', FloatField, **curr_filters),
+        fot_revenue_curr=aggr_constructor(Avg, st + 'fot_revenue', FloatField, **curr_filters),
+    ).filter(
         shop__dttm_deleted__isnull=True,
-    ).annotate(
-        workers_amount_curr=calculate(Sum, 'workers_amount', dt_now),
-        workers_amount_prev=calculate(Sum, 'workers_amount', dt_prev),
-        lack_curr=calculate(Avg, 'lack', dt_now),
-        lack_prev=calculate(Avg, 'lack', dt_prev),
-        idle_curr=calculate(Avg, 'idle', dt_now),
-        idle_prev=calculate(Avg, 'idle', dt_prev),
-        fot_curr=calculate(Sum, 'fot', dt_now),
-        fot_prev=calculate(Sum, 'fot', dt_prev),
-        revenue_curr=calculate(Sum, 'revenue', dt_now),
-        revenue_prev=calculate(Sum, 'revenue', dt_prev),
-        fot_revenue_curr=calculate(Avg, 'fot_revenue', dt_now),
-        fot_revenue_prev=calculate(Avg, 'fot_revenue', dt_prev)
-    ).filter(**filter_dict)
+        **filter_dict
+    )
 
     if sort_type:
         super_shops = super_shops.order_by(sort_type + '_curr' if 'title' not in sort_type else sort_type)
