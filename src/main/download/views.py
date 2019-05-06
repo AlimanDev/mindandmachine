@@ -119,7 +119,9 @@ def get_demand_xlsx(request, workbook, form):
     """
     from_dt = form['from_dt']
     to_dt = form['to_dt']
-    timestep = 30  # minutes
+
+    shop = Shop.objects.get(id=form['shop_id'])
+    timestep = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute  # minutes
 
     model_form_dict = {
         'C': 'clients',
