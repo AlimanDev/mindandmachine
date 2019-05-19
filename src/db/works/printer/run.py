@@ -220,7 +220,7 @@ def common_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to, w
         worker_days = {x.dt: x for x in workingdays if x.worker_id == worker.id}
         row = [
             Cell(worker.tabel_code, format_text),
-            Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_text),
+            Cell('{} {} {}'.format(worker.last_name, worker.first_name or '', worker.middle_name or ''), format_text),
             Cell(worker.position.title if worker.position else 'Не указано', format_text),
             Cell('', format_holiday_debt)
         ] + [
@@ -250,13 +250,13 @@ def common_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays):
     format_header_date = workbook.add_format(fmt(font_size=11, border=2, bold=True, num_format='dd/mm'))
 
     data = [
-        [] for i in range(15)
+        [] for i in range(8)
     ] + [
         # weekdays
         ['', '', '', ''] + [Cell(PrintHelper.get_weekday_name(x), format_header_weekday) for x in __dt_range()],
 
         # main header
-        [Cell(x, format_header_text) for x in ['№', 'ФИО', 'ДОЛЖНОСТЬ', 'долг по выходным']] +
+        [Cell(x, format_header_text) for x in ['№', 'ФИО', 'ДОЛЖНОСТЬ', '']] +
         [Cell(x.date(), format_header_date) for x in __dt_range()] +
         [Cell(x, format_header_text) for x in ['плановые дни', 'дата', 'С графиком работы ознакомлен**. На работу в праздничные дни согласен', 'В', 'ОТ']],
 
@@ -265,7 +265,7 @@ def common_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays):
     ]
     data_size = {
         'rows': [15 for i in range(15)] + [15, 40, 10],
-        'cols': [25, 30, 25, 20] + [10 for x in __dt_range()] + [15, 15, 25, 10, 10]
+        'cols': [25, 30, 25, 2] + [10 for x in __dt_range()] + [15, 15, 25, 10, 10]
     }
 
     common_add_workers_one(
@@ -306,61 +306,61 @@ def common_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays):
     def __wt(__row, __col, __data, __fmt):
         worksheet.write(SheetIndexHelper.get_row(__row), SheetIndexHelper.get_column(__col), __data, __fmt)
 
-    # __wt(2, 'b', 'ООО "ЛЕРУА МЕРЛЕН ВОСТОК"', format_meta_bold)
+    # __wt(2, 'b', 'ООО сеть', format_meta_bold)
     __wt(3, 'b', 'Магазин {}'.format(shop.super_shop.title), format_meta_bold)
-    __wt(4, 'b', 'График работы отдела', format_meta_bold_bottom_2)
-    # __wt(4, 'c', 'сектор по обслуживанию клиентов', format_meta_bold_bottom_2)
-    __wt(4, 'd', '', format_meta_bold_bottom_2)
+    __wt(4, 'b', 'График работы сотрудников', format_meta_bold_bottom_2)
+    # __wt(4, 'c', 'сектор ', format_meta_bold_bottom_2)
+    # __wt(4, 'd', '', format_meta_bold_bottom_2)
 
-    __wt(6, 'c', '{} 2018'.format(PrintHelper.get_month_name(dt_from)), format_meta_bold)
+    __wt(4, 'c', '{} {}'.format(PrintHelper.get_month_name(dt_from), dt_from.year), format_meta_bold)
     __wt(7, 'b', 'составил:', format_meta_bold_bottom)
     __wt(7, 'c', '', format_meta_bold_bottom)
     __wt(7, 'd', '', format_meta_bold_bottom)
     __wt(8, 'b', 'подпись', format_meta_bold_right_small)
-    __wt(8, 'd', 'расшифровка', format_meta_bold_left_small)
+    __wt(8, 'c', 'расшифровка', format_meta_bold_left_small)
 
-    __wt(
-        12,
-        'b',
-        '* включает очередной, учебный и административный отпуск, отпуск по берем. и родам, отпуск по уходу за ребенком до 3-х лет, командировка. В случае отмены или переноса запланированного отсутствия сотрудник работает с с 9:00 до 18:00',
-        format_meta_common
-    )
-    __wt(
-        13,
-        'b',
-        '** в обязательном порядке все сотрудники ознакомлены с Графиком сменности до вступления его в силу за 1 месяц',
-        format_meta_common
-    )
+    # __wt(
+    #     12,
+    #     'b',
+    #     '* включает очередной, учебный и административный отпуск, отпуск по берем. и родам, отпуск по уходу за ребенком до 3-х лет, командировка. В случае отмены или переноса запланированного отсутствия сотрудник работает с с 9:00 до 18:00',
+    #     format_meta_common
+    # )
+    # __wt(
+    #     13,
+    #     'b',
+    #     '** в обязательном порядке все сотрудники ознакомлены с Графиком сменности до вступления его в силу за 1 месяц',
+    #     format_meta_common
+    # )
 
-    __wt(2, 'h', 'условные обозначения', format_meta_bold)
-    __wt(4, 'h', 'В', format_meta_workerday_holiday)
-    __wt(4, 'i', 'выходой день', format_meta_bold)
-    __wt(6, 'h', 'Z*', format_meta_workerday_z)
-    __wt(6, 'i', 'запланированное отсутствие', format_meta_bold)
+    # __wt(2, 'h', 'условные обозначения', format_meta_bold)
+    # __wt(4, 'h', 'В', format_meta_workerday_holiday)
+    # __wt(4, 'i', 'выходой день', format_meta_bold)
+    # __wt(6, 'h', 'Z*', format_meta_workerday_z)
+    # __wt(6, 'i', 'запланированное отсутствие', format_meta_bold)
 
-    __wt(1, 'w', 'Согласовано:', format_meta_bold)
-    __wt(3, 'w', 'Руководитель сектора по обслуживанию клиентов', format_meta_bold_bottom)
-    __wt(3, 'x', '', format_meta_bold_bottom)
-    __wt(3, 'y', '', format_meta_bold_bottom)
-    __wt(3, 'z', '', format_meta_bold_bottom)
-    __wt(3, 'aa', '', format_meta_bold_bottom)
-    __wt(4, 'x', 'наименование должности', format_meta_common)
+    # __wt(1, 'w', 'Согласовано:', format_meta_bold)
+    # __wt(3, 'w', 'Руководитель сектора по обслуживанию клиентов', format_meta_bold_bottom)
+    # __wt(3, 'x', '', format_meta_bold_bottom)
+    # __wt(3, 'y', '', format_meta_bold_bottom)
+    # __wt(3, 'z', '', format_meta_bold_bottom)
+    # __wt(3, 'aa', '', format_meta_bold_bottom)
+    # __wt(4, 'x', 'наименование должности', format_meta_common)
+    #
+    # __wt(6, 'x', '', format_meta_bold_bottom)
+    # __wt(6, 'y', '', format_meta_bold_bottom)
+    # __wt(6, 'z', '', format_meta_bold_bottom)
+    # __wt(6, 'aa', '', format_meta_bold_bottom)
+    # __wt(6, 'ab', '', format_meta_bold_bottom)
+    # __wt(6, 'ac', '', format_meta_bold_bottom)
+    # __wt(6, 'ad', '', format_meta_bold_bottom)
+    #
+    # __wt(7, 'y', 'подпись', format_meta_common)
+    # __wt(7, 'ac', 'расшифровка', format_meta_common)
 
-    __wt(6, 'x', '', format_meta_bold_bottom)
-    __wt(6, 'y', '', format_meta_bold_bottom)
-    __wt(6, 'z', '', format_meta_bold_bottom)
-    __wt(6, 'aa', '', format_meta_bold_bottom)
-    __wt(6, 'ab', '', format_meta_bold_bottom)
-    __wt(6, 'ac', '', format_meta_bold_bottom)
-    __wt(6, 'ad', '', format_meta_bold_bottom)
-
-    __wt(7, 'y', 'подпись', format_meta_common)
-    __wt(7, 'ac', 'расшифровка', format_meta_common)
-
-    __wt(8, 'x', '', format_meta_bold_bottom)
-    __wt(8, 'y', '', format_meta_bold_bottom)
-    __wt(8, 'z', '', format_meta_bold_bottom)
-    __wt(8, 'aa', '', format_meta_bold_bottom)
+    # __wt(8, 'x', '', format_meta_bold_bottom)
+    # __wt(8, 'y', '', format_meta_bold_bottom)
+    # __wt(8, 'z', '', format_meta_bold_bottom)
+    # __wt(8, 'aa', '', format_meta_bold_bottom)
 
 
 def common_add_workers_two(workbook, shop_id, dt_from, dt_to, workingdays):
@@ -434,7 +434,7 @@ def common_add_workers_two(workbook, shop_id, dt_from, dt_to, workingdays):
             [
                 Cell('', format_common_top_left),
                 Cell('', format_common_top),
-                Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_fio),
+                Cell('{} {} {}'.format(worker.last_name, worker.first_name or '', worker.middle_name or ''), format_fio),
             ] + [
                 Cell('', format_common_top) for _ in range(len(user_data[0]) - 3)
             ]
@@ -530,7 +530,7 @@ def depart_add_workers_one(workbook, data, data_size, shop_id, dt_from, dt_to, w
             Cell('', format_text_border),
             Cell('', format_text_border),
             Cell('', format_text_border),
-            Cell('{} {} {}'.format(worker.last_name, worker.first_name, worker.middle_name), format_text_workers),
+            Cell('{} {} {}'.format(worker.last_name, worker.first_name or '', worker.middle_name or ''), format_text_workers),
         ] + [
             PrintHelper.depart_get_worker_day_cell(worker_days.get(dttm.date()), format_days, timetable, timetable_counters) for dttm in __dt_range()
         ] + [
@@ -655,13 +655,13 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays):
     worksheet.merge_range('E6:AB6', '{}'.format(shop.title), format_meta_main_title)
     worksheet.merge_range('AH2:AM2', '', format_meta_title_border_bottom)
     worksheet.merge_range('AH4:AM4', '', format_meta_title_border_bottom)
-    worksheet.merge_range('AH7:AM7', '\"____\" __________ 2018 г.', format_meta_title)
+    worksheet.merge_range('AH7:AM7', '\"____\" __________ ', format_meta_title)
 
     last_dt_column_index = SheetIndexHelper.get_column('e') + __dt_range_len() - 1
 
     worksheet.merge_range(
         'E9:{}9'.format(SheetIndexHelper.reverse_column(last_dt_column_index).upper()),
-        '{} 2018'.format(PrintHelper.get_month_name(dt_from).upper()),
+        '{} {}'.format(PrintHelper.get_month_name(dt_from).upper(), dt_from.year),
         format_meta_title_bold_14_border
     )
 
@@ -799,21 +799,21 @@ def depart_fill_sheet_one(workbook, shop, dt_from, dt_to, workingdays):
         )
         col_index += 1
 
-    worksheet.merge_range('B{0}:D{0}'.format(row_index + 2), 'СОБРАНИЕ ОТДЕЛА СОСТОИТСЯ:', format_meta_title_16)
-    __wt(row_index + 4, 'd', 'РАСПИСАНИЕ ПЕРЕРЫВОВ', format_meta_title_10)
-    __wt(row_index + 5, 'd', 'Смена', format_meta_title_border)
-    worksheet.merge_range('E{0}:H{0}'.format(row_index + 5), '1 перерыв', format_meta_title_border)
-    worksheet.merge_range('I{0}:L{0}'.format(row_index + 5), '2 перерыв', format_meta_title_border)
-    worksheet.merge_range('M{0}:P{0}'.format(row_index + 5), '3 перерыв', format_meta_title_border)
-
-    i = 0
-    for tt_value in sorted(timetable):
-        __wt(row_index + 6 + i, 'd', tt_value, format_meta_title_border)
-        worksheet.merge_range('E{0}:H{0}'.format(row_index + 6 + i), '', format_meta_title_border)
-        worksheet.merge_range('I{0}:L{0}'.format(row_index + 6 + i), '', format_meta_title_border)
-        worksheet.merge_range('M{0}:P{0}'.format(row_index + 6 + i), '', format_meta_title_border)
-
-        i += 1
+    # worksheet.merge_range('B{0}:D{0}'.format(row_index + 2), 'СОБРАНИЕ ОТДЕЛА СОСТОИТСЯ:', format_meta_title_16)
+    # __wt(row_index + 4, 'd', 'РАСПИСАНИЕ ПЕРЕРЫВОВ', format_meta_title_10)
+    # __wt(row_index + 5, 'd', 'Смена', format_meta_title_border)
+    # worksheet.merge_range('E{0}:H{0}'.format(row_index + 5), '1 перерыв', format_meta_title_border)
+    # worksheet.merge_range('I{0}:L{0}'.format(row_index + 5), '2 перерыв', format_meta_title_border)
+    # worksheet.merge_range('M{0}:P{0}'.format(row_index + 5), '3 перерыв', format_meta_title_border)
+    #
+    # i = 0
+    # for tt_value in sorted(timetable):
+    #     __wt(row_index + 6 + i, 'd', tt_value, format_meta_title_border)
+    #     worksheet.merge_range('E{0}:H{0}'.format(row_index + 6 + i), '', format_meta_title_border)
+    #     worksheet.merge_range('I{0}:L{0}'.format(row_index + 6 + i), '', format_meta_title_border)
+    #     worksheet.merge_range('M{0}:P{0}'.format(row_index + 6 + i), '', format_meta_title_border)
+    #
+    #     i += 1
 
     # __wt(row_timetable_header + 1, 'J', 'с', format_meta_title)
     # __wt(row_timetable_header + 1, 'L', 'по', format_meta_title)
@@ -876,10 +876,10 @@ def run(shop_id, dt_from, debug=False, inspection_version=False):
 
         file = file_path
 
-    usrs = User.objects.qos_filter_active(dt_from, dt_to, shop_id=shop_id)
+    usrs = User.objects.qos_filter_active(dt_from, dt_to, shop_id=shop_id).order_by('id')
     prod_month = ProductionMonth.objects.filter(
         dt_first__month=dt_from.month,
-        dt_first__year=dt_from.year
+        dt_first__year=dt_from.year,
     ).first()
     worker_days = WorkerDay.objects.qos_current_version().filter(
         dt__gte=dt_from, dt__lte=dt_to, worker__in=usrs
