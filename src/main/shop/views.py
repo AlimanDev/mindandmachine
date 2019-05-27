@@ -346,8 +346,7 @@ def set_parameters(request, form):
 
     """
     shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
-
-    shop.mean_queue_length = form['queue_length']
+    shop.queue_length = form['queue_length']
     shop.idle = form['idle']
     shop.fot = form['fot']
     shop.less_norm = form['less_norm']
@@ -361,6 +360,7 @@ def set_parameters(request, form):
     shop.min_change_time = form['min_change_time']
     shop.absenteeism = form['absenteeism']
     shop.even_shift_morning_evening = form['even_shift_morning_evening']
+    # shop.workdays_holidays_same = form['workdays_holidays_same']
     shop.paired_weekday = form['paired_weekday']
     shop.exit1day = form['exit1day']
     shop.exit42hours = form['exit42hours']

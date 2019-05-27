@@ -233,6 +233,7 @@ class WorkerConstraintConverter(BaseConverter):
         return {
             'id': obj.id,
             'worker': obj.worker_id,
+            'week_length': obj.worker.week_availability,
             'weekday': obj.weekday,
             'tm': cls.convert_time(obj.tm),
             'is_lite': obj.is_lite,
@@ -346,6 +347,19 @@ class SlotConverter(BaseConverter):
             'tm_start': cls.convert_time(obj.tm_start),
             'tm_end':  cls.convert_time(obj.tm_end),
             'name': obj.name
+        }
+
+
+class UserWeekdaySlotConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'worker': obj.worker_id,
+            'week_length': obj.worker.week_availability,
+            'weekday': obj.weekday,
+            'slot': SlotConverter.convert(obj.slot),
+            'is_suitable': obj.is_suitable,
         }
 
 

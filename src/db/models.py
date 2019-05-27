@@ -116,11 +116,14 @@ class Shop(models.Model):
     restricted_end_times = models.CharField(max_length=1024, default='[]')
     min_change_time = models.IntegerField(default=12)
     even_shift_morning_evening = models.BooleanField(default=False)
+    # workdays_holidays_same = models.BooleanField(default=False)
     paired_weekday = models.BooleanField(default=False)
     exit1day = models.BooleanField(default=False)
     exit42hours = models.BooleanField(default=False)
     process_type = models.CharField(max_length=1, choices=PROCESS_TYPE, default=YEAR_NORM)
     absenteeism = models.SmallIntegerField(default=0)  # percents
+    # added on 16.05.2019
+    queue_length = models.FloatField(default=3.0)
 
     def __str__(self):
         return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)

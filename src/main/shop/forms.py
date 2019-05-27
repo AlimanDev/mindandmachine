@@ -91,6 +91,7 @@ class SetParametersForm(forms.Form):
     min_change_time = forms.IntegerField()
     absenteeism = forms.IntegerField()
     even_shift_morning_evening = util_forms.BooleanField()
+    # workdays_holidays_same = util_forms.BooleanField() TODO(as)
     paired_weekday = util_forms.BooleanField()
     exit1day = util_forms.BooleanField()
     exit42hours = util_forms.BooleanField()
