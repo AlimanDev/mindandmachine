@@ -736,7 +736,17 @@ def set_worker_day(request, form):
         old_wd.delete()
         old_wd = None
 
-    if worker.attachment_group == User.GROUP_STAFF \
+
+    # todo: fix temp code -- if status TYPE_EMPTY or TYPE_DELETED then delete all sequence of worker_day -- possible to recreate timetable
+    if worker.attachment_group == User.GROUP_STAFF and form['type'] in \
+        [WorkerDay.Type.TYPE_EMPTY.value, WorkerDay.Type.TYPE_DELETED.value]:
+        while old_wd:
+            WorkerDayCashboxDetails.objects.filter(worker_day=old_wd).delete()
+            old_wd.delete()
+            old_wd = old_wd.parent_worker_day if old_wd.parent_worker_day_id else None
+
+
+    elif worker.attachment_group == User.GROUP_STAFF \
             or worker.attachment_group == User.GROUP_OUTSOURCE \
                     and form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
         new_worker_day = WorkerDay.objects.create(
