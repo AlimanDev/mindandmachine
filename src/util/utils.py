@@ -180,7 +180,7 @@ def api_method(
                 if request.method == 'GET':
                     form_params = request.GET
                 elif request.method == 'POST':
-                    if "Expo" in request.META['HTTP_USER_AGENT'] or "okhttp/3.6.0" in request.META['HTTP_USER_AGENT']:
+                    if "Expo" in request.META.get('HTTP_USER_AGENT', []) or "okhttp/3.6.0" in request.META.get('HTTP_USER_AGENT', []):
                         form_params = json.loads(request.body.decode())
                     else:
                         form_params = request.POST
