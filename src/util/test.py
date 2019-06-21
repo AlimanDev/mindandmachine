@@ -3,6 +3,9 @@ from django.test import TestCase
 
 from django.db.models import Q
 from src.db.models import (
+    Group,
+    Timetable,
+    FunctionGroup,
     User,
     WorkerDay,
     CameraCashboxStat,
@@ -36,6 +39,17 @@ class LocalTestCase(TestCase):
         super().setUp()
         dttm_now = now()
 
+
+        # group
+        self.group = Group.objects.create(name='Администратор')
+        FunctionGroup.objects.bulk_create([
+            FunctionGroup(
+                group=self.group,
+                func=func,
+                access_type=FunctionGroup.TYPE_ALL
+            ) for func in FunctionGroup.FUNCS
+        ])
+
         # supershop
         self.superShop = SuperShop.objects.create(
             title='SuperShop1',
@@ -63,6 +77,7 @@ class LocalTestCase(TestCase):
             self.USER_PASSWORD,
             id=1,
             shop=self.shop,
+            function_group=self.group,
             last_name='Дурак',
             first_name='Иван',
         )
@@ -174,6 +189,14 @@ class LocalTestCase(TestCase):
                     dttm_work_end=datetime.datetime.combine(dt_from, datetime.time(18, 0)),
                 )
             dt_from += datetime.timedelta(days=1)
+
+        # Timetable create
+        self.timetable1 = Timetable.objects.create(
+            shop = self.shop,
+            dt = datetime.date(2019, 6, 1),
+            status = 1,
+            dttm_status_change = datetime.datetime(2019, 6, 1, 9, 30, 0)
+        )
 
         # CameraCashbox
         self.camera_cashbox = CameraCashbox.objects.create(name='Camera_1', cashbox=self.cashbox1)
