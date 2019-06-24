@@ -7,6 +7,13 @@ pip install virtualenv
 virtualenv venv
 ```
 
+Или используя Docker:
+```bash
+./make dev
+```
+
+Эта команда поднимает python, postgres, redis в контейнерах докера и запустит проект в дев режиме.
+
 ## Usage
 
 To run a dev server:

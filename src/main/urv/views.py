@@ -10,6 +10,7 @@ from .forms import GetUserUrvForm, ChangeAttendanceForm
 from django.db.models import Q
 import functools
 from django.utils import timezone
+from django.core.paginator import Paginator, EmptyPage
 
 
 @api_method(
@@ -27,12 +28,16 @@ def get_user_urv(request, form):
          worker_ids(list): список айдишников юзеров, для которых выгружать
          from_dt(QOS_DATE): с какого числа выгружать данные
          to_dt(QOS_DATE): по какое
+         offset(int): смещение по страницам (по дефолту первая)
+         amount_per_page(int): количество результатов на страницу (по умолчанию 50)
     Returns:
         {}
     """
     worker_ids = form['worker_ids']
     from_dt = form['from_dt']
     to_dt = form['to_dt']
+    offset = form['offset'] if form['offset'] else 1
+    amount_per_page = form['amount_per_page'] if form['amount_per_page'] else 50
 
     # if not len(worker_ids):
     #     worker_ids = list(User.objects.qos_filter_active(
@@ -84,9 +89,22 @@ def get_user_urv(request, form):
         extra_filters = functools.reduce(lambda x, y: x | y, extra_filters)
         user_records = user_records.filter(extra_filters)
 
+    user_records = user_records.order_by('-dttm')
+
+    paginator = Paginator(user_records, amount_per_page)
+    try:
+        user_records = paginator.page(offset)
+    except EmptyPage:
+        return JsonResponse.value_error('Запрашиваемая страница не существует')
+    info = {
+        'offset': offset,
+        'pages': paginator.count,
+        'amount_per_page': amount_per_page,
+    }
+
     return JsonResponse.success([
-        AttendanceRecordsConverter.convert(record) for record in user_records.order_by('-dttm')
-    ])
+        AttendanceRecordsConverter.convert(record) for record in user_records
+    ], info)
 
 
 @api_method(

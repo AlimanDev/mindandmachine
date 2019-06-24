@@ -7,7 +7,8 @@ class GetUserUrvForm(forms.Form):
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
     shop_id = forms.IntegerField(required=False)
-    offset = forms.IntegerField(required=False)
+    offset = forms.IntegerField(required=False, min_value=1)
+    amount_per_page = forms.IntegerField(required=False, min_value=1)
 
     type = forms.CharField(required=False)
     from_tm = util_forms.TimeField(required=False)

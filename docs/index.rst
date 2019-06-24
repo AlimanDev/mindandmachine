@@ -26,6 +26,7 @@ Welcome to QoS_backend's documentation!
    modules/workerexchange
    modules/utils
    modules/celery
+   modules/urv
 
 
 
