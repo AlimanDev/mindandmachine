@@ -123,10 +123,10 @@ def get_super_shop_list_stats(form, request, display_format='raw'):
                 curr_stats = ss_dynamic_values[key + '_curr']
                 prev_stats = ss_dynamic_values[key + '_prev']
                 dynamic_values[key] = {
-                    'prev': prev_stats,
-                    'curr': curr_stats,
+                    'prev': prev_stats if prev_stats else 0,
+                    'curr': curr_stats if curr_stats else 0,
                     'change': change_sign(
-                        ceil((curr_stats / prev_stats - 1) * 100) if prev_stats else 0,
+                        ceil((curr_stats / prev_stats - 1) * 100) if (prev_stats and curr_stats) else 0,
                         key
                     )
                 }
