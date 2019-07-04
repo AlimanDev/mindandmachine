@@ -59,7 +59,7 @@ def get_status(request, form):
 
     Args:
         method: GET
-        url: /api/timetable/auto_setting/get_status
+        url: /api/timetable/auto_settings/get_status
         shop_id(int): required = False
         dt(QOS_DATE): required = True
 

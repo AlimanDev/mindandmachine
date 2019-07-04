@@ -47,6 +47,7 @@ def upload_demand(request, form, demand_file):
     datetime_format = '%d.%m.%Y %H:%M:%S'
     processed_rows = 0  # счетчик "обработынных" строк
     checked_rows = 0  # счетчик "проверенных" строк
+    from_to = []
 
     def create_demand_objs(obj=None):
         if obj is None:
@@ -63,6 +64,27 @@ def upload_demand(request, form, demand_file):
     # todo: check conflicts in operation_types_names or user other format
     operation_types = {op_type.name or op_type.work_type.name: op_type for op_type in operation_types}
     ######################### сюда писать логику чтения из экселя ######################################################
+    for index, row in enumerate(worksheet.rows):
+        dttm = row[time_column_num].value
+        if '.' not in dttm or ':' not in dttm:
+            continue
+        if not isinstance(dttm, datetime.datetime):
+            try:
+                dttm = datetime.datetime.strptime(dttm, datetime_format)
+                from_to.append(dttm)
+            except ValueError:
+                return JsonResponse.value_error(
+                    'Невозможно преобразовать время. Пожалуйста введите формат {}'.format(datetime_format))
+
+    from_to.sort()
+    dttm_from = from_to[1]
+    dttm_to = from_to[-1]
+
+    PeriodClients.objects.filter(
+        dttm_forecast__range=[dttm_from, dttm_to],
+        type=PeriodClients.FACT_TYPE,
+        operation_type__work_type__shop_id=shop_id,
+    ).delete()
 
     for index, row in enumerate(worksheet.rows):
         value = row[value_column_num].value
@@ -77,12 +99,13 @@ def upload_demand(request, form, demand_file):
             try:
                 dttm = datetime.datetime.strptime(dttm, datetime_format)
             except ValueError:
-                return JsonResponse.value_error('Невозможно преобразовать время. Пожалуйста введите формат {}'.format(datetime_format))
+                return JsonResponse.value_error(
+                    'Невозможно преобразовать время. Пожалуйста введите формат {}'.format(datetime_format))
 
         cashtype_name = row[cash_column_num].value
         cashtype_name = cashtype_name[:1].upper() + cashtype_name[1:].lower()  # учет регистра чтобы нормально в бд было
-
         ct_to_search = operation_types.get(cashtype_name, None)
+
         if ct_to_search:
             create_demand_objs(
                 PeriodClients(
@@ -96,7 +119,6 @@ def upload_demand(request, form, demand_file):
 
         else:
             return JsonResponse.internal_error('Невозможно прочитать тип работ на строке №{}.'.format(index))
-
     if processed_rows == 0 or processed_rows < checked_rows / 2:  # если было обработано, меньше половины строк, че-то пошло не так
         return JsonResponse.internal_error(
             'Было обработано {}/{} строк. Пожалуйста, проверьте формат данных в файле.'.format(
@@ -109,17 +131,16 @@ def upload_demand(request, form, demand_file):
     create_demand_objs(None)
 
     # works only for postgres
-    unique_fact = list(PeriodClients.objects.filter(
-        type=PeriodClients.FACT_TYPE,
-        operation_type__work_type__shop_id=shop_id
-    ).order_by('dttm_forecast', 'operation_type_id', '-id').distinct('dttm_forecast', 'operation_type_id'))
-
-    PeriodClients.objects.filter(
-        type=PeriodClients.FACT_TYPE,
-        operation_type__work_type__shop_id=shop_id
-    ).delete()
-    PeriodClients.objects.bulk_create(unique_fact)
-
+    # unique_fact = list(PeriodClients.objects.filter(
+    #     type=PeriodClients.FACT_TYPE,
+    #     operation_type__work_type__shop_id=shop_id
+    # ).order_by('dttm_forecast', 'operation_type_id', '-id').distinct('dttm_forecast', 'operation_type_id'))
+    #
+    # PeriodClients.objects.filter(
+    #     type=PeriodClients.FACT_TYPE,
+    #     operation_type__work_type__shop_id=shop_id
+    # ).delete()
+    # PeriodClients.objects.bulk_create(unique_fact)
     from_dt_to_create = PeriodClients.objects.filter(
         type=PeriodClients.FACT_TYPE,
         operation_type__work_type__shop_id=shop_id
@@ -161,10 +182,8 @@ def upload_timetable(request, form, timetable_file):
             if isinstance(cell.value, datetime.datetime):
                 work_dates.append(cell.value.date())
     dates_end_column = dates_start_column + len(work_dates) - 1
-
     if not work_dates:
         return JsonResponse.value_error('Не смог сгенерировать массив дат. Возможно они в формате строки.')
-
     shop_work_types = {w.name: w for w in WorkType.objects.filter(shop_id=shop_id, dttm_deleted__isnull=True)}
     for row in worksheet.iter_rows(min_row=workers_start_row):
         user_work_type = None
@@ -191,7 +210,6 @@ def upload_timetable(request, form, timetable_file):
                         worker=u,
                         work_type=user_work_type,
                     )
-
 
             if dates_start_column <= column_index <= dates_end_column:
                 dt = work_dates[column_index - dates_start_column]

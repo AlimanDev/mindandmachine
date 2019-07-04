@@ -3,6 +3,8 @@ from django.test import TestCase
 
 from django.db.models import Q
 from src.db.models import (
+    UserIdentifier,
+    AttendanceRecords,
     Group,
     Timetable,
     FunctionGroup,
@@ -39,14 +41,43 @@ class LocalTestCase(TestCase):
         super().setUp()
         dttm_now = now()
 
-
-        # group
-        self.group = Group.objects.create(name='Администратор')
+        # admin_group
+        self.admin_group = Group.objects.create(name='Администратор')
         FunctionGroup.objects.bulk_create([
             FunctionGroup(
-                group=self.group,
+                group=self.admin_group,
                 func=func,
                 access_type=FunctionGroup.TYPE_ALL
+            ) for func in FunctionGroup.FUNCS
+        ])
+
+        # central office
+        self.hq_group = Group.objects.create(name='ЦО')
+        for func in FunctionGroup.FUNCS:
+            if 'get' in func or func == 'signin' or func == 'signout':
+                FunctionGroup.objects.create(
+                    group=self.hq_group,
+                    func=func,
+                    access_type=FunctionGroup.TYPE_ALL
+                )
+
+        # chiefs
+        self.chief_group = Group.objects.create(name='Руководитель')
+        FunctionGroup.objects.bulk_create([
+            FunctionGroup(
+                group=self.chief_group,
+                func=func,
+                access_type=FunctionGroup.TYPE_SUPERSHOP
+            ) for func in FunctionGroup.FUNCS
+        ])
+
+        # employee
+        self.employee_group = Group.objects.create(name='Сотрудник')
+        FunctionGroup.objects.bulk_create([
+            FunctionGroup(
+                group=self.employee_group,
+                func=func,
+                access_type=FunctionGroup.TYPE_SELF
             ) for func in FunctionGroup.FUNCS
         ])
 
@@ -77,12 +108,13 @@ class LocalTestCase(TestCase):
             self.USER_PASSWORD,
             id=1,
             shop=self.shop,
-            function_group=self.group,
+            function_group=self.admin_group,
             last_name='Дурак',
             first_name='Иван',
         )
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2', first_name='Иван2', last_name='Иванов')
-        self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3', first_name='Иван3', last_name='Сидоров')
+        self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3', first_name='Иван3',
+                                 last_name='Сидоров')
         self.user4 = create_user(
             user_id=4,
             shop_id=self.shop,
@@ -90,6 +122,36 @@ class LocalTestCase(TestCase):
             dt_fired=(dttm_now - datetime.timedelta(days=1)).date(),
             first_name='Иван4',
             last_name='Петров'
+        )
+        self.user5 = User.objects.create_user(
+            'user5',
+            'm@m.m',
+            '4242',
+            id=5,
+            shop=self.shop,
+            function_group=self.hq_group,
+            last_name='Дурак5',
+            first_name='Иван5',
+        )
+        self.user6 = User.objects.create_user(
+            'user6',
+            'b@b.b',
+            '4242',
+            id=6,
+            shop=self.shop,
+            function_group=self.chief_group,
+            last_name='Дурак6',
+            first_name='Иван6',
+        )
+        self.user7 = User.objects.create_user(
+            'user7',
+            'k@k.k',
+            '4242',
+            id=7,
+            shop=self.shop,
+            function_group=self.employee_group,
+            last_name='Дурак7',
+            first_name='Иван7',
         )
 
         # work_types
@@ -101,13 +163,13 @@ class LocalTestCase(TestCase):
         )
         self.work_type2 = create_work_type(
             self.shop,
-            'тип_кассы_2',
+            'Тип_кассы_2',
             id=2,
             dttm_last_update_queue=datetime.datetime(2018, 12, 1, 9, 0, 0)
         )
         self.work_type3 = create_work_type(
             self.shop,
-            'тип_кассы_3',
+            'Тип_кассы_3',
             id=3,
             dttm_last_update_queue=None,
             dttm_deleted=dttm_now - datetime.timedelta(days=1)
@@ -192,10 +254,24 @@ class LocalTestCase(TestCase):
 
         # Timetable create
         self.timetable1 = Timetable.objects.create(
-            shop = self.shop,
-            dt = datetime.date(2019, 6, 1),
-            status = 1,
-            dttm_status_change = datetime.datetime(2019, 6, 1, 9, 30, 0)
+            shop=self.shop,
+            dt=datetime.date(2019, 6, 1),
+            status=1,
+            dttm_status_change=datetime.datetime(2019, 6, 1, 9, 30, 0)
+        )
+
+        # UserIdentifier
+        self.useridentifier = UserIdentifier.objects.create(
+            identifier='test_identifier',
+            worker=self.user1
+        )
+
+        # AttendanceRecords
+        self.attendancerecords = AttendanceRecords.objects.create(
+            dttm=datetime.datetime(2019, 6, 1, 9, 0, 0),
+            type='C',
+            identifier=self.useridentifier,
+            super_shop=self.superShop
         )
 
         # CameraCashbox
@@ -204,7 +280,7 @@ class LocalTestCase(TestCase):
         # CameraCashboxStat
         test_time = dttm_now
         for i in range(1, 20):
-            create_camera_cashbox_stat(self.camera_cashbox, test_time - datetime.timedelta(minutes=30*i), i)
+            create_camera_cashbox_stat(self.camera_cashbox, test_time - datetime.timedelta(minutes=30 * i), i)
             test_time -= datetime.timedelta(seconds=10)
 
         # Slots
@@ -257,7 +333,7 @@ class LocalTestCase(TestCase):
         gates = [self.exit_gate, self.entry_gate]
         for i in range(15):
             CameraClientEvent.objects.create(
-                dttm=dttm_now - datetime.timedelta(minutes=2*i),
+                dttm=dttm_now - datetime.timedelta(minutes=2 * i),
                 gate=gates[i % 2],
                 type=CameraClientEvent.DIRECTION_TYPES[i % 2][0],  # TOWARD / BACKWARD
             )
@@ -328,11 +404,11 @@ def create_user(user_id, shop_id, username, dt_hired=None, dt_fired=None, first_
 
 
 def create_worker_day(
-    worker,
-    dt,
-    dttm_work_start,
-    dttm_work_end,
-    type=WorkerDay.Type.TYPE_WORKDAY.value
+        worker,
+        dt,
+        dttm_work_start,
+        dttm_work_end,
+        type=WorkerDay.Type.TYPE_WORKDAY.value
 ):
     worker_day = WorkerDay.objects.create(
         worker=worker,
@@ -374,7 +450,7 @@ def create_work_type(shop, name, dttm_last_update_queue=None, dttm_deleted=None,
 def create_operation_type(do_forecast, dttm_deleted=None):
     for work_type in WorkType.objects.all():
         OperationType.objects.create(
-            name='operation type №{}'.format(work_type.id),
+            name='',
             work_type=work_type,
             do_forecast=do_forecast,
             dttm_deleted=dttm_deleted,

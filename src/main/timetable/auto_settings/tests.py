@@ -17,7 +17,6 @@ class TestAutoSettings(LocalTestCase):
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data']['status'], 'R')
 
-    # Не дописан. Проблемы с cashier_ids.
     def test_set_selected_cashiers(self):
         self.auth()
 
