@@ -727,14 +727,19 @@ def set_worker_day(request, form):
     except WorkerDay.MultipleObjectsReturned:
         return JsonResponse.multiple_objects_returned()
 
-    # этот блок вводит логику относительно аутсорс сотрудников. у них выходных нет, поэтому их мы просто удаляем
-    if old_wd and old_wd.worker.attachment_group == User.GROUP_OUTSOURCE:
-        try:
-            WorkerDayCashboxDetails.objects.filter(worker_day=old_wd).delete()
-        except ObjectDoesNotExist:
-            pass
-        old_wd.delete()
-        old_wd = None
+    if old_wd:
+        # Не пересохраняем, если тип не изменился
+        if old_wd.type == form['type'] and not WorkerDay.is_type_with_tm_range(form['type']):
+            return JsonResponse.success()
+
+        # этот блок вводит логику относительно аутсорс сотрудников. у них выходных нет, поэтому их мы просто удаляем
+        if old_wd.worker.attachment_group == User.GROUP_OUTSOURCE:
+            try:
+                WorkerDayCashboxDetails.objects.filter(worker_day=old_wd).delete()
+            except ObjectDoesNotExist:
+                pass
+            old_wd.delete()
+            old_wd = None
 
 
     # todo: fix temp code -- if status TYPE_EMPTY or TYPE_DELETED then delete all sequence of worker_day -- possible to recreate timetable
