@@ -137,14 +137,15 @@ def get_worker_timetable2(shop_id, form, indicators_only=False):
     absenteeism_coef = 1 + shop.absenteeism / 100
 
     from_dt = form['from_dt']
-    to_dt = form['to_dt']
+    # To include last day in "x < to_dt" conds
+    to_dt = form['to_dt'] + datetime.timedelta(days=1)
 
     dttms = [
         datetime.datetime.combine(from_dt + datetime.timedelta(days=day), datetime.time(
             hour=period * period_lengths_minutes // 60,
             minute=period * period_lengths_minutes % 60)
         )
-        for day in range((to_dt - from_dt).days + 2)
+        for day in range((to_dt - from_dt).days)
         for period in range(MINUTES_IN_DAY // period_lengths_minutes)
     ]
 
@@ -155,7 +156,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False):
 
     # check cashboxes
     work_types = WorkType.objects.filter(shop_id=shop_id).order_by('id')
-    if len(form['work_type_ids']) > 0:
+    if 'work_type_ids' in form and len(form['work_type_ids']) > 0:
         work_types = work_types.filter(id__in=form['work_type_ids'])
         if len(work_types) != len(form['work_type_ids']):
             return 'bad work_type_ids'
@@ -165,8 +166,8 @@ def get_worker_timetable2(shop_id, form, indicators_only=False):
     need_workers = PeriodClients.objects.annotate(
         need_workers=F('value') * F('operation_type__speed_coef') / period_lengths_minutes,
     ).select_related('operation_type').filter(
-        dttm_forecast__gte=form['from_dt'],
-        dttm_forecast__lte=form['to_dt'] + datetime.timedelta(days=1),
+        dttm_forecast__gte=from_dt,
+        dttm_forecast__lte=to_dt,
         operation_type__work_type_id__in=work_types.keys(),
         operation_type__dttm_deleted__isnull=True,
     )
@@ -191,12 +192,11 @@ def get_worker_timetable2(shop_id, form, indicators_only=False):
 
     # query selecting cashbox_details
     cashbox_details = WorkerDayCashboxDetails.objects.filter(
-        Q(worker_day__worker__dt_fired__gt=form['to_dt']) | Q(worker_day__worker__dt_fired__isnull=True),
-        Q(worker_day__worker__dt_hired__lt=form['from_dt']) | Q(worker_day__worker__dt_fired__isnull=True),
-        worker_day__dt__gte=from_dt,
-        worker_day__dt__lte=to_dt,
+        Q(worker_day__worker__dt_fired__gt=to_dt) | Q(worker_day__worker__dt_fired__isnull=True),
+        Q(worker_day__worker__dt_hired__lt=from_dt) | Q(worker_day__worker__dt_hired__isnull=True),
+        dttm_from__gte=from_dt,
+        dttm_to__lte=to_dt,
         work_type_id__in=work_types.keys(),
-        dttm_to__isnull=False,
     ).exclude(
         status=WorkerDayCashboxDetails.TYPE_BREAK
     ).select_related('worker_day', 'worker_day__worker')
@@ -217,7 +217,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False):
     workers = list(User.objects.filter(id__in=cashbox_details.values_list('worker_day__worker')))
     month_work_stat = count_work_month_stats(
         dt_start=from_dt,
-        dt_end=to_dt,
+        dt_end=form['to_dt'], # original date
         users=workers
     )
     fot = 0
