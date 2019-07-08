@@ -175,7 +175,7 @@ def select_cashiers(request, form):
         method: GET
         url: /api/timetable/cashier/select_cashiers
         work_types(list): required = True
-        workers_ids(list): required = True
+        worker_ids(list): required = True
         workday_type(str): required = False
         workdays(str): required = False
         shop_id(int): required = False
@@ -204,9 +204,9 @@ def select_cashiers(request, form):
 
         users = [x for x in users if x.id in users_hits]
 
-    cashier_ids = set(form.get('worker_ids', []))
-    if len(cashier_ids) > 0:
-        users = [x for x in users if x.id in cashier_ids]
+    worker_ids = set(form.get('worker_ids', []))
+    if len(worker_ids) > 0:
+        users = [x for x in users if x.id in worker_ids]
 
     worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(worker__shop_id=shop_id)
 
@@ -993,7 +993,7 @@ def set_worker_restrictions(request, form):
                 )
             except IntegrityError:
                 pass
-            
+
     del_old_wcis_ids = [wci.id for wci in curr_work_types.values()]
     WorkerCashboxInfo.objects.filter(id__in=del_old_wcis_ids).delete()
 
