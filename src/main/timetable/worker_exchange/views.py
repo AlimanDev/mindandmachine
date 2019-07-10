@@ -1,18 +1,32 @@
+from django.db.models import F
 from src.db.models import (
     WorkType,
+    Shop,
+    WorkerDay,
+    WorkerDayCashboxDetails,
     User,
-    Shop
+    Event,
+    Notifications,
+)
+from src.util.models_converter import (
+    WorkerDayConverter,
+    BaseConverter,
+    UserConverter,
+    VacancyConverter,
 )
 from .forms import (
-    GetWorkersToExchange
+    GetWorkersToExchange,
+    NotifyWorkersAboutVacancyForm,
+    ShowVacanciesForm,
+    VacancyForm,
 )
 from .utils import (
-    get_users_who_can_work_on_ct_type,
-    ChangeTypeFunctions,
-    get_init_params
+    search_candidates,
+    send_noti2candidates,
+    cancel_vacancy as cancel_vacancy_util,
 )
 from src.util.utils import api_method, JsonResponse
-from src.util.models_converter import UserConverter
+from django.utils import timezone
 
 
 @api_method(
@@ -22,63 +36,185 @@ from src.util.models_converter import UserConverter
 )
 def get_workers_to_exchange(request, form):
     """
+    Note:
+        Для работы биржы смен необходимы права ALL
+        на функции get_workers_to_exchange, get_cashier_timetable, get_month_stat
+    # todo: fix this
     Args:
         method: GET
         url: /api/timetable/worker_exchange/get_workers_to_exchange
         specialization(int): required = True. на какую специализацию ищем замену
-        dttm(QOS_DATETIME): required = True. на какую дату-время ищем замену
+        dttm_start(QOS_DATETIME): required = True. на какую дату-время ищем замену
+        dttm_end(QOS_DATETIME): required = True. на какую дату-время ищем замену
 
     Returns:
         {
-            user_id: {
-                | 'tm_start': время начала нового рабочего дня,
-                | 'tm_end': время конца нового рабочего дня,
-                | 'type': с какой функции получили этого пользователя\n
-                'user_info': {
-                    Информация о пользователе (UserConverter)
+
+            'users':[
+                user_id: {
+                    | 'info': dict with User info
+                    | 'timetable': list of dict WorkerDay models  -- расписание работы сотрудника в интервале [-10, 10] \
+                     дней от запрашиваемого для замены
                 }
-            }
-        }
+            ]
+            'tt_from_dt': дата, с которой отрисовывать расписание
+            'tt_to_dt': дата, по которую отрисовывать расписание
+
     """
-    ct_type = form['specialization']
-    dttm_exchange = form['dttm']
-    try:
-        shop_id = WorkType.objects.get(id=ct_type).shop.id
-    except Shop.DoesNotExist:
-        shop_id = request.user.shop_id
 
-    users_who_can_work_on_ct = get_users_who_can_work_on_ct_type(ct_type, dttm_exchange)
+    work_type = WorkType.objects.select_related('shop', 'shop__super_shop').get(id=form['specialization'], dttm_deleted__isnull=True)
+    worker_day = WorkerDayCashboxDetails(
+        dttm_from=form['dttm_start'],
+        dttm_to=form['dttm_end'],
+        work_type=work_type,
+    )
 
-    init_params_dict = get_init_params(dttm_exchange, shop_id)
-
-    default_function_dict = {
-        'shop_id': shop_id,
-        'dttm_exchange': dttm_exchange,
-        'ct_type': ct_type,
-        'predict_demand': init_params_dict['predict_demand'],
-        'mean_bills_per_step': init_params_dict['mean_bills_per_step'],
-        'work_types': init_params_dict['work_types_dict'],
-        'users_who_can_work': users_who_can_work_on_ct
+    search_params = {
+        'own_shop': True if form['own_shop'] else False,
+        'other_shops': True if form['other_shops'] else False,
+        'other_supershops': True if form['other_supershops'] else False,
+        'outsource': True if form['outsource'] else False,
     }
 
-    error_message = ''
+    workers = search_candidates(worker_day, **search_params)  # fixme: may return tooooo much users
+    workers = workers.annotate(
+        supershop_title=F('shop__super_shop__title'),
+        shop_title=F('shop__title')
+    )  # fixme: delete this -- specially for current front
 
-    result_dict = {}
-    for f in ChangeTypeFunctions:
-        try:
-            func_result_dict = f(default_function_dict)
-        except ValueError:
-            error_message += 'Ошибка в функции {}.'.format(f.__name__)
-            # return JsonResponse.internal_error('Ошибка в функции {}'.format(f.__name__))
-        for user_id in func_result_dict:
-            if user_id in result_dict.keys():
-                if func_result_dict[user_id]['type'] < result_dict[user_id]['type']:
-                    result_dict[user_id]['type'] = func_result_dict[user_id]['type']
-            else:
-                result_dict[user_id] = {}
-                result_dict[user_id].update(func_result_dict[user_id])
+    users = {}
+    for worker in workers:
+        worker_info = UserConverter.convert_main(worker)
+        worker_info['shop_title'] = worker.shop_title
+        worker_info['supershop_title'] = worker.supershop_title
+        users[worker.id] = {'info': worker_info, 'timetable': []}
 
-    for k in result_dict.keys():
-        result_dict[k].update({'user_info': UserConverter.convert(User.objects.get(id=k))})
+    change_dt = form['dttm_start'].date()
+    worker_days = list(WorkerDay.objects.qos_current_version().filter(
+        worker_id__in=users.keys(),
+        dt__gte=change_dt - timezone.timedelta(days=10),
+        dt__lte=change_dt + timezone.timedelta(days=10),
+    ).order_by('worker_id', 'dt')) # fixme: ordering just for frontend
 
-    return JsonResponse.success(result_dict, additional_info=error_message)
+    for wd in worker_days:
+        users[wd.worker_id]['timetable'].append(WorkerDayConverter.convert(wd))
+
+    res_dict = {
+        'users': users,
+        'tt_from_dt': BaseConverter.convert_date(change_dt - timezone.timedelta(days=10)),
+        'tt_to_dt': BaseConverter.convert_date(change_dt + timezone.timedelta(days=10)),
+    }
+    return JsonResponse.success(res_dict)
+
+
+@api_method(
+    'POST',
+    NotifyWorkersAboutVacancyForm,
+    lambda_func=lambda x: WorkType.objects.get(id=x['work_type']).shop
+)
+def notify_workers_about_vacancy(request, form):
+    """
+    Рассылаем уведомление сотрудникам о вакансии и создаем вакансию
+    method: POST
+    url: /api/timetable/worker_exchange/notify_workers_about_vacancy
+    Args:
+        work_type(int): required = True. на какую специализацию ищем замену
+        dttm_start(QOS_DATETIME): required = True. на какую дату-время ищем замену
+        dttm_end(QOS_DATETIME): required = True. на какую дату-время ищем замену
+
+        worker_ids: список сотрудников, кому отправляем уведомление
+    Returns:
+        {}
+    """
+    work_type = WorkType.objects.get(id=form['work_type'],dttm_deleted__isnull=True)
+    worker_day_detail = WorkerDayCashboxDetails.objects.create(
+        dttm_from=form['dttm_start'],
+        dttm_to=form['dttm_end'],
+        work_type=work_type,
+        status=WorkerDayCashboxDetails.TYPE_VACANCY,
+        is_vacancy=True,
+    )
+    worker_day_detail.work_type = work_type
+
+    # for checking permissions
+    search_params = {
+        'own_shop': True,
+        'other_shops': True,
+        'other_supershops': True,
+        'outsource': True,
+    }
+    workers = search_candidates(worker_day_detail, **search_params)
+    users = workers.filter(id__in=form['worker_ids'])
+
+    send_noti2candidates(users, worker_day_detail)
+    return JsonResponse.success()
+
+
+@api_method(
+    'GET',
+    ShowVacanciesForm,
+    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+)
+def show_vacancy(request, form):
+    """
+    Отображает список вакансии по определенному департаменту
+    method: GET
+    url: /api/timetable/worker_exchange/show_vacancy
+    Args:
+        shop_id(int): required = True. по какому департаменту смотрим
+        pointer(int): required = False. смещение(какую страницу) смотрим
+        count(int): required = False. сколько максимум отображать объектов на странице
+
+        worker_ids: список сотрудников, кому отправляем уведомление
+    Returns:
+        {
+            'vacancies': список вакансий Vacancy [
+               | 'id': int,
+               | 'dttm_added': datetime,
+               | 'dt': date,
+               | 'dttm_from': datetime,
+               | 'dttm_to': datetime,
+               | 'worker_fio': str -- фио сотрудника,
+               | 'is_canceled': bool,
+               | 'work_type': идентификатор работ,
+            ],
+        }
+    """
+
+    pointer = form['pointer'] if form['pointer'] else 0
+    count = form['count'] if form['count'] else 30
+
+    vacancies = WorkerDayCashboxDetails.objects.filter(
+        work_type__shop=form['shop_id'],
+        is_vacancy=True,
+    ).select_related('worker_day', 'worker_day__worker').order_by('-id')[pointer * count: (pointer + 1) * count]
+
+    res_dict = {
+        'vacancies': [VacancyConverter.convert(vac) for vac in vacancies],
+    }
+    return JsonResponse.success(res_dict)
+
+
+@api_method(
+    'POST',
+    VacancyForm,
+    lambda_func=lambda x: Shop.objects.get(worktype__workerdaycashboxdetails__id=x['vacancy_id'])
+)
+def cancel_vacancy(request, form):
+    """
+    удаляет размещенную вакансию
+
+    method: POST
+    url: /api/timetable/worker_exchange/cancel_vacancy
+    Args:
+        vacancy_id(int): required = True. идентификатор вакансии
+    Returns:
+        {}
+
+    """
+    cancel_vacancy_util(form['vacancy_id'])
+    return JsonResponse.success()
+
+
+
+

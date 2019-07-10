@@ -37,7 +37,14 @@ class Enum(enum.Enum):
 
 
 def check_func_groups():
-    always_allowed_funcs = ['wrapper', 'is_signed', 'update_csrf', 'signin', 'get_user_allowed_funcs']
+    always_allowed_funcs = [
+        'wrapper',
+        'is_signed',
+        'update_csrf',
+        'signin',
+        'get_user_allowed_funcs',
+        'rotate_fcm_token',
+    ]
 
     def get_all_view_names(all_url_patterns=None, all_views=[]):
         if all_url_patterns is None:  # на 0ом уровне рекурсии
@@ -66,5 +73,5 @@ def check_func_groups():
             # else:
             #     error_group_message += '{}, '.format(view)
     if missing_views:
-        raise ValueError('The following views are not mentioned in FUNCS list: ' + ', '.join(missing_views)[:-2])
+        raise ValueError('The following views are not mentioned in FUNCS list: ' + ', '.join(missing_views))
 

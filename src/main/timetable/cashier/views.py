@@ -252,7 +252,6 @@ def select_cashiers(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
-
 @api_method(
     'GET',
     GetCashierTimetableForm,
@@ -829,6 +828,7 @@ def get_worker_day_logs(request, form):
             'dttm_work_start': __work_dttm(obj.dttm_work_start),
             'dttm_work_end': __work_dttm(obj.dttm_work_end),
             'created_by': obj.created_by_id,
+            'created_by_fio': obj.created_by.get_fio(),
             'prev_type': WorkerDayConverter.convert_type(obj.parent_worker_day.type),
             'prev_dttm_work_start': __work_dttm(obj.parent_worker_day.dttm_work_start),
             'prev_dttm_work_end': __work_dttm(obj.parent_worker_day.dttm_work_end),
@@ -853,7 +853,7 @@ def get_worker_day_logs(request, form):
         attachment_group=User.GROUP_STAFF
     )
 
-    child_worker_days = WorkerDay.objects.select_related('worker', 'parent_worker_day').filter(
+    child_worker_days = WorkerDay.objects.select_related('worker', 'parent_worker_day', 'created_by').filter(
         worker__in=active_users,
         parent_worker_day_id__isnull=False,
         dt__gte=form['from_dt'],
@@ -975,6 +975,7 @@ def set_worker_restrictions(request, form):
     Returns:
         {}
     """
+
     try:
         worker = User.objects.get(id=form['worker_id'])
     except User.DoesNotExist:
@@ -1389,7 +1390,7 @@ def request_worker_day(request, form):
     worker_id = form['worker_id']
 
     existing_requests = WorkerDayChangeRequest.objects.filter(dt=dt, worker_id=worker_id)
-    Notifications.objects.filter(object_id__in=existing_requests.values_list('id')).delete()
+    # Notifications.objects.filter(object_id__in=existing_requests.values_list('id')).delete()
     existing_requests.delete()
 
     if tm_work_end and tm_work_start:
@@ -1461,24 +1462,24 @@ def handle_worker_day_request(request, form):
             parent_worker_day=old_wd
         )
 
-        Notifications.objects.create(
-            to_worker_id=change_request.worker_id,
-            type=Notifications.TYPE_INFO,
-            text=new_notification_text+'одобрен.'
-        )
+        # Notifications.objects.create(
+        #     to_worker_id=change_request.worker_id,
+        #     type=Notifications.TYPE_INFO,
+        #     text=new_notification_text+'одобрен.'
+        # )
         change_request.status_type = WorkerDayChangeRequest.TYPE_APPROVED
 
     elif action == 'D':
-        Notifications.objects.create(
-            to_worker_id=change_request.worker_id,
-            type=Notifications.TYPE_INFO,
-            text=new_notification_text + 'отклонен.'
-        )
+        # Notifications.objects.create(
+        #     to_worker_id=change_request.worker_id,
+        #     type=Notifications.TYPE_INFO,
+        #     text=new_notification_text + 'отклонен.'
+        # )
         change_request.status_type = WorkerDayChangeRequest.TYPE_DECLINED
     else:
         return JsonResponse.internal_error('Неизвестное дейсвтие')
 
     change_request.save()
-    Notifications.objects.filter(object_id=change_request.id).delete()
+    # Notifications.objects.filter(object_id=change_request.id).delete()
 
     return JsonResponse.success()

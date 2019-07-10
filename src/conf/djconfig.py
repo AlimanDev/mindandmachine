@@ -41,9 +41,20 @@ INSTALLED_APPS = [
     'src.db',
     'src.main',
     'django_celery_beat',
-    'django_celery_results',
     'src.celery',
+    'fcm_django',
 ]
+
+FCM_DJANGO_SETTINGS = {
+    "FCM_SERVER_KEY": "AAAAoJJLEXM:APA91bHcdiVZxmJE26xjLgYHmmVF03BgEt5r05uJN0kITq_buvZKI26jxGQP-qNAA2FjJdYNI21n_ECtBiisVlIZnCxaF8csG3AW5AXB1BoQiBsn4PlXLFOr1XcxA0cMD3pbwCifWGb0",
+     # true if you want to have only one active device per registered user at a time
+     # default: False
+    "ONE_DEVICE_PER_USER": False,
+     # devices to which notifications cannot be sent,
+     # are deleted upon receiving error response from FCM
+     # default: False
+    "DELETE_INACTIVE_DEVICES": False,
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -163,6 +174,10 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': True,
         },
+        # 'django.db.backends': {
+        #     'level': 'DEBUG',
+        #     'handlers': ['console'],
+        # }
     },
 }
 
@@ -190,6 +205,8 @@ STATIC_URL = '/static/'
 MEDIA_URL = '/_i/media/'
 
 
+SESSION_COOKIE_SECURE = True
+
 QOS_DATETIME_FORMAT = '%H:%M:%S %d.%m.%Y'
 QOS_DATE_FORMAT = '%d.%m.%Y'
 QOS_TIME_FORMAT = '%H:%M:%S'
@@ -197,6 +214,7 @@ QOS_SHORT_TIME_FORMAT = '%H:%M'
 
 ALLOWED_UPLOAD_EXTENSIONS = ['xlsx', 'xls']
 
+MOBILE_USER_AGENTS = ('QoS_mobile_app', 'okhttp',)
 
 CELERY_IMPORTS = ('src.celery.tasks',)
 CELERY_BROKER_URL = 'redis://localhost:6379'

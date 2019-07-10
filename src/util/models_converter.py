@@ -41,8 +41,24 @@ class BaseConverter(object):
 
 class UserConverter(BaseConverter):
     @classmethod
+    def convert_main(cls, obj):
+        return {
+            'id': obj.id,
+            'username': obj.username,
+            'shop_id': obj.shop_id,
+            'first_name': obj.first_name,
+            'last_name': obj.last_name,
+            'middle_name': obj.middle_name,
+            'avatar_url': obj.avatar.url if obj.avatar else None,
+            'sex': obj.sex,
+            'phone_number': obj.phone_number,
+            'email': obj.email,
+            'tabel_code': obj.tabel_code,
+        }
+
+    @classmethod
     def convert(cls, obj):
-        user_identifier = UserIdentifier.objects.filter(worker_id=obj.id).first()
+        # user_identifier = UserIdentifier.objects.filter(worker_id=obj.id).first()
         return {
             'id': obj.id,
             'username': obj.username,
@@ -63,7 +79,7 @@ class UserConverter(BaseConverter):
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
             'attachment_group': obj.attachment_group,
-            'identifier': user_identifier.identifier if user_identifier else None,
+            'identifier': obj.identifier if hasattr(obj, 'identifier') else None,
         }
 
 
@@ -328,13 +344,16 @@ class NotificationConverter(BaseConverter):
     def convert(cls, obj):
         return {
             'id': obj.id,
-            'type': obj.type,
-            'text': obj.text,
-            'was_read': obj.was_read,
-            'to_worker': obj.to_worker_id,
             'dttm_added': BaseConverter.convert_datetime(obj.dttm_added),
-            'object_id': obj.object_id,
-            'content_type': obj.content_type.__str__()
+            'to_worker': obj.to_worker_id,
+            'was_read': obj.was_read,
+
+            # 'type': obj.event.text,
+            'text': obj.event.get_text() if obj.event_id else '',
+            'is_question': obj.event.is_question() if obj.event_id else '',
+            'is_action_active': obj.event.is_action_active() if obj.event_id else False,
+            # 'object_id': obj.object_id,
+            # 'content_type': obj._meta.object_name,
         }
 
 
@@ -394,4 +413,19 @@ class ProductionDayConverter(BaseConverter):
             'dt': cls.convert_date(obj.dt),
             'type': obj.type,
             'is_celebration': obj.is_celebration,
+        }
+
+
+class VacancyConverter(BaseConverter):
+    @classmethod
+    def convert(self, obj):
+        return {
+            'id': obj.id,
+            'dttm_added': self.convert_datetime(obj.dttm_added),
+            'dt': self.convert_date(obj.dttm_from.date()),
+            'dttm_from': self.convert_time(obj.dttm_from.time()),
+            'dttm_to': self.convert_time(obj.dttm_to.time()),
+            'worker_fio': obj.worker_day.worker.get_fio() if obj.worker_day_id else '',
+            'is_canceled': True if obj.dttm_deleted else False,
+            'work_type': obj.work_type_id,
         }

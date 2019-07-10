@@ -7,7 +7,7 @@ from src.db.models import (
     WorkType,
     PeriodDemandChangeLog,
     Shop,
-    Notifications,
+    Event,
     User,
     FunctionGroup,
     OperationType,
@@ -456,15 +456,25 @@ def set_pred_bills(request, data):
 
     save_models(models_list, None)
 
+    notify4users = User.objects.filter(
+        function_group__allowed_functions__func='set_demand',
+        function_group__allowed_functions__access_type__in=[FunctionGroup.TYPE_SHOP, FunctionGroup.TYPE_SUPERSHOP],
+        shop=shop,
+    )
+    Event.objects.mm_event_create(
+        notify4users,
+        text='Cоставлен новый спрос на период с {} по {}'.format(data['dt_from'], data['dt_to']),
+        department=shop,
+    )
     # уведомляшки всем
-    for u in User.objects.filter(
-            shop=shop,
-            function_group__allowed_functions__access_type__in=FunctionGroup.__INSIDE_SHOP_TYPES__
-    ):
-        Notifications.objects.create(
-            type=Notifications.TYPE_SUCCESS,
-            to_worker=u,
-            text='Был составлен новый спрос на период с {} по {}'.format(data['dt_from'], data['dt_to'])
-        )
+    # for u in User.objects.filter(
+    #         shop=shop,
+    #         function_group__allowed_functions__access_type__in=FunctionGroup.__INSIDE_SHOP_TYPES__
+    # ):
+    #     Notifications.objects.create(
+    #         type=Notifications.TYPE_SUCCESS,
+    #         to_worker=u,
+    #         text='Был составлен новый спрос на период с {} по {}'.format(data['dt_from'], data['dt_to'])
+    #     )
 
     return JsonResponse.success()

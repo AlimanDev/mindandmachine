@@ -106,6 +106,8 @@ https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html#exam
 ## Не работает для круглосуточных магазинов
 
 1. celery task release_all_workers -- наверно стоит сделать через 16 часов после начала работы отпускать (больше не смогут работать)
-2. алгоритм воообще не знает как по ночам делать -- надо менять структуру
-3. надо бы поменять time на datetime (или combine?)
+
+Проблемы:
+
+1. Для работы биржы смен необходимы права ALL на функции get_workers_to_exchange, get_cashier_timetable, get_month_stat
 

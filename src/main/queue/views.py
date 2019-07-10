@@ -344,14 +344,14 @@ def set_predict_queue(request, data):
     save_models(models_list, None)
 
     # уведомляшки всем
-    for u in User.objects.filter(
-            shop=shop,
-            function_group__allowed_functions__access_type__in=FunctionGroup.__INSIDE_SHOP_TYPES__
-    ):
-        Notifications.objects.create(
-            type=Notifications.TYPE_SUCCESS,
-            to_worker=u,
-            text='Был составлен новый прогноз очереди на период с {} по {}'.format(data['dt_from'], data['dt_to'])
-        )
+    # for u in User.objects.filter(
+    #         shop=shop,
+    #         function_group__allowed_functions__access_type__in=FunctionGroup.__INSIDE_SHOP_TYPES__
+    # ):
+    #     Notifications.objects.create(
+    #         type=Notifications.TYPE_SUCCESS,
+    #         to_worker=u,
+    #         text='Был составлен новый прогноз очереди на период с {} по {}'.format(data['dt_from'], data['dt_to'])
+    #     )
 
     return JsonResponse.success()

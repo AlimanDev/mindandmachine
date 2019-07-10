@@ -275,15 +275,15 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
 
     @staticmethod
     def worker_last_name(instance: WorkerDayCashboxDetails):
-        return instance.worker_day.worker.last_name
+        return instance.worker_day.worker.last_name if instance.worker_day else ''
 
     @staticmethod
     def shop_title(instance: WorkerDayCashboxDetails):
-        return instance.worker_day.worker.shop.title
+        return instance.worker_day.worker.shop.title if instance.worker_day else ''
 
     @staticmethod
     def worker_day_dt(instance: WorkerDayCashboxDetails):
-        return instance.worker_day.dt
+        return instance.worker_day.dt if instance.worker_day else instance.dttm_from.date()
 
     @staticmethod
     def on_work_type(instance: WorkerDayCashboxDetails):

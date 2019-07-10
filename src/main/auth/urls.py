@@ -6,5 +6,6 @@ urlpatterns = [
     path('update_csrf', views.update_csrf),
     path('signin', views.signin),
     path('signout', views.signout),
-    path('is_signed', views.is_signed)
+    path('is_signed', views.is_signed),
+    path('rotate_fcm_token', views.rotate_fcm_token),
 ]

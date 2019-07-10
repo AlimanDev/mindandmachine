@@ -41,6 +41,8 @@ class SelectCashiersForm(forms.Form):
     from_tm = util_forms.TimeField(required=False)
     to_tm = util_forms.TimeField(required=False)
 
+    include_shop_title = util_forms.BooleanField(required=False)
+
     def clean_workday_type(self):
         value = self.cleaned_data['workday_type']
         if value is None or value == '':
@@ -241,7 +243,8 @@ class SetWorkerRestrictionsForm(forms.Form):
                 return None
             value = json.loads(value)
             for constr in value:
-                if constr['weekday'] > 6 or constr['weekday'] < 0:
+                weekday = constr['weekday'] if type(constr) is dict else constr
+                if weekday > 6 or weekday < 0:
                     raise ValidationError('Invalid weekday')
         except:
             raise ValidationError('Invalid constrains data')

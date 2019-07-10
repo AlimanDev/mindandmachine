@@ -4,7 +4,8 @@ from django.middleware.csrf import rotate_token
 from src.db.models import User
 from src.util.models_converter import UserConverter
 from src.util.utils import JsonResponse, api_method
-from .forms import SigninForm
+from .forms import SigninForm, FCMTokenForm
+from fcm_django.models import FCMDevice
 
 
 @api_method('GET', auth_required=False, check_permissions=False)
@@ -80,3 +81,15 @@ def is_signed(request):
         data['user'] = UserConverter.convert(user)
 
     return JsonResponse.success(data)
+
+
+@api_method('POST', FCMTokenForm, check_permissions=False)
+def rotate_fcm_token(request, form):
+    user_id = request.user.id
+    FCMDevice.objects.filter(user_id=user_id).delete()
+    FCMDevice.objects.create(
+        user_id=user_id,
+        registration_id=form['fcm_token'],
+        type=form['platform']
+    )
+    return JsonResponse.success()

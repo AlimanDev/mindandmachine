@@ -330,7 +330,11 @@ def get_table(request, form):
     return response
 
 
-@api_method('GET', GetWorkerStatForm)
+@api_method(
+    'GET',
+    GetWorkerStatForm,
+    lambda_func=lambda x: User.objects.filter(id__in=x['worker_ids']).values_list('id', flat=True)
+)
 def get_month_stat(request, form):
     """
     Считает статистику за месяц dt
