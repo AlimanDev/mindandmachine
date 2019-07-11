@@ -1090,13 +1090,15 @@ def create_cashier(request, form):
             | 'tabel_code':
         }
     """
+    username = str(time.time() * 1000000)[:-2]
     try:
-        user = User.objects.create_user(username=form['username'], password=form['password'], email='q@q.com')
+        user = User.objects.create_user(username=username, password=form['password'], email='q@q.com')
         user.first_name = form['first_name']
         user.middle_name = form['middle_name']
         user.last_name = form['last_name']
         user.shop_id = form['shop_id']
         user.dt_hired = form['dt_hired']
+        user.username = 'u' + str(user.id)
         user.save()
     except:
         return JsonResponse.already_exists_error()

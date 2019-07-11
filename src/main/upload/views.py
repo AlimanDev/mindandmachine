@@ -3,6 +3,7 @@ import datetime
 from openpyxl import load_workbook
 import pandas as pd
 import re
+import time
 from openpyxl.utils import column_index_from_string
 from dateutil.relativedelta import relativedelta
 from src.util.utils import api_method, JsonResponse
@@ -192,17 +193,21 @@ def upload_timetable(request, form, timetable_file):
             if column_index == fio_column:
                 first_last_names = cell.value.split(' ')
                 last_name_concated = ' '.join(first_last_names[:-2])
+                username = str(time.time() * 1000000)[:-2]
                 # try:
-                u, _ = User.objects.get_or_create(
+                u, create = User.objects.get_or_create(
                     shop_id=shop_id,
                     last_name=last_name_concated,
                     first_name=first_last_names[0],
                     defaults={
-                        'username': 'user-' + str(User.objects.count()),
+                        'username': username,
                     }
                 )
                 # except User.DoesNotExist:
                 #     return JsonResponse.value_error('Не могу найти пользователя на строке {}'.format(cell.row))
+            if create:
+                u.username = 'u' + str(u.id)
+                u.save()
             elif column_index == work_type_column:
                 user_work_type = shop_work_types.get(cell.value, None)
                 if user_work_type:
