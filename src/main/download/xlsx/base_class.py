@@ -42,6 +42,7 @@ class Xlsx_base:
             'font_size': 10,
             'font_name': 'Arial',
             'align': 'center',
+            'valign': 'vcenter',
             'bold': True,
         }
 
@@ -79,6 +80,7 @@ class Xlsx_base:
             'font_name': 'Arial',
             'bold': True,
             'align': 'center',
+            'valign': 'vcenter',
             'font_color': COLOR_BLACK,
             'border': 1,
             'bg_color': '',

@@ -6,7 +6,7 @@ from random import randint
 import numpy as np
 from datetime import time, datetime
 from dateutil.relativedelta import relativedelta
-from ..models import (
+from src.db.models import (
     SuperShop,
     Shop,
     User,
@@ -24,6 +24,7 @@ from ..models import (
     Group,
     FunctionGroup,
     Timetable,
+    Notifications,
 )
 from src.util.models_converter import (
     WorkerDayConverter,
@@ -78,7 +79,7 @@ def create_work_types(work_types, shop):
     return wt_dict
 
 
-def create_forecast(demand: list, work_types_dict: dict, start_dt:timezone.datetime.date, days: int):
+def create_forecast(demand: list, work_types_dict: dict, start_dt: timezone.datetime.date, days: int):
     clients_models = []
     queues_models = []
 
@@ -234,9 +235,15 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         while day < days:
             wd = wds.iloc[day_ind]
             dt = wd['dt'] + dt_diff
-            default_dttm = timezone.datetime.combine(dt, time(15, 30))
-            dttm_work_start = default_dttm if wd['dttm_work_start'] in [pd.NaT, np.NaN] else timezone.datetime.combine(dt, wd['dttm_work_start'])
-            dttm_work_end = default_dttm if wd['dttm_work_end'] in [pd.NaT, np.NaN] else timezone.datetime.combine(dt, wd['dttm_work_end'])
+            if WorkerDayConverter.parse_type(wd['type']) == WorkerDay.Type.TYPE_HOLIDAY.value:
+                default_dttm = None
+            else:
+                default_dttm = timezone.datetime.combine(dt, time(15, 30))
+            dttm_work_start = default_dttm if wd['dttm_work_start'] in [pd.NaT, np.NaN] else timezone.datetime.combine(
+                dt, wd['dttm_work_start'])
+            dttm_work_end = default_dttm if wd['dttm_work_end'] in [pd.NaT, np.NaN] else timezone.datetime.combine(dt,
+                                                                                                                   wd[
+                                                                                                                       'dttm_work_end'])
             if dttm_work_start and dttm_work_end and (dttm_work_end < dttm_work_start):
                 dttm_work_end += timezone.timedelta(days=1)
 
@@ -249,6 +256,15 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     dttm_work_start=dttm_work_start,
                     dttm_work_end=dttm_work_end,
                 )
+                if np.random.randint(3) == 1:
+                    wd_model.parent_worker_day = WorkerDay.objects.create(
+                        worker=worker,
+                        dt=dt,
+                        type=WorkerDay.Type.TYPE_HOLIDAY.value,
+
+                        dttm_work_start=None,
+                        dttm_work_end=None,
+                    )
                 add_models(details, WorkerDayCashboxDetails, WorkerDayCashboxDetails(
                     worker_day=wd_model,
                     work_type=work_types_dict[wd['work_type']],
@@ -269,7 +285,6 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     identifier=worker_ident,
                     super_shop_id=shop.super_shop_id,
                 ))
-
 
             else:
                 add_models(models, WorkerDay, WorkerDay(
@@ -332,6 +347,31 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
     WorkerCashboxInfo.objects.all().update(mean_speed=F('mean_speed'))
 
 
+def create_notifications():
+    list_notifications = []
+    for user in User.objects.all():
+        list_notifications.append(Notifications(
+            to_worker=user,
+            text='Test notifications #success',
+            type='success',
+        ))
+        list_notifications.append(Notifications(
+            to_worker=user,
+            text='Test notifications #info',
+            type='info',
+        ))
+        list_notifications.append(Notifications(
+            to_worker=user,
+            text='Test notifications #warning',
+            type='warning',
+        ))
+        list_notifications.append(Notifications(
+            to_worker=user,
+            text='Test notifications #error',
+            type='error',
+        ))
+    Notifications.objects.bulk_create(list_notifications)
+
 
 def main(date=None, shops=None):
     f = open('src/db/works/test_data.json')
@@ -363,6 +403,7 @@ def main(date=None, shops=None):
 
     dttm_curr = datetime.now().replace(day=1)
     dttm_prev = dttm_curr - relativedelta(months=1)
+    create_notifications()
     for shop_ind in range(4, 2000):
         supershop, shop = create_shop(shop_ind)
         shop_id = shop.id

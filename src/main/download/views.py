@@ -82,7 +82,7 @@ def get_tabel(request, workbook, form):
     # construct weekday
     tabel.construct_dates('%w', 14, 6)
 
-    #construct day 2
+    # construct day 2
     tabel.construct_dates('d%d', 15, 6)
 
     tabel.construnts_users_info(users, 16, 0, ['code', 'fio', 'position', 'hired'])
@@ -181,11 +181,11 @@ def get_demand_xlsx(request, workbook, form):
 
                 if index != expected_record_amount - 1:
                     next_demand = period_demands[demand_index]
-                    if next_demand.type == PeriodClients.LONG_FORECASE_TYPE and\
-                        next_demand.dttm_forecast == demand.dttm_forecast and\
+                    if next_demand.type == PeriodClients.LONG_FORECASE_TYPE and \
+                            next_demand.dttm_forecast == demand.dttm_forecast and \
                             next_demand.operation_type.work_type.name == demand.work_type.name:
-                                worksheet.write(index + 1, 2, round(next_demand.value, 1))
-                                demand_index += 1
+                        worksheet.write(index + 1, 2, round(next_demand.value, 1))
+                        demand_index += 1
             else:
                 worksheet.write(index + 1, 2, round(demand.value, 1))
                 worksheet.write(index + 1, 3, 'Нет данных')

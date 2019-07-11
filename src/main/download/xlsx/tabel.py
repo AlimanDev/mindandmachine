@@ -275,7 +275,7 @@ class Tabel_xlsx(Xlsx_base):
 
         # add right info
 
-    def __time2hours(self, tm_start, tm_end, breaks=None):
+    def _time2hours(self, tm_start, tm_end, breaks=None):
         diff_h = (tm_end.hour - tm_start.hour) + (tm_end.minute - tm_start.minute) / 60
         if diff_h < 0:
             diff_h += 24
@@ -289,18 +289,18 @@ class Tabel_xlsx(Xlsx_base):
             diff_h -= breaks[i][2]
         return diff_h
 
-    def __count_time(self, tm_start, tm_end, hours=None, breaks=None, night_edges=None):
+    def _count_time(self, tm_start, tm_end, hours=None, breaks=None, night_edges=None):
         if (night_edges is None) and (hours is not None):
             night_edges = (
                 datetime.time(22, 0),
                 datetime.time(6, 0),
             )
 
-        total = str(int(self.__time2hours(tm_start, tm_end, breaks) + 0.75))
+        total = str(int(self._time2hours(tm_start, tm_end, breaks) + 0.75))
         night_hs = 'all'
         if night_edges[0] > tm_start:
-            # day_hs = self.__time2hours(tm_start, night_edges[0])
-            night_hs = int(self.__time2hours(night_edges[0], tm_end) if (night_edges[0] < tm_end) or (
+            # day_hs = self._time2hours(tm_start, night_edges[0])
+            night_hs = int(self._time2hours(night_edges[0], tm_end) if (night_edges[0] < tm_end) or (
                         night_edges[1] >= tm_end) else 0)
             # print(night_hs, night_edges[0] < tm_end, night_edges[1] >= tm_end)
         return total, night_hs
@@ -323,7 +323,7 @@ class Tabel_xlsx(Xlsx_base):
                 if (it < n_workdays) and (workdays[it].worker_id == user.id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
                     if wd.type == WorkerDay.Type.TYPE_WORKDAY.value:
-                        total_h, night_h = self.__count_time(wd.dttm_work_start.time(), wd.dttm_work_end.time(), (0, 0), triplets)
+                        total_h, night_h = self._count_time(wd.dttm_work_start.time(), wd.dttm_work_end.time(), (0, 0), triplets)
                         if night_h == 'all':  # night_work
                             wd.type = 'night_work'
                         if (type(night_h) != str) and (night_h > 0):
@@ -332,7 +332,7 @@ class Tabel_xlsx(Xlsx_base):
                             text = str(total_h)
 
                     elif wd.type == WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
-                        total_h = ceil(self.__time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), triplets))
+                        total_h = ceil(self._time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), triplets))
                         text = 'В{}'.format(total_h)
 
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
@@ -362,7 +362,7 @@ class Tabel_xlsx(Xlsx_base):
                     self.workbook.add_format(cell_format)
                 )
 
-    def __write_formula(self, row, n_rows, col, formula, cell_format):
+    def _write_formula(self, row, n_rows, col, formula, cell_format):
         for r_ind in range(row, row + n_rows):
             self.worksheet.write_formula(
                 r_ind, col,
@@ -370,7 +370,7 @@ class Tabel_xlsx(Xlsx_base):
                 cell_format
             )
 
-    def __write_names_in_row(self, row, col, names, cell_format):
+    def _write_names_in_row(self, row, col, names, cell_format):
         for col_offset in range(len(names)):
             self.worksheet.write_string(row, col + col_offset, names[col_offset], cell_format)
 
@@ -385,14 +385,14 @@ class Tabel_xlsx(Xlsx_base):
         self.worksheet.write_string(row + 2, col, '', cell_f)
         self.worksheet.write_string(row + 3, col, 'pl_days', cell_f)
 
-        self.__write_formula(row + 4, n_users, col, 'D8-AR{0}', cell_f)
+        self._write_formula(row + 4, n_users, col, 'D8-AR{0}', cell_f)
 
         # other
         cell_format['bg_color'] = COLOR_WHITE
         cell_format['font_size'] = 10
         cell_f = self.workbook.add_format(cell_format)
 
-        self.__write_names_in_row(row, col + 1, [
+        self._write_names_in_row(row, col + 1, [
             'часы', 'дни', 'Выхо', 'дни', 'праз',
             'к-во выход. и празд. дней', 'ОТ', 'Б',
             'Н', 'п', 'Кален дни', '9', '10',
@@ -401,7 +401,7 @@ class Tabel_xlsx(Xlsx_base):
             'к-во дней  часов неявок', 'ночные'
         ], cell_f)
 
-        self.__write_names_in_row(row + 3, col + 1, [
+        self._write_names_in_row(row + 3, col + 1, [
             'f_hours', 'f_days', 'fh_days', 'pl_days2', 'f_pr_days',
             'vihodn', 'otpusk', 'boln',
             'nejavka', 'prazd', 'k_days', 's9', 's10',
@@ -412,7 +412,7 @@ class Tabel_xlsx(Xlsx_base):
         ], cell_f)
 
         # неполная функция -- есть варианты которые не учитываются
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 1,
             '=COUNTIF(G{0}:AK{0}, "В1")*1 + COUNTIF(G{0}:AK{0},"В2")*2+COUNTIF(G{0}:AK{0},"В3")*3+COUNTIF(G{0}:AK{0},"В4")*4+'
             'COUNTIF(G{0}:AK{0},"В5")*5+COUNTIF(G{0}:AK{0},"В6")*6+COUNTIF(G{0}:AK{0},"В7")*7+COUNTIF(G{0}:AK{0},"В8")*8+'
@@ -423,7 +423,7 @@ class Tabel_xlsx(Xlsx_base):
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 2,
             'SUM(COUNTIF(G{0}:AK{0},"В1"),COUNTIF(G{0}:AK{0},"В2"),COUNTIF(G{0}:AK{0},"В3"),COUNTIF(G{0}:AK{0},"В4"),'
             'COUNTIF(G{0}:AK{0},"В5"),COUNTIF(G{0}:AK{0},"В6"),COUNTIF(G{0}:AK{0},"В7"),COUNTIF(G{0}:AK{0},"В8"),'
@@ -433,7 +433,7 @@ class Tabel_xlsx(Xlsx_base):
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 3,
             '(COUNTIF(G{0}:AK{0},"В1")*1+COUNTIF(G{0}:AK{0},"В2")*2+COUNTIF(G{0}:AK{0},"В3")*3+'
             'COUNTIF(G{0}:AK{0},"В4")*4+COUNTIF(G{0}:AK{0},"В5")*5+COUNTIF(G{0}:AK{0},"В6")*6+'
@@ -442,13 +442,13 @@ class Tabel_xlsx(Xlsx_base):
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 4,
             '(AN{0}-AO{0})/8',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 6,
             '(COUNTIF(G{0}:AK{0},"В")+COUNTIF(G{0}:AK{0},"В1")+COUNTIF(G{0}:AK{0},"В2")+COUNTIF(G{0}:AK{0},"В3")+'
             'COUNTIF(G{0}:AK{0},"В4")+COUNTIF(G{0}:AK{0},"В5")+COUNTIF(G{0}:AK{0},"В6")+COUNTIF(G{0}:AK{0},"В7")+'
@@ -457,121 +457,121 @@ class Tabel_xlsx(Xlsx_base):
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 7,
             'COUNTIF(G{0}:AK{0},"ОТ")',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 8,
             'COUNTIF(G{0}:AK{0},"Б")',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 9,
             'COUNTIF(G{0}:AK{0},"Н")',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 10,
             'COUNTIF(G{0}:AK{0},"П")',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 11,
             'SUM(AO{0}:AV{0})-AQ{0}',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 12,
             'COUNTIF(G{0}:AK{0},9)',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 13,
             'COUNTIF(G{0}:AK{0},10)',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 14,
             'AX{0}+AY{0}*2',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 15,
             'COUNTIF(G{0}:AK{0},11)',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 16,
             'COUNTIF(G{0}:AK{0},12)',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 17,
             'BA{0}+BB{0}*2',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 18,
             'BA{0}*2+BB{0}*2',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 19,
             'AZ{0}+BD{0}+BG{0}',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 20,
             '(AO{0}+AQ{0})*8',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 22,
             'COUNTIF(G{0}:AK{0},"7")',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 23,
             'BH{0}*7',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 25,
             'COUNTIF(G{0}:AK{0},"7")',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 28,
             'COUNTIF(G{0}:AK{0},"ОД")',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 29,
             'COUNTIF(G{0}:AK{0},"ДО")',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 30,
             'COUNTIF(G{0}:AK{0},"У")',
             cell_f
@@ -590,13 +590,13 @@ class Tabel_xlsx(Xlsx_base):
         self.worksheet.write_string('BW16', 'Текущий месяц', cell_f)
         self.worksheet.write_string('BX16', 'Закрытый месяц', cell_f)
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 37,
             'AM{0}-D11',
             cell_f
         )
 
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 38,
             '0',
             cell_f
@@ -607,7 +607,7 @@ class Tabel_xlsx(Xlsx_base):
         cell_f.set_align('vjustify')
 
         self.worksheet.write_string('BY16', 'Закрытый месяц', cell_f)
-        self.__write_formula(
+        self._write_formula(
             row + 4, n_users, col + 39,
             'BW{0}+BX{0}',
             cell_f

@@ -180,7 +180,8 @@ def api_method(
                 if request.method == 'GET':
                     form_params = request.GET
                 elif request.method == 'POST':
-                    if "Expo" in request.META.get('HTTP_USER_AGENT', []) or "okhttp/3.6.0" in request.META.get('HTTP_USER_AGENT', []):
+                    if "Expo" in request.META.get('HTTP_USER_AGENT', []) or "okhttp/3.6.0" in request.META.get(
+                            'HTTP_USER_AGENT', []):
                         form_params = json.loads(request.body.decode())
                     else:
                         form_params = request.POST
@@ -224,7 +225,8 @@ def api_method(
                             )
                         )
 
-                    function_to_check = FunctionGroup.objects.filter(group__id=function_group_id, func=func.__name__).first()
+                    function_to_check = FunctionGroup.objects.filter(group__id=function_group_id,
+                                                                     func=func.__name__).first()
                     if function_to_check is None:
                         return JsonResponse.access_forbidden(
                             'Для вашей группы пользователей не разрешено просматривать или изменять запрашиваемые данные.'
@@ -309,6 +311,7 @@ def outer_server(is_camera=True, decode_body=True):
     Args:
         func(function): функция, которую надо выполнить
     """
+
     def decor(func):
         @csrf_exempt
         def wrapper(request, *args, **kwargs):
@@ -343,5 +346,7 @@ def outer_server(is_camera=True, decode_body=True):
                     raise e
                 else:
                     return JsonResponse.internal_error()
+
         return wrapper
+
     return decor
