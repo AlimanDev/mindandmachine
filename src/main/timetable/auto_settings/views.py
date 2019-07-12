@@ -338,7 +338,7 @@ def create_timetable(request, form):
                                   datetime.combine(date.today(), shop.tm_shop_opens)).seconds/3600)
     if hours_opened == 0:
         hours_opened = 24
-    period_normal_count = hours_opened * 2 * ((dt_to - dt_from).days + 1)
+    period_normal_count = hours_opened * 2 * ((dt_to - dt_from).days)
 
     work_types = WorkType.objects.qos_filter_active(
         dt_from=dt_from,
@@ -368,7 +368,7 @@ def create_timetable(request, form):
         operation_type__work_type__shop_id=shop_id,
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
-        dttm_forecast__date__lte=dt_to,
+        dttm_forecast__date__lt=dt_to,
     ).values(
         'dttm_forecast',
         'operation_type__work_type_id',
@@ -400,7 +400,7 @@ def create_timetable(request, form):
         collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
             worker__shop_id=shop_id,
             dt__gte=dt_from,
-            dt__lte=dt_to,
+            dt__lt=dt_to,
         ),
         group_key=lambda x: x.worker_id
     )
@@ -473,7 +473,7 @@ def create_timetable(request, form):
     init_params = json.loads(shop.init_params)
     work_days = list(ProductionDay.objects.filter(
         dt__gte=dt_from,
-        dt__lte=dt_to,
+        dt__lt=dt_to,
         type__in=ProductionDay.WORK_TYPES,
     ))
     work_hours = sum([ProductionDay.WORK_NORM_HOURS[wd.type] for wd in work_days])  # норма рабочего времени за период (за месяц)
@@ -483,6 +483,7 @@ def create_timetable(request, form):
     user_info = count_difference_of_normal_days(dt_end=dt_from, usrs=users)
 
     # инфа за предыдущий месяц
+    # TODO: FIXME: unwork in first days
     prev_month_num = (dt_from - timedelta(days=1)).month
     year_num = (dt_from - timedelta(days=1)).year
     prev_days_amount = monthrange(year_num, prev_month_num)[1]
@@ -645,8 +646,8 @@ def delete_timetable(request, form):
 
     WorkerDay.objects.filter(
         worker__shop_id=shop_id,
-        dt__month=dt_from.month,
-        dt__year=dt_from.year,
+        dt__gte=dt_from,
+        dt__lt=dt_to,
         worker__auto_timetable=True,
     ).filter(
         Q(created_by__isnull=True) |
