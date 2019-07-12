@@ -18,7 +18,6 @@ from ..utils import dttm_combine
 from src.main.timetable.table.utils import count_work_month_stats
 import numpy as np
 
-
 def filter_worker_day_by_dttm(shop_id, day_type, dttm_from, dttm_to):
     """
     Ну, что-то она да делает
@@ -121,7 +120,7 @@ def count_diff(dttm, period_clients, demand_ind, mean_bills_per_step, work_types
     return need_amount_dict, demand_ind
 
 
-def get_worker_timetable2(shop_id, form, indicators_only=False):
+def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacancies=False):
     def dttm2index(dt_init, dttm, period_in_day, period_lengths_minutes):
         days = (dttm.date() - dt_init).days
         return days * period_in_day + (dttm.hour * 60 + dttm.minute) // period_lengths_minutes
@@ -191,14 +190,17 @@ def get_worker_timetable2(shop_id, form, indicators_only=False):
     )
 
     # query selecting cashbox_details
+    status_list = list(WorkerDayCashboxDetails.WORK_TYPES_LIST)
+    if consider_vacancies:
+        status_list.append(WorkerDayCashboxDetails.TYPE_VACANCY)
+
     cashbox_details = WorkerDayCashboxDetails.objects.filter(
         Q(worker_day__worker__dt_fired__gt=to_dt) | Q(worker_day__worker__dt_fired__isnull=True),
         Q(worker_day__worker__dt_hired__lt=from_dt) | Q(worker_day__worker__dt_hired__isnull=True),
         dttm_from__gte=from_dt,
         dttm_to__lte=to_dt,
         work_type_id__in=work_types.keys(),
-    ).exclude(
-        status=WorkerDayCashboxDetails.TYPE_BREAK
+        status__in=status_list
     ).select_related('worker_day', 'worker_day__worker')
 
     lambda_index_work_details = lambda x: list(range(
@@ -236,6 +238,20 @@ def get_worker_timetable2(shop_id, form, indicators_only=False):
         lambda_add_work_details,
     )
 
+    # if consider_vacancies:
+    #     vacancies_workdetails = WorkerDayCashboxDetails.objects.filter(
+    #         dttm_from__gte=from_dt,
+    #         dttm_to__lte=to_dt,
+    #         status=WorkerDayCashboxDetails.TYPE_VACANCY,
+    #         work_type_id__in=work_types.keys(),
+    #     )
+    #     fill_array(
+    #         finite_work,
+    #         vacancies_workdetails,
+    #         lambda_index_work_details,
+    #         lambda_add_work_details,
+    #     )
+
     response = {}
 
     if not indicators_only:
@@ -266,7 +282,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False):
         }
 
     # statistics
-    worker_amount = len(set([x.worker_day.worker_id for x in finite_workdetails]))
+    worker_amount = len(set([x.worker_day.worker_id for x in finite_workdetails if x.worker_day]))
     deadtime_part = round(100 * np.maximum(finite_work - predict_needs, 0).sum() / (finite_work.sum() +1e-8), 1)
     covering_part = round(100 * np.maximum(predict_needs - finite_work, 0).sum() / (predict_needs.sum() +1e-8), 1)
     days_diff = (predict_needs - finite_work).reshape(period_in_day, -1).sum(1) / (period_in_day / 3) # in workers

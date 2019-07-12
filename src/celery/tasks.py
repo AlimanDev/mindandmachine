@@ -1,19 +1,32 @@
-import datetime
+from datetime import date, timedelta
 import json
 
-from django.db.models import Avg
+from django.db.models import Avg, Q
 from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
-from django.db.models import Q
+# from django.db.models import Q
 
 from src.main.timetable.worker_exchange.utils import (
-    get_init_params,
-    has_deficiency
+    # get_init_params,
+    # has_deficiency,
+    # split_cashiers_periods,
+    # intervals_to_shifts,
+    search_candidates,
+    send_noti2candidates,
+    cancel_vacancy,
+    confirm_vacancy
 )
 from src.main.demand.utils import create_predbills_request_function
 from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
 
+from src.conf.djconfig import (
+    QOS_DATETIME_FORMAT,
+)
+from src.util.models_converter import BaseConverter
+
+from src.main.timetable.worker_exchange.utils import search_candidates, send_noti2candidates
 from src.db.models import (
+    Event,
     PeriodQueues,
     WorkType,
     CameraCashboxStat,
@@ -21,9 +34,9 @@ from src.db.models import (
     WorkerMonthStat,
     ProductionMonth,
     WorkerDay,
-    Notifications,
+    # Notifications,
     Shop,
-    User,
+    # User,
     ProductionDay,
     WorkerCashboxInfo,
     CameraClientGate,
@@ -32,8 +45,10 @@ from src.db.models import (
     IncomeVisitors,
     EmptyOutcomeVisitors,
     PurchasesOutcomeVisitors,
+    ExchangeSettings,
 )
 from src.celery.celery import app
+import pandas
 
 
 @app.task
@@ -47,11 +62,11 @@ def update_queue(till_dttm=None):
     Note:
         Выполняется каждые полчаса
     """
-    time_step = datetime.timedelta(seconds=1800)  # todo: change to supershop step
+    time_step = timedelta(seconds=1800)  # todo: change to supershop step
     if till_dttm is None:
-        till_dttm = now() + datetime.timedelta(hours=3)  # moscow time
+        till_dttm = now() + timedelta(hours=3)  # moscow time
 
-    work_types = WorkType.objects.qos_filter_active(till_dttm + datetime.timedelta(minutes=30), till_dttm).filter(
+    work_types = WorkType.objects.qos_filter_active(till_dttm + timedelta(minutes=30), till_dttm).filter(
         dttm_last_update_queue__isnull=False,
     )
     if not len(work_types):
@@ -92,7 +107,7 @@ def update_queue(till_dttm=None):
 
 @app.task
 def update_visitors_info():
-    timestep = datetime.timedelta(minutes=30)
+    timestep = timedelta(minutes=30)
     dttm_now = now()
     # todo: исправить потом. пока делаем такую привязку
     # вообще хорошей идеей наверное будет просто cashbox_type blank=True, null=True сделать в PeriodDemand
@@ -170,7 +185,7 @@ def update_worker_month_stat():
         Обновляется 1 и 15 числа каждого месяца
     """
     dt = now().date().replace(day=1)
-    delta = datetime.timedelta(days=20)
+    delta = timedelta(days=20)
     dt1 = (dt - delta).replace(day=1)
     dt2 = (dt1 - delta).replace(day=1)
     product_month_1 = ProductionMonth.objects.get(
@@ -249,60 +264,363 @@ def update_worker_month_stat():
                     'work_hours': work_hours,
                 })
 
+# @app.task
+# def notify_cashiers_lack():
+#     """
+#     Создает уведомления на неделю вперед, если в магазине будет нехватка кассиров
+#
+#     Note:
+#         Выполняется каждую ночь
+#     """
+#     for shop in Shop.objects.all():
+#         dttm_now = now()
+#         notify_days = 7
+#         dttm = dttm_now.replace(minute=0, second=0, microsecond=0)
+#         init_params_dict = get_init_params(dttm_now, shop.id)
+#         work_types = init_params_dict['work_types_dict']
+#         mean_bills_per_step = init_params_dict['mean_bills_per_step']
+#         period_demands = []
+#         for i in range(notify_days):
+#             period_demands += get_init_params(dttm_now + datetime.timedelta(days=i), shop.id)['predict_demand']
+#
+#         managers_dir_list = []
+#         users_with_such_notes = []
+#         # пока что есть магазы в которых нет касс с ForecastHard
+#         if work_types and period_demands:
+#             return_dict = has_deficiency(
+#                 period_demands,
+#                 mean_bills_per_step,
+#                 work_types,
+#                 dttm,
+#                 dttm_now + datetime.timedelta(days=notify_days)
+#             )
+#             notifications_list = []
+#             for dttm_converted in return_dict.keys():
+#                 to_notify = False  # есть ли вообще нехватка
+#                 hrs, minutes, other = dttm_converted.split(':')  # дропаем секунды
+#                 if not shop.super_shop.is_supershop_open_at(datetime.time(hour=int(hrs), minute=int(minutes), second=0)):
+#                     continue
+#                 if sum(return_dict[dttm_converted].values()) > 0:
+#                     to_notify = True
+#                     notification_text = '{}:{} {}:\n'.format(hrs, minutes, other[3:])
+#                     for work_type in return_dict[dttm_converted].keys():
+#                         if return_dict[dttm_converted][work_type]:
+#                             notification_text += '{} будет не хватать сотрудников: {}. '.format(
+#                                 WorkType.objects.get(id=work_type).name,
+#                                 return_dict[dttm_converted][work_type]
+#                             )
+#                     managers_dir_list = User.objects.filter(
+#                         function_group__allowed_functions__func='get_workers_to_exchange',
+#                         dt_fired__isnull=True,
+#                         shop_id=shop.id
+#                     )
+#                     users_with_such_notes = []
+#
+# # TODO: REWRITE WITH EVENT
+# # FIXME: REWRITE WITH EVENT
+#                     # notes = Notifications.objects.filter(
+#                     #     type=Notifications.TYPE_INFO,
+#                     #     text=notification_text,
+#                     #     dttm_added__lt=now() + datetime.timedelta(hours=2)
+#                     # )
+#                     # for note in notes:
+#                     #     users_with_such_notes.append(note.to_worker_id)
+#
+#             #     if to_notify:
+#             #         for recipient in managers_dir_list:
+#             #             if recipient.id not in users_with_such_notes:
+#             #                 notifications_list.append(
+#             #                     Notifications(
+#             #                         type=Notifications.TYPE_INFO,
+#             #                         to_worker=recipient,
+#             #                         text=notification_text,
+#             #                     )
+#             #                 )
+#             #
+#             # Notifications.objects.bulk_create(notifications_list)
 
-# TODO: REWRITE WITH EVENT -- NOT WORKING FUNC
-# FIXME: REWRITE WITH EVENT -- NOT WORKING FUNC
+
+
+
 @app.task
-def notify_cashiers_lack():
+def create_vacancy_and_notify_cashiers_lack():
     """
     Создает уведомления на неделю вперед, если в магазине будет нехватка кассиров
 
-    Note:
-        Выполняется каждую ночь
     """
-    for shop in Shop.objects.all():
-        dttm_now = now()
-        notify_days = 7
-        dttm = dttm_now.replace(minute=0, second=0, microsecond=0)
-        init_params_dict = get_init_params(dttm_now, shop.id)
-        work_types = init_params_dict['work_types_dict']
-        mean_bills_per_step = init_params_dict['mean_bills_per_step']
-        period_demands = []
-        for i in range(notify_days):
-            period_demands += get_init_params(dttm_now + datetime.timedelta(days=i), shop.id)['predict_demand']
 
-        managers_dir_list = []
-        users_with_such_notes = []
-        # пока что есть магазы в которых нет касс с ForecastHard
-        if work_types and period_demands:
-            return_dict = has_deficiency(
-                period_demands,
-                mean_bills_per_step,
-                work_types,
-                dttm,
-                dttm_now + datetime.timedelta(days=notify_days)
-            )
-            notifications_list = []
-            for dttm_converted in return_dict.keys():
-                to_notify = False  # есть ли вообще нехватка
-                hrs, minutes, other = dttm_converted.split(':')  # дропаем секунды
-                if not shop.super_shop.is_supershop_open_at(datetime.time(hour=int(hrs), minute=int(minutes), second=0)):
+    exchange_settings = ExchangeSettings.objects.first()
+    if not exchange_settings.automatic_check_lack:
+        return
+    dttm_now = now().replace(minute=0, second=0, microsecond=0)
+    dttm_next_week = dttm_now + exchange_settings.automatic_check_lack_timegap
+    params = {
+        'from_dt': dttm_now.date(),
+        'to_dt': dttm_next_week.date(),
+    }
+
+    for shop in Shop.objects.all():
+        for work_type in shop.worktype_set.all():
+            print(work_type)
+            params['work_type_ids'] = [work_type.id]
+            shop_stat = get_shop_stats(
+                shop.id,
+                params,
+                consider_vacancies=True)
+            df_stat = pandas.DataFrame(shop_stat['lack_of_cashiers_on_period'])
+            # df_stat['dttm'] = pandas.to_datetime(df_stat.dttm, format=QOS_DATETIME_FORMAT)
+            #df_stat['lack_of_cashiers'] = round(df_stat['lack_of_cashiers'])
+            #df_stat = df_stat.where(df_stat.lack_of_cashiers>0).dropna()
+
+            vacancies = []
+            need_vacancy = 0
+            vacancy = None
+            while len(df_stat):
+                for i in df_stat.index:
+                    if df_stat['lack_of_cashiers'][i] > 0:
+                        if need_vacancy == 0:
+                            need_vacancy = 1
+                            vacancy = { 'dttm_from': df_stat['dttm'][i], 'lack': 0, 'count': 0 }
+                        vacancy['lack'] += df_stat['lack_of_cashiers'][i] if df_stat['lack_of_cashiers'][i] < 1 else 1
+                        vacancy['count'] += 1
+                    else:
+                        if need_vacancy == 1:
+                            need_vacancy = 0
+                            vacancy['dttm_to'] = df_stat['dttm'][i]
+                            vacancies.append(vacancy)
+                            vacancy = None
+                if vacancy:
+                    vacancy['dttm_to'] = df_stat.tail(1)['dttm'].iloc[0]
+                    vacancies.append(vacancy)
+                    vacancy = None
+                    need_vacancy = 0
+                df_stat = df_stat.where(df_stat>0).dropna()
+                df_stat['lack_of_cashiers'] = df_stat['lack_of_cashiers'] - 1
+
+                # unite vacancies
+            if not vacancies:
+                continue
+            df_vacancies = pandas.DataFrame(vacancies)
+            df_vacancies['dttm_from'] = pandas.to_datetime(df_vacancies['dttm_from'], format=QOS_DATETIME_FORMAT)
+            df_vacancies['dttm_to'] = pandas.to_datetime(df_vacancies['dttm_to'], format=QOS_DATETIME_FORMAT)
+            df_vacancies['delta'] = df_vacancies['dttm_to'] - df_vacancies['dttm_from']
+            df_vacancies['next_index'] = -1
+            df_vacancies['next'] = -1
+            df_vacancies = df_vacancies.sort_values(by=['dttm_from','dttm_to']).reset_index(drop=True)
+
+            for i in df_vacancies.index:
+                next_row =  df_vacancies.loc[
+                    (df_vacancies.dttm_from < df_vacancies['dttm_to'][i] + timedelta(hours=4)) &
+                    (df_vacancies.dttm_from >  df_vacancies['dttm_to'][i])
+                ].dttm_from
+
+                if next_row.empty:
                     continue
-                if sum(return_dict[dttm_converted].values()) > 0:
-                    to_notify = True
-                    notification_text = '{}:{} {}:\n'.format(hrs, minutes, other[3:])
-                    for work_type in return_dict[dttm_converted].keys():
-                        if return_dict[dttm_converted][work_type]:
-                            notification_text += '{} будет не хватать сотрудников: {}. '.format(
-                                WorkType.objects.get(id=work_type).name,
-                                return_dict[dttm_converted][work_type]
-                            )
-                    managers_dir_list = User.objects.filter(
-                        function_group__allowed_functions__func='get_workers_to_exchange',
-                        dt_fired__isnull=True,
-                        shop_id=shop.id
+                print(next_row)
+
+                df_vacancies.loc[i,'next_index'] = next_row.index[0]
+                df_vacancies.loc[i,'next'] = next_row[next_row.index[0]] - df_vacancies.dttm_to[i]
+
+            for i in df_vacancies.where(df_vacancies.next_index>-1).dropna().sort_values(by=['next']).index:
+                if df_vacancies.next_index[i] not in df_vacancies.index:
+                    df_vacancies.loc[i,'next_index'] = -1
+                    continue
+                next_index = df_vacancies.next_index[i]
+                next_row = df_vacancies.loc[next_index]
+                df_vacancies.loc[next_index, 'dttm_from'] = df_vacancies.dttm_from[i]
+                df_vacancies.loc[next_index,'delta'] = df_vacancies.dttm_to[next_index] - df_vacancies.dttm_from[next_index]
+                df_vacancies.drop([i], inplace=True)
+
+            max_shift = exchange_settings.working_shift_max_hours
+            min_shift = exchange_settings.working_shift_min_hours
+            for i in df_vacancies.index:
+                working_shifts = [df_vacancies.delta[i]]
+
+                #TODO проверить покрытие нехватки вакансиями
+                if df_vacancies.delta[i] > max_shift:
+                    rest = df_vacancies.delta[i] % max_shift
+                    count = int(df_vacancies.delta[i] / max_shift)
+
+                    if not rest:
+                        working_shifts = [max_shift] * count
+                    else:
+                        working_shifts = [max_shift] * (count-1)
+                        working_shifts.append(max_shift + rest - min_shift)
+                        working_shifts.append(min_shift)
+                elif df_vacancies.delta[i] < min_shift / 2:
+                #elif df_vacancies.delta[i] < exchange_settings.automatic_create_vacancy_lack_min:
+                    working_shifts = []
+                elif df_vacancies.delta[i] < min_shift:
+                    working_shifts = [min_shift]
+                dttm_to = dttm_from = df_vacancies.dttm_from[i]
+
+                for shift in working_shifts:
+                    dttm_from = dttm_to
+                    dttm_to = dttm_to + shift
+                    print('create vacancy {} {} {}'.format(dttm_from, dttm_to, work_type))
+
+                    worker_day_detail = WorkerDayCashboxDetails.objects.create(
+                        dttm_from=dttm_from,
+                        dttm_to=dttm_to,
+                        work_type=work_type,
+                        status=WorkerDayCashboxDetails.TYPE_VACANCY,
+                        is_vacancy=True,
                     )
-                    users_with_such_notes = []
+
+                    workers = search_candidates(
+                        worker_day_detail,
+                        own_shop=True,
+                        other_shops=True,
+                        other_supershops=True,
+                        outsource=True)
+                    send_noti2candidates(workers, worker_day_detail)
+
+
+
+@app.task
+def cancel_vacancies():
+    """
+    Автоматически отменяем вакансии, в которых нет потребности
+    :return:
+    """
+    exchange_settings = ExchangeSettings.objects.first()
+    if not exchange_settings.automatic_check_lack:
+        return
+
+    from_dt = now().replace(minute=0, second=0, microsecond=0).date()
+    to_dt = from_dt + exchange_settings.automatic_check_lack_timegap
+    params = {
+        'from_dt': from_dt,
+        'to_dt': to_dt,
+    }
+
+    for shop in Shop.objects.all():
+        for work_type in shop.worktype_set.all():
+            params['work_type_ids'] = [work_type.id]
+            shop_stat = get_shop_stats(
+                shop.id,
+                params,
+                consider_vacancies=True)
+            df_stat=pandas.DataFrame(shop_stat['tt_periods']['real_cashiers']).rename({'amount':'real_cashiers'}, axis=1)
+            df_stat['predict_cashier_needs'] = pandas.DataFrame(shop_stat['tt_periods']['predict_cashier_needs']).amount
+
+            df_stat['overflow'] = df_stat.real_cashiers - df_stat.predict_cashier_needs
+            df_stat['dttm'] = pandas.to_datetime(df_stat.dttm, format=QOS_DATETIME_FORMAT)
+            df_stat.set_index(df_stat.dttm, inplace=True)
+
+            work_types = list(WorkerDayCashboxDetails.WORK_TYPES_LIST)
+            work_types.append(WorkerDayCashboxDetails.TYPE_VACANCY)
+
+            vacancies = WorkerDayCashboxDetails.objects.filter(
+                Q(worker_day__worker__dt_fired__gt=to_dt) | Q(worker_day__worker__dt_fired__isnull=True),
+                Q(worker_day__worker__dt_hired__lt=from_dt) | Q(worker_day__worker__dt_hired__isnull=True),
+                dttm_from__gte=from_dt,
+                dttm_to__lte=to_dt,
+                work_type_id__in=[work_type.id],
+                is_vacancy=True,
+                status__in=work_types,
+            ).order_by('status','dttm_from','dttm_to')
+
+            for vacancy in  vacancies:
+                cond = (df_stat['dttm'] >= vacancy.dttm_from) & (df_stat['dttm'] <= vacancy.dttm_to)
+                overflow = df_stat.loc[cond,'overflow'].apply(lambda x:  x if (x < 1.0 and x >-1.0) else 1 if x >=1 else -1 ).mean()
+                if overflow > exchange_settings.automatic_delete_vacancy_oveflow_max:
+                    print ('cancel_vacancy overflow {} {} {}'.format(overflow, vacancy, vacancy.dttm_from))
+                    cancel_vacancy(vacancy.id)
+                    df_stat.loc[cond,'overflow'] -= 1
+
+
+
+@app.task
+def workers_hard_exchange():
+    """
+
+    Автоматически перекидываем сотрудников из других магазинов, если это приносит ценность (todo: добавить описание, что такое ценность).
+
+    :return:
+    """
+    def lack_calc(df, work_type_id, dttm_from, dttm_to):
+        cond = (df.work_type_id==work_type.id) & (df['dttm'] >= dttm_from) & (df['dttm'] <= dttm_to)
+        return df.loc[cond, 'lack'].apply(
+            lambda x:  x if (x < 1.0 and x >-1.0) else 1 if x >=1 else -1
+        ).sum() / 2
+
+    exchange_settings = ExchangeSettings.objects.first()
+    if not exchange_settings.automatic_check_lack:
+        return
+
+    from_dt = (now().replace(minute=0, second=0, microsecond=0) + exchange_settings.automatic_worker_select_timegap).date()
+    to_dt = from_dt + exchange_settings.automatic_check_lack_timegap
+    params = {
+        'from_dt': from_dt,
+        'to_dt': to_dt,
+    }
+
+    shop_list = Shop.objects.all()
+    df_shop_stat = pandas.DataFrame()
+
+    for shop in shop_list:
+        for work_type in shop.worktype_set.all():
+            params['work_type_ids'] = [work_type.id]
+            shop_stat = get_shop_stats(
+                shop.id,
+                params,
+                consider_vacancies=False)
+            df_stat=pandas.DataFrame(shop_stat['tt_periods']['real_cashiers']).rename({'amount':'real_cashiers'}, axis=1)
+            df_stat['predict_cashier_needs'] = pandas.DataFrame(shop_stat['tt_periods']['predict_cashier_needs']).amount
+            df_stat['lack'] = df_stat.predict_cashier_needs - df_stat.real_cashiers
+            df_stat['dttm'] = pandas.to_datetime(df_stat.dttm, format=QOS_DATETIME_FORMAT)
+            # df_stat['shop_id'] = shop.id
+            df_stat['work_type_id'] = work_type.id
+            df_shop_stat = df_shop_stat.append(df_stat)
+
+    df_shop_stat.set_index([# df_shop_stat.shop_id,
+                            df_shop_stat.work_type_id, df_shop_stat.dttm], inplace=True)
+
+    for shop in shop_list:
+        for work_type in shop.worktype_set.all():
+
+            vacancies = WorkerDayCashboxDetails.objects.filter(
+                dttm_from__gte=from_dt,
+                dttm_to__lte=to_dt,
+                work_type_id=work_type.id,
+                is_vacancy=True,
+                status=WorkerDayCashboxDetails.TYPE_VACANCY
+            ).order_by('status','dttm_from','dttm_to')
+
+            for vacancy in vacancies:
+                vacancy_lack = lack_calc( df_shop_stat, work_type.id, vacancy.dttm_from, vacancy.dttm_to)
+                print ('lack vacancy {};;; {}'.format(vacancy_lack, vacancy))
+                dttm_from_workers = vacancy.dttm_from - timedelta(hours=4)
+                if vacancy_lack > 0:
+                    workers = WorkerDayCashboxDetails.objects.filter(
+                        dttm_from=vacancy.dttm_from,
+                        dttm_to=vacancy.dttm_to,
+                        # work_type_id__in=[1],
+                        is_vacancy=False,
+                        status__in=WorkerDayCashboxDetails.WORK_TYPES_LIST,
+                    ).exclude(
+                        work_type_id=work_type.id,
+                    ).order_by('status','dttm_from','dttm_to')
+                    if not len(workers):
+                        continue
+                    worker_lack = None
+                    candidate_to_change = None
+                    for worker in workers:
+                        lack = lack_calc(df_shop_stat, worker.work_type_id, worker.dttm_from, worker.dttm_to )
+                        if worker_lack is None or lack < worker_lack:
+                            worker_lack = lack
+                            candidate_to_change = worker
+                    print ('worker lack  {}'.format(worker_lack))
+
+                    if vacancy_lack - worker_lack > exchange_settings.automatic_worker_select_lack_diff:
+                        user = candidate_to_change.worker_day.worker
+                        print('hard exchange  worker lack{} vacancy lack {}  candidate_to_change {} to vac {} user {}'.format(worker_lack, vacancy_lack, candidate_to_change, vacancy, user ))
+                        candidate_to_change.delete()
+                        event = Event.objects.get(workerday_details=vacancy.id)
+                        event.do_action(user)
+
+
 
 # TODO: REWRITE WITH EVENT
 # FIXME: REWRITE WITH EVENT
@@ -416,7 +734,7 @@ def clean_camera_stats():
 @app.task
 def update_shop_stats(dt=None):
     if not dt:
-        dt = datetime.date.today().replace(day=1)
+        dt = date.today().replace(day=1)
     shops = Shop.objects.filter(dttm_deleted__isnull=True)
     tts = Timetable.objects.filter(shop__in=shops, dt__gte=dt, status=Timetable.Status.READY.value)
     for timetable in tts:

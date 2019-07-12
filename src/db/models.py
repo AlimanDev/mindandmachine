@@ -855,6 +855,7 @@ class WorkerDayCashboxDetails(models.Model):
     TYPE_SOON = 'C'
     TYPE_FINISH = 'H'
     TYPE_ABSENCE = 'A'
+    TYPE_DELETED = 'D'
 
     DETAILS_TYPES = (
             (TYPE_WORK, 'work period'),
@@ -966,34 +967,34 @@ class Event(models.Model):
 
     department = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT) # todo: should be department model?
 
-    to_workerday = models.ForeignKey(WorkerDayCashboxDetails, null=True, blank=True, on_delete=models.PROTECT)
+    workerday_details = models.ForeignKey(WorkerDayCashboxDetails, null=True, blank=True, on_delete=models.PROTECT)
 
     objects = EventManager()
 
     def get_text(self):
-        if self.to_workerday:
+        if self.workerday_details:
             from src.util.models_converter import BaseConverter
 
-            if self.to_workerday.dttm_deleted:
+            if self.workerday_details.dttm_deleted:
                 return 'Вакансия отмена'
-            elif self.to_workerday.worker_day_id:
+            elif self.workerday_details.worker_day_id:
                 return 'Вакансия на {} в {} уже выбрана.'.format(
-                    BaseConverter.convert_date(self.to_workerday.dttm_from.date()),
-                    self.to_workerday.work_type.shop.title,
+                    BaseConverter.convert_date(self.workerday_details.dttm_from.date()),
+                    self.workerday_details.work_type.shop.title,
                 )
             else:
                 return 'Открыта вакансия на {} в {}. Время работы: с {} по {}. Хотите выйти?'.format(
-                    BaseConverter.convert_date(self.to_workerday.dttm_from.date()),
-                    self.to_workerday.work_type.shop.title,
-                    BaseConverter.convert_time(self.to_workerday.dttm_from.time()),
-                    BaseConverter.convert_time(self.to_workerday.dttm_to.time()),
+                    BaseConverter.convert_date(self.workerday_details.dttm_from.date()),
+                    self.workerday_details.work_type.shop.title,
+                    BaseConverter.convert_time(self.workerday_details.dttm_from.time()),
+                    BaseConverter.convert_time(self.workerday_details.dttm_to.time()),
                 )
 
         else:
             return self.text
 
     def is_question(self):
-        return not self.to_workerday_id is None
+        return not self.workerday_details_id is None
 
     def do_action(self, user):
         res = {
@@ -1001,8 +1002,8 @@ class Event(models.Model):
             'text': '',
         }
 
-        if self.to_workerday_id: # действие -- выход на вакансию
-            vacancy = self.to_workerday
+        if self.workerday_details_id: # действие -- выход на вакансию
+            vacancy = self.workerday_details
             user_worker_day = WorkerDay.objects.qos_current_version().filter(
                 worker=user,
                 dt=vacancy.dttm_from.date()
@@ -1058,7 +1059,7 @@ class Event(models.Model):
         return res
 
     def is_action_active(self):
-        if self.to_workerday and (self.to_workerday.dttm_deleted is None) and (self.to_workerday.worker_day_id is None):
+        if self.workerday_details and (self.workerday_details.dttm_deleted is None) and (self.workerday_details.worker_day_id is None):
             return True
         return False
 
@@ -1068,9 +1069,9 @@ class NotificationManager(models.Manager):
     def mm_filter(self, *args, **kwargs):
         return self.filter(*args, **kwargs).select_related(
             'event',
-            'event__to_workerday',
-            'event__to_workerday__work_type',
-            'event__to_workerday__work_type__shop'
+            'event__workerday_details',
+            'event__workerday_details__work_type',
+            'event__workerday_details__work_type__shop'
         )
 
 
@@ -1315,3 +1316,20 @@ class AttendanceRecords(models.Model):
 
     def __str__(self):
         return 'UserIdentID: {}, type: {}, dttm: {}'.format(self.identifier_id, self.type, self.dttm)
+
+
+class ExchangeSettings(models.Model):
+    automatic_check_lack = models.BooleanField(default=False)
+    automatic_check_lack_timegap = models.DurationField(default=datetime.timedelta(days=7))
+
+    # Минимальная загрузка сотрудника при создании и удалении вакансии
+    automatic_create_vacancy_lack_min = models.FloatField(default=.6)
+    automatic_delete_vacancy_oveflow_max = models.FloatField(default=0.5)
+
+    #Только автоназначение сотрудников
+    automatic_worker_select_timegap = models.DurationField(default=datetime.timedelta(hours=4))
+    automatic_worker_select_lack_diff = models.FloatField(default=2)
+
+    #Длина смены
+    working_shift_min_hours = models.DurationField(default=datetime.timedelta(hours=4)) # Минимальная длина смены
+    working_shift_max_hours = models.DurationField(default=datetime.timedelta(hours=12)) # Максимальная длина смены

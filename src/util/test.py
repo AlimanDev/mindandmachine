@@ -254,10 +254,10 @@ class LocalTestCase(TestCase):
 
         # Timetable create
         self.timetable1 = Timetable.objects.create(
-            shop=self.shop,
-            dt=datetime.date(2019, 6, 1),
-            status=1,
-            dttm_status_change=datetime.datetime(2019, 6, 1, 9, 30, 0)
+            shop = self.shop,
+            dt = datetime.date(2019, 6, 1),
+            status = 1,
+            dttm_status_change = datetime.datetime(2019, 6, 1, 9, 30, 0)
         )
 
         # UserIdentifier
@@ -463,4 +463,5 @@ def create_period_clients(dttm_forecast, value, type, operation_type):
         value=value,
         type=type,
         operation_type=operation_type
-    )
+)
+

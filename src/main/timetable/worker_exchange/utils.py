@@ -26,6 +26,8 @@ Note:
         }
 """
 
+import datetime
+
 from src.db.models import (
     WorkerDay,
     Event,
@@ -35,6 +37,7 @@ from src.db.models import (
 
 from django.db.models import Q
 from django.utils import timezone
+from django.conf import settings
 from src.util.models_converter import BaseConverter
 
 
@@ -87,7 +90,7 @@ def search_candidates(wd_details, **kwargs):
         workerday__dt=wd_details.dttm_from.date(),
         workerday__child__isnull=True,
     )
-    print(workers.query.__str__())
+    # print(workers.query.__str__())
     # import pdb
     # pdb.set_trace()
 
@@ -101,7 +104,7 @@ def send_noti2candidates(users, worker_day_detail):
 
         text='',
         department_id=worker_day_detail.work_type.shop_id,
-        to_workerday=worker_day_detail,
+        workerday_details=worker_day_detail,
     )
     return event
 
@@ -109,38 +112,37 @@ def send_noti2candidates(users, worker_day_detail):
 def cancel_vacancy(vacancy_id):
     WorkerDayCashboxDetails.objects.filter(id=vacancy_id, is_vacancy=True).update(
         dttm_deleted=timezone.now(),
-        status=WorkerDayCashboxDetails.TYPE_VACANCY,
+        status=WorkerDayCashboxDetails.TYPE_DELETED,
     )
 
 
-# def confirm_vacancy(vacancy_id, user):
-#     """
-#
-#     :param vacancy_id:
-#     :param user:
-#     :return:
-#     0 -- все ок
-#     1 -- нет открытой вакансии
-#     2 -- не может подтвердить с учетом графика (пересечение есть)
-#     """
-#     vacancy = WorkerDayCashboxDetails.objects.filter(
-#         id=vacancy_id,
-#         is_vacancy=True,
-#         dttm_deleted__isnull=True,
-#         worker_day__isnull=True,
-#     ).last()
-#     if vacancy is None:
-#         return 1
-#
-#
-#     workerday = WorkerDay.objects.qos_current_version().filter(
-#         dt=vacancy.dttm_from.date(),
-#         worker=user,
-#     ).last()
-#
-#     # todo: add better time checker if not the same
-#     WorkerDayCashboxDetails.objects.filter(
-#         worker_day=workerday,
-#
-#     )
+def confirm_vacancy(vacancy_id, user):
+    """
 
+    :param vacancy_id:
+    :param user:
+    :return:
+    0 -- все ок
+    1 -- нет открытой вакансии
+    2 -- не может подтвердить с учетом графика (пересечение есть)
+    """
+    vacancy = WorkerDayCashboxDetails.objects.filter(
+        id=vacancy_id,
+        is_vacancy=True,
+        dttm_deleted__isnull=True,
+        worker_day__isnull=True,
+    ).last()
+    if vacancy is None:
+        return 1
+
+
+    workerday = WorkerDay.objects.qos_current_version().filter(
+        dt=vacancy.dttm_from.date(),
+        worker=user,
+    ).last()
+
+    # todo: add better time checker if not the same
+    WorkerDayCashboxDetails.objects.filter(
+        worker_day=workerday,
+
+    )
