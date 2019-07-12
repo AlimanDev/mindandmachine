@@ -540,7 +540,7 @@ def workers_hard_exchange():
     :return:
     """
     def lack_calc(df, work_type_id, dttm_from, dttm_to):
-        cond = (df.work_type_id==work_type.id) & (df['dttm'] >= dttm_from) & (df['dttm'] <= dttm_to)
+        cond = (df.work_type_id==work_type_id) & (df['dttm'] >= dttm_from) & (df['dttm'] <= dttm_to)
         return df.loc[cond, 'lack'].apply(
             lambda x:  x if (x < 1.0 and x >-1.0) else 1 if x >=1 else -1
         ).sum() / 2
