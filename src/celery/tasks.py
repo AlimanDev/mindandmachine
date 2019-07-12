@@ -375,7 +375,7 @@ def create_vacancy_and_notify_cashiers_lack():
             vacancies = []
             need_vacancy = 0
             vacancy = None
-            while len(df_stat):
+            while len(df_stat.loc[df_stat.lack_of_cashiers>0]):
                 for i in df_stat.index:
                     if df_stat['lack_of_cashiers'][i] > 0:
                         if need_vacancy == 0:
@@ -394,7 +394,7 @@ def create_vacancy_and_notify_cashiers_lack():
                     vacancies.append(vacancy)
                     vacancy = None
                     need_vacancy = 0
-                df_stat = df_stat.where(df_stat>0).dropna()
+                #df_stat = df_stat.where(df_stat>0).dropna()
                 df_stat['lack_of_cashiers'] = df_stat['lack_of_cashiers'] - 1
 
                 # unite vacancies
@@ -408,6 +408,8 @@ def create_vacancy_and_notify_cashiers_lack():
             df_vacancies['next'] = -1
             df_vacancies = df_vacancies.sort_values(by=['dttm_from','dttm_to']).reset_index(drop=True)
 
+            df_vacancies.lack = df_vacancies.lack / df_vacancies['count']
+            df_vacancies = df_vacancies.loc[df_vacancies.lack>exchange_settings.automatic_create_vacancy_lack_min]
             for i in df_vacancies.index:
                 next_row =  df_vacancies.loc[
                     (df_vacancies.dttm_from < df_vacancies['dttm_to'][i] + timedelta(hours=4)) &
