@@ -1,7 +1,7 @@
 import json
 import urllib.request
 
-from datetime import datetime, timedelta, date, time
+from datetime import datetime, timedelta, date
 
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
@@ -50,6 +50,7 @@ from ..table.utils import count_difference_of_normal_days
 from src.main.other.notification.utils import send_notification
 from django.db.models import F
 from calendar import monthrange
+from .utils import set_timetable_date_from
 
 
 @api_method('GET', GetStatusForm)
@@ -153,7 +154,7 @@ def create_timetable(request, form):
                     'last_name': 'Иванов',
                     'middle_name': 'Иванович',
                     'tabel_code': 8090345,
-                    'is_fixed_hours': False, # Фиксированный ли график. Если да, то проставляем ему из availabilities смены циклически. 
+                    'is_fixed_hours': False, # Фиксированный ли график. Если да, то проставляем ему из availabilities смены циклически.
                     На стороне бека все проверки, что корректные данные (по 1 смене на каждый день и нет противоречащих constraints)
                 }
 
@@ -190,8 +191,8 @@ def create_timetable(request, form):
                         'is_lite': True,  # жесткие ли ограничения
                     }
                 ],
-                
-                # кроме ограничений, бывает еще и наоборот указаны доступности в сменах. Constraints идут в приоритете, 
+
+                # кроме ограничений, бывает еще и наоборот указаны доступности в сменах. Constraints идут в приоритете,
                 # так что сначала парсятся доступности, а потом ограничения поверх них.
                 'availability_info': [
                     {
@@ -271,10 +272,10 @@ def create_timetable(request, form):
             Алго будет пытаться равномерно распределить это между чуваками. Ну, не совсем втупую, с учетом отпусков.
             При этом индивидуальные часы игнорируются.
             'idle': 0, # ограничение на простой
-            'slider': 3.2, # ползунок, который каким-то образом влияет на составление и отражает что-то вроде допустимой 
+            'slider': 3.2, # ползунок, который каким-то образом влияет на составление и отражает что-то вроде допустимой
             средней длины очереди. Пока интерпретируется как "чем меньше, чем больше сотрудников нужно вывести". Бегает
             от 1 до 10, float.
-            
+
             # пока не используемые
             'mean_queue_length': 2.3,
             'max_queue_length': 4,
@@ -291,13 +292,18 @@ def create_timetable(request, form):
     """
 
     shop_id = form['shop_id']
-    dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1).date()
-    dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
+
+    dt_from = set_timetable_date_from(form['dt'].year, form['dt'].month)
+    if not dt_from:
+        return JsonResponse.value_error('Нельзя изменить расписание за прошедший месяц')
+
+    dt_first = dt_from.replace(day=1)
+    dt_to = (dt_first + relativedelta(months=1))
 
     try:
         tt = Timetable.objects.create(
             shop_id=shop_id,
-            dt=dt_from,
+            dt=dt_first,
             status=Timetable.Status.PROCESSING.value,
             dttm_status_change=datetime.now()
         )
@@ -344,9 +350,9 @@ def create_timetable(request, form):
             operation_type__work_type=work_type,
             type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
-            dttm_forecast__date__lt=dt_to + timedelta(days=1),
+            dttm_forecast__date__lt=dt_to,
         ).count()
-        
+
         if periods_len % period_normal_count:
             period_difference['work_type_name'].append(work_type.name)
             period_difference['difference'].append(abs(period_normal_count - periods_len))
@@ -602,13 +608,13 @@ def delete_timetable(request, form):
     """
     shop_id = form['shop_id']
 
-    dt_from = datetime(year=form['dt'].year, month=form['dt'].month, day=1)
-    dt_now = datetime.now().date()
+    dt_from = set_timetable_date_from(form['dt'].year, form['dt'].month)
+    if not dt_from:
+        return JsonResponse.value_error('Cannot delete past month')
+    dt_first = dt_from.replace(day=1)
+    dt_to = (dt_first + relativedelta(months=1))
 
-    # if dt_from.date() < dt_now:
-    #     return JsonResponse.value_error('Cannot delete past month')
-
-    tts = Timetable.objects.filter(shop_id=shop_id, dt=dt_from)
+    tts = Timetable.objects.filter(shop_id=shop_id, dt=dt_first)
     for tt in tts:
         if (tt.status == Timetable.Status.PROCESSING.value) and (not tt.task_id is None):
             try:
@@ -620,24 +626,24 @@ def delete_timetable(request, form):
             send_notification('D', tt, sender=request.user)
     tts.delete()
 
-    WorkerDayChangeRequest.objects.select_related('worker_day', 'worker_day__worker').filter(
+    WorkerDayChangeRequest.objects.filter(
         worker__shop_id=shop_id,
-        dt__month=dt_from.month,
-        dt__year=dt_from.year,
+        dt__gte=dt_from,
+        dt__lt=dt_to,
         worker__auto_timetable=True,
     ).delete()
 
-    WorkerDayCashboxDetails.objects.select_related('worker_day', 'worker_day__worker').filter(
+    WorkerDayCashboxDetails.objects.filter(
         worker_day__worker__shop_id=shop_id,
-        worker_day__dt__month=dt_from.month,
-        worker_day__dt__year=dt_from.year,
+        worker_day__dt__gte=dt_from,
+        worker_day__dt__lt=dt_to,
         worker_day__worker__auto_timetable=True,
     ).filter(
         Q(worker_day__created_by__isnull=True) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
     ).delete()
 
-    WorkerDay.objects.select_related('worker').filter(
+    WorkerDay.objects.filter(
         worker__shop_id=shop_id,
         dt__month=dt_from.month,
         dt__year=dt_from.year,

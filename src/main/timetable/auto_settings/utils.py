@@ -1,3 +1,8 @@
+from datetime import datetime, timedelta
+
+REBUILD_TIMETABLE_MIN_DELTA = 2
+
+
 def time2int(tm, minute_step=15, start_h=6):
     """
     Вообще непонятно что функция делает
@@ -15,3 +20,14 @@ def time2int(tm, minute_step=15, start_h=6):
     if diff_h < 0:
         diff_h += 24
     return int((diff_h * 60 + tm.minute) / minute_step + 0.99999999)
+
+def set_timetable_date_from(year, month):
+    date_from = datetime(year=year, month=month, day=1).date()
+    date_min = datetime.now().date() + timedelta(days=REBUILD_TIMETABLE_MIN_DELTA)
+    date_mon_begin = datetime(year=date_min.year, month=date_min.month, day=1).date()
+
+    if date_from < date_mon_begin:
+        return None
+    if date_from < date_min:
+        date_from = date_min
+    return date_from
