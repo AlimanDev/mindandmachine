@@ -35,6 +35,7 @@ from src.db.models import (
     PurchasesOutcomeVisitors,
     WorkerDayChangeRequest,
     AttendanceRecords,
+    ExchangeSettings,
 )
 
 
@@ -398,3 +399,10 @@ class ProductionMonthAdmin(admin.ModelAdmin):
 class AttendanceRecordsAdmin(admin.ModelAdmin):
     list_display = ['id', 'dttm', 'type',]
     list_filter = ('type', 'verified', 'type')
+
+
+
+@admin.register(ExchangeSettings)
+class ExchangeSettingsAdmin(admin.ModelAdmin):
+    pass
+
