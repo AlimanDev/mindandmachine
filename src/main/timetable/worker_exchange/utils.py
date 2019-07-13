@@ -110,6 +110,7 @@ def send_noti2candidates(users, worker_day_detail):
 
 
 def cancel_vacancy(vacancy_id):
+    # todo: change user work day if selected
     WorkerDayCashboxDetails.objects.filter(id=vacancy_id, is_vacancy=True).update(
         dttm_deleted=timezone.now(),
         status=WorkerDayCashboxDetails.TYPE_DELETED,

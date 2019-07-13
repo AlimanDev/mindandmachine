@@ -15,7 +15,7 @@ class GetStatusForm(forms.Form):
 
 
 class SetSelectedCashiersForm(forms.Form):
-    cashier_ids = util_forms.IntegersList(required=True)
+    worker_ids = util_forms.IntegersList(required=True)
     shop_id = forms.IntegerField()
 
 

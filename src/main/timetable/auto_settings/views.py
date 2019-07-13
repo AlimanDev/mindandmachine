@@ -23,6 +23,8 @@ from src.db.models import (
     Slot,
     UserWeekdaySlot,
     ProductionDay,
+    Event,
+    Notifications,
 )
 from src.util.collection import group_by
 from src.util.forms import FormUtil
@@ -51,6 +53,7 @@ from src.main.other.notification.utils import send_notification
 from django.db.models import F
 from calendar import monthrange
 from .utils import set_timetable_date_from
+from django.utils import timezone
 
 
 @api_method('GET', GetStatusForm)
@@ -94,15 +97,15 @@ def set_selected_cashiers(request, form):
     Args:
         method: POST
         url: /api/timetable/auto_settings/set_selected_cashiers
-        cashier_ids(list): id'шники сотрудников которым проставлять
+        worker_ids(list): id'шники сотрудников которым проставлять
         shop_id(int): required = True
 
     Note:
         Всем другим сотрудникам из этого магаза проставляется значение противоположное value
     """
     shop_workers = User.objects.filter(shop_id=form['shop_id'], attachment_group=User.GROUP_STAFF)
-    shop_workers.exclude(id__in=form['cashier_ids']).update(auto_timetable=False)
-    User.objects.filter(id__in=form['cashier_ids']).update(auto_timetable=True)
+    shop_workers.exclude(id__in=form['worker_ids']).update(auto_timetable=False)
+    User.objects.filter(id__in=form['worker_ids']).update(auto_timetable=True)
     return JsonResponse.success()
 
 
@@ -653,6 +656,17 @@ def delete_timetable(request, form):
         Q(created_by__isnull=True) |
         Q(type=WorkerDay.Type.TYPE_EMPTY.value)
     ).delete()
+
+    # cancel vacancy
+    # todo: add deleting workerdays
+    WorkerDayCashboxDetails.objects.filter(
+        dttm_from__date__gte=dt_from,
+        dttm_from__date__lt=dt_to,
+        is_vacancy=True,
+    ).update(
+        dttm_deleted=timezone.now(),
+        status=WorkerDayCashboxDetails.TYPE_DELETED,
+    )
 
     return JsonResponse.success()
 
