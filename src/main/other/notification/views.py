@@ -1,6 +1,6 @@
 from src.db.models import Notifications
 from src.util.utils import api_method, JsonResponse
-from src.util.models_converter import NotificationConverter
+from src.util.models_converter import NotificationConverter, WorkerDayCashboxDetails
 from.forms import SetNotificationsReadForm, GetNotificationsForm, NotifyAction
 
 
@@ -90,14 +90,19 @@ def get_notifications2(request, form):
     count = form.get('count', 20)
     count = count if count else 20
 
-    notifies = list(Notifications.objects.mm_filter(to_worker=request.user).
-                    order_by('-id')[pointer * count: (pointer + 1) * count]
-    )
+    notifies = Notifications.objects.mm_filter(
+        to_worker=request.user).order_by('-id').exclude(
+        event__workerday_details__status=WorkerDayCashboxDetails.TYPE_DELETED)
+    notifies_vacancy = list(notifies.filter(
+        event__workerday_details__isnull=False))[pointer * count: (pointer + 1) * count]
+    notifies_other = list(notifies.filter(
+        event__workerday_details__isnull=True))[pointer * count: (pointer + 1) * count]
 
     result = {
         'unread_count': Notifications.objects.filter(to_worker=request.user, was_read=False).count(),
         'next_noty_pointer': pointer + 1 if len(notifies) == count else None,
-        'notifications': [NotificationConverter.convert(note) for note in notifies],
+        'notifications_vacancy': [NotificationConverter.convert(note) for note in notifies_vacancy],
+        'notifications_other': [NotificationConverter.convert(note) for note in notifies_other],
     }
     return JsonResponse.success(result)
 
