@@ -1,7 +1,7 @@
-from src.db.models import Notifications
+from src.db.models import Notifications, WorkerDayCashboxDetails
 from src.util.utils import api_method, JsonResponse
-from src.util.models_converter import NotificationConverter, WorkerDayCashboxDetails
-from.forms import SetNotificationsReadForm, GetNotificationsForm, NotifyAction
+from src.util.models_converter import NotificationConverter
+from .forms import SetNotificationsReadForm, GetNotificationsForm, NotifyAction
 
 
 @api_method('GET', GetNotificationsForm, check_permissions=False)
@@ -41,7 +41,8 @@ def get_notifications(request, form):
     old_notifications = list(old_notifications[:count])
 
     result = dict(
-        get_noty_pointer=old_notifications[-1].id if (len(old_notifications) > 0 and len(old_notifications) == count) else None,
+        get_noty_pointer=old_notifications[-1].id if (
+                    len(old_notifications) > 0 and len(old_notifications) == count) else None,
         old_notifications=[NotificationConverter.convert(notification) for notification in old_notifications]
     )
 
@@ -65,6 +66,7 @@ def get_notifications2(request, form):
         url: /api/other/notifications/get_notifications
         pointer(int): required = False. Начиная с каких уведомлений получать (id меньше pointer'a)
         count(int): required = True. Сколько уведомлений мы хотим получить
+        type(str): required = False. Тип уведомления (vacancy - вакансия, other - остальные) default = all.
 
     Returns:
         {
@@ -93,21 +95,22 @@ def get_notifications2(request, form):
     notifies = Notifications.objects.mm_filter(
         to_worker=request.user).order_by('-id').exclude(
         event__workerday_details__status=WorkerDayCashboxDetails.TYPE_DELETED)
-    notifies_vacancy = list(notifies.filter(
-        event__workerday_details__isnull=False))[pointer * count: (pointer + 1) * count]
-    notifies_other = list(notifies.filter(
-        event__workerday_details__isnull=True))[pointer * count: (pointer + 1) * count]
+
+    if form['type'] == 'vacancy':
+        notifies = list(notifies.filter(
+            event__workerday_details__isnull=False))[pointer * count: (pointer + 1) * count]
+    elif form['type'] == 'other':
+        notifies = list(notifies.filter(
+            event__workerday_details__isnull=True))[pointer * count: (pointer + 1) * count]
+    else:
+        notifies = list(notifies)[pointer * count: (pointer + 1) * count]
 
     result = {
         'unread_count': Notifications.objects.filter(to_worker=request.user, was_read=False).count(),
         'next_noty_pointer': pointer + 1 if len(notifies) == count else None,
-        'notifications_vacancy': [NotificationConverter.convert(note) for note in notifies_vacancy],
-        'notifications_other': [NotificationConverter.convert(note) for note in notifies_other],
+        'notifications': [NotificationConverter.convert(note) for note in notifies],
     }
     return JsonResponse.success(result)
-
-
-
 
 
 @api_method('POST', SetNotificationsReadForm, check_permissions=False)
@@ -165,4 +168,3 @@ def do_notify_action(request, form):
     else:
         result = {'text': 'Невозможно выполнить действие'}
     return JsonResponse.value_error(result['text'])
-
