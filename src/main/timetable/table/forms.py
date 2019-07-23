@@ -12,3 +12,11 @@ class GetWorkerStatForm(forms.Form):
     dt = util_forms.DateField()
     worker_ids = util_forms.IntegersList()
 
+
+class WorkersToExchange(forms.Form):
+    worker1_id = forms.IntegerField(required=True)
+    worker2_id = forms.IntegerField(required=True)
+    from_dt = util_forms.DateField(required=True)
+    to_dt = util_forms.DateField(required=True)
+
+

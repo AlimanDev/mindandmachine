@@ -226,7 +226,7 @@ class User(DjangoAbstractUser):
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
-    dt_hired = models.DateField(null=True, blank=True)
+    dt_hired = models.DateField(default=datetime.date(2019, 1, 1))
     dt_fired = models.DateField(null=True, blank=True)
     salary = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
@@ -362,6 +362,7 @@ class FunctionGroup(models.Model):
         'cancel_vacancy',
         'confirm_vacancy',
         'do_notify_action',
+        'exchange_workers_day',
     )
 
     FUNCS_TUPLE = ((f, f) for f in FUNCS)
