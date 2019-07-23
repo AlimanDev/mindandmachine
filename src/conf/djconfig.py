@@ -264,8 +264,13 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
 
-    'task-notify-cashiers-lack': {
-        'task': 'src.celery.tasks.notify_cashiers_lack',
+    'task-vacancies_create_and_cancel': {
+        'task': 'src.celery.tasks.vacancies_create_and_cancel',
+        'schedule': crontab(hour=1, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-workers_hard_exchange': {
+        'task': 'src.celery.tasks.workers_hard_exchange',
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
@@ -294,4 +299,3 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     }
 }
-
