@@ -68,6 +68,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
         dt__gte=dt_start,
         dt__lte=dt_end,
         worker_id__in=users_ids.keys(),
+        child__isnull=True,
     ).values(
         'id',
         'worker_id',

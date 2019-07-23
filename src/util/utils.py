@@ -97,6 +97,10 @@ class JsonResponse(object):
         return cls.__base_error_response(400, 'AuthError', 'No such user or password incorrect')
 
     @classmethod
+    def not_active_error(cls):
+        return cls.__base_error_response(400, 'NotActiveError', 'User is not active')
+
+    @classmethod
     def auth_required(cls):
         return cls.__base_error_response(401, 'AuthRequired')
 

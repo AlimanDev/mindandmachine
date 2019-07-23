@@ -1,7 +1,8 @@
-from src.db.models import Notifications
+from src.db.models import Notifications, WorkerDayCashboxDetails
 from src.util.utils import api_method, JsonResponse
 from src.util.models_converter import NotificationConverter
 from.forms import SetNotificationsReadForm, GetNotificationsForm, NotifyAction
+from django.db.models import Q
 
 
 @api_method('GET', GetNotificationsForm, check_permissions=False)
@@ -90,9 +91,10 @@ def get_notifications2(request, form):
     count = form.get('count', 20)
     count = count if count else 20
 
-    notifies = list(Notifications.objects.mm_filter(to_worker=request.user).
-                    order_by('-id')[pointer * count: (pointer + 1) * count]
-    )
+    notifies = list(Notifications.objects.mm_filter(
+        Q(event__workerday_details__dttm_deleted__isnull=True) |
+        Q(event__workerday_details__worker_day__worker=request.user),
+        to_worker=request.user).order_by('-id')[pointer * count: (pointer + 1) * count])
 
     result = {
         'unread_count': Notifications.objects.filter(to_worker=request.user, was_read=False).count(),

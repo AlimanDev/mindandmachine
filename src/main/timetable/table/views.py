@@ -350,7 +350,7 @@ def get_month_stat(request, form):
     dt_start = datetime.date(form['dt'].year, form['dt'].month, 1)
     dt_start_year = datetime.date(dt_start.year, 1, 1)
     dt_end = dt_start + relativedelta(months=+1)
-    usrs = User.objects.qos_filter_active(dt_start, dt_end)
+    usrs = User.objects.qos_filter_active(form['dt'], dt_end)
     # todo: add code for permissions check (check stat of workers from another shops)
     worker_ids = form['worker_ids']
 

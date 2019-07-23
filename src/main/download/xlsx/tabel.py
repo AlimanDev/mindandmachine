@@ -385,7 +385,7 @@ class Tabel_xlsx(Xlsx_base):
         self.worksheet.write_string(row + 2, col, '', cell_f)
         self.worksheet.write_string(row + 3, col, 'pl_days', cell_f)
 
-        self._write_formula(row + 4, n_users, col, 'D8-AR{0}', cell_f)
+        self._write_formula(row + 4, n_users, col, 'AN{0}+AT{0}+AU{0}+AV{0}', cell_f)
 
         # other
         cell_format['bg_color'] = COLOR_WHITE
