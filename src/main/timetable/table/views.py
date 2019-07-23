@@ -379,7 +379,7 @@ def get_month_stat(request, form):
 
 
 @api_method(
-    'GET',
+    'POST',
     WorkersToExchange,
     lambda_func=lambda x: User.objects.get(id=x['worker1_id']).shop,
 )
@@ -388,7 +388,7 @@ def exchange_workers_day(request, form):
     Обмен рабочим расписание между двумя сотрудниками в заданный день
     Args:
          method: POST
-         url: /api/timetable/worker_exchange/exchange_workers_day
+         url: /api/timetable/table/exchange_workers_day
          worker1_id(int): id первого пользователя
          worker2_id(int): id второго пользователя
          from_dt(QOS_DATE): дата для замены, c которой обменять график сотрудников
