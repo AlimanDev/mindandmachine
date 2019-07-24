@@ -7,6 +7,7 @@ import numpy as np
 from datetime import time, datetime
 from dateutil.relativedelta import relativedelta
 from src.db.models import (
+    Event,
     SuperShop,
     Shop,
     User,
@@ -235,15 +236,12 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         while day < days:
             wd = wds.iloc[day_ind]
             dt = wd['dt'] + dt_diff
-            if WorkerDayConverter.parse_type(wd['type']) == WorkerDay.Type.TYPE_HOLIDAY.value:
-                default_dttm = None
-            else:
-                default_dttm = timezone.datetime.combine(dt, time(15, 30))
+
+            default_dttm = timezone.datetime.combine(dt, time(15, 30))
             dttm_work_start = default_dttm if wd['dttm_work_start'] in [pd.NaT, np.NaN] else timezone.datetime.combine(
                 dt, wd['dttm_work_start'])
-            dttm_work_end = default_dttm if wd['dttm_work_end'] in [pd.NaT, np.NaN] else timezone.datetime.combine(dt,
-                                                                                                                   wd[
-                                                                                                                       'dttm_work_end'])
+            dttm_work_end = default_dttm if wd['dttm_work_end'] in [pd.NaT, np.NaN] else timezone.datetime.combine(
+                dt, wd['dttm_work_end'])
             if dttm_work_start and dttm_work_end and (dttm_work_end < dttm_work_start):
                 dttm_work_end += timezone.timedelta(days=1)
 
@@ -292,8 +290,10 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     dt=dt,
                     type=WorkerDayConverter.parse_type(wd['type']),
 
-                    dttm_work_start=dttm_work_start,
-                    dttm_work_end=dttm_work_end,
+                    dttm_work_start=None if WorkerDayConverter.parse_type(wd['type']) ==
+                                            WorkerDay.Type.TYPE_HOLIDAY.value else dttm_work_start,
+                    dttm_work_end=None if WorkerDayConverter.parse_type(wd['type']) ==
+                                          WorkerDay.Type.TYPE_HOLIDAY.value else dttm_work_end,
                 ))
             day += 1
             day_ind = (day_ind + 1) % wds.shape[0]
@@ -349,28 +349,17 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
 
 def create_notifications():
     list_notifications = []
+    list_event = []
     for user in User.objects.all():
-        list_notifications.append(Notifications(
-            to_worker=user,
-            text='Test notifications #success',
-            type='success',
+        list_event.append(Event(
+            text='Test notifications',
         ))
         list_notifications.append(Notifications(
             to_worker=user,
-            text='Test notifications #info',
-            type='info',
-        ))
-        list_notifications.append(Notifications(
-            to_worker=user,
-            text='Test notifications #warning',
-            type='warning',
-        ))
-        list_notifications.append(Notifications(
-            to_worker=user,
-            text='Test notifications #error',
-            type='error',
+            event=list_event[-1],
         ))
     Notifications.objects.bulk_create(list_notifications)
+    Event.objects.bulk_create(list_event)
 
 
 def main(date=None, shops=None):
