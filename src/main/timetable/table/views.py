@@ -18,7 +18,7 @@ from src.util.models_converter import (
     BaseConverter,
 )
 from src.util.utils import api_method, JsonResponse
-from .forms import GetWorkerStatForm
+from .forms import GetWorkerStatForm, WorkersToExchange
 from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
 from .utils import (
     count_work_month_stats,
@@ -350,7 +350,7 @@ def get_month_stat(request, form):
     dt_start = datetime.date(form['dt'].year, form['dt'].month, 1)
     dt_start_year = datetime.date(dt_start.year, 1, 1)
     dt_end = dt_start + relativedelta(months=+1)
-    usrs = User.objects.qos_filter_active(dt_start, dt_end)
+    usrs = User.objects.qos_filter_active(form['dt'], dt_end)
     # todo: add code for permissions check (check stat of workers from another shops)
     worker_ids = form['worker_ids']
 
@@ -376,6 +376,78 @@ def get_month_stat(request, form):
         })
     return JsonResponse.success({'users_info': month_info})
 
+
+
+@api_method(
+    'POST',
+    WorkersToExchange,
+    lambda_func=lambda x: User.objects.get(id=x['worker1_id']).shop,
+)
+def exchange_workers_day(request, form):
+    """
+    Обмен рабочим расписание между двумя сотрудниками в заданный день
+    Args:
+         method: POST
+         url: /api/timetable/table/exchange_workers_day
+         worker1_id(int): id первого пользователя
+         worker2_id(int): id второго пользователя
+         from_dt(QOS_DATE): дата для замены, c которой обменять график сотрудников
+         to_dt(QOS_DATE): дата для замены, по которую включительно обменять график сотрудников
+    Returns:
+        {}
+    """
+
+    def create_worker_day(wd_parent, wd_swap):
+        wd_new = WorkerDay(
+            type=wd_swap.type,
+            dttm_work_start=wd_swap.dttm_work_start,
+            dttm_work_end=wd_swap.dttm_work_end,
+            worker_id=wd_parent.worker_id,
+            dt=wd_parent.dt,
+            parent_worker_day=wd_parent,
+            created_by=request.user,
+        )
+        wd_new.save()
+
+        wd_cashbox_details_new = []
+        for wd_cashbox_details_parent in wd_swap.workerdaycashboxdetails_set.all():
+            wd_cashbox_details_new.append(WorkerDayCashboxDetails(
+                worker_day_id=wd_new.id,
+                on_cashbox_id=wd_cashbox_details_parent.on_cashbox_id,
+                work_type_id=wd_cashbox_details_parent.work_type_id,
+                status=wd_cashbox_details_parent.status,
+                is_tablet=wd_cashbox_details_parent.is_tablet,
+                dttm_from=wd_cashbox_details_parent.dttm_from,
+                dttm_to=wd_cashbox_details_parent.dttm_to,
+            ))
+        WorkerDayCashboxDetails.objects.bulk_create(wd_cashbox_details_new)
+
+    if form['to_dt'] < form['from_dt']:
+        return JsonResponse.value_error('Первая дата должна быть меньше второй')
+
+    days = (form['to_dt'] - form['from_dt']).days + 1
+
+    wd_parent_list = list(WorkerDay.objects.qos_current_version().filter(
+        worker_id__in=(form['worker1_id'], form['worker2_id']),
+        dt__gte=form['from_dt'],
+        dt__lte=form['to_dt'],
+    ).order_by('dt'))
+
+    if len(wd_parent_list) != days * 2:
+        return JsonResponse.value_error('Отсутствует расписание сотрудников')
+
+    day_pairs = []
+    for day_ind in range(days):
+        day_pair = [wd_parent_list[day_ind * 2], wd_parent_list[day_ind * 2 + 1]]
+        if day_pair[0].dt != day_pair[1].dt:
+            return JsonResponse.value_error('Отсутствует расписание сотрудников')
+        day_pairs.append(day_pair)
+
+    for day_pair in day_pairs:
+        create_worker_day(day_pair[0], day_pair[1])
+        create_worker_day(day_pair[1], day_pair[0])
+
+    return JsonResponse.success()
 
 
 

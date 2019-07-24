@@ -1,6 +1,9 @@
 from src.util.test import LocalTestCase
 import io
 import pandas
+from django.utils import timezone
+import datetime
+from src.conf.djconfig import QOS_DATE_FORMAT
 
 class TestDownload(LocalTestCase):
 
@@ -14,7 +17,8 @@ class TestDownload(LocalTestCase):
     def test_get_tabel(self):
         self.auth()
 
-        response = self.api_get('/api/download/get_tabel?weekday=01.06.2019&shop_id=1')
+        response = self.api_get('/api/download/get_tabel?weekday={}&shop_id=1'.format(
+            datetime.date.strftime(timezone.now(), QOS_DATE_FORMAT)))
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[1]][14], 'Дурак Иван None')

@@ -10,6 +10,7 @@
 
 
 from uuid import uuid4
+from django.utils import timezone
 
 def password_generator(len=14):
     return str(uuid4()).replace('-', '')[:len]  # algo based on SHA-1 (not safe enough nowdays)
@@ -77,7 +78,8 @@ def main(hq_accs=2):
         username='qadmin',
         function_group=admin_group,
         first_name='Admin',
-        last_name='Admin'
+        last_name='Admin',
+        dt_hired=timezone.now().date(),
     )
     u_pass = password_generator()
     admin.set_password(u_pass)

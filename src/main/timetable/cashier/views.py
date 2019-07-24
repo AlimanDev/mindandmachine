@@ -2,9 +2,11 @@ from datetime import time, datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ObjectDoesNotExist
 import json
+from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
 
 from src.db.models import (
     User,
+    Shop,
     WorkerDay,
     WorkerDayChangeRequest,
     ProductionDay,
@@ -727,6 +729,7 @@ def set_worker_day(request, form):
         return JsonResponse.multiple_objects_returned()
 
     if old_wd:
+        old_wd_type = old_wd.type
         # Не пересохраняем, если тип не изменился
         if old_wd.type == form['type'] and not WorkerDay.is_type_with_tm_range(form['type']):
             return JsonResponse.success()
@@ -788,6 +791,14 @@ def set_worker_day(request, form):
     response = {
         'action': action
     }
+
+    shop = Shop.objects.get(user=form['worker_id'])
+    work_type = WorkType.objects.get(id=form['work_type'] if form['work_type'] else old_wd_type)
+
+    if form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
+        cancel_vacancies(shop, work_type)
+    if form['type'] != WorkerDay.Type.TYPE_WORKDAY.value:
+        create_vacancies_and_notify(shop, work_type)
 
     return JsonResponse.success(response)
 

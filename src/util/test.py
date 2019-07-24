@@ -111,6 +111,7 @@ class LocalTestCase(TestCase):
             function_group=self.admin_group,
             last_name='Дурак',
             first_name='Иван',
+            dt_hired=now().date(),
         )
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2', first_name='Иван2', last_name='Иванов')
         self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3', first_name='Иван3',
@@ -132,6 +133,7 @@ class LocalTestCase(TestCase):
             function_group=self.hq_group,
             last_name='Дурак5',
             first_name='Иван5',
+            dt_hired=now().date(),
         )
         self.user6 = User.objects.create_user(
             'user6',
@@ -142,6 +144,7 @@ class LocalTestCase(TestCase):
             function_group=self.chief_group,
             last_name='Дурак6',
             first_name='Иван6',
+            dt_hired=now().date(),
         )
         self.user7 = User.objects.create_user(
             'user7',
@@ -152,6 +155,7 @@ class LocalTestCase(TestCase):
             function_group=self.employee_group,
             last_name='Дурак7',
             first_name='Иван7',
+            dt_hired=now().date(),
         )
 
         # work_types

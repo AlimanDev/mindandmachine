@@ -226,7 +226,7 @@ class User(DjangoAbstractUser):
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
-    dt_hired = models.DateField(null=True, blank=True)
+    dt_hired = models.DateField(default=datetime.date(2019, 1, 1))
     dt_fired = models.DateField(null=True, blank=True)
     salary = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
@@ -362,6 +362,7 @@ class FunctionGroup(models.Model):
         'cancel_vacancy',
         'confirm_vacancy',
         'do_notify_action',
+        'exchange_workers_day',
     )
 
     FUNCS_TUPLE = ((f, f) for f in FUNCS)
@@ -898,9 +899,9 @@ class WorkerDayCashboxDetails(models.Model):
     dttm_to = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return '{}, {}, {}, {}-{}, id: {}'.format(
+        return '{}, {}, {}, {}, {}-{}, id: {}'.format(
             # self.worker_day.worker.last_name,
-            # self.worker_day.dt,
+            self.dttm_from.date(),
             '', '',
             self.work_type.name if self.work_type else None,
             self.dttm_from.replace(microsecond=0).time() if self.dttm_from else self.dttm_from,
@@ -1319,16 +1320,20 @@ class AttendanceRecords(models.Model):
 
 
 class ExchangeSettings(models.Model):
+    #Создаем ли автоматически вакансии
     automatic_check_lack = models.BooleanField(default=False)
+    #Период, за который проверяем
     automatic_check_lack_timegap = models.DurationField(default=datetime.timedelta(days=7))
 
-    # Минимальная загрузка сотрудника при создании и удалении вакансии
-    automatic_create_vacancy_lack_min = models.FloatField(default=.6)
-    automatic_delete_vacancy_oveflow_max = models.FloatField(default=0.5)
+    # Минимальная потребность в сотруднике при создании вакансии
+    automatic_create_vacancy_lack_min = models.FloatField(default=.5)
+    # Максимальная потребность в сотруднике для удалении вакансии
+    automatic_delete_vacancy_lack_max = models.FloatField(default=0.3)
 
     #Только автоназначение сотрудников
-    automatic_worker_select_timegap = models.DurationField(default=datetime.timedelta(hours=4))
-    automatic_worker_select_lack_diff = models.FloatField(default=2)
+    automatic_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=1))
+    # Дробное число, на какую долю сотрудник не занят, чтобы совершить обмен
+    automatic_worker_select_overflow_min = models.FloatField(default=0.8)
 
     #Длина смены
     working_shift_min_hours = models.DurationField(default=datetime.timedelta(hours=4)) # Минимальная длина смены

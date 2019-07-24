@@ -485,21 +485,16 @@ def create_timetable(request, form):
 
     user_info = count_difference_of_normal_days(dt_end=dt_from, usrs=users)
 
-    # инфа за предыдущий месяц
-    # TODO: FIXME: unwork in first days
-    prev_month_num = (dt_from - timedelta(days=1)).month
-    year_num = (dt_from - timedelta(days=1)).year
-    prev_days_amount = monthrange(year_num, prev_month_num)[1]
+    # инфа за предыдущую неделю
 
     prev_month_data = group_by(
         collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
             worker__shop_id=shop_id,
-            dt__gte=dt_from - timedelta(days=prev_days_amount),
+            dt__gte=dt_from - timedelta(days=7),
             dt__lt=dt_from,
         ),
         group_key=lambda x: x.worker_id,
     )
-
     # если стоит флаг shop.paired_weekday, смотрим по юзерам, нужны ли им в этом месяце выходные в выходные
     resting_states_list = [WorkerDay.Type.TYPE_HOLIDAY.value]
     if shop.paired_weekday:

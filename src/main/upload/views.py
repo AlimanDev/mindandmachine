@@ -205,9 +205,9 @@ def upload_timetable(request, form, timetable_file):
                 )
                 # except User.DoesNotExist:
                 #     return JsonResponse.value_error('Не могу найти пользователя на строке {}'.format(cell.row))
-            if create:
-                u.username = 'u' + str(u.id)
-                u.save()
+                if create:
+                    u.username = 'u' + str(u.id)
+                    u.save()
             elif column_index == work_type_column:
                 user_work_type = shop_work_types.get(cell.value, None)
                 if user_work_type:

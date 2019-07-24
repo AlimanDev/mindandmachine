@@ -21,7 +21,7 @@ class TestAutoSettings(LocalTestCase):
         self.auth()
 
         response = self.api_post('/api/timetable/auto_settings/set_selected_cashiers',
-                                 {'cashier_ids': json.dumps([1, 2]), 'shop_id': 1})
+                                 {'worker_ids': json.dumps([1, 2]), 'shop_id': 1})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         user = User.objects.filter(id__in=[1, 2, 3]).order_by('id')

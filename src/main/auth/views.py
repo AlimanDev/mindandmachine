@@ -6,6 +6,7 @@ from src.util.models_converter import UserConverter
 from src.util.utils import JsonResponse, api_method
 from .forms import SigninForm, FCMTokenForm
 from fcm_django.models import FCMDevice
+from django.utils import timezone
 
 
 @api_method('GET', auth_required=False, check_permissions=False)
@@ -39,7 +40,10 @@ def signin(request, form):
         user = authenticate(request, username=form['username'], password=form['password'])
         if user is None:
             return JsonResponse.auth_error()
-
+        if user.dt_fired is not None and user.dt_fired <= timezone.now().date():
+            return JsonResponse.not_active_error()
+        elif user.dt_hired is None or user.dt_hired > timezone.now().date():
+            return JsonResponse.not_active_error()
         login(request, user)
     user = User.objects.get(id=request.user.id)
 

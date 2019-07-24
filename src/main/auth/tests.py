@@ -1,4 +1,6 @@
 from src.util.test import LocalTestCase
+from src.db.models import User
+from django.utils.timezone import now
 
 
 class AuthTestCase(LocalTestCase):
@@ -25,3 +27,33 @@ class AuthTestCase(LocalTestCase):
 
         response = self.api_get('/api/auth/is_signed')
         self.assertEqual(response.json['data']['is_signed'], False)
+
+        user = User.objects.get(pk=1)
+        user.dt_fired = now().date()
+        user.save()
+
+        response = self.api_post(
+            '/api/auth/signin',
+            {
+                'username': LocalTestCase.USER_USERNAME,
+                'password': LocalTestCase.USER_PASSWORD,
+            }
+        )
+        self.assertEqual(response.json['data']['error_type'], 'NotActiveError')
+        self.api_post('/api/auth/signout')
+
+        user = User.objects.get(pk=1)
+        user.dt_fired = None
+        user.dt_hired = None
+        user.save()
+
+        response = self.api_post(
+            '/api/auth/signin',
+            {
+                'username': LocalTestCase.USER_USERNAME,
+                'password': LocalTestCase.USER_PASSWORD,
+            }
+        )
+        self.assertEqual(response.json['data']['error_type'], 'NotActiveError')
+
+
