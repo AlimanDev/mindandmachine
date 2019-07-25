@@ -796,7 +796,7 @@ def set_worker_day(request, form):
     work_type = WorkType.objects.get(id=form['work_type'] if form['work_type'] else old_wd_type)
 
     if form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
-        cancel_vacancies(shop, work_type)
+        cancel_vacancies(shop.id, work_type.id)
     if form['type'] != WorkerDay.Type.TYPE_WORKDAY.value:
         create_vacancies_and_notify(shop, work_type)
 

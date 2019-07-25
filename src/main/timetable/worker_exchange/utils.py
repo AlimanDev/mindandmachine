@@ -155,7 +155,7 @@ def confirm_vacancy(vacancy_id, user):
     )
 
 
-def create_vacancies_and_notify(shop, work_type):
+def create_vacancies_and_notify(shop_id, work_type_id):
     """
     Создает уведомления на неделю вперед, если в магазине будет нехватка кассиров
 
@@ -171,10 +171,10 @@ def create_vacancies_and_notify(shop, work_type):
         'to_dt': dttm_next_week.date(),
     }
 
-    print('check vacancies for {}; {}'.format(shop, work_type))
-    params['work_type_ids'] = [work_type.id]
+    print('check vacancies for {}; {}'.format(shop_id, work_type_id))
+    params['work_type_ids'] = [work_type_id]
     shop_stat = get_shop_stats(
-        shop.id,
+        shop_id,
         params,
         consider_vacancies=True)
     df_stat = pandas.DataFrame(shop_stat['lack_of_cashiers_on_period'])
@@ -270,12 +270,12 @@ def create_vacancies_and_notify(shop, work_type):
         for shift in working_shifts:
             dttm_from = dttm_to
             dttm_to = dttm_to + shift
-            print('create vacancy {} {} {}'.format(dttm_from, dttm_to, work_type))
+            print('create vacancy {} {} {}'.format(dttm_from, dttm_to, work_type_id))
 
             worker_day_detail = WorkerDayCashboxDetails.objects.create(
                 dttm_from=dttm_from,
                 dttm_to=dttm_to,
-                work_type=work_type,
+                work_type_id=work_type_id,
                 status=WorkerDayCashboxDetails.TYPE_VACANCY,
                 is_vacancy=True,
             )
@@ -289,7 +289,7 @@ def create_vacancies_and_notify(shop, work_type):
             send_noti2candidates(workers, worker_day_detail)
 
 
-def cancel_vacancies(shop, work_type):
+def cancel_vacancies(shop_id, work_type_id):
     """
     Автоматически отменяем вакансии, в которых нет потребности
     :return:
@@ -310,9 +310,9 @@ def cancel_vacancies(shop, work_type):
         'to_dt': to_dt,
     }
 
-    params['work_type_ids'] = [work_type.id]
+    params['work_type_ids'] = [work_type_id]
     shop_stat = get_shop_stats(
-        shop.id,
+        shop_id,
         params,
         consider_vacancies=True)
     df_stat=pandas.DataFrame(shop_stat['tt_periods']['real_cashiers']).rename({'amount':'real_cashiers'}, axis=1)
@@ -329,7 +329,7 @@ def cancel_vacancies(shop, work_type):
         (Q(worker_day__worker__id__isnull=False) & Q(dttm_from__gte=min_dttm)) | Q(worker_day__worker__id__isnull=True),
         dttm_from__gte=from_dt,
         dttm_to__lte=to_dt,
-        work_type_id__in=[work_type.id],
+        work_type_id__in=[work_type_id],
         is_vacancy=True,
         status__in=work_types,
     ).order_by('status','dttm_from','dttm_to')

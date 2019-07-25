@@ -354,27 +354,27 @@ def vacancies_create_and_cancel():
 
     for shop in Shop.objects.all():
         for work_type in shop.worktype_set.all():
-            cancel_shop_vacancies.apply_async((shop, work_type))
-            create_shop_vacancies_and_notify.apply_async((shop, work_type))
+            cancel_shop_vacancies.apply_async((shop.id, work_type.id))
+            create_shop_vacancies_and_notify.apply_async((shop.id, work_type.id))
 
 
 @app.task
-def create_shop_vacancies_and_notify(shop, work_type):
+def create_shop_vacancies_and_notify(shop_id, work_type_id):
     """
     Создает уведомления на неделю вперед, если в магазине будет нехватка кассиров
 
     """
 
-    create_vacancies_and_notify(shop, work_type)
+    create_vacancies_and_notify(shop_id, work_type_id)
 
 
 @app.task
-def cancel_shop_vacancies(shop, work_type):
+def cancel_shop_vacancies(shop_id, work_type_id):
     """
     Автоматически отменяем вакансии, в которых нет потребности
     :return:
     """
-    cancel_vacancies(shop, work_type)
+    cancel_vacancies(shop_id, work_type_id)
 
 
 @app.task

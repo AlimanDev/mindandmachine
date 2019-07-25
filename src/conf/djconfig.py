@@ -266,7 +266,7 @@ CELERY_BEAT_SCHEDULE = {
 
     'task-vacancies_create_and_cancel': {
         'task': 'src.celery.tasks.vacancies_create_and_cancel',
-        'schedule': crontab(hour=1, minute=0),
+        'schedule': crontab(minute='*/30'),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-workers_hard_exchange': {
