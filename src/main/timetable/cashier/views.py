@@ -798,7 +798,7 @@ def set_worker_day(request, form):
     if form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
         cancel_vacancies(shop.id, work_type.id)
     if form['type'] != WorkerDay.Type.TYPE_WORKDAY.value:
-        create_vacancies_and_notify(shop, work_type)
+        create_vacancies_and_notify(shop.id, work_type.id) # todo: fix this row
 
     return JsonResponse.success(response)
 
