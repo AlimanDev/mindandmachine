@@ -643,6 +643,18 @@ def delete_timetable(request, form):
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
     ).delete()
 
+    WorkerDayCashboxDetails.objects.filter(
+        worker_day__worker__shop_id=shop_id,
+        worker_day__dt__gte=dt_from,
+        worker_day__dt__lt=dt_to,
+        worker_day__worker__auto_timetable=True,
+        is_vacancy=True,
+    ).update(
+        worker_day=None
+    )
+
+
+
     WorkerDay.objects.filter(
         worker__shop_id=shop_id,
         dt__gte=dt_from,
