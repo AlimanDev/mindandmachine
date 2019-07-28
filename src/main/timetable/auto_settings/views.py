@@ -654,10 +654,12 @@ def delete_timetable(request, form):
 
     # cancel vacancy
     # todo: add deleting workerdays
+    work_type_ids = [w.id for w in WorkType.objects.filter(shop_id=shop_id)]
     WorkerDayCashboxDetails.objects.filter(
         dttm_from__date__gte=dt_from,
         dttm_from__date__lt=dt_to,
         is_vacancy=True,
+        work_type_id__in=work_type_ids,
     ).update(
         dttm_deleted=timezone.now(),
         status=WorkerDayCashboxDetails.TYPE_DELETED,
