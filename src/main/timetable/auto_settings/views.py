@@ -637,6 +637,7 @@ def delete_timetable(request, form):
         worker_day__dt__gte=dt_from,
         worker_day__dt__lt=dt_to,
         worker_day__worker__auto_timetable=True,
+        is_vacancy=False,
     ).filter(
         Q(worker_day__created_by__isnull=True) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
