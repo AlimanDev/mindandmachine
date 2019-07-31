@@ -1367,6 +1367,14 @@ def change_cashier_info(request, form):
     if form['dt_fired']:
         user.dt_fired = form['dt_fired']
 
+        wd_query_set = list(WorkerDay.objects.filter(dt__gte=form['dt_fired'], worker=user).order_by('-id'))
+        if len(wd_query_set):
+            WorkerDayCashboxDetails.objects.filter(
+                worker_day__in=wd_query_set
+            ).delete()
+            for wd in wd_query_set:
+                wd.delete()
+
     user.save()
 
     return JsonResponse.success()
