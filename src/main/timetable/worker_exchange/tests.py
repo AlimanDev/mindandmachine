@@ -273,7 +273,7 @@ class Test_auto_worker_exchange(TestCase):
         wdcd = WorkerDayCashboxDetails.objects.all()
         self.assertEqual(len(wdcd.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY)), 2)
 
-        cancel_vacancies(self.shop, self.work_type)
+        cancel_vacancies(self.shop.id, self.work_type.id)
 
         wdcd = WorkerDayCashboxDetails.objects.all()
         self.assertEqual(len(wdcd.filter(status=WorkerDayCashboxDetails.TYPE_DELETED)), 1)
@@ -285,7 +285,7 @@ class Test_auto_worker_exchange(TestCase):
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 0)
-        create_vacancies_and_notify(self.shop, self.work_type)
+        create_vacancies_and_notify(self.shop.id, self.work_type.id)
         wdcd = WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY).order_by('dttm_to')
         print(wdcd.count(), '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         self.assertEqual([wdcd[0].dttm_from.time(), wdcd[0].dttm_to.time()],
@@ -304,7 +304,7 @@ class Test_auto_worker_exchange(TestCase):
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 2)
-        create_vacancies_and_notify(self.shop, self.work_type)
+        create_vacancies_and_notify(self.shop.id, self.work_type.id)
         wdcd = WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY).order_by('dttm_to')
         self.assertEqual([wdcd[0].dttm_from.time(), wdcd[0].dttm_to.time()],
                          [datetime.time(9, 0), datetime.time(20, 0)])
@@ -321,7 +321,7 @@ class Test_auto_worker_exchange(TestCase):
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 1)
-        create_vacancies_and_notify(self.shop, self.work_type)
+        create_vacancies_and_notify(self.shop.id, self.work_type.id)
         wdcd = WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY).order_by('dttm_to')
         self.assertEqual([wdcd[0].dttm_from.time(), wdcd[0].dttm_to.time()], [datetime.time(9, 0),
                                                                               datetime.time(13, 0)])
@@ -339,7 +339,7 @@ class Test_auto_worker_exchange(TestCase):
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 2)
-        create_vacancies_and_notify(self.shop, self.work_type)
+        create_vacancies_and_notify(self.shop.id, self.work_type.id)
         wdcd = WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY).order_by('dttm_to')
         self.assertEqual([wdcd[0].dttm_from.time(), wdcd[0].dttm_to.time()], [datetime.time(9, 0),
                                                                               datetime.time(14, 0)])
@@ -357,7 +357,7 @@ class Test_auto_worker_exchange(TestCase):
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 2)
-        create_vacancies_and_notify(self.shop, self.work_type)
+        create_vacancies_and_notify(self.shop.id, self.work_type.id)
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 2)
 
