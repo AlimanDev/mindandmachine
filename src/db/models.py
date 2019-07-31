@@ -6,6 +6,7 @@ from django.contrib.auth.models import (
 from django.contrib.contenttypes.models import ContentType
 from . import utils
 import datetime
+from fcm_django.models import FCMDevice
 
 
 class Region(models.Model):
@@ -957,6 +958,9 @@ class EventManager(models.Manager):
 
         notis = Notifications.objects.bulk_create([Notifications(event=event, to_worker=u) for u in users])
         # todo: add sending push notifies
+        if push_title is not None:
+            devices = FCMDevice.objects.filter(user__in=users)
+            devices.send_message(title=push_title, body=event.text)
         return event
 
 
