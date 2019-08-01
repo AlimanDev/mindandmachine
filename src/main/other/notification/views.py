@@ -99,12 +99,12 @@ def get_notifications2(request, form):
 
     if form['type'] == 'vacancy':
         notifies = list(notifies.filter(
-            event__workerday_details__isnull=False))[pointer * count: (pointer + 1) * count]
+            event__workerday_details__isnull=False)[pointer * count: (pointer + 1) * count])
     elif form['type'] == 'other':
         notifies = list(notifies.filter(
-            event__workerday_details__isnull=True))[pointer * count: (pointer + 1) * count]
+            event__workerday_details__isnull=True)[pointer * count: (pointer + 1) * count])
     else:
-        notifies = list(notifies)[pointer * count: (pointer + 1) * count]
+        notifies = list(notifies[pointer * count: (pointer + 1) * count])
 
     result = {
         'unread_count': Notifications.objects.filter(to_worker=request.user, was_read=False).count(),
