@@ -267,9 +267,13 @@ def create_vacancies_and_notify(shop_id, work_type_id):
             working_shifts = [min_shift]
         dttm_to = dttm_from = df_vacancies.dttm_from[i]
 
+        shop_tm_closes = Shop.objects.get(id=shop_id).tm_shop_closes
         for shift in working_shifts:
             dttm_from = dttm_to
             dttm_to = dttm_to + shift
+            if dttm_to.time() > shop_tm_closes:
+                dttm_to = dttm_to.replace(hour=shop_tm_closes.hour, minute=shop_tm_closes.minute)
+                dttm_from = dttm_to - shift
             print('create vacancy {} {} {}'.format(dttm_from, dttm_to, work_type_id))
 
             worker_day_detail = WorkerDayCashboxDetails.objects.create(
