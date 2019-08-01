@@ -3,6 +3,7 @@ from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ObjectDoesNotExist
 import json
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
+from django.utils import timezone
 
 from src.db.models import (
     User,
@@ -1367,13 +1368,20 @@ def change_cashier_info(request, form):
     if form['dt_fired']:
         user.dt_fired = form['dt_fired']
 
-        wd_query_set = list(WorkerDay.objects.filter(dt__gte=form['dt_fired'], worker=user).order_by('-id'))
-        if len(wd_query_set):
-            WorkerDayCashboxDetails.objects.filter(
-                worker_day__in=wd_query_set
-            ).delete()
-            for wd in wd_query_set:
-                wd.delete()
+        WorkerDayCashboxDetails.objects.filter(
+            worker_day__worker=user,
+            worker_day__dt__gte=form['dt_fired'],
+            is_vacancy=False,
+        ).delete()
+
+        WorkerDayCashboxDetails.objects.filter(
+            worker_day__worker=user,
+            worker_day__dt__gte=form['dt_fired'],
+            is_vacancy=True,
+        ).update(
+            dttm_deleted=timezone.now(),
+            status=WorkerDayCashboxDetails.TYPE_DELETED,
+        )
 
     user.save()
 
