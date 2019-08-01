@@ -263,6 +263,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                         dttm_work_start=None,
                         dttm_work_end=None,
                     )
+                    wd_model.save()
                 add_models(details, WorkerDayCashboxDetails, WorkerDayCashboxDetails(
                     worker_day=wd_model,
                     work_type=work_types_dict[wd['work_type']],
