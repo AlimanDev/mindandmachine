@@ -299,3 +299,7 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     }
 }
+
+SFTP_IP = '80.87.200.194'
+SFTP_USERNAME = 'root'
+SFTP_PASSWORD = 'Xw0Hq3Hybm4c'
