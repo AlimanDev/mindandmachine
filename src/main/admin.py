@@ -47,8 +47,8 @@ class RegionAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerPosition)
 class WorkerPositionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'department', 'title')
-    search_fields = ('department',)
+    list_display = ('id', 'title')
+    search_fields = ('title',)
 
 
 @admin.register(OperationType)

@@ -138,11 +138,10 @@ class WorkerPosition(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    department = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)
     title = models.CharField(max_length=64)
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.title, self.department.title, self.department.super_shop.title, self.id)
+        return '{}, {}, {}, {}'.format(self.title, self.id)
 
 
 class WorkerManager(UserManager):
