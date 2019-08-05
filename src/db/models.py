@@ -126,6 +126,9 @@ class Shop(models.Model):
     def __str__(self):
         return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)
 
+    def system_step_in_minutes(self):
+        return self.forecast_step_minutes.hour * 60 + self.forecast_step_minutes.minute
+
 
 class WorkerPosition(models.Model):
     """

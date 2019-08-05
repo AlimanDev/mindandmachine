@@ -56,6 +56,8 @@ from src.main.other.notification.utils import send_notification
 from django.contrib.auth import update_session_auth_hash
 from django.db import IntegrityError
 
+import time as time_in_seconds
+
 
 @api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
@@ -1102,7 +1104,7 @@ def create_cashier(request, form):
             | 'tabel_code':
         }
     """
-    username = str(time.time() * 1000000)[:-2]
+    username = str(time_in_seconds.time() * 1000000)[:-2]
     try:
         user = User.objects.create_user(username=username, password=form['password'], email='q@q.com')
         user.first_name = form['first_name']
