@@ -1,10 +1,9 @@
-from datetime import datetime, timedelta, date
+from datetime import time, datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ObjectDoesNotExist
 import json
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
 from django.utils import timezone
-import time as time_in_seconds
 
 from src.db.models import (
     User,
