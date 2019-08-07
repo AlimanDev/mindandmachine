@@ -1,7 +1,7 @@
 from src.db.models import (
     User,
     AttendanceRecords,
-    UserIdentifier,
+    # UserIdentifier,
     Shop
 )
 from src.util.utils import JsonResponse, api_method
@@ -46,19 +46,18 @@ def get_user_urv(request, form):
     #         shop_id=request.user.shop_id
     #     ).values_list('id', flat=True))
 
-    super_shop = Shop.objects.get(id=form['shop_id']).super_shop
 
-    user_records = AttendanceRecords.objects.select_related('identifier').filter(
+    user_records = AttendanceRecords.objects.filter(
         dttm__date__gte=from_dt,
         dttm__date__lte=to_dt,
-        super_shop=super_shop,
+        shop_id=form['shop_id'],
     )
 
     if len(worker_ids):
         user_records = user_records.filter(
-            Q(identifier__worker_id__in=worker_ids) |
-            Q(identifier__worker_id__isnull=True) |
-            Q(identifier__worker__attachment_group=User.GROUP_OUTSOURCE)
+            Q(user_id__in=worker_ids) |
+            Q(user_id__isnull=True) |
+            Q(user__attachment_group=User.GROUP_OUTSOURCE)
         )
     if form['from_tm']:
         user_records = user_records.filter(dttm__time__gte=form['from_tm'])
@@ -76,13 +75,13 @@ def get_user_urv(request, form):
         select_not_verified = Q(verified=False)
 
     if form['show_not_detected']:
-        select_not_detected = Q(identifier__worker_id__isnull=True)
+        select_not_detected = Q(user_id__isnull=True)
 
     if form['show_workers']:
-        select_workers = Q(identifier__worker__attachment_group=User.GROUP_STAFF)
+        select_workers = Q(user__attachment_group=User.GROUP_STAFF)
 
     if form['show_outstaff']:
-        select_outstaff = Q(identifier__worker__attachment_group=User.GROUP_OUTSOURCE)
+        select_outstaff = Q(user__attachment_group=User.GROUP_OUTSOURCE)
 
     extra_filters = list(filter(lambda x: x, [select_not_verified, select_not_detected, select_workers, select_outstaff]))
     if len(extra_filters):
@@ -114,35 +113,36 @@ def get_user_urv(request, form):
     # lambda_func=None,  # lambda x: User.objects.get(id=x['worker_ids'][0])
 )
 def change_user_urv(request, form):
-    if not form['to_user_id'] and not form['is_outsource']:
-        return JsonResponse.value_error('Выберите, пожалуйста, либо сотрудника, либо вариант аутсорса.')
-
-    identifier = UserIdentifier.objects.get(attendancerecords__id=form['attendance_id'])
-
-    if form['is_outsource']:
-        dt = timezone.now().date()
-        outsourcer_number = User.objects.filter(
-            attachment_group=User.GROUP_OUTSOURCE,
-            dt_hired=dt,
-            dt_fired=dt,
-        ).count()
-        user = User.objects.create(
-            shop_id=request.user.shop_id,
-            attachment_group=User.GROUP_OUTSOURCE,
-            first_name='№{}'.format(outsourcer_number + 1),
-            last_name='Наемный сотрудник',
-            dt_hired=dt,
-            dt_fired=dt,
-            salary=0,
-            username='outsourcer_{}_{}'.format(dt, outsourcer_number + 1),
-            auto_timetable=False
-        )
-    else:
-        user = User.objects.get(
-            id=form['to_user_id'],
-            shop_id=request.user.shop_id,
-        )
-
-    identifier.worker = user
-    identifier.save()
-    return JsonResponse.success()
+    pass
+    # if not form['to_user_id'] and not form['is_outsource']:
+    #     return JsonResponse.value_error('Выберите, пожалуйста, либо сотрудника, либо вариант аутсорса.')
+    #
+    # identifier = UserIdentifier.objects.get(attendancerecords__id=form['attendance_id'])
+    #
+    # if form['is_outsource']:
+    #     dt = timezone.now().date()
+    #     outsourcer_number = User.objects.filter(
+    #         attachment_group=User.GROUP_OUTSOURCE,
+    #         dt_hired=dt,
+    #         dt_fired=dt,
+    #     ).count()
+    #     user = User.objects.create(
+    #         shop_id=request.user.shop_id,
+    #         attachment_group=User.GROUP_OUTSOURCE,
+    #         first_name='№{}'.format(outsourcer_number + 1),
+    #         last_name='Наемный сотрудник',
+    #         dt_hired=dt,
+    #         dt_fired=dt,
+    #         salary=0,
+    #         username='outsourcer_{}_{}'.format(dt, outsourcer_number + 1),
+    #         auto_timetable=False
+    #     )
+    # else:
+    #     user = User.objects.get(
+    #         id=form['to_user_id'],
+    #         shop_id=request.user.shop_id,
+    #     )
+    #
+    # identifier.worker = user
+    # identifier.save()
+    # return JsonResponse.success()
