@@ -1288,15 +1288,6 @@ class CameraClientEvent(models.Model):
         return 'id {}: {}, {}, {}'.format(self.id, self.dttm, self.type, self.gate.name)
 
 
-class UserIdentifier(models.Model):
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    identifier = models.CharField(max_length=256, unique=True)
-    worker = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True)
-
-    def __str__(self):
-        return 'id: {}, identifier: {}, worker: {}'.format(self.id, self.identifier, self.worker_id)
-
-
 class AttendanceRecords(models.Model):
     class Meta(object):
         verbose_name = 'Данные УРВ'
@@ -1315,10 +1306,10 @@ class AttendanceRecords(models.Model):
 
     dttm = models.DateTimeField()
     type = models.CharField(max_length=1, choices=RECORD_TYPES)
-    identifier = models.ForeignKey(UserIdentifier, on_delete=models.PROTECT)
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
     verified = models.BooleanField(default=True)
 
-    super_shop = models.ForeignKey(SuperShop, on_delete=models.PROTECT) # todo: or should be to shop? fucking logic
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo: or should be to shop? fucking logic
 
     def __str__(self):
         return 'UserIdentID: {}, type: {}, dttm: {}'.format(self.identifier_id, self.type, self.dttm)
