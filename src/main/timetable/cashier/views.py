@@ -57,6 +57,8 @@ from src.main.other.notification.utils import send_notification
 from django.contrib.auth import update_session_auth_hash
 from django.db import IntegrityError
 
+import time as time_in_seconds
+
 
 @api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
@@ -392,7 +394,7 @@ def get_cashier_timetable(request, form):
                 #                     worker_day_change_requests.get(obj.id, [])[:10]]
             })
 
-        user = User.objects.get(id=worker_id)
+        user = User.objects.select_related('position').get(id=worker_id)
 
         response[worker_id] = {
             'indicators': indicators_response,

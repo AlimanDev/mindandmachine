@@ -133,6 +133,7 @@ def get_forecast(request, form):
     operation_type_ids = form['operation_type_ids']
 
     shop_id = FormUtil.get_shop_id(request, form)
+    shop = Shop.objects.get(id=shop_id)
 
     period_clients = PeriodClients.objects.select_related('operation_type__work_type').filter(
         operation_type__work_type__shop_id=shop_id
@@ -155,7 +156,7 @@ def get_forecast(request, form):
 
     dttm_from = datetime.combine(form['from_dt'], time())
     dttm_to = datetime.combine(form['to_dt'], time()) + timedelta(days=1)
-    dttm_step = timedelta(minutes=30)
+    dttm_step = timedelta(seconds=shop.system_step_in_minutes() * 60)
 
     forecast_periods = {x[0]: [] for x in PeriodClients.FORECAST_TYPES}
 
