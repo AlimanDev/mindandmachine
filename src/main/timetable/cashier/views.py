@@ -4,7 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 import json
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
 from django.utils import timezone
-import time
+import time as time_in_seconds
 
 from src.db.models import (
     User,
@@ -1103,7 +1103,7 @@ def create_cashier(request, form):
             | 'tabel_code':
         }
     """
-    username = str(time.time() * 1000000)[:-2]
+    username = str(time_in_seconds.time() * 1000000)[:-2]
     try:
         user = User.objects.create_user(username=username, password=form['password'], email='q@q.com')
         user.first_name = form['first_name']
