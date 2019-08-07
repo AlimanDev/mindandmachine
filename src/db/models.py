@@ -123,6 +123,8 @@ class Shop(models.Model):
     # added on 16.05.2019
     queue_length = models.FloatField(default=3.0)
 
+    max_work_hours_7days = models.SmallIntegerField(default=48)
+
     def __str__(self):
         return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)
 

@@ -79,6 +79,7 @@ class UserConverter(BaseConverter):
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
             'attachment_group': obj.attachment_group,
+            'position': obj.position.title if hasattr(obj, 'position') and obj.position else '', # fixme: hasatrr always return true, => sometimes extra request to db
             'identifier': obj.identifier if hasattr(obj, 'identifier') else None,
         }
 

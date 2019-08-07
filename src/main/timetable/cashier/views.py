@@ -393,7 +393,7 @@ def get_cashier_timetable(request, form):
                 #                     worker_day_change_requests.get(obj.id, [])[:10]]
             })
 
-        user = User.objects.get(id=worker_id)
+        user = User.objects.select_related('position').get(id=worker_id)
 
         response[worker_id] = {
             'indicators': indicators_response,
