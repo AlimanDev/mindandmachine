@@ -113,7 +113,7 @@ def get_user_urv(request, form):
     # lambda_func=None,  # lambda x: User.objects.get(id=x['worker_ids'][0])
 )
 def change_user_urv(request, form):
-    pass
+    return JsonResponse.success()
     # if not form['to_user_id'] and not form['is_outsource']:
     #     return JsonResponse.value_error('Выберите, пожалуйста, либо сотрудника, либо вариант аутсорса.')
     #
