@@ -80,6 +80,8 @@ def create_predbills_request_function(shop_id, dt=None):
     YEARS_TO_COLLECT = 3  # за последние YEARS_TO_COLLECT лет
     predict2days = 62  # на N дней прогноз
 
+    dt_to = datetime.now().date() + timedelta(days=predict2days)
+
     if dt is None:
         dt = datetime.now().date()
         # dt = (PeriodClients.objects.all().order_by('dttm_forecast').last().dttm_forecast).date() + timedelta(days=1)
@@ -89,7 +91,7 @@ def create_predbills_request_function(shop_id, dt=None):
 
     day_info = ProductionDay.objects.filter(
         dt__gte=dt - relativedelta(years=YEARS_TO_COLLECT),
-        dt__lte=dt + timedelta(days=predict2days),
+        dt__lte=dt_to,
     )
 
     shop = Shop.objects.select_related('super_shop').filter(id=shop_id).first()
@@ -130,7 +132,7 @@ def create_predbills_request_function(shop_id, dt=None):
         'algo_params': {
             'days_info': [ProductionDayConverter.convert(day) for day in day_info],
             'dt_from': BaseConverter.convert_date(dt),
-            'dt_to': BaseConverter.convert_date(dt + timedelta(days=predict2days)),
+            'dt_to': BaseConverter.convert_date(dt_to),
             # 'dt_start': BaseConverter.convert_date(dt),
             # 'days': predict2days,
             'period_step': BaseConverter.convert_time(shop.forecast_step_minutes),
