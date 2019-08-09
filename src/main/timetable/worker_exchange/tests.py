@@ -211,7 +211,7 @@ class Test_auto_worker_exchange(TestCase):
         )
 
     def create_vacancy(self, tm_from, tm_to):
-        WorkerDayCashboxDetails.objects.create(
+        return WorkerDayCashboxDetails.objects.create(
             dttm_from=('{} ' + tm_from).format(self.dt_now),
             dttm_to=('{} ' + tm_to).format(self.dt_now),
             work_type=self.work_type,
@@ -369,25 +369,24 @@ class Test_auto_worker_exchange(TestCase):
         self.create_period_clients(18, self.operation_type)
         self.create_period_clients(72, self.operation_type2)
 
-        self.create_vacancy('09:00:00', '21:00:00')
+        vacancy=self.create_vacancy('09:00:00', '21:00:00')
         Event.objects.create(
             text='Ивент для тестов, вакансия id 5.',
             department=self.shop,
-            workerday_details=WorkerDayCashboxDetails.objects.get(pk=5)
+            workerday_details=vacancy
         )
 
         wdcd = WorkerDayCashboxDetails.objects.all()
         self.assertEqual(len(wdcd), 5)
-        self.assertEqual(len(wdcd.filter(pk=1)), 1)
-        self.assertEqual(wdcd.get(pk=5).status, WorkerDayCashboxDetails.TYPE_VACANCY)
+        # self.assertEqual(len(wdcd.filter(pk=1)), 1)
+        self.assertEqual(vacancy.status, WorkerDayCashboxDetails.TYPE_VACANCY)
 
         workers_exchange()
 
         wdcd = WorkerDayCashboxDetails.objects.all()
         self.assertEqual(len(wdcd), 4)
-        self.assertEqual(len(wdcd.filter(pk=1)), 0)
-        self.assertEqual(wdcd.get(pk=5).status, WorkerDayCashboxDetails.TYPE_WORK)
-
+        # self.assertEqual(len(wdcd.filter(pk=1)), 0)
+        self.assertEqual(wdcd.get(pk=vacancy.id).status, WorkerDayCashboxDetails.TYPE_WORK)
     # Предикшн в 4 человека -> 4 человека в работе -> никого не перекидывает.
     def test_workers_hard_exchange2(self):
         self.create_users(4)
@@ -396,11 +395,11 @@ class Test_auto_worker_exchange(TestCase):
         self.create_period_clients(18, self.operation_type)
         self.create_period_clients(150, self.operation_type2)
 
-        self.create_vacancy('09:00:00', '21:00:00')
+        vacancy=self.create_vacancy('09:00:00', '21:00:00')
         Event.objects.create(
             text='Ивент для тестов, вакансия id 5.',
             department=self.shop,
-            workerday_details=WorkerDayCashboxDetails.objects.get(pk=5)
+            workerday_details=vacancy
         )
 
         wdcd = WorkerDayCashboxDetails.objects.all()
