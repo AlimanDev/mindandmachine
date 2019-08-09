@@ -125,6 +125,8 @@ class Shop(models.Model):
 
     max_work_hours_7days = models.SmallIntegerField(default=48)
 
+    staff_number = models.SmallIntegerField(default=0)
+
     def __str__(self):
         return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)
 
