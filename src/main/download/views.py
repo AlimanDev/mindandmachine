@@ -236,18 +236,18 @@ def get_urv_xlsx(request, workbook, form):
     worksheet.write(0, 2, 'Время')
     worksheet.write(0, 3, 'Тип')
 
-    records = list(AttendanceRecords.objects.select_related('identifier', 'identifier__worker').filter(
+    records = list(AttendanceRecords.objects.select_related('user').filter(
         dttm__date__gte=from_dt,
         dttm__date__lte=to_dt,
-        identifier__worker__shop_id=shop_id,
-    ).order_by('dttm', 'identifier__worker'))
+        shop_id=shop_id,
+    ).order_by('dttm', 'user'))
 
     prev_date = None
     prev_worker = None
 
     for index, record in enumerate(records):
         record_date = record.dttm.date()
-        record_worker = record.identifier.worker
+        record_worker = record.user
         if prev_date != record_date:
             worksheet.write(index + 1, 0, record_date.strftime('%d.%m.%Y'))
             prev_date = record_date

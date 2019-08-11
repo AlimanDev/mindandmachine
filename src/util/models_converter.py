@@ -58,7 +58,6 @@ class UserConverter(BaseConverter):
 
     @classmethod
     def convert(cls, obj):
-        # user_identifier = UserIdentifier.objects.filter(worker_id=obj.id).first()
         return {
             'id': obj.id,
             'username': obj.username,

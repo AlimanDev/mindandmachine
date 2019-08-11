@@ -20,7 +20,6 @@ from src.db.models import (
     WorkType,
     OperationType,
     Cashbox,
-    UserIdentifier,
     AttendanceRecords,
     Group,
     FunctionGroup,
@@ -228,10 +227,6 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         worker_id = None
         if np.random.randint(4):
             worker_id = worker.id
-        worker_ident = UserIdentifier.objects.create(
-            identifier='{}-{}'.format(shop.id, worker.id),
-            worker_id=worker_id,
-        )
 
         while day < days:
             wd = wds.iloc[day_ind]
@@ -274,15 +269,15 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                 add_models(models_attendance, AttendanceRecords, AttendanceRecords(
                     dttm=dttm_work_start,
                     type=AttendanceRecords.TYPE_COMING,
-                    identifier=worker_ident,
-                    super_shop_id=shop.super_shop_id,
+                    user_id=worker_id,
+                    shop_id=shop.id,
                 ))
 
                 add_models(models_attendance, AttendanceRecords, AttendanceRecords(
                     dttm=dttm_work_end,
                     type=AttendanceRecords.TYPE_LEAVING,
-                    identifier=worker_ident,
-                    super_shop_id=shop.super_shop_id,
+                    user_id=worker_id,
+                    shop_id=shop.id,
                 ))
 
             else:
@@ -300,26 +295,6 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             day_ind = (day_ind + 1) % wds.shape[0]
             if day_ind == 0:
                 dt_diff = start_dt - wds.iloc[0]['dt'] + timezone.timedelta(days=day)
-
-    worker_ident = UserIdentifier.objects.create(
-        identifier='{}-{}'.format(shop.id, 'random'),
-        # worker=worker,
-    )
-
-    add_models(models_attendance, AttendanceRecords, AttendanceRecords(
-        dttm=dttm_work_start,
-        type=AttendanceRecords.TYPE_COMING,
-        identifier=worker_ident,
-        super_shop_id=shop.super_shop_id,
-    ))
-
-    add_models(models_attendance, AttendanceRecords, AttendanceRecords(
-        dttm=dttm_work_end,
-        type=AttendanceRecords.TYPE_LEAVING,
-        identifier=worker_ident,
-        super_shop_id=shop.super_shop_id,
-
-    ))
 
     add_models(details, WorkerDayCashboxDetails, None)
     add_models(models, WorkerDay, None)

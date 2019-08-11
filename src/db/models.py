@@ -1313,7 +1313,7 @@ class AttendanceRecords(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo: or should be to shop? fucking logic
 
     def __str__(self):
-        return 'UserIdentID: {}, type: {}, dttm: {}'.format(self.identifier_id, self.type, self.dttm)
+        return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
 
 class ExchangeSettings(models.Model):
