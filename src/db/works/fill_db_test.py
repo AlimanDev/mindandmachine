@@ -259,12 +259,30 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                         dttm_work_end=None,
                     )
                     wd_model.save()
-                add_models(details, WorkerDayCashboxDetails, WorkerDayCashboxDetails(
-                    worker_day=wd_model,
-                    work_type=work_types_dict[wd['work_type']],
-                    dttm_from=dttm_work_start,
-                    dttm_to=dttm_work_end,
-                ))
+
+                if np.random.randint(4) != 1:
+                    add_models(details, WorkerDayCashboxDetails, WorkerDayCashboxDetails(
+                        worker_day=wd_model,
+                        work_type=work_types_dict[wd['work_type']],
+                        dttm_from=dttm_work_start,
+                        dttm_to=dttm_work_end,
+                    ))
+                else:
+                    add_models(details, WorkerDayCashboxDetails, WorkerDayCashboxDetails(
+                        worker_day=wd_model,
+                        work_type=work_types_dict[wd['work_type']],
+                        dttm_from=dttm_work_start,
+                        dttm_to=dttm_work_end,
+                        is_vacancy=True,
+                    ))
+                    if np.random.randint(4) == 1:
+                        add_models(details, WorkerDayCashboxDetails, WorkerDayCashboxDetails(
+                            work_type=work_types_dict[wd['work_type']],
+                            dttm_from=dttm_work_start,
+                            dttm_to=dttm_work_end,
+                            status=WorkerDayCashboxDetails.TYPE_VACANCY,
+                            is_vacancy=True,
+                        ))
 
                 add_models(models_attendance, AttendanceRecords, AttendanceRecords(
                     dttm=dttm_work_start,
@@ -365,6 +383,10 @@ def main(date=None, shops=None):
         work_types_dict = create_work_types(data['work_types'], shop)
         create_forecast(data['demand'], work_types_dict, start_date, demand_days)
         create_users_workdays(data['cashiers'], work_types_dict, start_date, worker_days, shop, shop_size)
+        dttm_curr = datetime.now().replace(day=1)
+        dttm_prev = dttm_curr - relativedelta(months=1)
+        create_timetable(shop.id, dttm_curr)
+        create_timetable(shop.id, dttm_prev)
 
     dttm_curr = datetime.now().replace(day=1)
     dttm_prev = dttm_curr - relativedelta(months=1)
