@@ -3,7 +3,7 @@ import datetime
 from src.db.models import (
     WorkerDay,
     Timetable,
-    UserIdentifier,
+    # UserIdentifier,
     AttendanceRecords,
 )
 from src.conf.djconfig import (
@@ -79,6 +79,7 @@ class UserConverter(BaseConverter):
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
             'attachment_group': obj.attachment_group,
+            'position': obj.position.title if hasattr(obj, 'position') and obj.position else '', # fixme: hasatrr always return true, => sometimes extra request to db
             'identifier': obj.identifier if hasattr(obj, 'identifier') else None,
         }
 
@@ -399,7 +400,7 @@ class AttendanceRecordsConverter(BaseConverter):
         return {
             'id': obj.id,
             'dttm': cls.convert_datetime(obj.dttm),
-            'worker_id': obj.identifier.worker_id,
+            'worker_id': obj.user_id,
             'type': obj.type,
             'is_verified': obj.verified,
         }

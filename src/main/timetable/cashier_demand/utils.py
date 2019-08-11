@@ -289,6 +289,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
     revenue = 1000000
     response.update({
         'indicators': {
+            ''
             'deadtime_part': deadtime_part,
             'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': fot if fot else None,
@@ -297,6 +298,10 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
             'fot_revenue': round(fot / revenue, 2) * 100,
             # 'change_amount': changed_amount,
             'covering_part': covering_part,
+
+            'total_need': predict_needs.sum(),
+            'total_go': finite_work.sum(),
+            'total_plan': shop.staff_number * norm_work_hours,
         },
     })
     return response

@@ -123,8 +123,15 @@ class Shop(models.Model):
     # added on 16.05.2019
     queue_length = models.FloatField(default=3.0)
 
+    max_work_hours_7days = models.SmallIntegerField(default=48)
+
+    staff_number = models.SmallIntegerField(default=0)
+
     def __str__(self):
         return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)
+
+    def system_step_in_minutes(self):
+        return self.forecast_step_minutes.hour * 60 + self.forecast_step_minutes.minute
 
 
 class WorkerPosition(models.Model):
@@ -138,11 +145,10 @@ class WorkerPosition(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    department = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)
     title = models.CharField(max_length=64)
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.title, self.department.title, self.department.super_shop.title, self.id)
+        return '{}, {}, {}, {}'.format(self.title, self.id)
 
 
 class WorkerManager(UserManager):
@@ -1283,15 +1289,6 @@ class CameraClientEvent(models.Model):
         return 'id {}: {}, {}, {}'.format(self.id, self.dttm, self.type, self.gate.name)
 
 
-class UserIdentifier(models.Model):
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    identifier = models.CharField(max_length=256, unique=True)
-    worker = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True)
-
-    def __str__(self):
-        return 'id: {}, identifier: {}, worker: {}'.format(self.id, self.identifier, self.worker_id)
-
-
 class AttendanceRecords(models.Model):
     class Meta(object):
         verbose_name = 'Данные УРВ'
@@ -1310,10 +1307,10 @@ class AttendanceRecords(models.Model):
 
     dttm = models.DateTimeField()
     type = models.CharField(max_length=1, choices=RECORD_TYPES)
-    identifier = models.ForeignKey(UserIdentifier, on_delete=models.PROTECT)
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
     verified = models.BooleanField(default=True)
 
-    super_shop = models.ForeignKey(SuperShop, on_delete=models.PROTECT) # todo: or should be to shop? fucking logic
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo: or should be to shop? fucking logic
 
     def __str__(self):
         return 'UserIdentID: {}, type: {}, dttm: {}'.format(self.identifier_id, self.type, self.dttm)

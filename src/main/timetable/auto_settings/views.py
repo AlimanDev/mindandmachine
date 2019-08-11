@@ -443,7 +443,7 @@ def create_timetable(request, form):
         'workdays_holidays_same': False, #TODO(as): флаг, учитывать ли равномерность по работе чуваков в будни и выхи при составлении (нет на фронте)
         '1day_holiday': int(shop.exit1day),
         'max_outsourcing_day': 3,
-        'max_work_hours_7days': 48,
+        'max_work_hours_7days': int(shop.max_work_hours_7days),
         'slider': shop.queue_length,
         'fot': shop.fot,
         'idle': shop.idle,
