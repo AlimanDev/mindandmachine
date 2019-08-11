@@ -251,7 +251,10 @@ class WorkerDayAdmin(admin.ModelAdmin):
     list_display = ('worker_last_name', 'shop_title', 'super_shop_title', 'dt', 'type', 'id', 'dttm_work_start',
                     'dttm_work_end')
     search_fields = ('worker__last_name', 'worker__shop__title', 'worker__shop__super_shop__title', 'id', 'dt')
-    list_filter = ('worker__shop',)
+    list_filter = ('worker__shop', 'type')
+    raw_id_fields = ('parent_worker_day',)
+    list_select_related = ('worker', 'worker__shop')
+
 
     @staticmethod
     def worker_last_name(instance: WorkerConstraint):
@@ -272,7 +275,10 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: upd: сервак просто падает если туда зайти
     list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_work_type', 'id', 'dttm_from', 'dttm_to')
     search_fields = ('worker_day__worker__last_name', 'worker_day__worker__shop__title', 'id')
-    list_filter = ('worker_day__worker__shop',)
+    list_filter = ('worker_day__worker__shop', 'is_vacancy')
+    raw_id_fields = ('worker_day',)
+    list_select_related = (
+        'worker_day__worker', 'worker_day__worker__shop', 'work_type')
 
     @staticmethod
     def worker_last_name(instance: WorkerDayCashboxDetails):
