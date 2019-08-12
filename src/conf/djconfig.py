@@ -132,6 +132,15 @@ EMAIL_HOST_PASSWORD = 'TjP6szfJe0PpLNH'
 
 SERVER_EMAIL = EMAIL_HOST_USER
 
+# For askona
+# SFTP_IP = '80.87.200.194'
+# SFTP_USERNAME = 'root'
+# SFTP_PASSWORD = 'Xw0Hq3Hybm4c'
+
+SFTP_IP = '212.109.194.87'
+SFTP_USERNAME = ''
+SFTP_PASSWORD = ''
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -299,7 +308,3 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     }
 }
-
-SFTP_IP = '80.87.200.194'
-SFTP_USERNAME = 'root'
-SFTP_PASSWORD = 'Xw0Hq3Hybm4c'
