@@ -36,7 +36,7 @@ from src.db.models import (
     WorkerDay,
     # Notifications,
     Shop,
-    # User,
+    User,
     ProductionDay,
     WorkerCashboxInfo,
     CameraClientGate,
@@ -48,6 +48,8 @@ from src.db.models import (
     ExchangeSettings,
 )
 from src.celery.celery import app
+from django.core.mail import EmailMessage
+from src.conf.djconfig import ADMINS
 
 
 @app.task
@@ -521,3 +523,25 @@ def update_shop_stats(dt=None):
         timetable.lack = stats['covering_part']
         timetable.fot_revenue = stats['fot_revenue']
         timetable.save()
+
+
+@app.tasks
+def send_notify_email(message, id_list, file=None):
+    '''
+    Функция-обёртка для отправки email сообщений (в том числе файлов)
+    :param message: сообщение
+    :param id_list: список id пользователей
+    :param file: файл
+    :return:
+    '''
+    user_emails = [user.email for user in User.objects.filter(id__in=id_list)]
+    result = EmailMessage(
+        subject='Сообщение от mind&machine',
+        body=message,
+        from_email=ADMINS[0][1],
+        to=user_emails,
+    )
+    if file:
+        result.attach_file(message)
+    result = result.send()
+    return 'Отправлено {} сообщений из {}'.format(result, len(id_list))
