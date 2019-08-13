@@ -61,7 +61,7 @@ class SuperShop(models.Model):
 # на самом деле это отдел
 class Shop(models.Model):
     class Meta(object):
-        # unique_together = ('super_shop', 'title')
+        # unique_together = ('parent', 'title')
         verbose_name = 'Отдел'
         verbose_name_plural = 'Отделы'
 
@@ -75,7 +75,7 @@ class Shop(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    parent = models.ForeignKey('self', on_delete=models.PROTECT, null=True)
+    parent = models.ForeignKey('self', on_delete=models.PROTECT, null=True, blank=True)
     # path = LtreeField()
 
     # full_interface = models.BooleanField(default=True)
@@ -149,11 +149,13 @@ class Shop(models.Model):
     def __str__(self):
         return '{}, {}, {}'.format(
             self.title,
-            self.parent.title if self.parent else '',
+            self.parent_title(),
             self.id)
 
     def system_step_in_minutes(self):
         return self.forecast_step_minutes.hour * 60 + self.forecast_step_minutes.minute
+    def parent_title(self):
+        return self.parent.title if self.parent else '',
 
 
 class WorkerPosition(models.Model):
@@ -170,7 +172,7 @@ class WorkerPosition(models.Model):
     title = models.CharField(max_length=64)
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.title, self.id)
+        return '{}, {}'.format(self.title, self.id)
 
 
 class WorkerManager(UserManager):
@@ -218,8 +220,8 @@ class User(DjangoAbstractUser):
         verbose_name_plural = 'Пользователи'
 
     def __str__(self):
-        if self.shop and self.shop.super_shop:
-            ss_title = self.shop.super_shop.title
+        if self.shop and self.shop.parent:
+            ss_title = self.shop.parent.title
         else:
             ss_title = None
         return '{}, {}, {}, {}'.format(self.first_name, self.last_name, ss_title, self.id)
@@ -373,7 +375,7 @@ class FunctionGroup(models.Model):
         'upload_demand',
         'upload_timetable',
         'change_user_urv',
-        'get_super_shop',
+        'get_parent',
         'delete_cashbox',
         'set_timetable',
         'get_super_shop_list',
@@ -436,7 +438,7 @@ class WorkType(models.Model):
         verbose_name_plural = 'Типы работ'
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.name, self.shop.title, self.shop.super_shop.title, self.id)
+        return '{}, {}, {}, {}'.format(self.name, self.shop.title, self.shop.parent.title, self.id)
 
     id = models.BigAutoField(primary_key=True)
 
@@ -523,7 +525,7 @@ class Slot(models.Model):
             self.tm_start,
             self.tm_end,
             self.shop.title,
-            self.shop.super_shop.title,
+            self.shop.parent.title,
             self.id
         )
 
@@ -569,7 +571,7 @@ class Cashbox(models.Model):
         return '{}, {}, {}, {}, {}'.format(
             self.type.name,
             self.type.shop.title,
-            self.type.shop.super_shop.title,
+            self.type.shop.parent.title,
             self.id,
             self.number
         )
@@ -822,7 +824,7 @@ class WorkerDay(models.Model):
         return '{}, {}, {}, {}, {}, {}'.format(
             self.worker.last_name,
             self.worker.shop.title,
-            self.worker.shop.super_shop.title,
+            self.worker.shop.parent.title,
             self.dt,
             self.Type.get_name_by_value(self.type),
             self.id
