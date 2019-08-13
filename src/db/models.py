@@ -6,7 +6,7 @@ from django.contrib.auth.models import (
 from django.contrib.contenttypes.models import ContentType
 from . import utils
 import datetime
-
+# from project.ltree import LtreeField
 
 class Region(models.Model):
     class Meta(object):
@@ -14,7 +14,6 @@ class Region(models.Model):
         verbose_name_plural = 'Регионы'
 
     title = models.CharField(max_length=256, unique=True, default='Москва')
-
 
 # магазин
 class SuperShop(models.Model):
@@ -57,10 +56,12 @@ class SuperShop(models.Model):
                 return tm < self.tm_end
 
 
+
+
 # на самом деле это отдел
 class Shop(models.Model):
     class Meta(object):
-        unique_together = ('super_shop', 'title')
+        # unique_together = ('super_shop', 'title')
         verbose_name = 'Отдел'
         verbose_name_plural = 'Отделы'
 
@@ -74,8 +75,26 @@ class Shop(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    super_shop = models.ForeignKey(SuperShop, on_delete=models.PROTECT)
+    parent = models.ForeignKey('self', on_delete=models.PROTECT, null=True)
+    # path = LtreeField()
+
     # full_interface = models.BooleanField(default=True)
+
+    TYPE_REGION = 'r'
+    TYPE_SHOP = 's'
+
+    DEPARTMENT_TYPES = (
+        (TYPE_REGION, 'region'),
+        (TYPE_SHOP, 'shop'),
+    )
+
+
+    #From supershop
+    code = models.CharField(max_length=64, null=True, blank=True)
+    address = models.CharField(max_length=256, blank=True, null=True)
+    type = models.CharField(max_length=1, choices=DEPARTMENT_TYPES, default=TYPE_SHOP)
+    dt_opened = models.DateField(null=True, blank=True)
+    dt_closed = models.DateField(null=True, blank=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
@@ -128,7 +147,10 @@ class Shop(models.Model):
     staff_number = models.SmallIntegerField(default=0)
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)
+        return '{}, {}, {}'.format(
+            self.title,
+            self.parent.title if self.parent else '',
+            self.id)
 
     def system_step_in_minutes(self):
         return self.forecast_step_minutes.hour * 60 + self.forecast_step_minutes.minute
