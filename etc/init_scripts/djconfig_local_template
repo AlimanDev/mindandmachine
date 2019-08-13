@@ -1,0 +1,38 @@
+DEBUG = False
+
+SECRET_KEY = '%s'
+
+ALLOWED_HOSTS = [
+    '*',
+]
+
+
+ADMINS = [('alex', 'a.aleskin@mindandmachine.ru')]
+
+EMAIL_HOST_USER='no-reply@mindandmachine.ru'
+EMAIL_HOST_PASSWORD='qweasdzxc1'
+EMAIL_HOST='smtp.yandex.ru'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': '%s',  # 'qos_test'
+        'USER': '%s',  # 'qos_v1_user'
+        'PASSWORD': '%s',  # '1'
+        'HOST': '127.0.0.1',
+        'PORT': '5432',
+    }
+}
+
+MEDIA_ROOT = '/var/www/media/%s/'
+STATIC_ROOT = '/var/www/servers/%s/'
+
+
+QOS_DEV_MODE_ENABLED = True
+QOS_SET_TIMETABLE_KEY = 'a'
+
+HOST_IP = '127.0.0.1:%s' # dev
+TIMETABLE_IP = "127.0.0.1:%s"
+

@@ -1,0 +1,29 @@
+
+server {
+    listen 80;
+
+    root /usr/share/nginx/html;
+    index index.html index.htm;
+
+    error_page 404 /404.html;
+    client_max_body_size 50m;
+
+    server_name  %s.mindandmachine.ru;
+
+    location /_i/static/admin/ {
+        alias /var/www/servers/%s/admin/;
+    }
+
+    location / {
+         root /var/www/servers/%s/frontend/dist/;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:%s;
+    }
+
+    location /admin/ {
+        proxy_pass http://127.0.0.1:%s/admin/;
+    }
+
+}
