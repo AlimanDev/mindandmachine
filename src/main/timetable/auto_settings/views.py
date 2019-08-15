@@ -453,10 +453,9 @@ def create_timetable(request, form):
     }
 
     cashboxes = [
-        WorkTypeConverter.convert(x) for x in WorkType.objects.qos_filter_active(
-            dt_from=dt_from,
-            dt_to=dt_to,
-            shop_id=shop_id
+        WorkTypeConverter.convert(x) for x in WorkType.objects.filter(
+            dttm_deleted__isnull=True,
+            shop_id=shop_id,
         )
     ]
 
