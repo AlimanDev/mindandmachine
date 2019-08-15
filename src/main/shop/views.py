@@ -1,7 +1,6 @@
 import datetime
 from src.db.models import (
     Shop,
-    SuperShop,
     User,
     Region,
     Timetable,
@@ -100,14 +99,17 @@ def get_super_shop(request, form):
          }
     """
     dt_now = datetime.date.today().replace(day=1)
-    super_shop_id = form['super_shop_id']
+    shop_id = form['super_shop_id']
 
     try:
-        super_shop = SuperShop.objects.get(id=super_shop_id)
-    except SuperShop.DoesNotExist:
+        super_shop = Shop.objects.get(id=shop_id)
+    except Shop.DoesNotExist:
         return JsonResponse.does_not_exists_error()
 
-    shops = Shop.objects.filter(super_shop=super_shop, dttm_deleted__isnull=True)
+    #TODO: мы теперь внутри просто магазина, что показывать
+    shops = Shop.objects.filter(parent=super_shop, dttm_deleted__isnull=True)
+    if len(shops) ==0:
+        shops=[super_shop]
 
     return_list = []
     dynamic_values = dict()
@@ -115,8 +117,8 @@ def get_super_shop(request, form):
     for shop in shops:
         shop_id = shop.id
         converted = ShopConverter.convert(shop)
-        curr_stats = calculate_supershop_stats(dt_now, shop_id)
-        prev_stats = calculate_supershop_stats(dt_now - relativedelta(months=1), shop_id)
+        curr_stats = calculate_supershop_stats(dt_now, [shop_id])
+        prev_stats = calculate_supershop_stats(dt_now - relativedelta(months=1), [shop_id])
         curr_stats.pop('revenue')
         prev_stats.pop('revenue')
 
@@ -211,7 +213,7 @@ def add_shop(request, form):
         title=form['title'],
         tm_shop_opens=form['tm_shop_opens'],
         tm_shop_closes=form['tm_shop_closes'],
-        super_shop_id=super_shop_id
+        parent_id=super_shop_id
     )
     return JsonResponse.success(ShopConverter.convert(created))
 
@@ -381,20 +383,22 @@ def set_parameters(request, form):
 )
 def get_supershop_stats(request, form):
     try:
-        super_shop = SuperShop.objects.get(id=form['supershop_id'])
-    except SuperShop.DoesNotExist:
-        return JsonResponse.internal_error('No such SuperShop in database')
+        super_shop = Shop.objects.get(id=form['supershop_id'])
+    except Shop.DoesNotExist:
+        return JsonResponse.internal_error('No such Shop in database')
     shops = Shop.objects.filter(
-        super_shop=super_shop,
+        parent=super_shop,
         dttm_deleted__isnull=True
     )
     shop_ids = shops.values_list('id', flat=True)
+    if len(shop_ids) == 0:
+        shop_ids = [super_shop.id]
     dt_now = datetime.date.today().replace(day=1)
     dt_from = dt_now - relativedelta(months=6)
 
     successful_tts = Timetable.objects.select_related('shop').filter(
         dt=dt_now + relativedelta(months=1),
-        shop_id__in=shops.values_list('id', flat=True),
+        shop_id__in=shop_ids,
         status=Timetable.Status.READY.value,
     ).count()
 
@@ -420,7 +424,7 @@ def get_supershop_stats(request, form):
     })
 
     return JsonResponse.success({
-        'shop_tts': '{}/{}'.format(successful_tts, shops.count()),
+        'shop_tts': '{}/{}'.format(successful_tts, len(shop_ids)),
         'fot_revenue': fot_revenue_stats,
         'stats': {
             'curr': curr_month_stats,

@@ -356,6 +356,7 @@ class FunctionGroup(models.Model):
         'get_change_request',
         'delete_timetable',
         'get_types',
+        'get_super_shop',
         'get_supershop_stats',
         'get_all_slots',
         'get_cashiers_timetable',

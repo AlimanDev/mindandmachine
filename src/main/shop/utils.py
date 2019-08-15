@@ -4,8 +4,8 @@ from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from src.db.models import (
     Timetable,
-    SuperShop,
     FunctionGroup,
+    Shop
 )
 from dateutil.relativedelta import relativedelta
 from src.util.models_converter import SuperShopConverter
@@ -19,8 +19,8 @@ def calculate_supershop_stats(month, shop_ids):
     :param shops:
     :return:
     """
-    if not isinstance(shop_ids, QuerySet):
-        shop_ids = [shop_ids]
+    # if not isinstance(shop_ids, QuerySet):
+    #     shop_ids = [shop_ids]
     return Timetable.objects.filter(
         dt=month,
         shop__id__in=shop_ids
@@ -42,8 +42,9 @@ def get_super_shop_list_stats(form, request, display_format='raw'):
     sort_type = form['sort_type']
     filter_dict = {
         'title__icontains': form['title'],
-        'type': form['super_shop_type'],
-        'region__title': form['region'],
+        'type': Shop.TYPE_SHOP,
+        # 'type': form['super_shop_type'],
+        # 'region__title': form['region'],
         'dt_opened__gte': form['opened_after_dt'],
         'dt_closed__lte': form['closed_before_dt'],
     }
@@ -77,11 +78,11 @@ def get_super_shop_list_stats(form, request, display_format='raw'):
             output_field=field_type(),
         ))
 
-    st = 'shop__timetable__'  # short alias
+    st = 'timetable__'  # short alias
     prev_filters = {st + 'dt': dt_prev}
     curr_filters = {st + 'dt': dt_now}
 
-    super_shops = SuperShop.objects.select_related('region').annotate(
+    shops = Shop.objects.annotate(
         workers_amount_prev=aggr_constructor(Sum, st + 'workers_amount', IntegerField, **prev_filters),
         lack_prev=aggr_constructor(Avg, st + 'lack', FloatField, **prev_filters),
         idle_prev=aggr_constructor(Avg, st + 'idle', FloatField, **prev_filters),
@@ -101,11 +102,11 @@ def get_super_shop_list_stats(form, request, display_format='raw'):
     )
 
     if sort_type:
-        super_shops = super_shops.order_by(sort_type + '_curr' if 'title' not in sort_type else sort_type)
+        shops = shops.order_by(sort_type + '_curr' if 'title' not in sort_type else sort_type)
 
-    total = super_shops.count()
+    total = shops.count()
     if display_format == 'raw':
-        super_shops = super_shops[amount * pointer:amount * (pointer + 1)]
+        shops = shops[amount * pointer:amount * (pointer + 1)]
     return_list = []
     dynamic_values = dict()
 
@@ -114,7 +115,7 @@ def get_super_shop_list_stats(form, request, display_format='raw'):
     def change_sign(value, key):
         return value * (-1) if key in reverse_plus_fields else value
 
-    for ss in super_shops:
+    for ss in shops:
         converted_ss = SuperShopConverter.convert(ss)
         #  откидываем лишние данные типа title, tm_start, tm_end, ...
         ss_dynamic_values = {k: v for k, v in ss.__dict__.items() if 'curr' in k or 'prev' in k}

@@ -1,7 +1,6 @@
 from django import forms
 from src.util import forms as util_forms
 from django.core.exceptions import ValidationError
-from src.db.models import SuperShop
 
 
 class GetDepartmentForm(forms.Form):
@@ -16,7 +15,7 @@ class GetSuperShopListForm(forms.Form):
     pointer = forms.IntegerField()
     items_per_page = forms.IntegerField()
     title = forms.CharField(required=False, max_length=256)
-    super_shop_type = util_forms.ChoiceField([SuperShop.TYPE_COMMON, SuperShop.TYPE_HYPERMARKET], '')
+    # super_shop_type = util_forms.ChoiceField([SuperShop.TYPE_COMMON, SuperShop.TYPE_HYPERMARKET], '')
     region = forms.CharField(required=False, max_length=256)
     closed_before_dt = util_forms.DateField(required=False)
     opened_after_dt = util_forms.DateField(required=False)
