@@ -578,8 +578,8 @@ def get_cashboxes_open_time(request, form):
     if len(worker_day_cashbox_details):
         share_of_open_time = 0
         last_cashbox = worker_day_cashbox_details[0].on_cashbox
-        duration_of_the_shop = time_diff(worker_day_cashbox_details[0].work_type.shop.super_shop.tm_start,
-                                         worker_day_cashbox_details[0].work_type.shop.super_shop.tm_end) * (
+        duration_of_the_shop = time_diff(worker_day_cashbox_details[0].work_type.shop.dt_opened,
+                                         worker_day_cashbox_details[0].work_type.shop.dt_closed) * (
                                        (dt_to - dt_from).days + 1)
 
         for detail in worker_day_cashbox_details:
@@ -696,4 +696,3 @@ def get_cashboxes_used_resource(request, form):
                                                                          (duration_of_the_shop / time_delta / 100), 3)
 
     return JsonResponse.success(response)
-
