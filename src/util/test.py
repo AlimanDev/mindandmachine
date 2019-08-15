@@ -3,7 +3,6 @@ from django.test import TestCase
 
 from django.db.models import Q
 from src.db.models import (
-    UserIdentifier,
     AttendanceRecords,
     Group,
     Timetable,
@@ -260,18 +259,12 @@ class LocalTestCase(TestCase):
             dttm_status_change = datetime.datetime(2019, 6, 1, 9, 30, 0)
         )
 
-        # UserIdentifier
-        self.useridentifier = UserIdentifier.objects.create(
-            identifier='test_identifier',
-            worker=self.user1
-        )
-
         # AttendanceRecords
         self.attendancerecords = AttendanceRecords.objects.create(
             dttm=datetime.datetime(2019, 6, 1, 9, 0, 0),
             type='C',
-            identifier=self.useridentifier,
-            super_shop=self.superShop
+            user=self.user1,
+            shop=self.shop
         )
 
         # CameraCashbox
@@ -463,4 +456,3 @@ def create_period_clients(dttm_forecast, value, type, operation_type):
         type=type,
         operation_type=operation_type
 )
-

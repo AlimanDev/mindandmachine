@@ -731,6 +731,7 @@ def set_worker_day(request, form):
     except WorkerDay.MultipleObjectsReturned:
         return JsonResponse.multiple_objects_returned()
 
+    old_wd_type = None
     if old_wd:
         old_wd_type = old_wd.type
         # Не пересохраняем, если тип не изменился
@@ -796,11 +797,11 @@ def set_worker_day(request, form):
     }
 
     shop = Shop.objects.get(user=form['worker_id'])
-    work_type = WorkType.objects.get(id=form['work_type'] if form['work_type'] else old_wd_type)
+    work_type = WorkType.objects.get(id=form['work_type']) if form['work_type'] else old_wd_type
 
-    if form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
+    if (form['type'] == WorkerDay.Type.TYPE_WORKDAY.value) and work_type:
         cancel_vacancies(shop.id, work_type.id)
-    if form['type'] != WorkerDay.Type.TYPE_WORKDAY.value:
+    if (form['type'] != WorkerDay.Type.TYPE_WORKDAY.value) and work_type:
         create_vacancies_and_notify(shop.id, work_type.id) # todo: fix this row
 
     return JsonResponse.success(response)

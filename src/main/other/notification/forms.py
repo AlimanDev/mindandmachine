@@ -10,6 +10,7 @@ class SetNotificationsReadForm(forms.Form):
 class GetNotificationsForm(forms.Form):
     pointer = forms.IntegerField(required=False)
     count = forms.IntegerField(required=False)
+    type = util_forms.ChoiceField(['all', 'vacancy', 'other'], default='all')
 
 
 class NotifyAction(forms.Form):

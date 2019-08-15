@@ -1,0 +1,14 @@
+[uwsgi]
+
+chdir       = /var/servers/{}/backend/qos/
+wsgi-file   = wsgi.py
+
+pidfile     = /var/servers/{}/backend/qos.pid
+
+master      = true
+processed   = 8
+threads     = 8
+http        = 127.0.0.1:{}
+
+daemonize = /var/log/servers/{}/uwsgi.log
+
