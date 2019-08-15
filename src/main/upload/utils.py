@@ -13,16 +13,18 @@ from openpyxl.utils import column_index_from_string
 from dateutil.relativedelta import relativedelta
 from src.db.models import (
     User,
+    Shop,
     PeriodClients,
     WorkType,
     WorkerDay,
     WorkerDayCashboxDetails,
     OperationType,
     WorkerCashboxInfo,
+    WorkerPosition,
 )
 from src.main.demand.utils import create_predbills_request_function
 from src.util.models_converter import BaseConverter
-from src.conf.djconfig import SFTP_IP, SFTP_PASSWORD, SFTP_USERNAME
+from src.conf.djconfig import SFTP_IP, SFTP_PASSWORD, SFTP_USERNAME, SFTP_PATH
 
 
 WORK_TYPES = {
@@ -51,7 +53,7 @@ def get_uploaded_file(func):
 
         if not file:
             return JsonResponse.value_error('Файл не был загружен.')
-        if not file.name.split('.', file.name.count('.'))[-1] in ALLOWED_UPLOAD_EXTENSIONS:
+        if not file.name.split('/')[-1].split('.', file.name.split('/')[-1].count('.'))[-1] in ALLOWED_UPLOAD_EXTENSIONS:
             return JsonResponse.value_error('Файлы с таким расширением не поддерживается.')
 
         try:
@@ -73,29 +75,26 @@ def upload_vacation_util(vacation_file):
     """
 
     try:
-        worksheet = pd.read_excel(vacation_file)
+        worksheet = pd.read_csv(vacation_file, sep=';')
     except KeyError:
         return JsonResponse.internal_error('Не удалось открыть активный лист.')
 
-    columns = {
-        'from_dt': 'Дата начала',
-        'to_dt': 'Дата конца',
-        'tabel': 'Табельный №'
-    }
+    tabel_code_col = 0
+    from_dt_col = 1
+    to_dt_col = 2
 
-    for column in columns.values():
-        if not column in worksheet.columns:
-            return JsonResponse.internal_error('Не удалось найти колонку: {}'.format(column))
+    worksheet[from_dt_col] = pd.to_datetime(worksheet.iloc[:, from_dt_col], format='%d.%m.%y')
+    worksheet[to_dt_col] = pd.to_datetime(worksheet.iloc[:, to_dt_col], format='%d.%m.%y')
 
     list_to_create = []
     for index, row in worksheet.iterrows():
         try:
-            user = User.objects.get(tabel_code=row[columns['tabel']])
+            user = User.objects.get(tabel_code=row[tabel_code_col])
         except Exception:
-            return JsonResponse.internal_error('Не удалось найти пользователя {}'.format(row[columns['tabel']]))
+            return JsonResponse.internal_error('Не удалось найти пользователя {}'.format(row[tabel_code_col]))
 
-        from_dt = row[columns['from_dt']].date()
-        to_dt = row[columns['to_dt']].date()
+        from_dt = row[from_dt_col].date()
+        to_dt = row[to_dt_col].date()
 
         if to_dt < from_dt:
             return JsonResponse.internal_error('Дата конца отпуска должна быть больше или равна дате начала отпуска.')
@@ -235,131 +234,126 @@ def upload_timetable_util(form, timetable_file):
 
     return JsonResponse.success()
 
-def upload_demand_util(form, demand_file):
-    """
-    Принимает от клиента экселевский файл в формате из TPNET (для леруа специально) и загружает из него данные в бд
+def upload_demand_util(demand_file, form=None):
+    code_col = 0
+    datetime_col = 1
+    value_col = 2
 
-    Args:
-         method: POST
-         url: /api/upload/upload_demand
-         shop_id(int): required = True
-    """
     try:
-        worksheet = load_workbook(demand_file).active
+        worksheet = pd.read_csv(demand_file, sep=';')
     except KeyError:
         return JsonResponse.internal_error('Не удалось открыть активный лист.')
 
-    list_to_create = []
+    worksheet[datetime_col] = pd.to_datetime(worksheet.iloc[:, datetime_col])
+    worksheet.iloc[:, datetime_col] = worksheet[datetime_col].map(lambda x: x.replace(minute=0, second=0))
+    from_dttm = worksheet.iloc[:, datetime_col].min()
+    to_dttm = worksheet.iloc[:, datetime_col].max()
 
-    shop_id = form['shop_id']
-    cash_column_num = 0
-    time_column_num = 1
-    value_column_num = 2
-    datetime_format = '%d.%m.%Y %H:%M:%S'
-    processed_rows = 0  # счетчик "обработынных" строк
-    checked_rows = 0  # счетчик "проверенных" строк
-    from_to = []
+    if demand_file.name.split('/')[-1] == 'incoming.csv':
+        shop_codes = worksheet.iloc[:,code_col].unique()
+        name_operation_type = 'intro'
+    else:
+        # Нет определённого пользователся (но может он из магазина, который у нас будет)
+        users = User.objects.filter(tabel_code__in=worksheet.iloc[:, code_col].unique()).select_related('shop')
+        shop_tabel = {user.tabel_code:user.shop.super_shop.code for user in users}
+        shop_codes = {value for value in shop_tabel.values()}
+        worksheet = worksheet.groupby([
+            worksheet.columns[code_col],
+            worksheet.columns[datetime_col],
+        ])[worksheet.columns[value_col]].sum().reset_index()
+        name_operation_type = 'bills'
 
-    def create_demand_objs(obj=None):
-        if obj is None:
-            PeriodClients.objects.bulk_create(list_to_create)
-        elif len(list_to_create) == 999:
-            list_to_create.append(obj)
-            PeriodClients.objects.bulk_create(list_to_create)
-            list_to_create[:] = []
-        else:
-            list_to_create.append(obj)
-
-    # work_types = list(WorkType.objects.filter(shop_id=shop_id))
-    operation_types = list(OperationType.objects.filter(work_type__shop_id=shop_id).select_related('work_type'))
-    # todo: check conflicts in operation_types_names or user other format
-    operation_types = {op_type.name or op_type.work_type.name: op_type for op_type in operation_types}
-    ######################### сюда писать логику чтения из экселя ######################################################
-    for index, row in enumerate(worksheet.rows):
-        dttm = row[time_column_num].value
-        if '.' not in dttm or ':' not in dttm:
-            continue
-        if not isinstance(dttm, datetime.datetime):
-            try:
-                dttm = datetime.datetime.strptime(dttm, datetime_format)
-                from_to.append(dttm)
-            except ValueError:
-                return JsonResponse.value_error(
-                    'Невозможно преобразовать время. Пожалуйста введите формат {}'.format(datetime_format))
-
-    from_to.sort()
-    dttm_from = from_to[1]
-    dttm_to = from_to[-1]
-
-    PeriodClients.objects.filter(
-        dttm_forecast__range=[dttm_from, dttm_to],
-        type=PeriodClients.FACT_TYPE,
-        operation_type__work_type__shop_id=shop_id,
-    ).delete()
-
-    for index, row in enumerate(worksheet.rows):
-        value = row[value_column_num].value
-        if isinstance(row[value_column_num].value, str):
-            #  может быть 'Нет данных'
-            continue
-        checked_rows += 1
-        dttm = row[time_column_num].value
-        if '.' not in dttm or ':' not in dttm:
-            continue
-        if not isinstance(dttm, datetime.datetime):
-            try:
-                dttm = datetime.datetime.strptime(dttm, datetime_format)
-            except ValueError:
-                return JsonResponse.value_error(
-                    'Невозможно преобразовать время. Пожалуйста введите формат {}'.format(datetime_format))
-
-        cashtype_name = row[cash_column_num].value
-        cashtype_name = cashtype_name[:1].upper() + cashtype_name[1:].lower()  # учет регистра чтобы нормально в бд было
-        ct_to_search = operation_types.get(cashtype_name, None)
-
-        if ct_to_search:
-            create_demand_objs(
-                PeriodClients(
-                    dttm_forecast=dttm,
-                    operation_type=ct_to_search,
-                    value=value,
-                    type=PeriodClients.FACT_TYPE
-                )
+    for shop_code in shop_codes:
+        list_to_create = []
+        try:
+            operation_type = OperationType.objects.get(
+                work_type__shop__super_shop__code=shop_code,
+                name=name_operation_type,
             )
-            processed_rows += 1
+        except Exception:
+            print('Нет такого operation_type: {} - {}'.format(shop_code, name_operation_type))
+            continue
 
-        else:
-            return JsonResponse.internal_error('Невозможно прочитать тип работ на строке №{}.'.format(index))
-    if processed_rows == 0 or processed_rows < checked_rows / 2:  # если было обработано, меньше половины строк, че-то пошло не так
-        return JsonResponse.internal_error(
-            'Было обработано {}/{} строк. Пожалуйста, проверьте формат данных в файле.'.format(
-                processed_rows, worksheet.max_row
-            )
-        )
+        PeriodClients.objects.filter(
+            dttm_forecast__range=[from_dttm, to_dttm],
+            type=PeriodClients.FACT_TYPE,
+            operation_type=operation_type,
+        ).delete()
 
-    ####################################################################################################################
+        for index, row in worksheet.iterrows():
+            if demand_file.name.split('/')[-1] == 'incoming.csv' and row[code_col] == shop_code or \
+                   demand_file.name.split('/')[-1] != 'incoming.csv' and shop_tabel[str(row[code_col])] == shop_code:
+                if len(list_to_create) == 999:
+                    PeriodClients.objects.bulk_create(list_to_create)
+                    list_to_create = []
+                list_to_create.append(PeriodClients(
+                    dttm_forecast=row[datetime_col],
+                    type=PeriodClients.FACT_TYPE,
+                    operation_type=operation_type,
+                    value=row[value_col],
+                ))
 
-    create_demand_objs(None)
+        PeriodClients.objects.bulk_create(list_to_create)
 
-    # works only for postgres
-    # unique_fact = list(PeriodClients.objects.filter(
-    #     type=PeriodClients.FACT_TYPE,
-    #     operation_type__work_type__shop_id=shop_id
-    # ).order_by('dttm_forecast', 'operation_type_id', '-id').distinct('dttm_forecast', 'operation_type_id'))
-    #
-    # PeriodClients.objects.filter(
-    #     type=PeriodClients.FACT_TYPE,
-    #     operation_type__work_type__shop_id=shop_id
-    # ).delete()
-    # PeriodClients.objects.bulk_create(unique_fact)
-    from_dt_to_create = PeriodClients.objects.filter(
-        type=PeriodClients.FACT_TYPE,
-        operation_type__work_type__shop_id=shop_id
-    ).order_by('dttm_forecast').last().dttm_forecast.date() + relativedelta(days=1)
+        from_dt_to_create = PeriodClients.objects.filter(
+            type=PeriodClients.FACT_TYPE,
+            operation_type__name=operation_type.name,
+        ).order_by('dttm_forecast').last().dttm_forecast.date() + relativedelta(days=1)
 
-    result_of_func = create_predbills_request_function(shop_id=shop_id, dt=from_dt_to_create)
+        result_of_func = create_predbills_request_function(shop_id=operation_type.work_type.shop.id, dt=from_dt_to_create)
 
     return JsonResponse.success() if result_of_func is True else result_of_func
+
+
+def upload_employees_util(vacation_file):
+    """
+    Принимает от клиента экселевский файл и загружает отпуска
+
+    Args:
+         method: POST
+    """
+
+    try:
+        worksheet = pd.read_csv(vacation_file, sep=';')
+    except KeyError:
+        return JsonResponse.internal_error('Не удалось открыть активный лист.')
+
+    tabel_code_col = 0
+    last_name_col = 1
+    first_name_col = 2
+    middle_name_col = 3
+    position_col = 4
+    hired_col = 5
+    fired_col = 6
+    shop_code_col = 7
+
+    worksheet[hired_col] = pd.to_datetime(worksheet.iloc[:, hired_col], format='%d.%m.%y')
+    worksheet[fired_col] = pd.to_datetime(worksheet.iloc[:, fired_col], format='%d.%m.%y')
+
+    for index, row in worksheet.iterrows():
+        update_kwargs = {
+            'tabel_code': row[tabel_code_col],
+            'last_name': row[last_name_col],
+            'first_name': row[first_name_col],
+            'middle_name': row[middle_name_col],
+            'position': WorkerPosition.objects.get(title=row[position_col]),
+            'dt_hired': row[hired_col],
+            'dt_fired': row[fired_col],
+            'shop': Shop.objects.filter(super_shop__code=row[shop_code_col])[0],
+        }
+        user, create = User.objects.update_or_create(
+            tabel_code=row[tabel_code_col],
+            last_name=row[last_name_col],
+            first_name=row[first_name_col],
+            middle_name=row[middle_name_col],
+            defaults=update_kwargs,
+        )
+
+        if create:
+            user.username = 'user-' + str(user.id)
+            user.save()
+
+    return JsonResponse.success()
 
 
 def sftp_download(localpath):
@@ -367,6 +361,6 @@ def sftp_download(localpath):
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect(SFTP_IP, username=SFTP_USERNAME, password=SFTP_PASSWORD)
     sftp = ssh.open_sftp()
-    sftp.get('/home/askona/' + localpath, localpath)
+    sftp.get(SFTP_PATH + localpath, localpath)
     sftp.close()
     ssh.close()

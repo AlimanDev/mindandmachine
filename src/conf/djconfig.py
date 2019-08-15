@@ -136,10 +136,12 @@ SERVER_EMAIL = EMAIL_HOST_USER
 # SFTP_IP = '80.87.200.194'
 # SFTP_USERNAME = 'root'
 # SFTP_PASSWORD = 'Xw0Hq3Hybm4c'
+# SFTP_PATH = '/home/askona/'
 
 SFTP_IP = '212.109.194.87'
 SFTP_USERNAME = ''
 SFTP_PASSWORD = ''
+SFTP_PATH = '/home/askona/'
 
 LOGGING = {
     'version': 1,

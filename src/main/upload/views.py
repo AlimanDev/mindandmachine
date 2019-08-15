@@ -14,7 +14,7 @@ def upload_demand(request, form, demand_file):
          url: /api/upload/upload_demand
          shop_id(int): required = True
     """
-    return upload_demand_util(form, demand_file)
+    return upload_demand_util(demand_file)
 
 
 @api_method('POST', UploadForm)

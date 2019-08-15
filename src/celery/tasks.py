@@ -5,7 +5,7 @@ import os
 from django.db.models import Avg
 from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
-from src.main.upload.utils import upload_demand_util, upload_timetable_util, upload_vacation_util, sftp_download
+from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
 from src.main.timetable.worker_exchange.utils import (
     # get_init_params,
@@ -527,20 +527,21 @@ def update_shop_stats(dt=None):
 
 @app.task
 def upload_demand_task():
-    localpath = 'bills_1082019.csv'
-    sftp_download(localpath)
-    file = open(localpath, 'rb')
-    upload_demand_util(file) # 1st arg = form
-    file.close()
-    os.remove(localpath)
+    localpaths = ['bills.csv', 'incoming.csv']
+    for localpath in localpaths:
+        sftp_download(localpath)
+        file = open(localpath, 'r')
+        upload_demand_util(file)
+        file.close()
+        os.remove(localpath)
 
 
 @app.task
-def upload_timetable_task():
+def upload_employees_task():
     localpath = 'employees.csv'
     sftp_download(localpath)
-    file = open(localpath, 'rb')
-    upload_timetable_util(file) # 1st arg = form
+    file = open(localpath, 'r')
+    upload_employees_util(file)
     file.close()
     os.remove(localpath)
 
@@ -549,7 +550,7 @@ def upload_timetable_task():
 def upload_vacation_task():
     localpath = 'holidays.csv'
     sftp_download(localpath)
-    file = open(localpath, 'rb')
+    file = open(localpath, 'r')
     upload_vacation_util(file)
     file.close()
     os.remove(localpath)
