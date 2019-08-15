@@ -9,7 +9,7 @@ from math import ceil
 from src.util.utils import api_method, JsonResponse
 from .utils import (
     calculate_supershop_stats,
-    get_super_shop_list_stats,
+    get_shop_list_stats,
 )
 from dateutil.relativedelta import relativedelta
 from src.util.forms import FormUtil
@@ -171,7 +171,7 @@ def get_super_shop_list(request, form):
             'amount': количество магазинов
         }
     """
-    return_list, total = get_super_shop_list_stats(form, request=request)
+    return_list, total = get_shop_list_stats(form, request=request)
 
     return JsonResponse.success({
         'pages': ceil(total / form['items_per_page']),

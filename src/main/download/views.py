@@ -6,7 +6,7 @@ from .forms import (
     GetUrvXlsxForm,
 )
 from src.main.shop.forms import GetSuperShopListForm
-from src.main.shop.utils import get_super_shop_list_stats
+from src.main.shop.utils import get_shop_list_stats
 from src.db.models import (
     Shop,
     User,
@@ -294,7 +294,7 @@ def get_supershops_stats(request, workbook, form):
     """
     dt_now = date.today().replace(day=1)
     dt_prev = date.today().replace(day=1) - relativedelta(months=1)
-    data, amount = get_super_shop_list_stats(form, request=request, display_format='excel')
+    data, amount = get_shop_list_stats(form, request=request, display_format='excel')
 
     def write_stats(row_index, col_index, value_dict_name):
         worksheet.write(row_index, col_index, '{}/{} ({}%)'.format(

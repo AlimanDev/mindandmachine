@@ -34,7 +34,7 @@ def calculate_supershop_stats(month, shop_ids):
     )
 
 
-def get_super_shop_list_stats(form, request, display_format='raw'):
+def get_shop_list_stats(form, request, display_format='raw'):
     dt_now = datetime.datetime.today().replace(day=1)
     dt_prev = dt_now - relativedelta(months=1)
     pointer = form['pointer']
