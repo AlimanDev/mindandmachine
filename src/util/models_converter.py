@@ -3,7 +3,6 @@ import datetime
 from src.db.models import (
     WorkerDay,
     Timetable,
-    # UserIdentifier,
     AttendanceRecords,
 )
 from src.conf.djconfig import (
@@ -288,28 +287,34 @@ class ShopConverter(BaseConverter):
     def convert(cls, obj):
         return {
             'id': obj.id,
-            'super_shop': obj.super_shop_id,
+            'parent': obj.parent_id,
             'title': obj.title,
             'tm_shop_opens': cls.convert_time(obj.tm_shop_opens),
             'tm_shop_closes': cls.convert_time(obj.tm_shop_closes),
-        }
-
-
-class SuperShopConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'title': obj.title,
             'code': obj.code,
             'address': obj.address,
             'type': obj.type,
-            'region': obj.region.title if obj.region else None,
             'dt_opened': cls.convert_date(obj.dt_opened),
             'dt_closed': cls.convert_date(obj.dt_closed),
-            'tm_start': cls.convert_time(obj.tm_start),
-            'tm_end': cls.convert_time(obj.tm_end),
         }
+SuperShopConverter=ShopConverter
+
+# class SuperShopConverter(BaseConverter):
+#     @classmethod
+#     def convert(cls, obj):
+#         return {
+#             'id': obj.id,
+#             'title': obj.title,
+#             'code': obj.code,
+#             'address': obj.address,
+#             'type': obj.type,
+#             # 'region': obj.region.title if obj.region else None,
+#             'dt_opened': cls.convert_date(obj.dt_opened),
+#             'dt_closed': cls.convert_date(obj.dt_closed),
+#             'tm_start': cls.convert_time(obj.tm_start),
+#             'tm_end': cls.convert_time(obj.tm_end),
+#         }
+
 
 
 class TimetableConverter(BaseConverter):
