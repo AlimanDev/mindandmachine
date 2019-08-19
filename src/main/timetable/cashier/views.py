@@ -731,9 +731,8 @@ def set_worker_day(request, form):
     except WorkerDay.MultipleObjectsReturned:
         return JsonResponse.multiple_objects_returned()
 
-    old_wd_type = None
     if old_wd:
-        old_wd_type = old_wd.type
+        # old_wd_type = old_wd.type
         # Не пересохраняем, если тип не изменился
         if old_wd.type == form['type'] and not WorkerDay.is_type_with_tm_range(form['type']):
             return JsonResponse.success()
@@ -797,12 +796,18 @@ def set_worker_day(request, form):
     }
 
     shop = Shop.objects.get(user=form['worker_id'])
-    work_type = WorkType.objects.get(id=form['work_type']) if form['work_type'] else old_wd_type
+    work_type_id = WorkType.objects.get(id=form['work_type']).id if form['work_type'] else None
+    if work_type_id is None:
+        work_type_id = WorkerDayCashboxDetails.objects.filter(
+            worker_day=old_wd,
+            dttm_deleted__isnull=True
+        ).first()
+        work_type_id = work_type_id.work_type_id if not work_type_id is None else None
 
-    if (form['type'] == WorkerDay.Type.TYPE_WORKDAY.value) and work_type:
-        cancel_vacancies(shop.id, work_type.id)
-    if (form['type'] != WorkerDay.Type.TYPE_WORKDAY.value) and work_type:
-        create_vacancies_and_notify(shop.id, work_type.id) # todo: fix this row
+    if (form['type'] == WorkerDay.Type.TYPE_WORKDAY.value) and work_type_id:
+        cancel_vacancies(shop.id, work_type_id)
+    if (form['type'] != WorkerDay.Type.TYPE_WORKDAY.value) and work_type_id:
+        create_vacancies_and_notify(shop.id, work_type_id) # todo: fix this row
 
     return JsonResponse.success(response)
 
