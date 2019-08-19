@@ -173,6 +173,13 @@ def api_method(
                     return JsonResponse.internal_error('cannot dev_autologin')
                 login(request, user)
 
+            token = request.POST['access_token'] if request.POST.get('access_token', None) \
+                else request.GET.get('access_token', None)
+            if token:
+                user_with_access_token = User.objects.filter(access_token=token)
+                if len(user_with_access_token) == 1:
+                    request.user = user_with_access_token[0]
+
             if auth_required and not request.user.is_authenticated:
                 return JsonResponse.auth_required()
 

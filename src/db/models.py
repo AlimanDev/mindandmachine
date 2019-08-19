@@ -263,6 +263,7 @@ class User(DjangoAbstractUser):
     tabel_code = models.CharField(max_length=15, null=True, blank=True)
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     is_ready_for_overworkings = models.BooleanField(default=False)
+    access_token = models.CharField(max_length=32, blank=True, null=True)
 
     objects = WorkerManager()
 
