@@ -12,7 +12,7 @@ from src.util.models_converter import WorkerDayConverter, UserConverter, BaseCon
 class GetCashiersListForm(forms.Form):
     dt_hired_before = util_forms.DateField(required=False)
     dt_fired_after = util_forms.DateField(required=False)
-    shop_id = forms.IntegerField(required=False)
+    shop_id = forms.IntegerField(required=True)
     consider_outsource = forms.BooleanField(required=False)
     show_all = forms.BooleanField(required=False)
 
@@ -30,11 +30,11 @@ class GetCashiersListForm(forms.Form):
 
 
 class SelectCashiersForm(forms.Form):
+    shop_id = forms.IntegerField(required=True)
     work_types = util_forms.IntegersList()
     worker_ids = util_forms.IntegersList()
     workday_type = forms.CharField(required=False)
     workdays = forms.CharField(required=False)
-    shop_id = forms.IntegerField(required=False)
     checkpoint = forms.IntegerField(required=False)
 
     work_workdays = forms.CharField(required=False)
@@ -108,17 +108,22 @@ class DublicateCashierTimetableForm(forms.Form):
     to_worker_id = forms.IntegerField(required=True)
     from_dt = util_forms.DateField(required=True)
     to_dt = util_forms.DateField(required=True)
+    shop_id = forms.IntegerField(required=True)
 
     def clean_from_worker_id(self):
         try:
-            main_worker = User.objects.get(id=self.cleaned_data['from_worker_id'])
+            main_worker = User.objects.get(
+                id=self.cleaned_data['from_worker_id'],
+                shop_id=self.cleaned_data['shop_id'])
         except User.DoesNotExist:
             raise forms.ValidationError('Неверно указан сотрудник, чье расписание копировать.')
         return main_worker.id
 
     def clean_to_worker_id(self):
         try:
-            trainee_worker = User.objects.get(id=self.cleaned_data['to_worker_id'])
+            trainee_worker = User.objects.get(
+                id=self.cleaned_data['to_worker_id'],
+                shop_id=self.cleaned_data['shop_id'])
         except User.DoesNotExist:
             raise forms.ValidationError('Неверно указан сотрудник, кому хотите копировать расписание.')
         return trainee_worker.id
