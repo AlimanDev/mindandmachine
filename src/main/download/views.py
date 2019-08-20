@@ -99,11 +99,7 @@ def get_tabel(request, workbook, form):
     return workbook, 'Tabel'
 
 
-@api_method(
-    'GET',
-    GetDemandXlsxForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
-)
+@api_method('GET', GetDemandXlsxForm)
 @xlsx_method
 def get_demand_xlsx(request, workbook, form):
     """
@@ -215,11 +211,7 @@ def get_demand_xlsx(request, workbook, form):
     )
 
 
-@api_method(
-    'GET',
-    GetUrvXlsxForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
-)
+@api_method('GET', GetUrvXlsxForm)
 @xlsx_method
 def get_urv_xlsx(request, workbook, form):
     """
@@ -271,11 +263,7 @@ def get_urv_xlsx(request, workbook, form):
     return workbook, 'URV {}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))
 
 
-@api_method(
-    'GET',
-    GetSuperShopListForm,
-    lambda_func=lambda x: False
-)
+@api_method('GET', GetSuperShopListForm)
 @xlsx_method
 def get_supershops_stats(request, workbook, form):
     """

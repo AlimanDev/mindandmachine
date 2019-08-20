@@ -88,7 +88,6 @@ def get_status(request, form):
 @api_method(
     'POST',
     SetSelectedCashiersForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def set_selected_cashiers(request, form):
     """
@@ -112,7 +111,6 @@ def set_selected_cashiers(request, form):
 @api_method(
     'POST',
     CreateTimetableForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def create_timetable(request, form):
     """
@@ -590,7 +588,6 @@ def create_timetable(request, form):
 @api_method(
     'POST',
     DeleteTimetableForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def delete_timetable(request, form):
     """
@@ -680,7 +677,7 @@ def delete_timetable(request, form):
 
     return JsonResponse.success()
 
-
+#TODO сделать auth_required=True
 @csrf_exempt
 @api_method('POST', SetTimetableForm, auth_required=False)
 def set_timetable(request, form):
