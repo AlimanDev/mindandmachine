@@ -210,6 +210,22 @@ def api_method(
 
             if check_permissions:
                 if auth_required and request.user.is_authenticated:
+                    function_group_id = request.user.function_group_id
+                    if not function_group_id:
+                        return JsonResponse.internal_error(
+                            'У пользователя {} {} не указана группа'.format(
+                                request.user.first_name,
+                                request.user.last_name
+                            )
+                        )
+
+                    function_to_check = FunctionGroup.objects.filter(group__id=function_group_id,
+                                                                     func=func.__name__).first()
+                    if function_to_check is None:
+                        return JsonResponse.access_forbidden(
+                            'Для вашей группы пользователей не разрешено просматривать или изменять запрашиваемые данные.'
+                        )
+
                     if lambda_func is None:
                         if form.cleaned_data.get('shop_id'):
                             shop = Shop.objects.filter(id=form.cleaned_data['shop_id']).first()
@@ -226,22 +242,6 @@ def api_method(
                         except MultipleObjectsReturned:
                             return JsonResponse.multiple_objects_returned()
                     request.shop = shop
-
-                    function_group_id = request.user.function_group_id
-                    if not function_group_id:
-                        return JsonResponse.internal_error(
-                            'У пользователя {} {} не указана группа'.format(
-                                request.user.first_name,
-                                request.user.last_name
-                            )
-                        )
-
-                    function_to_check = FunctionGroup.objects.filter(group__id=function_group_id,
-                                                                     func=func.__name__).first()
-                    if function_to_check is None:
-                        return JsonResponse.access_forbidden(
-                            'Для вашей группы пользователей не разрешено просматривать или изменять запрашиваемые данные.'
-                        )
 
                     level = request.user.shop.get_level(shop)
                     if level is None or level < -function_to_check.level_down \
