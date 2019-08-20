@@ -26,7 +26,6 @@ from src.db.models import (
     CameraClientEvent,
     Group,
     FunctionGroup,
-    Region,
     WorkerPosition,
     OperationType,
     IncomeVisitors,
@@ -36,12 +35,6 @@ from src.db.models import (
     AttendanceRecords,
     ExchangeSettings,
 )
-
-
-@admin.register(Region)
-class RegionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title',)
-    search_fields = ('title',)
 
 
 @admin.register(WorkerPosition)
@@ -371,7 +364,7 @@ class GroupAdmin(admin.ModelAdmin):
 
 @admin.register(FunctionGroup)
 class FunctionGroupAdmin(admin.ModelAdmin):
-    list_display = ('id', 'access_type', 'group', 'func')
+    list_display = ('id', 'access_type', 'group', 'func', 'level_down', 'level_up')
     list_filter = ('access_type', 'group', 'func')
     search_fields = ('id',)
 

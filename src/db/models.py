@@ -8,55 +8,6 @@ from . import utils
 import datetime
 # from project.ltree import LtreeField
 
-class Region(models.Model):
-    class Meta(object):
-        verbose_name = 'Регион'
-        verbose_name_plural = 'Регионы'
-
-    title = models.CharField(max_length=256, unique=True, default='Москва')
-
-# магазин
-class SuperShop(models.Model):
-    class Meta:
-        verbose_name = 'Магазин'
-        verbose_name_plural = 'Магазины'
-
-    id = models.BigAutoField(primary_key=True)
-
-    TYPE_HYPERMARKET = 'H'
-    TYPE_COMMON = 'C'
-
-    SIZE_TYPES = (
-        (TYPE_HYPERMARKET, 'hypermarket'),
-        (TYPE_COMMON, 'common supershop'),
-    )
-
-    title = models.CharField(max_length=64, unique=True)
-    code = models.CharField(max_length=64, null=True, blank=True)
-
-    dt_opened = models.DateField(null=True, blank=True)
-    dt_closed = models.DateField(null=True, blank=True)
-
-    tm_start = models.TimeField(null=True, blank=True, default=datetime.time(hour=7))
-    tm_end = models.TimeField(null=True, blank=True, default=datetime.time(hour=23, minute=59, second=59))
-    type = models.CharField(max_length=1, choices=SIZE_TYPES, default=TYPE_COMMON)
-    region = models.ForeignKey(Region, blank=True, null=True, on_delete=models.PROTECT)
-    address = models.CharField(max_length=256, blank=True, null=True)
-
-    def __str__(self):
-        return '{}, {}, {}'.format(self.title, self.code, self.id)
-
-    def is_supershop_open_at(self, tm):
-        if self.tm_start < self.tm_end:
-            return self.tm_start < tm < self.tm_end
-        else:
-            if tm > self.tm_start:
-                return True
-            else:
-                return tm < self.tm_end
-
-
-
 
 # на самом деле это отдел
 class Shop(models.Model):
@@ -75,7 +26,7 @@ class Shop(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    parent = models.ForeignKey('self', on_delete=models.PROTECT, null=True, blank=True)
+    parent = models.ForeignKey('self', on_delete=models.PROTECT, null=True, blank=True, related_name='child')
     # path = LtreeField()
 
     # full_interface = models.BooleanField(default=True)
@@ -405,6 +356,8 @@ class FunctionGroup(models.Model):
     group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name='allowed_functions', blank=True, null=True)
     func = models.CharField(max_length=128, choices=FUNCS_TUPLE)
     access_type = models.CharField(choices=TYPES, max_length=32)
+    level_up = models.IntegerField(default=0)
+    level_down = models.IntegerField(default=100)
 
     def __str__(self):
         return 'id: {}, group: {}, access_type: {}, func name: {}'.format(
@@ -1360,3 +1313,5 @@ class ExchangeSettings(models.Model):
     #Длина смены
     working_shift_min_hours = models.DurationField(default=datetime.timedelta(hours=4)) # Минимальная длина смены
     working_shift_max_hours = models.DurationField(default=datetime.timedelta(hours=12)) # Максимальная длина смены
+
+    automatic_worker_select_tree_level = models.IntegerField(default=1)
