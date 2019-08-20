@@ -7,6 +7,7 @@ import numpy as np
 from datetime import time, datetime
 from dateutil.relativedelta import relativedelta
 from src.db.models import (
+    ExchangeSettings,
     Event,
     SuperShop,
     Shop,
@@ -224,9 +225,6 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         day = 0
         day_ind = 0
 
-        worker_id = None
-        if np.random.randint(4):
-            worker_id = worker.id
 
         while day < days:
             wd = wds.iloc[day_ind]
@@ -258,6 +256,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                         dttm_work_start=None,
                         dttm_work_end=None,
                     )
+                    wd_model.created_by=worker
                     wd_model.save()
 
                 if np.random.randint(4) != 1:
@@ -287,14 +286,14 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                 add_models(models_attendance, AttendanceRecords, AttendanceRecords(
                     dttm=dttm_work_start,
                     type=AttendanceRecords.TYPE_COMING,
-                    user_id=worker_id,
+                    user_id=worker.id,
                     shop_id=shop.id,
                 ))
 
                 add_models(models_attendance, AttendanceRecords, AttendanceRecords(
                     dttm=dttm_work_end,
                     type=AttendanceRecords.TYPE_LEAVING,
-                    user_id=worker_id,
+                    user_id=worker.id,
                     shop_id=shop.id,
                 ))
 
@@ -360,7 +359,7 @@ def main(date=None, shops=None):
     f = open('src/db/works/test_data.json')
     data = json.load(f)
     f.close()
-
+    ExchangeSettings.objects.create()
     if date is None:
         date = timezone.now().date()
 
