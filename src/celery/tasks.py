@@ -50,7 +50,7 @@ from src.db.models import (
     ExchangeSettings,
 )
 from src.celery.celery import app
-
+import time as time_in_secs
 
 @app.task
 def update_queue(till_dttm=None):
@@ -527,7 +527,10 @@ def update_shop_stats(dt=None):
 
 @app.task
 def upload_demand_task():
-    localpaths = ['bills.csv', 'incoming.csv']
+    localpaths = [
+        'bills_{}.csv'.format(str(time_in_secs.time()).replace('.', '_')),
+        'incoming_{}.csv'.format(str(time_in_secs.time()).replace('.', '_'))
+    ]
     for localpath in localpaths:
         sftp_download(localpath)
         file = open(localpath, 'r')
@@ -538,7 +541,7 @@ def upload_demand_task():
 
 @app.task
 def upload_employees_task():
-    localpath = 'employees.csv'
+    localpath = 'employees_{}.csv'.format(str(time_in_secs.time()).replace('.', '_'))
     sftp_download(localpath)
     file = open(localpath, 'r')
     upload_employees_util(file)
@@ -548,7 +551,7 @@ def upload_employees_task():
 
 @app.task
 def upload_vacation_task():
-    localpath = 'holidays.csv'
+    localpath = 'holidays_{}.csv'.format(str(time_in_secs.time()).replace('.', '_'))
     sftp_download(localpath)
     file = open(localpath, 'r')
     upload_vacation_util(file)
