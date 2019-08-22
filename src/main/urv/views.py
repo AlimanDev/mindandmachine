@@ -11,6 +11,9 @@ from django.db.models import Q
 import functools
 from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage
+import pandas as pd
+from src.main.upload.utils import get_uploaded_file
+import datetime
 
 
 @api_method(
@@ -146,3 +149,65 @@ def change_user_urv(request, form):
     # identifier.worker = user
     # identifier.save()
     # return JsonResponse.success()
+
+
+@api_method('POST')
+@get_uploaded_file
+def urv_uploader(request, urv_file):
+    row_start = 5
+
+    try:
+        worksheet = pd.read_excel(urv_file, skiprows=[x for x in range(row_start)])
+    except KeyError:
+        return JsonResponse.internal_error('Не удалось открыть активный лист.')
+
+    col_fio = 8
+    col_date = 9
+    col_coming = 10
+    col_leaving = 11
+
+    from_dt = datetime.datetime.strptime(worksheet.iloc[:, col_date].min(), '%d.%m.%Y')
+    to_dt = datetime.datetime.strptime(worksheet.iloc[:, col_date].max(), '%d.%m.%Y') + datetime.timedelta(days=1)
+
+    list_to_create = []
+    user_list = []
+    for index, row in worksheet.iterrows():
+        fio = row[col_fio].split(' ')
+
+        try:
+            user = User.objects.get(first_name=fio[1], last_name=fio[0], middle_name=fio[2])
+            user_list.append(user)
+        except Exception:
+            print('Пользователь {} {} {} не найден.'.format(fio[0], fio[1], fio[2]))
+            continue
+
+        if len(list_to_create) >= 999:
+            AttendanceRecords.objects.bulk_create(list_to_create)
+            list_to_create = []
+
+        if row[col_coming] != 'nan':
+            dttm_coming = datetime.datetime.strptime(
+                '{} {}'.format(row[col_date], row[col_coming]), '%d.%m.%Y %H:%M:%S')
+
+            list_to_create.append(
+                AttendanceRecords(
+                    type=AttendanceRecords.TYPE_COMING,
+                    dttm=dttm_coming,
+                    user=user,
+                    shop=user.shop,
+                ))
+        if row[col_leaving] != 'nan':
+            dttm_leaving = datetime.datetime.strptime(
+                '{} {}'.format(row[col_date], row[col_leaving]), '%d.%m.%Y %H:%M:%S')
+
+            list_to_create.append(
+                AttendanceRecords(
+                    type=AttendanceRecords.TYPE_LEAVING,
+                    dttm=dttm_leaving,
+                    user=user,
+                    shop=user.shop,
+                ))
+
+    AttendanceRecords.objects.filter(dttm__range=[from_dt, to_dt], user__in=user_list).delete()
+    AttendanceRecords.objects.bulk_create(list_to_create)
+    return JsonResponse.success()
