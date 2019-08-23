@@ -217,8 +217,10 @@ def count_difference_of_normal_days(dt_end, usrs, dt_start=None):
     for u_it in range(len(usrs)):
         dt_u_st = usrs[u_it].dt_hired if usrs[u_it].dt_hired and (usrs[u_it].dt_hired > dt_start) else dt_start
         total_norm_days, total_norm_hours = dts_start_count_dict[dt_u_st]
-        diff_prev_days = prev_info[u_it]['count_workdays'] - total_norm_days
-        diff_prev_hours = prev_info[u_it]['count_hours'] - total_norm_hours
+        diff_prev_days = prev_info[u_it]['count_workdays'] - total_norm_days if usrs[u_it] in prev_info \
+            else 0 - total_norm_days
+        diff_prev_hours = prev_info[u_it]['count_hours'] - total_norm_hours if usrs[u_it] in prev_info \
+            else 0 - total_norm_hours
 
         user_info_dict[usrs[u_it].id] = {
             'diff_prev_paid_days': diff_prev_days,
