@@ -6,11 +6,15 @@ from django.contrib.auth.models import (
 from django.contrib.contenttypes.models import ContentType
 from . import utils
 import datetime
-# from project.ltree import LtreeField
-
+from mptt.models import MPTTModel, TreeForeignKey
 
 # на самом деле это отдел
-class Shop(models.Model):
+class Shop(MPTTModel):
+    def __init__(self, *args, **kwargs):
+        super(Shop, self).__init__(*args, **kwargs)
+        # self.__original_parent_id = self.parent_id
+        # self.__original_path = self.path
+
     class Meta(object):
         # unique_together = ('parent', 'title')
         verbose_name = 'Отдел'
@@ -26,8 +30,8 @@ class Shop(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    parent = models.ForeignKey('self', on_delete=models.PROTECT, null=True, blank=True, related_name='child')
-    # path = LtreeField()
+    parent = TreeForeignKey('self', on_delete=models.PROTECT, null=True, blank=True, related_name='child')
+    # path = LTreeField()
 
     # full_interface = models.BooleanField(default=True)
 
@@ -105,8 +109,68 @@ class Shop(models.Model):
 
     def system_step_in_minutes(self):
         return self.forecast_step_minutes.hour * 60 + self.forecast_step_minutes.minute
+
     def parent_title(self):
         return self.parent.title if self.parent else '',
+    def get_level_of(self, shop):
+        if self.id == shop.id:
+            return 0
+        if (self.level < shop.level and self.is_ancestor_of(shop)) \
+            or (self.level > shop.level and self.is_descendant_of(shop)):
+                return shop.level - self.level
+        return None
+
+
+    # def find_parent_level(self, shop):
+    #     level = 0
+    #     parent = self
+    #     while parent:
+    #         if parent.id == shop.id:
+    #             return level
+    #         level+=1
+    #         parent = parent.parent
+    #     return None
+    # def get_level(self, shop):
+    #     level = self.find_parent_level(shop)
+    #     if level is not None:
+    #         return level
+    #
+    #     level = shop.find_parent_level(self)
+    #     if level is not None:
+    #         return -level
+    #
+    #     return None
+
+    # def set_childs_path(self):
+    #     for c in self.get_childs():
+    #         c.set_path()
+    #         c.save()
+    #         c.set_childs_path()
+    # def set_path(self):
+    #     if self.parent_id:
+    #         self.path = '.'.join([self.parent.path, str(self.id)])
+    #     else:
+    #         self.path = str(self.id)
+    #
+    # def get_childs(self, full_tree=False,original_path=False):
+    #     if full_tree:
+    #         path = self.__original_path if original_path else self.path
+    #         return Shop.objects.filter(
+    #             path__startswith=path + '.').order_by('path')
+    #
+    #     return Shop.objects.all().filter(parent_id=self.id)
+
+    # def save(self, force_insert=False, force_update=False, *args, **kwargs):
+    #     if not self.path or self.parent != self.__original_parent:
+    #         self.set_path()
+    #     super(Shop, self).save(force_insert, force_update, *args, **kwargs)
+    #     if self.parent_id != self.__original_parent_id:
+    #         for child in self.get_childs(full_tree=True, original_path=True):
+    #             child.set_path()
+    #             child.save()
+    #
+    #         self.__original_parent_id = self.parent_id
+    #         self.__original_path = self.path
 
 
 class WorkerPosition(models.Model):
@@ -272,9 +336,7 @@ class FunctionGroup(models.Model):
         'update_cashbox',
         'delete_work_type',
         'get_outsource_workers',
-        'add_supershop',
         'change_cashier_info',
-        'get_demand_xlsx',
         'get_not_working_cashiers_list',
         'get_table',
         'get_worker_day',
@@ -290,10 +352,8 @@ class FunctionGroup(models.Model):
         'select_cashiers',
         'request_worker_day',
         'add_outsource_workers',
-        'get_parameters',
         'set_worker_restrictions',
         'create_cashier',
-        'get_urv_xlsx',
         'get_cashiers_info',
         'create_work_type',
         'get_visitors_info',
@@ -302,13 +362,10 @@ class FunctionGroup(models.Model):
         'set_notifications_read',
         'get_status',
         'get_forecast',
-        'set_parameters',
         'get_cashiers_list',
         'get_change_request',
         'delete_timetable',
         'get_types',
-        'get_super_shop',
-        'get_supershop_stats',
         'get_all_slots',
         'get_cashiers_timetable',
         'set_demand',
@@ -330,21 +387,32 @@ class FunctionGroup(models.Model):
         'get_parent',
         'delete_cashbox',
         'set_timetable',
-        'get_super_shop_list',
         'delete_worker_day',
         'create_predbills_request',
-        'get_timetable_xlsx',
         'process_forecast',
-        'edit_supershop',
-        'get_supershops_stats',
-        'edit_shop',
-        'add_shop',
         'notify_workers_about_vacancy',
         'show_vacancy',
         'cancel_vacancy',
         'confirm_vacancy',
         'do_notify_action',
         'exchange_workers_day',
+
+        # download/
+        'get_demand_xlsx',
+        'get_department_stats_xlsx',
+        'get_timetable_xlsx',
+        'get_urv_xlsx',
+
+        # shop/
+        # 'get_super_shop',
+        # 'add_supershop',
+        # 'edit_supershop',
+        'add_department',
+        'edit_department',
+        'get_department_list',
+        'get_department_stats',
+        'get_parameters',
+        'set_parameters',
     )
 
     FUNCS_TUPLE = ((f, f) for f in FUNCS)
@@ -1122,7 +1190,7 @@ class Timetable(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='timetable')
     status_message = models.CharField(max_length=256, null=True, blank=True)
     dt = models.DateField()
     status = utils.EnumField(Status)
