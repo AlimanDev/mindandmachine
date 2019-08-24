@@ -7,15 +7,11 @@ class GetDepartmentForm(forms.Form):
     shop_id = forms.IntegerField(required=False)
 
 
-class GetSuperShopForm(forms.Form):
-    super_shop_id = forms.IntegerField()
-
-
-class GetSuperShopListForm(forms.Form):
+class GetDepartmentListForm(forms.Form):
     pointer = forms.IntegerField()
     items_per_page = forms.IntegerField()
+    shop_id = forms.IntegerField(required=False)
     title = forms.CharField(required=False, max_length=256)
-    # super_shop_type = util_forms.ChoiceField([SuperShop.TYPE_COMMON, SuperShop.TYPE_HYPERMARKET], '')
     region = forms.CharField(required=False, max_length=256)
     closed_before_dt = util_forms.DateField(required=False)
     opened_after_dt = util_forms.DateField(required=False)
@@ -33,39 +29,20 @@ class GetSuperShopListForm(forms.Form):
         if self.cleaned_data['format'] not in available_formats:
             raise ValidationError('unknown format')
 
-
-class AddEditSuperShopForm(forms.Form):
+class AddEditDepartmentForm(forms.Form):
     title = forms.CharField(max_length=128)
     code = forms.CharField(max_length=64)
     address = forms.CharField(max_length=256, required=False)
-    region = forms.CharField(required=False)
-    tm_start = util_forms.TimeField()
-    tm_end = util_forms.TimeField()
-
-    class Meta:
-        abstract = True
-
-
-class AddSuperShopForm(AddEditSuperShopForm):
-    open_dt = util_forms.DateField()
-
-
-class EditSuperShopForm(AddEditSuperShopForm):
-    supershop_id = forms.IntegerField()
-    close_dt = util_forms.DateField(required=False)
-
-
-class AddEditShopForm(forms.Form):
-    title = forms.CharField(max_length=64)
     tm_shop_opens = util_forms.TimeField()
     tm_shop_closes = util_forms.TimeField()
+    parent_id = forms.IntegerField()
 
 
-class AddShopForm(AddEditShopForm):
-    super_shop_id = forms.IntegerField()
+class AddDepartmentForm(AddEditDepartmentForm):
+    dt_opened = util_forms.DateField()
 
 
-class EditShopForm(AddEditShopForm):
+class EditDepartmentForm(AddEditDepartmentForm):
     shop_id = forms.IntegerField()
     to_delete = util_forms.BooleanField(required=False)
 
@@ -112,5 +89,5 @@ class SetParametersForm(forms.Form):
                 raise ValidationError('Значение {} должно быть указано в процентах (0-100)'.format(value))
 
 
-class GetSuperShopStatsForm(forms.Form):
-    supershop_id = forms.IntegerField()
+class GetDepartmentStatsForm(forms.Form):
+    shop_id = forms.IntegerField(required=False)

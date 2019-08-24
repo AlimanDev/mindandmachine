@@ -14,7 +14,6 @@ from dateutil.relativedelta import relativedelta
 from src.util.forms import FormUtil
 from src.util.models_converter import (
     ShopConverter,
-    SuperShopConverter,
     BaseConverter,
 )
 from .forms import (
@@ -80,7 +79,7 @@ def get_department(request, form):
 
     return JsonResponse.success({
         'shops': return_list,
-        'super_shop': SuperShopConverter.convert(shop)
+        'super_shop': ShopConverter.convert(shop)
     })
 
 
