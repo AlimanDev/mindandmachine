@@ -296,25 +296,6 @@ class ShopConverter(BaseConverter):
             'dt_opened': cls.convert_date(obj.dt_opened),
             'dt_closed': cls.convert_date(obj.dt_closed),
         }
-SuperShopConverter=ShopConverter
-
-# class SuperShopConverter(BaseConverter):
-#     @classmethod
-#     def convert(cls, obj):
-#         return {
-#             'id': obj.id,
-#             'title': obj.title,
-#             'code': obj.code,
-#             'address': obj.address,
-#             'type': obj.type,
-#             # 'region': obj.region.title if obj.region else None,
-#             'dt_opened': cls.convert_date(obj.dt_opened),
-#             'dt_closed': cls.convert_date(obj.dt_closed),
-#             'tm_start': cls.convert_time(obj.tm_start),
-#             'tm_end': cls.convert_time(obj.tm_end),
-#         }
-
-
 
 class TimetableConverter(BaseConverter):
     __STATUSES = {
