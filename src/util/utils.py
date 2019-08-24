@@ -243,9 +243,9 @@ def api_method(
                             return JsonResponse.multiple_objects_returned()
                     request.shop = shop
 
-                    level = request.user.shop.get_level_of(shop)
-                    if level is None or level > function_to_check.level_down \
-                            or level < -function_to_check.level_up:
+                    parent = request.user.shop.get_ancestor_by_level_distance(function_to_check.level_up)
+                    level = parent.get_level_of(shop)
+                    if level is None or level < 0 or level > function_to_check.level_down:
                         return JsonResponse.access_forbidden(
                             'Вы не можете просматрировать информацию по другим магазинам'
                         )
@@ -371,7 +371,6 @@ def outer_server(is_camera=True, decode_body=True):
 
             if access_key is not None and request_key != access_key:
                 return JsonResponse.access_forbidden('invalid key')
-
             try:
                 return func(request, request_data, *args, **kwargs)
             except Exception as e:
