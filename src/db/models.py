@@ -113,12 +113,11 @@ class Shop(MPTTModel):
     def get_level_of(self, shop):
         if self.id == shop.id:
             return 0
-        if (self.level < shop.level and self.is_ancestor_of(shop)) \
-            or (self.level > shop.level and self.is_descendant_of(shop)):
+        if self.is_ancestor_of(shop) or self.is_descendant_of(shop):
                 return shop.level - self.level
         return None
     def get_ancestor_by_level_distance(self, level):
-        if self.level == 0 or level==0:
+        if self.level == 0 or level == 0:
             return self
         level = self.level - level if self.level > level else 0
         return self.get_ancestors().filter(level=level)[0]
