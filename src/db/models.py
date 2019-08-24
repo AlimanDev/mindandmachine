@@ -12,8 +12,6 @@ from mptt.models import MPTTModel, TreeForeignKey
 class Shop(MPTTModel):
     def __init__(self, *args, **kwargs):
         super(Shop, self).__init__(*args, **kwargs)
-        # self.__original_parent_id = self.parent_id
-        # self.__original_path = self.path
 
     class Meta(object):
         # unique_together = ('parent', 'title')
@@ -31,7 +29,6 @@ class Shop(MPTTModel):
     id = models.BigAutoField(primary_key=True)
 
     parent = TreeForeignKey('self', on_delete=models.PROTECT, null=True, blank=True, related_name='child')
-    # path = LTreeField()
 
     # full_interface = models.BooleanField(default=True)
 
@@ -112,6 +109,7 @@ class Shop(MPTTModel):
 
     def parent_title(self):
         return self.parent.title if self.parent else '',
+
     def get_level_of(self, shop):
         if self.id == shop.id:
             return 0
@@ -119,58 +117,11 @@ class Shop(MPTTModel):
             or (self.level > shop.level and self.is_descendant_of(shop)):
                 return shop.level - self.level
         return None
-
-
-    # def find_parent_level(self, shop):
-    #     level = 0
-    #     parent = self
-    #     while parent:
-    #         if parent.id == shop.id:
-    #             return level
-    #         level+=1
-    #         parent = parent.parent
-    #     return None
-    # def get_level(self, shop):
-    #     level = self.find_parent_level(shop)
-    #     if level is not None:
-    #         return level
-    #
-    #     level = shop.find_parent_level(self)
-    #     if level is not None:
-    #         return -level
-    #
-    #     return None
-
-    # def set_childs_path(self):
-    #     for c in self.get_childs():
-    #         c.set_path()
-    #         c.save()
-    #         c.set_childs_path()
-    # def set_path(self):
-    #     if self.parent_id:
-    #         self.path = '.'.join([self.parent.path, str(self.id)])
-    #     else:
-    #         self.path = str(self.id)
-    #
-    # def get_childs(self, full_tree=False,original_path=False):
-    #     if full_tree:
-    #         path = self.__original_path if original_path else self.path
-    #         return Shop.objects.filter(
-    #             path__startswith=path + '.').order_by('path')
-    #
-    #     return Shop.objects.all().filter(parent_id=self.id)
-
-    # def save(self, force_insert=False, force_update=False, *args, **kwargs):
-    #     if not self.path or self.parent != self.__original_parent:
-    #         self.set_path()
-    #     super(Shop, self).save(force_insert, force_update, *args, **kwargs)
-    #     if self.parent_id != self.__original_parent_id:
-    #         for child in self.get_childs(full_tree=True, original_path=True):
-    #             child.set_path()
-    #             child.save()
-    #
-    #         self.__original_parent_id = self.parent_id
-    #         self.__original_path = self.path
+    def get_ancestor_by_level_distance(self, level):
+        if self.level == 0 or level==0:
+            return self
+        level = self.level - level if self.level > level else 0
+        return self.get_ancestors().filter(level=level)[0]
 
 
 class WorkerPosition(models.Model):
@@ -404,9 +355,6 @@ class FunctionGroup(models.Model):
         'get_urv_xlsx',
 
         # shop/
-        # 'get_super_shop',
-        # 'add_supershop',
-        # 'edit_supershop',
         'add_department',
         'edit_department',
         'get_department_list',

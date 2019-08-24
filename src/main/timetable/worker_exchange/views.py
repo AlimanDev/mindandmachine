@@ -49,7 +49,6 @@ def get_workers_to_exchange(request, form):
 
     Returns:
         {
-
             'users':[
                 user_id: {
                     | 'info': dict with User info
@@ -62,7 +61,8 @@ def get_workers_to_exchange(request, form):
 
     """
 
-    work_type = WorkType.objects.select_related('shop', 'shop__super_shop').get(id=form['specialization'], dttm_deleted__isnull=True)
+    work_type = WorkType.objects.select_related(
+        'shop', 'shop__parent').get(id=form['specialization'], dttm_deleted__isnull=True)
     worker_day = WorkerDayCashboxDetails(
         dttm_from=form['dttm_start'],
         dttm_to=form['dttm_end'],
@@ -70,15 +70,12 @@ def get_workers_to_exchange(request, form):
     )
 
     search_params = {
-        'own_shop': True if form['own_shop'] else False,
-        'other_shops': True if form['other_shops'] else False,
-        'other_supershops': True if form['other_supershops'] else False,
         'outsource': True if form['outsource'] else False,
     }
 
     workers = search_candidates(worker_day, **search_params)  # fixme: may return tooooo much users
     workers = workers.annotate(
-        supershop_title=F('shop__super_shop__title'),
+        parent_title=F('shop__parent__title'),
         shop_title=F('shop__title')
     )  # fixme: delete this -- specially for current front
 
@@ -86,7 +83,7 @@ def get_workers_to_exchange(request, form):
     for worker in workers:
         worker_info = UserConverter.convert_main(worker)
         worker_info['shop_title'] = worker.shop_title
-        worker_info['supershop_title'] = worker.supershop_title
+        worker_info['supershop_title'] = worker.parent_title
         users[worker.id] = {'info': worker_info, 'timetable': []}
 
     change_dt = form['dttm_start'].date()
@@ -138,9 +135,6 @@ def notify_workers_about_vacancy(request, form):
 
     # for checking permissions
     search_params = {
-        'own_shop': True,
-        'other_shops': True,
-        'other_supershops': True,
         'outsource': True,
     }
     workers = search_candidates(worker_day_detail, **search_params)
@@ -214,7 +208,3 @@ def cancel_vacancy(request, form):
     """
     cancel_vacancy_util(form['vacancy_id'])
     return JsonResponse.success()
-
-
-
-
