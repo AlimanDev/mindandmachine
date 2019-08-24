@@ -75,6 +75,7 @@ def get_shop_list_stats(form, request, display_format='raw'):
         dttm_deleted__isnull=True,
         lft__gte=OuterRef('lft'),
         lft__lte=OuterRef('rght'),
+        tree_id=OuterRef('tree_id'),
     ).order_by().values(
         'timetable__fot',
         'timetable__fot_revenue',
