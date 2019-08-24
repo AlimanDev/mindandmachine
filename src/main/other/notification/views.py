@@ -83,14 +83,11 @@ def get_notifications2(request, form):
                 | '
             | ],
             | 'unread_count': количество непрочитанных уведомлений
-
         }
     """
 
     pointer = form.get('pointer', 0)
-    pointer = pointer if pointer else 0
     count = form.get('count', 20)
-    count = count if count else 20
 
     notifies = Notifications.objects.mm_filter(
         Q(event__workerday_details__dttm_deleted__isnull=True) |
