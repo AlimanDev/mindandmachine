@@ -27,7 +27,6 @@ from src.db.models import (
     Notifications,
 )
 from src.util.collection import group_by
-from src.util.forms import FormUtil
 from src.util.models_converter import (
     TimetableConverter,
     WorkTypeConverter,
@@ -76,9 +75,9 @@ def get_status(request, form):
             'dttm_status_change': дата изменения
         }
     """
-    shop_id = FormUtil.get_shop_id(request, form)
+
     try:
-        tt = Timetable.objects.get(shop_id=shop_id, dt=form['dt'])
+        tt = Timetable.objects.get(shop_id=request.shop.id, dt=form['dt'])
     except Timetable.DoesNotExist:
         return JsonResponse.does_not_exists_error()
 
