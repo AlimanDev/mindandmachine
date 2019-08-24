@@ -330,7 +330,7 @@ def create_timetable(request, form):
             users_without_spec.append(u.first_name + ' ' + u.last_name)
     if users_without_spec:
         tt.status = Timetable.Status.ERROR.value
-        status_message = 'У пользователей {} не проставлены специалации.'.format(', '.join(users_without_spec))
+        status_message = 'Не проставлены типы работ у пользователей: {}.'.format(', '.join(users_without_spec))
         tt.delete()
         return JsonResponse.value_error(status_message)
 
@@ -429,6 +429,7 @@ def create_timetable(request, form):
 
     shop_dict = {
         'shop_name': shop.title,
+        'process_type': shop.process_type,
         'mean_queue_length': shop.mean_queue_length,
         'max_queue_length': shop.max_queue_length,
         'dead_time_part': shop.dead_time_part,
