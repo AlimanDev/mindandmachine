@@ -243,9 +243,9 @@ def api_method(
                             return JsonResponse.multiple_objects_returned()
                     request.shop = shop
 
-                    level = request.user.shop.get_level(shop)
-                    if level is None or level < -function_to_check.level_down \
-                            or level > function_to_check.level_up:
+                    level = request.user.shop.get_level_of(shop)
+                    if level is None or level > function_to_check.level_down \
+                            or level < -function_to_check.level_up:
                         return JsonResponse.access_forbidden(
                             'Вы не можете просматрировать информацию по другим магазинам'
                         )
