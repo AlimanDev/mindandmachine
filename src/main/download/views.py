@@ -5,7 +5,7 @@ from .forms import (
     GetDemandXlsxForm,
     GetUrvXlsxForm,
 )
-from src.main.shop.forms import GetSuperShopListForm
+from src.main.shop.forms import GetDepartmentListForm
 from src.main.shop.utils import get_shop_list_stats
 
 from src.db.models import (
@@ -263,9 +263,9 @@ def get_urv_xlsx(request, workbook, form):
     return workbook, 'URV {}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))
 
 
-@api_method('GET', GetSuperShopListForm)
+@api_method('GET', GetDepartmentListForm)
 @xlsx_method
-def get_supershops_stats(request, workbook, form):
+def get_department_stats_xlsx(request, workbook, form):
     """
     Скачивает статистику по магазинам за пред/текущий периоды
 
