@@ -1,5 +1,12 @@
 from src.util.utils import api_method
-from .utils import *
+from .utils import (
+    get_uploaded_file,
+    upload_demand_util,
+    upload_timetable_util,
+    upload_vacation_util,
+    upload_urv_util
+
+)
 from .forms import UploadForm
 
 
