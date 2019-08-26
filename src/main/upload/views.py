@@ -1,5 +1,5 @@
 from src.util.utils import api_method
-from .utils import get_uploaded_file, upload_vacation_util, upload_demand_util, upload_timetable_util
+from .utils import *
 from .forms import UploadForm
 
 
@@ -42,3 +42,14 @@ def upload_vacation(request, vacation_file):
     """
     return upload_vacation_util(vacation_file)
 
+
+@api_method('POST')
+@get_uploaded_file
+def upload_urv(request, urv_file):
+    """
+    Принимает от клиента экселевский файл и загружает urv отметки
+
+    Args:
+         method: POST
+    """
+    return upload_urv_util(urv_file)
