@@ -307,6 +307,7 @@ def get_cashier_timetable(request, form):
     from_dt = form['from_dt']
     to_dt = form['to_dt']
     checkpoint = FormUtil.get_checkpoint(form)
+    work_types = {w.id: w for w in WorkType.objects.all()}
 
     response = {}
     # todo: rewrite with 1 request instead 80
@@ -346,7 +347,12 @@ def get_cashier_timetable(request, form):
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
                 )
-                wd_m.work_types_ids = [wd['work_types__id']] if wd['work_types__id'] else []
+                if wd['work_types__id']:
+                    wd_m.work_types_ids = [wd['work_types__id']]
+                    work_type = work_types[wd_m.work_types_ids[0]]
+                    if work_type.shop_id != form['shop_id']:
+                        wd_m.other_shop = work_type.shop.title
+
                 worker_days.append(
                     wd_m
                 )
