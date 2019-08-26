@@ -9,7 +9,6 @@ from src.util.models_converter import AttendanceRecordsConverter
 from .forms import GetUserUrvForm, ChangeAttendanceForm
 from django.db.models import Q
 import functools
-from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage
 
 
