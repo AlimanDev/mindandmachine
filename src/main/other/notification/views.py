@@ -86,8 +86,12 @@ def get_notifications2(request, form):
         }
     """
 
-    pointer = form.get('pointer', 0)
-    count = form.get('count', 20)
+    pointer = form.get('pointer')
+    count = form.get('count')
+    if pointer is None:
+        pointer = 0
+    if count is None:
+        count = 20
 
     notifies = Notifications.objects.mm_filter(
         Q(event__workerday_details__dttm_deleted__isnull=True) |
