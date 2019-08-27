@@ -357,60 +357,65 @@ def upload_employees_util(vacation_file):
 
 
 def upload_urv_util(urv_file):
-    row_start = 5
 
     try:
-        worksheet = pd.read_excel(urv_file, skiprows=[x for x in range(row_start)])
+        worksheet = pd.read_excel(urv_file)
     except KeyError:
         return JsonResponse.internal_error('Не удалось открыть активный лист.')
 
-    col_fio = 8
-    col_date = 9
-    col_coming = 10
-    col_leaving = 11
+    col_fio = 4
+    col_date = 5
+    col_coming = 6
+    col_leaving = 7
+    dt_format = '%Y-%m-%d'
+    dttm_format = '%Y-%m-%d %H:%M:%S'
 
-    from_dt = datetime.datetime.strptime(worksheet.iloc[:, col_date].min(), '%d.%m.%Y')
-    to_dt = datetime.datetime.strptime(worksheet.iloc[:, col_date].max(), '%d.%m.%Y') + datetime.timedelta(days=1)
+    from_dt = datetime.datetime.strptime(worksheet.iloc[:, col_date].min().split(' ')[0], dt_format)
+    to_dt = datetime.datetime.strptime(worksheet.iloc[:, col_date].max().split(' ')[0], dt_format) + datetime.timedelta(days=1)
 
     list_to_create = []
     user_list = []
+    not_found_user = ''
     for index, row in worksheet.iterrows():
-        fio = row[col_fio].split(' ')
+        if row[col_fio] != 'NULL' and str(row[col_fio]) != 'nan':
+            fio = row[col_fio].split(' ')
+            if fio != not_found_user:
+                current_dt = row[col_date].split(' ')[0]
 
-        try:
-            user = User.objects.get(first_name=fio[1], last_name=fio[0], middle_name=fio[2])
-            user_list.append(user)
-        except Exception:
-            print('Пользователь {} {} {} не найден.'.format(fio[0], fio[1], fio[2]))
-            continue
+                try:
+                    user = User.objects.get(first_name=fio[1], last_name=fio[0], dt_fired__isnull=True)
+                    user_list.append(user)
+                except Exception:
+                    not_found_user = fio
+                    print('Пользователь {} {} {} не найден или уволен.'.format(fio[0], fio[1], fio[2]))
+                    continue
 
-        if len(list_to_create) >= 999:
-            AttendanceRecords.objects.bulk_create(list_to_create)
-            list_to_create = []
+                if len(list_to_create) >= 999:
+                    AttendanceRecords.objects.bulk_create(list_to_create)
+                    list_to_create = []
 
-        if row[col_coming] != 'nan':
-            dttm_coming = datetime.datetime.strptime(
-                '{} {}'.format(row[col_date], row[col_coming]), '%d.%m.%Y %H:%M:%S')
+                if row[col_coming] != 'NULL' and str(row[col_coming]) != 'nan':
+                    dttm_coming = datetime.datetime.strptime(
+                        '{} {}'.format(current_dt, row[col_coming].split('.')[0]), dttm_format)
 
-            list_to_create.append(
-                AttendanceRecords(
-                    type=AttendanceRecords.TYPE_COMING,
-                    dttm=dttm_coming,
-                    user=user,
-                    shop=user.shop,
-                ))
-        if row[col_leaving] != 'nan':
-            dttm_leaving = datetime.datetime.strptime(
-                '{} {}'.format(row[col_date], row[col_leaving]), '%d.%m.%Y %H:%M:%S')
+                    list_to_create.append(
+                        AttendanceRecords(
+                            type=AttendanceRecords.TYPE_COMING,
+                            dttm=dttm_coming,
+                            user=user,
+                            shop=user.shop,
+                        ))
+                if row[col_leaving] != 'NULL' and str(row[col_leaving]) != 'nan':
+                    dttm_leaving = datetime.datetime.strptime(
+                        '{} {}'.format(current_dt, row[col_leaving].split('.')[0]), dttm_format)
 
-            list_to_create.append(
-                AttendanceRecords(
-                    type=AttendanceRecords.TYPE_LEAVING,
-                    dttm=dttm_leaving,
-                    user=user,
-                    shop=user.shop,
-                ))
-
+                    list_to_create.append(
+                        AttendanceRecords(
+                            type=AttendanceRecords.TYPE_LEAVING,
+                            dttm=dttm_leaving,
+                            user=user,
+                            shop=user.shop,
+                        ))
     AttendanceRecords.objects.filter(dttm__range=[from_dt, to_dt], user__in=user_list).delete()
     AttendanceRecords.objects.bulk_create(list_to_create)
     return JsonResponse.success()
