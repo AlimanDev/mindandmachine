@@ -11,7 +11,6 @@ from django.db.models import Sum, Q
 from django.db.models.functions import Coalesce
 
 from src.util.models_converter import WorkerDayConverter
-import json
 
 
 def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
@@ -218,13 +217,14 @@ def count_difference_of_normal_days(dt_end, usrs, dt_start=None):
     for u_it in range(len(usrs)):
         dt_u_st = usrs[u_it].dt_hired if usrs[u_it].dt_hired and (usrs[u_it].dt_hired > dt_start) else dt_start
         total_norm_days, total_norm_hours = dts_start_count_dict[dt_u_st]
-        break_triplets_sum = sum(json.loads(usrs[u_it].shop.break_triplets)[2])
-        diff_prev_days = prev_info[usrs[u_it].id]['count_workdays'] if prev_info.get(usrs[u_it].id, None) else 0
-        diff_prev_hours = prev_info[usrs[u_it].id]['count_hours'] if prev_info.get(usrs[u_it].id, None) else 0
+        diff_prev_days = prev_info[usrs[u_it].id]['count_workdays'] - total_norm_days if prev_info.get(
+            usrs[u_it].id, None) else 0 - total_norm_days
+        diff_prev_hours = prev_info[usrs[u_it].id]['count_hours'] - total_norm_hours if prev_info.get(
+            usrs[u_it].id, None) else 0 - total_norm_hours
 
         user_info_dict[usrs[u_it].id] = {
-            'diff_prev_paid_days': diff_prev_days - total_norm_days,
-            'diff_prev_paid_hours': diff_prev_hours - total_norm_hours - break_triplets_sum,
+            'diff_prev_paid_days': diff_prev_days,
+            'diff_prev_paid_hours': diff_prev_hours
         }
 
     return user_info_dict
