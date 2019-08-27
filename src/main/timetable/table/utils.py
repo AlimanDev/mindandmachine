@@ -227,7 +227,7 @@ def count_difference_of_normal_days(dt_end, usrs, dt_start=None):
         count_workdays=Coalesce(Sum('workermonthstat__work_days'), 0),
         count_hours=Coalesce(Sum('workermonthstat__work_hours'), 0),
     ).order_by('id'))
-    prev_info = {user.id: user for user in prev_info}
+    prev_info = {user['id']: user for user in prev_info}
     user_info_dict = {}
 
     for u_it in range(len(usrs)):
