@@ -4,6 +4,7 @@ from src.db.models import (
     ProductionDay,
     User
 )
+import json
 from datetime import time
 from ..utils import timediff
 import datetime as dt
@@ -128,10 +129,25 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
                     worker['work_in_holidays'] += 1
 
         if row['workerdaycashboxdetails__dttm_from'] and row['workerdaycashboxdetails__dttm_to']:
-            worker['paid_hours'] += round(timediff(
+            duration_of_workerday = round(timediff(
                 row['workerdaycashboxdetails__dttm_from'],
                 row['workerdaycashboxdetails__dttm_to'],
             ))
+
+            break_triplets = user.shop.break_triplets
+            list_of_break_triplets = json.loads(break_triplets)
+            time_break_triplets = 0
+            for triplet in list_of_break_triplets:
+                for time_triplet in triplet[2]:
+                    time_break_triplets += time_triplet
+                triplet[2] = time_break_triplets
+                time_break_triplets = 0
+
+            for triplet in list_of_break_triplets:
+                if float(triplet[0]) < duration_of_workerday * 60 <= float(triplet[1]):
+                    time_break_triplets = triplet[2]
+            duration_of_workerday -= round(time_break_triplets / 60, 3)
+            worker['paid_hours'] += duration_of_workerday
 
     # t = check_time(t)
     workers_info[worker_id] = worker
