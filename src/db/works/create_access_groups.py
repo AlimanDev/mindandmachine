@@ -11,7 +11,7 @@
 
 from uuid import uuid4
 from django.utils import timezone
-
+from src.db.models import Shop
 def password_generator(len=14):
     return str(uuid4()).replace('-', '')[:len]  # algo based on SHA-1 (not safe enough nowdays)
 
@@ -22,6 +22,10 @@ def main(hq_accs=2):
     :param hq_accs: кол-во аккаунтов для ЦО
     :return:
     """
+
+    root_shop = Shop.objects.filter(level=0).first()
+    middle_shops = Shop.objects.filter(level=1)
+    leaf_shop = Shop.objects.filter(level=2).first()
 
     from src.db.models import (
         User,
@@ -36,29 +40,11 @@ def main(hq_accs=2):
         FunctionGroup(
             group=admin_group,
             func=func,
-            access_type=FunctionGroup.TYPE_ALL
+            level_up=1,
+            level_down=100,
         ) for func in FunctionGroup.FUNCS
     ])
 
-    # central office
-    hq_group = Group.objects.create(name='ЦО')
-    for func in FunctionGroup.FUNCS:
-        if 'get' in func or func == 'signin' or func == 'signout':
-            FunctionGroup.objects.create(
-                group=hq_group,
-                func=func,
-                access_type=FunctionGroup.TYPE_ALL
-            )
-
-    # chiefs
-    chief_group = Group.objects.create(name='Руководитель')
-    FunctionGroup.objects.bulk_create([
-        FunctionGroup(
-            group=chief_group,
-            func=func,
-            access_type=FunctionGroup.TYPE_SUPERSHOP
-        ) for func in FunctionGroup.FUNCS
-    ])
 
     # employee
     employee_group = Group.objects.create(name='Сотрудник')
@@ -66,7 +52,8 @@ def main(hq_accs=2):
         FunctionGroup(
             group=employee_group,
             func=func,
-            access_type=FunctionGroup.TYPE_SELF
+            level_up=0,
+            level_down=0,
         ) for func in FunctionGroup.FUNCS
     ])
 
@@ -80,6 +67,7 @@ def main(hq_accs=2):
         first_name='Admin',
         last_name='Admin',
         dt_hired=timezone.now().date(),
+        shop = root_shop
     )
     u_pass = password_generator()
     admin.set_password(u_pass)
@@ -87,13 +75,14 @@ def main(hq_accs=2):
     print('admin login: {}, password: {}'.format('qadmin', u_pass))
 
 
-    for i in range(1, hq_accs + 1):
-        username = 'hq_{}'.format(i)
+    for i in range(0, len(middle_shops)):
+        username = 'hq_{}'.format(i+1)
         hq_acc = User.objects.create(
             username=username,
             first_name='ЦО',
             last_name='',
-            function_group=hq_group
+            function_group=admin_group,
+            shop = middle_shops[i]
         )
 
         u_pass = password_generator()
