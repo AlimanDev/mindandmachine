@@ -346,6 +346,7 @@ class FunctionGroup(models.Model):
         'confirm_vacancy',
         'do_notify_action',
         'exchange_workers_day',
+        'upload_urv',
 
         # download/
         'get_demand_xlsx',

@@ -327,7 +327,7 @@ def create_timetable(request, form):
             users_without_spec.append(u.first_name + ' ' + u.last_name)
     if users_without_spec:
         tt.status = Timetable.Status.ERROR.value
-        status_message = 'У пользователей {} не проставлены специалации.'.format(', '.join(users_without_spec))
+        status_message = 'Не проставлены типы работ у пользователей: {}.'.format(', '.join(users_without_spec))
         tt.delete()
         return JsonResponse.value_error(status_message)
 
@@ -338,7 +338,7 @@ def create_timetable(request, form):
                                   datetime.combine(date.today(), shop.tm_shop_opens)).seconds/3600)
     if hours_opened == 0:
         hours_opened = 24
-    period_normal_count = hours_opened * 2 * ((dt_to - dt_from).days)
+    period_normal_count = int(hours_opened * ((dt_to - dt_from).days) * (60 / period_step))
 
     work_types = WorkType.objects.qos_filter_active(
         dt_from=dt_from,
@@ -347,6 +347,7 @@ def create_timetable(request, form):
     )
     for work_type in work_types:
         periods_len = PeriodClients.objects.filter(
+            operation_type__dttm_deleted__isnull=True,
             operation_type__work_type=work_type,
             type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
@@ -365,7 +366,9 @@ def create_timetable(request, form):
         return JsonResponse.value_error(status_message)
 
     periods = PeriodClients.objects.filter(
+        operation_type__dttm_deleted__isnull=True,
         operation_type__work_type__shop_id=shop_id,
+        operation_type__work_type__dttm_deleted__isnull=True,
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lt=dt_to,
@@ -396,21 +399,73 @@ def create_timetable(request, form):
         group_key=lambda x: x.worker_id
     )
 
+    new_worker_days = []
+    worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
+        worker__shop_id=form['shop_id'],
+        dt__gte=dt_from,
+        dt__lte=dt_to,
+    ).order_by(
+        'dt'
+    ).values(
+        'id',
+        'type',
+        'dttm_added',
+        'dt',
+        'worker_id',
+        'dttm_work_start',
+        'dttm_work_end',
+        'work_types__id',
+    )
+    for wd in worker_days_db:
+        wd_mod = WorkerDay(
+            id=wd['id'],
+            type=wd['type'],
+            dttm_added=wd['dttm_added'],
+            dt=wd['dt'],
+            worker_id=wd['worker_id'],
+            dttm_work_start=wd['dttm_work_start'],
+            dttm_work_end=wd['dttm_work_end'],
+        )
+        wd_mod.work_type_id = wd['work_types__id'][0] if wd['work_types__id'] else None
+        new_worker_days.append(wd_mod)
+
     worker_day = group_by(
-        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
-            worker__shop_id=shop_id,
-            dt__gte=dt_from,
-            dt__lt=dt_to,
-        ),
+        collection=new_worker_days,
         group_key=lambda x: x.worker_id
     )
 
+    prev_worker_days = []
+    worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
+        worker__shop_id=form['shop_id'],
+        dt__gte=dt_from - timedelta(days=7),
+        dt__lte=dt_from,
+    ).order_by(
+        'dt'
+    ).values(
+        'id',
+        'type',
+        'dttm_added',
+        'dt',
+        'worker_id',
+        'dttm_work_start',
+        'dttm_work_end',
+        'work_types__id',
+    )
+    for wd in worker_days_db:
+        wd_mod = WorkerDay(
+            id=wd['id'],
+            type=wd['type'],
+            dttm_added=wd['dttm_added'],
+            dt=wd['dt'],
+            worker_id=wd['worker_id'],
+            dttm_work_start=wd['dttm_work_start'],
+            dttm_work_end=wd['dttm_work_end'],
+        )
+        wd_mod.work_type_id = wd['work_types__id'][0] if wd['work_types__id'] else None
+        prev_worker_days.append(wd_mod)
+
     prev_data = group_by(
-        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
-            worker__shop_id=shop_id,
-            dt__gte=dt_from - timedelta(days=7),
-            dt__lt=dt_from,
-        ),
+        collection=prev_worker_days,
         group_key=lambda x: x.worker_id
     )
 
@@ -423,12 +478,13 @@ def create_timetable(request, form):
 
     shop_dict = {
         'shop_name': shop.title,
+        'process_type': shop.process_type,
         'mean_queue_length': shop.mean_queue_length,
         'max_queue_length': shop.max_queue_length,
         'dead_time_part': shop.dead_time_part,
         'max_work_coef': max_work_coef,
         'min_work_coef': min_work_coef,
-        'period_step': shop.forecast_step_minutes.minute,
+        'period_step': period_step,
         'tm_start_work': BaseConverter.convert_time(shop.tm_shop_opens),
         'tm_end_work': BaseConverter.convert_time(shop.tm_shop_closes),
         'min_work_period': shop.shift_start * 60,
@@ -448,9 +504,8 @@ def create_timetable(request, form):
 
     cashboxes = [
         WorkTypeConverter.convert(x) for x in WorkType.objects.filter(
-            shop_id=shop_id
-        ).exclude(
-            work_type_reversed__do_forecast=OperationType.FORECAST_NONE
+            dttm_deleted__isnull=True,
+            shop_id=shop_id,
         )
     ]
 
@@ -716,51 +771,53 @@ def set_timetable(request, form):
     timetable.save()
     if timetable.status != Timetable.Status.READY.value and timetable.status_message:
         return JsonResponse.success(timetable.status_message)
-    users = {x.id: x for x in User.objects.filter(id__in=list(data['users']), attachment_group=User.GROUP_STAFF)}
 
-    for uid, v in data['users'].items():
-        for wd in v['workdays']:
-            # todo: actually use a form here is better
-            # todo: too much request to db
+    if data['users']:
+        users = {x.id: x for x in User.objects.filter(id__in=list(data['users']), attachment_group=User.GROUP_STAFF)}
 
-            dt = BaseConverter.parse_date(wd['dt'])
-            try:
-                wd_obj = WorkerDay.objects.get(worker_id=uid, dt=dt, child__id__isnull=True)
-                if wd_obj.created_by or wd_obj.type != WorkerDay.Type.TYPE_EMPTY:
-                    continue
-            except WorkerDay.DoesNotExist:
-                wd_obj = WorkerDay(
-                    dt=BaseConverter.parse_date(wd['dt']),
-                    worker_id=uid,
-                )
+        for uid, v in data['users'].items():
+            for wd in v['workdays']:
+                # todo: actually use a form here is better
+                # todo: too much request to db
 
-            wd_obj.worker.shop_id = users[int(uid)].shop_id
-            wd_obj.type = WorkerDayConverter.parse_type(wd['type'])
-            if WorkerDay.is_type_with_tm_range(wd_obj.type):
-                wd_obj.dttm_work_start = BaseConverter.parse_datetime(wd['dttm_work_start'])
-                wd_obj.dttm_work_end = BaseConverter.parse_datetime(wd['dttm_work_end'])
-                wd_obj.save()
-
-                WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
-                wdd_list = []
-
-                for wdd in wd['details']:
-                    wdd_el = WorkerDayCashboxDetails(
-                        worker_day=wd_obj,
-                        dttm_from=BaseConverter.parse_datetime(wdd['dttm_from']),
-                        dttm_to=BaseConverter.parse_datetime(wdd['dttm_to']),
+                dt = BaseConverter.parse_date(wd['dt'])
+                try:
+                    wd_obj = WorkerDay.objects.get(worker_id=uid, dt=dt, child__id__isnull=True)
+                    if wd_obj.created_by or wd_obj.type != WorkerDay.Type.TYPE_EMPTY:
+                        continue
+                except WorkerDay.DoesNotExist:
+                    wd_obj = WorkerDay(
+                        dt=BaseConverter.parse_date(wd['dt']),
+                        worker_id=uid,
                     )
-                    if wdd['type'] > 0:
-                        wdd_el.work_type_id = wdd['type']
-                    else:
-                        wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
 
-                    wdd_list.append(wdd_el)
-                WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
+                wd_obj.worker.shop_id = users[int(uid)].shop_id
+                wd_obj.type = WorkerDayConverter.parse_type(wd['type'])
+                if WorkerDay.is_type_with_tm_range(wd_obj.type):
+                    wd_obj.dttm_work_start = BaseConverter.parse_datetime(wd['dttm_work_start'])
+                    wd_obj.dttm_work_end = BaseConverter.parse_datetime(wd['dttm_work_end'])
+                    wd_obj.save()
 
-            else:
-                wd_obj.save()
+                    WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
+                    wdd_list = []
 
-    send_notification('C', timetable)
+                    for wdd in wd['details']:
+                        wdd_el = WorkerDayCashboxDetails(
+                            worker_day=wd_obj,
+                            dttm_from=BaseConverter.parse_datetime(wdd['dttm_from']),
+                            dttm_to=BaseConverter.parse_datetime(wdd['dttm_to']),
+                        )
+                        if wdd['type'] > 0:
+                            wdd_el.work_type_id = wdd['type']
+                        else:
+                            wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
+
+                        wdd_list.append(wdd_el)
+                    WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
+
+                else:
+                    wd_obj.save()
+
+        send_notification('C', timetable)
 
     return JsonResponse.success()

@@ -112,7 +112,7 @@ class WorkerDayConverter(BaseConverter):
         def __work_tm(__field):
             return cls.convert_time(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
 
-        return {
+        data = {
             'id': obj.id,
             'dttm_added': cls.convert_datetime(obj.dttm_added),
             'dt': cls.convert_date(obj.dt),
@@ -121,8 +121,13 @@ class WorkerDayConverter(BaseConverter):
             'dttm_work_start': __work_tm(obj.dttm_work_start),
             'dttm_work_end': __work_tm(obj.dttm_work_end),
             'work_types': list(set(obj.work_types_ids)) if hasattr(obj, 'work_types_ids') else [],
+            'work_type': obj.work_type_id if hasattr(obj, 'work_type_id') else None,
             'created_by': obj.created_by_id,
         }
+        if hasattr(obj, 'other_shop'):
+            data['other_shop']=  obj.other_shop
+
+        return data
 
 
 class WorkerDayChangeLogConverter(BaseConverter):
