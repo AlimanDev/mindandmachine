@@ -2,7 +2,8 @@ from src.db.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     ProductionDay,
-    User
+    User,
+    Shop,
 )
 import json
 from datetime import time
@@ -61,6 +62,17 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
     # t = check_time()
     users_ids = {u.id: u for u in users}
     prod_days_list = list(ProductionDay.objects.filter(dt__gte=dt_start, dt__lte=dt_end).order_by('dt'))
+
+    shop_ids = list(set(user.shop_id for user in users))
+    shops = Shop.objects.filter(id__in=shop_ids)
+
+    shops_triplets_dict = {}
+    for shop in shops:
+        break_triplets = shop.break_triplets
+        list_of_break_triplets = json.loads(break_triplets)
+        list_of_break_triplets = [[triplet[0], triplet[1], sum(triplet[2])] for triplet in list_of_break_triplets]
+        shops_triplets_dict[shop.id] = list_of_break_triplets
+
 
     total_norm = get_norm_work_periods(prod_days_list, dt_start, dt_end)
 
@@ -134,15 +146,8 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
                 row['workerdaycashboxdetails__dttm_to'],
             ))
 
-            break_triplets = user.shop.break_triplets
-            list_of_break_triplets = json.loads(break_triplets)
+            list_of_break_triplets = shops_triplets_dict[user.shop_id]
             time_break_triplets = 0
-            for triplet in list_of_break_triplets:
-                for time_triplet in triplet[2]:
-                    time_break_triplets += time_triplet
-                triplet[2] = time_break_triplets
-                time_break_triplets = 0
-
             for triplet in list_of_break_triplets:
                 if float(triplet[0]) < duration_of_workerday * 60 <= float(triplet[1]):
                     time_break_triplets = triplet[2]
