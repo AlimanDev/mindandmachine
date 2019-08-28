@@ -379,7 +379,7 @@ def create_timetable(request, form):
         'dttm_forecast',
         'operation_type__work_type_id',
     ).annotate(
-        clients=Sum(F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + shop.absenteeism))
+        clients=Sum(F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + (shop.absenteeism / 100)))
     ).values_list(
         'dttm_forecast',
         'operation_type__work_type_id',
