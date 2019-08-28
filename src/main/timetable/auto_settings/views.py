@@ -330,7 +330,7 @@ def create_timetable(request, form):
             users_without_spec.append(u.first_name + ' ' + u.last_name)
     if users_without_spec:
         tt.status = Timetable.Status.ERROR.value
-        status_message = 'У пользователей {} не проставлены специалации.'.format(', '.join(users_without_spec))
+        status_message = 'Не проставлены типы работ у пользователей: {}.'.format(', '.join(users_without_spec))
         tt.delete()
         return JsonResponse.value_error(status_message)
 
@@ -402,21 +402,73 @@ def create_timetable(request, form):
         group_key=lambda x: x.worker_id
     )
 
+    new_worker_days = []
+    worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
+        worker__shop_id=form['shop_id'],
+        dt__gte=dt_from,
+        dt__lte=dt_to,
+    ).order_by(
+        'dt'
+    ).values(
+        'id',
+        'type',
+        'dttm_added',
+        'dt',
+        'worker_id',
+        'dttm_work_start',
+        'dttm_work_end',
+        'work_types__id',
+    )
+    for wd in worker_days_db:
+        wd_mod = WorkerDay(
+            id=wd['id'],
+            type=wd['type'],
+            dttm_added=wd['dttm_added'],
+            dt=wd['dt'],
+            worker_id=wd['worker_id'],
+            dttm_work_start=wd['dttm_work_start'],
+            dttm_work_end=wd['dttm_work_end'],
+        )
+        wd_mod.work_type_id = wd['work_types__id'][0] if wd['work_types__id'] else None
+        new_worker_days.append(wd_mod)
+
     worker_day = group_by(
-        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
-            worker__shop_id=shop_id,
-            dt__gte=dt_from,
-            dt__lt=dt_to,
-        ),
+        collection=new_worker_days,
         group_key=lambda x: x.worker_id
     )
 
+    prev_worker_days = []
+    worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
+        worker__shop_id=form['shop_id'],
+        dt__gte=dt_from - timedelta(days=7),
+        dt__lte=dt_from,
+    ).order_by(
+        'dt'
+    ).values(
+        'id',
+        'type',
+        'dttm_added',
+        'dt',
+        'worker_id',
+        'dttm_work_start',
+        'dttm_work_end',
+        'work_types__id',
+    )
+    for wd in worker_days_db:
+        wd_mod = WorkerDay(
+            id=wd['id'],
+            type=wd['type'],
+            dttm_added=wd['dttm_added'],
+            dt=wd['dt'],
+            worker_id=wd['worker_id'],
+            dttm_work_start=wd['dttm_work_start'],
+            dttm_work_end=wd['dttm_work_end'],
+        )
+        wd_mod.work_type_id = wd['work_types__id'][0] if wd['work_types__id'] else None
+        prev_worker_days.append(wd_mod)
+
     prev_data = group_by(
-        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
-            worker__shop_id=shop_id,
-            dt__gte=dt_from - timedelta(days=7),
-            dt__lt=dt_from,
-        ),
+        collection=prev_worker_days,
         group_key=lambda x: x.worker_id
     )
 
@@ -429,6 +481,7 @@ def create_timetable(request, form):
 
     shop_dict = {
         'shop_name': shop.title,
+        'process_type': shop.process_type,
         'mean_queue_length': shop.mean_queue_length,
         'max_queue_length': shop.max_queue_length,
         'dead_time_part': shop.dead_time_part,
