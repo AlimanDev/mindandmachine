@@ -3,6 +3,8 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
     UserManager
 )
+from json_field import JSONField
+
 from django.contrib.contenttypes.models import ContentType
 from . import utils
 import datetime
@@ -472,6 +474,51 @@ class OperationType(models.Model):
         default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 200, "reg_lambda": 2, "silent": 1, "iterations": 20}'
     )
 
+class OperationSchedule(models.Model):
+    class Meta:
+        verbose_name = 'Расписание операций'
+        verbose_name_plural = 'Расписания операций'
+
+    def __str__(self):
+        return 'id: {}, name: {}, work type: {}'.format(self.id, self.name, self.work_type)
+
+    PERIOD_DAILY = 'd'
+    PERIOD_WEEKLY = 'w'
+    PERIOD_MONTHLY = 'm'
+    PERIOD_CHOICES = (
+        (PERIOD_DAILY, 'Ежедневно',),
+        (PERIOD_WEEKLY, 'В неделю',),
+        (PERIOD_MONTHLY, 'В месяц',),
+    )
+
+
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    dttm_deleted = models.DateTimeField(blank=True, null=True)
+
+    operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT, related_name='work_type_reversed')
+    name = models.CharField(max_length=128)
+    tm_start = models.TimeField()
+    tm_end = models.TimeField()
+
+    period = models.CharField(
+        max_length=1,
+        default=PERIOD_DAILY,
+        choices=PERIOD_CHOICES,
+    )
+
+
+    days_in_period = JSONField()
+    amount = IntegerField()
+    def check_days_in_period(self):
+        if self.period == self.PERIOD_WEEKLY:
+            for d in self.days_in_period:
+                if d < 0 or d > 6:
+                    return False
+        elif self.period == self.PERIOD_MONTHLY:
+            for d in self.days_in_period:
+                if d < 0 or d > 30:
+                    return False
+        return True
 
 class UserWeekdaySlot(models.Model):
     class Meta(object):
