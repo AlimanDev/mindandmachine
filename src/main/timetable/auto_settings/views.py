@@ -403,6 +403,7 @@ def create_timetable(request, form):
     )
 
     new_worker_days = []
+    worker_days_mask = {}
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
         worker__shop_id=form['shop_id'],
         dt__gte=dt_from,
@@ -420,17 +421,21 @@ def create_timetable(request, form):
         'work_types__id',
     )
     for wd in worker_days_db:
-        wd_mod = WorkerDay(
-            id=wd['id'],
-            type=wd['type'],
-            dttm_added=wd['dttm_added'],
-            dt=wd['dt'],
-            worker_id=wd['worker_id'],
-            dttm_work_start=wd['dttm_work_start'],
-            dttm_work_end=wd['dttm_work_end'],
-        )
-        wd_mod.work_type_id = wd['work_types__id'][0] if wd['work_types__id'] else None
-        new_worker_days.append(wd_mod)
+        if (wd['id'] in worker_days_mask) and wd['work_types__id']:
+            pass
+        else:
+            worker_days_mask[wd['id']] = len(new_worker_days)
+            wd_mod = WorkerDay(
+                id=wd['id'],
+                type=wd['type'],
+                dttm_added=wd['dttm_added'],
+                dt=wd['dt'],
+                worker_id=wd['worker_id'],
+                dttm_work_start=wd['dttm_work_start'],
+                dttm_work_end=wd['dttm_work_end'],
+            )
+            wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
+            new_worker_days.append(wd_mod)
 
     worker_day = group_by(
         collection=new_worker_days,
@@ -438,6 +443,7 @@ def create_timetable(request, form):
     )
 
     prev_worker_days = []
+    worker_days_mask = {}
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
         worker__shop_id=form['shop_id'],
         dt__gte=dt_from - timedelta(days=7),
@@ -455,17 +461,21 @@ def create_timetable(request, form):
         'work_types__id',
     )
     for wd in worker_days_db:
-        wd_mod = WorkerDay(
-            id=wd['id'],
-            type=wd['type'],
-            dttm_added=wd['dttm_added'],
-            dt=wd['dt'],
-            worker_id=wd['worker_id'],
-            dttm_work_start=wd['dttm_work_start'],
-            dttm_work_end=wd['dttm_work_end'],
-        )
-        wd_mod.work_type_id = wd['work_types__id'][0] if wd['work_types__id'] else None
-        prev_worker_days.append(wd_mod)
+        if (wd['id'] in worker_days_mask) and wd['work_types__id']:
+            pass
+        else:
+            worker_days_mask[wd['id']] = len(prev_worker_days)
+            wd_mod = WorkerDay(
+                id=wd['id'],
+                type=wd['type'],
+                dttm_added=wd['dttm_added'],
+                dt=wd['dt'],
+                worker_id=wd['worker_id'],
+                dttm_work_start=wd['dttm_work_start'],
+                dttm_work_end=wd['dttm_work_end'],
+            )
+            wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
+            prev_worker_days.append(wd_mod)
 
     prev_data = group_by(
         collection=prev_worker_days,
