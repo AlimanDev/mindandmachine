@@ -3,12 +3,11 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
     UserManager
 )
-from json_field import JSONField
 
 from django.contrib.contenttypes.models import ContentType
 from . import utils
 import datetime
-
+import json
 
 class Region(models.Model):
     class Meta(object):
@@ -372,6 +371,11 @@ class FunctionGroup(models.Model):
         'do_notify_action',
         'exchange_workers_day',
         'upload_urv',
+
+        'get_operation_templates',
+        'create_operation_template',
+        'update_operation_template',
+        'delete_operation_template',
     )
 
     FUNCS_TUPLE = ((f, f) for f in FUNCS)
@@ -474,17 +478,22 @@ class OperationType(models.Model):
         default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 200, "reg_lambda": 2, "silent": 1, "iterations": 20}'
     )
 
-class OperationSchedule(models.Model):
+class OperationTemplate(models.Model):
     class Meta:
         verbose_name = 'Расписание операций'
         verbose_name_plural = 'Расписания операций'
 
     def __str__(self):
-        return 'id: {}, name: {}, work type: {}'.format(self.id, self.name, self.work_type)
+        return 'id: {}, name: {}, period: {}, period_in_days: {}, operation type: {}'.format(
+            self.id,
+            self.name,
+            self.period,
+            self.days_in_period,
+            self.operation_type.name)
 
-    PERIOD_DAILY = 'd'
-    PERIOD_WEEKLY = 'w'
-    PERIOD_MONTHLY = 'm'
+    PERIOD_DAILY = 'D'
+    PERIOD_WEEKLY = 'W'
+    PERIOD_MONTHLY = 'M'
     PERIOD_CHOICES = (
         (PERIOD_DAILY, 'Ежедневно',),
         (PERIOD_WEEKLY, 'В неделю',),
@@ -499,6 +508,7 @@ class OperationSchedule(models.Model):
     name = models.CharField(max_length=128)
     tm_start = models.TimeField()
     tm_end = models.TimeField()
+    value = models.FloatField()
 
     period = models.CharField(
         max_length=1,
@@ -506,9 +516,11 @@ class OperationSchedule(models.Model):
         choices=PERIOD_CHOICES,
     )
 
+    days_in_period = models.TextField()
+    value = models.IntegerField()
 
-    days_in_period = JSONField()
-    amount = IntegerField()
+    dt_built_to = models.DateTimeField(blank=True, null=True)
+
     def check_days_in_period(self):
         if self.period == self.PERIOD_WEEKLY:
             for d in self.days_in_period:
@@ -519,6 +531,54 @@ class OperationSchedule(models.Model):
                 if d < 0 or d > 30:
                     return False
         return True
+
+
+    def generate_dates(self, dt_from, dt_to):
+        def generate_times(dt, step):
+            dt0 = datetime.datetime.combine(dt, self.tm_start)
+            dt1 = datetime.datetime.combine(dt, self.tm_end)
+            while dt0 < dt1:
+                yield dt0
+                dt0 += datetime.timedelta(minutes=step)
+
+        days_in_period = json.loads(self.days_in_period)
+        shop = self.operation_type.work_type.shop
+        step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
+
+        if self.period == self.PERIOD_DAILY:
+            while dt_from < dt_to:
+                yield dttm_from
+                dt_from += datetime.timedelta(days=1)
+            return
+
+        if self.period == self.PERIOD_WEEKLY:
+            lambda_get_day = lambda dt: dt.isoweekday()
+        elif self.period == self.PERIOD_MONTHLY:
+            lambda_get_day = lambda dt: dt.day
+
+        day = lambda_get_day(dt_from)
+        while dt_from <= dt_to:
+            for period_day in days_in_period:
+                if period_day < day:
+                    continue
+                elif period_day > day:
+                    delta = period_day - day
+                    dt_from += datetime.timedelta(days=delta)
+                    if dt_from > dt_to:
+                        return
+
+                for t in generate_times(dt_from, step):
+                    yield t
+                dt_from += datetime.timedelta(days=1)
+                if dt_from > dt_to:
+                    return
+                day = lambda_get_day(dt_from)
+            if day == days_in_period[0]:
+                for t in generate_times(dt_from, step):
+                    yield t
+
+            dt_from += datetime.timedelta(days=1)
+            day = lambda_get_day(dt_from)
 
 class UserWeekdaySlot(models.Model):
     class Meta(object):

@@ -220,6 +220,21 @@ class OperationTypeConverter(BaseConverter):
         }
 
 
+class OperationTemplateConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'name': obj.name,
+            'tm_start': cls.convert_time(obj.tm_start),
+            'tm_end': cls.convert_time(obj.tm_end),
+            'value': obj.value,
+            'period': obj.period,
+            'days_in_period': obj.days_in_period,
+            'operation_type_id': obj.operation_type_id
+        }
+
+
 class CashboxConverter(BaseConverter):
     @classmethod
     def convert(cls, obj):
