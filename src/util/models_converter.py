@@ -231,7 +231,8 @@ class OperationTemplateConverter(BaseConverter):
             'value': obj.value,
             'period': obj.period,
             'days_in_period': obj.days_in_period,
-            'operation_type_id': obj.operation_type_id
+            'operation_type_id': obj.operation_type_id,
+            'dt_built_to': cls.convert_date(obj.dt_built_to)
         }
 
 

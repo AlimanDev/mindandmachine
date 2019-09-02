@@ -1,6 +1,9 @@
-import datetime
+from django.utils.timezone import now
+
+from datetime import datetime, timedelta
 import json
 
+from .utils import build_period_clients, delete_period_clients
 from src.db.models import (
     OperationTemplate,
     OperationType,
@@ -95,7 +98,6 @@ def create_operation_template(request, form):
             | 'dttm_added': ,
             | 'dttm_deleted': ,
         }
-
     """
     operation_type_id = form['operation_type_id']
 
@@ -142,7 +144,7 @@ def delete_operation_template(request, form):
     except OperationTemplate.DoesNotExist:
         return JsonResponse.does_not_exists_error()
 
-    operation_template.dttm_deleted = datetime.datetime.now()
+    operation_template.dttm_deleted = datetime.now()
     operation_template.save()
 
     return JsonResponse.success()
@@ -198,14 +200,27 @@ def update_operation_template(request, form):
     except OperationTemplate.DoesNotExist:
         return JsonResponse.does_not_exists_error('operation template does not exist')
 
-    operation_template.name=form['name']
-    operation_template.tm_start=form['tm_start']
-    operation_template.tm_end=form['tm_end']
-    operation_template.value=form['value']
-    operation_template.period=form['period']
-    operation_template.days_in_period=form['days_in_period']
+    build_period = False
+    if operation_template.dt_built_to \
+        and (operation_template.value != form['value'] \
+             or operation_template.period != form['period'] \
+             or operation_template.days_in_period != form['days_in_period']):
+        delete_period_clients(operation_template,
+                              dt_from=form['date_rebuild_from'])
+
+        build_period = True
+
+    operation_template.name = form['name']
+    operation_template.value = form['value']
+    operation_template.tm_start = form['tm_start']
+    operation_template.tm_end = form['tm_end']
+    operation_template.period = form['period']
+    operation_template.days_in_period = json.dumps(form['days_in_period'])
     operation_template.save()
 
+    if build_period:
+        build_period_clients(operation_template,
+                             dt_from=form['date_rebuild_from'])
     return JsonResponse.success(
         OperationTemplateConverter.convert(operation_template)
     )

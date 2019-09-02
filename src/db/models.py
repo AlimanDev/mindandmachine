@@ -480,8 +480,8 @@ class OperationType(models.Model):
 
 class OperationTemplate(models.Model):
     class Meta:
-        verbose_name = 'Расписание операций'
-        verbose_name_plural = 'Расписания операций'
+        verbose_name = 'Шаблон операций'
+        verbose_name_plural = 'Шаблоны операций'
 
     def __str__(self):
         return 'id: {}, name: {}, period: {}, period_in_days: {}, operation type: {}'.format(
@@ -517,9 +517,8 @@ class OperationTemplate(models.Model):
     )
 
     days_in_period = models.TextField()
-    value = models.IntegerField()
 
-    dt_built_to = models.DateTimeField(blank=True, null=True)
+    dt_built_to = models.DateField(blank=True, null=True)
 
     def check_days_in_period(self):
         if self.period == self.PERIOD_WEEKLY:
@@ -547,7 +546,8 @@ class OperationTemplate(models.Model):
 
         if self.period == self.PERIOD_DAILY:
             while dt_from < dt_to:
-                yield dttm_from
+                for t in generate_times(dt_from, step):
+                    yield t
                 dt_from += datetime.timedelta(days=1)
             return
 

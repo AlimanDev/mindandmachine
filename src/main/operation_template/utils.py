@@ -35,10 +35,20 @@ from src.db.models import (
 )
 
 
-def build_period_clients(operation_template, dt_from, dt_to):
+def build_period_clients(operation_template, dt_from=None, dt_to=None,):
+    dt_min = now().date() + timedelta(days = 2)
 
+    if operation_template.dt_built_to \
+        and (not dt_from \
+        or dt_from > operation_template.dt_built_to):
+            dt_from = operation_template.dt_built_to + timedelta(days=1)
     if not dt_from:
-        dt_from = operation_template.dt_built_to + timedelta(days=1)
+        dt_from = dt_min
+
+    if not dt_to:
+        dt_to = dt_min + timedelta(days=62)
+    if dt_to < operation_template.dt_built_to:
+        dt_to = operation_template.dt_built_to
 
     period_clients = PeriodClients.objects.filter(
         operation_type=operation_template.operation_type,
@@ -66,11 +76,24 @@ def build_period_clients(operation_template, dt_from, dt_to):
                 type=PeriodClients.LONG_FORECASE_TYPE,
                 operation_type_id=operation_template.operation_type_id
                 )
+    operation_template.dt_built_to = dt_to
+    operation_template.save()
 
 
 def delete_period_clients(operation_template, dt_from=None, dt_to=None):
+    dt_min = now().date() + timedelta(days = 2)
+
+    if operation_template.dt_built_to \
+        and (not dt_from \
+        or dt_from > operation_template.dt_built_to):
+            dt_from = operation_template.dt_built_to + timedelta(days=1)
     if not dt_from:
-        dt_from = now().date() + timedelta(days=1)
+        dt_from = dt_min
+
+    if not dt_to:
+        dt_to = dt_min + timedelta(days=62)
+    if dt_to < operation_template.dt_built_to:
+        dt_to = operation_template.dt_built_to
 
     period_clients = PeriodClients.objects.filter(
         operation_type=operation_template.operation_type,
@@ -90,7 +113,7 @@ def delete_period_clients(operation_template, dt_from=None, dt_to=None):
     for date in operation_template.generate_dates(dt_from, dt_to):
         while period and period.dttm_forecast < date:
             period = next(period_clients, None)
-        if period.dttm_forecast==date:
+        if period and period.dttm_forecast==date:
             period.value -= operation_template.value
             if period.value < 0:
                 period.value = 0

@@ -29,3 +29,4 @@ class UpdateOperationTemplateForm(forms.Form):
     tm_end = util_forms.TimeField()
     period = util_forms.ChoiceField(choices=['D', 'W', 'M'])
     days_in_period = util_forms.IntegersList()
+    date_rebuild_from = forms.DateField(required=False)
