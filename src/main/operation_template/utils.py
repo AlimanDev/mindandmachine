@@ -35,20 +35,22 @@ from src.db.models import (
 )
 
 
-def build_period_clients(operation_template, dt_from=None, dt_to=None,):
+def build_period_clients(operation_template, dt_from=None, dt_to=None, operation='create'):
     dt_min = now().date() + timedelta(days = 2)
-
-    if operation_template.dt_built_to \
-        and (not dt_from \
-        or dt_from > operation_template.dt_built_to):
-            dt_from = operation_template.dt_built_to + timedelta(days=1)
-    if not dt_from:
-        dt_from = dt_min
 
     if not dt_to:
         dt_to = dt_min + timedelta(days=62)
-    if dt_to < operation_template.dt_built_to:
-        dt_to = operation_template.dt_built_to
+
+    if operation_template.dt_built_to:
+        if (not dt_from \
+            or dt_from > operation_template.dt_built_to):
+            dt_from = operation_template.dt_built_to + timedelta(days=1)
+        if dt_to < operation_template.dt_built_to:
+            dt_to = operation_template.dt_built_to
+
+    if not dt_from:
+        dt_from = dt_min
+
 
     period_clients = PeriodClients.objects.filter(
         operation_type=operation_template.operation_type,
@@ -66,10 +68,15 @@ def build_period_clients(operation_template, dt_from=None, dt_to=None,):
         while period and period.dttm_forecast < date:
             period = next(period_clients, None)
         if period and period.dttm_forecast == date:
-            period.value += operation_template.value
+            if operation=='create':
+                period.value += operation_template.value
+            else:
+                period.value -= operation_template.value
+                if period.value < 0:
+                    period.value = 0
             period.save()
             period = next(period_clients, None)
-        else:
+        elif operation=='create':
             PeriodClients.objects.create(
                 dttm_forecast=date,
                 value=operation_template.value,
@@ -80,42 +87,3 @@ def build_period_clients(operation_template, dt_from=None, dt_to=None,):
     operation_template.save()
 
 
-def delete_period_clients(operation_template, dt_from=None, dt_to=None):
-    dt_min = now().date() + timedelta(days = 2)
-
-    if operation_template.dt_built_to \
-        and (not dt_from \
-        or dt_from > operation_template.dt_built_to):
-            dt_from = operation_template.dt_built_to + timedelta(days=1)
-    if not dt_from:
-        dt_from = dt_min
-
-    if not dt_to:
-        dt_to = dt_min + timedelta(days=62)
-    if dt_to < operation_template.dt_built_to:
-        dt_to = operation_template.dt_built_to
-
-    period_clients = PeriodClients.objects.filter(
-        operation_type=operation_template.operation_type,
-        dttm_forecast__gte=dt_from,
-        )
-    if dt_to:
-        period_clients.filter(
-            dttm_forecast__lte=dt_to,
-            )
-    period_clients = period_clients.order_by('dttm_forecast')
-    period_clients = period_clients.iterator()
-    try:
-        period = next(period_clients)
-    except StopIteration:
-        return
-
-    for date in operation_template.generate_dates(dt_from, dt_to):
-        while period and period.dttm_forecast < date:
-            period = next(period_clients, None)
-        if period and period.dttm_forecast==date:
-            period.value -= operation_template.value
-            if period.value < 0:
-                period.value = 0
-            period.save()
-            period = next(period_clients, None)

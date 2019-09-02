@@ -3,7 +3,7 @@ from django.utils.timezone import now
 from datetime import datetime, timedelta
 import json
 
-from .utils import build_period_clients, delete_period_clients
+from .utils import build_period_clients
 from src.db.models import (
     OperationTemplate,
     OperationType,
@@ -205,8 +205,8 @@ def update_operation_template(request, form):
         and (operation_template.value != form['value'] \
              or operation_template.period != form['period'] \
              or operation_template.days_in_period != form['days_in_period']):
-        delete_period_clients(operation_template,
-                              dt_from=form['date_rebuild_from'])
+        build_period_clients(operation_template,
+                              dt_from=form['date_rebuild_from'], operation='delete')
 
         build_period = True
 
