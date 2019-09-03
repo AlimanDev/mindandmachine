@@ -391,6 +391,25 @@ class FunctionGroup(models.Model):
         )
 
 
+class WorkerDayApprove(models.Model):
+    class Meta:
+        verbose_name = 'Подверждение расписания'
+        verbose_name_plural = 'Подтверждения расписания'
+
+    def __str__(self):
+        return '{},  {},  {}'.format(
+            self.id,
+            self.shop,
+            self.dt_approved,
+        )
+
+    id = models.BigAutoField(primary_key=True)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo delete this by cashbox_type
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True)
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    dt_approved = models.DateField(auto_now_add=True)
+
+
 class WorkTypeManager(models.Manager):
     def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
         """
@@ -822,6 +841,7 @@ class WorkerDay(models.Model):
 
     work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')
 
+    worker_day_approve = models.ForeignKey(WorkerDayApprove, on_delete=models.PROTECT, blank=True, null=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
     parent_worker_day = models.OneToOneField('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child')
     # fixme: better change parent to child as usual check if this is the last version of WorkerDay
