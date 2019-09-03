@@ -1,9 +1,11 @@
 from datetime import date, timedelta
 import json
+import os
 
 from django.db.models import Avg
 from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
+from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
 from src.main.timetable.worker_exchange.utils import (
     # get_init_params,
@@ -48,7 +50,7 @@ from src.db.models import (
     ExchangeSettings,
 )
 from src.celery.celery import app
-
+import time as time_in_secs
 
 @app.task
 def update_queue(till_dttm=None):
@@ -521,3 +523,38 @@ def update_shop_stats(dt=None):
         timetable.lack = stats['covering_part']
         timetable.fot_revenue = stats['fot_revenue']
         timetable.save()
+
+
+@app.task
+def upload_demand_task():
+    localpaths = [
+        'bills_{}.csv'.format(str(time_in_secs.time()).replace('.', '_')),
+        'incoming_{}.csv'.format(str(time_in_secs.time()).replace('.', '_'))
+    ]
+    for localpath in localpaths:
+        sftp_download(localpath)
+        file = open(localpath, 'r')
+        upload_demand_util(file)
+        file.close()
+        os.remove(localpath)
+
+
+@app.task
+def upload_employees_task():
+    localpath = 'employees_{}.csv'.format(str(time_in_secs.time()).replace('.', '_'))
+    sftp_download(localpath)
+    file = open(localpath, 'r')
+    upload_employees_util(file)
+    file.close()
+    os.remove(localpath)
+
+
+@app.task
+def upload_vacation_task():
+    localpath = 'holidays_{}.csv'.format(str(time_in_secs.time()).replace('.', '_'))
+    sftp_download(localpath)
+    file = open(localpath, 'r')
+    upload_vacation_util(file)
+    file.close()
+    os.remove(localpath)
+

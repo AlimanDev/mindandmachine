@@ -370,6 +370,7 @@ class FunctionGroup(models.Model):
         'confirm_vacancy',
         'do_notify_action',
         'exchange_workers_day',
+        'upload_urv',
     )
 
     FUNCS_TUPLE = ((f, f) for f in FUNCS)
