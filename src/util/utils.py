@@ -176,6 +176,7 @@ def api_method(
             token = request.POST.get('access_token', None) or request.GET.get('access_token', None)
             if token:
                 user_with_access_token = User.objects.filter(access_token=token)
+                # чтобы ошибок не было тогда, когда токен не подходит -- или стоит показывать что не прошла авторизация?
                 if len(user_with_access_token) == 1:
                     request.user = user_with_access_token[0]
 
