@@ -746,8 +746,7 @@ def delete_timetable(request, form):
     return JsonResponse.success()
 
 
-@csrf_exempt
-@api_method('POST', SetTimetableForm, auth_required=False)
+@api_method('POST', SetTimetableForm, check_permissions=False) # fixme: add check_permissions by user_id
 def set_timetable(request, form):
     """
     Ждет request'a от qos_algo. Когда получает, записывает данные по расписанию в бд
@@ -755,21 +754,14 @@ def set_timetable(request, form):
     Args:
         method: POST
         url: /api/timetable/auto_settings/set_timetable
-        key(str): ключ для сверки
         data(str): json data с данными от qos_algo
 
     Raises:
-        JsonResponse.internal_error: если ключ не сконфигурирован, либо не подходит
         JsonResponse.does_not_exists_error: если расписания нет в бд
 
     Note:
         Отправляет уведомление о том, что расписание успешно было создано
     """
-    if settings.QOS_SET_TIMETABLE_KEY is None:
-        return JsonResponse.internal_error('key is not configured')
-
-    if form['key'] != settings.QOS_SET_TIMETABLE_KEY:
-        return JsonResponse.internal_error('invalid key')
 
     try:
         data = json.loads(form['data'])

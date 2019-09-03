@@ -148,7 +148,7 @@ class WorkerPosition(models.Model):
     title = models.CharField(max_length=64)
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.title, self.id)
+        return '{}, {}'.format(self.title, self.id)
 
 
 class WorkerManager(UserManager):
@@ -263,6 +263,7 @@ class User(DjangoAbstractUser):
     tabel_code = models.CharField(max_length=15, null=True, blank=True)
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     is_ready_for_overworkings = models.BooleanField(default=False)
+    access_token = models.CharField(max_length=64, blank=True, null=True)
 
     objects = WorkerManager()
 
@@ -370,6 +371,7 @@ class FunctionGroup(models.Model):
         'do_notify_action',
         'exchange_workers_day',
         'upload_urv',
+        'set_pred_bills',
     )
 
     FUNCS_TUPLE = ((f, f) for f in FUNCS)
