@@ -371,6 +371,7 @@ class FunctionGroup(models.Model):
         'do_notify_action',
         'exchange_workers_day',
         'upload_urv',
+        'set_pred_bills',
     )
 
     FUNCS_TUPLE = ((f, f) for f in FUNCS)
