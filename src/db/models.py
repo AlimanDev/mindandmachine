@@ -545,7 +545,7 @@ class OperationTemplate(models.Model):
         step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
 
         if self.period == self.PERIOD_DAILY:
-            while dt_from < dt_to:
+            while dt_from <= dt_to:
                 for t in generate_times(dt_from, step):
                     yield t
                 dt_from += datetime.timedelta(days=1)
