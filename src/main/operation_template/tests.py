@@ -90,10 +90,10 @@ class TestOperationTemplate(LocalTestCase):
         l = len(period_days)
         ind = period_days.index(dates[0].isoweekday())
         ind_dates = 0
-        self.assertEqual(ind >= 0, True)
+        self.assertTrue(ind >= 0)
 
         while ind_dates < len(dates):
-            self.assertEqual(period_days[ind % l] == dates[ind_dates].isoweekday() , True)
+            self.assertEqual(period_days[ind % l], dates[ind_dates].isoweekday())
             ind += 1
             ind_dates += times
 
@@ -130,9 +130,9 @@ class TestOperationTemplate(LocalTestCase):
         dates = pc.values_list('dttm_forecast', flat=True)
 
 
-        self.assertEqual(dates[0].day in json.loads(self.ot_monthly.days_in_period), True)
-        self.assertEqual(dates[6].day in json.loads(self.ot_monthly.days_in_period), True)
-        self.assertEqual(dates[12].day in json.loads(self.ot_monthly.days_in_period), True)
+        self.assertTrue(dates[0].day in json.loads(self.ot_monthly.days_in_period))
+        self.assertTrue(dates[6].day in json.loads(self.ot_monthly.days_in_period))
+        self.assertTrue(dates[12].day in json.loads(self.ot_monthly.days_in_period))
 
         self.assertEqual(dates[0].time(), time(10, 0))
         self.assertEqual(dates[6].time(), time(10, 30))
