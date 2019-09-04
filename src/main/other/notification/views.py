@@ -68,6 +68,9 @@ def get_notifications2(request, form):
         count(int): required = True. Сколько уведомлений мы хотим получить
         type(str): required = False. Тип уведомления (vacancy - вакансия, other - остальные) default = all.
 
+        shop_id(str): required = False. вакансии магазина.
+        dt(str): required = False. дата вакансий.
+
     Returns:
         {
             | "next_noty_pointer": int or null if no more,
@@ -95,16 +98,23 @@ def get_notifications2(request, form):
     notifies = Notifications.objects.mm_filter(
         Q(event__workerday_details__dttm_deleted__isnull=True) |
         Q(event__workerday_details__worker_day__worker=request.user),
-        to_worker=request.user).order_by('-id')
+        to_worker=request.user
+    ).order_by('-id')
+
+    # todo: fix this selection of notifications
+    if form['shop_id']:
+        notifies = notifies.filter(event__workerday_details__work_type__shop_id=form['shop_id'])
+
+    if form['dt']:
+        notifies = notifies.filter(event__workerday_details__dttm_from__date=form['dt'])
 
     if form['type'] == 'vacancy':
-        notifies = list(notifies.filter(
-            event__workerday_details__isnull=False)[pointer * count: (pointer + 1) * count])
+        notifies = notifies.filter(event__workerday_details__isnull=False)
     elif form['type'] == 'other':
-        notifies = list(notifies.filter(
-            event__workerday_details__isnull=True)[pointer * count: (pointer + 1) * count])
+        notifies = notifies.filter(event__workerday_details__isnull=True)
     else:
-        notifies = list(notifies[pointer * count: (pointer + 1) * count])
+        pass
+    notifies = list(notifies[pointer * count: (pointer + 1) * count])
 
     result = {
         'unread_count': Notifications.objects.filter(to_worker=request.user, was_read=False).count(),

@@ -993,7 +993,8 @@ class Event(models.Model):
                     self.workerday_details.work_type.shop.title,
                 )
             else:
-                return 'Открыта вакансия на {} в {}. Время работы: с {} по {}. Хотите выйти?'.format(
+                return 'Открыта вакансия на {} на {} в {}. Время работы: с {} по {}. Хотите выйти?'.format(
+                    self.workerday_details.work_type.name,
                     BaseConverter.convert_date(self.workerday_details.dttm_from.date()),
                     self.workerday_details.work_type.shop.title,
                     BaseConverter.convert_time(self.workerday_details.dttm_from.time()),
@@ -1094,7 +1095,7 @@ class Notifications(models.Model):
     def __str__(self):
         return '{}, {}, {}, id: {}'.format(
             self.to_worker.last_name,
-            self.to_worker.shop.title,
+            self.to_worker.shop.title if self.to_worker.shop else 'no shop',
             self.dttm_added,
             # self.text[:60],
             self.id
