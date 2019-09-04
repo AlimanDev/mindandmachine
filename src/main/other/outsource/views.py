@@ -64,9 +64,10 @@ def get_outsource_workers(request, form):
         outsource_workerdays = WorkerDayCashboxDetails.objects.select_related(
             'worker_day',
             'worker_day__worker',
+            'worker_day__worker__shop',
             'work_type',
-            'work_type__shop'
         ).filter(
+            dttm_deleted__isnull=True,
             dttm_from__gte=from_dt + timedelta(days=date),
             dttm_to__lt=from_dt + timedelta(days=date+1),
             work_type_id__in=[w.id for w in shop.worktype_set.all()],
@@ -97,7 +98,7 @@ def get_outsource_workers(request, form):
                         data['type'] = WorkerDayConverter.convert_type(wd.worker_day.type)
                         data['first_name'] = wd.worker_day.worker.first_name
                         data['last_name'] = wd.worker_day.worker.last_name
-                        data['shop'] = wd.work_type.shop.title
+                        data['shop'] = wd.worker_day.worker.shop.title
 
                     date_response_dict[converted_date]['outsource_workers'].append(data)
 
