@@ -53,7 +53,6 @@ class TestOperationTemplate(LocalTestCase):
                 )
                 tm_start += timedelta(minutes=30)
             dt_from += timedelta(days=1)
-        print("length ", len(PeriodClients.objects.all()))
 
     def test_generate_dates(self):
         dt_from = self.dt_from
@@ -69,25 +68,34 @@ class TestOperationTemplate(LocalTestCase):
         self.assertEqual(len(dates), 15 * 5)
 
     def test_build_period_clients_week(self):
+        days = 15
+        times = 4 # периодов в день
         dt_from = datetime.now().date() + timedelta(days=5) #  15 дней
-        dt_to = dt_from + timedelta(days=14)
+        dt_to = dt_from + timedelta(days=days-1)
 
         self.create_period_clients(dt_from, dt_to)
         pc = PeriodClients.objects.all()
-        self.assertEqual(len(pc), 15 * 24)
+        self.assertEqual(len(pc), days * 24)
 
         # create by operation_template
         utils.build_period_clients(self.ot_weekly, dt_from, dt_to)
-        self.assertEqual(len(PeriodClients.objects.all()), 15 * 24)
+        self.assertEqual(len(PeriodClients.objects.all()), days * 24)
         pc=PeriodClients.objects.filter(
             value=3.25
         )
-        self.assertEqual(len(pc), 6 * 4)
+        self.assertEqual(len(pc), 6 * times) #6 дней за 2 недели
         dates = pc.values_list('dttm_forecast', flat=True)
 
-        self.assertEqual(dates[0].isoweekday() in json.loads(self.ot_weekly.days_in_period), True)
-        self.assertEqual(dates[5].isoweekday() in json.loads(self.ot_weekly.days_in_period), True)
-        self.assertEqual(dates[10].isoweekday() in json.loads(self.ot_weekly.days_in_period), True)
+        period_days = json.loads(self.ot_weekly.days_in_period)
+        l = len(period_days)
+        ind = period_days.index(dates[0].isoweekday())
+        ind_dates = 0
+        self.assertEqual(ind >= 0, True)
+
+        while ind_dates < len(dates):
+            self.assertEqual(period_days[ind % l] == dates[ind_dates].isoweekday() , True)
+            ind += 1
+            ind_dates += times
 
         self.assertEqual(dates[0].time(), time(10, 0))
         self.assertEqual(dates[5].time(), time(10, 30))
@@ -103,7 +111,7 @@ class TestOperationTemplate(LocalTestCase):
         pc=PeriodClients.objects.filter(
             value=1
         )
-        self.assertEqual(len(pc), 15 * 24)
+        self.assertEqual(len(pc), days * 24)
 
     def test_build_period_clients_month(self):
         dt_from = datetime.now().date() + timedelta(days=5) #  15 дней
@@ -120,6 +128,7 @@ class TestOperationTemplate(LocalTestCase):
             value=3.25
         )
         dates = pc.values_list('dttm_forecast', flat=True)
+
 
         self.assertEqual(dates[0].day in json.loads(self.ot_monthly.days_in_period), True)
         self.assertEqual(dates[6].day in json.loads(self.ot_monthly.days_in_period), True)
