@@ -36,7 +36,7 @@ class LocalTestCase(TestCase):
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
+    def setUp(self, periodclients=True):
         super().setUp()
         dttm_now = now()
 
@@ -206,6 +206,9 @@ class LocalTestCase(TestCase):
         # CameraGates
         self.entry_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_ENTRY, name='Вход')
         self.exit_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_OUT, name='Выход')
+
+        if not periodclients:
+            return
 
         # PeriodClients
         dttm_from = (dttm_now - relativedelta(days=15)).replace(hour=6, minute=30, second=0, microsecond=0)
