@@ -124,6 +124,7 @@ class WorkerDayConverter(BaseConverter):
             'work_types': list(set(obj.work_types_ids)) if hasattr(obj, 'work_types_ids') else [],
             'work_type': obj.work_type_id if hasattr(obj, 'work_type_id') else None,
             'created_by': obj.created_by_id,
+            'worker_day_approved': obj.worker_day_approved_id,
         }
         if hasattr(obj, 'other_shop'):
             data['other_shop']=  obj.other_shop
@@ -434,3 +435,16 @@ class VacancyConverter(BaseConverter):
             'is_canceled': True if obj.dttm_deleted else False,
             'work_type': obj.work_type_id,
         }
+
+
+class WorkerDayApproveConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'shop_id': obj.shop_id,
+            'created_by': obj.created_by_id,
+            'dt_approved': cls.convert_date(obj.dt_approved),
+            'dttm_added': cls.convert_datetime(obj.dttm_added),
+        }
+
