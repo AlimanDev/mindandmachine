@@ -125,7 +125,7 @@ class WorkerDayConverter(BaseConverter):
             'created_by': obj.created_by_id,
         }
         if hasattr(obj, 'other_shop'):
-            data['other_shop']=  obj.other_shop
+            data['other_shop'] = obj.other_shop
 
         return data
 

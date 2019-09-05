@@ -34,6 +34,7 @@ from src.db.models import (
     WorkerDayChangeRequest,
     AttendanceRecords,
     ExchangeSettings,
+    Event,
 )
 
 
@@ -302,11 +303,11 @@ class NotificationsAdmin(admin.ModelAdmin):
 
     @staticmethod
     def parent_title(instance: Notifications):
-        return instance.to_worker.shop.parent_title()
+        return instance.to_worker.shop.parent_title() if instance.to_worker.shop else ''
 
     @staticmethod
     def shop_title(instance: Notifications):
-        return instance.to_worker.shop.title
+        return instance.to_worker.shop.title if instance.to_worker.shop else ''
 
 
 @admin.register(Timetable)
@@ -404,3 +405,12 @@ class AttendanceRecordsAdmin(admin.ModelAdmin):
 @admin.register(ExchangeSettings)
 class ExchangeSettingsAdmin(admin.ModelAdmin):
     pass
+<<<<<<< HEAD
+=======
+
+
+@admin.register(Event)
+class EventAdmin(admin.ModelAdmin):
+    pass
+
+>>>>>>> master

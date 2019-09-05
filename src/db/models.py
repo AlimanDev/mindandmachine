@@ -252,6 +252,7 @@ class User(DjangoAbstractUser):
     tabel_code = models.CharField(max_length=15, null=True, blank=True)
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     is_ready_for_overworkings = models.BooleanField(default=False)
+    access_token = models.CharField(max_length=64, blank=True, null=True)
 
     objects = WorkerManager()
 
@@ -347,6 +348,7 @@ class FunctionGroup(models.Model):
         'do_notify_action',
         'exchange_workers_day',
         'upload_urv',
+        'set_pred_bills',
 
         # download/
         'get_demand_xlsx',
@@ -984,7 +986,8 @@ class Event(models.Model):
                     self.workerday_details.work_type.shop.title,
                 )
             else:
-                return 'Открыта вакансия на {} в {}. Время работы: с {} по {}. Хотите выйти?'.format(
+                return 'Открыта вакансия на {} на {} в {}. Время работы: с {} по {}. Хотите выйти?'.format(
+                    self.workerday_details.work_type.name,
                     BaseConverter.convert_date(self.workerday_details.dttm_from.date()),
                     self.workerday_details.work_type.shop.title,
                     BaseConverter.convert_time(self.workerday_details.dttm_from.time()),
@@ -1085,7 +1088,7 @@ class Notifications(models.Model):
     def __str__(self):
         return '{}, {}, {}, id: {}'.format(
             self.to_worker.last_name,
-            self.to_worker.shop.title,
+            self.to_worker.shop.title if self.to_worker.shop else 'no shop',
             self.dttm_added,
             # self.text[:60],
             self.id

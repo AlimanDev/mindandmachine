@@ -12,6 +12,9 @@ class GetNotificationsForm(forms.Form):
     count = forms.IntegerField(required=False)
     type = util_forms.ChoiceField(['all', 'vacancy', 'other'], default='all')
 
+    shop_id = forms.IntegerField(required=False)
+    dt = util_forms.DateField(required=False)
+
 
 class NotifyAction(forms.Form):
     notify_id = forms.IntegerField(required=True)

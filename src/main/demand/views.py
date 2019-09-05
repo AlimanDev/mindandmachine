@@ -24,9 +24,11 @@ from .forms import (
     CreatePredictBillsRequestForm,
     GetDemandChangeLogsForm,
     GetVisitorsInfoForm,
+    SetPredictBillsForm,
 )
 from .utils import create_predbills_request_function
 from django.apps import apps
+import json
 
 
 @api_method('GET', GetIndicatorsForm)
@@ -375,10 +377,8 @@ def create_predbills_request(request, form):
     return JsonResponse.success() if result is True else result
 
 
-# @csrf_exempt
-# @api_method('POST', SetPredictBillsForm, auth_required=False, check_permissions=False)
-@outer_server(is_camera=False, decode_body=False)
-def set_pred_bills(request, data):
+@api_method('POST', SetPredictBillsForm, check_permissions=False)
+def set_pred_bills(request, form):
     """
     ждет request'a от qos_algo. когда получает, записывает данные из data в базу данных
 
@@ -403,6 +403,11 @@ def set_pred_bills(request, data):
         if commit:
             PeriodClients.objects.bulk_create(lst)
             lst[:] = []
+
+    try:
+        data = json.loads(form['data'])
+    except:
+        return JsonResponse.internal_error('cannot parse json')
 
     shop = Shop.objects.get(id=data['shop_id'])
     dt_from = BaseConverter.parse_date(data['dt_from'])

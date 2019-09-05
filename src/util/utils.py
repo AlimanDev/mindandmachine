@@ -174,6 +174,13 @@ def api_method(
                     return JsonResponse.internal_error('cannot dev_autologin')
                 login(request, user)
 
+            token = request.POST.get('access_token', None) or request.GET.get('access_token', None)
+            if token:
+                user_with_access_token = User.objects.filter(access_token=token)
+                # чтобы ошибок не было тогда, когда токен не подходит -- или стоит показывать что не прошла авторизация?
+                if len(user_with_access_token) == 1:
+                    request.user = user_with_access_token[0]
+
             if auth_required and not request.user.is_authenticated:
                 return JsonResponse.auth_required()
 
@@ -349,10 +356,10 @@ def outer_server(is_camera=True, decode_body=True):
     def decor(func):
         @csrf_exempt
         def wrapper(request, *args, **kwargs):
-            if is_camera:
-                access_key = settings.QOS_CAMERA_KEY
-            else:
-                access_key = settings.QOS_SET_TIMETABLE_KEY
+            # if is_camera:
+            access_key = settings.QOS_CAMERA_KEY
+            # else:
+            #     access_key = settings.QOS_SET_TIMETABLE_KEY
 
             if request.method != 'POST':
                 return JsonResponse.method_error(request.method, 'POST')
