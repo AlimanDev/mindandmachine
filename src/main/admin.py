@@ -405,12 +405,9 @@ class AttendanceRecordsAdmin(admin.ModelAdmin):
 @admin.register(ExchangeSettings)
 class ExchangeSettingsAdmin(admin.ModelAdmin):
     pass
-<<<<<<< HEAD
-=======
 
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
     pass
 
->>>>>>> master
