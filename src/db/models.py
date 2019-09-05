@@ -1333,4 +1333,5 @@ class ExchangeSettings(models.Model):
     working_shift_min_hours = models.DurationField(default=datetime.timedelta(hours=4)) # Минимальная длина смены
     working_shift_max_hours = models.DurationField(default=datetime.timedelta(hours=12)) # Максимальная длина смены
 
+    # Количество вверх уровней дерева, для которого ищем магазины
     automatic_worker_select_tree_level = models.IntegerField(default=1)
