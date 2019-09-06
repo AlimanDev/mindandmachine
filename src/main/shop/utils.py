@@ -71,11 +71,12 @@ def get_shop_list_stats(form, request, display_format='raw'):
     dt_curr = datetime.datetime.today().replace(day=1)
     dt_prev = dt_curr - relativedelta(months=1)
 
-    childs_subquery = Shop.objects.filter(
+    childs_subquery_curr = Shop.objects.filter(
         dttm_deleted__isnull=True,
         lft__gte=OuterRef('lft'),
         lft__lte=OuterRef('rght'),
         tree_id=OuterRef('tree_id'),
+        timetable__dt=dt_curr
     ).order_by().values(
         'timetable__fot',
         'timetable__fot_revenue',
@@ -85,8 +86,20 @@ def get_shop_list_stats(form, request, display_format='raw'):
         'timetable__workers_amount'
     )
 
-    childs_subquery_prev = childs_subquery.filter(timetable__dt=dt_prev)
-    childs_subquery_curr = childs_subquery.filter(timetable__dt=dt_curr)
+    childs_subquery_prev = Shop.objects.filter(
+        dttm_deleted__isnull=True,
+        lft__gte=OuterRef('lft'),
+        lft__lte=OuterRef('rght'),
+        tree_id=OuterRef('tree_id'),
+        timetable__dt=dt_prev
+    ).order_by().values(
+        'timetable__fot',
+        'timetable__fot_revenue',
+        'timetable__revenue',
+        'timetable__lack',
+        'timetable__idle',
+        'timetable__workers_amount'
+    )
 
 
     shops = shop.get_children().filter(

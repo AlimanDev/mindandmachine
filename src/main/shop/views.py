@@ -280,8 +280,7 @@ def set_parameters(request, form):
 )
 def get_department_stats(request, form):
     super_shop=request.shop
-    shops = Shop.objects.filter(
-        parent=super_shop,
+    shops=super_shop.get_descendants().filter(
         dttm_deleted__isnull=True
     )
     shop_ids = shops.values_list('id', flat=True)
