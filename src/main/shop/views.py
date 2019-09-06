@@ -98,6 +98,7 @@ def get_department_list(request, form):
     Args:
         method: GET
         url: api/shop/get_department_list
+        shop_id: id магазина
         pointer(int): указывает с айдишника какого магазина в querysete всех магазов будем инфу отдавать
         items_per_page(int): сколько шопов будем на фронте показывать
         title(str): required = False, название магазина

@@ -1068,7 +1068,6 @@ class Event(models.Model):
         return False
 
 
-
 class NotificationManager(models.Manager):
     def mm_filter(self, *args, **kwargs):
         return self.filter(*args, **kwargs).select_related(
@@ -1077,8 +1076,6 @@ class NotificationManager(models.Manager):
             'event__workerday_details__work_type',
             'event__workerday_details__work_type__shop'
         )
-
-
 
 
 class Notifications(models.Model):
@@ -1314,9 +1311,9 @@ class AttendanceRecords(models.Model):
 
 
 class ExchangeSettings(models.Model):
-    #Создаем ли автоматически вакансии
+    # Создаем ли автоматически вакансии
     automatic_check_lack = models.BooleanField(default=False)
-    #Период, за который проверяем
+    # Период, за который проверяем
     automatic_check_lack_timegap = models.DurationField(default=datetime.timedelta(days=7))
 
     # Минимальная потребность в сотруднике при создании вакансии
@@ -1324,14 +1321,14 @@ class ExchangeSettings(models.Model):
     # Максимальная потребность в сотруднике для удалении вакансии
     automatic_delete_vacancy_lack_max = models.FloatField(default=0.3)
 
-    #Только автоназначение сотрудников
+    # Только автоназначение сотрудников
     automatic_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=1))
     # Дробное число, на какую долю сотрудник не занят, чтобы совершить обмен
     automatic_worker_select_overflow_min = models.FloatField(default=0.8)
 
-    #Длина смены
+    # Длина смены
     working_shift_min_hours = models.DurationField(default=datetime.timedelta(hours=4)) # Минимальная длина смены
     working_shift_max_hours = models.DurationField(default=datetime.timedelta(hours=12)) # Максимальная длина смены
 
-    # Количество вверх уровней дерева, для которого ищем магазины
+    # Расстояние до родителя, в поддереве которого ищем сотрудников для автоназначения
     automatic_worker_select_tree_level = models.IntegerField(default=1)
