@@ -2,6 +2,8 @@ from django.db import migrations
 from django.db.models import Q
 from django.db import IntegrityError
 from django.db import transaction
+
+
 def change_access_rights(apps, schema_editor):
     FunctionGroup = apps.get_model('db', 'FunctionGroup')
 

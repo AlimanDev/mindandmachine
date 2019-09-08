@@ -1,5 +1,7 @@
 from django.db import migrations
 from django.db.models import Q
+
+
 def create_shop_tree(apps, schema_editor):
     Shop = apps.get_model('db', 'Shop')
     shop = Shop.objects.create(
@@ -14,6 +16,7 @@ def create_shop_tree(apps, schema_editor):
         ~Q(id = shop.id)
     ).update(parent=shop)
     Shop._tree_manager.rebuild()
+
 
 class Migration(migrations.Migration):
 

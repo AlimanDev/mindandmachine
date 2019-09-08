@@ -742,7 +742,7 @@ def delete_timetable(request, form):
     return JsonResponse.success()
 
 
-@csrf_exempt
+# @csrf_exempt
 #@api_method('POST', SetTimetableForm, auth_required=False)
 @api_method('POST', SetTimetableForm, check_permissions=False) # fixme: add check_permissions by user_id
 def set_timetable(request, form):
