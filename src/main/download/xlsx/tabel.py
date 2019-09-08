@@ -117,7 +117,7 @@ class Tabel_xlsx(Xlsx_base):
             'align': 'fill',
             'font_color': COLOR_RED,
         })
-        self.worksheet.write_string(2, 1, 'Магазин: {}'.format(self.super_shop.title), text_top)
+        self.worksheet.write_string(2, 1, 'Магазин: {}'.format(self.shop.parent_title()), text_top)
         self.worksheet.write_rich_string(3, 1,
                                          text_top, 'ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ ',
                                          text_top_red, '{}  {}г.'.format(

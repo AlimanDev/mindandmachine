@@ -27,7 +27,6 @@ from src.db.models import (
     Notifications,
 )
 from src.util.collection import group_by
-from src.util.forms import FormUtil
 from src.util.models_converter import (
     TimetableConverter,
     WorkTypeConverter,
@@ -76,9 +75,9 @@ def get_status(request, form):
             'dttm_status_change': дата изменения
         }
     """
-    shop_id = FormUtil.get_shop_id(request, form)
+
     try:
-        tt = Timetable.objects.get(shop_id=shop_id, dt=form['dt'])
+        tt = Timetable.objects.get(shop_id=request.shop.id, dt=form['dt'])
     except Timetable.DoesNotExist:
         return JsonResponse.does_not_exists_error()
 
@@ -88,7 +87,6 @@ def get_status(request, form):
 @api_method(
     'POST',
     SetSelectedCashiersForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def set_selected_cashiers(request, form):
     """
@@ -112,7 +110,6 @@ def set_selected_cashiers(request, form):
 @api_method(
     'POST',
     CreateTimetableForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def create_timetable(request, form):
     """
@@ -655,7 +652,6 @@ def create_timetable(request, form):
 @api_method(
     'POST',
     DeleteTimetableForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def delete_timetable(request, form):
     """
@@ -746,6 +742,8 @@ def delete_timetable(request, form):
     return JsonResponse.success()
 
 
+# @csrf_exempt
+#@api_method('POST', SetTimetableForm, auth_required=False)
 @api_method('POST', SetTimetableForm, check_permissions=False) # fixme: add check_permissions by user_id
 def set_timetable(request, form):
     """

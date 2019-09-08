@@ -52,25 +52,21 @@ def search_candidates(wd_details, **kwargs):
 
     :param wd_details: db.WorkerDayCashboxDetails -- only in python, not real model in db. idea: no model until users selected for sending
     :param kwargs: dict {
-        |  'own_shop': Boolean, if True then add: искать из своего магазина/отдела только
-        |  'other_shops': Boolean, if True then show: искать из своего магазина/отдела только
-        |  'other_supershops': Boolean, if True then show: смотрим другие локации
-        |  'outsource': Boolean, if True then show, добавляем аутсорс
+        'outsource': Boolean, if True then show, добавляем аутсорс
     }
     :return:
     """
 
+    exchange_settings = ExchangeSettings.objects.first()
+    if not exchange_settings.automatic_worker_select_tree_level:
+        return
+    shop = wd_details.work_type.shop
+    parent = shop.get_ancestor_by_level_distance(exchange_settings.automatic_worker_select_tree_level)
+    shops = parent.get_descendants()
+
     # department checks
 
-    depart_filter = Q()
-    if kwargs['own_shop']:
-        depart_filter |= Q(shop_id=wd_details.work_type.shop_id)
-
-    if kwargs['other_shops']:
-        depart_filter |= Q(shop__super_shop_id=wd_details.work_type.shop.super_shop_id)
-
-    if kwargs['other_supershops']:
-        depart_filter |= Q(shop__super_shop_id__gte=1)
+    depart_filter = Q(shop_id__in=shops)
 
     # todo: add outsource
 
@@ -351,7 +347,6 @@ def cancel_vacancies(shop_id, work_type_id):
 
 def workers_exchange():
     """
-
     Автоматически перекидываем сотрудников из других магазинов, если это приносит ценность (todo: добавить описание, что такое ценность).
 
     :return:
@@ -373,10 +368,12 @@ def workers_exchange():
     for shop in shop_list:
         for work_type in shop.worktype_set.all():
             params['work_type_ids'] = [work_type.id]
+
             shop_stat = get_shop_stats(
                 shop.id,
                 params,
                 consider_vacancies=False)
+
             df_stat=pandas.DataFrame(shop_stat['tt_periods']['real_cashiers']).rename({'amount':'real_cashiers'}, axis=1)
             df_stat['predict_cashier_needs'] = pandas.DataFrame(shop_stat['tt_periods']['predict_cashier_needs']).amount
             df_stat['lack'] = df_stat.predict_cashier_needs - df_stat.real_cashiers

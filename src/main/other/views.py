@@ -3,7 +3,6 @@ from src.db.models import (
     Slot,
     UserWeekdaySlot,
     WorkType,
-    Region,
     FunctionGroup,
 )
 from src.util.models_converter import BaseConverter
@@ -15,10 +14,6 @@ from .forms import (
 )
 from collections import defaultdict
 
-
-@api_method('GET', auth_required=False, check_permissions=False)
-def get_regions(request):
-    return JsonResponse.success(list(Region.objects.all().values_list('title', flat=True)))
 
 
 @api_method('GET', UserAllowedFuncsForm, check_permissions=False)
@@ -77,7 +72,7 @@ def get_all_slots(request, form):
 @api_method(
     'GET',
     GetSlots,
-    lambda_func=lambda x: User.objects.get(id=x['user_id'])
+    lambda_func=lambda x: User.objects.get(id=x['user_id']).shop
 )
 def get_slots(request, form):
     """

@@ -1,7 +1,6 @@
 from src.util.test import LocalTestCase
 from src.db.models import (
     ExchangeSettings,
-    SuperShop,
     WorkType,
     WorkerDayCashboxDetails,
     Shop,
@@ -25,6 +24,14 @@ class TestWorkerExchange(LocalTestCase):
 
     def setUp(self):
         super().setUp()
+        self.exchange_settings = ExchangeSettings.objects.create(
+            automatic_check_lack_timegap=datetime.timedelta(days=1),
+            automatic_check_lack=True,
+            automatic_create_vacancy_lack_min=0.4,
+            automatic_delete_vacancy_lack_max=0.5,
+            automatic_worker_select_overflow_min=0.6,
+            automatic_worker_select_timegap=datetime.timedelta(hours=4)
+        )
 
     def test_get_workers_to_exchange(self):
         self.auth()
@@ -37,7 +44,7 @@ class TestWorkerExchange(LocalTestCase):
         wd.save()
 
         response = self.api_get(
-            '/api/timetable/worker_exchange/get_workers_to_exchange?own_shop=True&specialization=2&dttm_start=09:00:00 {0}&dttm_end=21:00:00 {0}'.format(
+            '/api/timetable/worker_exchange/get_workers_to_exchange?specialization=2&dttm_start=09:00:00 {0}&dttm_end=21:00:00 {0}'.format(
                 self.qos_dt))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
@@ -54,7 +61,7 @@ class TestWorkerExchange(LocalTestCase):
             'email': '',
             'tabel_code': None,
             'shop_title': 'Shop1',
-            'supershop_title': 'SuperShop1',
+            'supershop_title': 'Region Shop1',
         })
         self.assertEqual(len(response.json['data']['users']['3']['timetable']), 11)
         self.assertEqual(response.json['data']['tt_from_dt'], (self.dttm - relativedelta(days=10)).strftime('%d.%m.%Y'))
@@ -163,19 +170,19 @@ class Test_auto_worker_exchange(TestCase):
     def setUp(self):
         super().setUp()
 
-        self.superShop = SuperShop.objects.create(
+        self.root_shop = Shop.objects.create(
             title='SuperShop1',
-            tm_start=datetime.time(7, 0, 0),
-            tm_end=datetime.time(0, 0, 0)
+            tm_shop_opens=datetime.time(7, 0, 0),
+            tm_shop_closes=datetime.time(0, 0, 0)
         )
 
         self.shop = Shop.objects.create(
-            super_shop=self.superShop,
+            parent=self.root_shop,
             title='Shop1'
         )
 
         self.shop2 = Shop.objects.create(
-            super_shop=self.superShop,
+            parent=self.root_shop,
             title='Shop2'
         )
 
