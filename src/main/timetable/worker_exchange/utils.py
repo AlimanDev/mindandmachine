@@ -28,7 +28,7 @@ Note:
 from datetime import date, timedelta
 import pandas
 
-from django.db.models import Q
+from django.db.models import Q, Exists, OuterRef
 from django.utils.timezone import now
 from django.conf import settings
 
@@ -74,27 +74,17 @@ def search_candidates(wd_details, **kwargs):
     # todo: 2. add WorkerCashboxInfo check if necessary
     # todo: 3. add Location check
     workers = User.objects.filter(
-
-        Q(workerday__type__in=[
-            WorkerDay.Type.TYPE_HOLIDAY.value,
-            WorkerDay.Type.TYPE_VACATION.value,
-            WorkerDay.Type.TYPE_EMPTY.value,
-            WorkerDay.Type.TYPE_DELETED.value,
-            WorkerDay.Type.TYPE_HOLIDAY_SPECIAL.value,
-        ]) |
-        Q(workerday__type=WorkerDay.Type.TYPE_WORKDAY.value, workerday__dttm_work_start__gte=wd_details.dttm_to) |
-        Q(workerday__type=WorkerDay.Type.TYPE_WORKDAY.value,workerday__dttm_work_end__lte=wd_details.dttm_from),
         depart_filter,
-
         dt_fired__isnull=True,
         is_ready_for_overworkings=True,
-
-        workerday__dt=wd_details.dttm_from.date(),
-        workerday__child__isnull=True,
-    )
-    # print(workers.query.__str__())
-    # import pdb
-    # pdb.set_trace()
+    ).annotate(
+        no_wdays=~Exists(WorkerDay.objects.filter(
+            worker=OuterRef('pk'),
+            dttm_work_start__lte=wd.dttm_to,
+            dttm_work_end__gte=wd.dttm_from,
+            dt=wd.dttm_from.date(),
+            ))
+    ).filter(no_wdays=True)
 
     return workers
 
