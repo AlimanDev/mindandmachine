@@ -252,14 +252,12 @@ def create_vacancies_and_notify(shop_id, work_type_id):
             working_shifts = []
         elif df_vacancies.delta[i] < min_shift:
             working_shifts = [min_shift]
-        dttm_to = dttm_from = df_vacancies.dttm_from[i]
 
-        # TODO:
-        # tm_shop_closes = 00:00?
-        # tm_shop_opens
+        dttm_to = dttm_from = df_vacancies.dttm_from[i]
 
         dttm_shop_opens = datetime.combine(dttm_from.date(), shop.tm_shop_opens)
         dttm_shop_closes = datetime.combine(dttm_from.date(), shop.tm_shop_closes)
+
         if shop.tm_shop_closes == time(hour=0, minute=0, second=0):
             dttm_shop_closes += timedelta(days=1)
 
