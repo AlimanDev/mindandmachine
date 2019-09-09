@@ -25,7 +25,7 @@ Note:
             }, ..
         }
 """
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, time
 import pandas
 
 from django.db.models import Q, Exists, OuterRef
@@ -80,9 +80,9 @@ def search_candidates(wd_details, **kwargs):
     ).annotate(
         no_wdays=~Exists(WorkerDay.objects.filter(
             worker=OuterRef('pk'),
-            dttm_work_start__lte=wd.dttm_to,
-            dttm_work_end__gte=wd.dttm_from,
-            dt=wd.dttm_from.date(),
+            dttm_work_start__lte=wd_details.dttm_to,
+            dttm_work_end__gte=wd_details.dttm_from,
+            dt=wd_details.dttm_from.date(),
             ))
     ).filter(no_wdays=True)
 
