@@ -25,7 +25,7 @@ Note:
             }, ..
         }
 """
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import pandas
 
 from django.db.models import Q, Exists, OuterRef
@@ -147,6 +147,7 @@ def create_vacancies_and_notify(shop_id, work_type_id):
 
     """
 
+    shop=Shop.objects.get(id=shop_id)
     exchange_settings = ExchangeSettings.objects.first()
     if not exchange_settings.automatic_check_lack:
         return
@@ -253,13 +254,23 @@ def create_vacancies_and_notify(shop_id, work_type_id):
             working_shifts = [min_shift]
         dttm_to = dttm_from = df_vacancies.dttm_from[i]
 
-        shop_tm_closes = Shop.objects.get(id=shop_id).tm_shop_closes
+        # TODO:
+        # tm_shop_closes = 00:00?
+        # tm_shop_opens
+
+        dttm_shop_opens = datetime.combine(dttm_from.date(), shop.tm_shop_opens)
+        dttm_shop_closes = datetime.combine(dttm_from.date(), shop.tm_shop_closes)
+        if shop.tm_shop_closes == time(hour=0, minute=0, second=0):
+            dttm_shop_closes += timedelta(days=1)
+
         for shift in working_shifts:
             dttm_from = dttm_to
             dttm_to = dttm_to + shift
-            if dttm_to.time() > shop_tm_closes:
-                dttm_to = dttm_to.replace(hour=shop_tm_closes.hour, minute=shop_tm_closes.minute)
+            if dttm_to > dttm_shop_closes:
+                dttm_to = dttm_shop_closes
                 dttm_from = dttm_to - shift
+            if dttm_from < dttm_shop_opens:
+                dttm_from = dttm_shop_opens
             print('create vacancy {} {} {}'.format(dttm_from, dttm_to, work_type_id))
 
             worker_day_detail = WorkerDayCashboxDetails.objects.create(
