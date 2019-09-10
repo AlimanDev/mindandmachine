@@ -15,7 +15,7 @@ def create_shop_tree(apps, schema_editor):
     shops = Shop.objects.filter(
         ~Q(id = shop.id)
     ).update(parent=shop)
-    Shop._tree_manager.rebuild()
+    #Shop._tree_manager.rebuild()
 
 
 class Migration(migrations.Migration):
