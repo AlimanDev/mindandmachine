@@ -330,11 +330,7 @@ def get_table(request, form):
     return response
 
 
-@api_method(
-    'GET',
-    GetWorkerStatForm,
-    lambda_func=lambda x: User.objects.filter(id__in=x['worker_ids']).values_list('id', flat=True)
-)
+@api_method('GET', GetWorkerStatForm)
 def get_month_stat(request, form):
     """
     Считает статистику за месяц dt
@@ -342,7 +338,7 @@ def get_month_stat(request, form):
     Args:
         method: GET
         url: /api/timetable/table/get_month_stat
-        shop_id(int): required = False
+        shop_id(int): required = True
         dt(QOS_DATE): required = True
         worker_ids(list): required = False
     """
@@ -381,11 +377,10 @@ def get_month_stat(request, form):
 @api_method(
     'POST',
     WorkersToExchange,
-    lambda_func=lambda x: User.objects.get(id=x['worker1_id']).shop,
 )
 def exchange_workers_day(request, form):
     """
-    Обмен рабочим расписание между двумя сотрудниками в заданный день
+    Обмен рабочим расписанием между двумя сотрудниками в заданный день
     Args:
          method: POST
          url: /api/timetable/table/exchange_workers_day
@@ -393,6 +388,7 @@ def exchange_workers_day(request, form):
          worker2_id(int): id второго пользователя
          from_dt(QOS_DATE): дата для замены, c которой обменять график сотрудников
          to_dt(QOS_DATE): дата для замены, по которую включительно обменять график сотрудников
+         shop_id: required = True
     Returns:
         {}
     """
@@ -448,6 +444,3 @@ def exchange_workers_day(request, form):
         create_worker_day(day_pair[1], day_pair[0])
 
     return JsonResponse.success()
-
-
-

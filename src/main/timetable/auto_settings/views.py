@@ -27,7 +27,6 @@ from src.db.models import (
     Notifications,
 )
 from src.util.collection import group_by
-from src.util.forms import FormUtil
 from src.util.models_converter import (
     TimetableConverter,
     WorkTypeConverter,
@@ -76,9 +75,9 @@ def get_status(request, form):
             'dttm_status_change': дата изменения
         }
     """
-    shop_id = FormUtil.get_shop_id(request, form)
+
     try:
-        tt = Timetable.objects.get(shop_id=shop_id, dt=form['dt'])
+        tt = Timetable.objects.get(shop_id=request.shop.id, dt=form['dt'])
     except Timetable.DoesNotExist:
         return JsonResponse.does_not_exists_error()
 
@@ -88,7 +87,6 @@ def get_status(request, form):
 @api_method(
     'POST',
     SetSelectedCashiersForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def set_selected_cashiers(request, form):
     """
@@ -112,7 +110,6 @@ def set_selected_cashiers(request, form):
 @api_method(
     'POST',
     CreateTimetableForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def create_timetable(request, form):
     """
@@ -379,7 +376,7 @@ def create_timetable(request, form):
         'dttm_forecast',
         'operation_type__work_type_id',
     ).annotate(
-        clients=Sum(F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + shop.absenteeism))
+        clients=Sum(F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + (shop.absenteeism / 100)))
     ).values_list(
         'dttm_forecast',
         'operation_type__work_type_id',
@@ -403,6 +400,7 @@ def create_timetable(request, form):
     )
 
     new_worker_days = []
+    worker_days_mask = {}
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
         worker__shop_id=form['shop_id'],
         dt__gte=dt_from,
@@ -420,17 +418,21 @@ def create_timetable(request, form):
         'work_types__id',
     )
     for wd in worker_days_db:
-        wd_mod = WorkerDay(
-            id=wd['id'],
-            type=wd['type'],
-            dttm_added=wd['dttm_added'],
-            dt=wd['dt'],
-            worker_id=wd['worker_id'],
-            dttm_work_start=wd['dttm_work_start'],
-            dttm_work_end=wd['dttm_work_end'],
-        )
-        wd_mod.work_type_id = wd['work_types__id'][0] if wd['work_types__id'] else None
-        new_worker_days.append(wd_mod)
+        if (wd['id'] in worker_days_mask) and wd['work_types__id']:
+            pass
+        else:
+            worker_days_mask[wd['id']] = len(new_worker_days)
+            wd_mod = WorkerDay(
+                id=wd['id'],
+                type=wd['type'],
+                dttm_added=wd['dttm_added'],
+                dt=wd['dt'],
+                worker_id=wd['worker_id'],
+                dttm_work_start=wd['dttm_work_start'],
+                dttm_work_end=wd['dttm_work_end'],
+            )
+            wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
+            new_worker_days.append(wd_mod)
 
     worker_day = group_by(
         collection=new_worker_days,
@@ -438,6 +440,7 @@ def create_timetable(request, form):
     )
 
     prev_worker_days = []
+    worker_days_mask = {}
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
         worker__shop_id=form['shop_id'],
         dt__gte=dt_from - timedelta(days=7),
@@ -455,17 +458,21 @@ def create_timetable(request, form):
         'work_types__id',
     )
     for wd in worker_days_db:
-        wd_mod = WorkerDay(
-            id=wd['id'],
-            type=wd['type'],
-            dttm_added=wd['dttm_added'],
-            dt=wd['dt'],
-            worker_id=wd['worker_id'],
-            dttm_work_start=wd['dttm_work_start'],
-            dttm_work_end=wd['dttm_work_end'],
-        )
-        wd_mod.work_type_id = wd['work_types__id'][0] if wd['work_types__id'] else None
-        prev_worker_days.append(wd_mod)
+        if (wd['id'] in worker_days_mask) and wd['work_types__id']:
+            pass
+        else:
+            worker_days_mask[wd['id']] = len(prev_worker_days)
+            wd_mod = WorkerDay(
+                id=wd['id'],
+                type=wd['type'],
+                dttm_added=wd['dttm_added'],
+                dt=wd['dt'],
+                worker_id=wd['worker_id'],
+                dttm_work_start=wd['dttm_work_start'],
+                dttm_work_end=wd['dttm_work_end'],
+            )
+            wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
+            prev_worker_days.append(wd_mod)
 
     prev_data = group_by(
         collection=prev_worker_days,
@@ -645,7 +652,6 @@ def create_timetable(request, form):
 @api_method(
     'POST',
     DeleteTimetableForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def delete_timetable(request, form):
     """
@@ -736,8 +742,9 @@ def delete_timetable(request, form):
     return JsonResponse.success()
 
 
-@csrf_exempt
-@api_method('POST', SetTimetableForm, auth_required=False)
+# @csrf_exempt
+#@api_method('POST', SetTimetableForm, auth_required=False)
+@api_method('POST', SetTimetableForm, check_permissions=False) # fixme: add check_permissions by user_id
 def set_timetable(request, form):
     """
     Ждет request'a от qos_algo. Когда получает, записывает данные по расписанию в бд
@@ -745,21 +752,14 @@ def set_timetable(request, form):
     Args:
         method: POST
         url: /api/timetable/auto_settings/set_timetable
-        key(str): ключ для сверки
         data(str): json data с данными от qos_algo
 
     Raises:
-        JsonResponse.internal_error: если ключ не сконфигурирован, либо не подходит
         JsonResponse.does_not_exists_error: если расписания нет в бд
 
     Note:
         Отправляет уведомление о том, что расписание успешно было создано
     """
-    if settings.QOS_SET_TIMETABLE_KEY is None:
-        return JsonResponse.internal_error('key is not configured')
-
-    if form['key'] != settings.QOS_SET_TIMETABLE_KEY:
-        return JsonResponse.internal_error('invalid key')
 
     try:
         data = json.loads(form['data'])

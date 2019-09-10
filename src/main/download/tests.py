@@ -21,7 +21,7 @@ class TestDownload(LocalTestCase):
             datetime.date.strftime(timezone.now(), QOS_DATE_FORMAT)))
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(tabel[tabel.columns[1]][14], 'Дурак Иван None')
+        self.assertEqual(tabel[tabel.columns[1]][14], 'Дурак6 Иван6 None')
 
 
     def test_get_demand_xlsx(self):
@@ -30,7 +30,7 @@ class TestDownload(LocalTestCase):
         response = self.api_get('/api/download/get_demand_xlsx?from_dt=30.05.2019&to_dt=02.06.2019&shop_id=1&demand_model=C')
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(tabel[tabel.columns[0]][0], 'Кассы')
+        self.assertEqual(tabel[tabel.columns[0]][0], 'Кассы ')
         self.assertEqual(tabel[tabel.columns[1]][0], '30.05.2019 00:00:00')
 
     def test_get_urv_xlsx(self):
@@ -44,10 +44,10 @@ class TestDownload(LocalTestCase):
         self.assertEqual(tabel[tabel.columns[2]][0], '09:00')
         self.assertEqual(tabel[tabel.columns[3]][0], 'пришел')
 
-    def test_get_supershops_stats(self):
+    def get_department_stats_xlsx(self):
         self.auth()
 
-        response = self.api_get('/api/download/get_supershops_stats?format=excel&pointer=1&items_per_page=1&revenue=-&lack=-&fot=-&idle=-&workers_amount=-&fot_revenue=-')
+        response = self.api_get('/api/download/get_department_stats_xlsx?format=excel&pointer=1&items_per_page=1&revenue=-&lack=-&fot=-&idle=-&workers_amount=-&fot_revenue=-')
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[0]][0], 'SuperShop1, ')

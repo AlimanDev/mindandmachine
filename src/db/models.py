@@ -9,59 +9,15 @@ from . import utils
 import datetime
 import json
 
-class Region(models.Model):
-    class Meta(object):
-        verbose_name = 'Регион'
-        verbose_name_plural = 'Регионы'
-
-    title = models.CharField(max_length=256, unique=True, default='Москва')
-
-
-# магазин
-class SuperShop(models.Model):
-    class Meta:
-        verbose_name = 'Магазин'
-        verbose_name_plural = 'Магазины'
-
-    id = models.BigAutoField(primary_key=True)
-
-    TYPE_HYPERMARKET = 'H'
-    TYPE_COMMON = 'C'
-
-    SIZE_TYPES = (
-        (TYPE_HYPERMARKET, 'hypermarket'),
-        (TYPE_COMMON, 'common supershop'),
-    )
-
-    title = models.CharField(max_length=64, unique=True)
-    code = models.CharField(max_length=64, null=True, blank=True)
-
-    dt_opened = models.DateField(null=True, blank=True)
-    dt_closed = models.DateField(null=True, blank=True)
-
-    tm_start = models.TimeField(null=True, blank=True, default=datetime.time(hour=7))
-    tm_end = models.TimeField(null=True, blank=True, default=datetime.time(hour=23, minute=59, second=59))
-    type = models.CharField(max_length=1, choices=SIZE_TYPES, default=TYPE_COMMON)
-    region = models.ForeignKey(Region, blank=True, null=True, on_delete=models.PROTECT)
-    address = models.CharField(max_length=256, blank=True, null=True)
-
-    def __str__(self):
-        return '{}, {}, {}'.format(self.title, self.code, self.id)
-
-    def is_supershop_open_at(self, tm):
-        if self.tm_start < self.tm_end:
-            return self.tm_start < tm < self.tm_end
-        else:
-            if tm > self.tm_start:
-                return True
-            else:
-                return tm < self.tm_end
-
+from mptt.models import MPTTModel, TreeForeignKey
 
 # на самом деле это отдел
-class Shop(models.Model):
+class Shop(MPTTModel):
+    def __init__(self, *args, **kwargs):
+        super(Shop, self).__init__(*args, **kwargs)
+
     class Meta(object):
-        unique_together = ('super_shop', 'title')
+        # unique_together = ('parent', 'title')
         verbose_name = 'Отдел'
         verbose_name_plural = 'Отделы'
 
@@ -75,8 +31,25 @@ class Shop(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    super_shop = models.ForeignKey(SuperShop, on_delete=models.PROTECT)
+    parent = TreeForeignKey('self', on_delete=models.PROTECT, null=True, blank=True, related_name='child')
+
     # full_interface = models.BooleanField(default=True)
+
+    TYPE_REGION = 'r'
+    TYPE_SHOP = 's'
+
+    DEPARTMENT_TYPES = (
+        (TYPE_REGION, 'region'),
+        (TYPE_SHOP, 'shop'),
+    )
+
+
+    #From supershop
+    code = models.CharField(max_length=64, null=True, blank=True)
+    address = models.CharField(max_length=256, blank=True, null=True)
+    type = models.CharField(max_length=1, choices=DEPARTMENT_TYPES, default=TYPE_SHOP)
+    dt_opened = models.DateField(null=True, blank=True)
+    dt_closed = models.DateField(null=True, blank=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
@@ -129,10 +102,28 @@ class Shop(models.Model):
     staff_number = models.SmallIntegerField(default=0)
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.title, self.super_shop.title, self.id)
+        return '{}, {}, {}'.format(
+            self.title,
+            self.parent_title(),
+            self.id)
 
     def system_step_in_minutes(self):
         return self.forecast_step_minutes.hour * 60 + self.forecast_step_minutes.minute
+
+    def parent_title(self):
+        return self.parent.title if self.parent else '',
+
+    def get_level_of(self, shop):
+        if self.id == shop.id:
+            return 0
+        if self.is_ancestor_of(shop) or self.is_descendant_of(shop):
+                return shop.level - self.level
+        return None
+    def get_ancestor_by_level_distance(self, level):
+        if self.level == 0 or level == 0:
+            return self
+        level = self.level - level if self.level > level else 0
+        return self.get_ancestors().filter(level=level)[0]
 
 
 class WorkerPosition(models.Model):
@@ -149,7 +140,7 @@ class WorkerPosition(models.Model):
     title = models.CharField(max_length=64)
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.title, self.id)
+        return '{}, {}'.format(self.title, self.id)
 
 
 class WorkerManager(UserManager):
@@ -197,8 +188,8 @@ class User(DjangoAbstractUser):
         verbose_name_plural = 'Пользователи'
 
     def __str__(self):
-        if self.shop and self.shop.super_shop:
-            ss_title = self.shop.super_shop.title
+        if self.shop and self.shop.parent:
+            ss_title = self.shop.parent.title
         else:
             ss_title = None
         return '{}, {}, {}, {}'.format(self.first_name, self.last_name, ss_title, self.id)
@@ -264,6 +255,7 @@ class User(DjangoAbstractUser):
     tabel_code = models.CharField(max_length=15, null=True, blank=True)
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     is_ready_for_overworkings = models.BooleanField(default=False)
+    access_token = models.CharField(max_length=64, blank=True, null=True)
 
     objects = WorkerManager()
 
@@ -298,9 +290,7 @@ class FunctionGroup(models.Model):
         'update_cashbox',
         'delete_work_type',
         'get_outsource_workers',
-        'add_supershop',
         'change_cashier_info',
-        'get_demand_xlsx',
         'get_not_working_cashiers_list',
         'get_table',
         'get_worker_day',
@@ -316,10 +306,8 @@ class FunctionGroup(models.Model):
         'select_cashiers',
         'request_worker_day',
         'add_outsource_workers',
-        'get_parameters',
         'set_worker_restrictions',
         'create_cashier',
-        'get_urv_xlsx',
         'get_cashiers_info',
         'create_work_type',
         'get_visitors_info',
@@ -328,12 +316,10 @@ class FunctionGroup(models.Model):
         'set_notifications_read',
         'get_status',
         'get_forecast',
-        'set_parameters',
         'get_cashiers_list',
         'get_change_request',
         'delete_timetable',
         'get_types',
-        'get_supershop_stats',
         'get_all_slots',
         'get_cashiers_timetable',
         'set_demand',
@@ -352,18 +338,12 @@ class FunctionGroup(models.Model):
         'upload_demand',
         'upload_timetable',
         'change_user_urv',
-        'get_super_shop',
+        'get_parent',
         'delete_cashbox',
         'set_timetable',
-        'get_super_shop_list',
         'delete_worker_day',
         'create_predbills_request',
-        'get_timetable_xlsx',
         'process_forecast',
-        'edit_supershop',
-        'get_supershops_stats',
-        'edit_shop',
-        'add_shop',
         'notify_workers_about_vacancy',
         'show_vacancy',
         'cancel_vacancy',
@@ -376,6 +356,21 @@ class FunctionGroup(models.Model):
         'create_operation_template',
         'update_operation_template',
         'delete_operation_template',
+        'set_pred_bills',
+
+        # download/
+        'get_demand_xlsx',
+        'get_department_stats_xlsx',
+        'get_timetable_xlsx',
+        'get_urv_xlsx',
+
+        # shop/
+        'add_department',
+        'edit_department',
+        'get_department_list',
+        'get_department_stats',
+        'get_parameters',
+        'set_parameters',
     )
 
     FUNCS_TUPLE = ((f, f) for f in FUNCS)
@@ -387,6 +382,8 @@ class FunctionGroup(models.Model):
     group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name='allowed_functions', blank=True, null=True)
     func = models.CharField(max_length=128, choices=FUNCS_TUPLE)
     access_type = models.CharField(choices=TYPES, max_length=32)
+    level_up = models.IntegerField(default=0)
+    level_down = models.IntegerField(default=100)
 
     def __str__(self):
         return 'id: {}, group: {}, access_type: {}, func name: {}'.format(
@@ -421,7 +418,7 @@ class WorkType(models.Model):
         verbose_name_plural = 'Типы работ'
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.name, self.shop.title, self.shop.super_shop.title, self.id)
+        return '{}, {}, {}, {}'.format(self.name, self.shop.title, self.shop.parent.title, self.id)
 
     id = models.BigAutoField(primary_key=True)
 
@@ -609,7 +606,7 @@ class Slot(models.Model):
             self.tm_start,
             self.tm_end,
             self.shop.title,
-            self.shop.super_shop.title,
+            self.shop.parent.title,
             self.id
         )
 
@@ -655,7 +652,7 @@ class Cashbox(models.Model):
         return '{}, {}, {}, {}, {}'.format(
             self.type.name,
             self.type.shop.title,
-            self.type.shop.super_shop.title,
+            self.type.shop.parent.title,
             self.id,
             self.number
         )
@@ -908,7 +905,7 @@ class WorkerDay(models.Model):
         return '{}, {}, {}, {}, {}, {}'.format(
             self.worker.last_name,
             self.worker.shop.title,
-            self.worker.shop.super_shop.title,
+            self.worker.shop.parent.title,
             self.dt,
             self.Type.get_name_by_value(self.type),
             self.id
@@ -1098,7 +1095,8 @@ class Event(models.Model):
                     self.workerday_details.work_type.shop.title,
                 )
             else:
-                return 'Открыта вакансия на {} в {}. Время работы: с {} по {}. Хотите выйти?'.format(
+                return 'Открыта вакансия на {} на {} в {}. Время работы: с {} по {}. Хотите выйти?'.format(
+                    self.workerday_details.work_type.name,
                     BaseConverter.convert_date(self.workerday_details.dttm_from.date()),
                     self.workerday_details.work_type.shop.title,
                     BaseConverter.convert_time(self.workerday_details.dttm_from.time()),
@@ -1179,7 +1177,6 @@ class Event(models.Model):
         return False
 
 
-
 class NotificationManager(models.Manager):
     def mm_filter(self, *args, **kwargs):
         return self.filter(*args, **kwargs).select_related(
@@ -1190,8 +1187,6 @@ class NotificationManager(models.Manager):
         )
 
 
-
-
 class Notifications(models.Model):
     class Meta(object):
         verbose_name = 'Уведомления'
@@ -1199,7 +1194,7 @@ class Notifications(models.Model):
     def __str__(self):
         return '{}, {}, {}, id: {}'.format(
             self.to_worker.last_name,
-            self.to_worker.shop.title,
+            self.to_worker.shop.title if self.to_worker.shop else 'no shop',
             self.dttm_added,
             # self.text[:60],
             self.id
@@ -1252,7 +1247,7 @@ class Timetable(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='timetable')
     status_message = models.CharField(max_length=256, null=True, blank=True)
     dt = models.DateField()
     status = utils.EnumField(Status)
@@ -1425,9 +1420,9 @@ class AttendanceRecords(models.Model):
 
 
 class ExchangeSettings(models.Model):
-    #Создаем ли автоматически вакансии
+    # Создаем ли автоматически вакансии
     automatic_check_lack = models.BooleanField(default=False)
-    #Период, за который проверяем
+    # Период, за который проверяем
     automatic_check_lack_timegap = models.DurationField(default=datetime.timedelta(days=7))
 
     # Минимальная потребность в сотруднике при создании вакансии
@@ -1435,11 +1430,14 @@ class ExchangeSettings(models.Model):
     # Максимальная потребность в сотруднике для удалении вакансии
     automatic_delete_vacancy_lack_max = models.FloatField(default=0.3)
 
-    #Только автоназначение сотрудников
+    # Только автоназначение сотрудников
     automatic_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=1))
     # Дробное число, на какую долю сотрудник не занят, чтобы совершить обмен
     automatic_worker_select_overflow_min = models.FloatField(default=0.8)
 
-    #Длина смены
+    # Длина смены
     working_shift_min_hours = models.DurationField(default=datetime.timedelta(hours=4)) # Минимальная длина смены
     working_shift_max_hours = models.DurationField(default=datetime.timedelta(hours=12)) # Максимальная длина смены
+
+    # Расстояние до родителя, в поддереве которого ищем сотрудников для автоназначения
+    automatic_worker_select_tree_level = models.IntegerField(default=1)

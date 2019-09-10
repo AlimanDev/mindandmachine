@@ -5,8 +5,8 @@ from .forms import (
     GetDemandXlsxForm,
     GetUrvXlsxForm,
 )
-from src.main.shop.forms import GetSuperShopListForm
-from src.main.shop.utils import get_super_shop_list_stats
+from src.main.shop.forms import GetDepartmentListForm
+from src.main.shop.utils import get_shop_list_stats
 
 from src.db.models import (
     Shop,
@@ -99,11 +99,7 @@ def get_tabel(request, workbook, form):
     return workbook, 'Tabel'
 
 
-@api_method(
-    'GET',
-    GetDemandXlsxForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
-)
+@api_method('GET', GetDemandXlsxForm)
 @xlsx_method
 def get_demand_xlsx(request, workbook, form):
     """
@@ -215,11 +211,7 @@ def get_demand_xlsx(request, workbook, form):
     )
 
 
-@api_method(
-    'GET',
-    GetUrvXlsxForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
-)
+@api_method('GET', GetUrvXlsxForm)
 @xlsx_method
 def get_urv_xlsx(request, workbook, form):
     """
@@ -271,13 +263,9 @@ def get_urv_xlsx(request, workbook, form):
     return workbook, 'URV {}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))
 
 
-@api_method(
-    'GET',
-    GetSuperShopListForm,
-    lambda_func=lambda x: False
-)
+@api_method('GET', GetDepartmentListForm)
 @xlsx_method
-def get_supershops_stats(request, workbook, form):
+def get_department_stats_xlsx(request, workbook, form):
     """
     Скачивает статистику по магазинам за пред/текущий периоды
 
@@ -305,13 +293,13 @@ def get_supershops_stats(request, workbook, form):
     """
     dt_now = date.today().replace(day=1)
     dt_prev = date.today().replace(day=1) - relativedelta(months=1)
-    data, amount = get_super_shop_list_stats(form, request=request, display_format='excel')
+    data, amount = get_shop_list_stats(form, request=request, display_format='excel')
 
     def write_stats(row_index, col_index, value_dict_name):
         worksheet.write(row_index, col_index, '{}/{} ({}%)'.format(
-            round(super_shop_data[value_dict_name]['prev']),
-            round(super_shop_data[value_dict_name]['curr']),
-            round(super_shop_data[value_dict_name]['change']),
+            round(shop_data[value_dict_name]['prev']),
+            round(shop_data[value_dict_name]['curr']),
+            round(shop_data[value_dict_name]['change']),
         ))
 
     worksheet = workbook.add_worksheet('Показатели по магазину')
@@ -323,8 +311,8 @@ def get_supershops_stats(request, workbook, form):
     worksheet.write(0, 4, 'Нехватка, %')
     worksheet.write(0, 5, 'Сотрудники')
 
-    for index, super_shop_data in enumerate(data, start=1):
-        worksheet.write(index, 0, '{}, {}'.format(super_shop_data['title'], super_shop_data['code'] or ''))
+    for index, shop_data in enumerate(data, start=1):
+        worksheet.write(index, 0, '{}, {}'.format(shop_data['title'], shop_data['code'] or ''))
         write_stats(index, 1, 'fot_revenue')
         write_stats(index, 2, 'fot')
         write_stats(index, 3, 'idle')

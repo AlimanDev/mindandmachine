@@ -29,11 +29,10 @@ class TestAutoSettings(LocalTestCase):
         self.assertEqual(user[1].auto_timetable, True)
         self.assertEqual(user[2].auto_timetable, False)
 
-    # {'error_type': 'InternalError', 'error_message': 'Внутренняя ошибка сервера'}
+    # {'error_type': 'InternalError', 'error_message': 'Внутренняя ошибка сервера'} // no timetable_id
     def test_set_timetable(self):
         self.auth()
 
-        response = self.api_post('/api/timetable/auto_settings/set_timetable',
-                                 {'key': settings.QOS_SET_TIMETABLE_KEY, 'data': json.dumps({})})
+        response = self.api_post('/api/timetable/auto_settings/set_timetable', {'data': json.dumps({})})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
