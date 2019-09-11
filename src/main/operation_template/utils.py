@@ -27,7 +27,8 @@ Note:
 """
 from datetime import date, timedelta
 from django.utils.timezone import now
-
+from django.db.models.functions import Greatest
+from django.db.models import F
 
 from src.db.models import (
     OperationTemplate,
@@ -36,6 +37,10 @@ from src.db.models import (
 
 
 def build_period_clients(operation_template, dt_from=None, dt_to=None, operation='create'):
+    """
+        Создает потребность в PeriodClients в соответствии с шаблоном.
+        По умолчанию на 62 дня вперед, начиная с послезавтра
+    """
     dt_min = now().date() + timedelta(days = 2)
 
     if not dt_to:
@@ -64,26 +69,33 @@ def build_period_clients(operation_template, dt_from=None, dt_to=None, operation
     except StopIteration:
         pass
 
+
+    sign = 1 if operation=='create' else -1
+
+    updates = []
+    creates = []
+
     for date in operation_template.generate_dates(dt_from, dt_to):
         while period and period.dttm_forecast < date:
             period = next(period_clients, None)
         if period and period.dttm_forecast == date:
-            if operation=='create':
-                period.value += operation_template.value
-            else:
-                period.value -= operation_template.value
-                if period.value < 0:
-                    period.value = 0
-            period.save()
+            updates.append(period.id)
             period = next(period_clients, None)
         elif operation=='create':
-            PeriodClients.objects.create(
-                dttm_forecast=date,
-                value=operation_template.value,
-                type=PeriodClients.LONG_FORECASE_TYPE,
-                operation_type_id=operation_template.operation_type_id
-                )
+            creates.append(
+                PeriodClients(
+                    dttm_forecast=date,
+                    value=operation_template.value,
+                    type=PeriodClients.LONG_FORECASE_TYPE,
+                    operation_type_id=operation_template.operation_type_id
+                    ))
+
+    if len(creates):
+        PeriodClients.objects.bulk_create(creates)
+    if len(updates):
+        PeriodClients.objects.filter(id__in=updates).update(
+            value = Greatest(F('value') + operation_template.value * sign, 0)
+            )
+
     operation_template.dt_built_to = dt_to
     operation_template.save()
-
-
