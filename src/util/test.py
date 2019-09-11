@@ -87,13 +87,9 @@ class LocalTestCase(TestCase):
             ) for func in FunctionGroup.FUNCS
         ])
 
+        Shop._tree_manager.rebuild()
         # supershop
-        self.root_shop = Shop.objects.create(
-            id=10,
-            title='Department',
-            # tm_start=datetime.time(7, 0, 0),
-            # tm_end=datetime.time(0, 0, 0),
-        )
+        self.root_shop = Shop.objects.first()
 
         # shops
         self.reg_shop1 = Shop.objects.create(
@@ -114,7 +110,7 @@ class LocalTestCase(TestCase):
 
         # shops
         self.shop = Shop.objects.create(
-            id=1,
+            id=13,
             parent=self.reg_shop1,
             title='Shop1',
             break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
