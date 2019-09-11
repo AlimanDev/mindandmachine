@@ -35,14 +35,14 @@ class TestOperationTemplate(LocalTestCase):
             operation_type=self.operation_type,
             name='Ежемесячный',
             period=OperationTemplate.PERIOD_MONTHLY,
-            days_in_period='[1,3,7,15, 28, 31]',
+            days_in_period='[1,3,7,15,28,31]',
             tm_start=time(10),
             tm_end=time(12,30),
             value=2.25
         )
     def create_period_clients(self, dt_from, dt_to):
         while dt_from <= dt_to:
-            tm_start = datetime.combine(dt_from,  time(8))
+            tm_start = datetime.combine(dt_from,  time(11))
             tm_end = datetime.combine(dt_from,  time(19, 30))
             while tm_start <= tm_end:
                 PeriodClients.objects.create(
@@ -68,22 +68,36 @@ class TestOperationTemplate(LocalTestCase):
         self.assertEqual(len(dates), 15 * 5)
 
     def test_build_period_clients_week(self):
-        days = 15
+        total_days = 15
+        ot_days = 6
         times = 4 # периодов в день
         dt_from = datetime.now().date() + timedelta(days=5) #  15 дней
-        dt_to = dt_from + timedelta(days=days-1)
+        dt_to = dt_from + timedelta(days=total_days-1)
 
         self.create_period_clients(dt_from, dt_to)
         pc = PeriodClients.objects.all()
-        self.assertEqual(len(pc), days * 24)
+        self.assertEqual(len(pc), total_days * 18)
 
         # create by operation_template
         utils.build_period_clients(self.ot_weekly, dt_from, dt_to)
-        self.assertEqual(len(PeriodClients.objects.all()), days * 24)
+        self.assertEqual(len(PeriodClients.objects.all()), total_days * 18 + ot_days * 2)
+
+        #6 дней за 2 недели по часу  - увеличено
         pc=PeriodClients.objects.filter(
             value=3.25
         )
-        self.assertEqual(len(pc), 6 * times) #6 дней за 2 недели
+        self.assertEqual(len(pc), ot_days * times / 2 )
+
+        #6 дней за 2 недели по часу  - добавлено
+        pc=PeriodClients.objects.filter(
+            value=2.25
+        )
+        self.assertEqual(len(pc), ot_days * times / 2)
+
+
+        pc=PeriodClients.objects.filter(
+            value__gt=1
+        ).order_by('dttm_forecast')
         dates = pc.values_list('dttm_forecast', flat=True)
 
         period_days = json.loads(self.ot_weekly.days_in_period)
@@ -111,24 +125,45 @@ class TestOperationTemplate(LocalTestCase):
         pc=PeriodClients.objects.filter(
             value=1
         )
-        self.assertEqual(len(pc), days * 24)
+        self.assertEqual(len(pc), total_days * 18)
+
+        pc=PeriodClients.objects.filter(
+            value=0
+        )
+        self.assertEqual(len(pc), ot_days * 2)
 
     def test_build_period_clients_month(self):
-        dt_from = datetime.now().date() + timedelta(days=5) #  15 дней
-        dt_to = dt_from + timedelta(days=61)
+        total_days = 62
+        times = 5 # периодов в день
+
+        dt_from = datetime.now().date() + timedelta(days=5)
+        dt_to = dt_from + timedelta(days=total_days-1)
+
+        dates = [d for d in self.ot_monthly.generate_dates(dt_from, dt_to)]
+
+        #Количество дней по шаблону за период
+        ot_days = len([d for d in self.ot_monthly.generate_dates(dt_from, dt_to)]) / times
+
 
         self.create_period_clients(dt_from, dt_to)
         pc = PeriodClients.objects.all()
-        self.assertEqual(len(pc), 62 * 24)
+        self.assertEqual(len(pc), total_days * 18 )
 
         # create by operation_template
         utils.build_period_clients(self.ot_monthly, dt_from, dt_to)
-        self.assertEqual(len(PeriodClients.objects.all()), 62 * 24)
-        pc=PeriodClients.objects.filter(
-            value=3.25
-        )
-        dates = pc.values_list('dttm_forecast', flat=True)
+        self.assertEqual(len(PeriodClients.objects.all()), total_days * 18 + ot_days * 2)
 
+
+        pc=PeriodClients.objects.filter(value=3.25)
+        self.assertEqual(len(pc), ot_days * 3 )
+
+
+        pc=PeriodClients.objects.filter(value=2.25)
+        self.assertEqual(len(pc), ot_days * 2 )
+
+
+        pc=PeriodClients.objects.filter(value__gt=1).order_by('dttm_forecast')
+        dates = pc.values_list('dttm_forecast', flat=True)
 
         self.assertTrue(dates[0].day in json.loads(self.ot_monthly.days_in_period))
         self.assertTrue(dates[6].day in json.loads(self.ot_monthly.days_in_period))
@@ -148,4 +183,9 @@ class TestOperationTemplate(LocalTestCase):
         pc=PeriodClients.objects.filter(
             value=1
         )
-        self.assertEqual(len(pc), 62 * 24)
+        self.assertEqual(len(pc), 62 * 18)
+
+        pc=PeriodClients.objects.filter(
+            value=0
+        )
+        self.assertEqual(len(pc), ot_days * 2)
