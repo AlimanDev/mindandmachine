@@ -476,6 +476,35 @@ class OperationType(models.Model):
     )
 
 class OperationTemplate(models.Model):
+    """
+        Шаблоны операций.
+        В соответствии с ними создаются записи в PeriodClients
+        Пример 1:
+        {
+            name: Уборка
+            operation_type_id: 1,
+            tm_start: 10:00:00
+            tm_end: 12:00:00
+            period: W
+            days_in_period: [1,3,5]
+            value: 2.5
+        }
+        В PeriodClients создадутся записи о потребности в двух с половиной людях
+            с 10 до 12 в пн, ср, пт каждую неделю
+
+        Пример 2:
+        {
+            name: Уборка
+            operation_type_id: 1,
+            tm_start: 10:00:00
+            tm_end: 12:00:00
+            period: M
+            days_in_period: [1,3,5,15]
+            value: 1
+        }
+        В PeriodClients создадутся записи о потребности в 1 человеке
+            с 10 до 12 каждый месяц 1,3,5,15 числа
+    """
     class Meta:
         verbose_name = 'Шаблон операций'
         verbose_name_plural = 'Шаблоны операций'
@@ -515,6 +544,7 @@ class OperationTemplate(models.Model):
 
     days_in_period = models.TextField()
 
+    # день до которого заполнен PeriodClients
     dt_built_to = models.DateField(blank=True, null=True)
 
     def check_days_in_period(self):
