@@ -7,6 +7,7 @@ from .utils import build_period_clients
 from src.db.models import (
     OperationTemplate,
     OperationType,
+    Shop
 )
 
 from src.util.utils import JsonResponse, api_method
@@ -18,11 +19,14 @@ from .forms import (
     CreateOperationTemplateForm,
     DeleteOperationTemplateForm,
     UpdateOperationTemplateForm,
+    OperationTemplateForm
 )
 
 
 @api_method('GET', GetOperationTemplatesForm,
-    lambda_func=lambda x: OperationType.objects.get(id=x['operation_type_id']).work_type.shop
+    lambda_func=lambda x:
+        OperationType.objects.get(id=x['operation_type_id']).work_type.shop \
+            if x['operation_type_id'] else Shop.objects.get(id=x['shop_id'])
 )
 def get_operation_templates(request, form):
     """
@@ -52,13 +56,19 @@ def get_operation_templates(request, form):
             }, ...
         ]
     """
+    shop = request.shop
 
     operation_templates = OperationTemplate.objects.filter(
-        # operation_type__work_type__shop_id=form['shop_id'],
-        operation_type_id=form['operation_type_id'],
         dttm_deleted=None,
     )
-
+    if form['operation_type_id']:
+        operation_templates=operation_templates.filter(
+            operation_type_id=form['operation_type_id'],
+        )
+    else:
+        operation_templates=operation_templates.filter(
+            operation_type__work_type__shop_id=shop.id,
+        )
 
     return JsonResponse.success(
         [OperationTemplateConverter.convert(x) for x in operation_templates]
@@ -83,6 +93,9 @@ def create_operation_template(request, form):
         'value': количество человек,
         'period': ежедневно, неделя, месяц,
         'days_in_period': массив с номерами дней в неделе или месяце,
+            [1,7] для недели,
+            [1,31] для месяца.
+            Отсутствующий день в месяце пропускается
         'operation_type_id': id типа операции,
 
     Returns:
@@ -101,18 +114,15 @@ def create_operation_template(request, form):
     """
     operation_type_id = form['operation_type_id']
 
-    try:
-        operation_template = OperationTemplate.objects.create(
-            name=form['name'],
-            tm_start=form['tm_start'],
-            tm_end=form['tm_end'],
-            value=form['value'],
-            period=form['period'],
-            days_in_period=form['days_in_period'],
-            operation_type_id=form['operation_type_id'],
-        )
-    except OperationType.DoesNotExist:
-        return JsonResponse.does_not_exists_error('operation_type does not exist')
+    operation_template = OperationTemplate.objects.create(
+        name=form['name'],
+        tm_start=form['tm_start'],
+        tm_end=form['tm_end'],
+        value=form['value'],
+        period=form['period'],
+        days_in_period=form['days_in_period'],
+        operation_type_id=form['operation_type_id'],
+    )
 
     return JsonResponse.success(
         OperationTemplateConverter.convert(operation_template)
@@ -122,7 +132,7 @@ def create_operation_template(request, form):
 @api_method(
     'POST',
     DeleteOperationTemplateForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
+    lambda_func=lambda x: OperationTemplate.objects.get(id=x['id']).operation_type.work_type.shop
 )
 def delete_operation_template(request, form):
     """
@@ -139,7 +149,7 @@ def delete_operation_template(request, form):
 
     try:
         operation_template = OperationTemplate.objects.get(
-            operation_template_id=form['id'],
+            id=form['id'],
         )
     except OperationTemplate.DoesNotExist:
         return JsonResponse.does_not_exists_error()
@@ -192,10 +202,12 @@ def update_operation_template(request, form):
         JsonResponse.multiple_objects_returned: если вернулось несколько объектов в QuerySet'e
     """
 
+    id = form.pop('id')
+    date_rebuild_from=form.pop('date_rebuild_from')
 
     try:
         operation_template = OperationTemplate.objects.get(
-            id=form['id']
+            id=id
             )
     except OperationTemplate.DoesNotExist:
         return JsonResponse.does_not_exists_error('operation template does not exist')
@@ -210,17 +222,12 @@ def update_operation_template(request, form):
 
         build_period = True
 
-    operation_template.name = form['name']
-    operation_template.value = form['value']
-    operation_template.tm_start = form['tm_start']
-    operation_template.tm_end = form['tm_end']
-    operation_template.period = form['period']
-    operation_template.days_in_period = json.dumps(form['days_in_period'])
-    operation_template.save()
+
+    operation_template = OperationTemplateForm(form, instance=operation_template).save()
 
     if build_period:
         build_period_clients(operation_template,
-                             dt_from=form['date_rebuild_from'])
+                             dt_from=date_rebuild_from)
     return JsonResponse.success(
         OperationTemplateConverter.convert(operation_template)
     )
