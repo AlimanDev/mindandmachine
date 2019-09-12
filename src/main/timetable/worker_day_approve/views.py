@@ -46,8 +46,6 @@ def get_worker_day_approves(request, form):
         ]
     """
     shop = request.shop
-    dt = date(form['year'], form['month'], 1)
-    dt_end = dt + relativedelta(months=1)
     worker_day_approve = WorkerDayApprove.objects.filter(
         shop_id = shop.id
     )
@@ -65,9 +63,9 @@ def get_worker_day_approves(request, form):
         )
 
 
-    return JsonResponse.success(
-        WorkerDayApproveConverter.convert(worker_day_approve)
-    )
+    return JsonResponse.success([
+        WorkerDayApproveConverter.convert(wda) for wda in worker_day_approve
+    ])
 
 @api_method(
     'POST',
@@ -105,7 +103,7 @@ def create_worker_day_approve(request, form):
         workerdaycashboxdetails__work_type__shop_id=form['shop_id'],
         dt__gte=dt,
         dt__lt=dt_end,
-        worker_day_approve_id_isnull=True
+        worker_day_approve_id__isnull=True
     ).update(worker_day_approve=worker_day_approve)
 
 
