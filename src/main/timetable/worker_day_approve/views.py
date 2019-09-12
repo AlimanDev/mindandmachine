@@ -1,10 +1,8 @@
 from django.utils.timezone import now
 
 from dateutil.relativedelta import relativedelta
-from datetime import date, datetime
-import json
+from datetime import date
 
-from .utils import build_period_clients
 from src.db.models import (
     WorkerDay,
     WorkerDayApprove,
@@ -15,10 +13,61 @@ from src.util.models_converter import (
     WorkerDayApproveConverter,
 )
 from .forms import (
+    GetWorkerDayApprovesForm,
     WorkerDayApproveForm,
     DeleteWorkerDayApproveForm,
 )
 
+
+@api_method(
+    'GET',
+    GetWorkerDayApprovesForm,
+)
+def get_worker_day_approves(request, form):
+    """
+    Создает новое подтверждение расписания
+
+    Args:
+        method: POST
+        url: /api/worker_day_approve/get_worker_day_approves
+        'shop_id': id магазина
+        'dt_from' : дата с
+        'dt_to' : дата по
+
+    Returns:
+        [{
+            | 'id': id шаблона,
+            | 'shop_id': название,
+            | 'dt_approved': 1 число подтвежденного месяца,
+            | 'dttm_added': когда добавлено,
+            | 'created_by': кем создан,
+        },
+        ...
+        ]
+    """
+    shop = request.shop
+    dt = date(form['year'], form['month'], 1)
+    dt_end = dt + relativedelta(months=1)
+    worker_day_approve = WorkerDayApprove.objects.filter(
+        shop_id = shop.id
+    )
+    if form['dt_approved']:
+        worker_day_approve = worker_day_approve.filter(
+        dt_approved=form['dt_approved'],
+        )
+    if form['dt_to']:
+        worker_day_approve = worker_day_approve.filter(
+        dttm_added__lte=form['dt_to'],
+        )
+    if form['dt_from']:
+        worker_day_approve = worker_day_approve.filter(
+        dttm_added__gte=form['dt_from'],
+        )
+
+
+    return JsonResponse.success(
+        WorkerDayApproveConverter.convert(worker_day_approve)
+    )
 
 @api_method(
     'POST',
@@ -91,7 +140,7 @@ def delete_worker_day_approve(request, form):
     except WorkerDayApprove.DoesNotExist:
         return JsonResponse.does_not_exists_error()
 
-    worker_day_approve.dttm_deleted = datetime.now()
+    worker_day_approve.dttm_deleted = now()
     worker_day_approve.save()
 
     WorkerDay.objects.filter(
@@ -99,4 +148,3 @@ def delete_worker_day_approve(request, form):
     ).update(worker_day_approve=None)
 
     return JsonResponse.success()
-

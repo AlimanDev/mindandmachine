@@ -285,6 +285,7 @@ class FunctionGroup(models.Model):
     )
 
     FUNCS = (
+        'get_worker_day_approves',
         'create_worker_day_approve',
         'delete_worker_day_approve',
         'get_cashboxes_open_time',
@@ -406,7 +407,7 @@ class WorkerDayApprove(models.Model):
         )
 
     id = models.BigAutoField(primary_key=True)
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo delete this by cashbox_type
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True)
     dt_approved = models.DateField()
     dttm_added = models.DateTimeField(auto_now_add=True)
