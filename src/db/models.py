@@ -390,6 +390,11 @@ class FunctionGroup(models.Model):
 
 
 class WorkerDayApprove(models.Model):
+    """
+        Подтверждение расписания на месяц
+        Временная отметка, привязанная к магазину, которая
+            подтверждает все workerday за указанный месяц
+    """
     class Meta:
         verbose_name = 'Подверждение расписания'
         verbose_name_plural = 'Подтверждения расписания'
