@@ -30,7 +30,7 @@ from .forms import (
 )
 def get_operation_templates(request, form):
     """
-    Возвращает список шаблонов операций для заданных в operation_types_ids типов
+    Возвращает список шаблонов операций для shop_id или operation_type_id
 
     Args:
         method: GET
@@ -112,7 +112,6 @@ def create_operation_template(request, form):
             | 'dttm_deleted': ,
         }
     """
-    operation_type_id = form['operation_type_id']
 
     operation_template = OperationTemplate.objects.create(
         name=form['name'],
@@ -147,12 +146,9 @@ def delete_operation_template(request, form):
 
     """
 
-    try:
-        operation_template = OperationTemplate.objects.get(
-            id=form['id'],
-        )
-    except OperationTemplate.DoesNotExist:
-        return JsonResponse.does_not_exists_error()
+    operation_template = OperationTemplate.objects.get(
+        id=form['id'],
+    )
 
     operation_template.dttm_deleted = datetime.now()
     operation_template.save()

@@ -19,7 +19,7 @@ class OperationTemplateForm(forms.ModelForm):
 
 
 class CreateOperationTemplateForm(OperationTemplateForm):
-    operation_type_id = forms.IntegerField(required=False)
+    operation_type_id = forms.IntegerField(required=True)
 
 
 class UpdateOperationTemplateForm(OperationTemplateForm):

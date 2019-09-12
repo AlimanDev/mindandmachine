@@ -37,8 +37,9 @@ from src.db.models import (
 
 
 def build_period_clients(operation_template, dt_from=None, dt_to=None, operation='create'):
-    """
-        Создает потребность в PeriodClients в соответствии с шаблоном.
+    """ При operation='create' создает потребность в PeriodClients
+            в соответствии с шаблоном.
+        При operation='delete' - удаляет
         По умолчанию на 62 дня вперед, начиная с послезавтра
     """
     dt_min = now().date() + timedelta(days = 2)
@@ -56,7 +57,7 @@ def build_period_clients(operation_template, dt_from=None, dt_to=None, operation
     if not dt_from:
         dt_from = dt_min
 
-
+    # Добавить транзакцию
     period_clients = PeriodClients.objects.filter(
         operation_type=operation_template.operation_type,
         dttm_forecast__gte=dt_from,
@@ -75,6 +76,9 @@ def build_period_clients(operation_template, dt_from=None, dt_to=None, operation
     updates = []
     creates = []
 
+    # Ищем нужные нам интервалы в period clients.
+    # Найденным записям увеличиваем значение по шаблону.
+    # Если не нашли - создаем новую запись
     for date in operation_template.generate_dates(dt_from, dt_to):
         while period and period.dttm_forecast < date:
             period = next(period_clients, None)
