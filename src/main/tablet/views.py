@@ -312,7 +312,7 @@ def get_cashiers_info(request, form):
 @api_method(
     'POST',
     ChangeCashierStatus,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+    lambda_func=lambda x: User.objects.get(id=x['worker_id']).shop
 )
 def change_cashier_status(request, form):
     """
@@ -448,4 +448,3 @@ def change_cashier_status(request, form):
             "cashbox_id": None if wdcd is None else wdcd.on_cashbox_id
         }
     })
-

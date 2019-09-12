@@ -15,8 +15,8 @@ class TestTablet(LocalTestCase):
         response = self.api_get('/api/tablet/get_cashboxes_info?shop_id=1')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
-        self.assertEqual(response.json['data']['1']['with_queue'], True)
-        self.assertEqual(response.json['data']['1']['cashbox'][0]['number'], 1)
+        self.assertEqual(response.json['data']['2']['with_queue'], True)
+        self.assertEqual(response.json['data']['2']['cashbox'][0]['number'], 2)
         # {'number': 1, 'cashbox_id': 1, 'status': 'C', 'queue': None, 'user_id': None}
         # self.assertEqual(response.json['data']['1']['cashbox'][0]['status'], 'O')
         # self.assertEqual(response.json['data']['1']['cashbox'][0]['queue'], 5.5)
@@ -28,7 +28,7 @@ class TestTablet(LocalTestCase):
                                 .format(BaseConverter.convert_datetime(now() + datetime.timedelta(hours=3))))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
-        self.assertEqual(response.json['data']['1']['worker_id'], 1)
+        self.assertEqual(response.json['data']['2']['worker_id'], 2)
         # Ошибка в status = T
         # self.assertEqual(response.json['data']['1']['status'], 'W')
 
@@ -56,7 +56,7 @@ class TestTablet(LocalTestCase):
         self.auth()
 
         response = self.api_post('/api/tablet/change_cashier_status', {
-            'worker_id': self.user1.id,
+            'worker_id': self.user2.id,
             'status': WorkerDayCashboxDetails.TYPE_WORK,
             'cashbox_id': self.cashbox1.id,
         })
@@ -69,13 +69,13 @@ class TestTablet(LocalTestCase):
                                 .format(BaseConverter.convert_datetime(now() + datetime.timedelta(hours=3))))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
-        self.assertEqual(response.json['data']['1']['worker_id'], 1)
-        self.assertEqual(response.json['data']['1']['status'], 'W')
+        self.assertEqual(response.json['data']['2']['worker_id'], 2)
+        self.assertEqual(response.json['data']['2']['status'], 'W')
 
         response = self.api_get('/api/tablet/get_cashboxes_info?shop_id=1')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
-        self.assertEqual(response.json['data']['1']['cashbox'][0]['status'], 'O')
+        self.assertEqual(response.json['data']['2']['cashbox'][0]['status'], 'C')
 
         api_change_cashier_status(worker_id=self.user2.id, status=WorkerDayCashboxDetails.TYPE_WORK,
                                   cashbox_id=self.cashbox2.id)

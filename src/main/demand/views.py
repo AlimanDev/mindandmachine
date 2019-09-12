@@ -24,10 +24,11 @@ from .forms import (
     CreatePredictBillsRequestForm,
     GetDemandChangeLogsForm,
     GetVisitorsInfoForm,
+    SetPredictBillsForm,
 )
 from .utils import create_predbills_request_function
-from src.util.forms import FormUtil
 from django.apps import apps
+import json
 
 
 @api_method('GET', GetIndicatorsForm)
@@ -132,17 +133,16 @@ def get_forecast(request, form):
 
     operation_type_ids = form['operation_type_ids']
 
-    shop_id = FormUtil.get_shop_id(request, form)
-    shop = Shop.objects.get(id=shop_id)
+    shop = request.shop
 
     period_clients = PeriodClients.objects.select_related('operation_type__work_type').filter(
-        operation_type__work_type__shop_id=shop_id
+        operation_type__work_type__shop_id=shop.id
     )
     period_products = PeriodProducts.objects.select_related('operation_type__work_type').filter(
-        operation_type__work_type__shop_id=shop_id
+        operation_type__work_type__shop_id=shop.id
     )
     period_queues = PeriodQueues.objects.select_related('operation_type__work_type').filter(
-        operation_type__work_type__shop_id=shop_id
+        operation_type__work_type__shop_id=shop.id
     )
 
     if len(operation_type_ids) > 0:
@@ -192,7 +192,6 @@ def get_forecast(request, form):
 @api_method(
     'POST',
     SetDemandForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
 )
 def set_demand(request, form):
     """
@@ -214,7 +213,7 @@ def set_demand(request, form):
     dttm_to = form['to_dttm']
     multiply_coef = form.get('multiply_coef')
     set_value = form.get('set_value')
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = request.shop.id
 
     if not len(work_type_ids):
         work_type_ids = WorkType.objects.qos_filter_active(
@@ -371,18 +370,15 @@ def create_predbills_request(request, form):
     Raises:
         JsonResponse.internal_error: если произошла ошибка при создании request'a
     """
-    shop_id = FormUtil.get_shop_id(request, form)
     dt = form['dt']
 
-    result = create_predbills_request_function(shop_id, dt)
+    result = create_predbills_request_function(request.shop.id, dt)
 
     return JsonResponse.success() if result is True else result
 
 
-# @csrf_exempt
-# @api_method('POST', SetPredictBillsForm, auth_required=False, check_permissions=False)
-@outer_server(is_camera=False, decode_body=False)
-def set_pred_bills(request, data):
+@api_method('POST', SetPredictBillsForm, check_permissions=False)
+def set_pred_bills(request, form):
     """
     ждет request'a от qos_algo. когда получает, записывает данные из data в базу данных
 
@@ -407,6 +403,11 @@ def set_pred_bills(request, data):
         if commit:
             PeriodClients.objects.bulk_create(lst)
             lst[:] = []
+
+    try:
+        data = json.loads(form['data'])
+    except:
+        return JsonResponse.internal_error('cannot parse json')
 
     shop = Shop.objects.get(id=data['shop_id'])
     dt_from = BaseConverter.parse_date(data['dt_from'])

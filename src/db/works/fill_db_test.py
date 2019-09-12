@@ -9,7 +9,6 @@ from dateutil.relativedelta import relativedelta
 from src.db.models import (
     ExchangeSettings,
     Event,
-    SuperShop,
     Shop,
     User,
     PeriodClients,
@@ -32,15 +31,14 @@ from src.util.models_converter import (
 )
 
 
-def create_shop(shop_ind):
-    supershop = SuperShop.objects.create(title='Магазин № {}'.format(shop_ind))
+def create_shop(shop_id):
     shop = Shop.objects.create(
-        super_shop=supershop,
+        parent_id=shop_id,
         title='department №1',
         forecast_step_minutes=time(minute=30),
         break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]]]'
     )
-    return supershop, shop
+    return shop
 
 
 def create_timetable(shop_id, dttm):
@@ -377,8 +375,11 @@ def main(date=None, shops=None):
     demand_days = (predict_date - start_date).days + 1
     # print(start_date, end_date, predict_date, worker_days, demand_days)
 
+    root_shop = Shop.objects.create(title='Корневой магазин')
+    parent_shop1 = Shop.objects.create(title='Супер Магазин № 1', parent = root_shop)
+    parent_shop2 = Shop.objects.create(title='Супер Магазин № 2', parent = root_shop)
     for shop_ind, shop_size in enumerate(shops, start=1):
-        supershop, shop = create_shop(shop_ind)
+        shop = create_shop(parent_shop1.id)
         work_types_dict = create_work_types(data['work_types'], shop)
         create_forecast(data['demand'], work_types_dict, start_date, demand_days)
         create_users_workdays(data['cashiers'], work_types_dict, start_date, worker_days, shop, shop_size)
@@ -391,7 +392,7 @@ def main(date=None, shops=None):
     dttm_prev = dttm_curr - relativedelta(months=1)
     create_notifications()
     for shop_ind in range(4, 2000):
-        supershop, shop = create_shop(shop_ind)
+        shop = create_shop(parent_shop2.id)
         shop_id = shop.id
         create_timetable(shop_id, dttm_curr)
         create_timetable(shop_id, dttm_prev)

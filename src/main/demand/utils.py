@@ -94,7 +94,7 @@ def create_predbills_request_function(shop_id, dt=None):
         dt__lte=dt_to,
     )
 
-    shop = Shop.objects.select_related('super_shop').filter(id=shop_id).first()
+    shop = Shop.objects.filter(id=shop_id).first()
 
     period_clients = PeriodClients.objects.select_related('operation_type__work_type__shop').filter(
         operation_type__work_type__shop_id=shop_id,
@@ -162,7 +162,3 @@ def create_predbills_request_function(shop_id, dt=None):
     if task_id is None:
         return JsonResponse.algo_internal_error('Ошибка при создании задачи на исполненение.')
     return True
-
-
-
-

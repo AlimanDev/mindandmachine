@@ -13,6 +13,7 @@ class TestNotifications(LocalTestCase):
                 text='Test event #{}'.format(number)
             )
             Notifications.objects.create(
+                id=number,
                 to_worker=self.user1,
                 event=event
             )
@@ -22,6 +23,7 @@ class TestNotifications(LocalTestCase):
                 text='Test event #{}'.format(number)
             )
             Notifications.objects.create(
+                id=number,
                 to_worker=self.user1,
                 event=event,
                 was_read=True
@@ -51,6 +53,7 @@ class TestNotifications(LocalTestCase):
         )
 
         Notifications.objects.create(
+            id=11,
             event=event,
             to_worker=self.user1,
         )
@@ -110,5 +113,5 @@ class TestNotifications(LocalTestCase):
         self.auth()
 
         self.assertEqual(WorkerDayCashboxDetails.objects.get(pk=self.wdcd.id).worker_day, None)
-        response = self.api_post('/api/other/notifications/do_notify_action', {'notify_id': 21})
+        response = self.api_post('/api/other/notifications/do_notify_action', {'notify_id': 11})
         self.assertEqual(WorkerDayCashboxDetails.objects.get(pk=self.wdcd.id).worker_day.worker.id, 1)
