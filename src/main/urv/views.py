@@ -1,23 +1,24 @@
+from datetime import timedelta
+import functools
+
+from django.db.models import Q
+from django.core.paginator import Paginator, EmptyPage
+
 from src.db.models import (
     User,
     AttendanceRecords,
     # UserIdentifier,
-    Shop
+    Shop,
+    WorkerDay
 )
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import AttendanceRecordsConverter
+from src.util.forms import FormUtil
 from .forms import GetUserUrvForm, ChangeAttendanceForm
-from django.db.models import Q
-import functools
-from django.core.paginator import Paginator, EmptyPage
+from .utils import get_queryset
 
 
-@api_method(
-    'GET',
-    GetUserUrvForm,
-    # check_permissions=False,
-    # lambda_func=None,  # lambda x: User.objects.get(id=x['worker_ids'][0])
-)
+@api_method('GET', GetUserUrvForm)
 def get_user_urv(request, form):
     """
 
@@ -32,61 +33,11 @@ def get_user_urv(request, form):
     Returns:
         {}
     """
-    worker_ids = form['worker_ids']
-    from_dt = form['from_dt']
-    to_dt = form['to_dt']
-    offset = form['offset'] if form['offset'] else 1
+
     amount_per_page = form['amount_per_page'] if form['amount_per_page'] else 50
+    offset = form['offset'] if form['offset'] else 1
 
-    # if not len(worker_ids):
-    #     worker_ids = list(User.objects.qos_filter_active(
-    #         to_dt,
-    #         from_dt,
-    #         shop_id=request.user.shop_id
-    #     ).values_list('id', flat=True))
-
-
-    user_records = AttendanceRecords.objects.filter(
-        dttm__date__gte=from_dt,
-        dttm__date__lte=to_dt,
-        shop_id=form['shop_id'],
-    )
-
-    if len(worker_ids):
-        user_records = user_records.filter(
-            Q(user_id__in=worker_ids) |
-            Q(user_id__isnull=True) |
-            Q(user__attachment_group=User.GROUP_OUTSOURCE)
-        )
-    if form['from_tm']:
-        user_records = user_records.filter(dttm__time__gte=form['from_tm'])
-    if form['to_tm']:
-        user_records = user_records.filter(dttm__time__lte=form['to_tm'])
-    if form['type']:
-        user_records = user_records.filter(type=form['type'])
-
-    select_not_verified = False
-    select_not_detected = False
-    select_workers = False
-    select_outstaff = False
-
-    if form['show_not_verified']:
-        select_not_verified = Q(verified=False)
-
-    if form['show_not_detected']:
-        select_not_detected = Q(user_id__isnull=True)
-
-    if form['show_workers']:
-        select_workers = Q(user__attachment_group=User.GROUP_STAFF)
-
-    if form['show_outstaff']:
-        select_outstaff = Q(user__attachment_group=User.GROUP_OUTSOURCE)
-
-    extra_filters = list(filter(lambda x: x, [select_not_verified, select_not_detected, select_workers, select_outstaff]))
-    if len(extra_filters):
-        extra_filters = functools.reduce(lambda x, y: x | y, extra_filters)
-        user_records = user_records.filter(extra_filters)
-
+    user_records = get_queryset(request, form)
     user_records = user_records.order_by('-dttm')
 
     paginator = Paginator(user_records, amount_per_page)
@@ -105,43 +56,103 @@ def get_user_urv(request, form):
     ], info)
 
 
-@api_method(
-    'POST',
-    ChangeAttendanceForm,
-    # check_permissions=False,
-    # lambda_func=None,  # lambda x: User.objects.get(id=x['worker_ids'][0])
-)
-def change_user_urv(request, form):
-    return JsonResponse.success()
-    # if not form['to_user_id'] and not form['is_outsource']:
-    #     return JsonResponse.value_error('Выберите, пожалуйста, либо сотрудника, либо вариант аутсорса.')
-    #
-    # identifier = UserIdentifier.objects.get(attendancerecords__id=form['attendance_id'])
-    #
-    # if form['is_outsource']:
-    #     dt = timezone.now().date()
-    #     outsourcer_number = User.objects.filter(
-    #         attachment_group=User.GROUP_OUTSOURCE,
-    #         dt_hired=dt,
-    #         dt_fired=dt,
-    #     ).count()
-    #     user = User.objects.create(
-    #         shop_id=request.user.shop_id,
-    #         attachment_group=User.GROUP_OUTSOURCE,
-    #         first_name='№{}'.format(outsourcer_number + 1),
-    #         last_name='Наемный сотрудник',
-    #         dt_hired=dt,
-    #         dt_fired=dt,
-    #         salary=0,
-    #         username='outsourcer_{}_{}'.format(dt, outsourcer_number + 1),
-    #         auto_timetable=False
-    #     )
-    # else:
-    #     user = User.objects.get(
-    #         id=form['to_user_id'],
-    #         shop_id=request.user.shop_id,
-    #     )
-    #
-    # identifier.worker = user
-    # identifier.save()
-    # return JsonResponse.success()
+@api_method('GET', GetUserUrvForm)
+def get_indicators(request, form):
+    """
+
+    Args:
+         method: GET
+         url: /urv/get_indicators
+         worker_ids(list): список айдишников юзеров, для которых выгружать
+         from_dt(QOS_DATE): с какого числа выгружать данные
+         to_dt(QOS_DATE): по какое
+         offset(int): смещение по страницам (по дефолту первая)
+         amount_per_page(int): количество результатов на с траницу (по умолчанию 50)
+         from_tm: время с
+         to_tm: время по
+         shop_id: id магазина
+         show_outstaff
+         show_workers
+         show_not_verified
+         show_not_detected
+    """
+    ticks = get_queryset(request, form)
+    from_dt = form['from_dt']
+    to_dt = form['to_dt']
+    worker_ids = form['worker_ids']
+
+    checkpoint = FormUtil.get_checkpoint(form)
+    worker_days = WorkerDay.objects.qos_filter_version(checkpoint).filter(
+        dt__gte=from_dt,
+        dt__lte=to_dt,
+        worker__shop_id=form['shop_id'],
+        type=WorkerDay.Type.TYPE_WORKDAY.value
+    )
+    if len(worker_ids):
+        worker_days = worker_days.filter(
+            worker_id__in=worker_ids,
+        )
+    if form['from_tm']:
+        worker_days = worker_days.filter(dttm_work_start__time__gte=form['from_tm'])
+    if form['to_tm']:
+        worker_days = worker_days.filter(dttm_work_end__time__lte=form['to_tm'])
+
+    select_not_verified = False
+    select_not_detected = False
+    select_workers = False
+    select_outstaff = False
+
+    if form['show_workers']:
+        select_workers = Q(worker__attachment_group=User.GROUP_STAFF)
+
+    if form['show_outstaff']:
+        select_outstaff = Q(worker__attachment_group=User.GROUP_OUTSOURCE)
+
+    extra_filters = list(filter(lambda x: x, [select_workers, select_outstaff]))
+    if len(extra_filters):
+        extra_filters = functools.reduce(lambda x, y: x | y, extra_filters)
+        worker_days = worker_days.filter(extra_filters)
+
+
+    ticks_count_plan = worker_days.count()
+    if not form['type']:
+        ticks_count_plan *= 2
+
+    hours_count_plan = timedelta(hours=0)
+    hours_count_fact = timedelta(hours=0)
+
+    for wd in worker_days:
+        if wd.dttm_work_end and wd.dttm_work_start:
+            hours_count_plan += wd.dttm_work_end - wd.dttm_work_start
+
+    stat = {}
+    for tick in ticks:
+        dt = tick.dttm.date()
+        if tick.user_id not in stat:
+            stat[tick.user_id] = {}
+        if dt not in stat[tick.user_id]:
+            stat[tick.user_id][dt] = {
+                AttendanceRecords.TYPE_COMING: [],
+                AttendanceRecords.TYPE_LEAVING: []
+            }
+        if tick.type not in stat[tick.user_id][dt]:
+            continue
+        stat[tick.user_id][dt][tick.type].append(tick.dttm)
+
+    for v in stat.values():
+        for type_dict in v.values():
+            dttm_come = min(type_dict[AttendanceRecords.TYPE_COMING])
+            dttm_leave = max(type_dict[AttendanceRecords.TYPE_LEAVING])
+            if dttm_come is None or  dttm_leave is None or dttm_leave < dttm_come:
+                continue
+
+            hours_count_fact += dttm_leave - dttm_come
+
+    indicators = {
+        'ticks_count_fact': ticks.count(),
+        'ticks_count_plan': ticks_count_plan,
+        'hours_count_plan': hours_count_plan.total_seconds() / 3600,
+        'hours_count_fact': hours_count_fact.total_seconds() / 3600,
+    }
+    return JsonResponse.success(indicators)
+
