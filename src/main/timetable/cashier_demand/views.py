@@ -183,6 +183,7 @@ def get_cashiers_timetable(request, form):
                 | 'change_amounut'(int): количество изменений в графике,
                 | 'deadtime_part'(float): доля простоя,
                 | 'need_cashier_amount'(int): сколько еще нужно кассиров в этот период
+                | 'hours_count_fact'(int): кол-во по факту отработанных часов
             },\n
             'period_step'(int): 30,\n
             'tt_periods': {

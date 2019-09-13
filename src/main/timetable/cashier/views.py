@@ -4,7 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 import json
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
 from django.utils import timezone
-
+from src.main.urv.utils import working_hours_count
 from src.db.models import (
     AttendanceRecords,
     User,
@@ -390,7 +390,7 @@ def get_cashier_timetable(request, form):
             'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and
                                                                         x.dt in official_holidays),
             'change_amount': len(worker_day_change_log),
-            'tick_count': ticks.count()
+            'hours_count_fact': working_hours_count(ticks)
         }
 
         days_response = []
