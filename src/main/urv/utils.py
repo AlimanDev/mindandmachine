@@ -5,7 +5,7 @@ from src.db.models import (
 
 import functools
 from django.db.models import Q
-
+from datetime import timedelta
 def get_queryset(request, form):
     worker_ids = form['worker_ids']
     from_dt = form['from_dt']
@@ -53,3 +53,33 @@ def get_queryset(request, form):
         user_records = user_records.filter(extra_filters)
 
     return user_records
+
+
+
+def working_hours_count(ticks):
+    hours_count_fact = timedelta(hours=0)
+
+    stat = {}
+    for tick in ticks:
+        dt = tick.dttm.date()
+        if tick.user_id not in stat:
+            stat[tick.user_id] = {}
+        if dt not in stat[tick.user_id]:
+            stat[tick.user_id][dt] = {
+                AttendanceRecords.TYPE_COMING: [],
+                AttendanceRecords.TYPE_LEAVING: []
+            }
+        if tick.type not in stat[tick.user_id][dt]:
+            continue
+        stat[tick.user_id][dt][tick.type].append(tick.dttm)
+
+    for v in stat.values():
+        for type_dict in v.values():
+            dttm_come = min(type_dict[AttendanceRecords.TYPE_COMING])
+            dttm_leave = max(type_dict[AttendanceRecords.TYPE_LEAVING])
+            if dttm_come is None or  dttm_leave is None or dttm_leave < dttm_come:
+                continue
+
+            hours_count_fact += dttm_leave - dttm_come
+
+    return hours_count_fact.total_seconds() / 3600

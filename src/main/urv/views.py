@@ -15,7 +15,7 @@ from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import AttendanceRecordsConverter
 from src.util.forms import FormUtil
 from .forms import GetUserUrvForm, ChangeAttendanceForm
-from .utils import get_queryset
+from .utils import get_queryset, working_hours_count
 
 
 @api_method('GET', GetUserUrvForm)
@@ -119,40 +119,16 @@ def get_indicators(request, form):
         ticks_count_plan *= 2
 
     hours_count_plan = timedelta(hours=0)
-    hours_count_fact = timedelta(hours=0)
-
     for wd in worker_days:
         if wd.dttm_work_end and wd.dttm_work_start:
             hours_count_plan += wd.dttm_work_end - wd.dttm_work_start
-
-    stat = {}
-    for tick in ticks:
-        dt = tick.dttm.date()
-        if tick.user_id not in stat:
-            stat[tick.user_id] = {}
-        if dt not in stat[tick.user_id]:
-            stat[tick.user_id][dt] = {
-                AttendanceRecords.TYPE_COMING: [],
-                AttendanceRecords.TYPE_LEAVING: []
-            }
-        if tick.type not in stat[tick.user_id][dt]:
-            continue
-        stat[tick.user_id][dt][tick.type].append(tick.dttm)
-
-    for v in stat.values():
-        for type_dict in v.values():
-            dttm_come = min(type_dict[AttendanceRecords.TYPE_COMING])
-            dttm_leave = max(type_dict[AttendanceRecords.TYPE_LEAVING])
-            if dttm_come is None or  dttm_leave is None or dttm_leave < dttm_come:
-                continue
-
-            hours_count_fact += dttm_leave - dttm_come
 
     indicators = {
         'ticks_count_fact': ticks.count(),
         'ticks_count_plan': ticks_count_plan,
         'hours_count_plan': hours_count_plan.total_seconds() / 3600,
-        'hours_count_fact': hours_count_fact.total_seconds() / 3600,
+        'hours_count_fact': working_hours_count(ticks)
     }
+
     return JsonResponse.success(indicators)
 
