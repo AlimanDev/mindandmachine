@@ -213,17 +213,14 @@ def update_operation_template(request, form):
         and (operation_template.value != form['value'] \
              or operation_template.period != form['period'] \
              or operation_template.days_in_period != form['days_in_period']):
-        build_period_clients(operation_template,
-                              dt_from=form['date_rebuild_from'], operation='delete')
+        build_period_clients(operation_template, dt_from=form['date_rebuild_from'], operation='delete')
 
         build_period = True
-
 
     operation_template = OperationTemplateForm(form, instance=operation_template).save()
 
     if build_period:
-        build_period_clients(operation_template,
-                             dt_from=date_rebuild_from)
+        build_period_clients(operation_template, dt_from=date_rebuild_from)
     return JsonResponse.success(
         OperationTemplateConverter.convert(operation_template)
     )

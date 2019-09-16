@@ -48,8 +48,7 @@ def build_period_clients(operation_template, dt_from=None, dt_to=None, operation
         dt_to = dt_min + timedelta(days=62)
 
     if operation_template.dt_built_to:
-        if (not dt_from \
-            or dt_from > operation_template.dt_built_to):
+        if not dt_from or dt_from > operation_template.dt_built_to:
             dt_from = operation_template.dt_built_to + timedelta(days=1)
         if dt_to < operation_template.dt_built_to:
             dt_to = operation_template.dt_built_to
@@ -62,8 +61,9 @@ def build_period_clients(operation_template, dt_from=None, dt_to=None, operation
         operation_type=operation_template.operation_type,
         dttm_forecast__gte=dt_from,
         dttm_forecast__lte=dt_to,
-        ).order_by(
-        'dttm_forecast')
+    ).order_by(
+        'dttm_forecast'
+    )
     period_clients = period_clients.iterator()
     try:
         period = next(period_clients)
