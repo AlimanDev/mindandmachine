@@ -75,9 +75,11 @@ def working_hours_count(ticks):
 
     for v in stat.values():
         for type_dict in v.values():
+            if not type_dict[AttendanceRecords.TYPE_COMING] or not type_dict[AttendanceRecords.TYPE_LEAVING]:
+                continue
             dttm_come = min(type_dict[AttendanceRecords.TYPE_COMING])
             dttm_leave = max(type_dict[AttendanceRecords.TYPE_LEAVING])
-            if dttm_come is None or  dttm_leave is None or dttm_leave < dttm_come:
+            if  dttm_leave < dttm_come:
                 continue
 
             hours_count_fact += dttm_leave - dttm_come
