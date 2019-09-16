@@ -123,12 +123,16 @@ def get_indicators(request, form):
         if wd.dttm_work_end and wd.dttm_work_start:
             hours_count_plan += wd.dttm_work_end - wd.dttm_work_start
 
+    ticks_coming_count = ticks.filter(type=AttendanceRecords.TYPE_COMING).count()
+    ticks_leaving_count = ticks.filter(type=AttendanceRecords.TYPE_LEAVING).count()
+
     indicators = {
-        'ticks_count_fact': ticks.count(),
+        'ticks_coming_count_fact': ticks_coming_count,
+        'ticks_leaving_count_fact': ticks_leaving_count,
+        'ticks_count_fact': ticks_coming_count + ticks_leaving_count,
         'ticks_count_plan': ticks_count_plan,
         'hours_count_plan': hours_count_plan.total_seconds() / 3600,
         'hours_count_fact': working_hours_count(ticks)
     }
 
     return JsonResponse.success(indicators)
-
