@@ -79,6 +79,8 @@ def stat_count(ticks):
 
     for dt_type in user_dt_type.values():
         for type_dttm in dt_type.values():
+            dttm_come = None
+            dttm_leave = None
             if type_dttm[AttendanceRecords.TYPE_COMING]:
                 stat['ticks_coming_count'] += 1
                 dttm_come = min(type_dttm[AttendanceRecords.TYPE_COMING])
