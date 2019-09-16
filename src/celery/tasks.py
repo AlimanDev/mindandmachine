@@ -60,7 +60,12 @@ def op_type_build_period_clients():
     dt_from = now().date() + timedelta(days = 2)
     dt_to = dt_from + timedelta(days=62)
 
-    for ot in OperationTemplate.objects.filter(Q(dt_built_to__isnull=True) | Q(dt_built_to__lt=dt_to)):
+    oper_templates = OperationTemplate.objects.filter(
+        Q(dt_built_to__isnull=True) | Q(dt_built_to__lt=dt_to),
+        dttm_deleted__isnull=True,
+    )
+
+    for ot in oper_templates:
         build_period_clients(ot, dt_to=dt_to)
 
 

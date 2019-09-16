@@ -35,6 +35,7 @@ from src.db.models import (
     AttendanceRecords,
     ExchangeSettings,
     Event,
+    OperationTemplate,
 )
 
 
@@ -410,4 +411,11 @@ class ExchangeSettingsAdmin(admin.ModelAdmin):
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
     pass
+
+
+@admin.register(OperationTemplate)
+class OperationTemplateAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'operation_type')
+    list_filter = ('operation_type', )
+    search_fields = ('name',)
 

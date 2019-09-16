@@ -42,7 +42,7 @@ def build_period_clients(operation_template, dt_from=None, dt_to=None, operation
         При operation='delete' - удаляет
         По умолчанию на 62 дня вперед, начиная с послезавтра
     """
-    dt_min = now().date() + timedelta(days = 2)
+    dt_min = now().date() + timedelta(days=2)
 
     if not dt_to:
         dt_to = dt_min + timedelta(days=62)

@@ -153,6 +153,9 @@ def delete_operation_template(request, form):
     operation_template.dttm_deleted = datetime.now()
     operation_template.save()
 
+    dt_from = now().date() + timedelta(days=2)
+    build_period_clients(operation_template, dt_from=dt_from, operation='delete')
+
     return JsonResponse.success()
 
 
