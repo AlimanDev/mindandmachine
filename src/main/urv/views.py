@@ -15,7 +15,7 @@ from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import AttendanceRecordsConverter
 from src.util.forms import FormUtil
 from .forms import GetUserUrvForm, ChangeAttendanceForm
-from .utils import get_queryset, working_hours_count
+from .utils import get_queryset, stat_count
 
 
 @api_method('GET', GetUserUrvForm)
@@ -123,16 +123,18 @@ def get_indicators(request, form):
         if wd.dttm_work_end and wd.dttm_work_start:
             hours_count_plan += wd.dttm_work_end - wd.dttm_work_start
 
-    ticks_coming_count = ticks.filter(type=AttendanceRecords.TYPE_COMING).count()
-    ticks_leaving_count = ticks.filter(type=AttendanceRecords.TYPE_LEAVING).count()
 
+    # ticks_coming_count = ticks.filter(type=AttendanceRecords.TYPE_COMING).distinct('dttm__date','user_id').count()
+    # ticks_leaving_count = ticks.filter(type=AttendanceRecords.TYPE_LEAVING).distinct('dttm__date','user_id').count()
+
+    stat = stat_count(ticks)
     indicators = {
-        'ticks_coming_count_fact': ticks_coming_count,
-        'ticks_leaving_count_fact': ticks_leaving_count,
-        'ticks_count_fact': ticks_coming_count + ticks_leaving_count,
+        'ticks_coming_count_fact': stat['ticks_coming_count'],
+        'ticks_leaving_count_fact': stat['ticks_leaving_count'],
+        'ticks_count_fact': stat['ticks_coming_count'] + stat['ticks_leaving_count'],
+        'hours_count_fact': stat['hours_count'],
         'ticks_count_plan': ticks_count_plan,
         'hours_count_plan': hours_count_plan.total_seconds() / 3600,
-        'hours_count_fact': working_hours_count(ticks)
     }
 
     return JsonResponse.success(indicators)

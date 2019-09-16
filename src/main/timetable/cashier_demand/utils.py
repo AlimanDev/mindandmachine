@@ -21,7 +21,7 @@ from src.db.models import (
 from src.util.collection import group_by
 from src.util.models_converter import BaseConverter
 from src.main.timetable.table.utils import count_work_month_stats
-from src.main.urv.utils import working_hours_count
+from src.main.urv.utils import stat_count
 from ..utils import dttm_combine
 
 
@@ -322,7 +322,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
             'total_need': predict_needs.sum(),
             'total_go': finite_work.sum(),
             'total_plan': shop.staff_number * norm_work_hours,
-            'hours_count_fact': working_hours_count(ticks)
+            'hours_count_fact': stat_count(ticks)['hours_count']
         },
     })
     return response

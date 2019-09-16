@@ -56,32 +56,38 @@ def get_queryset(request, form):
 
 
 
-def working_hours_count(ticks):
-    hours_count_fact = timedelta(hours=0)
+def stat_count(ticks):
+    stat = {
+        'hours_count': timedelta(hours=0),
+        'ticks_coming_count': 0,
+        'ticks_leaving_count': 0,
+    }
 
-    stat = {}
+    user_dt_type = {}
     for tick in ticks:
         dt = tick.dttm.date()
-        if tick.user_id not in stat:
-            stat[tick.user_id] = {}
-        if dt not in stat[tick.user_id]:
-            stat[tick.user_id][dt] = {
+        if tick.user_id not in user_dt_type:
+            user_dt_type[tick.user_id] = {}
+        if dt not in user_dt_type[tick.user_id]:
+            user_dt_type[tick.user_id][dt] = {
                 AttendanceRecords.TYPE_COMING: [],
                 AttendanceRecords.TYPE_LEAVING: []
             }
-        if tick.type not in stat[tick.user_id][dt]:
+        if tick.type not in user_dt_type[tick.user_id][dt]:
             continue
-        stat[tick.user_id][dt][tick.type].append(tick.dttm)
+        user_dt_type[tick.user_id][dt][tick.type].append(tick.dttm)
 
-    for v in stat.values():
-        for type_dict in v.values():
-            if not type_dict[AttendanceRecords.TYPE_COMING] or not type_dict[AttendanceRecords.TYPE_LEAVING]:
-                continue
-            dttm_come = min(type_dict[AttendanceRecords.TYPE_COMING])
-            dttm_leave = max(type_dict[AttendanceRecords.TYPE_LEAVING])
-            if  dttm_leave < dttm_come:
-                continue
+    for dt_type in user_dt_type.values():
+        for type_dttm in dt_type.values():
+            if type_dttm[AttendanceRecords.TYPE_COMING]:
+                stat['ticks_coming_count'] += 1
+                dttm_come = min(type_dttm[AttendanceRecords.TYPE_COMING])
 
-            hours_count_fact += dttm_leave - dttm_come
+            if type_dttm[AttendanceRecords.TYPE_LEAVING]:
+                stat['ticks_leaving_count'] += 1
+                dttm_leave = max(type_dttm[AttendanceRecords.TYPE_LEAVING])
 
-    return hours_count_fact.total_seconds() / 3600
+            if dttm_come and dttm_leave and dttm_come < dttm_leave:
+                stat['hours_count'] += dttm_leave - dttm_come
+    stat['hours_count'] = stat['hours_count'].total_seconds() / 3600
+    return stat
