@@ -1,7 +1,8 @@
 from datetime import timedelta
 import functools
 
-from django.db.models import Q
+from django.db.models import Q, F, Sum
+from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator, EmptyPage
 
 from src.db.models import (
@@ -118,14 +119,15 @@ def get_indicators(request, form):
     if not form['type']:
         ticks_count_plan *= 2
 
-    hours_count_plan = timedelta(hours=0)
-    for wd in worker_days:
-        if wd.dttm_work_end and wd.dttm_work_start:
-            hours_count_plan += wd.dttm_work_end - wd.dttm_work_start
+    hours_count_plan = worker_days.aggregate(
+        sum = Coalesce(
+                Sum(
+                    Coalesce(
+                        F('dttm_work_end') - F('dttm_work_start'),
+                        timedelta(0))),
+                timedelta(0))
+        )['sum']
 
-
-    # ticks_coming_count = ticks.filter(type=AttendanceRecords.TYPE_COMING).distinct('dttm__date','user_id').count()
-    # ticks_leaving_count = ticks.filter(type=AttendanceRecords.TYPE_LEAVING).distinct('dttm__date','user_id').count()
 
     stat = stat_count(ticks)
     indicators = {
