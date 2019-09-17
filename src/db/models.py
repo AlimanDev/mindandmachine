@@ -7,6 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from . import utils
 import datetime
 from fcm_django.models import FCMDevice
+from src.conf.djconfig import IS_PUSH_ACTIVE
 
 
 class Region(models.Model):
@@ -958,7 +959,7 @@ class EventManager(models.Manager):
 
         notis = Notifications.objects.bulk_create([Notifications(event=event, to_worker=u) for u in users])
         # todo: add sending push notifies
-        if push_title is not None:
+        if (not push_title is None) and IS_PUSH_ACTIVE:
             devices = FCMDevice.objects.filter(user__in=users)
             devices.send_message(title=push_title, body=event.text)
         return event
