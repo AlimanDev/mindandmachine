@@ -218,6 +218,8 @@ QOS_DATE_FORMAT = '%d.%m.%Y'
 QOS_TIME_FORMAT = '%H:%M:%S'
 QOS_SHORT_TIME_FORMAT = '%H:%M'
 
+IS_PUSH_ACTIVE = False # отправляем ли пуши на телефон при уведомлениях
+
 ALLOWED_UPLOAD_EXTENSIONS = ['xlsx', 'xls']
 
 MOBILE_USER_AGENTS = ('QoS_mobile_app', 'okhttp',)
