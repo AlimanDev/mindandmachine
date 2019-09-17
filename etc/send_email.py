@@ -1,22 +1,15 @@
-from django.core.mail import EmailMessage
-from src.conf.djconfig import ADMINS
+from src.celery.tasks import send_notify_email
 
 
-def send_email(message, to_email, file=None):
+def send_email(message, send2user_ids, title=None, file=None, html_content=None):
     '''
-    Функция-обёртка для отправки email сообщения (в том числе файла)
+    Функция-обёртка для отправки email сообщений (в том числе файлов)
     :param message: сообщение
-    :param to_email: email на который отправляем сообщение
+    :param send2user_ids: список id пользователей
+    :param title: название сообщения
     :param file: файл
+    :param html_content: контент в формате html
     :return:
     '''
-    result = EmailMessage(
-        subject='Сообщение от mind&machine',
-        body=message,
-        from_email=ADMINS[0][1],
-        to=[to_email],
-    )
-    if file:
-        result.attach_file(file)
-    result = result.send()
-    return 'Сообщение {}'.format('отправлено' if result else 'неотправлено')
+
+    return send_notify_email(message, send2user_ids, title, file, html_content)

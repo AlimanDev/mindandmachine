@@ -21,10 +21,6 @@ from src.main.timetable.worker_exchange.utils import (
 
 from src.main.demand.utils import create_predbills_request_function
 from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
-
-from src.util.models_converter import BaseConverter
-
-from src.main.timetable.worker_exchange.utils import search_candidates, send_noti2candidates
 from src.db.models import (
     Event,
     PeriodQueues,
@@ -48,8 +44,8 @@ from src.db.models import (
     ExchangeSettings,
 )
 from src.celery.celery import app
-from django.core.mail import EmailMessage
-from src.conf.djconfig import ADMINS
+from django.core.mail import EmailMultiAlternatives
+from src.conf.djconfig import EMAIL_HOST_USER
 
 
 @app.task
@@ -525,23 +521,30 @@ def update_shop_stats(dt=None):
         timetable.save()
 
 
-@app.tasks
-def send_notify_email(message, id_list, file=None):
+@app.task
+def send_notify_email(message, send2user_ids, title=None, file=None, html_content=None):
     '''
     Функция-обёртка для отправки email сообщений (в том числе файлов)
     :param message: сообщение
-    :param id_list: список id пользователей
+    :param send2user_ids: список id пользователей
+    :param title: название сообщения
     :param file: файл
+    :param html_content: контент в формате html
     :return:
     '''
-    user_emails = [user.email for user in User.objects.filter(id__in=id_list)]
-    result = EmailMessage(
-        subject='Сообщение от mind&machine',
+
+    # todo: add message if no emails
+    user_emails = [user.email for user in User.objects.filter(id__in=send2user_ids) if user.email]
+    msg = EmailMultiAlternatives(
+        subject='Сообщение от Mind&Machine' if title is None else title,
         body=message,
-        from_email=ADMINS[0][1],
+        from_email=EMAIL_HOST_USER,
         to=user_emails,
     )
     if file:
-        result.attach_file(message)
-    result = result.send()
-    return 'Отправлено {} сообщений из {}'.format(result, len(id_list))
+        msg.attach_file(file)
+
+    if html_content:
+        msg.attach_alternative(html_content, "text/html")
+    result = msg.send()
+    return 'Отправлено {} сообщений из {}'.format(result, len(send2user_ids))
