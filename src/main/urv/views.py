@@ -16,7 +16,7 @@ from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import AttendanceRecordsConverter
 from src.util.forms import FormUtil
 from .forms import GetUserUrvForm, ChangeAttendanceForm
-from .utils import get_queryset, stat_count
+from .utils import get_queryset, tick_stat_count, wd_stat_count
 
 
 @api_method('GET', GetUserUrvForm)
@@ -46,6 +46,7 @@ def get_user_urv(request, form):
         user_records = paginator.page(offset)
     except EmptyPage:
         return JsonResponse.value_error('Запрашиваемая страница не существует')
+
     info = {
         'offset': offset,
         'pages': paginator.count,
@@ -119,24 +120,18 @@ def get_indicators(request, form):
     if not form['type']:
         ticks_count_plan *= 2
 
-    hours_count_plan = worker_days.aggregate(
-        sum = Coalesce(
-                Sum(
-                    Coalesce(
-                        F('dttm_work_end') - F('dttm_work_start'),
-                        timedelta(0))),
-                timedelta(0))
-        )['sum']
+    wd_stat = wd_stat_count(worker_days)
+    tick_stat = tick_stat_count(ticks)
 
-
-    stat = stat_count(ticks)
     indicators = {
-        'ticks_coming_count_fact': stat['ticks_coming_count'],
-        'ticks_leaving_count_fact': stat['ticks_leaving_count'],
-        'ticks_count_fact': stat['ticks_coming_count'] + stat['ticks_leaving_count'],
-        'hours_count_fact': stat['hours_count'],
+        'ticks_coming_count_fact': tick_stat['ticks_coming_count'],
+        'ticks_leaving_count_fact': tick_stat['ticks_leaving_count'],
+        'ticks_count_fact': tick_stat['ticks_coming_count'] + tick_stat['ticks_leaving_count'],
+        'hours_count_fact': tick_stat['hours_count'],
         'ticks_count_plan': ticks_count_plan,
-        'hours_count_plan': hours_count_plan.total_seconds() / 3600,
+        'hours_count_plan': wd_stat['hours_count_plan'],
+        'lateness_count': wd_stat['lateness_count']
+
     }
 
     return JsonResponse.success(indicators)

@@ -1,11 +1,16 @@
+import functools
+from datetime import timedelta
+import pandas
+
+from django.db.models import F, Sum, Min, Max, Q, Case, When, Value, IntegerField, Count
+from django.db.models.functions import Extract
+
 from src.db.models import (
     AttendanceRecords,
     User
 )
 
-import functools
-from django.db.models import Q
-from datetime import timedelta
+
 def get_queryset(request, form):
     worker_ids = form['worker_ids']
     from_dt = form['from_dt']
@@ -56,7 +61,7 @@ def get_queryset(request, form):
 
 
 
-def stat_count(ticks):
+def tick_stat_count(ticks):
     stat = {
         'hours_count': timedelta(hours=0),
         'ticks_coming_count': 0,
@@ -93,3 +98,30 @@ def stat_count(ticks):
                 stat['hours_count'] += dttm_leave - dttm_come
     stat['hours_count'] = stat['hours_count'].total_seconds() / 3600
     return stat
+
+
+# можно было бы всю статистику считать этой функцией, если бы не было отметок, для людей без расписания
+# а так нужна еще tick_stat_count - статистика только по отметкам
+def wd_stat_count(worker_days):
+    return worker_days.values('worker_id', 'dt', 'dttm_work_start','dttm_work_end').annotate(
+        coming=Min('worker__attendancerecords__dttm',
+                     filter=Q(worker__attendancerecords__dttm__date=F('dt'),
+                              worker__attendancerecords__type='C')),
+
+        # leaving=Max('worker__attendancerecords__dttm',
+        #               filter=Q(worker__attendancerecords__dttm__date=F('dt'),
+        #                        worker__attendancerecords__type='L')),
+        # hours_fact=F('leaving') - F('coming'),
+        hours_plan=F('dttm_work_end') - F('dttm_work_start'),
+        is_late=Case(
+            When(coming__gt=F('dttm_work_start')-timedelta(minutes=15),
+                 then=1),
+            default=Value(0), output_field=IntegerField())
+    ).aggregate(
+         # hours_fact_count=Extract(Sum('hours_fact'), 'epoch') / 3600,
+         hours_count_plan=Extract(Sum('hours_plan'),'epoch') / 3600,
+         lateness_count=Sum('is_late'),
+         # ticks_coming_count=Count('coming'),
+         # ticks_leaving_count=Count('leaving')
+    )
+
