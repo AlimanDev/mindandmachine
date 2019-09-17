@@ -2,8 +2,10 @@ from src.db.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     ProductionDay,
-    User
+    User,
+    Shop,
 )
+import json
 from datetime import time
 from ..utils import timediff
 import datetime as dt
@@ -60,6 +62,17 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
     # t = check_time()
     users_ids = {u.id: u for u in users}
     prod_days_list = list(ProductionDay.objects.filter(dt__gte=dt_start, dt__lte=dt_end).order_by('dt'))
+
+    shop_ids = list(set(user.shop_id for user in users))
+    shops = Shop.objects.filter(id__in=shop_ids)
+
+    shops_triplets_dict = {}
+    for shop in shops:
+        break_triplets = shop.break_triplets
+        list_of_break_triplets = json.loads(break_triplets)
+        list_of_break_triplets = [[triplet[0], triplet[1], sum(triplet[2])] for triplet in list_of_break_triplets]
+        shops_triplets_dict[shop.id] = list_of_break_triplets
+
 
     total_norm = get_norm_work_periods(prod_days_list, dt_start, dt_end)
 
@@ -128,10 +141,18 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
                     worker['work_in_holidays'] += 1
 
         if row['workerdaycashboxdetails__dttm_from'] and row['workerdaycashboxdetails__dttm_to']:
-            worker['paid_hours'] += round(timediff(
+            duration_of_workerday = round(timediff(
                 row['workerdaycashboxdetails__dttm_from'],
                 row['workerdaycashboxdetails__dttm_to'],
             ))
+
+            list_of_break_triplets = shops_triplets_dict[user.shop_id]
+            time_break_triplets = 0
+            for triplet in list_of_break_triplets:
+                if float(triplet[0]) < duration_of_workerday * 60 <= float(triplet[1]):
+                    time_break_triplets = triplet[2]
+            duration_of_workerday -= round(time_break_triplets / 60, 3)
+            worker['paid_hours'] += duration_of_workerday
 
     # t = check_time(t)
     workers_info[worker_id] = worker
@@ -211,14 +232,16 @@ def count_difference_of_normal_days(dt_end, usrs, dt_start=None):
         count_workdays=Coalesce(Sum('workermonthstat__work_days'), 0),
         count_hours=Coalesce(Sum('workermonthstat__work_hours'), 0),
     ).order_by('id'))
-
+    prev_info = {user['id']: user for user in prev_info}
     user_info_dict = {}
 
     for u_it in range(len(usrs)):
         dt_u_st = usrs[u_it].dt_hired if usrs[u_it].dt_hired and (usrs[u_it].dt_hired > dt_start) else dt_start
         total_norm_days, total_norm_hours = dts_start_count_dict[dt_u_st]
-        diff_prev_days = prev_info[u_it]['count_workdays'] - total_norm_days
-        diff_prev_hours = prev_info[u_it]['count_hours'] - total_norm_hours
+        diff_prev_days = prev_info[usrs[u_it].id]['count_workdays'] - total_norm_days if prev_info.get(
+            usrs[u_it].id, None) else 0 - total_norm_days
+        diff_prev_hours = prev_info[usrs[u_it].id]['count_hours'] - total_norm_hours if prev_info.get(
+            usrs[u_it].id, None) else 0 - total_norm_hours
 
         user_info_dict[usrs[u_it].id] = {
             'diff_prev_paid_days': diff_prev_days,

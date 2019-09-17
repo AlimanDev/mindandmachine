@@ -80,6 +80,8 @@ def create_predbills_request_function(shop_id, dt=None):
     YEARS_TO_COLLECT = 3  # за последние YEARS_TO_COLLECT лет
     predict2days = 62  # на N дней прогноз
 
+    dt_to = datetime.now().date() + timedelta(days=predict2days)
+
     if dt is None:
         dt = datetime.now().date()
         # dt = (PeriodClients.objects.all().order_by('dttm_forecast').last().dttm_forecast).date() + timedelta(days=1)
@@ -89,10 +91,10 @@ def create_predbills_request_function(shop_id, dt=None):
 
     day_info = ProductionDay.objects.filter(
         dt__gte=dt - relativedelta(years=YEARS_TO_COLLECT),
-        dt__lte=dt + timedelta(days=predict2days),
+        dt__lte=dt_to,
     )
 
-    shop = Shop.objects.select_related('super_shop').filter(id=shop_id).first()
+    shop = Shop.objects.filter(id=shop_id).first()
 
     period_clients = PeriodClients.objects.select_related('operation_type__work_type__shop').filter(
         operation_type__work_type__shop_id=shop_id,
@@ -111,15 +113,17 @@ def create_predbills_request_function(shop_id, dt=None):
         # todo: aa: месяца один тип закрылся, а потом новый открылся... трешшшшшш
         operation_types_dict = {}
         for operation_type in OperationType.objects.select_related('work_type').filter(
+                dttm_deleted__isnull=True,
                 work_type__shop_id=shop_id,
                 do_forecast=OperationType.FORECAST_HARD
         ):
-            operation_types_dict[operation_type.id] = {
-                'id': operation_type.id,
-                'predict_demand_params':  json.loads(operation_type.period_demand_params),
-                'name': operation_type.name,
-                'work_type': operation_type.work_type.id
-            }
+            if any(map(lambda x: x.operation_type_id == operation_type.id, period_clients)):
+                operation_types_dict[operation_type.id] = {
+                    'id': operation_type.id,
+                    'predict_demand_params':  json.loads(operation_type.period_demand_params),
+                    'name': operation_type.name,
+                    'work_type': operation_type.work_type.id
+                }
     except ValueError as error_message:
         return JsonResponse.internal_error(error_message)
 
@@ -128,7 +132,7 @@ def create_predbills_request_function(shop_id, dt=None):
         'algo_params': {
             'days_info': [ProductionDayConverter.convert(day) for day in day_info],
             'dt_from': BaseConverter.convert_date(dt),
-            'dt_to': BaseConverter.convert_date(dt + timedelta(days=predict2days)),
+            'dt_to': BaseConverter.convert_date(dt_to),
             # 'dt_start': BaseConverter.convert_date(dt),
             # 'days': predict2days,
             'period_step': BaseConverter.convert_time(shop.forecast_step_minutes),
@@ -158,7 +162,3 @@ def create_predbills_request_function(shop_id, dt=None):
     if task_id is None:
         return JsonResponse.algo_internal_error('Ошибка при создании задачи на исполненение.')
     return True
-
-
-
-

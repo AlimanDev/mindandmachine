@@ -17,7 +17,6 @@ from src.db.models import (
     ExchangeSettings,
     User,
     PeriodClients,
-    SuperShop,
     WorkerDay,
     OperationType,
     Event,
@@ -154,6 +153,3 @@ class TestCelery(LocalTestCase):
         self.assertEqual(stats.count(), 100)
         clean_camera_stats()
         stats = CameraCashboxStat.objects.filter(dttm__lt=now() - relativedelta(months=3))
-        self.assertEqual(stats.count(), 0)
-
-

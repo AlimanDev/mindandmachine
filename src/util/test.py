@@ -3,7 +3,6 @@ from django.test import TestCase
 
 from django.db.models import Q
 from src.db.models import (
-    UserIdentifier,
     AttendanceRecords,
     Group,
     Timetable,
@@ -16,7 +15,6 @@ from src.db.models import (
     OperationType,
     PeriodClients,
     Shop,
-    SuperShop,
     Cashbox,
     CameraCashbox,
     WorkerDayCashboxDetails,
@@ -47,19 +45,23 @@ class LocalTestCase(TestCase):
             FunctionGroup(
                 group=self.admin_group,
                 func=func,
-                access_type=FunctionGroup.TYPE_ALL
+                level_up=1,
+                level_down=99,
+                # access_type=FunctionGroup.TYPE_ALL
             ) for func in FunctionGroup.FUNCS
         ])
 
-        # central office
-        self.hq_group = Group.objects.create(name='ЦО')
-        for func in FunctionGroup.FUNCS:
-            if 'get' in func or func == 'signin' or func == 'signout':
-                FunctionGroup.objects.create(
-                    group=self.hq_group,
-                    func=func,
-                    access_type=FunctionGroup.TYPE_ALL
-                )
+        # # central office
+        # self.hq_group = Group.objects.create(name='ЦО')
+        # for func in FunctionGroup.FUNCS:
+        #     if 'get' in func or func == 'signin' or func == 'signout':
+        #         FunctionGroup.objects.create(
+        #             group=self.hq_group,
+        #             func=func,
+        #             level_up=1,
+        #             level_down=99,
+        #             # access_type=FunctionGroup.TYPE_ALL
+        #         )
 
         # chiefs
         self.chief_group = Group.objects.create(name='Руководитель')
@@ -67,7 +69,9 @@ class LocalTestCase(TestCase):
             FunctionGroup(
                 group=self.chief_group,
                 func=func,
-                access_type=FunctionGroup.TYPE_SUPERSHOP
+                level_up=0,
+                level_down=99,
+                # access_type=FunctionGroup.TYPE_SUPERSHOP
             ) for func in FunctionGroup.FUNCS
         ])
 
@@ -77,28 +81,60 @@ class LocalTestCase(TestCase):
             FunctionGroup(
                 group=self.employee_group,
                 func=func,
-                access_type=FunctionGroup.TYPE_SELF
+                level_up=0,
+                level_down=0,
+                # access_type=FunctionGroup.TYPE_SELF
             ) for func in FunctionGroup.FUNCS
         ])
 
         # supershop
-        self.superShop = SuperShop.objects.create(
-            title='SuperShop1',
-            tm_start=datetime.time(7, 0, 0),
-            tm_end=datetime.time(0, 0, 0),
+        self.root_shop = Shop.objects.create(
+            id=10,
+            title='Department',
+            # tm_start=datetime.time(7, 0, 0),
+            # tm_end=datetime.time(0, 0, 0),
+        )
+
+        # shops
+        self.reg_shop1 = Shop.objects.create(
+            id=11,
+            parent=self.root_shop,
+            title='Region Shop1',
+            break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
+            tm_shop_opens=datetime.time(7, 0, 0),
+            tm_shop_closes=datetime.time(0, 0, 0),
+        )
+        self.reg_shop2 = Shop.objects.create(
+            id=12,
+            parent=self.root_shop,
+            title='Region Shop2',
+            tm_shop_opens=datetime.time(7, 0, 0),
+            tm_shop_closes=datetime.time(0, 0, 0),
         )
 
         # shops
         self.shop = Shop.objects.create(
             id=1,
-            super_shop=self.superShop,
+            parent=self.reg_shop1,
             title='Shop1',
-            break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]]
+            break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
+            tm_shop_opens=datetime.time(7, 0, 0),
+            tm_shop_closes=datetime.time(0, 0, 0),
         )
         self.shop2 = Shop.objects.create(
             id=2,
-            super_shop=self.superShop,
+            parent=self.reg_shop1,
             title='Shop2',
+            tm_shop_opens=datetime.time(7, 0, 0),
+            tm_shop_closes=datetime.time(0, 0, 0),
+        )
+
+        self.shop3 = Shop.objects.create(
+            id=3,
+            parent=self.reg_shop2,
+            title='Shop3',
+            tm_shop_opens=datetime.time(7, 0, 0),
+            tm_shop_closes=datetime.time(0, 0, 0),
         )
 
         # users
@@ -107,33 +143,36 @@ class LocalTestCase(TestCase):
             self.USER_EMAIL,
             self.USER_PASSWORD,
             id=1,
-            shop=self.shop,
+            shop=self.root_shop,
             function_group=self.admin_group,
             last_name='Дурак',
             first_name='Иван',
-            dt_hired=now().date(),
         )
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2', first_name='Иван2', last_name='Иванов')
         self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3', first_name='Иван3',
                                  last_name='Сидоров')
-        self.user4 = create_user(
-            user_id=4,
-            shop_id=self.shop,
-            username='user4',
-            dt_fired=(dttm_now - datetime.timedelta(days=1)).date(),
+
+        self.user4 = User.objects.create_user(
+            'user4',
+            '4b@b.b',
+            '4242',
+            id=4,
+            shop=self.shop,
+            function_group=self.admin_group,
+            last_name='Петров',
             first_name='Иван4',
-            last_name='Петров'
         )
+
+
         self.user5 = User.objects.create_user(
             'user5',
             'm@m.m',
             '4242',
             id=5,
-            shop=self.shop,
-            function_group=self.hq_group,
+            shop=self.reg_shop1,
+            function_group=self.chief_group,
             last_name='Дурак5',
             first_name='Иван5',
-            dt_hired=now().date(),
         )
         self.user6 = User.objects.create_user(
             'user6',
@@ -144,7 +183,6 @@ class LocalTestCase(TestCase):
             function_group=self.chief_group,
             last_name='Дурак6',
             first_name='Иван6',
-            dt_hired=now().date(),
         )
         self.user7 = User.objects.create_user(
             'user7',
@@ -155,7 +193,6 @@ class LocalTestCase(TestCase):
             function_group=self.employee_group,
             last_name='Дурак7',
             first_name='Иван7',
-            dt_hired=now().date(),
         )
 
         # work_types
@@ -264,18 +301,12 @@ class LocalTestCase(TestCase):
             dttm_status_change = datetime.datetime(2019, 6, 1, 9, 30, 0)
         )
 
-        # UserIdentifier
-        self.useridentifier = UserIdentifier.objects.create(
-            identifier='test_identifier',
-            worker=self.user1
-        )
-
         # AttendanceRecords
         self.attendancerecords = AttendanceRecords.objects.create(
             dttm=datetime.datetime(2019, 6, 1, 9, 0, 0),
             type='C',
-            identifier=self.useridentifier,
-            super_shop=self.superShop
+            user=self.user1,
+            shop=self.shop
         )
 
         # CameraCashbox
@@ -394,12 +425,11 @@ class LocalTestCase(TestCase):
                 dt += datetime.timedelta(days=1)
 
 
-def create_user(user_id, shop_id, username, dt_hired=None, dt_fired=None, first_name='', last_name=''):
+def create_user(user_id, shop_id, username, dt_fired=None, first_name='', last_name=''):
     user = User.objects.create(
         id=user_id,
         username=username,
         shop=shop_id,
-        dt_hired=dt_hired,
         dt_fired=dt_fired,
         first_name=first_name,
         last_name=last_name,
@@ -468,4 +498,3 @@ def create_period_clients(dttm_forecast, value, type, operation_type):
         type=type,
         operation_type=operation_type
 )
-

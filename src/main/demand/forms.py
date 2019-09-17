@@ -64,3 +64,8 @@ class CreatePredictBillsRequestForm(forms.Form):
     shop_id = forms.IntegerField()
     dt = util_forms.DateField()
 
+
+class SetPredictBillsForm(forms.Form):
+    data = forms.CharField()
+
+

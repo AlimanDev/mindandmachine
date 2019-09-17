@@ -5,16 +5,19 @@ from .forms import (
     GetDemandXlsxForm,
     GetUrvXlsxForm,
 )
-from src.main.shop.forms import GetSuperShopListForm
-from src.main.shop.utils import get_super_shop_list_stats
+from src.main.shop.forms import GetDepartmentListForm
+from src.main.shop.utils import get_shop_list_stats
+
 from src.db.models import (
     Shop,
     User,
     WorkerDay,
     PeriodClients,
+    OperationType,
     WorkType,
     AttendanceRecords,
 )
+
 from datetime import time, timedelta, datetime, date
 from dateutil.relativedelta import relativedelta
 from django.apps import apps
@@ -96,11 +99,7 @@ def get_tabel(request, workbook, form):
     return workbook, 'Tabel'
 
 
-@api_method(
-    'GET',
-    GetDemandXlsxForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
-)
+@api_method('GET', GetDemandXlsxForm)
 @xlsx_method
 def get_demand_xlsx(request, workbook, form):
     """
@@ -130,7 +129,7 @@ def get_demand_xlsx(request, workbook, form):
     }
 
     if (to_dt - from_dt).days > 90:
-        return JsonResponse.internal_error('Выберите, пожалуйста, более короткий период.'), 'error'
+        return JsonResponse.internal_error('Выберите, пожалуйста, период не больше 90 дней.'), 'error'
 
     worksheet = workbook.add_worksheet('{}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d')))
     worksheet.set_column(0, 3, 30)
@@ -154,10 +153,12 @@ def get_demand_xlsx(request, workbook, form):
     ).order_by('dttm_forecast', 'operation_type_id', 'type'))
 
     work_types = list(WorkType.objects.filter(shop_id=form['shop_id']).order_by('id'))
+    operation_types = list(OperationType.objects.filter(work_type__in=work_types).order_by('id'))
     amount_work_types = len(work_types)
+    amount_operation_types = len(operation_types)
 
     dttm = datetime.combine(from_dt, time(0, 0))
-    expected_record_amount = (to_dt - from_dt).days * amount_work_types * 24 * 60 // timestep
+    expected_record_amount = (to_dt - from_dt).days * amount_operation_types * 24 * 60 // timestep
 
     demand_index = 0
     period_demands_len = len(period_demands)
@@ -165,16 +166,22 @@ def get_demand_xlsx(request, workbook, form):
         demand = model()  # null model if no data
 
     for index in range(expected_record_amount):
-        work_type_index = index % amount_work_types
-        work_type_name = work_types[work_type_index].name
+        operation_type_index = index % amount_operation_types
+        operation_type = operation_types[operation_type_index]
+        work_type = operation_type.work_type
+
+        # work_type_index = index % amount_work_types
+        # work_type_name = work_types[work_type_index].name
 
         if period_demands_len > demand_index:
             demand = period_demands[demand_index]
 
-        worksheet.write(index + 1, 0, work_type_name)
+        worksheet.write(index + 1, 0, work_type.name + ' ' + operation_type.name)
         worksheet.write(index + 1, 1, dttm.strftime('%d.%m.%Y %H:%M:%S'))
 
-        if demand.dttm_forecast == dttm and demand.operation_type.work_type.name == work_type_name:
+        if (demand.dttm_forecast == dttm and
+            demand.operation_type.work_type.name == work_type.name and
+            demand.operation_type.name == operation_type.name):
             if demand.type == PeriodClients.FACT_TYPE:
                 worksheet.write(index + 1, 3, round(demand.value, 1))
                 demand_index += 1
@@ -183,7 +190,7 @@ def get_demand_xlsx(request, workbook, form):
                     next_demand = period_demands[demand_index]
                     if next_demand.type == PeriodClients.LONG_FORECASE_TYPE and \
                             next_demand.dttm_forecast == demand.dttm_forecast and \
-                            next_demand.operation_type.work_type.name == demand.work_type.name:
+                            next_demand.operation_type.work_type.name == demand.operation_type.work_type.name:
                         worksheet.write(index + 1, 2, round(next_demand.value, 1))
                         demand_index += 1
             else:
@@ -194,7 +201,7 @@ def get_demand_xlsx(request, workbook, form):
         else:
             worksheet.write(index + 1, 2, 'Нет данных')
             worksheet.write(index + 1, 3, 'Нет данных')
-        if index % amount_work_types == amount_work_types - 1 and index != 0:
+        if index % amount_operation_types == amount_operation_types - 1 and index != 0:
             dttm += timedelta(minutes=timestep)
 
     return workbook, '{} {}-{}'.format(
@@ -204,11 +211,7 @@ def get_demand_xlsx(request, workbook, form):
     )
 
 
-@api_method(
-    'GET',
-    GetUrvXlsxForm,
-    lambda_func=lambda x: Shop.objects.get(id=x['shop_id'])
-)
+@api_method('GET', GetUrvXlsxForm)
 @xlsx_method
 def get_urv_xlsx(request, workbook, form):
     """
@@ -236,18 +239,18 @@ def get_urv_xlsx(request, workbook, form):
     worksheet.write(0, 2, 'Время')
     worksheet.write(0, 3, 'Тип')
 
-    records = list(AttendanceRecords.objects.select_related('identifier', 'identifier__worker').filter(
+    records = list(AttendanceRecords.objects.select_related('user').filter(
         dttm__date__gte=from_dt,
         dttm__date__lte=to_dt,
-        identifier__worker__shop_id=shop_id,
-    ).order_by('dttm', 'identifier__worker'))
+        shop_id=shop_id,
+    ).order_by('dttm', 'user'))
 
     prev_date = None
     prev_worker = None
 
     for index, record in enumerate(records):
         record_date = record.dttm.date()
-        record_worker = record.identifier.worker
+        record_worker = record.user
         if prev_date != record_date:
             worksheet.write(index + 1, 0, record_date.strftime('%d.%m.%Y'))
             prev_date = record_date
@@ -260,13 +263,9 @@ def get_urv_xlsx(request, workbook, form):
     return workbook, 'URV {}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))
 
 
-@api_method(
-    'GET',
-    GetSuperShopListForm,
-    lambda_func=lambda x: False
-)
+@api_method('GET', GetDepartmentListForm)
 @xlsx_method
-def get_supershops_stats(request, workbook, form):
+def get_department_stats_xlsx(request, workbook, form):
     """
     Скачивает статистику по магазинам за пред/текущий периоды
 
@@ -294,13 +293,13 @@ def get_supershops_stats(request, workbook, form):
     """
     dt_now = date.today().replace(day=1)
     dt_prev = date.today().replace(day=1) - relativedelta(months=1)
-    data, amount = get_super_shop_list_stats(form, request=request, display_format='excel')
+    data, amount = get_shop_list_stats(form, request=request, display_format='excel')
 
     def write_stats(row_index, col_index, value_dict_name):
         worksheet.write(row_index, col_index, '{}/{} ({}%)'.format(
-            round(super_shop_data[value_dict_name]['prev']),
-            round(super_shop_data[value_dict_name]['curr']),
-            round(super_shop_data[value_dict_name]['change']),
+            round(shop_data[value_dict_name]['prev']),
+            round(shop_data[value_dict_name]['curr']),
+            round(shop_data[value_dict_name]['change']),
         ))
 
     worksheet = workbook.add_worksheet('Показатели по магазину')
@@ -312,8 +311,8 @@ def get_supershops_stats(request, workbook, form):
     worksheet.write(0, 4, 'Нехватка, %')
     worksheet.write(0, 5, 'Сотрудники')
 
-    for index, super_shop_data in enumerate(data, start=1):
-        worksheet.write(index, 0, '{}, {}'.format(super_shop_data['title'], super_shop_data['code'] or ''))
+    for index, shop_data in enumerate(data, start=1):
+        worksheet.write(index, 0, '{}, {}'.format(shop_data['title'], shop_data['code'] or ''))
         write_stats(index, 1, 'fot_revenue')
         write_stats(index, 2, 'fot')
         write_stats(index, 3, 'idle')

@@ -38,5 +38,4 @@ class DeleteTimetableForm(forms.Form):
 
 
 class SetTimetableForm(forms.Form):
-    key = forms.CharField()
     data = forms.CharField()

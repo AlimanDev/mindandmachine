@@ -3,7 +3,6 @@ import datetime
 from src.db.models import (
     WorkerDay,
     Timetable,
-    UserIdentifier,
     AttendanceRecords,
 )
 from src.conf.djconfig import (
@@ -58,7 +57,6 @@ class UserConverter(BaseConverter):
 
     @classmethod
     def convert(cls, obj):
-        # user_identifier = UserIdentifier.objects.filter(worker_id=obj.id).first()
         return {
             'id': obj.id,
             'username': obj.username,
@@ -79,6 +77,7 @@ class UserConverter(BaseConverter):
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
             'attachment_group': obj.attachment_group,
+            'position': obj.position.title if hasattr(obj, 'position') and obj.position else '', # fixme: hasatrr always return true, => sometimes extra request to db
             'identifier': obj.identifier if hasattr(obj, 'identifier') else None,
         }
 
@@ -113,7 +112,7 @@ class WorkerDayConverter(BaseConverter):
         def __work_tm(__field):
             return cls.convert_time(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
 
-        return {
+        data = {
             'id': obj.id,
             'dttm_added': cls.convert_datetime(obj.dttm_added),
             'dt': cls.convert_date(obj.dt),
@@ -122,8 +121,13 @@ class WorkerDayConverter(BaseConverter):
             'dttm_work_start': __work_tm(obj.dttm_work_start),
             'dttm_work_end': __work_tm(obj.dttm_work_end),
             'work_types': list(set(obj.work_types_ids)) if hasattr(obj, 'work_types_ids') else [],
+            'work_type': obj.work_type_id if hasattr(obj, 'work_type_id') else None,
             'created_by': obj.created_by_id,
         }
+        if hasattr(obj, 'other_shop'):
+            data['other_shop'] = obj.other_shop
+
+        return data
 
 
 class WorkerDayChangeLogConverter(BaseConverter):
@@ -287,29 +291,16 @@ class ShopConverter(BaseConverter):
     def convert(cls, obj):
         return {
             'id': obj.id,
-            'super_shop': obj.super_shop_id,
+            'parent': obj.parent_id,
             'title': obj.title,
             'tm_shop_opens': cls.convert_time(obj.tm_shop_opens),
             'tm_shop_closes': cls.convert_time(obj.tm_shop_closes),
-        }
-
-
-class SuperShopConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'title': obj.title,
             'code': obj.code,
             'address': obj.address,
             'type': obj.type,
-            'region': obj.region.title if obj.region else None,
             'dt_opened': cls.convert_date(obj.dt_opened),
             'dt_closed': cls.convert_date(obj.dt_closed),
-            'tm_start': cls.convert_time(obj.tm_start),
-            'tm_end': cls.convert_time(obj.tm_end),
         }
-
 
 class TimetableConverter(BaseConverter):
     __STATUSES = {
@@ -399,7 +390,7 @@ class AttendanceRecordsConverter(BaseConverter):
         return {
             'id': obj.id,
             'dttm': cls.convert_datetime(obj.dttm),
-            'worker_id': obj.identifier.worker_id,
+            'worker_id': obj.user_id,
             'type': obj.type,
             'is_verified': obj.verified,
         }

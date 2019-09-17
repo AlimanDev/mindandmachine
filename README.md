@@ -111,3 +111,12 @@ https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html#exam
 
 1. Для работы биржы смен необходимы права ALL на функции get_workers_to_exchange, get_cashier_timetable, get_month_stat
 
+
+
+
+### что нужно делать при развертывании:
+
+1. для создания расписания указать параметры
+2. для биржи смены создать 1 модель
+3. создать группы доступов и сделать юзеров для перессылки ключей
+

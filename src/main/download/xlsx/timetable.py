@@ -95,7 +95,7 @@ class Timetable_xlsx(Tabel_xlsx):
             fmt(font_size=9, bold=True, align='right', text_wrap=False))
 
         # top left info
-        self.worksheet.write_string(2, 1, 'Магазин: {}'.format(self.super_shop.title), format_meta_bold)
+        self.worksheet.write_string(2, 1, 'Магазин: {}'.format(self.shop.parent_title()), format_meta_bold)
         self.worksheet.write_rich_string(3, 1, 'График работы сотрудников', format_meta_bold_bottom_2)
         self.worksheet.write_rich_string(3, 2, format_meta_bold,
                                          '{}  {}г.'.format(self.MONTH_NAMES[self.month.month].upper(), self.month.year))

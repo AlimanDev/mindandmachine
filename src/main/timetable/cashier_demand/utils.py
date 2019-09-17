@@ -126,8 +126,11 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
         return days * period_in_day + (dttm.hour * 60 + dttm.minute) // period_lengths_minutes
 
     def fill_array(array, db_list, lambda_get_indexes, lambda_add):
+        arr_sz = array.size
         for db_model in db_list:
-            array[lambda_get_indexes(db_model)] += lambda_add(db_model)
+            # период может быть до 12 ночи, а смена с 10 до 8 утра следующего дня и поэтому выходим за границы
+            indexes = [ind for ind in lambda_get_indexes(db_model) if ind < arr_sz]
+            array[indexes] += lambda_add(db_model)
 
     MINUTES_IN_DAY = 24 * 60
     shop = Shop.objects.get(id=shop_id)
@@ -291,6 +294,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
     revenue = 1000000
     response.update({
         'indicators': {
+            ''
             'deadtime_part': deadtime_part,
             'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': fot if fot else None,
@@ -299,6 +303,10 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
             'fot_revenue': round(fot / revenue, 2) * 100,
             # 'change_amount': changed_amount,
             'covering_part': covering_part,
+
+            'total_need': predict_needs.sum(),
+            'total_go': finite_work.sum(),
+            'total_plan': shop.staff_number * norm_work_hours,
         },
     })
     return response
