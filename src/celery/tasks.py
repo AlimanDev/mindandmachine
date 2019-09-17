@@ -46,13 +46,11 @@ from src.db.models import (
     ExchangeSettings,
 )
 from src.celery.celery import app
-<<<<<<< HEAD
 from django.core.mail import EmailMultiAlternatives
 from src.conf.djconfig import EMAIL_HOST_USER
 
-=======
 import time as time_in_secs
->>>>>>> master
+
 
 @app.task
 def update_queue(till_dttm=None):
