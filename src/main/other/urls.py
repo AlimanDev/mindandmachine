@@ -6,7 +6,6 @@ from .outsource import urls as outsource_urls
 
 
 urlpatterns = [
-    path('get_regions', views.get_regions),
     path('get_slots', views.get_slots),
     path('get_all_slots', views.get_all_slots),
     path('get_user_allowed_funcs', views.get_user_allowed_funcs),

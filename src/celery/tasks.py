@@ -1,9 +1,11 @@
 from datetime import date, timedelta
 import json
+import os
 
 from django.db.models import Avg
 from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
+from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
 from src.main.timetable.worker_exchange.utils import (
     # get_init_params,
@@ -44,9 +46,13 @@ from src.db.models import (
     ExchangeSettings,
 )
 from src.celery.celery import app
+<<<<<<< HEAD
 from django.core.mail import EmailMultiAlternatives
 from src.conf.djconfig import EMAIL_HOST_USER
 
+=======
+import time as time_in_secs
+>>>>>>> master
 
 @app.task
 def update_queue(till_dttm=None):
@@ -548,3 +554,38 @@ def send_notify_email(message, send2user_ids, title=None, file=None, html_conten
         msg.attach_alternative(html_content, "text/html")
     result = msg.send()
     return 'Отправлено {} сообщений из {}'.format(result, len(send2user_ids))
+
+
+@app.task
+def upload_demand_task():
+    localpaths = [
+        'bills_{}.csv'.format(str(time_in_secs.time()).replace('.', '_')),
+        'incoming_{}.csv'.format(str(time_in_secs.time()).replace('.', '_'))
+    ]
+    for localpath in localpaths:
+        sftp_download(localpath)
+        file = open(localpath, 'r')
+        upload_demand_util(file)
+        file.close()
+        os.remove(localpath)
+
+
+@app.task
+def upload_employees_task():
+    localpath = 'employees_{}.csv'.format(str(time_in_secs.time()).replace('.', '_'))
+    sftp_download(localpath)
+    file = open(localpath, 'r')
+    upload_employees_util(file)
+    file.close()
+    os.remove(localpath)
+
+
+@app.task
+def upload_vacation_task():
+    localpath = 'holidays_{}.csv'.format(str(time_in_secs.time()).replace('.', '_'))
+    sftp_download(localpath)
+    file = open(localpath, 'r')
+    upload_vacation_util(file)
+    file.close()
+    os.remove(localpath)
+

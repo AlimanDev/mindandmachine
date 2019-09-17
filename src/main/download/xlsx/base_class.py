@@ -47,7 +47,6 @@ class Xlsx_base:
         }
 
         self.shop = shop
-        self.super_shop = shop.super_shop
         self.month = datetime.date(dt.year, dt.month, 1)
         self.prod_days = prod_days
 
@@ -161,5 +160,3 @@ class Xlsx_base:
                     )
                 except TypeError:
                     self.worksheet.write_string(row + it, col + col_shift, '', text_format)
-
-

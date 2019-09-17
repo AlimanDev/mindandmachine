@@ -58,7 +58,6 @@ from django.db import IntegrityError
 
 import time as time_in_seconds
 
-
 @api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
     """
@@ -70,7 +69,7 @@ def get_cashiers_list(request, form):
         url: /api/timetable/cashier/get_cashiers_list
         dt_hired_before(QOS_DATE): required = False.
         dt_fired_after(QOS_DATE): required False
-        shop_id(int): required = False
+        shop_id(int): required = True
         consider_outsource(bool): required = False (учитывать outsource работников)
 
     Returns:
@@ -98,7 +97,7 @@ def get_cashiers_list(request, form):
     """
     response_users = []
     attachment_groups = [User.GROUP_STAFF, User.GROUP_OUTSOURCE if form['consider_outsource'] else None]
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     users_qs = User.objects.filter(
         shop_id=shop_id,
         attachment_group__in=attachment_groups
@@ -125,7 +124,7 @@ def get_not_working_cashiers_list(request, form):
         url: /api/timetable/cashier/get_not_working_cashiers_list
         dt_hired_before(QOS_DATE): required = False.
         dt_fired_after(QOS_DATE): required False
-        shop_id(int): required = False
+        shop_id(int): required = True
 
     Returns:
         {[
@@ -151,7 +150,7 @@ def get_not_working_cashiers_list(request, form):
         ]}
     """
     dt_now = datetime.now() + timedelta(hours=3)
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     checkpoint = FormUtil.get_checkpoint(form)
 
     users_not_working_today = []
@@ -183,14 +182,14 @@ def select_cashiers(request, form):
         worker_ids(list): required = True
         workday_type(str): required = False
         workdays(str): required = False
-        shop_id(int): required = False
+        shop_id(int): required = True
         work_workdays(str): required = False
         from_tm(QOS_TIME): required = False
         to_tm(QOS_TIME): required = False
         checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     """
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     checkpoint = FormUtil.get_checkpoint(form)
 
     users = User.objects.qos_filter_active(
@@ -257,11 +256,8 @@ def select_cashiers(request, form):
     return JsonResponse.success([UserConverter.convert(x) for x in users])
 
 
-@api_method(
-    'GET',
-    GetCashierTimetableForm,
-    lambda_func=lambda x: User.objects.filter(id__in=x['worker_ids']).values_list('id', flat=True)
-)
+
+@api_method('GET', GetCashierTimetableForm)
 def get_cashier_timetable(request, form):
     """
     Возвращает информацию о расписании сотрудника
@@ -307,6 +303,7 @@ def get_cashier_timetable(request, form):
     from_dt = form['from_dt']
     to_dt = form['to_dt']
     checkpoint = FormUtil.get_checkpoint(form)
+    work_types = {w.id: w for w in WorkType.objects.select_related('shop').all()}
 
     response = {}
     # todo: rewrite with 1 request instead 80
@@ -346,7 +343,12 @@ def get_cashier_timetable(request, form):
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
                 )
-                wd_m.work_types_ids = [wd['work_types__id']] if wd['work_types__id'] else []
+                if wd['work_types__id']:
+                    wd_m.work_types_ids = [wd['work_types__id']]
+                    work_type = work_types[wd_m.work_types_ids[0]]
+                    if work_type.shop_id != form['shop_id']:
+                        wd_m.other_shop = work_type.shop.title
+
                 worker_days.append(
                     wd_m
                 )
@@ -406,7 +408,7 @@ def get_cashier_timetable(request, form):
 @api_method(
     'GET',
     GetCashierInfoForm,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+    lambda_func=lambda x: User.objects.get(id=x['worker_id']).shop
 )
 def get_cashier_info(request, form):
     """
@@ -533,7 +535,7 @@ def get_cashier_info(request, form):
 @api_method(
     'GET',
     GetWorkerDayForm,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+    lambda_func=lambda x: User.objects.get(id=x['worker_id']).shop
 )
 def get_worker_day(request, form):
     """
@@ -649,7 +651,7 @@ def get_worker_day(request, form):
 @api_method(
     'POST',
     SetWorkerDayForm,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+    lambda_func=lambda x: User.objects.get(id=x['worker_id']).shop
 )
 def set_worker_day(request, form):
     """
@@ -732,7 +734,7 @@ def set_worker_day(request, form):
         return JsonResponse.multiple_objects_returned()
 
     if old_wd:
-        old_wd_type = old_wd.type
+        # old_wd_type = old_wd.type
         # Не пересохраняем, если тип не изменился
         if old_wd.type == form['type'] and not WorkerDay.is_type_with_tm_range(form['type']):
             return JsonResponse.success()
@@ -796,12 +798,18 @@ def set_worker_day(request, form):
     }
 
     shop = Shop.objects.get(user=form['worker_id'])
-    work_type = WorkType.objects.get(id=form['work_type'] if form['work_type'] else old_wd_type)
+    work_type_id = WorkType.objects.get(id=form['work_type']).id if form['work_type'] else None
+    if work_type_id is None:
+        work_type_id = WorkerDayCashboxDetails.objects.filter(
+            worker_day=old_wd,
+            dttm_deleted__isnull=True
+        ).first()
+        work_type_id = work_type_id.work_type_id if not work_type_id is None else None
 
-    if form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
-        cancel_vacancies(shop.id, work_type.id)
-    if form['type'] != WorkerDay.Type.TYPE_WORKDAY.value:
-        create_vacancies_and_notify(shop.id, work_type.id) # todo: fix this row
+    if (form['type'] == WorkerDay.Type.TYPE_WORKDAY.value) and work_type_id:
+        cancel_vacancies(shop.id, work_type_id)
+    if (form['type'] != WorkerDay.Type.TYPE_WORKDAY.value) and work_type_id:
+        create_vacancies_and_notify(shop.id, work_type_id) # todo: fix this row
 
     return JsonResponse.success(response)
 
@@ -848,7 +856,7 @@ def get_worker_day_logs(request, form):
             'prev_dttm_work_end': __work_dttm(obj.parent_worker_day.dttm_work_end),
         }
 
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     worker_day_id = form['worker_day_id']
 
     worker_day_desired = None
@@ -888,7 +896,7 @@ def get_worker_day_logs(request, form):
 @api_method(
     'POST',
     DeleteWorkerDayChangeLogsForm,
-    lambda_func=lambda x: WorkerDay.objects.get(id=x['worker_day_id']).worker
+    lambda_func=lambda x: WorkerDay.objects.get(id=x['worker_day_id']).worker.shop
 )
 def delete_worker_day(request, form):
     """
@@ -965,7 +973,7 @@ def delete_worker_day(request, form):
 @api_method(
     'POST',
     SetWorkerRestrictionsForm,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+    lambda_func=lambda x: User.objects.get(id=x['worker_id']).shop
 )
 def set_worker_restrictions(request, form):
     """
@@ -1063,11 +1071,7 @@ def set_worker_restrictions(request, form):
     return JsonResponse.success()
 
 
-@api_method(
-    'POST',
-    CreateCashierForm,
-    lambda_func=lambda x: False
-)
+@api_method('POST', CreateCashierForm)
 def create_cashier(request, form):
     """
     Создает кассира
@@ -1081,6 +1085,7 @@ def create_cashier(request, form):
         username(str): max_length = 150, required = True
         password(str): max_length = 64, required = True
         dt_hired(QOS_DATE): дата найма, required = True
+        shop_id(int): required = True
 
     Note:
         также отправляет уведомление о том, что пользователь был создан
@@ -1122,11 +1127,7 @@ def create_cashier(request, form):
     return JsonResponse.success(UserConverter.convert(user))
 
 
-@api_method(
-    'POST',
-    DublicateCashierTimetableForm,
-    lambda_func=lambda x: User.objects.get(id=x['from_worker_id'])
-)
+@api_method('POST', DublicateCashierTimetableForm)
 def dublicate_cashier_table(request, form):
     """
     Здесь будем использовать только актуальные данные (qos_current_version)
@@ -1141,6 +1142,7 @@ def dublicate_cashier_table(request, form):
         to_worker_id(int): required = True
         from_dt(QOS_DATE): дата начала копирования расписания
         to_dt(QOS_DATE): дата конца копирования
+        shop_id(int): required = True
     """
     from_worker_id = form['from_worker_id']
     to_worker_id = form['to_worker_id']
@@ -1194,7 +1196,7 @@ def dublicate_cashier_table(request, form):
 @api_method(
     'POST',
     DeleteCashierForm,
-    lambda_func=lambda x: User.objects.get(id=x['user_id'])
+    lambda_func=lambda x: User.objects.get(id=x['user_id']).shop
 )
 def delete_cashier(request, form):
     """
@@ -1233,7 +1235,7 @@ def delete_cashier(request, form):
 @api_method(
     'POST',
     PasswordChangeForm,
-    lambda_func=lambda x: User.objects.get(id=x['user_id'])
+    lambda_func=lambda x: User.objects.get(id=x['user_id']).shop
 )
 def password_edit(request, form):
     """
@@ -1274,7 +1276,7 @@ def password_edit(request, form):
 @api_method(
     'GET',
     GetWorkerChangeRequestsForm,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id'])
+    lambda_func=lambda x: User.objects.get(id=x['worker_id']).shop
 )
 def get_change_request(request, form):
     """
@@ -1319,7 +1321,7 @@ def get_change_request(request, form):
 @api_method(
     'POST',
     ChangeCashierInfo,
-    lambda_func=lambda x: User.objects.get(id=x['user_id']),
+    lambda_func=lambda x: User.objects.get(id=x['user_id']).shop,
     check_password=True,
 )
 def change_cashier_info(request, form):
@@ -1395,7 +1397,7 @@ def change_cashier_info(request, form):
 @api_method(
     'POST',
     SetWorkerDayForm,
-    check_permissions=False,
+    # check_permissions=False,
 )
 def request_worker_day(request, form):
     """
@@ -1451,7 +1453,7 @@ def request_worker_day(request, form):
 @api_method(
     'POST',
     HandleWorkerDayRequestForm,
-    lambda_func=lambda x: WorkerDayChangeRequest.objects.get(id=x['request_id']).worker
+    lambda_func=lambda x: WorkerDayChangeRequest.objects.get(id=x['request_id']).worker.shop
 )
 def handle_worker_day_request(request, form):
     """

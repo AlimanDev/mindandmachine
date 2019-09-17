@@ -1,7 +1,6 @@
 from django.contrib import admin
 from src.db.models import (
     User,
-    SuperShop,
     Shop,
     WorkerDay,
     PeriodClients,
@@ -27,7 +26,6 @@ from src.db.models import (
     CameraClientEvent,
     Group,
     FunctionGroup,
-    Region,
     WorkerPosition,
     OperationType,
     IncomeVisitors,
@@ -36,13 +34,8 @@ from src.db.models import (
     WorkerDayChangeRequest,
     AttendanceRecords,
     ExchangeSettings,
+    Event,
 )
-
-
-@admin.register(Region)
-class RegionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title',)
-    search_fields = ('title',)
 
 
 @admin.register(WorkerPosition)
@@ -64,14 +57,20 @@ class OperationTypeAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class QsUserAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'super_shop_title', 'work_type_name', 'id',)
-    search_fields = ('first_name', 'last_name', 'shop__super_shop__title', 'workercashboxinfo__work_type__name', 'id')
+    list_display = ('first_name', 'last_name', 'shop_title', 'parent_title', 'work_type_name', 'id')
+    search_fields = ('first_name', 'last_name', 'shop__parent__title', 'workercashboxinfo__work_type__name', 'id')
     list_filter = ('shop', )
 
     @staticmethod
-    def super_shop_title(instance: User):
-        if instance.shop and instance.shop.super_shop:
-            return instance.shop.super_shop.title
+    def parent_title(instance: User):
+        if instance.shop and instance.shop.parent:
+            return instance.shop.parent_title()
+        return 'без магазина'
+
+    @staticmethod
+    def shop_title(instance: User):
+        if instance.shop and instance.shop.parent:
+            return instance.shop.title
         return 'без магазина'
 
     @staticmethod
@@ -80,26 +79,22 @@ class QsUserAdmin(admin.ModelAdmin):
         return ' '.join(['"{}"'.format(cbi.work_type.name) for cbi in cashboxinfo_set])
 
 
-@admin.register(SuperShop)
-class SuperShopAdmin(admin.ModelAdmin):
-    list_display = ('title', 'code', 'id')
-    search_fields = list_display
 
 
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
-    list_display = ('title', 'super_shop_title', 'id')
-    search_fields = ('title', 'super_shop__title', 'id')
+    list_display = ('title', 'parent_title', 'id')
+    search_fields = ('title', 'parent__title', 'id')
 
     @staticmethod
-    def super_shop_title(instance: Shop):
-        return instance.super_shop.title
+    def parent_title(instance: Shop):
+        return instance.parent_title()
 
 
 @admin.register(WorkType)
 class WorkTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'shop_title', 'super_shop_title', 'dttm_added', 'id')
-    search_fields = ('name', 'shop__title', 'shop__super_shop__title', 'id')
+    list_display = ('name', 'shop_title', 'parent_title', 'dttm_added', 'id')
+    search_fields = ('name', 'shop__title', 'shop__parent__title', 'id')
     list_filter = ('shop', )
 
     @staticmethod
@@ -107,14 +102,14 @@ class WorkTypeAdmin(admin.ModelAdmin):
         return instance.shop.title
 
     @staticmethod
-    def super_shop_title(instance: WorkType):
-        return instance.shop.super_shop.title
+    def parent_title(instance: WorkType):
+        return instance.shop.parent_title()
 
 
 @admin.register(Slot)
 class SlotAdmin(admin.ModelAdmin):
-    list_display = ('name', 'work_type_name', 'shop_title', 'super_shop_title', 'tm_start', 'tm_end', 'id')
-    search_fields = ('name', 'shop__title', 'shop__super_shop__title', 'id')
+    list_display = ('name', 'work_type_name', 'shop_title', 'parent_title', 'tm_start', 'tm_end', 'id')
+    search_fields = ('name', 'shop__title', 'shop__parent__title', 'id')
     list_filter = ('shop', )
 
     @staticmethod
@@ -122,8 +117,8 @@ class SlotAdmin(admin.ModelAdmin):
         return instance.shop.title
 
     @staticmethod
-    def super_shop_title(instance: Slot):
-        return instance.shop.super_shop.title
+    def parent_title(instance: Slot):
+        return instance.shop.parent_title()
 
     @staticmethod
     def work_type_name(instance: Slot):
@@ -133,9 +128,9 @@ class SlotAdmin(admin.ModelAdmin):
 
 @admin.register(UserWeekdaySlot)
 class UserWeekDaySlotAdmin(admin.ModelAdmin):
-    list_display = ('worker_first_name', 'worker_last_name', 'shop_title', 'super_shop_title', 'slot_name',
+    list_display = ('worker_first_name', 'worker_last_name', 'shop_title', 'parent_title', 'slot_name',
                     'weekday', 'id')
-    search_fields = ('worker__first_name','worker__last_name', 'worker__shop__title', 'worker__shop__super_shop__title',
+    search_fields = ('worker__first_name','worker__last_name', 'worker__shop__title', 'worker__shop__parent__title',
                      'slot__name', 'id')
     list_filter = ('worker__shop', )
 
@@ -156,14 +151,14 @@ class UserWeekDaySlotAdmin(admin.ModelAdmin):
         return instance.worker.shop.title
 
     @staticmethod
-    def super_shop_title(instance: UserWeekdaySlot):
-        return instance.worker.shop.super_shop.title
+    def parent_title(instance: UserWeekdaySlot):
+        return instance.worker.shop.parent_title()
 
 
 @admin.register(Cashbox)
 class CashboxAdmin(admin.ModelAdmin):
-    list_display = ('type_name', 'shop_title', 'super_shop_title', 'id', 'number')
-    search_fields = ('type__name', 'type__shop__title', 'type__shop__super_shop__title', 'id')
+    list_display = ('type_name', 'shop_title', 'parent_title', 'id', 'number')
+    search_fields = ('type__name', 'type__shop__title', 'type__shop__parent__title', 'id')
     list_filter = ('type__shop', )
 
     @staticmethod
@@ -175,8 +170,8 @@ class CashboxAdmin(admin.ModelAdmin):
         return instance.type.shop.title
 
     @staticmethod
-    def super_shop_title(instance: Cashbox):
-        return instance.type.shop.super_shop.title
+    def parent_title(instance: Cashbox):
+        return instance.type.shop.parent_title()
 
 
 class PeriodDemandAdmin(admin.ModelAdmin):
@@ -248,10 +243,12 @@ class WorkerConstraintAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerDay)
 class WorkerDayAdmin(admin.ModelAdmin):
-    list_display = ('worker_last_name', 'shop_title', 'super_shop_title', 'dt', 'type', 'id', 'dttm_work_start',
+    list_display = ('worker_last_name', 'shop_title', 'parent_title', 'dt', 'type', 'id', 'dttm_work_start',
                     'dttm_work_end')
-    search_fields = ('worker__last_name', 'worker__shop__title', 'worker__shop__super_shop__title', 'id', 'dt')
-    list_filter = ('worker__shop',)
+    search_fields = ('worker__last_name', 'worker__shop__title', 'worker__shop__parent__title', 'id', 'dt')
+    list_filter = ('worker__shop', 'type')
+    raw_id_fields = ('parent_worker_day',)
+    list_select_related = ('worker', 'worker__shop')
 
     @staticmethod
     def worker_last_name(instance: WorkerConstraint):
@@ -262,8 +259,8 @@ class WorkerDayAdmin(admin.ModelAdmin):
         return instance.worker.shop.title
 
     @staticmethod
-    def super_shop_title(instance: WorkerDay):
-        return instance.worker.shop.super_shop.title
+    def parent_title(instance: WorkerDay):
+        return instance.worker.shop.parent_title()
 
 
 @admin.register(WorkerDayCashboxDetails)
@@ -272,7 +269,10 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: upd: сервак просто падает если туда зайти
     list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_work_type', 'id', 'dttm_from', 'dttm_to')
     search_fields = ('worker_day__worker__last_name', 'worker_day__worker__shop__title', 'id')
-    list_filter = ('worker_day__worker__shop',)
+    list_filter = ('worker_day__worker__shop', 'is_vacancy')
+    raw_id_fields = ('worker_day',)
+    list_select_related = (
+        'worker_day__worker', 'worker_day__worker__shop', 'work_type')
 
     @staticmethod
     def worker_last_name(instance: WorkerDayCashboxDetails):
@@ -293,8 +293,8 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
 
 @admin.register(Notifications)
 class NotificationsAdmin(admin.ModelAdmin):
-    list_display = ('worker_last_name', 'shop_title', 'super_shop_title', 'dttm_added', 'id')
-    search_fields = ('to_worker__last_name', 'to_worker__shop__title', 'to_worker__shop__super_shop__title', 'id')
+    list_display = ('worker_last_name', 'shop_title', 'parent_title', 'dttm_added', 'id')
+    search_fields = ('to_worker__last_name', 'to_worker__shop__title', 'to_worker__shop__parent__title', 'id')
     list_filter = ('to_worker__shop',)
 
     @staticmethod
@@ -302,24 +302,24 @@ class NotificationsAdmin(admin.ModelAdmin):
         return instance.to_worker.last_name
 
     @staticmethod
-    def super_shop_title(instance: Notifications):
-        return instance.to_worker.shop.super_shop.title
+    def parent_title(instance: Notifications):
+        return instance.to_worker.shop.parent_title() if instance.to_worker.shop else ''
 
     @staticmethod
     def shop_title(instance: Notifications):
-        return instance.to_worker.shop.title
+        return instance.to_worker.shop.title if instance.to_worker.shop else ''
 
 
 @admin.register(Timetable)
 class TimetableAdmin(admin.ModelAdmin):
-    list_display = ('id', 'shop_title', 'super_shop_title', 'dt', 'status', 'dttm_status_change',
+    list_display = ('id', 'shop_title', 'parent_title', 'dt', 'status', 'dttm_status_change',
                     'fot', 'idle', 'lack', 'workers_amount', 'revenue', 'fot_revenue',)
-    search_fields = ('shop__title', 'shop__super_shop__title')
+    search_fields = ('shop__title', 'shop__parent__title')
     list_filter = ('shop',)
 
     @staticmethod
-    def super_shop_title(instance: Timetable):
-        return instance.shop.super_shop.title
+    def parent_title(instance: Timetable):
+        return instance.shop.parent_title()
 
     @staticmethod
     def shop_title(instance: Timetable):
@@ -365,7 +365,7 @@ class GroupAdmin(admin.ModelAdmin):
 
 @admin.register(FunctionGroup)
 class FunctionGroupAdmin(admin.ModelAdmin):
-    list_display = ('id', 'access_type', 'group', 'func')
+    list_display = ('id', 'access_type', 'group', 'func', 'level_down', 'level_up')
     list_filter = ('access_type', 'group', 'func')
     search_fields = ('id',)
 
@@ -404,5 +404,10 @@ class AttendanceRecordsAdmin(admin.ModelAdmin):
 
 @admin.register(ExchangeSettings)
 class ExchangeSettingsAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(Event)
+class EventAdmin(admin.ModelAdmin):
     pass
 

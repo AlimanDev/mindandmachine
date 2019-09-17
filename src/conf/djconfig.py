@@ -132,6 +132,12 @@ EMAIL_HOST_PASSWORD = 'TjP6szfJe0PpLNH'
 
 SERVER_EMAIL = EMAIL_HOST_USER
 
+
+SFTP_IP = '212.109.194.87'
+SFTP_USERNAME = ''
+SFTP_PASSWORD = ''
+SFTP_PATH = '~/'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

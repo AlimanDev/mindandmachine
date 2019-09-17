@@ -7,8 +7,8 @@ import numpy as np
 from datetime import time, datetime
 from dateutil.relativedelta import relativedelta
 from src.db.models import (
+    ExchangeSettings,
     Event,
-    SuperShop,
     Shop,
     User,
     PeriodClients,
@@ -20,7 +20,6 @@ from src.db.models import (
     WorkType,
     OperationType,
     Cashbox,
-    UserIdentifier,
     AttendanceRecords,
     Group,
     FunctionGroup,
@@ -32,15 +31,14 @@ from src.util.models_converter import (
 )
 
 
-def create_shop(shop_ind):
-    supershop = SuperShop.objects.create(title='Магазин № {}'.format(shop_ind))
+def create_shop(shop_id):
     shop = Shop.objects.create(
-        super_shop=supershop,
+        parent_id=shop_id,
         title='department №1',
         forecast_step_minutes=time(minute=30),
         break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]]]'
     )
-    return supershop, shop
+    return shop
 
 
 def create_timetable(shop_id, dttm):
@@ -225,13 +223,6 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         day = 0
         day_ind = 0
 
-        worker_id = None
-        if np.random.randint(4):
-            worker_id = worker.id
-        worker_ident = UserIdentifier.objects.create(
-            identifier='{}-{}'.format(shop.id, worker.id),
-            worker_id=worker_id,
-        )
 
         while day < days:
             wd = wds.iloc[day_ind]
@@ -263,26 +254,45 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                         dttm_work_start=None,
                         dttm_work_end=None,
                     )
+                    wd_model.created_by=worker
                     wd_model.save()
-                add_models(details, WorkerDayCashboxDetails, WorkerDayCashboxDetails(
-                    worker_day=wd_model,
-                    work_type=work_types_dict[wd['work_type']],
-                    dttm_from=dttm_work_start,
-                    dttm_to=dttm_work_end,
-                ))
+
+                if np.random.randint(4) != 1:
+                    add_models(details, WorkerDayCashboxDetails, WorkerDayCashboxDetails(
+                        worker_day=wd_model,
+                        work_type=work_types_dict[wd['work_type']],
+                        dttm_from=dttm_work_start,
+                        dttm_to=dttm_work_end,
+                    ))
+                else:
+                    add_models(details, WorkerDayCashboxDetails, WorkerDayCashboxDetails(
+                        worker_day=wd_model,
+                        work_type=work_types_dict[wd['work_type']],
+                        dttm_from=dttm_work_start,
+                        dttm_to=dttm_work_end,
+                        is_vacancy=True,
+                    ))
+                    if np.random.randint(4) == 1:
+                        add_models(details, WorkerDayCashboxDetails, WorkerDayCashboxDetails(
+                            work_type=work_types_dict[wd['work_type']],
+                            dttm_from=dttm_work_start,
+                            dttm_to=dttm_work_end,
+                            status=WorkerDayCashboxDetails.TYPE_VACANCY,
+                            is_vacancy=True,
+                        ))
 
                 add_models(models_attendance, AttendanceRecords, AttendanceRecords(
                     dttm=dttm_work_start,
                     type=AttendanceRecords.TYPE_COMING,
-                    identifier=worker_ident,
-                    super_shop_id=shop.super_shop_id,
+                    user_id=worker.id,
+                    shop_id=shop.id,
                 ))
 
                 add_models(models_attendance, AttendanceRecords, AttendanceRecords(
                     dttm=dttm_work_end,
                     type=AttendanceRecords.TYPE_LEAVING,
-                    identifier=worker_ident,
-                    super_shop_id=shop.super_shop_id,
+                    user_id=worker.id,
+                    shop_id=shop.id,
                 ))
 
             else:
@@ -300,26 +310,6 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             day_ind = (day_ind + 1) % wds.shape[0]
             if day_ind == 0:
                 dt_diff = start_dt - wds.iloc[0]['dt'] + timezone.timedelta(days=day)
-
-    worker_ident = UserIdentifier.objects.create(
-        identifier='{}-{}'.format(shop.id, 'random'),
-        # worker=worker,
-    )
-
-    add_models(models_attendance, AttendanceRecords, AttendanceRecords(
-        dttm=dttm_work_start,
-        type=AttendanceRecords.TYPE_COMING,
-        identifier=worker_ident,
-        super_shop_id=shop.super_shop_id,
-    ))
-
-    add_models(models_attendance, AttendanceRecords, AttendanceRecords(
-        dttm=dttm_work_end,
-        type=AttendanceRecords.TYPE_LEAVING,
-        identifier=worker_ident,
-        super_shop_id=shop.super_shop_id,
-
-    ))
 
     add_models(details, WorkerDayCashboxDetails, None)
     add_models(models, WorkerDay, None)
@@ -367,7 +357,7 @@ def main(date=None, shops=None):
     f = open('src/db/works/test_data.json')
     data = json.load(f)
     f.close()
-
+    ExchangeSettings.objects.create()
     if date is None:
         date = timezone.now().date()
 
@@ -385,17 +375,24 @@ def main(date=None, shops=None):
     demand_days = (predict_date - start_date).days + 1
     # print(start_date, end_date, predict_date, worker_days, demand_days)
 
+    root_shop = Shop.objects.create(title='Корневой магазин')
+    parent_shop1 = Shop.objects.create(title='Супер Магазин № 1', parent = root_shop)
+    parent_shop2 = Shop.objects.create(title='Супер Магазин № 2', parent = root_shop)
     for shop_ind, shop_size in enumerate(shops, start=1):
-        supershop, shop = create_shop(shop_ind)
+        shop = create_shop(parent_shop1.id)
         work_types_dict = create_work_types(data['work_types'], shop)
         create_forecast(data['demand'], work_types_dict, start_date, demand_days)
         create_users_workdays(data['cashiers'], work_types_dict, start_date, worker_days, shop, shop_size)
+        dttm_curr = datetime.now().replace(day=1)
+        dttm_prev = dttm_curr - relativedelta(months=1)
+        create_timetable(shop.id, dttm_curr)
+        create_timetable(shop.id, dttm_prev)
 
     dttm_curr = datetime.now().replace(day=1)
     dttm_prev = dttm_curr - relativedelta(months=1)
     create_notifications()
     for shop_ind in range(4, 2000):
-        supershop, shop = create_shop(shop_ind)
+        shop = create_shop(parent_shop2.id)
         shop_id = shop.id
         create_timetable(shop_id, dttm_curr)
         create_timetable(shop_id, dttm_prev)

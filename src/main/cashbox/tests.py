@@ -24,14 +24,6 @@ class TestCashbox(LocalTestCase):
         #     '1': {'share_time': 20.956},
         #     '2': {'share_time': 8.382}})
 
-    def test_get_cashboxes_used_resource(self):
-        self.auth()
-        response = self.api_get(
-            '/api/cashbox/get_cashboxes_used_resource?shop_id=1&from_dt=16.06.2018&to_dt=16.06.2018')
-        self.assertEqual(response.status_code, 200)
-        # 'error_message': 'Внутренняя ошибка сервера'
-        # self.assertEqual(response.json['code'], 200)
-        # self.assertEqual(response.json['data']['2']['100'], 35.295)
 
     def test_get_types(self):
         self.auth()

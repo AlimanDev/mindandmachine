@@ -1,7 +1,7 @@
 from src.util.test import LocalTestCase
 from src.db.models import User
 from django.utils.timezone import now
-
+from datetime import timedelta
 
 class AuthTestCase(LocalTestCase):
     def test_auth_cycle_success(self):
@@ -40,20 +40,3 @@ class AuthTestCase(LocalTestCase):
             }
         )
         self.assertEqual(response.json['data']['error_type'], 'NotActiveError')
-        self.api_post('/api/auth/signout')
-
-        user = User.objects.get(pk=1)
-        user.dt_fired = None
-        user.dt_hired = None
-        user.save()
-
-        response = self.api_post(
-            '/api/auth/signin',
-            {
-                'username': LocalTestCase.USER_USERNAME,
-                'password': LocalTestCase.USER_PASSWORD,
-            }
-        )
-        self.assertEqual(response.json['data']['error_type'], 'NotActiveError')
-
-
