@@ -578,6 +578,7 @@ class OperationTemplate(models.Model):
                 dt_from += datetime.timedelta(days=1)
             return
 
+        lambda_get_day = None
         if self.period == self.PERIOD_WEEKLY:
             lambda_get_day = lambda dt: dt.isoweekday()
         elif self.period == self.PERIOD_MONTHLY:
