@@ -113,7 +113,7 @@ def create_operation_template(request, form):
         }
     """
 
-    operation_template = OperationTemplate.objects.create(
+    operation_template = OperationTemplate(
         name=form['name'],
         tm_start=form['tm_start'],
         tm_end=form['tm_end'],
@@ -122,6 +122,9 @@ def create_operation_template(request, form):
         days_in_period=form['days_in_period'],
         operation_type_id=form['operation_type_id'],
     )
+    if not operation_template.check_days_in_period():
+        return JsonResponse.value_error('перечисленные дни не соответствуют периоду')
+    operation_template.save()
 
     return JsonResponse.success(
         OperationTemplateConverter.convert(operation_template)
@@ -206,8 +209,9 @@ def update_operation_template(request, form):
 
     try:
         operation_template = OperationTemplate.objects.get(
-            id=id
-            )
+            id=id,
+            dttm_deleted = None,
+        )
     except OperationTemplate.DoesNotExist:
         return JsonResponse.does_not_exists_error('operation template does not exist')
 
@@ -216,11 +220,16 @@ def update_operation_template(request, form):
         and (operation_template.value != form['value'] \
              or operation_template.period != form['period'] \
              or operation_template.days_in_period != form['days_in_period']):
-        build_period_clients(operation_template, dt_from=form['date_rebuild_from'], operation='delete')
+        build_period_clients(operation_template, dt_from=date_rebuild_from, operation='delete')
 
         build_period = True
 
-    operation_template = OperationTemplateForm(form, instance=operation_template).save()
+    operation_template = OperationTemplateForm(form, instance=operation_template).save(commit=False)
+    # operation_template.days_in_period = form['days_in_period']
+    if not operation_template.check_days_in_period():
+        return JsonResponse.value_error('перечисленные дни не соответствуют периоду')
+
+    operation_template.save()
 
     if build_period:
         build_period_clients(operation_template, dt_from=date_rebuild_from)

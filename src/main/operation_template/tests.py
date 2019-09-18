@@ -1,9 +1,7 @@
-from src.util.test import LocalTestCase, WorkType, datetime
+from src.util.test import LocalTestCase, datetime
 from src.db.models import OperationTemplate, OperationType, PeriodClients
 from src.main.operation_template import utils
 from datetime import date, time, datetime, timedelta
-import json
-# from django.test import TestCase
 
 class TestOperationTemplate(LocalTestCase):
 
@@ -17,7 +15,7 @@ class TestOperationTemplate(LocalTestCase):
             operation_type=self.operation_type,
             name='Ежедневный',
             period=OperationTemplate.PERIOD_DAILY,
-            days_in_period='[1,3,5]', #не используются в ежедневном шаблоне
+            days_in_period=[], #не используются в ежедневном шаблоне
             tm_start=time(10),
             tm_end=time(12),
             value=2.25
@@ -26,7 +24,7 @@ class TestOperationTemplate(LocalTestCase):
             operation_type=self.operation_type,
             name='Еженедельный',
             period=OperationTemplate.PERIOD_WEEKLY,
-            days_in_period='[2,3,7]',
+            days_in_period=[2,3,7],
             tm_start=time(10),
             tm_end=time(12),
             value=2.25
@@ -35,7 +33,7 @@ class TestOperationTemplate(LocalTestCase):
             operation_type=self.operation_type,
             name='Ежемесячный',
             period=OperationTemplate.PERIOD_MONTHLY,
-            days_in_period='[1,3,7,15,28,31]',
+            days_in_period=[1,3,7,15,28,31],
             tm_start=time(10),
             tm_end=time(12,30),
             value=2.25
@@ -110,7 +108,7 @@ class TestOperationTemplate(LocalTestCase):
         ).order_by('dttm_forecast')
         dates = pc.values_list('dttm_forecast', flat=True)
 
-        period_days = json.loads(self.ot_weekly.days_in_period)
+        period_days = self.ot_weekly.days_in_period
         l = len(period_days)
         ind = period_days.index(dates[0].isoweekday())
         ind_dates = 0
@@ -175,9 +173,9 @@ class TestOperationTemplate(LocalTestCase):
         pc=PeriodClients.objects.filter(value__gt=1).order_by('dttm_forecast')
         dates = pc.values_list('dttm_forecast', flat=True)
 
-        self.assertTrue(dates[0].day in json.loads(self.ot_monthly.days_in_period))
-        self.assertTrue(dates[6].day in json.loads(self.ot_monthly.days_in_period))
-        self.assertTrue(dates[12].day in json.loads(self.ot_monthly.days_in_period))
+        self.assertTrue(dates[0].day in self.ot_monthly.days_in_period)
+        self.assertTrue(dates[6].day in self.ot_monthly.days_in_period)
+        self.assertTrue(dates[12].day in self.ot_monthly.days_in_period)
 
         self.assertEqual(dates[0].time(), time(10, 0))
         self.assertEqual(dates[6].time(), time(10, 30))

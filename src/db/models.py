@@ -4,7 +4,6 @@ from django.contrib.auth.models import (
     UserManager
 )
 
-from django.contrib.contenttypes.models import ContentType
 from . import utils
 import datetime
 import json
@@ -513,7 +512,7 @@ class OperationTemplate(models.Model):
         verbose_name_plural = 'Шаблоны операций'
 
     def __str__(self):
-        return 'id: {}, name: {}, period: {}, period_in_days: {}, operation type: {}'.format(
+        return 'id: {}, name: {}, period: {}, days_in_period: {}, operation type: {}'.format(
             self.id,
             self.name,
             self.period,
@@ -545,19 +544,20 @@ class OperationTemplate(models.Model):
         choices=PERIOD_CHOICES,
     )
 
-    days_in_period = models.TextField()
-
+    # days_in_period = models.TextField()
+    days_in_period = utils.IntegerListField()
     # день до которого заполнен PeriodClients
     dt_built_to = models.DateField(blank=True, null=True)
 
     def check_days_in_period(self):
+        # days_in_period = json.loads(self.days_in_period)
         if self.period == self.PERIOD_WEEKLY:
             for d in self.days_in_period:
-                if d < 0 or d > 6:
+                if d < 1 or d > 7:
                     return False
         elif self.period == self.PERIOD_MONTHLY:
             for d in self.days_in_period:
-                if d < 0 or d > 30:
+                if d < 1 or d > 31:
                     return False
         return True
 
@@ -570,7 +570,7 @@ class OperationTemplate(models.Model):
                 yield dt0
                 dt0 += datetime.timedelta(minutes=step)
 
-        days_in_period = json.loads(self.days_in_period)
+        days_in_period = self.days_in_period
         shop = self.operation_type.work_type.shop
         step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
 
