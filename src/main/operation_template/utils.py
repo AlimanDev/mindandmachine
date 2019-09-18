@@ -65,6 +65,7 @@ def build_period_clients(operation_template, dt_from=None, dt_to=None, operation
         'dttm_forecast'
     )
     period_clients = period_clients.iterator()
+    period = None
     try:
         period = next(period_clients)
     except StopIteration:

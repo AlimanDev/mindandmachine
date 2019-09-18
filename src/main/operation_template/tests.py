@@ -2,14 +2,13 @@ from src.util.test import LocalTestCase, datetime
 from src.db.models import OperationTemplate, OperationType, PeriodClients
 from src.main.operation_template import utils
 from datetime import date, time, datetime, timedelta
-
+import json
 class TestOperationTemplate(LocalTestCase):
 
     def setUp(self, **args):
         super().setUp(periodclients=False)
         self.operation_type = OperationType.objects.all().first()
-        self.dt_from = date(2019, 8, 28)
-        self.dt_to = date(2019, 11, 5)
+        self.dt_from = datetime.now().date() + timedelta(days=5)
 
         self.ot_daily = OperationTemplate.objects.create(
             operation_type=self.operation_type,
@@ -34,9 +33,9 @@ class TestOperationTemplate(LocalTestCase):
             name='Ежемесячный',
             period=OperationTemplate.PERIOD_MONTHLY,
             days_in_period=[1,3,7,15,28,31],
-            tm_start=time(10),
-            tm_end=time(12,30),
-            value=2.25
+            tm_start=time(10,30),
+            tm_end=time(13),
+            value=3.25
         )
     def create_period_clients(self, dt_from, dt_to):
         creates = []
@@ -63,8 +62,8 @@ class TestOperationTemplate(LocalTestCase):
         return creates
 
     def test_generate_dates(self):
-        dt_from = self.dt_from
-        dt_to   = self.dt_to
+        dt_from = date(2019, 8, 28)
+        dt_to = date(2019, 11, 5)
 
         dates = list(self.ot_daily.generate_dates(dt_from, dt_to))
         self.assertEqual(len(dates), 70 * 4)
@@ -76,8 +75,8 @@ class TestOperationTemplate(LocalTestCase):
         self.assertEqual(len(dates), 15 * 5)
 
     def test_build_period_clients_week(self):
-        total_days = 14
-        ot_days = 6
+        total_days = 63
+        ot_days = 27
         times = 4 # периодов в день
         dt_from = datetime.now().date() + timedelta(days=5) #  15 дней
         dt_to = dt_from + timedelta(days=total_days-1)
@@ -140,14 +139,12 @@ class TestOperationTemplate(LocalTestCase):
         )
         self.assertEqual(len(pc), ot_days * 2)
 
-    def test_build_period_clients_month(self):
-        total_days = 62
+    def test_build_period_clients_month_test(self):
+        total_days = 63
         times = 5 # периодов в день
 
         dt_from = datetime.now().date() + timedelta(days=5)
         dt_to = dt_from + timedelta(days=total_days-1)
-
-        dates = [d for d in self.ot_monthly.generate_dates(dt_from, dt_to)]
 
         #Количество дней по шаблону за период
         ot_days = len([d for d in self.ot_monthly.generate_dates(dt_from, dt_to)]) / times
@@ -162,11 +159,11 @@ class TestOperationTemplate(LocalTestCase):
         self.assertEqual(len(PeriodClients.objects.all()), total_days * 18 + ot_days * 2)
 
 
-        pc=PeriodClients.objects.filter(value=3.25)
+        pc=PeriodClients.objects.filter(value=4.25)
         self.assertEqual(len(pc), ot_days * 3 )
 
 
-        pc=PeriodClients.objects.filter(value=2.25)
+        pc=PeriodClients.objects.filter(value=3.25)
         self.assertEqual(len(pc), ot_days * 2 )
 
 
@@ -177,9 +174,9 @@ class TestOperationTemplate(LocalTestCase):
         self.assertTrue(dates[6].day in self.ot_monthly.days_in_period)
         self.assertTrue(dates[12].day in self.ot_monthly.days_in_period)
 
-        self.assertEqual(dates[0].time(), time(10, 0))
-        self.assertEqual(dates[6].time(), time(10, 30))
-        self.assertEqual(dates[12].time(), time(11, 0))
+        self.assertEqual(dates[0].time(), time(10, 30))
+        self.assertEqual(dates[6].time(), time(11, 0))
+        self.assertEqual(dates[12].time(), time(11, 30))
 
         # delete by operation_template
         utils.build_period_clients(
@@ -191,7 +188,7 @@ class TestOperationTemplate(LocalTestCase):
         pc=PeriodClients.objects.filter(
             value=1
         )
-        self.assertEqual(len(pc), 62 * 18)
+        self.assertEqual(len(pc), total_days * 18)
 
         pc=PeriodClients.objects.filter(
             value=0
@@ -252,3 +249,53 @@ class TestOperationTemplate(LocalTestCase):
             value=0
         )
         self.assertEqual(len(pc), ot_days * 2)
+
+    def test_api(self):
+        self.auth()
+        ot = {
+            'value': 2.25,
+            'name':'Еженедельный',
+            'tm_start': '10:00:00',
+            'tm_end': '12:00:00',
+            'period': 'W',
+            'days_in_period':'[2,3,7]',
+            'operation_type_id': self.operation_type.id,
+        }
+        response = self.api_post('/api/operation_template/create_operation_template', ot)
+        data = response.json['data']
+        days_in_period = ot.pop('days_in_period')
+
+        for k in ot.keys():
+            self.assertEqual(data[k], ot[k])
+        self.assertEqual(data['days_in_period'], json.loads(days_in_period))
+
+        id = data['id']
+
+        ot = {
+            'id': id,
+            'value': 3.25,
+            'name':'Ежемесячный',
+            'tm_start': '10:30:00',
+            'tm_end': '13:00:00',
+            'period': OperationTemplate.PERIOD_MONTHLY,
+            'days_in_period':'["a","b"]',
+            'date_rebuild_from': self.dt_from,
+        }
+
+        response = self.api_post('/api/operation_template/update_operation_template', ot)
+        self.assertEqual(response.json['data']['error_message'], "[('days_in_period', ['invalid IntegerListType'])]")
+
+        ot['days_in_period'] = '[1,2,4,15,20,50]'
+        response = self.api_post('/api/operation_template/update_operation_template', ot)
+        self.assertEqual(response.json['data']['error_message'], "Перечисленные дни не соответствуют периоду")
+
+        ot['days_in_period'] = '[1,2,4,15,20]'
+        response = self.api_post('/api/operation_template/update_operation_template', ot)
+        data = response.json['data']
+
+        days_in_period = ot.pop('days_in_period')
+        date_rebuild_from = ot.pop('date_rebuild_from')
+        for k in ot.keys():
+            self.assertEqual(data[k], ot[k])
+        self.assertEqual(data['days_in_period'], json.loads(days_in_period))
+

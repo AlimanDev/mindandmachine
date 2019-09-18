@@ -227,7 +227,7 @@ def update_operation_template(request, form):
     operation_template = OperationTemplateForm(form, instance=operation_template).save(commit=False)
     # operation_template.days_in_period = form['days_in_period']
     if not operation_template.check_days_in_period():
-        return JsonResponse.value_error('перечисленные дни не соответствуют периоду')
+        return JsonResponse.value_error('Перечисленные дни не соответствуют периоду')
 
     operation_template.save()
 
