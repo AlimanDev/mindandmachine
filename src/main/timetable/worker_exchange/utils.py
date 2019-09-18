@@ -25,10 +25,10 @@ Note:
             }, ..
         }
 """
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, time
 import pandas
 
-from django.db.models import Q
+from django.db.models import Q, Exists, OuterRef
 from django.utils.timezone import now
 from django.conf import settings
 
@@ -74,27 +74,17 @@ def search_candidates(wd_details, **kwargs):
     # todo: 2. add WorkerCashboxInfo check if necessary
     # todo: 3. add Location check
     workers = User.objects.filter(
-
-        Q(workerday__type__in=[
-            WorkerDay.Type.TYPE_HOLIDAY.value,
-            WorkerDay.Type.TYPE_VACATION.value,
-            WorkerDay.Type.TYPE_EMPTY.value,
-            WorkerDay.Type.TYPE_DELETED.value,
-            WorkerDay.Type.TYPE_HOLIDAY_SPECIAL.value,
-        ]) |
-        Q(workerday__type=WorkerDay.Type.TYPE_WORKDAY.value, workerday__dttm_work_start__gte=wd_details.dttm_to) |
-        Q(workerday__type=WorkerDay.Type.TYPE_WORKDAY.value,workerday__dttm_work_end__lte=wd_details.dttm_from),
         depart_filter,
-
         dt_fired__isnull=True,
         is_ready_for_overworkings=True,
-
-        workerday__dt=wd_details.dttm_from.date(),
-        workerday__child__isnull=True,
-    )
-    # print(workers.query.__str__())
-    # import pdb
-    # pdb.set_trace()
+    ).annotate(
+        no_wdays=~Exists(WorkerDay.objects.filter(
+            worker=OuterRef('pk'),
+            dttm_work_start__lte=wd_details.dttm_to,
+            dttm_work_end__gte=wd_details.dttm_from,
+            dt=wd_details.dttm_from.date(),
+            ))
+    ).filter(no_wdays=True)
 
     return workers
 
@@ -157,6 +147,7 @@ def create_vacancies_and_notify(shop_id, work_type_id):
 
     """
 
+    shop=Shop.objects.get(id=shop_id)
     exchange_settings = ExchangeSettings.objects.first()
     if not exchange_settings.automatic_check_lack:
         return
@@ -261,15 +252,23 @@ def create_vacancies_and_notify(shop_id, work_type_id):
             working_shifts = []
         elif df_vacancies.delta[i] < min_shift:
             working_shifts = [min_shift]
+
         dttm_to = dttm_from = df_vacancies.dttm_from[i]
 
-        shop_tm_closes = Shop.objects.get(id=shop_id).tm_shop_closes
+        dttm_shop_opens = datetime.combine(dttm_from.date(), shop.tm_shop_opens)
+        dttm_shop_closes = datetime.combine(dttm_from.date(), shop.tm_shop_closes)
+
+        if shop.tm_shop_closes == time(hour=0, minute=0, second=0):
+            dttm_shop_closes += timedelta(days=1)
+
         for shift in working_shifts:
             dttm_from = dttm_to
             dttm_to = dttm_to + shift
-            if dttm_to.time() > shop_tm_closes:
-                dttm_to = dttm_to.replace(hour=shop_tm_closes.hour, minute=shop_tm_closes.minute)
+            if dttm_to > dttm_shop_closes:
+                dttm_to = dttm_shop_closes
                 dttm_from = dttm_to - shift
+            if dttm_from < dttm_shop_opens:
+                dttm_from = dttm_shop_opens
             print('create vacancy {} {} {}'.format(dttm_from, dttm_to, work_type_id))
 
             worker_day_detail = WorkerDayCashboxDetails.objects.create(

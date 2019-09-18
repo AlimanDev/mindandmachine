@@ -9,7 +9,10 @@ from . import utils
 import datetime
 import json
 
+from fcm_django.models import FCMDevice
+from src.conf.djconfig import IS_PUSH_ACTIVE
 from mptt.models import MPTTModel, TreeForeignKey
+
 
 # на самом деле это отдел
 class Shop(MPTTModel):
@@ -1099,6 +1102,9 @@ class EventManager(models.Manager):
 
         notis = Notifications.objects.bulk_create([Notifications(event=event, to_worker=u) for u in users])
         # todo: add sending push notifies
+        if (not push_title is None) and IS_PUSH_ACTIVE:
+            devices = FCMDevice.objects.filter(user__in=users)
+            devices.send_message(title=push_title, body=event.text)
         return event
 
 

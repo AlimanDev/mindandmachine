@@ -28,6 +28,7 @@ from src.util.models_converter import BaseConverter
 
 from src.main.timetable.worker_exchange.utils import search_candidates, send_noti2candidates
 from src.main.operation_template.utils import build_period_clients
+
 from src.db.models import (
     Event,
     PeriodQueues,
@@ -39,7 +40,7 @@ from src.db.models import (
     WorkerDay,
     # Notifications,
     Shop,
-    # User,
+    User,
     ProductionDay,
     WorkerCashboxInfo,
     CameraClientGate,
@@ -52,6 +53,9 @@ from src.db.models import (
     OperationTemplate
 )
 from src.celery.celery import app
+from django.core.mail import EmailMultiAlternatives
+from src.conf.djconfig import EMAIL_HOST_USER
+
 import time as time_in_secs
 
 
@@ -540,6 +544,35 @@ def update_shop_stats(dt=None):
         timetable.lack = stats['covering_part']
         timetable.fot_revenue = stats['fot_revenue']
         timetable.save()
+
+
+@app.task
+def send_notify_email(message, send2user_ids, title=None, file=None, html_content=None):
+    '''
+    Функция-обёртка для отправки email сообщений (в том числе файлов)
+    :param message: сообщение
+    :param send2user_ids: список id пользователей
+    :param title: название сообщения
+    :param file: файл
+    :param html_content: контент в формате html
+    :return:
+    '''
+
+    # todo: add message if no emails
+    user_emails = [user.email for user in User.objects.filter(id__in=send2user_ids) if user.email]
+    msg = EmailMultiAlternatives(
+        subject='Сообщение от Mind&Machine' if title is None else title,
+        body=message,
+        from_email=EMAIL_HOST_USER,
+        to=user_emails,
+    )
+    if file:
+        msg.attach_file(file)
+
+    if html_content:
+        msg.attach_alternative(html_content, "text/html")
+    result = msg.send()
+    return 'Отправлено {} сообщений из {}'.format(result, len(send2user_ids))
 
 
 @app.task
