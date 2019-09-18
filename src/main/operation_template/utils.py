@@ -60,7 +60,7 @@ def build_period_clients(operation_template, dt_from=None, dt_to=None, operation
     period_clients = PeriodClients.objects.filter(
         operation_type=operation_template.operation_type,
         dttm_forecast__gte=dt_from,
-        dttm_forecast__lte=dt_to,
+        dttm_forecast__lte=dt_to+timedelta(days=1),
     ).order_by(
         'dttm_forecast'
     )
