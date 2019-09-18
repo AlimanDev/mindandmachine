@@ -299,3 +299,8 @@ class TestOperationTemplate(LocalTestCase):
             self.assertEqual(data[k], ot[k])
         self.assertEqual(data['days_in_period'], json.loads(days_in_period))
 
+        response = self.api_post('/api/operation_template/delete_operation_template',
+                                 {'id': id})
+        self.assertEqual(response.json['code'], 200)
+        operation_template = OperationTemplate.objects.get(id=id)
+        self.assertTrue(operation_template.dttm_deleted is not None)
