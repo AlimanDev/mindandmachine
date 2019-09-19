@@ -69,7 +69,6 @@ def get_outsource_workers(request, form):
         ).filter(
             dttm_deleted__isnull=True,
             dttm_from__gte=from_dt + timedelta(days=date),
-            dttm_to__lt=from_dt + timedelta(days=date+1),
             work_type_id__in=[w.id for w in shop.worktype_set.all()],
             is_vacancy=True,
             status__in=status_list
