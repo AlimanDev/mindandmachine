@@ -50,6 +50,14 @@ def get_outsource_workers(request, form):
     to_dt = form['to_dt']
     date_response_dict = response_dict['dates']
 
+
+    for date in range((to_dt - from_dt).days + 1):
+        converted_date = BaseConverter.convert_date(from_dt + timedelta(days=date))
+        date_response_dict[converted_date] = {
+            'outsource_workers': [],
+            'amount': 0
+        }
+
     status_list = list(WorkerDayCashboxDetails.WORK_TYPES_LIST)
     status_list.append(WorkerDayCashboxDetails.TYPE_VACANCY)
 
@@ -61,7 +69,7 @@ def get_outsource_workers(request, form):
     ).filter(
         dttm_deleted__isnull=True,
         dttm_from__gte=from_dt,
-        dttm_to__lt=to_dt + timedelta(days=1),
+        dttm_from__lt=to_dt + timedelta(days=1),
         work_type_id__in=[w.id for w in shop.worktype_set.all()],
         is_vacancy=True,
         status__in=status_list
@@ -76,11 +84,6 @@ def get_outsource_workers(request, form):
 
     for wd in outsource_workerdays:
         converted_date = BaseConverter.convert_date(wd.dttm_from.date())
-        if converted_date not in date_response_dict:
-            date_response_dict[converted_date] = {
-                'outsource_workers': [],
-                'amount': 0
-            }
 
         # first_name = '№{}'.format(str(outsourcer_number + 1))
         try:
