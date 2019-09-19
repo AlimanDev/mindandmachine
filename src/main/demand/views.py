@@ -377,7 +377,7 @@ def create_predbills_request(request, form):
     return JsonResponse.success() if result is True else result
 
 
-@api_method('POST', SetPredictBillsForm, check_permissions=False)
+@api_method('POST', SetPredictBillsForm)
 def set_pred_bills(request, form):
     """
     ждет request'a от qos_algo. когда получает, записывает данные из data в базу данных

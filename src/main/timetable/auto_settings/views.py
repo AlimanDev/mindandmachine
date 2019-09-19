@@ -744,7 +744,7 @@ def delete_timetable(request, form):
 
 # @csrf_exempt
 #@api_method('POST', SetTimetableForm, auth_required=False)
-@api_method('POST', SetTimetableForm, check_permissions=False) # fixme: add check_permissions by user_id
+@api_method('POST', SetTimetableForm)
 def set_timetable(request, form):
     """
     Ждет request'a от qos_algo. Когда получает, записывает данные по расписанию в бд
