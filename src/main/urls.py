@@ -1,36 +1,40 @@
 from django.conf import settings
+from django.conf.urls import include, url
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path
-from .cashbox import urls as cashbox_urls
-from .timetable import urls as timetable_urls
+
 from .auth import urls as auth_urls
-from .demand import urls as demand_urls
-from .queue import urls as queue_urls
-from .other import urls as other_urls
 from .camera import urls as camera_urls
+from .cashbox import urls as cashbox_urls
 from .download import urls as download_urls
+from .demand import urls as demand_urls
+from .operation_template import urls as operation_template_urls
+from .other import urls as other_urls
+from .timetable import urls as timetable_urls
+from .queue import urls as queue_urls
+from .shop import urls as shop_urls
 from .tablet import urls as tablet_urls
 from .upload import urls as upload_urls
 from .urv import urls as urv_urls
-from .shop import urls as shop_urls
-from django.conf.urls import include, url
+
 from src.conf.djconfig import DEBUG
 
 
 api_urlpatterns = [
     path('auth/', include(auth_urls)),
-    path('cashbox/', include(cashbox_urls)),
-    path('timetable/', include(timetable_urls)),
-    path('demand/', include(demand_urls)),
-    path('queue/', include(queue_urls)),
     path('camera/', include(camera_urls)),
-    path('other/', include(other_urls)),
+    path('cashbox/', include(cashbox_urls)),
+    path('demand/', include(demand_urls)),
     path('download/', include(download_urls)),
+    path('other/', include(other_urls)),
+    path('operation_template/', include(operation_template_urls)),
+    path('shop/', include(shop_urls)),
     path('tablet/', include(tablet_urls)),
+    path('timetable/', include(timetable_urls)),
+    path('queue/', include(queue_urls)),
     path('upload/', include(upload_urls)),
     path('urv/', include(urv_urls)),
-    path('shop/', include(shop_urls)),
 ]
 
 urlpatterns = [

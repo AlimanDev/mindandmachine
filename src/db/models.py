@@ -3,9 +3,11 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
     UserManager
 )
-from django.contrib.contenttypes.models import ContentType
+
 from . import utils
 import datetime
+import json
+
 from fcm_django.models import FCMDevice
 from src.conf.djconfig import IS_PUSH_ACTIVE
 from mptt.models import MPTTModel, TreeForeignKey
@@ -351,6 +353,11 @@ class FunctionGroup(models.Model):
         'do_notify_action',
         'exchange_workers_day',
         'upload_urv',
+
+        'get_operation_templates',
+        'create_operation_template',
+        'update_operation_template',
+        'delete_operation_template',
         'set_pred_bills',
 
         # download/
@@ -470,6 +477,139 @@ class OperationType(models.Model):
         default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 200, "reg_lambda": 2, "silent": 1, "iterations": 20}'
     )
 
+class OperationTemplate(models.Model):
+    """
+        Шаблоны операций.
+        В соответствии с ними создаются записи в PeriodClients
+        Пример 1:
+        {
+            name: Уборка
+            operation_type_id: 1,
+            tm_start: 10:00:00
+            tm_end: 12:00:00
+            period: W
+            days_in_period: [1,3,5]
+            value: 2.5
+        }
+        В PeriodClients создадутся записи о потребности в двух с половиной людях
+            с 10 до 12 в пн, ср, пт каждую неделю
+
+        Пример 2:
+        {
+            name: Уборка
+            operation_type_id: 1,
+            tm_start: 10:00:00
+            tm_end: 12:00:00
+            period: M
+            days_in_period: [1,3,5,15]
+            value: 1
+        }
+        В PeriodClients создадутся записи о потребности в 1 человеке
+            с 10 до 12 каждый месяц 1,3,5,15 числа
+    """
+    class Meta:
+        verbose_name = 'Шаблон операций'
+        verbose_name_plural = 'Шаблоны операций'
+
+    def __str__(self):
+        return 'id: {}, name: {}, period: {}, days_in_period: {}, operation type: {}'.format(
+            self.id,
+            self.name,
+            self.period,
+            self.days_in_period,
+            self.operation_type.name)
+
+    PERIOD_DAILY = 'D'
+    PERIOD_WEEKLY = 'W'
+    PERIOD_MONTHLY = 'M'
+    PERIOD_CHOICES = (
+        (PERIOD_DAILY, 'Ежедневно',),
+        (PERIOD_WEEKLY, 'В неделю',),
+        (PERIOD_MONTHLY, 'В месяц',),
+    )
+
+
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    dttm_deleted = models.DateTimeField(blank=True, null=True)
+
+    operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT, related_name='work_type_reversed')
+    name = models.CharField(max_length=128)
+    tm_start = models.TimeField()
+    tm_end = models.TimeField()
+    value = models.FloatField()
+
+    period = models.CharField(
+        max_length=1,
+        default=PERIOD_DAILY,
+        choices=PERIOD_CHOICES,
+    )
+
+    # days_in_period = models.TextField()
+    days_in_period = utils.IntegerListField()
+    # день до которого заполнен PeriodClients
+    dt_built_to = models.DateField(blank=True, null=True)
+
+    def check_days_in_period(self):
+        # days_in_period = json.loads(self.days_in_period)
+        if self.period == self.PERIOD_WEEKLY:
+            for d in self.days_in_period:
+                if d < 1 or d > 7:
+                    return False
+        elif self.period == self.PERIOD_MONTHLY:
+            for d in self.days_in_period:
+                if d < 1 or d > 31:
+                    return False
+        return True
+
+
+    def generate_dates(self, dt_from, dt_to):
+        def generate_times(dt, step):
+            dt0 = datetime.datetime.combine(dt, self.tm_start)
+            dt1 = datetime.datetime.combine(dt, self.tm_end)
+            while dt0 < dt1:
+                yield dt0
+                dt0 += datetime.timedelta(minutes=step)
+
+        days_in_period = self.days_in_period
+        shop = self.operation_type.work_type.shop
+        step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
+
+        if self.period == self.PERIOD_DAILY:
+            while dt_from <= dt_to:
+                for t in generate_times(dt_from, step):
+                    yield t
+                dt_from += datetime.timedelta(days=1)
+            return
+
+        lambda_get_day = None
+        if self.period == self.PERIOD_WEEKLY:
+            lambda_get_day = lambda dt: dt.isoweekday()
+        elif self.period == self.PERIOD_MONTHLY:
+            lambda_get_day = lambda dt: dt.day
+
+        day = lambda_get_day(dt_from)
+        while dt_from <= dt_to:
+            for period_day in days_in_period:
+                if period_day < day:
+                    continue
+                elif period_day > day:
+                    delta = period_day - day
+                    dt_from += datetime.timedelta(days=delta)
+                    if dt_from > dt_to:
+                        return
+
+                for t in generate_times(dt_from, step):
+                    yield t
+                dt_from += datetime.timedelta(days=1)
+                if dt_from > dt_to:
+                    return
+                day = lambda_get_day(dt_from)
+            if day == days_in_period[0]:
+                for t in generate_times(dt_from, step):
+                    yield t
+
+            dt_from += datetime.timedelta(days=1)
+            day = lambda_get_day(dt_from)
 
 class UserWeekdaySlot(models.Model):
     class Meta(object):

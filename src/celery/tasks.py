@@ -2,7 +2,7 @@ from datetime import date, timedelta
 import json
 import os
 
-from django.db.models import Avg
+from django.db.models import Avg, Q
 from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
@@ -23,6 +23,12 @@ from src.main.timetable.worker_exchange.utils import (
 
 from src.main.demand.utils import create_predbills_request_function
 from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
+
+from src.util.models_converter import BaseConverter
+
+from src.main.timetable.worker_exchange.utils import search_candidates, send_noti2candidates
+from src.main.operation_template.utils import build_period_clients
+
 from src.db.models import (
     Event,
     PeriodQueues,
@@ -44,12 +50,27 @@ from src.db.models import (
     EmptyOutcomeVisitors,
     PurchasesOutcomeVisitors,
     ExchangeSettings,
+    OperationTemplate
 )
 from src.celery.celery import app
 from django.core.mail import EmailMultiAlternatives
 from src.conf.djconfig import EMAIL_HOST_USER
 
 import time as time_in_secs
+
+
+@app.task
+def op_type_build_period_clients():
+    dt_from = now().date() + timedelta(days = 2)
+    dt_to = dt_from + timedelta(days=62)
+
+    oper_templates = OperationTemplate.objects.filter(
+        Q(dt_built_to__isnull=True) | Q(dt_built_to__lt=dt_to),
+        dttm_deleted__isnull=True,
+    )
+
+    for ot in oper_templates:
+        build_period_clients(ot, dt_to=dt_to)
 
 
 @app.task
@@ -586,4 +607,3 @@ def upload_vacation_task():
     upload_vacation_util(file)
     file.close()
     os.remove(localpath)
-

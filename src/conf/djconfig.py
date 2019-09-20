@@ -305,5 +305,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'src.celery.tasks.update_shop_stats',
         'schedule': crontab(hour=3, minute=0),
         'options': {'queue': BACKEND_QUEUE}
-    }
+    },
+    'task-update-operation-templates': {
+        'task': 'src.celery.tasks.op_type_build_period_clients',
+        'schedule': crontab(hour=1, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
 }
