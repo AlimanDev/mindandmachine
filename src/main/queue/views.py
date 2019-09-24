@@ -8,10 +8,7 @@ from src.db.models import (
     WorkType,
     Shop,
     PeriodDemand,
-    Notifications,
-    User,
     PeriodQueues,
-    FunctionGroup
 )
 from dateutil.relativedelta import relativedelta
 from src.util.forms import FormUtil
