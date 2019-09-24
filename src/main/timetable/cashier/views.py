@@ -324,6 +324,7 @@ def get_cashier_timetable(request, form):
             'dttm_work_start',
             'dttm_work_end',
             'work_types__id',
+            'comment',
         )
 
         worker_days = []
@@ -342,6 +343,7 @@ def get_cashier_timetable(request, form):
                     worker_id=wd['worker_id'],
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
+                    comment=wd['comment'],
                 )
                 if wd['work_types__id']:
                     wd_m.work_types_ids = [wd['work_types__id']]
@@ -688,21 +690,18 @@ def set_worker_day(request, form):
         JsonResponse.multiple_objects_returned
     """
 
+    details = []
     if form['details']:
         details = json.loads(form['details'])
-    else:
-        details = []
-    dt = form['dt']
-    response = {}
 
-    try:
-        worker = User.objects.get(id=form['worker_id'])
-    except User.DoesNotExist:
-        return JsonResponse.value_error('Invalid worker_id')
+    dt = form['dt']
+    worker = User.objects.get(id=form['worker_id'])
 
     wd_args = {
         'dt': dt,
         'type': form['type'],
+        'dttm_work_start': None,
+        'dttm_work_end': None,
     }
 
     if WorkerDay.is_type_with_tm_range(form['type']):
@@ -713,12 +712,6 @@ def set_worker_day(request, form):
         wd_args.update({
             'dttm_work_start': dttm_work_start,
             'dttm_work_end': dttm_work_end,
-        })
-
-    else:
-        wd_args.update({
-            'dttm_work_start': None,
-            'dttm_work_end': None,
         })
 
     try:
@@ -734,7 +727,6 @@ def set_worker_day(request, form):
         return JsonResponse.multiple_objects_returned()
 
     if old_wd:
-        # old_wd_type = old_wd.type
         # Не пересохраняем, если тип не изменился
         if old_wd.type == form['type'] and not WorkerDay.is_type_with_tm_range(form['type']):
             return JsonResponse.success()
@@ -748,23 +740,26 @@ def set_worker_day(request, form):
             old_wd.delete()
             old_wd = None
 
+    response = {
+        'action': action
+    }
 
     # todo: fix temp code -- if status TYPE_EMPTY or TYPE_DELETED then delete all sequence of worker_day -- possible to recreate timetable
-    if worker.attachment_group == User.GROUP_STAFF and form['type'] in \
-        [WorkerDay.Type.TYPE_EMPTY.value, WorkerDay.Type.TYPE_DELETED.value]:
-        while old_wd:
-            WorkerDayCashboxDetails.objects.filter(worker_day=old_wd).delete()
-            old_wd.delete()
-            old_wd = old_wd.parent_worker_day if old_wd.parent_worker_day_id else None
+    # if worker.attachment_group == User.GROUP_STAFF and form['type'] in \
+    #     [WorkerDay.Type.TYPE_EMPTY.value, WorkerDay.Type.TYPE_DELETED.value]:
+    #     while old_wd:
+    #         WorkerDayCashboxDetails.objects.filter(worker_day=old_wd).delete()
+    #         old_wd.delete()
+    #         old_wd = old_wd.parent_worker_day if old_wd.parent_worker_day_id else None
 
-
-    elif worker.attachment_group == User.GROUP_STAFF \
+    if worker.attachment_group == User.GROUP_STAFF \
             or worker.attachment_group == User.GROUP_OUTSOURCE \
                     and form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
         new_worker_day = WorkerDay.objects.create(
             worker_id=worker.id,
             parent_worker_day=old_wd,
             created_by=request.user,
+            comment=form['comment'],
             **wd_args
         )
         if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
@@ -788,14 +783,11 @@ def set_worker_day(request, form):
                     dttm_to=new_worker_day.dttm_work_end
                 )
 
-            response['day'] = WorkerDayConverter.convert(new_worker_day)
+        response['day'] = WorkerDayConverter.convert(new_worker_day)
 
     elif worker.attachment_group == User.GROUP_OUTSOURCE:
         worker.delete()
 
-    response = {
-        'action': action
-    }
 
     shop = Shop.objects.get(user=form['worker_id'])
     work_type_id = WorkType.objects.get(id=form['work_type']).id if form['work_type'] else None
@@ -804,12 +796,15 @@ def set_worker_day(request, form):
             worker_day=old_wd,
             dttm_deleted__isnull=True
         ).first()
-        work_type_id = work_type_id.work_type_id if not work_type_id is None else None
 
-    if (form['type'] == WorkerDay.Type.TYPE_WORKDAY.value) and work_type_id:
-        cancel_vacancies(shop.id, work_type_id)
-    if (form['type'] != WorkerDay.Type.TYPE_WORKDAY.value) and work_type_id:
-        create_vacancies_and_notify(shop.id, work_type_id) # todo: fix this row
+        if work_type_id:
+            work_type_id = work_type_id.work_type_id
+
+    if work_type_id:
+        if (form['type'] == WorkerDay.Type.TYPE_WORKDAY.value):
+            cancel_vacancies(shop.id, work_type_id)
+        else:
+            create_vacancies_and_notify(shop.id, work_type_id)
 
     return JsonResponse.success(response)
 
@@ -850,6 +845,7 @@ def get_worker_day_logs(request, form):
             'dttm_work_start': __work_dttm(obj.dttm_work_start),
             'dttm_work_end': __work_dttm(obj.dttm_work_end),
             'created_by': obj.created_by_id,
+            'comment': obj.comment,
             'created_by_fio': obj.created_by.get_fio(),
             'prev_type': WorkerDayConverter.convert_type(obj.parent_worker_day.type),
             'prev_dttm_work_start': __work_dttm(obj.parent_worker_day.dttm_work_start),

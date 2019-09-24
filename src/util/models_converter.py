@@ -123,6 +123,7 @@ class WorkerDayConverter(BaseConverter):
             'work_types': list(set(obj.work_types_ids)) if hasattr(obj, 'work_types_ids') else [],
             'work_type': obj.work_type_id if hasattr(obj, 'work_type_id') else None,
             'created_by': obj.created_by_id,
+            'comment': obj.comment,
         }
         if hasattr(obj, 'other_shop'):
             data['other_shop'] = obj.other_shop
