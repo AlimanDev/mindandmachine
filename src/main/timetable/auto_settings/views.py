@@ -6,13 +6,12 @@ from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Q, Avg, Sum
+from django.db.models import Q, Sum
 
 from src.db.models import (
     Timetable,
     User,
     WorkType,
-    OperationType,
     PeriodClients,
     WorkerConstraint,
     WorkerCashboxInfo,
@@ -23,8 +22,6 @@ from src.db.models import (
     Slot,
     UserWeekdaySlot,
     ProductionDay,
-    Event,
-    Notifications,
 )
 from src.util.collection import group_by
 from src.util.models_converter import (
@@ -35,7 +32,6 @@ from src.util.models_converter import (
     WorkerCashboxInfoConverter,
     WorkerDayConverter,
     BaseConverter,
-    PeriodClientsConverter,
     UserWeekdaySlotConverter,
 )
 from src.util.utils import api_method, JsonResponse
@@ -50,7 +46,6 @@ import requests
 from ..table.utils import count_difference_of_normal_days
 from src.main.other.notification.utils import send_notification
 from django.db.models import F
-from calendar import monthrange
 from .utils import set_timetable_date_from
 from django.utils import timezone
 
@@ -316,14 +311,16 @@ def create_timetable(request, form):
         shop_id=shop_id,
         auto_timetable=True,
     )
-    shop = Shop.objects.get(id=shop_id)
+    shop = request.shop
     period_step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
 
     # проверка что у всех юзеров указаны специализации
     users_without_spec = []
     for u in users:
-        worker_cashbox_info = WorkerCashboxInfo.objects.filter(worker=u).values_list('is_active')
-        if not [wci_obj for wci_obj in worker_cashbox_info if True in wci_obj]:
+        worker_cashbox_info = WorkerCashboxInfo.objects.filter(
+            worker=u,
+            is_active='True')
+        if not worker_cashbox_info.exists():
             users_without_spec.append(u.first_name + ' ' + u.last_name)
     if users_without_spec:
         tt.status = Timetable.Status.ERROR.value
@@ -335,7 +332,7 @@ def create_timetable(request, form):
     period_difference = {'work_type_name': [], 'difference': []}
 
     hours_opened = round((datetime.combine(date.today(), shop.tm_shop_closes) -
-                                  datetime.combine(date.today(), shop.tm_shop_opens)).seconds/3600)
+                                  datetime.combine(date.today(), shop.tm_shop_opens)).seconds / 3600)
     if hours_opened == 0:
         hours_opened = 24
     period_normal_count = int(hours_opened * ((dt_to - dt_from).days) * (60 / period_step))
@@ -405,6 +402,8 @@ def create_timetable(request, form):
         worker__shop_id=form['shop_id'],
         dt__gte=dt_from,
         dt__lte=dt_to,
+    ).exclude(
+        type=WorkerDay.Type.TYPE_EMPTY.value
     ).order_by(
         'dt'
     ).values(
@@ -419,20 +418,20 @@ def create_timetable(request, form):
     )
     for wd in worker_days_db:
         if (wd['id'] in worker_days_mask) and wd['work_types__id']:
-            pass
-        else:
-            worker_days_mask[wd['id']] = len(new_worker_days)
-            wd_mod = WorkerDay(
-                id=wd['id'],
-                type=wd['type'],
-                dttm_added=wd['dttm_added'],
-                dt=wd['dt'],
-                worker_id=wd['worker_id'],
-                dttm_work_start=wd['dttm_work_start'],
-                dttm_work_end=wd['dttm_work_end'],
-            )
-            wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
-            new_worker_days.append(wd_mod)
+            continue
+
+        worker_days_mask[wd['id']] = len(new_worker_days)
+        wd_mod = WorkerDay(
+            id=wd['id'],
+            type=wd['type'],
+            dttm_added=wd['dttm_added'],
+            dt=wd['dt'],
+            worker_id=wd['worker_id'],
+            dttm_work_start=wd['dttm_work_start'],
+            dttm_work_end=wd['dttm_work_end'],
+        )
+        wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
+        new_worker_days.append(wd_mod)
 
     worker_day = group_by(
         collection=new_worker_days,
@@ -445,6 +444,8 @@ def create_timetable(request, form):
         worker__shop_id=form['shop_id'],
         dt__gte=dt_from - timedelta(days=7),
         dt__lte=dt_from,
+    ).exclude(
+        type=WorkerDay.Type.TYPE_EMPTY.value
     ).order_by(
         'dt'
     ).values(
@@ -459,20 +460,19 @@ def create_timetable(request, form):
     )
     for wd in worker_days_db:
         if (wd['id'] in worker_days_mask) and wd['work_types__id']:
-            pass
-        else:
-            worker_days_mask[wd['id']] = len(prev_worker_days)
-            wd_mod = WorkerDay(
-                id=wd['id'],
-                type=wd['type'],
-                dttm_added=wd['dttm_added'],
-                dt=wd['dt'],
-                worker_id=wd['worker_id'],
-                dttm_work_start=wd['dttm_work_start'],
-                dttm_work_end=wd['dttm_work_end'],
-            )
-            wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
-            prev_worker_days.append(wd_mod)
+            continue
+        worker_days_mask[wd['id']] = len(prev_worker_days)
+        wd_mod = WorkerDay(
+            id=wd['id'],
+            type=wd['type'],
+            dttm_added=wd['dttm_added'],
+            dt=wd['dt'],
+            worker_id=wd['worker_id'],
+            dttm_work_start=wd['dttm_work_start'],
+            dttm_work_end=wd['dttm_work_end'],
+        )
+        wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
+        prev_worker_days.append(wd_mod)
 
     prev_data = group_by(
         collection=prev_worker_days,
@@ -643,7 +643,7 @@ def create_timetable(request, form):
         tt.status = Timetable.Status.ERROR.value
         tt.status_message = str(e)
         tt.save()
-        JsonResponse.internal_error('Error sending data to server')
+        return JsonResponse.internal_error('Error sending data to server')
 
     send_notification('C', tt, sender=request.user)
     return JsonResponse.success()
@@ -686,12 +686,6 @@ def delete_timetable(request, form):
             send_notification('D', tt, sender=request.user)
     tts.delete()
 
-    WorkerDayChangeRequest.objects.filter(
-        worker__shop_id=shop_id,
-        dt__gte=dt_from,
-        dt__lt=dt_to,
-        worker__auto_timetable=True,
-    ).delete()
 
     WorkerDayCashboxDetails.objects.filter(
         worker_day__worker__shop_id=shop_id,
@@ -702,7 +696,9 @@ def delete_timetable(request, form):
     ).filter(
         Q(worker_day__created_by__isnull=True) |
         Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
-    ).delete()
+    ).update(
+        dttm_deleted=timezone.now()
+    )
 
     WorkerDayCashboxDetails.objects.filter(
         worker_day__worker__shop_id=shop_id,
@@ -714,17 +710,23 @@ def delete_timetable(request, form):
         worker_day=None
     )
 
-
-
-    WorkerDay.objects.filter(
+    wdays = WorkerDay.objects.filter(
         worker__shop_id=shop_id,
         dt__gte=dt_from,
         dt__lt=dt_to,
         worker__auto_timetable=True,
     ).filter(
-        Q(created_by__isnull=True) |
-        Q(type=WorkerDay.Type.TYPE_EMPTY.value)
-    ).delete()
+        created_by__isnull=True,
+    ).exclude(
+        type=WorkerDay.Type.TYPE_EMPTY.value
+    )
+    for wd in wdays:
+        WorkerDay.objects.create(
+            type=WorkerDay.Type.TYPE_EMPTY.value,
+            dt = wd.dt,
+            parent_worker_day=wd,
+            worker_id=wd.worker_id,
+        )
 
     # cancel vacancy
     # todo: add deleting workerdays
@@ -785,15 +787,16 @@ def set_timetable(request, form):
                 # todo: too much request to db
 
                 dt = BaseConverter.parse_date(wd['dt'])
-                try:
-                    wd_obj = WorkerDay.objects.get(worker_id=uid, dt=dt, child__id__isnull=True)
-                    if wd_obj.created_by or wd_obj.type != WorkerDay.Type.TYPE_EMPTY:
+                wd_obj = WorkerDay(
+                    dt=dt,
+                    worker_id=uid,
+                )
+
+                parent_wd_obj = WorkerDay.objects.filter(worker_id=uid, dt=dt, child__id__isnull=True).first()
+                if parent_wd_obj:
+                    if parent_wd_obj.type != WorkerDay.Type.TYPE_EMPTY.value:
                         continue
-                except WorkerDay.DoesNotExist:
-                    wd_obj = WorkerDay(
-                        dt=BaseConverter.parse_date(wd['dt']),
-                        worker_id=uid,
-                    )
+                    wd_obj.parent_worker_day = parent_wd_obj
 
                 wd_obj.worker.shop_id = users[int(uid)].shop_id
                 wd_obj.type = WorkerDayConverter.parse_type(wd['type'])
