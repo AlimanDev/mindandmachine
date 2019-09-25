@@ -715,6 +715,7 @@ def delete_timetable(request, form):
         dt__gte=dt_from,
         dt__lt=dt_to,
         worker__auto_timetable=True,
+        child__id__isnull=True
     ).filter(
         created_by__isnull=True,
     ).exclude(
@@ -792,7 +793,10 @@ def set_timetable(request, form):
                     worker_id=uid,
                 )
 
-                parent_wd_obj = WorkerDay.objects.filter(worker_id=uid, dt=dt, child__id__isnull=True).first()
+                parent_wd_obj = WorkerDay.objects.filter(
+                    worker_id=uid,
+                    dt=dt,
+                    child__id__isnull=True).first()
                 if parent_wd_obj:
                     if parent_wd_obj.type != WorkerDay.Type.TYPE_EMPTY.value:
                         continue
