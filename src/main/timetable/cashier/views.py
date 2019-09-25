@@ -2,6 +2,9 @@ from datetime import time, datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ObjectDoesNotExist
 import json
+
+from django.db.models import Q
+
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
 from django.utils import timezone
 
@@ -96,23 +99,20 @@ def get_cashiers_list(request, form):
         ]}
 
     """
-    response_users = []
     attachment_groups = [User.GROUP_STAFF, User.GROUP_OUTSOURCE if form['consider_outsource'] else None]
     shop_id = form['shop_id']
+
+    q = Q()
+    if not form['show_all']:
+        q &= Q(dt_hired__isnull=True) | Q(dt_hired__lte=form['dt_hired_before'])
+        q &= Q(dt_fired__isnull=True) | Q(dt_fired__gt=form['dt_fired_after'])
+
     users_qs = User.objects.filter(
         shop_id=shop_id,
-        attachment_group__in=attachment_groups
-    ).order_by('id')
+        attachment_group__in=attachment_groups,
+    ).filter(q).order_by('id')
 
-    if form['show_all']:
-        response_users = users_qs
-    else:
-        for u in users_qs:
-            if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
-                if u.dt_fired is None or u.dt_fired > form['dt_fired_after']:
-                    response_users.append(u)
-
-    return JsonResponse.success([UserConverter.convert(x) for x in response_users])
+    return JsonResponse.success([UserConverter.convert(x) for x in users_qs])
 
 
 @api_method('GET', GetCashiersListForm)
