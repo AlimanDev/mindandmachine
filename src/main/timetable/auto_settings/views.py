@@ -310,7 +310,7 @@ def create_timetable(request, form):
     except:
         return JsonResponse.already_exists_error()
 
-    users = User.objects.qos_filter_active(
+    users = User.objects.select_related('position').qos_filter_active(
         dt_from,
         dt_to,
         shop_id=shop_id,

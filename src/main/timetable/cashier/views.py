@@ -101,7 +101,7 @@ def get_cashiers_list(request, form):
     users_qs = User.objects.filter(
         shop_id=shop_id,
         attachment_group__in=attachment_groups
-    ).order_by('id')
+    ).select_related('position').order_by('id')
 
     if form['show_all']:
         response_users = users_qs
