@@ -7,6 +7,8 @@ config importance
 """
 
 import os
+
+import sys
 from celery.schedules import crontab
 
 
@@ -312,3 +314,12 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
 }
+
+if 'test' in sys.argv:
+    # Disable migrations in test, fill the schema directly
+    class MigrationDisabler(dict):
+        def __getattr__(self, item):
+            return None
+
+
+    MIGRATION_MODULES = MigrationDisabler()

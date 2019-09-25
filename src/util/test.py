@@ -1,7 +1,12 @@
+import datetime
 import json
-from django.test import TestCase
+import logging
+from random import randint
 
-from django.db.models import Q
+from dateutil.relativedelta import relativedelta
+from django.test import TestCase
+from django.utils.timezone import now
+
 from src.db.models import (
     AttendanceRecords,
     Group,
@@ -11,7 +16,6 @@ from src.db.models import (
     WorkerDay,
     CameraCashboxStat,
     WorkType,
-    PeriodDemand,
     OperationType,
     PeriodClients,
     Shop,
@@ -24,19 +28,27 @@ from src.db.models import (
     CameraClientGate,
     CameraClientEvent
 )
-from random import randint
-import datetime
-from dateutil.relativedelta import relativedelta
-from django.utils.timezone import now
 
 
-class LocalTestCase(TestCase):
+class LocalTestCaseAsserts(TestCase):
+    def assertResponseCodeEqual(self, response, code):
+        self.assertEqual(response.json['code'], code,
+                         f"Got response code {response.json['code']}, expected {code}: {response.json}")
+
+    def assertResponseDataListCount(self, response, cnt):
+        got = len(response.json['data'])
+        self.assertEqual(got, cnt, f"Got response data size {got}, expected {cnt}")
+
+
+class LocalTestCase(LocalTestCaseAsserts, TestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
     def setUp(self, periodclients=True):
         super().setUp()
+        logging.disable(logging.CRITICAL)
+
         dttm_now = now()
 
         # admin_group

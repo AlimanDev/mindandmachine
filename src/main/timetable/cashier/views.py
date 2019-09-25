@@ -58,6 +58,7 @@ from django.db import IntegrityError
 
 import time as time_in_seconds
 
+
 @api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
     """
@@ -78,7 +79,7 @@ def get_cashiers_list(request, form):
                 | 'id': id пользователя,
                 | 'username': username,
                 | 'shop_id': id магазина к которому он привязан,
-                | 'work_type': тип рабочего дня,
+                | 'work_type': тип рабочего дня,q
                 | 'first_name': имя,
                 | 'last_name': фамилия,
                 | 'avatar_url': аватар,

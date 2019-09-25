@@ -1,10 +1,7 @@
 from src.util.test import LocalTestCase
 
+
 class TestApiMethod(LocalTestCase):
-
-    def setUp(self):
-        super().setUp()
-
     def auth(self, username):
         self.client.post(
             '/api/auth/signin',
