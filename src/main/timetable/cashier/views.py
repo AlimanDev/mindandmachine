@@ -846,7 +846,7 @@ def get_worker_day_logs(request, form):
             'dttm_work_end': __work_dttm(obj.dttm_work_end),
             'created_by': obj.created_by_id,
             'comment': obj.comment,
-            'created_by_fio': obj.created_by.get_fio(),
+            'created_by_fio': obj.created_by.get_fio() if obj.created_by else '',
             'prev_type': WorkerDayConverter.convert_type(obj.parent_worker_day.type),
             'prev_dttm_work_start': __work_dttm(obj.parent_worker_day.dttm_work_start),
             'prev_dttm_work_end': __work_dttm(obj.parent_worker_day.dttm_work_end),
