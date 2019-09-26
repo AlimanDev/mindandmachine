@@ -1,11 +1,12 @@
-from datetime import time, datetime, timedelta, date
-from dateutil.relativedelta import relativedelta
-from django.core.exceptions import ObjectDoesNotExist
 import json
+import time as time_in_seconds
+from datetime import time, datetime, timedelta, date
 
+from dateutil.relativedelta import relativedelta
+from django.contrib.auth import update_session_auth_hash
+from django.core.exceptions import ObjectDoesNotExist
+from django.db import IntegrityError
 from django.db.models import Q
-
-from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
 from django.utils import timezone
 
 from src.db.models import (
@@ -19,12 +20,10 @@ from src.db.models import (
     WorkType,
     WorkerDayCashboxDetails,
     UserWeekdaySlot,
-    Notifications,
 )
-from src.util.utils import (
-    JsonResponse,
-    api_method,
-)
+from src.main.other.notification.utils import send_notification
+from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
+from src.util.collection import group_by, count, range_u
 from src.util.forms import FormUtil
 from src.util.models_converter import (
     UserConverter,
@@ -35,8 +34,10 @@ from src.util.models_converter import (
     BaseConverter,
     WorkerDayChangeLogConverter,
 )
-from src.util.collection import group_by, count, range_u
-
+from src.util.utils import (
+    JsonResponse,
+    api_method,
+)
 from .forms import (
     GetCashierTimetableForm,
     SelectCashiersForm,
@@ -55,11 +56,6 @@ from .forms import (
     GetWorkerChangeRequestsForm,
     HandleWorkerDayRequestForm,
 )
-from src.main.other.notification.utils import send_notification
-from django.contrib.auth import update_session_auth_hash
-from django.db import IntegrityError
-
-import time as time_in_seconds
 
 
 @api_method('GET', GetCashiersListForm)
@@ -255,7 +251,6 @@ def select_cashiers(request, form):
         users = [x for x in users if x.id in set(y.worker_id for y in worker_days)]
 
     return JsonResponse.success([UserConverter.convert(x) for x in users])
-
 
 
 @api_method('GET', GetCashierTimetableForm)

@@ -1,11 +1,11 @@
 import datetime
-import json
 import logging
 from random import randint
 
 from dateutil.relativedelta import relativedelta
 from django.test import TestCase
 from django.utils.timezone import now
+from requests import Response
 
 from src.db.models import (
     AttendanceRecords,
@@ -31,12 +31,12 @@ from src.db.models import (
 
 
 class LocalTestCaseAsserts(TestCase):
-    def assertResponseCodeEqual(self, response, code):
-        self.assertEqual(response.json['code'], code,
-                         f"Got response code {response.json['code']}, expected {code}: {response.json}")
+    def assertResponseCodeEqual(self, response: Response, code: int):
+        got = response.json()['code']
+        self.assertEqual(got, code, f"Got response code {got}, expected {code}: {response.json()}")
 
-    def assertResponseDataListCount(self, response, cnt):
-        got = len(response.json['data'])
+    def assertResponseDataListCount(self, response: Response, cnt: int):
+        got = len(response.json()['data'])
         self.assertEqual(got, cnt, f"Got response data size {got}, expected {cnt}")
 
 
@@ -393,14 +393,12 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             }
         )
 
-    def api_get(self, *args, **kwargs):
+    def api_get(self, *args, **kwargs) -> Response:
         response = self.client.get(*args, **kwargs)
-        response.json = json.loads(response.content.decode('utf-8'))
         return response
 
-    def api_post(self, *args, **kwargs):
+    def api_post(self, *args, **kwargs) -> Response:
         response = self.client.post(*args, **kwargs)
-        response.json = json.loads(response.content.decode('utf-8'))
         return response
 
     def create_many_users(self, amount, from_date, to_date):

@@ -39,7 +39,7 @@ class TestCashier(LocalTestCase):
             'new_password': 'new_password',
         })
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertResponseCodeEqual(response, 200)
 
         response = self.api_post('/api/timetable/cashier/password_edit', {
             'user_id': 1,
@@ -47,7 +47,7 @@ class TestCashier(LocalTestCase):
             'new_password': self.USER_PASSWORD,
         })
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertResponseCodeEqual(response, 200)
 
         self.user1.save()
         self.auth()
@@ -58,7 +58,7 @@ class TestCashier(LocalTestCase):
             'new_password': 'new_password',
         })
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertResponseCodeEqual(response, 200)
 
     def test_change_cashier_info(self):
         self.auth()
