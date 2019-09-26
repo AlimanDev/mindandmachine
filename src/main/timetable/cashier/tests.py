@@ -6,7 +6,7 @@ from datetime import date
 class TestCashier(LocalTestCase):
 
     def setUp(self):
-        super().setUp()
+        super().setUp(periodclients=False)
 
     def test_change_password(self):
         self.auth()
