@@ -145,8 +145,16 @@ class LocalTestCase(TestCase):
             first_name='Иван',
         )
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2', first_name='Иван2', last_name='Иванов')
-        self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3', first_name='Иван3',
-                                 last_name='Сидоров')
+        self.user3 = User.objects.create_user(
+            'user3',
+            'u3@b.b',
+            '4242',
+            id=3,
+            shop_id=self.shop.id,
+            first_name='Иван3',
+            last_name='Сидоров',
+            auto_timetable=False
+        )
 
         self.user4 = User.objects.create_user(
             'user4',
