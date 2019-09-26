@@ -18,7 +18,6 @@ from src.db.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     Shop,
-    WorkerDayChangeRequest,
     Slot,
     UserWeekdaySlot,
     ProductionDay,
