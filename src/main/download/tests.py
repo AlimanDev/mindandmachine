@@ -17,8 +17,10 @@ class TestDownload(LocalTestCase):
     def test_get_tabel(self):
         self.auth()
 
-        response = self.api_get('/api/download/get_tabel?weekday={}&shop_id=1'.format(
-            datetime.date.strftime(timezone.now(), QOS_DATE_FORMAT)))
+        response = self.api_get('/api/download/get_tabel?weekday={}&shop_id={}'.format(
+            datetime.date.strftime(timezone.now(), QOS_DATE_FORMAT),
+            self.shop.id
+        ))
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[1]][14], 'Дурак6 Иван6 None')
@@ -27,7 +29,9 @@ class TestDownload(LocalTestCase):
     def test_get_demand_xlsx(self):
         self.auth()
 
-        response = self.api_get('/api/download/get_demand_xlsx?from_dt=30.05.2019&to_dt=02.06.2019&shop_id=1&demand_model=C')
+        response = self.api_get('/api/download/get_demand_xlsx?from_dt=30.05.2019&to_dt=02.06.2019&shop_id={}&demand_model=C'.format(
+            self.shop.id
+        ))
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[0]][0], 'Кассы ')
@@ -36,7 +40,9 @@ class TestDownload(LocalTestCase):
     def test_get_urv_xlsx(self):
         self.auth()
 
-        response = self.api_get('/api/download/get_urv_xlsx?from_dt=30.05.2019&to_dt=02.06.2019&shop_id=1')
+        response = self.api_get('/api/download/get_urv_xlsx?from_dt=30.05.2019&to_dt=02.06.2019&shop_id={}'.format(
+            self.shop.id
+        ))
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[0]][0], '01.06.2019')
