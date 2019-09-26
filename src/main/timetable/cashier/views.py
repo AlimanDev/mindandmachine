@@ -107,8 +107,8 @@ def get_cashiers_list(request, form):
         response_users = users_qs
     else:
         for u in users_qs:
-            if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
-                if u.dt_fired is None or u.dt_fired > form['dt_fired_after']:
+            if u.dt_hired is None or u.dt_hired <= form['dt_fired_after']:
+                if u.dt_fired is None or u.dt_fired > form['dt_hired_before']:
                     response_users.append(u)
 
     return JsonResponse.success([UserConverter.convert(x) for x in response_users])

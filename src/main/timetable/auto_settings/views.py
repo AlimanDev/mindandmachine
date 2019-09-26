@@ -744,7 +744,10 @@ def delete_timetable(request, form):
 
 # @csrf_exempt
 #@api_method('POST', SetTimetableForm, auth_required=False)
-@api_method('POST', SetTimetableForm, check_permissions=False) # fixme: add check_permissions by user_id
+@api_method('POST',
+            SetTimetableForm,
+            lambda_func=lambda x: Timetable.objects.get(id=x['timetable_id']).shop
+)
 def set_timetable(request, form):
     """
     Ждет request'a от qos_algo. Когда получает, записывает данные по расписанию в бд
@@ -766,10 +769,8 @@ def set_timetable(request, form):
     except:
         return JsonResponse.internal_error('cannot parse json')
 
-    try:
-        timetable = Timetable.objects.get(id=data['timetable_id'])
-    except Timetable.DoesNotExist:
-        return JsonResponse.does_not_exists_error('timetable')
+    timetable = Timetable.objects.get(id=form['timetable_id'])
+
     timetable.status = TimetableConverter.parse_status(data['timetable_status'])
     timetable.status_message = data.get('status_message', False)
     timetable.save()
