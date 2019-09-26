@@ -157,7 +157,7 @@ class TestShop(LocalTestCase):
         data = {
             'pages': 1,
             'shops': [
-                {'id': 12,
+                {'id': self.reg_shop2.id,
                  'parent': self.root_shop.id,
                  'title': 'Region Shop2', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00', 'code': None, 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None,
                  'revenue': {'prev': 4, 'curr': 8, 'change': 100},
@@ -166,7 +166,7 @@ class TestShop(LocalTestCase):
                  'idle': {'prev': 4.0, 'curr': 8.0, 'change': -100},
                  'workers_amount': {'prev': 4, 'curr': 8, 'change': 100},
                  'fot_revenue': {'prev': 4.0, 'curr': 8.0, 'change': -100}},
-                {'id': 11,
+                {'id': self.reg_shop1.id,
                  'parent': self.root_shop.id,
                  'title': 'Region Shop1', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00', 'code': None, 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None,
                  'revenue': {'prev': 10, 'curr': 20, 'change': 100},
