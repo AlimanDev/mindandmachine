@@ -123,7 +123,7 @@ class WorkerDayConverter(BaseConverter):
             'work_types': list(set(obj.work_types_ids)) if hasattr(obj, 'work_types_ids') else [],
             'work_type': obj.work_type_id if hasattr(obj, 'work_type_id') else None,
             'created_by': obj.created_by_id,
-            'worker_day_approved': obj.worker_day_approved_id,
+            'worker_day_approve_id': obj.worker_day_approve_id,
         }
         if hasattr(obj, 'other_shop'):
             data['other_shop'] = obj.other_shop
@@ -146,7 +146,7 @@ class WorkerDayChangeLogConverter(BaseConverter):
             return {
                 'worker_day': obj.id,
                 'dttm_changed': BaseConverter.convert_datetime(obj.dttm_added),
-                'changed_by': obj.created_by.id,
+                'changed_by': obj.created_by_id,
                 'comment': '',
                 'from_tm_work_start': __parent_work_tm(parent.dttm_work_start),
                 'from_tm_work_end': __parent_work_tm(parent.dttm_work_end),

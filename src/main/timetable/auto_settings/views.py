@@ -5,14 +5,12 @@ from datetime import datetime, timedelta, date
 
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
-from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Q, Avg, Sum
+from django.db.models import Q, Sum
 
 from src.db.models import (
     Timetable,
     User,
     WorkType,
-    OperationType,
     PeriodClients,
     WorkerConstraint,
     WorkerCashboxInfo,
@@ -23,8 +21,6 @@ from src.db.models import (
     Slot,
     UserWeekdaySlot,
     ProductionDay,
-    Event,
-    Notifications,
 )
 from src.util.collection import group_by
 from src.util.models_converter import (
@@ -35,7 +31,6 @@ from src.util.models_converter import (
     WorkerCashboxInfoConverter,
     WorkerDayConverter,
     BaseConverter,
-    PeriodClientsConverter,
     UserWeekdaySlotConverter,
 )
 from src.util.utils import api_method, JsonResponse
@@ -50,7 +45,6 @@ import requests
 from ..table.utils import count_difference_of_normal_days
 from src.main.other.notification.utils import send_notification
 from django.db.models import F
-from calendar import monthrange
 from .utils import set_timetable_date_from
 from django.utils import timezone
 

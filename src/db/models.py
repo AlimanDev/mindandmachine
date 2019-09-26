@@ -6,7 +6,6 @@ from django.contrib.auth.models import (
 
 from . import utils
 import datetime
-import json
 
 from fcm_django.models import FCMDevice
 from src.conf.djconfig import IS_PUSH_ACTIVE
@@ -899,7 +898,7 @@ class WorkerDayManager(models.Manager):
     def qos_current_version(self, approved_only=False):
         if approved_only:
             return super().get_queryset().filter(
-                Q(child__id__isnull=True) | Q(child__worker_day_approve_id__isnull=True),
+                models.Q(child__id__isnull=True) | models.Q(child__worker_day_approve_id__isnull=True),
                 worker_day_approve_id__isnull=False,
             )
         else:

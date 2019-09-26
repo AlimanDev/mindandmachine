@@ -16,7 +16,6 @@ from src.db.models import (
     WorkType,
     WorkerDayCashboxDetails,
     UserWeekdaySlot,
-    WorkerDayApprove
 )
 from src.util.utils import (
     JsonResponse,
@@ -309,7 +308,7 @@ def get_cashier_timetable(request, form):
     response = {}
     # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_ids']:
-        worker_days_db = WorkerDay.objects.get_filter_version(
+        worker_days_db = WorkerDay.objects.qos_filter_version(
             checkpoint, approved_only
         ).select_related('worker').filter(
             worker_id=worker_id,
@@ -327,6 +326,7 @@ def get_cashier_timetable(request, form):
             'dttm_work_start',
             'dttm_work_end',
             'work_types__id',
+            'worker_day_approve_id',
         )
 
         worker_days = []
@@ -345,6 +345,7 @@ def get_cashier_timetable(request, form):
                     worker_id=wd['worker_id'],
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
+                    worker_day_approve_id=wd['worker_day_approve_id '],
                 )
                 if wd['work_types__id']:
                     wd_m.work_types_ids = [wd['work_types__id']]
@@ -858,7 +859,7 @@ def get_worker_day_logs(request, form):
             'dttm_work_start': __work_dttm(obj.dttm_work_start),
             'dttm_work_end': __work_dttm(obj.dttm_work_end),
             'created_by': obj.created_by_id,
-            'created_by_fio': obj.created_by.get_fio(),
+            'created_by_fio': obj.created_by.get_fio() if obj.created_by else '',
             'prev_type': WorkerDayConverter.convert_type(obj.parent_worker_day.type),
             'prev_dttm_work_start': __work_dttm(obj.parent_worker_day.dttm_work_start),
             'prev_dttm_work_end': __work_dttm(obj.parent_worker_day.dttm_work_end),
