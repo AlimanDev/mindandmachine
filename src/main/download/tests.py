@@ -8,7 +8,7 @@ from src.conf.djconfig import QOS_DATE_FORMAT
 class TestDownload(LocalTestCase):
 
     def setUp(self):
-        super().setUp()
+        super().setUp(periodclients=False)
 
     def api_get(self, *args, **kwargs):
         response = self.client.get(*args, **kwargs)
@@ -37,6 +37,24 @@ class TestDownload(LocalTestCase):
         self.assertEqual(tabel[tabel.columns[0]][0], 'Кассы ')
         self.assertEqual(tabel[tabel.columns[1]][0], '30.05.2019 00:00:00')
 
+    def get_department_stats_xlsx(self):
+        self.auth()
+
+        response = self.api_get('/api/download/get_department_stats_xlsx?format=excel&pointer=1&items_per_page=1&revenue=-&lack=-&fot=-&idle=-&workers_amount=-&fot_revenue=-')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(tabel[tabel.columns[0]][0], 'SuperShop1, ')
+
+
+class TestURVDownload(LocalTestCase):
+
+    def setUp(self):
+        super().setUp()
+
+    def api_get(self, *args, **kwargs):
+        response = self.client.get(*args, **kwargs)
+        return response
+
     def test_get_urv_xlsx(self):
         self.auth()
 
@@ -50,10 +68,3 @@ class TestDownload(LocalTestCase):
         self.assertEqual(tabel[tabel.columns[2]][0], '09:00')
         self.assertEqual(tabel[tabel.columns[3]][0], 'пришел')
 
-    def get_department_stats_xlsx(self):
-        self.auth()
-
-        response = self.api_get('/api/download/get_department_stats_xlsx?format=excel&pointer=1&items_per_page=1&revenue=-&lack=-&fot=-&idle=-&workers_amount=-&fot_revenue=-')
-        tabel = pandas.read_excel(io.BytesIO(response.content))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(tabel[tabel.columns[0]][0], 'SuperShop1, ')
