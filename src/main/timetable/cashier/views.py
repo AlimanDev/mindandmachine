@@ -16,7 +16,7 @@ from src.db.models import (
     WorkType,
     WorkerDayCashboxDetails,
     UserWeekdaySlot,
-    Notifications,
+    WorkerDayApprove
 )
 from src.util.utils import (
     JsonResponse,
@@ -303,12 +303,15 @@ def get_cashier_timetable(request, form):
     from_dt = form['from_dt']
     to_dt = form['to_dt']
     checkpoint = FormUtil.get_checkpoint(form)
+    approved_only = form['approved_only']
     work_types = {w.id: w for w in WorkType.objects.select_related('shop').all()}
 
     response = {}
     # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_ids']:
-        worker_days_db = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+        worker_days_db = WorkerDay.objects.get_filter_version(
+            checkpoint, approved_only
+        ).select_related('worker').filter(
             worker_id=worker_id,
             worker__shop_id=form['shop_id'],
             dt__gte=from_dt,
@@ -361,14 +364,19 @@ def get_cashier_timetable(request, form):
             )
         ]
 
+        wd_logs = WorkerDay.objects.select_related('worker').filter(
+            worker_id=worker_id,
+            dt__gte=from_dt,
+            dt__lte=to_dt,
+            parent_worker_day__isnull=False,
+            worker__attachment_group=User.GROUP_STAFF
+        )
+        if approved_only:
+            wd_logs = wd_logs.filter(
+                worker_day_approve_id__isnull = False
+            )
         worker_day_change_log = group_by(
-            WorkerDay.objects.select_related('worker').filter(
-                worker_id=worker_id,
-                dt__gte=from_dt,
-                dt__lte=to_dt,
-                parent_worker_day__isnull=False,
-                worker__attachment_group=User.GROUP_STAFF
-            ),
+            wd_logs,
             group_key=lambda _: WorkerDay.objects.qos_get_current_worker_day(_).id,
             sort_key=lambda _: _.id,
             sort_reverse=True

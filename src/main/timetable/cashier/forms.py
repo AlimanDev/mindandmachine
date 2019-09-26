@@ -94,6 +94,7 @@ class GetCashierTimetableForm(forms.Form):
     to_dt = util_forms.DateField()
     shop_id = forms.IntegerField()
     checkpoint = forms.IntegerField(required=False)
+    approved_only = forms.BooleanField(required=False)
 
     def clean(self):
         if self.errors:

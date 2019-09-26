@@ -753,19 +753,26 @@ class WorkerConstraint(models.Model):
 
 
 class WorkerDayManager(models.Manager):
-    def qos_current_version(self):
+    def qos_current_version(self, approved_only=False):
+        if approved_only:
+            return super().get_queryset().filter(
+                Q(child__id__isnull=True) | Q(child__worker_day_approve_id__isnull=True),
+                worker_day_approve_id__isnull=False,
+            )
+        else:
+            return super().get_queryset().filter(child__id__isnull=True)
         return super().get_queryset().filter(child__id__isnull=True)
 
     def qos_initial_version(self):
         return super().get_queryset().filter(parent_worker_day__isnull=True)
 
-    def qos_filter_version(self, checkpoint):
+    def qos_filter_version(self, checkpoint, approved_only = False):
         """
         :param checkpoint: 0 or 1 / True of False. If 1 -- current version, else -- initial
         :return:
         """
         if checkpoint:
-            return self.qos_current_version()
+            return self.qos_current_version(approved_only)
         else:
             return self.qos_initial_version()
 
