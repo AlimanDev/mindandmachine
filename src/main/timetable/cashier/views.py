@@ -1119,7 +1119,7 @@ def create_cashier(request, form):
     """
     username = str(time_in_seconds.time() * 1000000)[:-2]
     try:
-        user = User.objects.create_user(username=username, password=form['password'], email='q@q.com')
+        user = User.objects.create_user(username=username, password=form['password'])
         user.first_name = form['first_name']
         user.middle_name = form['middle_name']
         user.last_name = form['last_name']

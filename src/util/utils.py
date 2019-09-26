@@ -233,7 +233,16 @@ def api_method(
                             'Для вашей группы пользователей не разрешено просматривать или изменять запрашиваемые данные.'
                         )
 
-                    if lambda_func is None:
+                    shop = None
+                    if lambda_func:
+                        try:
+                            shop = lambda_func(form.cleaned_data)
+                        except ObjectDoesNotExist:
+                            return JsonResponse.does_not_exists_error('error in api_method')
+                        except MultipleObjectsReturned:
+                            return JsonResponse.multiple_objects_returned()
+
+                    if not shop:
                         if form.cleaned_data.get('shop_id'):
                             shop = Shop.objects.filter(id=form.cleaned_data['shop_id']).first()
                             if not shop:
@@ -241,13 +250,6 @@ def api_method(
                         else:
                             shop = request.user.shop
 
-                    else:
-                        try:
-                            shop = lambda_func(form.cleaned_data)
-                        except ObjectDoesNotExist:
-                            return JsonResponse.does_not_exists_error('error in api_method')
-                        except MultipleObjectsReturned:
-                            return JsonResponse.multiple_objects_returned()
                     request.shop = shop
 
                     parent = request.user.shop.get_ancestor_by_level_distance(function_to_check.level_up)

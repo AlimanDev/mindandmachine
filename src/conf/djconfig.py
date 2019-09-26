@@ -218,6 +218,8 @@ QOS_DATE_FORMAT = '%d.%m.%Y'
 QOS_TIME_FORMAT = '%H:%M:%S'
 QOS_SHORT_TIME_FORMAT = '%H:%M'
 
+IS_PUSH_ACTIVE = False # отправляем ли пуши на телефон при уведомлениях
+
 ALLOWED_UPLOAD_EXTENSIONS = ['xlsx', 'xls']
 
 MOBILE_USER_AGENTS = ('QoS_mobile_app', 'okhttp',)
@@ -303,5 +305,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'src.celery.tasks.update_shop_stats',
         'schedule': crontab(hour=3, minute=0),
         'options': {'queue': BACKEND_QUEUE}
-    }
+    },
+    'task-update-operation-templates': {
+        'task': 'src.celery.tasks.op_type_build_period_clients',
+        'schedule': crontab(hour=1, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
 }

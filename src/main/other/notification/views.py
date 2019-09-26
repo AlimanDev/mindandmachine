@@ -3,6 +3,8 @@ from src.util.utils import api_method, JsonResponse
 from src.util.models_converter import NotificationConverter
 from .forms import SetNotificationsReadForm, GetNotificationsForm, NotifyAction
 from django.db.models import Q
+from django.utils.timezone import now
+
 
 @api_method('GET', GetNotificationsForm, check_permissions=False)
 def get_notifications(request, form):
@@ -99,6 +101,8 @@ def get_notifications2(request, form):
     notifies = Notifications.objects.mm_filter(
         Q(event__workerday_details__dttm_deleted__isnull=True) |
         Q(event__workerday_details__worker_day__worker=request.user),
+        event__workerday_details__work_type__shop__dttm_deleted__isnull=True,
+        event__workerday_details__dttm_from__gt=now(),
         to_worker=request.user
     ).order_by('-id')
 
