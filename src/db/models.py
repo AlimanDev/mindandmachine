@@ -157,10 +157,10 @@ class WorkerManager(UserManager):
         """
 
         return self.filter(
-            models.Q(dt_hired__lte=dt_from) | models.Q(dt_hired__isnull=True),
+            models.Q(dt_hired__lte=dt_to) | models.Q(dt_hired__isnull=True),
             attachment_group=User.GROUP_STAFF
         ).filter(
-            models.Q(dt_fired__gte=dt_to) | models.Q(dt_fired__isnull=True),
+            models.Q(dt_fired__gte=dt_from) | models.Q(dt_fired__isnull=True),
             attachment_group=User.GROUP_STAFF
         ).filter(*args, **kwargs)
 
