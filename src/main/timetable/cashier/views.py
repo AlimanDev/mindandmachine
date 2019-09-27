@@ -60,9 +60,9 @@ from .forms import (
 
 @api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
-    """
-    Возвращает список кассиров в данном магазине, уволенных позже чем dt_fired_after и нанятых\
-    раньше, чем dt_hired_before.
+    """Возвращает список кассиров в данном магазине
+
+    Уволенных позже чем dt_fired_after и нанятых раньше, чем dt_hired_before.
 
     Args:
         method: GET
@@ -150,23 +150,21 @@ def get_not_working_cashiers_list(request, form):
     shop_id = form['shop_id']
     checkpoint = FormUtil.get_checkpoint(form)
 
-    users_not_working_today = []
-
-    for u in WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+    users_not_working_today = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
             dt=dt_now.date(),
             worker__shop_id=shop_id,
             worker__attachment_group=User.GROUP_STAFF
+    ).filter(
+        (Q(worker__dt_hired__isnull=True) | Q(worker__dt_hired__lte=form['dt_hired_before'])) &
+        (Q(worker__dt_fired__isnull=True) | Q(worker__dt_fired__gt=form['dt_fired_after']))
     ).exclude(
         type=WorkerDay.Type.TYPE_WORKDAY.value
     ).order_by(
         'worker__last_name',
         'worker__first_name'
-    ):
-        if u.worker.dt_hired is None or u.worker.dt_hired <= form['dt_hired_before']:
-            if u.worker.dt_fired is None or u.worker.dt_fired >= form['dt_fired_after']:
-                users_not_working_today.append(u.worker)
+    )
 
-    return JsonResponse.success([UserConverter.convert(x) for x in users_not_working_today])
+    return JsonResponse.success([UserConverter.convert(x.worker) for x in users_not_working_today])
 
 
 @api_method('GET', SelectCashiersForm)

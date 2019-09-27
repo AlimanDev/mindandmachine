@@ -1,6 +1,7 @@
 import datetime
 import logging
 from random import randint
+from typing import TypeVar
 
 from dateutil.relativedelta import relativedelta
 from django.test import TestCase
@@ -432,6 +433,11 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
                     is_tablet=True
                 )
                 dt += datetime.timedelta(days=1)
+
+    @staticmethod
+    def refresh_model(item: TypeVar) -> TypeVar:
+        """Re-fetch provided item from database"""
+        return item.__class__.objects.get(pk=item.pk)
 
 
 def create_user(user_id, shop_id, username, dt_fired=None, first_name='', last_name=''):
