@@ -7,6 +7,7 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q, Avg, Sum
+from src.celery.tasks import cancel_shop_vacancies, create_shop_vacancies_and_notify
 
 from src.db.models import (
     Timetable,
@@ -824,5 +825,9 @@ def set_timetable(request, form):
                     wd_obj.save()
 
         send_notification('C', timetable)
+
+        for work_type in request.shop.worktype_set.all():
+            cancel_shop_vacancies.apply_async((request.shop.id, work_type.id))
+            create_shop_vacancies_and_notify.apply_async((request.shop.id, work_type.id))
 
     return JsonResponse.success()
