@@ -3,6 +3,8 @@ from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
 from django.test import TestCase
 from src.util.test import LocalTestCase
+from unittest import skip
+
 from src.db.models import (
     WorkerCashboxInfo,
     WorkType,
@@ -99,6 +101,7 @@ class TestCelery(LocalTestCase):
             self.assertEqual(cashbox_type.dttm_last_update_queue, None)
         self.assertGreater(PeriodQueues.objects.count(), 0)
 
+    @skip("visitor info")
     def test_update_visitors_info(self):
         def check_amount(model, dttm):
             return model.objects.filter(dttm_forecast=dttm, type=PeriodQueues.FACT_TYPE).count()
