@@ -8,7 +8,7 @@ from django.utils.timezone import now
 class TestTablet(LocalTestCase):
 
     def setUp(self):
-        super().setUp(periodclients=False)
+        super().setUp(worker_day=True)
 
     def test_get_cashboxes_info(self):
         self.auth()

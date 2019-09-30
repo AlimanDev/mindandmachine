@@ -6,7 +6,7 @@ from datetime import timedelta
 
 class TestNotifications(LocalTestCase):
     def setUp(self):
-        super().setUp()
+        super().setUp(worker_day=True)
 
         for number in range(1, 6):
             event = Event.objects.create(
