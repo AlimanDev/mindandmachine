@@ -204,13 +204,13 @@ class LocalTestCase(TestCase):
             self.shop,
             'Кассы',
             id=1,
-            dttm_last_update_queue=datetime.datetime(2018, 12, 1, 8, 30, 0)
+            dttm_last_update_queue=dttm_now.replace(hour=0,minute=0,second=0,microsecond=0)
         )
         self.work_type2 = create_work_type(
             self.shop,
             'Тип_кассы_2',
             id=2,
-            dttm_last_update_queue=datetime.datetime(2018, 12, 1, 9, 0, 0)
+            dttm_last_update_queue=dttm_now.replace(hour=0,minute=0,second=0,microsecond=0)
         )
         self.work_type3 = create_work_type(
             self.shop,
