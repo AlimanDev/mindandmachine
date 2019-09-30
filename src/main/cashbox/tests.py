@@ -4,7 +4,7 @@ from src.util.test import LocalTestCase, WorkType, datetime
 class TestCashbox(LocalTestCase):
 
     def setUp(self):
-        super().setUp(periodclients=False)
+        super().setUp()
         WorkType.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 0, 0, 0))
 
     def test_get_cashboxes_open_time(self):
