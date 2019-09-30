@@ -8,7 +8,7 @@ from src.db.models import Timetable
 class TestShop(LocalTestCase):
 
     def setUp(self):
-        super().setUp(periodclients=False)
+        super().setUp()
 
         # print(self.shop.__dict__)
         self.timetable1_1 = Timetable.objects.create(
