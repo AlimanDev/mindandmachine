@@ -23,7 +23,7 @@ class TestWorkerExchange(LocalTestCase):
     qos_dt = dttm.strftime('%d.%m.%Y')
 
     def setUp(self):
-        super().setUp(periodclients=False)
+        super().setUp(periodclients=False, worker_day=False)
         self.exchange_settings = ExchangeSettings.objects.create(
             automatic_check_lack_timegap=datetime.timedelta(days=1),
             automatic_check_lack=True,
