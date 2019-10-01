@@ -304,12 +304,12 @@ def create_timetable(request, form):
     except:
         return JsonResponse.already_exists_error()
 
-    users = User.objects.select_related('position').qos_filter_active(
+    users = User.objects.qos_filter_active(
         dt_from,
         dt_to,
         shop_id=shop_id,
         auto_timetable=True,
-    )
+    ).select_related('position')
     shop = request.shop
     period_step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
 
@@ -318,7 +318,8 @@ def create_timetable(request, form):
     for u in users:
         worker_cashbox_info = WorkerCashboxInfo.objects.filter(
             worker=u,
-            is_active='True')
+            is_active='True'
+        )
         if not worker_cashbox_info.exists():
             users_without_spec.append(u.first_name + ' ' + u.last_name)
     if users_without_spec:
@@ -720,13 +721,13 @@ def delete_timetable(request, form):
     ).exclude(
         type=WorkerDay.Type.TYPE_EMPTY.value
     )
-    for wd in wdays:
-        WorkerDay.objects.create(
-            type=WorkerDay.Type.TYPE_EMPTY.value,
-            dt = wd.dt,
-            parent_worker_day=wd,
-            worker_id=wd.worker_id,
-        )
+    wds = [WorkerDay(
+        type=WorkerDay.Type.TYPE_EMPTY.value,
+        dt = wd.dt,
+        parent_worker_day=wd,
+        worker_id=wd.worker_id,
+    ) for wd in wdays]
+    WorkerDay.objects.bulk_create(wds)
 
     # cancel vacancy
     # todo: add deleting workerdays
@@ -796,7 +797,8 @@ def set_timetable(request, form):
                 parent_wd_obj = WorkerDay.objects.filter(
                     worker_id=uid,
                     dt=dt,
-                    child__id__isnull=True).first()
+                    child__id__isnull=True
+                ).first()
                 if parent_wd_obj:
                     if parent_wd_obj.type != WorkerDay.Type.TYPE_EMPTY.value:
                         continue
