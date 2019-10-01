@@ -301,7 +301,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
     revenue = 1000000
 
     ticks = AttendanceRecords.objects.filter(
-        user__shop_id=form['shop_id'],
+        user__shop_id=shop_id,
         dttm__gte=from_dt,
         dttm__lte=to_dt,
         # workerday__work_type_id__in=work_types.keys(),
