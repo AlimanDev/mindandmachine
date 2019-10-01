@@ -2,7 +2,7 @@ from datetime import date, timedelta
 import json
 import os
 
-from django.db.models import Avg
+from django.db.models import Avg, Q
 from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
@@ -27,6 +27,8 @@ from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get
 from src.util.models_converter import BaseConverter
 
 from src.main.timetable.worker_exchange.utils import search_candidates, send_noti2candidates
+from src.main.operation_template.utils import build_period_clients
+
 from src.db.models import (
     Event,
     PeriodQueues,
@@ -38,7 +40,7 @@ from src.db.models import (
     WorkerDay,
     # Notifications,
     Shop,
-    # User,
+    User,
     ProductionDay,
     WorkerCashboxInfo,
     CameraClientGate,
@@ -48,9 +50,28 @@ from src.db.models import (
     EmptyOutcomeVisitors,
     PurchasesOutcomeVisitors,
     ExchangeSettings,
+    OperationTemplate
 )
 from src.celery.celery import app
+from django.core.mail import EmailMultiAlternatives
+from src.conf.djconfig import EMAIL_HOST_USER
+
 import time as time_in_secs
+
+
+@app.task
+def op_type_build_period_clients():
+    dt_from = now().date() + timedelta(days = 2)
+    dt_to = dt_from + timedelta(days=62)
+
+    oper_templates = OperationTemplate.objects.filter(
+        Q(dt_built_to__isnull=True) | Q(dt_built_to__lt=dt_to),
+        dttm_deleted__isnull=True,
+    )
+
+    for ot in oper_templates:
+        build_period_clients(ot, dt_to=dt_to)
+
 
 @app.task
 def update_queue(till_dttm=None):
@@ -526,6 +547,35 @@ def update_shop_stats(dt=None):
 
 
 @app.task
+def send_notify_email(message, send2user_ids, title=None, file=None, html_content=None):
+    '''
+    Функция-обёртка для отправки email сообщений (в том числе файлов)
+    :param message: сообщение
+    :param send2user_ids: список id пользователей
+    :param title: название сообщения
+    :param file: файл
+    :param html_content: контент в формате html
+    :return:
+    '''
+
+    # todo: add message if no emails
+    user_emails = [user.email for user in User.objects.filter(id__in=send2user_ids) if user.email]
+    msg = EmailMultiAlternatives(
+        subject='Сообщение от Mind&Machine' if title is None else title,
+        body=message,
+        from_email=EMAIL_HOST_USER,
+        to=user_emails,
+    )
+    if file:
+        msg.attach_file(file)
+
+    if html_content:
+        msg.attach_alternative(html_content, "text/html")
+    result = msg.send()
+    return 'Отправлено {} сообщений из {}'.format(result, len(send2user_ids))
+
+
+@app.task
 def upload_demand_task():
     localpaths = [
         'bills_{}.csv'.format(str(time_in_secs.time()).replace('.', '_')),
@@ -557,4 +607,3 @@ def upload_vacation_task():
     upload_vacation_util(file)
     file.close()
     os.remove(localpath)
-

@@ -1,15 +1,15 @@
 import datetime
 
-from src.db.models import (
-    WorkerDay,
-    Timetable,
-    AttendanceRecords,
-)
 from src.conf.djconfig import (
     QOS_DATE_FORMAT,
     QOS_DATETIME_FORMAT,
     QOS_TIME_FORMAT,
 )
+from src.db.models import (
+    WorkerDay,
+    Timetable,
+    AttendanceRecords,
+    User)
 
 
 class BaseConverter(object):
@@ -40,7 +40,7 @@ class BaseConverter(object):
 
 class UserConverter(BaseConverter):
     @classmethod
-    def convert_main(cls, obj):
+    def convert_main(cls, obj: User):
         return {
             'id': obj.id,
             'username': obj.username,
@@ -56,7 +56,7 @@ class UserConverter(BaseConverter):
         }
 
     @classmethod
-    def convert(cls, obj):
+    def convert(cls, obj: User):
         return {
             'id': obj.id,
             'username': obj.username,
@@ -77,8 +77,8 @@ class UserConverter(BaseConverter):
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
             'attachment_group': obj.attachment_group,
-            'position': obj.position.title if hasattr(obj, 'position') and obj.position else '', # fixme: hasatrr always return true, => sometimes extra request to db
-            'identifier': obj.identifier if hasattr(obj, 'identifier') else None,
+            'position': obj.position.title if getattr(obj, 'position', None) is not None else '',
+            'identifier': getattr(obj, 'identifier', None),
         }
 
 
@@ -216,6 +216,22 @@ class OperationTypeConverter(BaseConverter):
             'speed_coef': obj.speed_coef,
             'do_forecast': obj.do_forecast,
             'work_type_id': obj.work_type.id
+        }
+
+
+class OperationTemplateConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'name': obj.name,
+            'tm_start': cls.convert_time(obj.tm_start),
+            'tm_end': cls.convert_time(obj.tm_end),
+            'value': obj.value,
+            'period': obj.period,
+            'days_in_period': obj.days_in_period,
+            'operation_type_id': obj.operation_type_id,
+            'dt_built_to': cls.convert_date(obj.dt_built_to)
         }
 
 

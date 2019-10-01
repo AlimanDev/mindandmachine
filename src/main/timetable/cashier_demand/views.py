@@ -46,7 +46,7 @@ def get_workers(request, form):
     response = {}
 
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related(
-        'worker_day'
+        'worker_day', 'worker_day__worker', 'worker_day__worker__position'
     ).filter(
         Q(worker_day__worker__dt_fired__gt=from_dttm.date()) | Q(worker_day__worker__dt_fired__isnull=True),
         Q(worker_day__worker__dt_hired__lt=to_dttm.date()) | Q(worker_day__worker__dt_fired__isnull=True),
