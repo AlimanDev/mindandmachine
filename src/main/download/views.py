@@ -7,6 +7,7 @@ from .forms import (
 )
 from src.main.shop.forms import GetDepartmentListForm
 from src.main.shop.utils import get_shop_list_stats
+from src.main.urv.utils import tick_stat_count_details
 
 from src.db.models import (
     Shop,
@@ -48,7 +49,7 @@ def get_tabel(request, workbook, form):
     """
     ws = workbook.add_worksheet(Tabel_xlsx.MONTH_NAMES[form['weekday'].month])
 
-    shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
+    shop = request.shop
     checkpoint = FormUtil.get_checkpoint(form)
 
     tabel = Tabel_xlsx(
@@ -58,6 +59,18 @@ def get_tabel(request, workbook, form):
         worksheet=ws,
         prod_days=None
     )
+
+
+    from_dt = tabel.prod_days[0].dt
+    to_dt = tabel.prod_days[-1].dt
+
+    records = list(AttendanceRecords.objects.select_related('user').filter(
+        dttm__date__gte=from_dt,
+        dttm__date__lte=to_dt,
+        shop_id=shop.id,
+    ).order_by('dttm', 'user'))
+    tick_stat = tick_stat_count_details(records)
+
     users = list(User.objects.qos_filter_active(
         dt_from=tabel.prod_days[-1].dt,
         dt_to=tabel.prod_days[0].dt,
@@ -88,13 +101,13 @@ def get_tabel(request, workbook, form):
     # construct day 2
     tabel.construct_dates('d%d', 15, 6)
 
-    tabel.construnts_users_info(users, 16, 0, ['code', 'fio', 'position', 'hired'])
+    tabel.construnts_users_info(users, 16, 0, ['code', 'fio', 'position', 'hired'], extra_row=True)
 
-    tabel.fill_table(workdays, users, breaktimes, 16, 6)
+    tabel.fill_table(workdays, users, breaktimes, tick_stat, 16, 6)
 
-    tabel.add_xlsx_functions(len(users), 12, 37)
+    tabel.add_xlsx_functions(len(users), 12, 37, extra_row=True)
 
-    tabel.add_sign(16 + len(users) + 2)
+    tabel.add_sign(16 + len(users) * 2 + 2)
 
     return workbook, 'Tabel'
 
@@ -154,7 +167,6 @@ def get_demand_xlsx(request, workbook, form):
 
     work_types = list(WorkType.objects.filter(shop_id=form['shop_id']).order_by('id'))
     operation_types = list(OperationType.objects.filter(work_type__in=work_types).order_by('id'))
-    amount_work_types = len(work_types)
     amount_operation_types = len(operation_types)
 
     dttm = datetime.combine(from_dt, time(0, 0))

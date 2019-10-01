@@ -122,7 +122,7 @@ class Xlsx_base:
             self.worksheet.write_string(row, col + i, '', text_type)
             i += 1
 
-    def construnts_users_info(self, users, row, col, ordered_columns):
+    def construnts_users_info(self, users, row, col, ordered_columns, extra_row=False):
         """
         Записывает в столбик информацию по сотрудникам начиная с row строки в колонки [col, col + len(ordered_columns)].
         В ordered_columns указаны какие поля в каком порядке указывать.
@@ -148,15 +148,19 @@ class Xlsx_base:
             'hired': (lambda u: BaseConverter.convert_date(u.dt_hired), date_format, self.worksheet.write_datetime),
         }
 
+        shift = 2 if extra_row else 1
         for it, user in enumerate(list(users)):
             for col_shift, elem in enumerate(ordered_columns):
                 lambda_f, data_format, writer = user_elem_dict[elem]
                 try:
-                    writer(
-                        row + it,
+                    self.worksheet.merge_range(
+                        row + it * shift,
+                        col + col_shift,
+                        row + (it + 1) * shift - 1,
                         col + col_shift,
                         lambda_f(user) or '',
                         data_format
                     )
+
                 except TypeError:
                     self.worksheet.write_string(row + it, col + col_shift, '', text_format)

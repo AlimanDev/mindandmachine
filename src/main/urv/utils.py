@@ -60,6 +60,50 @@ def get_queryset(request, form):
     return user_records
 
 
+def get_user_tick_map(ticks):
+    user_dt_type = {}
+    for tick in ticks:
+        dt = tick.dttm.date()
+        if tick.user_id not in user_dt_type:
+            user_dt_type[tick.user_id] = {}
+        if dt not in user_dt_type[tick.user_id]:
+            user_dt_type[tick.user_id][dt] = {
+                AttendanceRecords.TYPE_COMING: None,
+                AttendanceRecords.TYPE_LEAVING: None
+            }
+
+        tick_map = user_dt_type[tick.user_id][dt]
+        if not tick_map[tick.type] or tick.type == AttendanceRecords.TYPE_COMING \
+            and tick.dttm < tick_map[tick.type] \
+            or tick.type == AttendanceRecords.TYPE_LEAVING \
+            and tick.dttm > user_dt_type[tick.user_id][dt][tick.type]:
+            tick_map[tick.type] = tick.dttm
+
+    return user_dt_type
+
+
+def tick_stat_count_details(ticks):
+    stat = {}
+    user_dt_type = get_user_tick_map(ticks)
+
+    for user_id, dt_type in user_dt_type.items():
+        stat[user_id] = {}
+        for dt, type_dttm in dt_type.items():
+            dttm_come = None
+            dttm_leave = None
+            if type_dttm[AttendanceRecords.TYPE_COMING]:
+                dttm_come = type_dttm[AttendanceRecords.TYPE_COMING]
+
+            if type_dttm[AttendanceRecords.TYPE_LEAVING]:
+                dttm_leave = type_dttm[AttendanceRecords.TYPE_LEAVING]
+
+            if dttm_come and dttm_leave and dttm_come < dttm_leave:
+                stat[user_id][dt] = (dttm_leave - dttm_come).total_seconds() / 3600
+    print (stat)
+
+    return stat
+
+
 
 def tick_stat_count(ticks):
     stat = {
@@ -68,19 +112,7 @@ def tick_stat_count(ticks):
         'ticks_leaving_count': 0,
     }
 
-    user_dt_type = {}
-    for tick in ticks:
-        dt = tick.dttm.date()
-        if tick.user_id not in user_dt_type:
-            user_dt_type[tick.user_id] = {}
-        if dt not in user_dt_type[tick.user_id]:
-            user_dt_type[tick.user_id][dt] = {
-                AttendanceRecords.TYPE_COMING: [],
-                AttendanceRecords.TYPE_LEAVING: []
-            }
-        if tick.type not in user_dt_type[tick.user_id][dt]:
-            continue
-        user_dt_type[tick.user_id][dt][tick.type].append(tick.dttm)
+    user_dt_type = get_user_tick_map(ticks)
 
     for dt_type in user_dt_type.values():
         for type_dttm in dt_type.values():
@@ -88,11 +120,11 @@ def tick_stat_count(ticks):
             dttm_leave = None
             if type_dttm[AttendanceRecords.TYPE_COMING]:
                 stat['ticks_coming_count'] += 1
-                dttm_come = min(type_dttm[AttendanceRecords.TYPE_COMING])
+                dttm_come = type_dttm[AttendanceRecords.TYPE_COMING]
 
             if type_dttm[AttendanceRecords.TYPE_LEAVING]:
                 stat['ticks_leaving_count'] += 1
-                dttm_leave = max(type_dttm[AttendanceRecords.TYPE_LEAVING])
+                dttm_leave = type_dttm[AttendanceRecords.TYPE_LEAVING]
 
             if dttm_come and dttm_leave and dttm_come < dttm_leave:
                 stat['hours_count'] += dttm_leave - dttm_come
