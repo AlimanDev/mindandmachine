@@ -6,7 +6,7 @@ import json
 class TestOperationTemplate(LocalTestCase):
 
     def setUp(self, **args):
-        super().setUp(periodclients=False)
+        super().setUp()
         self.operation_type = OperationType.objects.all().first()
         self.dt_from = datetime.now().date() + timedelta(days=5)
 
