@@ -8,11 +8,11 @@ from django.utils.timezone import now
 class TestTablet(LocalTestCase):
 
     def setUp(self):
-        super().setUp()
+        super().setUp(worker_day=True)
 
     def test_get_cashboxes_info(self):
         self.auth()
-        response = self.api_get('/api/tablet/get_cashboxes_info?shop_id=1')
+        response = self.api_get('/api/tablet/get_cashboxes_info?shop_id={}'.format(self.shop.id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data']['2']['with_queue'], True)
@@ -24,8 +24,8 @@ class TestTablet(LocalTestCase):
 
     def test_get_cashiers_info(self):
         self.auth()
-        response = self.api_get('/api/tablet/get_cashiers_info?shop_id=1&dttm={}'
-                                .format(BaseConverter.convert_datetime(now() + datetime.timedelta(hours=3))))
+        response = self.api_get('/api/tablet/get_cashiers_info?shop_id={}&dttm={}'
+                                .format(self.shop.id, BaseConverter.convert_datetime(now() + datetime.timedelta(hours=3))))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data']['2']['worker_id'], 2)
@@ -65,14 +65,14 @@ class TestTablet(LocalTestCase):
         # self.assertEqual(response.json['code'], 400)
         # self.assertEqual(response.json['data']['error_message'], 'cashbox already opened')
 
-        response = self.api_get('/api/tablet/get_cashiers_info?shop_id=1&dttm={}'
-                                .format(BaseConverter.convert_datetime(now() + datetime.timedelta(hours=3))))
+        response = self.api_get('/api/tablet/get_cashiers_info?shop_id={}&dttm={}'
+                                .format(self.shop.id, BaseConverter.convert_datetime(now() + datetime.timedelta(hours=3))))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data']['2']['worker_id'], 2)
         self.assertEqual(response.json['data']['2']['status'], 'W')
 
-        response = self.api_get('/api/tablet/get_cashboxes_info?shop_id=1')
+        response = self.api_get('/api/tablet/get_cashboxes_info?shop_id={}'.format(self.shop.id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data']['2']['cashbox'][0]['status'], 'C')

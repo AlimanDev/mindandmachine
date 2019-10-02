@@ -100,14 +100,14 @@ def get_cashiers_list(request, form):
     users_qs = User.objects.filter(
         shop_id=shop_id,
         attachment_group__in=attachment_groups
-    ).order_by('id')
+    ).select_related('position').order_by('id')
 
     if form['show_all']:
         response_users = users_qs
     else:
         for u in users_qs:
-            if u.dt_hired is None or u.dt_hired <= form['dt_hired_before']:
-                if u.dt_fired is None or u.dt_fired > form['dt_fired_after']:
+            if u.dt_hired is None or u.dt_hired <= form['dt_fired_after']:
+                if u.dt_fired is None or u.dt_fired > form['dt_hired_before']:
                     response_users.append(u)
 
     return JsonResponse.success([UserConverter.convert(x) for x in response_users])

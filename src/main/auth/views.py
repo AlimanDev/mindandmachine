@@ -45,7 +45,7 @@ def signin(request, form):
         elif user.dt_hired is None or user.dt_hired > timezone.now().date():
             return JsonResponse.not_active_error()
         login(request, user)
-    user = User.objects.get(id=request.user.id)
+    user = User.objects.select_related('position').get(id=request.user.id)
 
     return JsonResponse.success(UserConverter.convert(user))
 
@@ -81,7 +81,7 @@ def is_signed(request):
     }
 
     if request.user.is_authenticated:
-        user = User.objects.get(id=request.user.id)
+        user = User.objects.select_related('position').get(id=request.user.id)
         data['user'] = UserConverter.convert(user)
 
     return JsonResponse.success(data)

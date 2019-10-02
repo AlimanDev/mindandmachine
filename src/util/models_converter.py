@@ -1,15 +1,15 @@
 import datetime
 
-from src.db.models import (
-    WorkerDay,
-    Timetable,
-    AttendanceRecords,
-)
 from src.conf.djconfig import (
     QOS_DATE_FORMAT,
     QOS_DATETIME_FORMAT,
     QOS_TIME_FORMAT,
 )
+from src.db.models import (
+    WorkerDay,
+    Timetable,
+    AttendanceRecords,
+    User)
 
 
 class BaseConverter(object):
@@ -40,7 +40,7 @@ class BaseConverter(object):
 
 class UserConverter(BaseConverter):
     @classmethod
-    def convert_main(cls, obj):
+    def convert_main(cls, obj: User):
         return {
             'id': obj.id,
             'username': obj.username,
@@ -56,7 +56,7 @@ class UserConverter(BaseConverter):
         }
 
     @classmethod
-    def convert(cls, obj):
+    def convert(cls, obj: User):
         return {
             'id': obj.id,
             'username': obj.username,
@@ -77,8 +77,8 @@ class UserConverter(BaseConverter):
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
             'attachment_group': obj.attachment_group,
-            'position': obj.position.title if hasattr(obj, 'position') and obj.position else '', # fixme: hasatrr always return true, => sometimes extra request to db
-            'identifier': obj.identifier if hasattr(obj, 'identifier') else None,
+            'position': obj.position.title if getattr(obj, 'position', None) is not None else '',
+            'identifier': getattr(obj, 'identifier', None),
         }
 
 

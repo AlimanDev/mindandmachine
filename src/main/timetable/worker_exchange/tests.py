@@ -23,7 +23,7 @@ class TestWorkerExchange(LocalTestCase):
     qos_dt = dttm.strftime('%d.%m.%Y')
 
     def setUp(self):
-        super().setUp()
+        super().setUp(worker_day=False)
         self.exchange_settings = ExchangeSettings.objects.create(
             automatic_check_lack_timegap=datetime.timedelta(days=1),
             automatic_check_lack=True,
@@ -36,34 +36,48 @@ class TestWorkerExchange(LocalTestCase):
     def test_get_workers_to_exchange(self):
         self.auth()
 
-        user = User.objects.filter(workercashboxinfo__work_type=WorkType.objects.get(pk=2))[0]
+        user = self.user3
         user.is_ready_for_overworkings = True
         user.save()
-        wd = WorkerDay.objects.filter(worker=user)[0]
-        wd.type = 1
-        wd.save()
+
+        wd_dttm_from = (self.dttm - relativedelta(days=5)).replace(hour=9, minute=0,)
+        wd_dttm_to = (self.dttm - relativedelta(days=5)).replace(hour=18, minute=0,)
+
+        worker_day = WorkerDay.objects.create(
+            worker=user,
+            type=WorkerDay.Type.TYPE_WORKDAY.value,
+            dt=wd_dttm_from.date(),
+            dttm_work_start=wd_dttm_from ,
+            dttm_work_end=wd_dttm_to,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=worker_day,
+            work_type=self.work_type3,
+            dttm_from=worker_day.dttm_work_start,
+            dttm_to=worker_day.dttm_work_end,
+        )
 
         response = self.api_get(
-            '/api/timetable/worker_exchange/get_workers_to_exchange?specialization=2&dttm_start=09:00:00 {0}&dttm_end=21:00:00 {0}'.format(
+            '/api/timetable/worker_exchange/get_workers_to_exchange?specialization=2&dttm_start=09:00:00 {0}&dttm_end=18:00:00 {0}'.format(
                 self.qos_dt))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data']['users']['3']['info'], {
             'id': 3,
             'username': 'user3',
-            'shop_id': 1,
+            'shop_id': self.shop.id,
             'first_name': 'Иван3',
             'last_name': 'Сидоров',
             'middle_name': None,
             'avatar_url': None,
             'sex': 'F',
             'phone_number': None,
-            'email': '',
+            'email': 'u3@b.b',
             'tabel_code': None,
             'shop_title': 'Shop1',
             'supershop_title': 'Region Shop1',
         })
-        self.assertEqual(len(response.json['data']['users']['3']['timetable']), 11)
+        self.assertEqual(len(response.json['data']['users']['3']['timetable']), 1)
         self.assertEqual(response.json['data']['tt_from_dt'], (self.dttm - relativedelta(days=10)).strftime('%d.%m.%Y'))
         self.assertEqual(response.json['data']['tt_to_dt'], (self.dttm + relativedelta(days=10)).strftime('%d.%m.%Y'))
 
@@ -102,7 +116,8 @@ class TestWorkerExchange(LocalTestCase):
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data']['vacancies'], [])
 
-        wt = WorkType.objects.get(shop=Shop.objects.get(pk=1), name='Тип_кассы_2')
+        wt = WorkType.objects.get(
+            shop=self.shop, name='Тип_кассы_2')
         WorkerDayCashboxDetails.objects.create(
             dttm_from='{} 09:00:00'.format(self.dttm.date()),
             dttm_to='{} 15:00:00'.format(self.dttm.date()),
@@ -119,7 +134,10 @@ class TestWorkerExchange(LocalTestCase):
         )
 
         response = self.api_get(
-            '/api/timetable/worker_exchange/show_vacancy?shop_id=1')
+            '/api/timetable/worker_exchange/show_vacancy?shop_id={}'.format(
+                self.shop.id
+            )
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
 
@@ -139,7 +157,8 @@ class TestWorkerExchange(LocalTestCase):
     def test_cancel_vacancy(self):
         self.auth()
 
-        wt = WorkType.objects.get(shop=Shop.objects.get(pk=1), name='Тип_кассы_2')
+        wt = WorkType.objects.get(
+            shop=self.shop, name='Тип_кассы_2')
         worker_day_detail = WorkerDayCashboxDetails.objects.create(
             dttm_from='{} 09:00:00'.format(self.dttm.date()),
             dttm_to='{} 15:00:00'.format(self.dttm.date()),
@@ -186,7 +205,7 @@ class Test_auto_worker_exchange(TestCase):
             title='Shop2'
         )
 
-        self.work_type = WorkType.objects.create(
+        self.work_type1 = WorkType.objects.create(
             shop=self.shop,
             name='Кассы'
         )
@@ -198,7 +217,7 @@ class Test_auto_worker_exchange(TestCase):
 
         self.operation_type = OperationType.objects.create(
             name='operation type №1',
-            work_type=self.work_type,
+            work_type=self.work_type1,
             do_forecast=OperationType.FORECAST_HARD
         )
 
@@ -221,7 +240,7 @@ class Test_auto_worker_exchange(TestCase):
         return WorkerDayCashboxDetails.objects.create(
             dttm_from=('{} ' + tm_from).format(self.dt_now),
             dttm_to=('{} ' + tm_to).format(self.dt_now),
-            work_type=self.work_type,
+            work_type=self.work_type1,
             status=WorkerDayCashboxDetails.TYPE_VACANCY,
             is_vacancy=True
         )
@@ -280,7 +299,7 @@ class Test_auto_worker_exchange(TestCase):
         wdcd = WorkerDayCashboxDetails.objects.all()
         self.assertEqual(len(wdcd.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY)), 2)
 
-        cancel_vacancies(self.shop.id, self.work_type.id)
+        cancel_vacancies(self.shop.id, self.work_type1.id)
 
         wdcd = WorkerDayCashboxDetails.objects.all()
         self.assertEqual(len(wdcd.filter(status=WorkerDayCashboxDetails.TYPE_DELETED)), 1)
@@ -292,7 +311,7 @@ class Test_auto_worker_exchange(TestCase):
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 0)
-        create_vacancies_and_notify(self.shop.id, self.work_type.id)
+        create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         wdcd = WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY).order_by('dttm_to')
         print(wdcd.count(), '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         self.assertEqual([wdcd[0].dttm_from.time(), wdcd[0].dttm_to.time()],
@@ -311,7 +330,7 @@ class Test_auto_worker_exchange(TestCase):
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 2)
-        create_vacancies_and_notify(self.shop.id, self.work_type.id)
+        create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         wdcd = WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY).order_by('dttm_to')
         self.assertEqual([wdcd[0].dttm_from.time(), wdcd[0].dttm_to.time()],
                          [datetime.time(9, 0), datetime.time(20, 0)])
@@ -328,7 +347,7 @@ class Test_auto_worker_exchange(TestCase):
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 1)
-        create_vacancies_and_notify(self.shop.id, self.work_type.id)
+        create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         wdcd = WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY).order_by('dttm_to')
         self.assertEqual([wdcd[0].dttm_from.time(), wdcd[0].dttm_to.time()], [datetime.time(9, 0),
                                                                               datetime.time(13, 0)])
@@ -346,7 +365,7 @@ class Test_auto_worker_exchange(TestCase):
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 2)
-        create_vacancies_and_notify(self.shop.id, self.work_type.id)
+        create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         wdcd = WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY).order_by('dttm_to')
         self.assertEqual([wdcd[0].dttm_from.time(), wdcd[0].dttm_to.time()], [datetime.time(9, 0),
                                                                               datetime.time(14, 0)])
@@ -364,7 +383,7 @@ class Test_auto_worker_exchange(TestCase):
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 2)
-        create_vacancies_and_notify(self.shop.id, self.work_type.id)
+        create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 2)
 
