@@ -4,6 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 import json
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
 from django.utils import timezone
+from django.db.models import Q, F
 
 from src.db.models import (
     User,
@@ -309,6 +310,14 @@ def get_cashier_timetable(request, form):
     # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_ids']:
         worker_days_db = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+            Q(worker__dt_fired__gt=from_dt) &
+            Q(dt__lt=F('worker__dt_fired')) |
+            Q(worker__dt_fired__isnull=True),
+
+            Q(worker__dt_hired__lt=to_dt) &
+            Q(dt__gte=F('worker__dt_hired')) |
+            Q(worker__dt_hired__isnull=True),
+
             worker_id=worker_id,
             worker__shop_id=form['shop_id'],
             dt__gte=from_dt,
