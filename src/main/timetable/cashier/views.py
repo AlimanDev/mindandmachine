@@ -60,7 +60,8 @@ from .forms import (
 
 @api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
-    """Возвращает список кассиров в данном магазине
+    """
+    Возвращает список кассиров в данном магазине
 
     Уволенных позже чем dt_fired_after и нанятых раньше, чем dt_hired_before.
 
@@ -182,7 +183,6 @@ def select_cashiers(request, form):
         from_tm(QOS_TIME): required = False
         to_tm(QOS_TIME): required = False
         checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
-
     """
     shop_id = form['shop_id']
     checkpoint = FormUtil.get_checkpoint(form)
@@ -657,8 +657,8 @@ def set_worker_day(request, form):
         worker_id(int): required = True
         dt(QOS_DAT): дата рабочего дня
         type(str): required = True. новый тип рабочего дня
-        dttm_work_start(QOS_TIME): новое время начала рабочего дня
-        dttm_work_end(QOS_TIME): новое время конца рабочего дня
+        tm_work_start(QOS_TIME): новое время начала рабочего дня
+        tm_work_end(QOS_TIME): новое время конца рабочего дня
         work_type(int): required = False. на какой специализации он будет работать
         comment(str): max_length=128, required = False
         details(srt): детали рабочего дня (заносятся в WorkerDayCashboxDetails)
@@ -741,7 +741,6 @@ def set_worker_day(request, form):
                 pass
             old_wd.delete()
             old_wd = None
-
 
     # todo: fix temp code -- if status TYPE_EMPTY or TYPE_DELETED then delete all sequence of worker_day -- possible to recreate timetable
     if worker.attachment_group == User.GROUP_STAFF and form['type'] in \
@@ -915,10 +914,7 @@ def delete_worker_day(request, form):
     if wd_parent is None:
         return JsonResponse.internal_error('Нельзя удалить версию, составленную расписанием.')
 
-    try:
-        wd_child = worker_day_to_delete.child
-    except:
-        wd_child = None
+    wd_child = getattr(worker_day_to_delete, 'child', None)
 
     if wd_child is not None:
         wd_child.parent_worker_day = wd_parent
@@ -929,10 +925,7 @@ def delete_worker_day(request, form):
 
         if wd_child:
             wd_child.save()
-        try:
-            WorkerDayCashboxDetails.objects.get(worker_day_id=worker_day_to_delete.id).delete()
-        except:
-            pass
+        WorkerDayCashboxDetails.objects.filter(worker_day_id=worker_day_to_delete.id).delete()
         worker_day_to_delete.delete()
     except:
         return JsonResponse.internal_error('Не удалось удалить день из расписания.')
@@ -996,7 +989,6 @@ def set_worker_restrictions(request, form):
         worker = User.objects.get(id=form['worker_id'])
     except User.DoesNotExist:
         return JsonResponse.value_error('Invalid worker_id')
-
 
     # WorkTypes
     work_type_info = form.get('work_type_info', [])

@@ -1,9 +1,11 @@
 import datetime
 import logging
+from contextlib import contextmanager
 from random import randint
 from typing import TypeVar
 
 from dateutil.relativedelta import relativedelta
+from django.db import connection
 from django.test import TestCase
 from django.utils.timezone import now
 from requests import Response
@@ -40,6 +42,11 @@ class LocalTestCaseAsserts(TestCase):
         got = len(response.json()['data'])
         self.assertEqual(got, cnt, f"Got response data size {got}, expected {cnt}")
 
+    def assertErrorType(self, response: Response, error_type: str):
+        type_got = response.json()['data'].get('error_type')
+        self.assertIsNotNone(type_got, "There is no error_type in response")
+        self.assertEqual(type_got, error_type, f"Got error_type {type_got}, expected {error_type}")
+
 
 class LocalTestCase(LocalTestCaseAsserts, TestCase):
     USER_USERNAME = "user1"
@@ -49,6 +56,11 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
     def setUp(self, periodclients=True):
         super().setUp()
         logging.disable(logging.CRITICAL)
+
+        # Restart sequences from high value to not catch AlreadyExists errors on normal objects creation
+        # TODO: remove explicit object ids in object.create-s below and this sequence restart
+        with connection.cursor() as cursor:
+            cursor.execute("ALTER SEQUENCE db_user_id_seq RESTART WITH 100;")
 
         dttm_now = now()
 
@@ -393,6 +405,15 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
                 'password': self.USER_PASSWORD
             }
         )
+
+    @contextmanager
+    def auth_user(self, user=None):
+        """Context manager to make requests as specified user logged in"""
+        if user is None:
+            user = self.user1
+        self.client.force_login(user)
+        yield user
+        self.client.logout()
 
     def api_get(self, *args, **kwargs) -> Response:
         response = self.client.get(*args, **kwargs)

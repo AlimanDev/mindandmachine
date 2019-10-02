@@ -1,11 +1,12 @@
 import datetime
+import json
 from datetime import date
 
 from django.conf import settings
 from django.utils import timezone
 
 from src.db.models import User, WorkerDay, WorkerDayChangeRequest
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import BaseConverter, WorkerDayConverter
 from src.util.test import LocalTestCase
 
 
@@ -16,9 +17,8 @@ def create_stuff(shop_id: int) -> User:
         '4242',
         shop_id=shop_id,
         attachment_group=User.GROUP_STAFF,
-        last_name='Дурак7',
-        first_name='Иван7',
-        id=99,
+        last_name='Иванов',
+        first_name='Иван',
         dt_hired=timezone.now() - datetime.timedelta(days=5),
         dt_fired=timezone.now() + datetime.timedelta(days=3),
     )
@@ -306,21 +306,121 @@ class TestGetNotWorkingCashiersList(LocalTestCase):
 class TestSelectCashiers(LocalTestCase):
     url = '/api/timetable/cashier/select_cashiers'
 
+    # TODO Add more test cases
+
+    def test_success(self):
+        with self.auth_user():
+            response = self.api_get(self.url, {
+                "worker_ids": json.dumps([self.user2.pk]),
+                "shop_id": self.shop.pk,
+                "work_types": json.dumps([self.work_type3.pk]),
+            })
+        self.assertResponseCodeEqual(response, 200)
+        self.assertResponseDataListCount(response, 1)
+        self.assertEqual(response.json()['data'][0]['id'], self.user2.pk)
+
 
 class TestGetCashierTimetable(LocalTestCase):
     url = '/api/timetable/cashier/get_cashier_timetable'
+
+    # TODO Add more test cases
+
+    def test_success(self):
+        with self.auth_user():
+            response = self.api_get(self.url, {
+                "worker_ids": json.dumps([self.user2.pk]),
+                "shop_id": self.shop.pk,
+                "from_dt": BaseConverter.convert_date(timezone.now()),
+                "to_dt": BaseConverter.convert_date(timezone.now()),
+            })
+        self.assertResponseCodeEqual(response, 200)
+        self.assertResponseDataListCount(response, 1)
+        self.assertIsNotNone(response.json()['data'].get(str(self.user2.pk)))
 
 
 class TestGetCashierInfo(LocalTestCase):
     url = '/api/timetable/cashier/get_cashier_info'
 
+    def test_general_info(self):
+        with self.auth_user():
+            response = self.api_get(self.url, {
+                "worker_id": self.user2.pk,
+                "info": "general_info"
+            })
+        self.assertResponseCodeEqual(response, 200)
+        self.assertIsNotNone(response.json()['data'].get('general_info'))
+
+    def test_work_type_info(self):
+        with self.auth_user():
+            response = self.api_get(self.url, {
+                "worker_id": self.user2.pk,
+                "info": "work_type_info"
+            })
+        self.assertResponseCodeEqual(response, 200)
+        self.assertIsNotNone(response.json()['data'].get('work_type_info'))
+
+    def test_constraints_info(self):
+        with self.auth_user():
+            response = self.api_get(self.url, {
+                "worker_id": self.user2.pk,
+                "info": "constraints_info"
+            })
+        self.assertResponseCodeEqual(response, 200)
+        self.assertIsNotNone(response.json()['data'].get('constraints_info'))
+
+    def test_work_hours(self):
+        with self.auth_user():
+            response = self.api_get(self.url, {
+                "worker_id": self.user2.pk,
+                "info": "work_hours"
+            })
+        self.assertResponseCodeEqual(response, 200)
+        self.assertIsNotNone(response.json()['data'].get('work_hours'))
+
 
 class TestGetWorkerDay(LocalTestCase):
     url = '/api/timetable/cashier/get_worker_day'
 
+    def test_success(self):
+        with self.auth_user():
+            response = self.api_get(self.url, {
+                "worker_id": self.user2.pk,
+                "dt": BaseConverter.convert_date(timezone.now()),
+            })
+        self.assertResponseCodeEqual(response, 200)
+
+    def test_not_found(self):
+        with self.auth_user():
+            response = self.api_get(self.url, {
+                "worker_id": self.user2.pk,
+                "dt": BaseConverter.convert_date(timezone.now() - datetime.timedelta(days=16)),
+            })
+        self.assertResponseCodeEqual(response, 400)
+        self.assertErrorType(response, 'DoesNotExist')
+
 
 class TestSetWorkerDay(LocalTestCase):
     url = '/api/timetable/cashier/set_worker_day'
+
+    def test_success(self):
+        with self.auth_user():
+            response = self.api_post(self.url, {
+                "worker_id": self.user2.pk,
+                "dt": BaseConverter.convert_date(timezone.now()),
+                "tm_work_start": "11:00:00",
+                "tm_work_end": "12:00:00",
+                "type": WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_BUSINESS_TRIP.value),
+                "comment": "I'm a test"
+            })
+        self.assertResponseCodeEqual(response, 200)
+        data = response.json()['data']
+        self.assertEqual(data['action'], 'update', data)
+
+        wd: WorkerDay = WorkerDay.objects.filter(worker_id=self.user2.pk, dt=timezone.now().date()).last()
+        self.assertEqual(wd.dttm_work_start, datetime.datetime.combine(timezone.now().date(), datetime.time(11, 00)))
+        self.assertEqual(wd.dttm_work_end, datetime.datetime.combine(timezone.now().date(), datetime.time(12, 00)))
+        self.assertEqual(wd.type, WorkerDay.Type.TYPE_BUSINESS_TRIP.value)
+        self.assertIsNotNone(wd.parent_worker_day)
 
 
 class TestGetWorkerDayLogs(LocalTestCase):
@@ -330,6 +430,41 @@ class TestGetWorkerDayLogs(LocalTestCase):
 class TestDeleteWorkerDay(LocalTestCase):
     url = '/api/timetable/cashier/delete_worker_day'
 
+    def setUp(self, periodclients=True):
+        super().setUp(periodclients)
+        self.auth()
+        self.now = timezone.now()
+        self.staff = create_stuff(self.root_shop.pk)
+        self.wd_root = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.Type.TYPE_WORKDAY.value,
+                                                dt=self.now.date())
+        self.wd_child = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.Type.TYPE_VACATION.value,
+                                                 dt=self.now.date(), parent_worker_day_id=self.wd_root.pk)
+        self.wd_child2 = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.Type.TYPE_VACATION.value,
+                                                  dt=self.now.date(), parent_worker_day_id=self.wd_child.pk)
+
+    def test_success(self):
+        response = self.api_post(self.url, {
+            "worker_day_id": self.wd_child.pk
+        })
+        self.assertResponseCodeEqual(response, 200)
+        self.assertIsNone(WorkerDay.objects.filter(pk=self.wd_child.pk).first())
+        self.wd_child2 = self.refresh_model(self.wd_child2)
+        self.assertEqual(self.wd_child2.parent_worker_day_id, self.wd_root.pk)
+
+    def test_not_exists(self):
+        response = self.api_post(self.url, {
+            "worker_day_id": -1
+        })
+        self.assertResponseCodeEqual(response, 400)
+        self.assertErrorType(response, "DoesNotExist")
+
+    def test_no_parent(self):
+        response = self.api_post(self.url, {
+            "worker_day_id": self.wd_root.pk
+        })
+        self.assertResponseCodeEqual(response, 500)
+        self.assertErrorType(response, "InternalError")
+
 
 class TestSetWorkerRestrictions(LocalTestCase):
     url = '/api/timetable/cashier/set_worker_restrictions'
@@ -337,6 +472,32 @@ class TestSetWorkerRestrictions(LocalTestCase):
 
 class TestCreateCashier(LocalTestCase):
     url = '/api/timetable/cashier/create_cashier'
+
+    def test_success(self):
+        self.auth()
+        now = timezone.now()
+        response = self.api_post(self.url, {
+            "first_name": "James",
+            "last_name": "Bond",
+            "middle_name": "007",
+            "username": "jb007",
+            "password": "mi7",
+            "dt_hired": BaseConverter.convert_date(now),
+            "shop_id": self.root_shop.pk,
+        })
+        self.assertResponseCodeEqual(response, 200)
+        uid = response.json()['data'].get("id")
+        self.assertIsNotNone(uid)
+
+        user = User.objects.get(pk=uid)
+        self.assertEqual(user.first_name, "James")
+        self.assertEqual(user.last_name, "Bond")
+        self.assertEqual(user.middle_name, "007")
+        self.assertEqual(user.username, f"u{uid}")
+        self.assertEqual(user.dt_hired, now.date())
+        self.assertIsNone(user.dt_fired)
+        self.assertEqual(user.shop_id, self.root_shop.pk)
+        self.assertTrue(user.check_password("mi7"))
 
 
 class TestDublicateCashierTable(LocalTestCase):
@@ -346,9 +507,86 @@ class TestDublicateCashierTable(LocalTestCase):
 class TestDeleteCashier(LocalTestCase):
     url = '/api/timetable/cashier/delete_cashier'
 
+    def setUp(self, periodclients=True):
+        super().setUp(periodclients)
+        self.auth()
+        self.now = timezone.now()
+        self.user = create_stuff(self.root_shop.pk)
+        self.user.dt_fired = None
+        self.user.save()
+
+    def test_success(self):
+        self.assertIsNone(self.user.dt_fired)
+        response = self.api_post(self.url, {
+            "user_id": self.user.pk,
+            "dt_fired": BaseConverter.convert_date(self.now)
+        })
+        self.assertResponseCodeEqual(response, 200)
+        self.user = self.refresh_model(self.user)
+        self.assertEqual(self.user.dt_fired, self.now.date())
+
+    def test_not_found(self):
+        response = self.api_post(self.url, {
+            "user_id": -1,
+            "dt_fired": BaseConverter.convert_date(self.now)
+        })
+        self.assertResponseCodeEqual(response, 400)
+        self.assertErrorType(response, "DoesNotExist")
+
 
 class TestGetChangeRequest(LocalTestCase):
     url = '/api/timetable/cashier/get_change_request'
+
+    def setUp(self, periodclients=True):
+        super().setUp(periodclients)
+        self.auth()
+        self.user = create_stuff(self.root_shop.pk)
+        self.now = timezone.now().replace(microsecond=0)
+        self.wd_today = WorkerDayChangeRequest.objects.create(
+            worker_id=self.user.pk, dt=self.now.date(),
+            type=WorkerDay.Type.TYPE_VACATION.value
+        )
+        self.wd_tomorrow = WorkerDayChangeRequest.objects.create(
+            worker_id=self.user.pk, dt=(self.now + datetime.timedelta(days=1)).date(),
+            type=WorkerDay.Type.TYPE_WORKDAY.value
+        )
+
+    def test_success(self):
+        # Today request
+        response = self.api_get(self.url, {
+            'worker_id': self.user.id,
+            'dt': BaseConverter.convert_date(self.now)
+        })
+        self.assertResponseCodeEqual(response, 200)
+        self.assertEqual(response.json()['data']['type'],
+                         WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_VACATION.value))
+
+        # Tomorrow request
+        response = self.api_get(self.url, {
+            'worker_id': self.user.id,
+            'dt': BaseConverter.convert_date(self.now + datetime.timedelta(days=1))
+        })
+        self.assertResponseCodeEqual(response, 200)
+        self.assertEqual(response.json()['data']['type'],
+                         WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_WORKDAY.value))
+
+        # Yesterday request - no request
+        response = self.api_get(self.url, {
+            'worker_id': self.user.id,
+            'dt': BaseConverter.convert_date(self.now - datetime.timedelta(days=1))
+        })
+        self.assertResponseCodeEqual(response, 200)
+
+    def test_multiple_requests(self):
+        WorkerDayChangeRequest.objects.create(
+            worker_id=self.user.pk, dt=self.now.date(),
+            type=WorkerDay.Type.TYPE_VACATION.value
+        )
+        response = self.api_get(self.url, {
+            'worker_id': self.user.id,
+            'dt': BaseConverter.convert_date(self.now)
+        })
+        self.assertResponseCodeEqual(response, 500)
 
 
 class TestRequestWorkerDay(LocalTestCase):
