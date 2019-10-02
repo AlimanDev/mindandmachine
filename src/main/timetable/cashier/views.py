@@ -1,9 +1,16 @@
 from datetime import time, datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
-from django.core.exceptions import ObjectDoesNotExist
 import json
-from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
+import time as time_in_seconds
+
+from django.contrib.auth import update_session_auth_hash
+from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
+from django.db import IntegrityError
 from django.utils import timezone
+
+from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
+from src.main.other.notification.utils import send_notification
 
 from src.db.models import (
     User,
@@ -16,7 +23,6 @@ from src.db.models import (
     WorkType,
     WorkerDayCashboxDetails,
     UserWeekdaySlot,
-    Notifications,
 )
 from src.util.utils import (
     JsonResponse,
@@ -52,11 +58,7 @@ from .forms import (
     GetWorkerChangeRequestsForm,
     HandleWorkerDayRequestForm,
 )
-from src.main.other.notification.utils import send_notification
-from django.contrib.auth import update_session_auth_hash
-from django.db import IntegrityError
 
-import time as time_in_seconds
 
 @api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
@@ -365,10 +367,10 @@ def get_cashier_timetable(request, form):
 
         worker_day_change_log = group_by(
             WorkerDay.objects.select_related('worker').filter(
+                Q(parent_worker_day__isnull=False) | Q(created_by__isnull=False),
                 worker_id=worker_id,
                 dt__gte=from_dt,
                 dt__lte=to_dt,
-                parent_worker_day__isnull=False,
                 worker__attachment_group=User.GROUP_STAFF
             ),
             group_key=lambda _: WorkerDay.objects.qos_get_current_worker_day(_).id,
@@ -836,7 +838,7 @@ def get_worker_day_logs(request, form):
         def __work_dttm(__field):
             return BaseConverter.convert_datetime(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
 
-        return {
+        res = {
             'id': obj.id,
             'dttm_added': BaseConverter.convert_datetime(obj.dttm_added),
             'dt': BaseConverter.convert_date(obj.dt),
@@ -847,10 +849,12 @@ def get_worker_day_logs(request, form):
             'created_by': obj.created_by_id,
             'comment': obj.comment,
             'created_by_fio': obj.created_by.get_fio() if obj.created_by else '',
-            'prev_type': WorkerDayConverter.convert_type(obj.parent_worker_day.type),
-            'prev_dttm_work_start': __work_dttm(obj.parent_worker_day.dttm_work_start),
-            'prev_dttm_work_end': __work_dttm(obj.parent_worker_day.dttm_work_end),
         }
+        if obj.parent_worker_day:
+            res['prev_type'] = WorkerDayConverter.convert_type(obj.parent_worker_day.type)
+            res['prev_dttm_work_start'] = __work_dttm(obj.parent_worker_day.dttm_work_start)
+            res['prev_dttm_work_end']  = __work_dttm(obj.parent_worker_day.dttm_work_end)
+        return res
 
     shop_id = form['shop_id']
     worker_day_id = form['worker_day_id']
@@ -872,8 +876,8 @@ def get_worker_day_logs(request, form):
     )
 
     child_worker_days = WorkerDay.objects.select_related('worker', 'parent_worker_day', 'created_by').filter(
+        Q(parent_worker_day__isnull=False) | Q(created_by__isnull=False),
         worker__in=active_users,
-        parent_worker_day_id__isnull=False,
         dt__gte=form['from_dt'],
         dt__lte=form['to_dt'],
     ).order_by('-dttm_added')

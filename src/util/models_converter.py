@@ -142,21 +142,25 @@ class WorkerDayChangeLogConverter(BaseConverter):
                 obj.parent_worker_day and obj.parent_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value else None
 
         parent = obj.parent_worker_day
-        if parent:
-            return {
+        res = {}
+        if parent or obj.created_by_id:
+            res = {
                 'worker_day': obj.id,
                 'dttm_changed': BaseConverter.convert_datetime(obj.dttm_added),
-                'changed_by': obj.created_by.id if obj.created_by else '',
+                'changed_by': obj.created_by_id,
                 'comment': obj.comment,
-                'from_tm_work_start': __parent_work_tm(parent.dttm_work_start),
-                'from_tm_work_end': __parent_work_tm(parent.dttm_work_end),
-                'from_type': WorkerDayConverter.convert_type(parent.type),
                 'to_tm_work_start': __work_tm(obj.dttm_work_start),
                 'to_tm_work_end': __work_tm(obj.dttm_work_end),
                 'to_type': WorkerDayConverter.convert_type(obj.type),
             }
-        else:
-            return {}
+            if parent:
+                res['from_tm_work_start'] = __parent_work_tm(parent.dttm_work_start)
+                res['from_tm_work_end'] = __parent_work_tm(parent.dttm_work_end)
+                res['from_type'] = WorkerDayConverter.convert_type(parent.type)
+            else:
+                res['from_type'] = WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_EMPTY.value)
+
+        return res
 
 
 class WorkerDayChangeRequestConverter(BaseConverter):
