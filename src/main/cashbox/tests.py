@@ -9,14 +9,18 @@ class TestCashbox(LocalTestCase):
 
     def test_get_cashboxes_open_time(self):
         self.auth()
-        response = self.api_get('/api/cashbox/get_cashboxes_open_time?shop_id=1&from_dt=02.6.2018&to_dt=2.6.2018')
+        response = self.api_get('/api/cashbox/get_cashboxes_open_time?shop_id={}&from_dt=02.6.2018&to_dt=2.6.2018'.format(
+            self.shop.id
+        ))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         # {'1': {'share_time': 0}, '2': {'share_time': 0}, '3': {'share_time': 0}
         # self.assertEqual(response.json['data'], {
         #     '1': {'share_time': 88.237},
         #     '2': {'share_time': 35.295}})
-        response = self.api_get('/api/cashbox/get_cashboxes_open_time?shop_id=1&from_dt=02.6.2018&to_dt=20.8.2018')
+        response = self.api_get('/api/cashbox/get_cashboxes_open_time?shop_id={}&from_dt=02.6.2018&to_dt=20.8.2018'.format(
+            self.shop.id
+        ))
         self.assertEqual(response.status_code, 200)
         # {'1': {'share_time': 0}, '2': {'share_time': 0}, '3': {'share_time': 0}}
         # self.assertEqual(response.json['code'], 200)
@@ -27,7 +31,9 @@ class TestCashbox(LocalTestCase):
 
     def test_get_types(self):
         self.auth()
-        response = self.api_get('/api/cashbox/get_types?shop_id=1')
+        response = self.api_get('/api/cashbox/get_types?shop_id={}'.format(
+            self.shop.id
+        ))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         # Поступает больше данных, чем мы проверяем.
@@ -41,12 +47,13 @@ class TestCashbox(LocalTestCase):
 
     def test_get_cashboxes(self):
         self.auth()
-        response = self.api_get('/api/cashbox/get_cashboxes?shop_id=1&work_type_ids=[]')
+        response = self.api_get('/api/cashbox/get_cashboxes?shop_id={}&work_type_ids=[]'.format(
+            self.shop.id
+        ))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(len(response.json['data']['work_types']), 3)
-        # response.json['data']['cashboxes'] = 3
-        # self.assertEqual(len(response.json['data']['cashboxes']), 8)
+        self.assertEqual(len(response.json['data']['cashboxes']), 3)
 
     def test_create_cashbox(self):
         self.auth()
@@ -57,12 +64,3 @@ class TestCashbox(LocalTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 400)
         self.assertEqual(response.json['data']['error_type'], 'AlreadyExist')
-
-        # response = self.api_post('/api/cashbox/create_cashbox', {
-        #     'work_type_id': 1,
-        #     'number': 100
-        # })
-        # print(response.json)
-        # self.assertEqual(response.status_code, 200)
-        # self.assertEqual(response.json['code'], 400)
-        # self.assertEqual(response.json['data']['error_type'], 'AlreadyExist')

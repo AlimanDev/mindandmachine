@@ -53,7 +53,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self, periodclients=True):
+    def setUp(self, worker_day=False):
         super().setUp()
         logging.disable(logging.CRITICAL)
 
@@ -170,8 +170,16 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             first_name='Иван',
         )
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2', first_name='Иван2', last_name='Иванов')
-        self.user3 = create_user(user_id=3, shop_id=self.shop, username='user3', first_name='Иван3',
-                                 last_name='Сидоров')
+        self.user3 = User.objects.create_user(
+            'user3',
+            'u3@b.b',
+            '4242',
+            id=3,
+            shop_id=self.shop.id,
+            first_name='Иван3',
+            last_name='Сидоров',
+            auto_timetable=False
+        )
 
         self.user4 = User.objects.create_user(
             'user4',
@@ -221,13 +229,13 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             self.shop,
             'Кассы',
             id=1,
-            dttm_last_update_queue=datetime.datetime(2018, 12, 1, 8, 30, 0)
+            dttm_last_update_queue=dttm_now.replace(hour=0,minute=0,second=0,microsecond=0)
         )
         self.work_type2 = create_work_type(
             self.shop,
             'Тип_кассы_2',
             id=2,
-            dttm_last_update_queue=datetime.datetime(2018, 12, 1, 9, 0, 0)
+            dttm_last_update_queue=dttm_now.replace(hour=0,minute=0,second=0,microsecond=0)
         )
         self.work_type3 = create_work_type(
             self.shop,
@@ -270,52 +278,52 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         self.entry_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_ENTRY, name='Вход')
         self.exit_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_OUT, name='Выход')
 
-        if not periodclients:
-            return
-
-        # PeriodClients
-        dttm_from = (dttm_now - relativedelta(days=15)).replace(hour=6, minute=30, second=0, microsecond=0)
-        dttm_to = dttm_from + relativedelta(months=1)
-        operation_types = OperationType.objects.all()
-        while dttm_from < dttm_to:
-            create_period_clients(
-                dttm_forecast=dttm_from,
-                value=randint(50, 150),
-                type=PeriodClients.LONG_FORECASE_TYPE,
-                operation_type=operation_types[0]
-            )
-            create_period_clients(
-                dttm_forecast=dttm_from,
-                value=randint(50, 150),
-                type=PeriodClients.LONG_FORECASE_TYPE,
-                operation_type=operation_types[1]
-            )
-            create_period_clients(
-                dttm_forecast=dttm_from,
-                value=randint(50, 150),
-                type=PeriodClients.LONG_FORECASE_TYPE,
-                operation_type=operation_types[2]
-            )
-            create_period_clients(
-                dttm_forecast=dttm_from - relativedelta(months=1),
-                value=randint(50, 150),
-                type=PeriodClients.FACT_TYPE,
-                operation_type=operation_types[3]
-            )
-            dttm_from += datetime.timedelta(minutes=30)
-
-        # Timetable
-        dt_from = (dttm_now - relativedelta(days=15)).date()
-        dt_to = dt_from + relativedelta(months=1)
-        while dt_from < dt_to:
-            for user in User.objects.all():
-                create_worker_day(
-                    worker=user,
-                    dt=dt_from,
-                    dttm_work_start=datetime.datetime.combine(dt_from, datetime.time(9, 0)),
-                    dttm_work_end=datetime.datetime.combine(dt_from, datetime.time(18, 0)),
-                )
-            dt_from += datetime.timedelta(days=1)
+        # if periodclients:
+        #
+        #     # PeriodClients
+        #     dttm_from = (dttm_now - relativedelta(days=15)).replace(hour=6, minute=30, second=0, microsecond=0)
+        #     dttm_to = dttm_from + relativedelta(months=1)
+        #     operation_types = OperationType.objects.all()
+        #     while dttm_from < dttm_to:
+        #         create_period_clients(
+        #             dttm_forecast=dttm_from,
+        #             value=randint(50, 150),
+        #             type=PeriodClients.LONG_FORECASE_TYPE,
+        #             operation_type=operation_types[0]
+        #         )
+        #         create_period_clients(
+        #             dttm_forecast=dttm_from,
+        #             value=randint(50, 150),
+        #             type=PeriodClients.LONG_FORECASE_TYPE,
+        #             operation_type=operation_types[1]
+        #         )
+        #         create_period_clients(
+        #             dttm_forecast=dttm_from,
+        #             value=randint(50, 150),
+        #             type=PeriodClients.LONG_FORECASE_TYPE,
+        #             operation_type=operation_types[2]
+        #         )
+        #         create_period_clients(
+        #             dttm_forecast=dttm_from - relativedelta(months=1),
+        #             value=randint(50, 150),
+        #             type=PeriodClients.FACT_TYPE,
+        #             operation_type=operation_types[3]
+        #         )
+        #         dttm_from += datetime.timedelta(minutes=30)
+        #
+        if worker_day:
+            # Timetable
+            dt_from = (dttm_now - relativedelta(days=15)).date()
+            dt_to = dt_from + relativedelta(months=1)
+            while dt_from < dt_to:
+                for user in User.objects.all():
+                    create_worker_day(
+                        worker=user,
+                        dt=dt_from,
+                        dttm_work_start=datetime.datetime.combine(dt_from, datetime.time(9, 0)),
+                        dttm_work_end=datetime.datetime.combine(dt_from, datetime.time(18, 0)),
+                    )
+                dt_from += datetime.timedelta(days=1)
 
         # Timetable create
         self.timetable1 = Timetable.objects.create(

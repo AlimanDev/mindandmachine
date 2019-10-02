@@ -1,5 +1,5 @@
 from src.util.test import LocalTestCase
-
+from unittest import skip
 
 class TestUpload(LocalTestCase):
 
@@ -7,6 +7,7 @@ class TestUpload(LocalTestCase):
         super().setUp()
 
     # Сервер для обработки алгоритма недоступен.
+    @skip("надо определиться с форматом")
     def test_upload_demand(self):
         self.auth()
 
@@ -17,6 +18,7 @@ class TestUpload(LocalTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertResponseCodeEqual(response, 200)
 
+    @skip("надо определиться с форматом")
     def test_upload_timetable(self):
         self.auth()
 

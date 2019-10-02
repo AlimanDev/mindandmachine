@@ -27,7 +27,9 @@ class TestWorkTypes(LocalTestCase):
 
         self.auth()
 
-        response = self.api_get('/api/other/get_all_slots?shop_id=1')
+        response = self.api_get('/api/other/get_all_slots?shop_id={}'.format(
+            self.shop.id
+        ))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data'], [
@@ -47,7 +49,9 @@ class TestWorkTypes(LocalTestCase):
             },
         ])
 
-        response = self.api_get('/api/other/get_all_slots?shop_id=2')
+        response = self.api_get('/api/other/get_all_slots?shop_id={}'.format(
+            self.shop2.id
+        ))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['code'], 200)
         self.assertEqual(response.json['data'], [])

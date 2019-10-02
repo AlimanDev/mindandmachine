@@ -2,11 +2,11 @@ from src.util.test import LocalTestCase
 from src.db.models import Notifications, User, Event, WorkerDayCashboxDetails, WorkerDay
 import json
 from django.utils import timezone
-
+from datetime import timedelta
 
 class TestNotifications(LocalTestCase):
     def setUp(self):
-        super().setUp()
+        super().setUp(worker_day=True)
 
         for number in range(1, 6):
             event = Event.objects.create(
@@ -29,7 +29,7 @@ class TestNotifications(LocalTestCase):
                 was_read=True
             )
 
-        dt = timezone.now().date()
+        dt = timezone.now().date() + timedelta(days=1)
 
         self.wdcd = WorkerDayCashboxDetails.objects.create(
             dttm_from='{} 09:00:00'.format(dt),

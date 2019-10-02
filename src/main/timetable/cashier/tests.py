@@ -577,17 +577,6 @@ class TestGetChangeRequest(LocalTestCase):
         })
         self.assertResponseCodeEqual(response, 200)
 
-    def test_multiple_requests(self):
-        WorkerDayChangeRequest.objects.create(
-            worker_id=self.user.pk, dt=self.now.date(),
-            type=WorkerDay.Type.TYPE_VACATION.value
-        )
-        response = self.api_get(self.url, {
-            'worker_id': self.user.id,
-            'dt': BaseConverter.convert_date(self.now)
-        })
-        self.assertResponseCodeEqual(response, 500)
-
 
 class TestRequestWorkerDay(LocalTestCase):
     url = '/api/timetable/cashier/request_worker_day'

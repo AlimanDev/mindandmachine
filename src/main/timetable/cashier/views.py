@@ -106,8 +106,8 @@ def get_cashiers_list(request, form):
 
     users_qs = User.objects.filter(
         shop_id=shop_id,
-        attachment_group__in=attachment_groups,
-    ).filter(q).order_by('id')
+        attachment_group__in=attachment_groups
+    ).filter(q).select_related('position').order_by('id')
 
     return JsonResponse.success([UserConverter.convert(x) for x in users_qs])
 
