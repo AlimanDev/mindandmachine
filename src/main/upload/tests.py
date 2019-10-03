@@ -1,5 +1,7 @@
-from src.util.test import LocalTestCase
 from unittest import skip
+
+from src.util.test import LocalTestCase
+
 
 class TestUpload(LocalTestCase):
 
@@ -26,4 +28,4 @@ class TestUpload(LocalTestCase):
         response = self.api_post('/api/upload/upload_timetable', {'shop_id': 1, 'file': file})
         file.close()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertEqual(response.json()['code'], 200)

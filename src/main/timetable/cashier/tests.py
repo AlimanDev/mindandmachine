@@ -35,8 +35,8 @@ class TestCashier(LocalTestCase):
         })
         self.assertEqual(response.status_code, 200)
         # {'error_type': 'AccessForbidden', 'error_message': ''}
-        # self.assertEqual(response.json['code'], 400)
-        # self.assertEqual(response.json['data']['error_type'], 'AuthError')
+        # self.assertEqual(response.json()['code'], 400)
+        # self.assertEqual(response.json()['data']['error_type'], 'AuthError')
 
         response = self.api_post('/api/timetable/cashier/password_edit', {
             'user_id': 5,
@@ -45,9 +45,9 @@ class TestCashier(LocalTestCase):
         })
         self.assertEqual(response.status_code, 200)
         # {'error_type': 'DoesNotExist', 'error_message': 'error in api_method'}
-        # self.assertEqual(response.json['code'], 403)
-        # self.assertEqual(response.json['data']['error_type'], 'AccessForbidden')
-        # self.assertEqual(response.json['data']['error_message'], 'You are not allowed to edit this user')
+        # self.assertEqual(response.json()['code'], 403)
+        # self.assertEqual(response.json()['data']['error_type'], 'AccessForbidden')
+        # self.assertEqual(response.json()['data']['error_message'], 'You are not allowed to edit this user')
 
         response = self.api_post('/api/timetable/cashier/password_edit', {
             'user_id': 1,
@@ -84,8 +84,8 @@ class TestCashier(LocalTestCase):
         })
         self.assertEqual(response.status_code, 200)
         # 'error_message': "[('password', ['This field is required.'])]"
-        # self.assertEqual(response.json['code'], 200)
-        # self.assertEqual(response.json['data']['new_first_name'], 'Benedick')
+        # self.assertEqual(response.json()['code'], 200)
+        # self.assertEqual(response.json()['data']['new_first_name'], 'Benedick')
 
         response = self.api_post('/api/timetable/cashier/change_cashier_info', {
             'user_id': 5,
@@ -93,8 +93,8 @@ class TestCashier(LocalTestCase):
         })
         self.assertEqual(response.status_code, 200)
         # 'error_message': "[('password', ['This field is required.'])]"
-        # self.assertEqual(response.json['code'], 403)
-        # self.assertEqual(response.json['data']['error_message'], 'You are not allowed to edit this user')
+        # self.assertEqual(response.json()['code'], 403)
+        # self.assertEqual(response.json()['data']['error_message'], 'You are not allowed to edit this user')
 
         response = self.api_post('/api/timetable/cashier/change_cashier_info', {
             'user_id': 2,
@@ -102,8 +102,8 @@ class TestCashier(LocalTestCase):
         })
         self.assertEqual(response.status_code, 200)
         # 'error_message': "[('password', ['This field is required.'])]"
-        # self.assertEqual(response.json['code'], 200)
-        # self.assertEqual(response.json['data']['new_first_name'], 'Viktor')
+        # self.assertEqual(response.json()['code'], 200)
+        # self.assertEqual(response.json()['data']['new_first_name'], 'Viktor')
 
         response = self.api_post('/api/timetable/cashier/change_cashier_info', {
             'user_id': 1,
@@ -111,8 +111,8 @@ class TestCashier(LocalTestCase):
         })
         self.assertEqual(response.status_code, 200)
         # 'error_message': "[('password', ['This field is required.'])]"
-        # self.assertEqual(response.json['code'], 403)
-        # self.assertEqual(response.json['data']['error_message'], 'You are not allowed to edit this group')
+        # self.assertEqual(response.json()['code'], 403)
+        # self.assertEqual(response.json()['data']['error_message'], 'You are not allowed to edit this group')
 
         response = self.api_post('/api/timetable/cashier/change_cashier_info', {
             'user_id': 1,
@@ -123,25 +123,25 @@ class TestCashier(LocalTestCase):
         })
         self.assertEqual(response.status_code, 200)
         # 'error_message': "[('password', ['This field is required.'])]"
-        # self.assertEqual(response.json['code'], 200)
-        # self.assertEqual(response.json['data']['new_first_name'], 'Viktor')
-        # self.assertEqual(response.json['data']['new_middle_name'], 'middle_name')
-        # self.assertEqual(response.json['data']['new_last_name'], 'last_name')
-        # self.assertEqual(response.json['data']['new_birthday'], '1990-02-03')
+        # self.assertEqual(response.json()['code'], 200)
+        # self.assertEqual(response.json()['data']['new_first_name'], 'Viktor')
+        # self.assertEqual(response.json()['data']['new_middle_name'], 'middle_name')
+        # self.assertEqual(response.json()['data']['new_last_name'], 'last_name')
+        # self.assertEqual(response.json()['data']['new_birthday'], '1990-02-03')
 
 
 class TestGetCashierList(LocalTestCase):
     """Tests for timetable/cashier/get_cashiers_list"""
     url = '/api/timetable/cashier/get_cashiers_list'
 
-    def setUp(self, periodclients=True):
-        super().setUp(periodclients)
+    def setUp(self, worker_day=False):
+        super().setUp(worker_day)
         self.staff1 = create_stuff(self.root_shop.id)
-        self.auth()
 
     def test_filter_defaults(self):
         # staff1 meets both defaults
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': 1,
         })
         self.assertResponseCodeEqual(response, 200)
@@ -151,7 +151,8 @@ class TestGetCashierList(LocalTestCase):
         self.staff1.save()
 
         # staff1 hired after default dt_hired_before
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': 1,
         })
         self.assertResponseCodeEqual(response, 200)
@@ -162,14 +163,16 @@ class TestGetCashierList(LocalTestCase):
         self.staff1.save()
 
         # staff1 fired before default dt_fired_after
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': 1,
         })
         self.assertResponseCodeEqual(response, 200)
         self.assertResponseDataListCount(response, 1)
 
         # show_all = true
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': 1,
             'show_all': True,
         })
@@ -178,7 +181,8 @@ class TestGetCashierList(LocalTestCase):
 
     def test_dt_hired_before(self):
         # staff1 included - hired before dt_hired_before filter
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': 1,
             'dt_hired_before': (timezone.now() - datetime.timedelta(days=3)).date().strftime(settings.QOS_DATE_FORMAT),
         })
@@ -186,7 +190,8 @@ class TestGetCashierList(LocalTestCase):
         self.assertResponseDataListCount(response, 2)
 
         # staff1 excluded - hired after dt_hired_before filter
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': 1,
             'dt_hired_before': (timezone.now() - datetime.timedelta(days=8)).date().strftime(settings.QOS_DATE_FORMAT),
         })
@@ -195,7 +200,8 @@ class TestGetCashierList(LocalTestCase):
 
     def test_dt_fired_after(self):
         # staff1 included - fired after dt_fired_after value
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': 1,
             'dt_fired_after': (timezone.now() + datetime.timedelta(days=1)).date().strftime(settings.QOS_DATE_FORMAT),
         })
@@ -203,7 +209,8 @@ class TestGetCashierList(LocalTestCase):
         self.assertResponseDataListCount(response, 2)
 
         # staff1 excluded - fired before dt_fired_after value
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': 1,
             'dt_fired_after': (timezone.now() + datetime.timedelta(days=5)).date().strftime(settings.QOS_DATE_FORMAT),
         })
@@ -225,13 +232,15 @@ class TestGetCashierList(LocalTestCase):
             dt_fired=timezone.now() + datetime.timedelta(days=3),
         )
 
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': 1,
         })
         self.assertResponseCodeEqual(response, 200)
         self.assertResponseDataListCount(response, 2)
 
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': 1,
             'consider_outsource': True,
         })
@@ -242,9 +251,8 @@ class TestGetCashierList(LocalTestCase):
 class TestGetNotWorkingCashiersList(LocalTestCase):
     url = '/api/timetable/cashier/get_not_working_cashiers_list'
 
-    def setUp(self, periodclients=True):
-        super().setUp(periodclients)
-        self.auth()
+    def setUp(self, worker_day=False):
+        super().setUp(worker_day)
         self.staff1 = create_stuff(self.root_shop.id)
         self.wd: WorkerDay = WorkerDay.objects.create(
             type=WorkerDay.Type.TYPE_VACATION.value, worker=self.staff1,
@@ -254,7 +262,8 @@ class TestGetNotWorkingCashiersList(LocalTestCase):
     def test_filter_defaults(self):
         self.wd.type = WorkerDay.Type.TYPE_WORKDAY.value
         self.wd.save()
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': self.root_shop.id,
         })
         self.assertResponseCodeEqual(response, 200)
@@ -262,7 +271,8 @@ class TestGetNotWorkingCashiersList(LocalTestCase):
 
         self.wd.type = WorkerDay.Type.TYPE_VACATION.value
         self.wd.save()
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': self.root_shop.id,
         })
         self.assertResponseCodeEqual(response, 200)
@@ -270,7 +280,8 @@ class TestGetNotWorkingCashiersList(LocalTestCase):
 
     def test_dt_hired_before(self):
         # staff1 included - hired before dt_hired_before filter
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': self.root_shop.id,
             'dt_hired_before': (timezone.now() - datetime.timedelta(days=3)).date().strftime(settings.QOS_DATE_FORMAT),
         })
@@ -278,7 +289,8 @@ class TestGetNotWorkingCashiersList(LocalTestCase):
         self.assertResponseDataListCount(response, 1)
 
         # staff1 excluded - hired after dt_hired_before filter
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': self.root_shop.id,
             'dt_hired_before': (timezone.now() - datetime.timedelta(days=8)).date().strftime(settings.QOS_DATE_FORMAT),
         })
@@ -287,7 +299,8 @@ class TestGetNotWorkingCashiersList(LocalTestCase):
 
     def test_dt_fired_after(self):
         # staff1 included - fired after dt_fired_after value
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': self.root_shop.id,
             'dt_fired_after': (timezone.now() + datetime.timedelta(days=1)).date().strftime(settings.QOS_DATE_FORMAT),
         })
@@ -295,7 +308,8 @@ class TestGetNotWorkingCashiersList(LocalTestCase):
         self.assertResponseDataListCount(response, 1)
 
         # staff1 excluded - fired before dt_fired_after value
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'shop_id': self.root_shop.id,
             'dt_fired_after': (timezone.now() + datetime.timedelta(days=5)).date().strftime(settings.QOS_DATE_FORMAT),
         })
@@ -430,9 +444,8 @@ class TestGetWorkerDayLogs(LocalTestCase):
 class TestDeleteWorkerDay(LocalTestCase):
     url = '/api/timetable/cashier/delete_worker_day'
 
-    def setUp(self, periodclients=True):
-        super().setUp(periodclients)
-        self.auth()
+    def setUp(self, worker_day=False):
+        super().setUp(worker_day)
         self.now = timezone.now()
         self.staff = create_stuff(self.root_shop.pk)
         self.wd_root = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.Type.TYPE_WORKDAY.value,
@@ -443,7 +456,8 @@ class TestDeleteWorkerDay(LocalTestCase):
                                                   dt=self.now.date(), parent_worker_day_id=self.wd_child.pk)
 
     def test_success(self):
-        response = self.api_post(self.url, {
+        with self.auth_user():
+            response = self.api_post(self.url, {
             "worker_day_id": self.wd_child.pk
         })
         self.assertResponseCodeEqual(response, 200)
@@ -452,14 +466,16 @@ class TestDeleteWorkerDay(LocalTestCase):
         self.assertEqual(self.wd_child2.parent_worker_day_id, self.wd_root.pk)
 
     def test_not_exists(self):
-        response = self.api_post(self.url, {
+        with self.auth_user():
+            response = self.api_post(self.url, {
             "worker_day_id": -1
         })
         self.assertResponseCodeEqual(response, 400)
         self.assertErrorType(response, "DoesNotExist")
 
     def test_no_parent(self):
-        response = self.api_post(self.url, {
+        with self.auth_user():
+            response = self.api_post(self.url, {
             "worker_day_id": self.wd_root.pk
         })
         self.assertResponseCodeEqual(response, 500)
@@ -474,9 +490,9 @@ class TestCreateCashier(LocalTestCase):
     url = '/api/timetable/cashier/create_cashier'
 
     def test_success(self):
-        self.auth()
         now = timezone.now()
-        response = self.api_post(self.url, {
+        with self.auth_user():
+            response = self.api_post(self.url, {
             "first_name": "James",
             "last_name": "Bond",
             "middle_name": "007",
@@ -507,9 +523,8 @@ class TestDublicateCashierTable(LocalTestCase):
 class TestDeleteCashier(LocalTestCase):
     url = '/api/timetable/cashier/delete_cashier'
 
-    def setUp(self, periodclients=True):
-        super().setUp(periodclients)
-        self.auth()
+    def setUp(self, worker_day=False):
+        super().setUp(worker_day)
         self.now = timezone.now()
         self.user = create_stuff(self.root_shop.pk)
         self.user.dt_fired = None
@@ -517,7 +532,8 @@ class TestDeleteCashier(LocalTestCase):
 
     def test_success(self):
         self.assertIsNone(self.user.dt_fired)
-        response = self.api_post(self.url, {
+        with self.auth_user():
+            response = self.api_post(self.url, {
             "user_id": self.user.pk,
             "dt_fired": BaseConverter.convert_date(self.now)
         })
@@ -526,7 +542,8 @@ class TestDeleteCashier(LocalTestCase):
         self.assertEqual(self.user.dt_fired, self.now.date())
 
     def test_not_found(self):
-        response = self.api_post(self.url, {
+        with self.auth_user():
+            response = self.api_post(self.url, {
             "user_id": -1,
             "dt_fired": BaseConverter.convert_date(self.now)
         })
@@ -537,9 +554,8 @@ class TestDeleteCashier(LocalTestCase):
 class TestGetChangeRequest(LocalTestCase):
     url = '/api/timetable/cashier/get_change_request'
 
-    def setUp(self, periodclients=True):
-        super().setUp(periodclients)
-        self.auth()
+    def setUp(self, worker_day=False):
+        super().setUp(worker_day)
         self.user = create_stuff(self.root_shop.pk)
         self.now = timezone.now().replace(microsecond=0)
         self.wd_today = WorkerDayChangeRequest.objects.create(
@@ -553,7 +569,8 @@ class TestGetChangeRequest(LocalTestCase):
 
     def test_success(self):
         # Today request
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'worker_id': self.user.id,
             'dt': BaseConverter.convert_date(self.now)
         })
@@ -562,7 +579,8 @@ class TestGetChangeRequest(LocalTestCase):
                          WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_VACATION.value))
 
         # Tomorrow request
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'worker_id': self.user.id,
             'dt': BaseConverter.convert_date(self.now + datetime.timedelta(days=1))
         })
@@ -571,7 +589,8 @@ class TestGetChangeRequest(LocalTestCase):
                          WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_WORKDAY.value))
 
         # Yesterday request - no request
-        response = self.api_get(self.url, {
+        with self.auth_user():
+            response = self.api_get(self.url, {
             'worker_id': self.user.id,
             'dt': BaseConverter.convert_date(self.now - datetime.timedelta(days=1))
         })
@@ -581,13 +600,13 @@ class TestGetChangeRequest(LocalTestCase):
 class TestRequestWorkerDay(LocalTestCase):
     url = '/api/timetable/cashier/request_worker_day'
 
-    def setUp(self, periodclients=True):
-        super().setUp(periodclients)
-        self.auth()
+    def setUp(self, worker_day=False):
+        super().setUp(worker_day)
         self.staff = create_stuff(self.root_shop.id)
 
     def test_required(self):
-        response = self.api_post(self.url, {
+        with self.auth_user():
+            response = self.api_post(self.url, {
             "worker_id": self.staff.id,
             "shop_id": self.root_shop.id,
             "dt": BaseConverter.convert_date(timezone.now().date()),
@@ -604,7 +623,8 @@ class TestRequestWorkerDay(LocalTestCase):
     def test_all_fields(self):
         now = timezone.now().replace(microsecond=0)
 
-        response = self.api_post(self.url, {
+        with self.auth_user():
+            response = self.api_post(self.url, {
             "worker_id": self.staff.id,
             "shop_id": self.root_shop.id,
             "dt": BaseConverter.convert_date(now.date()),
@@ -627,9 +647,8 @@ class TestRequestWorkerDay(LocalTestCase):
 class TestHandleWorkerDayRequest(LocalTestCase):
     url = '/api/timetable/cashier/handle_change_request'
 
-    def setUp(self, periodclients=True):
-        super().setUp(periodclients)
-        self.auth()
+    def setUp(self, worker_day=False):
+        super().setUp(worker_day)
         self.worker: User = create_stuff(self.root_shop.id)
         self.req: WorkerDayChangeRequest = WorkerDayChangeRequest.objects.create(
             worker=self.worker, dt=timezone.now().today(), type=WorkerDay.Type.TYPE_VACATION.value,
@@ -637,7 +656,8 @@ class TestHandleWorkerDayRequest(LocalTestCase):
 
     def test_approve(self):
         self.assertEqual(WorkerDay.objects.filter(worker_id=self.worker.id).count(), 0)
-        response = self.api_post(self.url, {
+        with self.auth_user():
+            response = self.api_post(self.url, {
             "request_id": self.req.id,
             "action": "A"
         })
@@ -648,7 +668,8 @@ class TestHandleWorkerDayRequest(LocalTestCase):
 
     def test_decline(self):
         self.assertEqual(WorkerDay.objects.filter(worker_id=self.worker.id).count(), 0)
-        response = self.api_post(self.url, {
+        with self.auth_user():
+            response = self.api_post(self.url, {
             "request_id": self.req.id,
             "action": "D"
         })
@@ -658,14 +679,16 @@ class TestHandleWorkerDayRequest(LocalTestCase):
         self.assertEqual(WorkerDay.objects.filter(worker_id=self.worker.id).count(), 0)
 
     def test_bad_action(self):
-        response = self.api_post(self.url, {
+        with self.auth_user():
+            response = self.api_post(self.url, {
             "request_id": self.req.id,
             "action": "EEE"
         })
         self.assertResponseCodeEqual(response, 500)
 
     def test_bad_request_id(self):
-        response = self.api_post(self.url, {
+        with self.auth_user():
+            response = self.api_post(self.url, {
             "request_id": 99999,
             "action": "A"
         })
