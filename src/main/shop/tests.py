@@ -114,7 +114,7 @@ class TestShop(LocalTestCase):
                   'info': None
                   }
 
-        self.assertEqual(response.json, answer)
+        self.assertEqual(response.json(), answer)
 
     def test_get_department_stats(self):
         self.auth()

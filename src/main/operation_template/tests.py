@@ -3,7 +3,7 @@ from datetime import date, time, datetime, timedelta
 
 from src.db.models import OperationTemplate, OperationType, PeriodClients
 from src.main.operation_template import utils
-from src.util.test import LocalTestCase, datetime
+from src.util.test import LocalTestCase
 
 
 class TestOperationTemplate(LocalTestCase):
@@ -40,6 +40,7 @@ class TestOperationTemplate(LocalTestCase):
             tm_end=time(13),
             value=3.25
         )
+
     def create_period_clients(self, dt_from, dt_to):
         creates = []
         while dt_from <= dt_to:

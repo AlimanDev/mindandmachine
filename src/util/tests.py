@@ -102,7 +102,6 @@ class TestApiMethod(LocalTestCase):
         self.assertResponseCodeEqual(response, 401)
         self.assertEqual(response.json()['data']['error_type'], 'AuthRequired')
 
-
     def test_valid_form(self):
         self.auth(self.USER_USERNAME)
 
