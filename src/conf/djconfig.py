@@ -7,8 +7,9 @@ config importance
 """
 
 import os
-from celery.schedules import crontab
+import sys
 
+from celery.schedules import crontab
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -312,3 +313,12 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
 }
+
+if 'test' in sys.argv:
+    # Disable migrations in test, fill the schema directly
+    class MigrationDisabler(dict):
+        def __getitem__(self, item):
+            return None
+
+
+    MIGRATION_MODULES = MigrationDisabler()

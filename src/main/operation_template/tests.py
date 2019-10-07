@@ -1,12 +1,15 @@
-from src.util.test import LocalTestCase, datetime
+import json
+from datetime import date, time, datetime, timedelta
+
 from src.db.models import OperationTemplate, OperationType, PeriodClients
 from src.main.operation_template import utils
-from datetime import date, time, datetime, timedelta
-import json
+from src.util.test import LocalTestCase
+
+
 class TestOperationTemplate(LocalTestCase):
 
     def setUp(self, **args):
-        super().setUp(periodclients=False)
+        super().setUp()
         self.operation_type = OperationType.objects.all().first()
         self.dt_from = datetime.now().date() + timedelta(days=5)
 
@@ -37,6 +40,7 @@ class TestOperationTemplate(LocalTestCase):
             tm_end=time(13),
             value=3.25
         )
+
     def create_period_clients(self, dt_from, dt_to):
         creates = []
         while dt_from <= dt_to:
@@ -262,7 +266,7 @@ class TestOperationTemplate(LocalTestCase):
             'operation_type_id': self.operation_type.id,
         }
         response = self.api_post('/api/operation_template/create_operation_template', ot)
-        data = response.json['data']
+        data = response.json()['data']
         days_in_period = ot.pop('days_in_period')
 
         for k in ot.keys():
@@ -283,15 +287,15 @@ class TestOperationTemplate(LocalTestCase):
         }
 
         response = self.api_post('/api/operation_template/update_operation_template', ot)
-        self.assertEqual(response.json['data']['error_message'], "[('days_in_period', ['invalid IntegerListType'])]")
+        self.assertEqual(response.json()['data']['error_message'], "[('days_in_period', ['invalid IntegerListType'])]")
 
         ot['days_in_period'] = '[1,2,4,15,20,50]'
         response = self.api_post('/api/operation_template/update_operation_template', ot)
-        self.assertEqual(response.json['data']['error_message'], "Перечисленные дни не соответствуют периоду")
+        self.assertEqual(response.json()['data']['error_message'], "Перечисленные дни не соответствуют периоду")
 
         ot['days_in_period'] = '[1,2,4,15,20]'
         response = self.api_post('/api/operation_template/update_operation_template', ot)
-        data = response.json['data']
+        data = response.json()['data']
 
         days_in_period = ot.pop('days_in_period')
         date_rebuild_from = ot.pop('date_rebuild_from')
@@ -301,6 +305,6 @@ class TestOperationTemplate(LocalTestCase):
 
         response = self.api_post('/api/operation_template/delete_operation_template',
                                  {'id': id})
-        self.assertEqual(response.json['code'], 200)
+        self.assertEqual(response.json()['code'], 200)
         operation_template = OperationTemplate.objects.get(id=id)
         self.assertTrue(operation_template.dttm_deleted is not None)
