@@ -1,8 +1,12 @@
-from datetime import time, datetime, timedelta, date
-from dateutil.relativedelta import relativedelta
-from django.core.exceptions import ObjectDoesNotExist
 import json
-from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
+import time as time_in_seconds
+from datetime import time, datetime, timedelta, date
+
+from dateutil.relativedelta import relativedelta
+from django.contrib.auth import update_session_auth_hash
+from django.core.exceptions import ObjectDoesNotExist
+from django.db import IntegrityError
+from django.db.models import Q
 from django.utils import timezone
 from django.db.models import Q, F
 
@@ -17,12 +21,10 @@ from src.db.models import (
     WorkType,
     WorkerDayCashboxDetails,
     UserWeekdaySlot,
-    Notifications,
 )
-from src.util.utils import (
-    JsonResponse,
-    api_method,
-)
+from src.main.other.notification.utils import send_notification
+from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
+from src.util.collection import group_by, count, range_u
 from src.util.forms import FormUtil
 from src.util.models_converter import (
     UserConverter,
@@ -33,8 +35,10 @@ from src.util.models_converter import (
     BaseConverter,
     WorkerDayChangeLogConverter,
 )
-from src.util.collection import group_by, count, range_u
-
+from src.util.utils import (
+    JsonResponse,
+    api_method,
+)
 from .forms import (
     GetCashierTimetableForm,
     SelectCashiersForm,
@@ -53,17 +57,14 @@ from .forms import (
     GetWorkerChangeRequestsForm,
     HandleWorkerDayRequestForm,
 )
-from src.main.other.notification.utils import send_notification
-from django.contrib.auth import update_session_auth_hash
-from django.db import IntegrityError
 
-import time as time_in_seconds
 
 @api_method('GET', GetCashiersListForm)
 def get_cashiers_list(request, form):
     """
-    Возвращает список кассиров в данном магазине, уволенных позже чем dt_fired_after и нанятых\
-    раньше, чем dt_hired_before.
+    Возвращает список кассиров в данном магазине
+
+    Уволенных позже чем dt_fired_after и нанятых раньше, чем dt_hired_before.
 
     Args:
         method: GET
@@ -96,23 +97,20 @@ def get_cashiers_list(request, form):
         ]}
 
     """
-    response_users = []
     attachment_groups = [User.GROUP_STAFF, User.GROUP_OUTSOURCE if form['consider_outsource'] else None]
     shop_id = form['shop_id']
+
+    q = Q()
+    if not form['show_all']:
+        q &= Q(dt_hired__isnull=True) | Q(dt_hired__lte=form['dt_hired_before'])
+        q &= Q(dt_fired__isnull=True) | Q(dt_fired__gt=form['dt_fired_after'])
+
     users_qs = User.objects.filter(
         shop_id=shop_id,
         attachment_group__in=attachment_groups
-    ).select_related('position').order_by('id')
+    ).filter(q).select_related('position').order_by('id')
 
-    if form['show_all']:
-        response_users = users_qs
-    else:
-        for u in users_qs:
-            if u.dt_hired is None or u.dt_hired <= form['dt_fired_after']:
-                if u.dt_fired is None or u.dt_fired > form['dt_hired_before']:
-                    response_users.append(u)
-
-    return JsonResponse.success([UserConverter.convert(x) for x in response_users])
+    return JsonResponse.success([UserConverter.convert(x) for x in users_qs])
 
 
 @api_method('GET', GetCashiersListForm)
@@ -154,23 +152,21 @@ def get_not_working_cashiers_list(request, form):
     shop_id = form['shop_id']
     checkpoint = FormUtil.get_checkpoint(form)
 
-    users_not_working_today = []
-
-    for u in WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+    users_not_working_today = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
             dt=dt_now.date(),
             worker__shop_id=shop_id,
             worker__attachment_group=User.GROUP_STAFF
+    ).filter(
+        (Q(worker__dt_hired__isnull=True) | Q(worker__dt_hired__lte=form['dt_hired_before'])) &
+        (Q(worker__dt_fired__isnull=True) | Q(worker__dt_fired__gt=form['dt_fired_after']))
     ).exclude(
         type=WorkerDay.Type.TYPE_WORKDAY.value
     ).order_by(
         'worker__last_name',
         'worker__first_name'
-    ):
-        if u.worker.dt_hired is None or u.worker.dt_hired <= form['dt_hired_before']:
-            if u.worker.dt_fired is None or u.worker.dt_fired >= form['dt_fired_after']:
-                users_not_working_today.append(u.worker)
+    )
 
-    return JsonResponse.success([UserConverter.convert(x) for x in users_not_working_today])
+    return JsonResponse.success([UserConverter.convert(x.worker) for x in users_not_working_today])
 
 
 @api_method('GET', SelectCashiersForm)
@@ -188,7 +184,6 @@ def select_cashiers(request, form):
         from_tm(QOS_TIME): required = False
         to_tm(QOS_TIME): required = False
         checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
-
     """
     shop_id = form['shop_id']
     checkpoint = FormUtil.get_checkpoint(form)
@@ -255,7 +250,6 @@ def select_cashiers(request, form):
         users = [x for x in users if x.id in set(y.worker_id for y in worker_days)]
 
     return JsonResponse.success([UserConverter.convert(x) for x in users])
-
 
 
 @api_method('GET', GetCashierTimetableForm)
@@ -672,8 +666,8 @@ def set_worker_day(request, form):
         worker_id(int): required = True
         dt(QOS_DAT): дата рабочего дня
         type(str): required = True. новый тип рабочего дня
-        dttm_work_start(QOS_TIME): новое время начала рабочего дня
-        dttm_work_end(QOS_TIME): новое время конца рабочего дня
+        tm_work_start(QOS_TIME): новое время начала рабочего дня
+        tm_work_end(QOS_TIME): новое время конца рабочего дня
         work_type(int): required = False. на какой специализации он будет работать
         comment(str): max_length=128, required = False
         details(srt): детали рабочего дня (заносятся в WorkerDayCashboxDetails)
@@ -756,7 +750,6 @@ def set_worker_day(request, form):
                 pass
             old_wd.delete()
             old_wd = None
-
 
     # todo: fix temp code -- if status TYPE_EMPTY or TYPE_DELETED then delete all sequence of worker_day -- possible to recreate timetable
     if worker.attachment_group == User.GROUP_STAFF and form['type'] in \
@@ -930,10 +923,7 @@ def delete_worker_day(request, form):
     if wd_parent is None:
         return JsonResponse.internal_error('Нельзя удалить версию, составленную расписанием.')
 
-    try:
-        wd_child = worker_day_to_delete.child
-    except:
-        wd_child = None
+    wd_child = getattr(worker_day_to_delete, 'child', None)
 
     if wd_child is not None:
         wd_child.parent_worker_day = wd_parent
@@ -944,10 +934,7 @@ def delete_worker_day(request, form):
 
         if wd_child:
             wd_child.save()
-        try:
-            WorkerDayCashboxDetails.objects.get(worker_day_id=worker_day_to_delete.id).delete()
-        except:
-            pass
+        WorkerDayCashboxDetails.objects.filter(worker_day_id=worker_day_to_delete.id).delete()
         worker_day_to_delete.delete()
     except:
         return JsonResponse.internal_error('Не удалось удалить день из расписания.')
@@ -1011,7 +998,6 @@ def set_worker_restrictions(request, form):
         worker = User.objects.get(id=form['worker_id'])
     except User.DoesNotExist:
         return JsonResponse.value_error('Invalid worker_id')
-
 
     # WorkTypes
     work_type_info = form.get('work_type_info', [])

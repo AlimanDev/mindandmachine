@@ -1,7 +1,15 @@
-import json
-from django.test import TestCase
+import datetime
+import logging
+from contextlib import contextmanager
+from random import randint
+from typing import TypeVar
 
-from django.db.models import Q
+from dateutil.relativedelta import relativedelta
+from django.db import connection
+from django.test import TestCase
+from django.utils.timezone import now
+from requests import Response
+
 from src.db.models import (
     AttendanceRecords,
     Group,
@@ -11,7 +19,6 @@ from src.db.models import (
     WorkerDay,
     CameraCashboxStat,
     WorkType,
-    PeriodDemand,
     OperationType,
     PeriodClients,
     Shop,
@@ -24,19 +31,37 @@ from src.db.models import (
     CameraClientGate,
     CameraClientEvent
 )
-from random import randint
-import datetime
-from dateutil.relativedelta import relativedelta
-from django.utils.timezone import now
 
 
-class LocalTestCase(TestCase):
+class LocalTestCaseAsserts(TestCase):
+    def assertResponseCodeEqual(self, response: Response, code: int):
+        got = response.json()['code']
+        self.assertEqual(got, code, f"Got response code {got}, expected {code}: {response.json()}")
+
+    def assertResponseDataListCount(self, response: Response, cnt: int):
+        got = len(response.json()['data'])
+        self.assertEqual(got, cnt, f"Got response data size {got}, expected {cnt}")
+
+    def assertErrorType(self, response: Response, error_type: str):
+        type_got = response.json()['data'].get('error_type')
+        self.assertIsNotNone(type_got, "There is no error_type in response")
+        self.assertEqual(type_got, error_type, f"Got error_type {type_got}, expected {error_type}")
+
+
+class LocalTestCase(LocalTestCaseAsserts, TestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
     def setUp(self, worker_day=False):
         super().setUp()
+        logging.disable(logging.CRITICAL)
+
+        # Restart sequences from high value to not catch AlreadyExists errors on normal objects creation
+        # TODO: remove explicit object ids in object.create-s below and this sequence restart
+        with connection.cursor() as cursor:
+            cursor.execute("ALTER SEQUENCE db_user_id_seq RESTART WITH 100;")
+
         dttm_now = now()
 
         # admin_group
@@ -389,14 +414,21 @@ class LocalTestCase(TestCase):
             }
         )
 
-    def api_get(self, *args, **kwargs):
+    @contextmanager
+    def auth_user(self, user=None):
+        """Context manager to make requests as specified user logged in"""
+        if user is None:
+            user = self.user1
+        self.client.force_login(user)
+        yield user
+        self.client.logout()
+
+    def api_get(self, *args, **kwargs) -> Response:
         response = self.client.get(*args, **kwargs)
-        response.json = json.loads(response.content.decode('utf-8'))
         return response
 
-    def api_post(self, *args, **kwargs):
+    def api_post(self, *args, **kwargs) -> Response:
         response = self.client.post(*args, **kwargs)
-        response.json = json.loads(response.content.decode('utf-8'))
         return response
 
     def create_many_users(self, amount, from_date, to_date):
@@ -430,6 +462,11 @@ class LocalTestCase(TestCase):
                     is_tablet=True
                 )
                 dt += datetime.timedelta(days=1)
+
+    @staticmethod
+    def refresh_model(item: TypeVar) -> TypeVar:
+        """Re-fetch provided item from database"""
+        return item.__class__.objects.get(pk=item.pk)
 
 
 def create_user(user_id, shop_id, username, dt_fired=None, first_name='', last_name=''):

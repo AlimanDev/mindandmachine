@@ -1,8 +1,9 @@
-from src.util.test import LocalTestCase
-from django.conf import settings
 import json
-from src.db.models import User
 from unittest import skip
+
+from src.db.models import User
+from src.util.test import LocalTestCase
+
 
 class TestAutoSettings(LocalTestCase):
 
@@ -16,8 +17,8 @@ class TestAutoSettings(LocalTestCase):
             self.shop.id
         ))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
-        self.assertEqual(response.json['data']['status'], 'R')
+        self.assertEqual(response.json()['code'], 200)
+        self.assertEqual(response.json()['data']['status'], 'R')
 
     def test_set_selected_cashiers(self):
         self.auth()
@@ -25,7 +26,7 @@ class TestAutoSettings(LocalTestCase):
         response = self.api_post('/api/timetable/auto_settings/set_selected_cashiers',
                                  {'worker_ids': json.dumps([1, 2]), 'shop_id': 1})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertEqual(response.json()['code'], 200)
         user = User.objects.filter(id__in=[1, 2, 3]).order_by('id')
         self.assertEqual(user[0].auto_timetable, True)
         self.assertEqual(user[1].auto_timetable, True)
@@ -38,4 +39,4 @@ class TestAutoSettings(LocalTestCase):
 
         response = self.api_post('/api/timetable/auto_settings/set_timetable', {'data': json.dumps({})})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertEqual(response.json()['code'], 200)

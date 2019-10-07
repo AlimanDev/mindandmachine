@@ -1,4 +1,9 @@
-from src.util.test import LocalTestCase
+import datetime
+
+from dateutil.relativedelta import relativedelta
+from django.test import TestCase
+from django.utils.timezone import now
+
 from src.db.models import (
     ExchangeSettings,
     WorkType,
@@ -10,10 +15,7 @@ from src.db.models import (
     PeriodClients,
     Event,
 )
-import datetime
-from django.utils.timezone import now
-from dateutil.relativedelta import relativedelta
-from django.test import TestCase
+from src.util.test import LocalTestCase
 from .utils import create_vacancies_and_notify, cancel_vacancies, workers_exchange
 
 
@@ -61,8 +63,8 @@ class TestWorkerExchange(LocalTestCase):
             '/api/timetable/worker_exchange/get_workers_to_exchange?specialization=2&dttm_start=09:00:00 {0}&dttm_end=18:00:00 {0}'.format(
                 self.qos_dt))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
-        self.assertEqual(response.json['data']['users']['3']['info'], {
+        self.assertEqual(response.json()['code'], 200)
+        self.assertEqual(response.json()['data']['users']['3']['info'], {
             'id': 3,
             'username': 'user3',
             'shop_id': self.shop.id,
@@ -77,9 +79,10 @@ class TestWorkerExchange(LocalTestCase):
             'shop_title': 'Shop1',
             'supershop_title': 'Region Shop1',
         })
-        self.assertEqual(len(response.json['data']['users']['3']['timetable']), 1)
-        self.assertEqual(response.json['data']['tt_from_dt'], (self.dttm - relativedelta(days=10)).strftime('%d.%m.%Y'))
-        self.assertEqual(response.json['data']['tt_to_dt'], (self.dttm + relativedelta(days=10)).strftime('%d.%m.%Y'))
+        self.assertEqual(len(response.json()['data']['users']['3']['timetable']), 1)
+        self.assertEqual(response.json()['data']['tt_from_dt'],
+                         (self.dttm - relativedelta(days=10)).strftime('%d.%m.%Y'))
+        self.assertEqual(response.json()['data']['tt_to_dt'], (self.dttm + relativedelta(days=10)).strftime('%d.%m.%Y'))
 
     def test_notify_workers_about_vacancy(self):
         self.auth()
@@ -88,13 +91,13 @@ class TestWorkerExchange(LocalTestCase):
                                  {'work_type': 2, 'dttm_start': '09:00:00 {}'.format(self.qos_dt),
                                   'dttm_end': '15:00:00 {}'.format(self.qos_dt)})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertEqual(response.json()['code'], 200)
 
         response = self.api_post('/api/timetable/worker_exchange/notify_workers_about_vacancy',
                                  {'work_type': 2, 'dttm_start': '15:00:00 {}'.format(self.qos_dt),
                                   'dttm_end': '21:00:00 {}'.format(self.qos_dt)})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertEqual(response.json()['code'], 200)
 
         vacancy = WorkerDayCashboxDetails.objects.filter(is_vacancy=True).order_by('id')
         wt = WorkType.objects.get(pk=2)
@@ -113,8 +116,8 @@ class TestWorkerExchange(LocalTestCase):
         response = self.api_get(
             '/api/timetable/worker_exchange/show_vacancy?shop_id=1')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
-        self.assertEqual(response.json['data']['vacancies'], [])
+        self.assertEqual(response.json()['code'], 200)
+        self.assertEqual(response.json()['data']['vacancies'], [])
 
         wt = WorkType.objects.get(
             shop=self.shop, name='Тип_кассы_2')
@@ -139,20 +142,20 @@ class TestWorkerExchange(LocalTestCase):
             )
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertEqual(response.json()['code'], 200)
 
-        self.assertEqual(response.json['data']['vacancies'][0]['dt'], self.qos_dt)
-        self.assertEqual(response.json['data']['vacancies'][0]['dttm_from'], '15:00:00')
-        self.assertEqual(response.json['data']['vacancies'][0]['dttm_to'], '21:00:00')
-        self.assertEqual(response.json['data']['vacancies'][0]['worker_fio'], '')
-        self.assertEqual(response.json['data']['vacancies'][0]['is_canceled'], False)
-        self.assertEqual(response.json['data']['vacancies'][0]['work_type'], 2)
-        self.assertEqual(response.json['data']['vacancies'][1]['dt'], self.qos_dt)
-        self.assertEqual(response.json['data']['vacancies'][1]['dttm_from'], '09:00:00')
-        self.assertEqual(response.json['data']['vacancies'][1]['dttm_to'], '15:00:00')
-        self.assertEqual(response.json['data']['vacancies'][1]['worker_fio'], '')
-        self.assertEqual(response.json['data']['vacancies'][1]['is_canceled'], False)
-        self.assertEqual(response.json['data']['vacancies'][1]['work_type'], 2)
+        self.assertEqual(response.json()['data']['vacancies'][0]['dt'], self.qos_dt)
+        self.assertEqual(response.json()['data']['vacancies'][0]['dttm_from'], '15:00:00')
+        self.assertEqual(response.json()['data']['vacancies'][0]['dttm_to'], '21:00:00')
+        self.assertEqual(response.json()['data']['vacancies'][0]['worker_fio'], '')
+        self.assertEqual(response.json()['data']['vacancies'][0]['is_canceled'], False)
+        self.assertEqual(response.json()['data']['vacancies'][0]['work_type'], 2)
+        self.assertEqual(response.json()['data']['vacancies'][1]['dt'], self.qos_dt)
+        self.assertEqual(response.json()['data']['vacancies'][1]['dttm_from'], '09:00:00')
+        self.assertEqual(response.json()['data']['vacancies'][1]['dttm_to'], '15:00:00')
+        self.assertEqual(response.json()['data']['vacancies'][1]['worker_fio'], '')
+        self.assertEqual(response.json()['data']['vacancies'][1]['is_canceled'], False)
+        self.assertEqual(response.json()['data']['vacancies'][1]['work_type'], 2)
 
     def test_cancel_vacancy(self):
         self.auth()
@@ -177,7 +180,7 @@ class TestWorkerExchange(LocalTestCase):
         response = self.api_post('/api/timetable/worker_exchange/cancel_vacancy',
                                  {'vacancy_id': worker_day_detail.id})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertEqual(response.json()['code'], 200)
         self.assertEqual(type(WorkerDayCashboxDetails.objects.get(pk=worker_day_detail.id).dttm_deleted),
                          type(datetime.datetime.now()))
         self.assertEqual(WorkerDayCashboxDetails.objects.get(pk=worker_day_detail2.id).dttm_deleted, None)
