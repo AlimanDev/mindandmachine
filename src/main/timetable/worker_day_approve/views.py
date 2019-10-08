@@ -25,10 +25,10 @@ from .forms import (
 )
 def get_worker_day_approves(request, form):
     """
-    Создает новое подтверждение расписания
+    Подтверждения расписания
 
     Args:
-        method: POST
+        method: GET
         url: /api/worker_day_approve/get_worker_day_approves
         'shop_id': id магазина
         'dt_from' : дата с
@@ -62,10 +62,10 @@ def get_worker_day_approves(request, form):
         dttm_added__gte=form['dt_from'],
         )
 
-
     return JsonResponse.success([
         WorkerDayApproveConverter.convert(wda) for wda in worker_day_approve
     ])
+
 
 @api_method(
     'POST',
