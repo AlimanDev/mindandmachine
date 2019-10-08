@@ -268,6 +268,7 @@ def get_cashier_timetable(request, form):
         from_dt(QOS_DATE): с какого числа смотреть расписание
         to_dt(QOS_DATE): по какое число
         shop_id(int): required = True
+        approved_only: required = False, только подтвержденные
         checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
@@ -308,7 +309,7 @@ def get_cashier_timetable(request, form):
     response = {}
     # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_ids']:
-       worker_days_db = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+        worker_days_db = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
             Q(worker__dt_fired__gt=from_dt) &
             Q(dt__lt=F('worker__dt_fired')) |
             Q(worker__dt_fired__isnull=True),
