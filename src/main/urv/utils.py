@@ -1,8 +1,7 @@
 import functools
 from datetime import timedelta
-import pandas
 
-from django.db.models import F, Sum, Min, Max, Q, Case, When, Value, IntegerField, Count
+from django.db.models import F, Sum, Min, Q, Case, When, Value, IntegerField
 from django.db.models.functions import Extract
 
 from src.db.models import (
@@ -35,24 +34,19 @@ def get_queryset(request, form):
     if form['type']:
         user_records = user_records.filter(type=form['type'])
 
-    select_not_verified = False
-    select_not_detected = False
-    select_workers = False
-    select_outstaff = False
-
+    extra_filters = []
     if form['show_not_verified']:
-        select_not_verified = Q(verified=False)
+        extra_filters.append(Q(verified=False))
 
     if form['show_not_detected']:
-        select_not_detected = Q(user_id__isnull=True)
+        extra_filters.append(Q(user_id__isnull=True))
 
     if form['show_workers']:
-        select_workers = Q(user__attachment_group=User.GROUP_STAFF)
+        extra_filters.append(Q(user__attachment_group=User.GROUP_STAFF))
 
     if form['show_outstaff']:
-        select_outstaff = Q(user__attachment_group=User.GROUP_OUTSOURCE)
+        extra_filters.append(Q(user__attachment_group=User.GROUP_OUTSOURCE))
 
-    extra_filters = list(filter(lambda x: x, [select_not_verified, select_not_detected, select_workers, select_outstaff]))
     if len(extra_filters):
         extra_filters = functools.reduce(lambda x, y: x | y, extra_filters)
         user_records = user_records.filter(extra_filters)
@@ -60,9 +54,19 @@ def get_queryset(request, form):
     return user_records
 
 
-def get_user_tick_map(ticks):
+def get_user_tick_map(tick_list):
+    """
+    конвертирует список отметок в словарь
+    :param tick_list:
+    :return: {user_id: {dt: {C: dttm1,
+                             L: dttm2},
+                        dt2: ...
+                        }
+             ...
+             }
+    """
     user_dt_type = {}
-    for tick in ticks:
+    for tick in tick_list:
         dt = tick.dttm.date()
         if tick.user_id not in user_dt_type:
             user_dt_type[tick.user_id] = {}
@@ -72,19 +76,25 @@ def get_user_tick_map(ticks):
                 AttendanceRecords.TYPE_LEAVING: None
             }
 
-        tick_map = user_dt_type[tick.user_id][dt]
-        if not tick_map[tick.type] or tick.type == AttendanceRecords.TYPE_COMING \
-            and tick.dttm < tick_map[tick.type] \
-            or tick.type == AttendanceRecords.TYPE_LEAVING \
-            and tick.dttm > user_dt_type[tick.user_id][dt][tick.type]:
-            tick_map[tick.type] = tick.dttm
+        tick_dttm = user_dt_type[tick.user_id][dt][tick.type]
+        if not tick_dttm \
+            or (tick.type == AttendanceRecords.TYPE_COMING and tick.dttm < tick_dttm) \
+            or (tick.type == AttendanceRecords.TYPE_LEAVING and tick.dttm > tick_dttm):
+                user_dt_type[tick.user_id][dt][tick.type] = tick.dttm
 
     return user_dt_type
 
 
-def tick_stat_count_details(ticks):
+def working_hours_count(tick_list):
+    """
+    :param AttendanceRecords list
+    :return: {user_id: {dt1: working_hours,
+                        dt2: working_hours2,
+                        ...},
+              user_id2: ...
+    """
     stat = {}
-    user_dt_type = get_user_tick_map(ticks)
+    user_dt_type = get_user_tick_map(tick_list)
 
     for user_id, dt_type in user_dt_type.items():
         stat[user_id] = {}
@@ -99,20 +109,18 @@ def tick_stat_count_details(ticks):
 
             if dttm_come and dttm_leave and dttm_come < dttm_leave:
                 stat[user_id][dt] = (dttm_leave - dttm_come).total_seconds() / 3600
-    print (stat)
-
     return stat
 
 
 
-def tick_stat_count(ticks):
+def tick_stat_count(tick_list):
     stat = {
         'hours_count': timedelta(hours=0),
         'ticks_coming_count': 0,
         'ticks_leaving_count': 0,
     }
 
-    user_dt_type = get_user_tick_map(ticks)
+    user_dt_type = get_user_tick_map(tick_list)
 
     for dt_type in user_dt_type.values():
         for type_dttm in dt_type.values():
@@ -132,13 +140,14 @@ def tick_stat_count(ticks):
     return stat
 
 
-# можно было бы всю статистику считать этой функцией, если бы не было отметок, для людей без расписания
+# можно было бы всю статистику считать этой функцией, если бы не было отметок для людей без расписания
 # а так нужна еще tick_stat_count - статистика только по отметкам
 def wd_stat_count(worker_days):
     return worker_days.values('worker_id', 'dt', 'dttm_work_start','dttm_work_end').annotate(
-        coming=Min('worker__attendancerecords__dttm',
-                     filter=Q(worker__attendancerecords__dttm__date=F('dt'),
-                              worker__attendancerecords__type='C')),
+        coming=Min('worker__attendancerecords__dttm', filter=Q(
+            worker__attendancerecords__dttm__date=F('dt'),
+            worker__attendancerecords__type=AttendanceRecords.TYPE_COMING
+        )),
 
         # leaving=Max('worker__attendancerecords__dttm',
         #               filter=Q(worker__attendancerecords__dttm__date=F('dt'),
@@ -146,8 +155,7 @@ def wd_stat_count(worker_days):
         # hours_fact=F('leaving') - F('coming'),
         hours_plan=F('dttm_work_end') - F('dttm_work_start'),
         is_late=Case(
-            When(coming__gt=F('dttm_work_start')-timedelta(minutes=15),
-                 then=1),
+            When(coming__gt=F('dttm_work_start')-timedelta(minutes=15), then=1),
             default=Value(0), output_field=IntegerField())
     ).aggregate(
          # hours_fact_count=Extract(Sum('hours_fact'), 'epoch') / 3600,
