@@ -1,8 +1,9 @@
 from datetime import datetime
+
 from dateutil.relativedelta import relativedelta
 
-from src.util.test import LocalTestCase
 from src.db.models import Timetable
+from src.util.test import LocalTestCase
 
 
 class TestShop(LocalTestCase):
@@ -92,7 +93,7 @@ class TestShop(LocalTestCase):
                 self.shop.id
             ))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertEqual(response.json()['code'], 200)
         answer = {'code': 200,
                   'data': {
                       'shops': [{
@@ -113,7 +114,7 @@ class TestShop(LocalTestCase):
                   'info': None
                   }
 
-        self.assertEqual(response.json, answer)
+        self.assertEqual(response.json(), answer)
 
     def test_get_department_stats(self):
         self.auth()
@@ -121,7 +122,7 @@ class TestShop(LocalTestCase):
                 self.shop.id
             ))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertEqual(response.json()['code'], 200)
         answer = {'code': 200,
                   'data': {
                       'shop_tts': '0/1',
@@ -142,8 +143,8 @@ class TestShop(LocalTestCase):
                       }},
                   'info': None
                   }
-        self.assertEqual(response.json['data']['stats'], answer['data']['stats'])
-        self.assertEqual(response.json['data']['fot_revenue'][-1]['value'], 10)
+        self.assertEqual(response.json()['data']['stats'], answer['data']['stats'])
+        self.assertEqual(response.json()['data']['fot_revenue'][-1]['value'], 10)
 
     def test_get_department_list(self):
         self.auth()
@@ -152,7 +153,7 @@ class TestShop(LocalTestCase):
                 self.root_shop.id
             ))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['code'], 200)
+        self.assertEqual(response.json()['code'], 200)
 
         data = {
             'pages': 1,
@@ -176,4 +177,4 @@ class TestShop(LocalTestCase):
                  'workers_amount': {'prev': 10, 'curr': 20, 'change': 100},
                  'fot_revenue': {'prev': 5.0, 'curr': 10.0, 'change': -100}}]
         }
-        self.assertEqual(response.json['data'], data)
+        self.assertEqual(response.json()['data'], data)
