@@ -7,7 +7,7 @@ from .forms import (
 )
 from src.main.shop.forms import GetDepartmentListForm
 from src.main.shop.utils import get_shop_list_stats
-from src.main.urv.utils import tick_stat_count_details
+from src.main.urv.utils import working_hours_count
 
 from src.db.models import (
     Shop,
@@ -69,7 +69,7 @@ def get_tabel(request, workbook, form):
         dttm__date__lte=to_dt,
         shop_id=shop.id,
     ).order_by('dttm', 'user'))
-    tick_stat = tick_stat_count_details(records)
+    working_hours = working_hours_count(records)
 
     users = list(User.objects.qos_filter_active(
         dt_from=tabel.prod_days[-1].dt,
@@ -103,7 +103,7 @@ def get_tabel(request, workbook, form):
 
     tabel.construnts_users_info(users, 16, 0, ['code', 'fio', 'position', 'hired'], extra_row=True)
 
-    tabel.fill_table(workdays, users, breaktimes, tick_stat, 16, 6)
+    tabel.fill_table(workdays, users, breaktimes, working_hours, 16, 6)
 
     tabel.add_xlsx_functions(len(users), 12, 37, extra_row=True)
 

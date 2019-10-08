@@ -305,7 +305,7 @@ class Tabel_xlsx(Xlsx_base):
             # print(night_hs, night_edges[0] < tm_end, night_edges[1] >= tm_end)
         return total, night_hs
 
-    def fill_table(self, workdays, users, triplets, tick_stat, row_s, col_s):
+    def fill_table(self, workdays, users, triplets, working_hours, row_s, col_s):
         """
         одинаковая сортировка у workdays и users должна быть
         :param workdays:
@@ -365,7 +365,7 @@ class Tabel_xlsx(Xlsx_base):
                 self.worksheet.write(
                     row_s + row_shift * 2 + 1,
                     col_s + day,
-                    tick_stat.get(user.id, {}).get(dt, ''),
+                    working_hours.get(user.id, {}).get(dt, ''),
                     self.workbook.add_format(cell_format)
                 )
 
