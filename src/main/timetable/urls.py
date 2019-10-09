@@ -4,6 +4,7 @@ from .cashier_demand import urls as cashier_demand_urls
 from .table import urls as table_urls
 from .auto_settings import urls as auto_settings_urls
 from .worker_exchange import urls as exchange_urls
+from .worker_day_approve import urls as approve_urls
 
 
 urlpatterns = [
@@ -11,5 +12,6 @@ urlpatterns = [
     path('needs/', include(cashier_demand_urls)),
     path('table/', include(table_urls)),
     path('auto_settings/', include(auto_settings_urls)),
-    path('worker_exchange/', include(exchange_urls))
+    path('worker_exchange/', include(exchange_urls)),
+    path('worker_day_approve/', include(approve_urls))
 ]

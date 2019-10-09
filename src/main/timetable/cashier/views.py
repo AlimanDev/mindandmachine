@@ -23,6 +23,10 @@ from src.db.models import (
     WorkerDayCashboxDetails,
     UserWeekdaySlot,
 )
+from src.util.utils import (
+    JsonResponse,
+    api_method,
+)
 from src.main.other.notification.utils import send_notification
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
 from src.util.collection import group_by, count, range_u
@@ -265,6 +269,7 @@ def get_cashier_timetable(request, form):
         from_dt(QOS_DATE): с какого числа смотреть расписание
         to_dt(QOS_DATE): по какое число
         shop_id(int): required = True
+        approved_only: required = False, только подтвержденные
         checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
@@ -299,6 +304,7 @@ def get_cashier_timetable(request, form):
     from_dt = form['from_dt']
     to_dt = form['to_dt']
     checkpoint = FormUtil.get_checkpoint(form)
+    approved_only = form['approved_only']
     work_types = {w.id: w for w in WorkType.objects.select_related('shop').all()}
 
     response = {}
@@ -328,6 +334,7 @@ def get_cashier_timetable(request, form):
             'dttm_work_start',
             'dttm_work_end',
             'work_types__id',
+            'worker_day_approve_id',
         )
 
         worker_days = []
@@ -346,6 +353,7 @@ def get_cashier_timetable(request, form):
                     worker_id=wd['worker_id'],
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
+                    worker_day_approve_id=wd['worker_day_approve_id '],
                 )
                 if wd['work_types__id']:
                     wd_m.work_types_ids = [wd['work_types__id']]
@@ -365,14 +373,19 @@ def get_cashier_timetable(request, form):
             )
         ]
 
+        wd_logs = WorkerDay.objects.select_related('worker').filter(
+            worker_id=worker_id,
+            dt__gte=from_dt,
+            dt__lte=to_dt,
+            parent_worker_day__isnull=False,
+            worker__attachment_group=User.GROUP_STAFF
+        )
+        if approved_only:
+            wd_logs = wd_logs.filter(
+                worker_day_approve_id__isnull = False
+            )
         worker_day_change_log = group_by(
-            WorkerDay.objects.select_related('worker').filter(
-                worker_id=worker_id,
-                dt__gte=from_dt,
-                dt__lte=to_dt,
-                parent_worker_day__isnull=False,
-                worker__attachment_group=User.GROUP_STAFF
-            ),
+            wd_logs,
             group_key=lambda _: WorkerDay.objects.qos_get_current_worker_day(_).id,
             sort_key=lambda _: _.id,
             sort_reverse=True
@@ -861,7 +874,7 @@ def get_worker_day_logs(request, form):
             'dttm_work_start': __work_dttm(obj.dttm_work_start),
             'dttm_work_end': __work_dttm(obj.dttm_work_end),
             'created_by': obj.created_by_id,
-            'created_by_fio': obj.created_by.get_fio(),
+            'created_by_fio': obj.created_by.get_fio() if obj.created_by else '',
             'prev_type': WorkerDayConverter.convert_type(obj.parent_worker_day.type),
             'prev_dttm_work_start': __work_dttm(obj.parent_worker_day.dttm_work_start),
             'prev_dttm_work_end': __work_dttm(obj.parent_worker_day.dttm_work_end),
