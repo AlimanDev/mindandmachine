@@ -762,14 +762,7 @@ def set_worker_day(request, form):
         'action': action
     }
 
-    # todo: fix temp code -- if status TYPE_EMPTY or TYPE_DELETED then delete all sequence of worker_day -- possible to recreate timetable
-    # if worker.attachment_group == User.GROUP_STAFF and form['type'] in \
-    #     [WorkerDay.Type.TYPE_EMPTY.value, WorkerDay.Type.TYPE_DELETED.value]:
-    #     while old_wd:
-    #         WorkerDayCashboxDetails.objects.filter(worker_day=old_wd).delete()
-    #         old_wd.delete()
-    #         old_wd = old_wd.parent_worker_day if old_wd.parent_worker_day_id else None
-
+    work_type = WorkType.objects.get(id=form['work_type']) if form['work_type'] else None
     if worker.attachment_group == User.GROUP_STAFF \
             or worker.attachment_group == User.GROUP_OUTSOURCE \
                     and form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
@@ -793,9 +786,8 @@ def set_worker_day(request, form):
                             else datetime.combine(dt + timedelta(days=1), dttm_to)
                     )
             else:
-                work_type_id = form.get('work_type')
                 WorkerDayCashboxDetails.objects.create(
-                    work_type_id=work_type_id,
+                    work_type=work_type,
                     worker_day=new_worker_day,
                     dttm_from=new_worker_day.dttm_work_start,
                     dttm_to=new_worker_day.dttm_work_end
@@ -806,23 +798,15 @@ def set_worker_day(request, form):
     elif worker.attachment_group == User.GROUP_OUTSOURCE:
         worker.delete()
 
+    old_cashboxdetails = WorkerDayCashboxDetails.objects.filter(
+        worker_day=old_wd,
+        dttm_deleted__isnull=True
+    ).first()
 
-    shop = Shop.objects.get(user=form['worker_id'])
-    work_type_id = WorkType.objects.get(id=form['work_type']).id if form['work_type'] else None
-    if work_type_id is None:
-        work_type_id = WorkerDayCashboxDetails.objects.filter(
-            worker_day=old_wd,
-            dttm_deleted__isnull=True
-        ).first()
-
-        if work_type_id:
-            work_type_id = work_type_id.work_type_id
-
-    if work_type_id:
-        if (form['type'] == WorkerDay.Type.TYPE_WORKDAY.value):
-            cancel_vacancies(shop.id, work_type_id)
-        else:
-            create_vacancies_and_notify(shop.id, work_type_id)
+    if work_type and form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
+        cancel_vacancies(work_type.shop_id, work_type.id)
+    if old_cashboxdetails:
+        create_vacancies_and_notify(old_cashboxdetails.work_type.shop_id, old_cashboxdetails.work_type_id)
 
     return JsonResponse.success(response)
 
