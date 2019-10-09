@@ -1,24 +1,23 @@
 import json
-
 import sys
-from django.core import mail
-from django.views.debug import ExceptionReporter
-from django.conf import settings
 from functools import wraps
+
+from django.conf import settings
 from django.contrib.auth import authenticate, login
-from django.http import HttpResponse
+from django.core import mail
 from django.core.exceptions import (
     ObjectDoesNotExist,
     MultipleObjectsReturned,
 )
+from django.http import HttpResponse
+from django.views.debug import ExceptionReporter
+from django.views.decorators.csrf import csrf_exempt
+
 from src.db.models import (
     User,
     Shop,
     FunctionGroup,
 )
-from django.views.decorators.csrf import csrf_exempt
-from django.db.models import QuerySet
-from datetime import datetime, timedelta
 
 
 def manually_mail_admins(request):
@@ -315,7 +314,6 @@ def api_method(
             try:
                 return func(request, *args, **kwargs)
             except Exception as e:
-                print(e)
                 if settings.DEBUG:
                     raise e
                 else:

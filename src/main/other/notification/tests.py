@@ -1,8 +1,11 @@
-from src.util.test import LocalTestCase
-from src.db.models import Notifications, User, Event, WorkerDayCashboxDetails, WorkerDay
 import json
-from django.utils import timezone
 from datetime import timedelta
+
+from django.utils import timezone
+
+from src.db.models import Notifications, Event, WorkerDayCashboxDetails, WorkerDay
+from src.util.test import LocalTestCase
+
 
 class TestNotifications(LocalTestCase):
     def setUp(self):
@@ -62,43 +65,43 @@ class TestNotifications(LocalTestCase):
         self.auth()
 
         response = self.api_get('/api/other/notifications/get_notifications2?count=5')
-        self.assertEqual(len(response.json['data']['notifications']), 5)
-        self.assertEqual(response.json['data']['notifications'][-1]['id'], 7)
-        self.assertEqual(response.json['data']['unread_count'], 6)
+        self.assertEqual(len(response.json()['data']['notifications']), 5)
+        self.assertEqual(response.json()['data']['notifications'][-1]['id'], 7)
+        self.assertEqual(response.json()['data']['unread_count'], 6)
 
         response = self.api_get('/api/other/notifications/get_notifications2?count=5&pointer=1')
-        self.assertEqual(len(response.json['data']['notifications']), 5)
-        self.assertEqual(response.json['data']['notifications'][-1]['id'], 2)
-        self.assertEqual(response.json['data']['unread_count'], 6)
+        self.assertEqual(len(response.json()['data']['notifications']), 5)
+        self.assertEqual(response.json()['data']['notifications'][-1]['id'], 2)
+        self.assertEqual(response.json()['data']['unread_count'], 6)
 
         response = self.api_get('/api/other/notifications/get_notifications2')
-        self.assertEqual(len(response.json['data']['notifications']), 11)
-        self.assertEqual(response.json['data']['notifications'][-1]['id'], 1)
-        self.assertEqual(response.json['data']['unread_count'], 6)
+        self.assertEqual(len(response.json()['data']['notifications']), 11)
+        self.assertEqual(response.json()['data']['notifications'][-1]['id'], 1)
+        self.assertEqual(response.json()['data']['unread_count'], 6)
 
         self.wdcd.dttm_deleted = timezone.now()
         self.wdcd.save()
 
         response = self.api_get('/api/other/notifications/get_notifications2')
-        self.assertEqual(len(response.json['data']['notifications']), 10)
-        self.assertEqual(response.json['data']['notifications'][-1]['id'], 1)
-        self.assertEqual(response.json['data']['unread_count'], 6)
+        self.assertEqual(len(response.json()['data']['notifications']), 10)
+        self.assertEqual(response.json()['data']['notifications'][-1]['id'], 1)
+        self.assertEqual(response.json()['data']['unread_count'], 6)
 
         self.wdcd.worker_day = self.user_worker_day
         self.wdcd.save()
 
         response = self.api_get('/api/other/notifications/get_notifications2')
-        self.assertEqual(len(response.json['data']['notifications']), 11)
-        self.assertEqual(response.json['data']['notifications'][-1]['id'], 1)
-        self.assertEqual(response.json['data']['unread_count'], 6)
+        self.assertEqual(len(response.json()['data']['notifications']), 11)
+        self.assertEqual(response.json()['data']['notifications'][-1]['id'], 1)
+        self.assertEqual(response.json()['data']['unread_count'], 6)
 
         self.user_worker_day.worker = self.user2
         self.user_worker_day.save()
 
         response = self.api_get('/api/other/notifications/get_notifications2')
-        self.assertEqual(len(response.json['data']['notifications']), 10)
-        self.assertEqual(response.json['data']['notifications'][-1]['id'], 1)
-        self.assertEqual(response.json['data']['unread_count'], 6)
+        self.assertEqual(len(response.json()['data']['notifications']), 10)
+        self.assertEqual(response.json()['data']['notifications'][-1]['id'], 1)
+        self.assertEqual(response.json()['data']['unread_count'], 6)
 
     def test_set_notifications_read(self):
         self.auth()

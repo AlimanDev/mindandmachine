@@ -25,14 +25,15 @@ Note:
             }, ..
         }
 """
-from datetime import date, timedelta, datetime, time
-import pandas
+from datetime import timedelta, datetime, time
 
+import pandas
 from django.db.models import Q, Exists, OuterRef
 from django.utils.timezone import now
-from django.conf import settings
 
-from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
+from src.conf.djconfig import (
+    QOS_DATETIME_FORMAT,
+)
 from src.db.models import (
     ExchangeSettings,
     WorkerDay,
@@ -41,10 +42,8 @@ from src.db.models import (
     WorkerDayCashboxDetails,
     Shop
 )
+from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
 from src.util.models_converter import BaseConverter
-from src.conf.djconfig import (
-    QOS_DATETIME_FORMAT,
-)
 
 
 def search_candidates(wd_details, **kwargs):
@@ -149,6 +148,8 @@ def create_vacancies_and_notify(shop_id, work_type_id):
 
     shop=Shop.objects.get(id=shop_id)
     exchange_settings = ExchangeSettings.objects.first()
+    if exchange_settings is None:
+        return
     if not exchange_settings.automatic_check_lack:
         return
     dttm_now = now().replace(minute=0, second=0, microsecond=0)
