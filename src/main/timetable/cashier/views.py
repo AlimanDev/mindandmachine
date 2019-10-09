@@ -357,7 +357,7 @@ def get_cashier_timetable(request, form):
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
                     comment=wd['comment'],
-                    worker_day_approve_id=wd['worker_day_approve_id '],
+                    worker_day_approve_id=wd['worker_day_approve_id'],
                 )
                 if wd['work_types__id']:
                     wd_m.work_types_ids = [wd['work_types__id']]
