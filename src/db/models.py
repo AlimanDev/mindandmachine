@@ -6,7 +6,6 @@ from django.contrib.auth.models import (
 
 from . import utils
 import datetime
-import json
 
 from fcm_django.models import FCMDevice
 from src.conf.djconfig import IS_PUSH_ACTIVE
@@ -280,6 +279,9 @@ class FunctionGroup(models.Model):
     )
 
     FUNCS = (
+        'get_worker_day_approves',
+        'create_worker_day_approve',
+        'delete_worker_day_approve',
         'get_cashboxes_open_time',
         'get_workers',
         'get_demand_change_logs',
@@ -394,6 +396,31 @@ class FunctionGroup(models.Model):
             self.access_type,
             self.func,
         )
+
+
+class WorkerDayApprove(models.Model):
+    """
+        Подтверждение расписания на месяц
+        Временная отметка, привязанная к магазину, которая
+            подтверждает все workerday за указанный месяц
+    """
+    class Meta:
+        verbose_name = 'Подверждение расписания'
+        verbose_name_plural = 'Подтверждения расписания'
+
+    def __str__(self):
+        return '{},  {},  {}'.format(
+            self.id,
+            self.shop,
+            self.dt_approved,
+        )
+
+    id = models.BigAutoField(primary_key=True)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True)
+    dt_approved = models.DateField()
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    dttm_deleted = models.DateTimeField(null=True, blank=True)
 
 
 class WorkTypeManager(models.Manager):
@@ -868,19 +895,26 @@ class WorkerConstraint(models.Model):
 
 
 class WorkerDayManager(models.Manager):
-    def qos_current_version(self):
+    def qos_current_version(self, approved_only=False):
+        if approved_only:
+            return super().get_queryset().filter(
+                models.Q(child__id__isnull=True) | models.Q(child__worker_day_approve_id__isnull=True),
+                worker_day_approve_id__isnull=False,
+            )
+        else:
+            return super().get_queryset().filter(child__id__isnull=True)
         return super().get_queryset().filter(child__id__isnull=True)
 
     def qos_initial_version(self):
         return super().get_queryset().filter(parent_worker_day__isnull=True)
 
-    def qos_filter_version(self, checkpoint):
+    def qos_filter_version(self, checkpoint, approved_only = False):
         """
         :param checkpoint: 0 or 1 / True of False. If 1 -- current version, else -- initial
         :return:
         """
         if checkpoint:
-            return self.qos_current_version()
+            return self.qos_current_version(approved_only)
         else:
             return self.qos_initial_version()
 
@@ -960,6 +994,7 @@ class WorkerDay(models.Model):
 
     work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')
 
+    worker_day_approve = models.ForeignKey(WorkerDayApprove, on_delete=models.PROTECT, blank=True, null=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
     parent_worker_day = models.OneToOneField('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child')
     # fixme: better change parent to child as usual check if this is the last version of WorkerDay

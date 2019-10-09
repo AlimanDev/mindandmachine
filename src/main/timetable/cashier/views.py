@@ -271,6 +271,7 @@ def get_cashier_timetable(request, form):
         from_dt(QOS_DATE): с какого числа смотреть расписание
         to_dt(QOS_DATE): по какое число
         shop_id(int): required = True
+        approved_only: required = False, только подтвержденные
         checkpoint(int): required = False (0 -- для начальной версии, 1 -- для текущей)
 
     Returns:
@@ -305,6 +306,7 @@ def get_cashier_timetable(request, form):
     from_dt = form['from_dt']
     to_dt = form['to_dt']
     checkpoint = FormUtil.get_checkpoint(form)
+    approved_only = form['approved_only']
     work_types = {w.id: w for w in WorkType.objects.select_related('shop').all()}
 
     response = {}
@@ -335,6 +337,7 @@ def get_cashier_timetable(request, form):
             'dttm_work_end',
             'work_types__id',
             'comment',
+            'worker_day_approve_id',
         )
 
         worker_days = []
@@ -354,6 +357,7 @@ def get_cashier_timetable(request, form):
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
                     comment=wd['comment'],
+                    worker_day_approve_id=wd['worker_day_approve_id '],
                 )
                 if wd['work_types__id']:
                     wd_m.work_types_ids = [wd['work_types__id']]
@@ -373,14 +377,19 @@ def get_cashier_timetable(request, form):
             )
         ]
 
+        wd_logs = WorkerDay.objects.select_related('worker').filter(
+            Q(parent_worker_day__isnull=False) | Q(created_by__isnull=False),
+            worker_id=worker_id,
+            dt__gte=from_dt,
+            dt__lte=to_dt,
+            worker__attachment_group=User.GROUP_STAFF
+        )
+        if approved_only:
+            wd_logs = wd_logs.filter(
+                worker_day_approve_id__isnull = False
+            )
         worker_day_change_log = group_by(
-            WorkerDay.objects.select_related('worker').filter(
-                Q(parent_worker_day__isnull=False) | Q(created_by__isnull=False),
-                worker_id=worker_id,
-                dt__gte=from_dt,
-                dt__lte=to_dt,
-                worker__attachment_group=User.GROUP_STAFF
-            ),
+            wd_logs,
             group_key=lambda _: WorkerDay.objects.qos_get_current_worker_day(_).id,
             sort_key=lambda _: _.id,
             sort_reverse=True
