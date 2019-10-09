@@ -1,7 +1,14 @@
 import datetime
+import numpy as np
+from decimal import Decimal
+
+
 from django.db.models import Q, F, Sum
 # from django.db.models.functions import Coalesce
+
+
 from src.db.models import (
+    AttendanceRecords,
     WorkerDay,
     User,
     WorkType,
@@ -13,10 +20,10 @@ from src.db.models import (
 )
 from src.util.collection import group_by
 from src.util.models_converter import BaseConverter
-from decimal import Decimal
-from ..utils import dttm_combine
 from src.main.timetable.table.utils import count_work_month_stats
-import numpy as np
+from src.main.urv.utils import tick_stat_count
+from ..utils import dttm_combine
+
 
 def filter_worker_day_by_dttm(shop_id, day_type, dttm_from, dttm_to):
     """
@@ -298,6 +305,14 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
     need_cashier_amount = np.maximum(days_diff[np.argsort(days_diff)[-1:]], 0).sum() # todo: redo with logic
 
     revenue = 1000000
+
+    ticks = AttendanceRecords.objects.filter(
+        user__shop_id=shop_id,
+        dttm__gte=from_dt,
+        dttm__lte=to_dt,
+        # workerday__work_type_id__in=work_types.keys(),
+    )
+
     response.update({
         'indicators': {
             ''
@@ -313,6 +328,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
             'total_need': predict_needs.sum(),
             'total_go': finite_work.sum(),
             'total_plan': shop.staff_number * norm_work_hours,
+            'hours_count_fact': tick_stat_count(ticks)['hours_count']
         },
     })
     return response

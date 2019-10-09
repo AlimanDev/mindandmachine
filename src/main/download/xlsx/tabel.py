@@ -305,7 +305,7 @@ class Tabel_xlsx(Xlsx_base):
             # print(night_hs, night_edges[0] < tm_end, night_edges[1] >= tm_end)
         return total, night_hs
 
-    def fill_table(self, workdays, users, triplets, row_s, col_s):
+    def fill_table(self, workdays, users, triplets, working_hours, row_s, col_s):
         """
         одинаковая сортировка у workdays и users должна быть
         :param workdays:
@@ -318,8 +318,8 @@ class Tabel_xlsx(Xlsx_base):
         cell_format = dict(self.day_type)
         n_workdays = len(workdays)
         for row_shift, user in enumerate(users):
-            night_hours = 0
             for day in range(len(self.prod_days)):
+
                 if (it < n_workdays) and (workdays[it].worker_id == user.id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
                     if wd.type == WorkerDay.Type.TYPE_WORKDAY.value:
@@ -356,25 +356,42 @@ class Tabel_xlsx(Xlsx_base):
                     })
 
                 self.worksheet.write_string(
-                    row_s + row_shift,
+                    row_s + row_shift * 2,
                     col_s + day,
                     text,
                     self.workbook.add_format(cell_format)
                 )
+                dt = self.month.replace(day=day+1)
+                self.worksheet.write(
+                    row_s + row_shift * 2 + 1,
+                    col_s + day,
+                    working_hours.get(user.id, {}).get(dt, ''),
+                    self.workbook.add_format(cell_format)
+                )
 
-    def _write_formula(self, row, n_rows, col, formula, cell_format):
-        for r_ind in range(row, row + n_rows):
-            self.worksheet.write_formula(
-                r_ind, col,
-                formula.format(r_ind + 1),
-                cell_format
-            )
+    def _write_formula(self, row, n_rows, col, formula, cell_format, extra_row=False):
+        step = 2 if extra_row else 1
+        n_rows *= step
+        for r_ind in range(row, row + n_rows, step):
+            if extra_row:
+                self.worksheet.merge_range(
+                    r_ind, col,
+                    r_ind + 1, col,
+                    "=" + formula.format(r_ind + 1),
+                    cell_format
+                )
+            else:
+                self.worksheet.write_formula(
+                    r_ind, col,
+                    formula.format(r_ind + 1),
+                    cell_format
+                )
 
     def _write_names_in_row(self, row, col, names, cell_format):
         for col_offset in range(len(names)):
             self.worksheet.write_string(row, col + col_offset, names[col_offset], cell_format)
 
-    def add_xlsx_functions(self, n_users, row, col):
+    def add_xlsx_functions(self, n_users, row, col, extra_row=False):
         cell_format = dict(self.day_type)
         cell_format['bg_color'] = COLOR_PINK
 
@@ -385,7 +402,7 @@ class Tabel_xlsx(Xlsx_base):
         self.worksheet.write_string(row + 2, col, '', cell_f)
         self.worksheet.write_string(row + 3, col, 'pl_days', cell_f)
 
-        self._write_formula(row + 4, n_users, col, 'AN{0}+AT{0}+AU{0}+AV{0}', cell_f)
+        self._write_formula(row + 4, n_users, col, 'AN{0}+AT{0}+AU{0}+AV{0}', cell_f, extra_row)
 
         # other
         cell_format['bg_color'] = COLOR_WHITE
@@ -420,7 +437,8 @@ class Tabel_xlsx(Xlsx_base):
             'COUNTIF(G{0}:AK{0},"7")*7+COUNTIF(G{0}:AK{0},"8")*8+COUNTIF(G{0}:AK{0},"9")*9+COUNTIF(G{0}:AK{0},"10")*10+'
             'COUNTIF(G{0}:AK{0},"11")*11+COUNTIF(G{0}:AK{0},"12")*12+COUNTIF(G{0}:AK{0},"К")*8+COUNTIF(G{0}:AK{0},"8_1")*8+'
             'COUNTIF(G{0}:AK{0},"8_2")*8+COUNTIF(G{0}:AK{0},"11_1")*11+COUNTIF(G{0}:AK{0},"11_7")*11+COUNTIF(G{0}:AK{0},"11_2")*11',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
@@ -430,7 +448,8 @@ class Tabel_xlsx(Xlsx_base):
             'COUNTIF(G{0}:AK{0},"7"),COUNTIF(G{0}:AK{0},"8"),COUNTIF(G{0}:AK{0},"9"),COUNTIF(G{0}:AK{0},"10"),'
             'COUNTIF(G{0}:AK{0},"11"),COUNTIF(G{0}:AK{0},"12"),COUNTIF(G{0}:AK{0},"13"),COUNTIF(G{0}:AK{0},"14"),'
             'COUNTIF(G{0}:AK{0},"К"))',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
@@ -439,13 +458,15 @@ class Tabel_xlsx(Xlsx_base):
             'COUNTIF(G{0}:AK{0},"В4")*4+COUNTIF(G{0}:AK{0},"В5")*5+COUNTIF(G{0}:AK{0},"В6")*6+'
             'COUNTIF(G{0}:AK{0},"В7")*7+COUNTIF(G{0}:AK{0},"В8")*8+COUNTIF(G{0}:AK{0},"В9")*9+'
             'COUNTIF(G{0}:AK{0},"В10")*10+COUNTIF(G{0}:AK{0},"В11")*11+COUNTIF(G{0}:AK{0},"В12")*12)',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 4,
             '(AN{0}-AO{0})/8',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
@@ -454,127 +475,148 @@ class Tabel_xlsx(Xlsx_base):
             'COUNTIF(G{0}:AK{0},"В4")+COUNTIF(G{0}:AK{0},"В5")+COUNTIF(G{0}:AK{0},"В6")+COUNTIF(G{0}:AK{0},"В7")+'
             'COUNTIF(G{0}:AK{0},"В8")+COUNTIF(G{0}:AK{0},"В9")+COUNTIF(G{0}:AK{0},"В10")+COUNTIF(G{0}:AK{0},"В11")+'
             'COUNTIF(G{0}:AK{0},"В12")+COUNTIF(G{0}:AK{0},"В13")+COUNTIF(G{0}:AK{0},"В14")+COUNTIF(G{0}:AK{0},"В15"))',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 7,
             'COUNTIF(G{0}:AK{0},"ОТ")',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 8,
             'COUNTIF(G{0}:AK{0},"Б")',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 9,
             'COUNTIF(G{0}:AK{0},"Н")',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 10,
             'COUNTIF(G{0}:AK{0},"П")',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 11,
             'SUM(AO{0}:AV{0})-AQ{0}',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 12,
             'COUNTIF(G{0}:AK{0},9)',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 13,
             'COUNTIF(G{0}:AK{0},10)',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 14,
             'AX{0}+AY{0}*2',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 15,
             'COUNTIF(G{0}:AK{0},11)',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 16,
             'COUNTIF(G{0}:AK{0},12)',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 17,
             'BA{0}+BB{0}*2',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 18,
             'BA{0}*2+BB{0}*2',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 19,
             'AZ{0}+BD{0}+BG{0}',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 20,
             '(AO{0}+AQ{0})*8',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 22,
             'COUNTIF(G{0}:AK{0},"7")',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 23,
             'BH{0}*7',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 25,
             'COUNTIF(G{0}:AK{0},"7")',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 28,
             'COUNTIF(G{0}:AK{0},"ОД")',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 29,
             'COUNTIF(G{0}:AK{0},"ДО")',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 30,
             'COUNTIF(G{0}:AK{0},"У")',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self.worksheet.write_formula('BL13', 'SUM(BL14:BL31)', cell_f)
@@ -593,13 +635,15 @@ class Tabel_xlsx(Xlsx_base):
         self._write_formula(
             row + 4, n_users, col + 37,
             'AM{0}-D11',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         self._write_formula(
             row + 4, n_users, col + 38,
             '0',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
         cell_format['bg_color'] = COLOR_GREEN3
@@ -610,7 +654,8 @@ class Tabel_xlsx(Xlsx_base):
         self._write_formula(
             row + 4, n_users, col + 39,
             'BW{0}+BX{0}',
-            cell_f
+            cell_f,
+            extra_row,
         )
 
     def add_sign(self, row, col=3):

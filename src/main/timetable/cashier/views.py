@@ -8,9 +8,10 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
 from django.db.models import Q
 from django.utils import timezone
+from src.main.urv.utils import tick_stat_count
 from django.db.models import Q, F
-
 from src.db.models import (
+    AttendanceRecords,
     User,
     Shop,
     WorkerDay,
@@ -377,6 +378,13 @@ def get_cashier_timetable(request, form):
             sort_reverse=True
         )
 
+        ticks = AttendanceRecords.objects.filter(
+            user_id=worker_id,
+            user__shop_id=form['shop_id'],
+            dttm__gte=from_dt,
+            dttm__lte=to_dt,
+        )
+
         indicators_response = {
             'work_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value),
             'holiday_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value),
@@ -384,7 +392,8 @@ def get_cashier_timetable(request, form):
             'vacation_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_VACATION.value),
             'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and
                                                                         x.dt in official_holidays),
-            'change_amount': len(worker_day_change_log)
+            'change_amount': len(worker_day_change_log),
+            'hours_count_fact': tick_stat_count(ticks)['hours_count']
         }
 
         days_response = []
