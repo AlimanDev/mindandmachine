@@ -107,8 +107,8 @@ def get_cashiers_list(request, form):
 
     q = Q()
     if not form['show_all']:
-        q &= Q(dt_hired__isnull=True) | Q(dt_hired__lte=form['dt_hired_before'])
-        q &= Q(dt_fired__isnull=True) | Q(dt_fired__gt=form['dt_fired_after'])
+        q &= Q(dt_hired__isnull=True) | Q(dt_hired__lte=form['dt_fired_after'])
+        q &= Q(dt_fired__isnull=True) | Q(dt_fired__gt=form['dt_hired_before'])
 
     users_qs = User.objects.filter(
         shop_id=shop_id,
@@ -162,8 +162,8 @@ def get_not_working_cashiers_list(request, form):
             worker__shop_id=shop_id,
             worker__attachment_group=User.GROUP_STAFF
     ).filter(
-        (Q(worker__dt_hired__isnull=True) | Q(worker__dt_hired__lte=form['dt_hired_before'])) &
-        (Q(worker__dt_fired__isnull=True) | Q(worker__dt_fired__gt=form['dt_fired_after']))
+        (Q(worker__dt_hired__isnull=True) | Q(worker__dt_hired__lte=form['dt_fired_after'])) &
+        (Q(worker__dt_fired__isnull=True) | Q(worker__dt_fired__gt=form['dt_hired_before']))
     ).exclude(
         type=WorkerDay.Type.TYPE_WORKDAY.value
     ).order_by(
