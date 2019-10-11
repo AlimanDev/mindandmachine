@@ -148,19 +148,27 @@ class Xlsx_base:
             'hired': (lambda u: BaseConverter.convert_date(u.dt_hired), date_format, self.worksheet.write_datetime),
         }
 
-        shift = 2 if extra_row else 1
         for it, user in enumerate(list(users)):
             for col_shift, elem in enumerate(ordered_columns):
                 lambda_f, data_format, writer = user_elem_dict[elem]
                 try:
-                    self.worksheet.merge_range(
-                        row + it * shift,
-                        col + col_shift,
-                        row + (it + 1) * shift - 1,
-                        col + col_shift,
-                        lambda_f(user) or '',
-                        data_format
-                    )
+                    if extra_row:
+                        shift = 2
+                        self.worksheet.merge_range(
+                            row + it * shift,
+                            col + col_shift,
+                            row + it * shift + 1,
+                            col + col_shift,
+                            lambda_f(user) or '',
+                            data_format
+                        )
+                    else:
+                        self.worksheet.write(
+                            row + it,
+                            col + col_shift,
+                            lambda_f(user) or '',
+                            data_format
+                        )
 
                 except TypeError:
                     self.worksheet.write_string(row + it, col + col_shift, '', text_format)

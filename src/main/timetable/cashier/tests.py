@@ -348,6 +348,9 @@ class TestSelectCashiers(LocalTestCase):
 class TestGetCashierTimetable(LocalTestCase):
     url = '/api/timetable/cashier/get_cashier_timetable'
 
+    def setUp(self, worker_day=True):
+        super().setUp(worker_day=worker_day)
+
     # TODO Add more test cases
 
     def test_success(self):
@@ -453,9 +456,9 @@ class TestSetWorkerDay(LocalTestCase):
         self.assertEqual(wd.type, WorkerDay.Type.TYPE_BUSINESS_TRIP.value)
         self.assertIsNotNone(wd.parent_worker_day)
 
-
-class TestGetWorkerDayLogs(LocalTestCase):
-    url = '/api/timetable/cashier/get_worker_day_logs'
+#
+# class TestGetWorkerDayLogs(LocalTestCase):
+#     url = '/api/timetable/cashier/get_worker_day_logs'
 
 
 class TestDeleteWorkerDay(LocalTestCase):
@@ -532,9 +535,9 @@ class TestCreateCashier(LocalTestCase):
         self.assertEqual(user.shop_id, self.root_shop.pk)
         self.assertTrue(user.check_password("mi7"))
 
-
-class TestDublicateCashierTable(LocalTestCase):
-    url = '/api/timetable/cashier/dublicate_cashier_table'
+#
+# class TestDublicateCashierTable(LocalTestCase):
+#     url = '/api/timetable/cashier/dublicate_cashier_table'
 
 
 class TestDeleteCashier(LocalTestCase):
