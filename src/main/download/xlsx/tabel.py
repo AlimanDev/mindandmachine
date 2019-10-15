@@ -117,7 +117,7 @@ class Tabel_xlsx(Xlsx_base):
             'align': 'fill',
             'font_color': COLOR_RED,
         })
-        self.worksheet.write_string(2, 1, 'Магазин: {}'.format(self.shop.parent_title()), text_top)
+        self.worksheet.write_string(2, 1, 'Магазин: {}'.format(self.shop.title), text_top)
         self.worksheet.write_rich_string(3, 1,
                                          text_top, 'ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ ',
                                          text_top_red, '{}  {}г.'.format(
@@ -365,27 +365,27 @@ class Tabel_xlsx(Xlsx_base):
                 self.worksheet.write(
                     row_s + row_shift * 2 + 1,
                     col_s + day,
-                    working_hours.get(user.id, {}).get(dt, ''),
+                    round(working_hours.get(user.id, {}).get(dt, 0)),
                     self.workbook.add_format(cell_format)
                 )
 
     def _write_formula(self, row, n_rows, col, formula, cell_format, extra_row=False):
         step = 2 if extra_row else 1
         n_rows *= step
-        for r_ind in range(row, row + n_rows, step):
-            if extra_row:
-                self.worksheet.merge_range(
-                    r_ind, col,
-                    r_ind + 1, col,
-                    "=" + formula.format(r_ind + 1),
-                    cell_format
-                )
-            else:
-                self.worksheet.write_formula(
-                    r_ind, col,
-                    formula.format(r_ind + 1),
-                    cell_format
-                )
+        for r_ind in range(row, row + n_rows):
+            # if extra_row:
+            #     self.worksheet.merge_range(
+            #         r_ind, col,
+            #         r_ind + 1, col,
+            #         "=" + formula.format(r_ind + 1),
+            #         cell_format
+            #     )
+            # else:
+            self.worksheet.write_formula(
+                r_ind, col,
+                formula.format(r_ind + 1),
+                cell_format
+            )
 
     def _write_names_in_row(self, row, col, names, cell_format):
         for col_offset in range(len(names)):
