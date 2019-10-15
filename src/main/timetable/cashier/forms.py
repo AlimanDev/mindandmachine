@@ -10,23 +10,11 @@ from src.util.models_converter import WorkerDayConverter, UserConverter, BaseCon
 
 
 class GetCashiersListForm(forms.Form):
-    dt_hired_before = util_forms.DateField(required=False)
-    dt_fired_after = util_forms.DateField(required=False)
+    dt_from = util_forms.DateField()
+    dt_to = util_forms.DateField()
     shop_id = forms.IntegerField(required=True)
     consider_outsource = forms.BooleanField(required=False)
     show_all = forms.BooleanField(required=False)
-
-    def clean_dt_hired_before(self):
-        value = self.cleaned_data.get('dt_hired_before')
-        if value is None:
-            return (datetime.now() + timedelta(days=10)).date()
-        return value
-
-    def clean_dt_fired_after(self):
-        value = self.cleaned_data.get('dt_fired_after')
-        if value is None:
-            return datetime.now().date()
-        return value
 
 
 class SelectCashiersForm(forms.Form):
