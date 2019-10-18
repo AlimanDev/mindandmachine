@@ -13,7 +13,6 @@ from src.util.utils import api_method, JsonResponse
 from src.util.models_converter import UserConverter, BaseConverter, WorkerDayConverter
 from datetime import datetime, timedelta
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import IntegrityError
 
 
 @api_method('GET', GetOutsourceWorkersForm)
@@ -41,6 +40,7 @@ def get_outsource_workers(request, form):
         'max_amount': 0,
         'dates': {}
     }
+
     try:
         shop = Shop.objects.get(id=form['shop_id'])
     except Shop.DoesNotExist:
@@ -72,7 +72,8 @@ def get_outsource_workers(request, form):
         dttm_from__lt=to_dt + timedelta(days=1),
         work_type_id__in=[w.id for w in shop.worktype_set.all()],
         is_vacancy=True,
-        status__in=status_list
+        status__in=status_list,
+        worker_day__child__id__isnull=True
     )
     # outsource_workerdays = WorkerDay.objects.qos_current_version(
     #     ).select_related('worker').filter(
