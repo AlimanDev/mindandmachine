@@ -1,33 +1,24 @@
 import json
-from datetime import datetime, timedelta
 
 from django import forms
 from django.core.exceptions import ValidationError
 
 from src.db.models import WorkerDay, User
 from src.util import forms as util_forms
-from src.util.models_converter import WorkerDayConverter, UserConverter, BaseConverter
+from src.util.models_converter import WorkerDayConverter, BaseConverter
 
 
 class GetCashiersListForm(forms.Form):
-    dt_hired_before = util_forms.DateField(required=False)
-    dt_fired_after = util_forms.DateField(required=False)
+    dt_from = util_forms.DateField(required=False)
+    dt_to = util_forms.DateField(required=False)
     shop_id = forms.IntegerField(required=True)
     consider_outsource = forms.BooleanField(required=False)
     show_all = forms.BooleanField(required=False)
 
-    def clean_dt_hired_before(self):
-        value = self.cleaned_data.get('dt_hired_before')
-        if value is None:
-            return (datetime.now() + timedelta(days=10)).date()
-        return value
-
-    def clean_dt_fired_after(self):
-        value = self.cleaned_data.get('dt_fired_after')
-        if value is None:
-            return datetime.now().date()
-        return value
-
+    def clean(self):
+        if not self.cleaned_data['show_all'] \
+            and (not self.cleaned_data['dt_from'] or not self.cleaned_data['dt_to']):
+            raise ValidationError('dt_from and dt_to or show_all must be set')
 
 class SelectCashiersForm(forms.Form):
     shop_id = forms.IntegerField(required=True)
