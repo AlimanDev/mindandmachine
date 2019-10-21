@@ -1,7 +1,16 @@
 from src.util.test import LocalTestCase
-from src.db.models import PeriodClients, OperationType, WorkType, Shop, PeriodProducts, PeriodQueues
+from src.db.models import (
+    PeriodClients, 
+    OperationType, 
+    WorkType, 
+    Shop, 
+    PeriodProducts, 
+    PeriodQueues,
+    Event
+)
 from datetime import datetime, timedelta, time
 from django.apps import apps
+import json
 
 class TestDemand(LocalTestCase):
     def setUp(self):
@@ -464,6 +473,7 @@ class TestSetDemand(TestDemand):
             ).values('dttm_forecast', 'type', 'operation_type_id', 'value').order_by('dttm_forecast')),
             correct_data
         )
+
     def test_correct_mul_operation(self):
         self.auth()
         self.data['multiply_coef'] = 2
@@ -622,6 +632,70 @@ class TestCreatePredBillsRequest(TestDemand):
             'data': {
                 'error_type': 'ValueException', 
                 'error_message': "[('shop_id', ['This field is required.']), ('dt', ['This field is required.'])]"
+            },
+            'info': None
+        }
+        self.assertEqual(response.json(), correct_data)
+
+
+class TestSetPredBills(TestDemand):
+
+    def setUp(self):
+        super().setUp()
+
+    def test_correct(self):
+        self.auth()
+        test_data = {
+            "access_token": "a", 
+            "key": "a", 
+            "data": "{\"status\": \"R\", \"demand\": [{\"dttm\": \"10:00:00 01.09.2019\", \"value\": 2.1225757598876953, \"work_type\": 5}, {\"dttm\": \"10:30:00 01.09.2019\", \"value\": 2.2346010208129883, \"work_type\": 5}, {\"dttm\": \"11:00:00 01.09.2019\", \"value\": 2.195962905883789, \"work_type\": 5}, {\"dttm\": \"11:30:00 01.09.2019\", \"value\": 2.307988166809082, \"work_type\": 5}], \"dt_from\": \"01.09.2019\", \"dt_to\": \"02.11.2019\", \"shop_id\": 1}"
+        }
+        
+        
+        response = self.api_post('/api/demand/set_predbills', test_data)
+        correct_data = [
+            {
+                'dttm_forecast': datetime(2019, 9, 1, 10, 0), 
+                'value': 2.1225757598877, 
+                'operation_type_id': 5, 
+                'type': 'L'
+            }, 
+            {
+                'dttm_forecast': datetime(2019, 9, 1, 10, 30), 
+                'value': 2.23460102081299, 
+                'operation_type_id': 5, 
+                'type': 'L'
+            }, 
+            {
+                'dttm_forecast': datetime(2019, 9, 1, 11, 0), 
+                'value': 2.19596290588379, 
+                'operation_type_id': 5, 
+                'type': 'L'
+            }, 
+            {
+                'dttm_forecast': datetime(2019, 9, 1, 11, 30), 
+                'value': 2.30798816680908, 
+                'operation_type_id': 5, 
+                'type': 'L'
+            }
+        ]
+        self.assertEqual(list(PeriodClients.objects.filter(
+            dttm_forecast__gte = datetime(2019, 9, 1, 10),
+            dttm_forecast__lte = datetime(2019, 9, 1, 11, 30),
+            operation_type_id = 5
+        ).values('dttm_forecast', 'value', 'operation_type_id', 'type')), correct_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Event.objects.get(pk=1).text, 'Cоставлен новый спрос на период с 01.09.2019 по 02.11.2019')
+
+    def test_data_not_setted(self):
+        self.auth()
+
+        response = self.api_post('/api/demand/set_predbills')
+        correct_data = {
+            'code': 400, 
+            'data': {
+                'error_type': 'ValueException', 
+                'error_message': "[('data', ['This field is required.'])]"
             },
             'info': None
         }

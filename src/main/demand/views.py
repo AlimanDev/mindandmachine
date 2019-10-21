@@ -201,6 +201,20 @@ def set_demand(request, form):
         shop_id(int): required = True
 
     """
+    models = []
+    def save_models(lst, model):
+        commit = False
+        if model:
+            lst.append(model)
+            if len(lst) > 1000:
+                commit = True
+        else:
+            commit = True
+
+        if commit:
+            PeriodClients.objects.bulk_create(lst)
+            lst[:] = []
+
     operation_type_ids = form.get('operation_type_id', [])
     dttm_from = form['from_dttm']
     dttm_to = form['to_dttm']
@@ -215,6 +229,7 @@ def set_demand(request, form):
             dttm_added__lte=dttm_to,
             work_type__shop_id=shop_id
         ).values_list('id', flat=True)
+        
     period_clients = PeriodClients.objects.select_related(
         'operation_type__work_type'
     ).filter(
@@ -226,6 +241,7 @@ def set_demand(request, form):
         dttm_forecast__date__lte=dttm_to.date(),
         operation_type_id__in=operation_type_ids
     )
+
     if (set_value is not None):
         dttm_step = timedelta(seconds=request.shop.system_step_in_minutes() * 60)
         dates_needed = set()
@@ -247,7 +263,16 @@ def set_demand(request, form):
             dates_to_add = set(period_clients.filter(operation_type_id = o_id).values_list('dttm_forecast', flat=True))
             dates_to_add = dates_needed.difference(dates_to_add)
             for date in dates_to_add:
-                PeriodClients.objects.create(dttm_forecast = date, operation_type_id = o_id, value = set_value)
+                save_models(
+                    models,
+                    PeriodClients(
+                        dttm_forecast = date, 
+                        operation_type_id = o_id, 
+                        value = set_value
+                    )
+                )
+                #PeriodClients.objects.create(dttm_forecast = date, operation_type_id = o_id, value = set_value)
+    save_models(models, None)
     changed_operation_type_ids = []
     for x in period_clients:
         if multiply_coef is not None:
@@ -426,7 +451,7 @@ def set_pred_bills(request, form):
     shop = Shop.objects.get(id=data['shop_id'])
     dt_from = BaseConverter.parse_date(data['dt_from'])
     dt_to = BaseConverter.parse_date(data['dt_to'])
-
+    
     PeriodClients.objects.select_related('operation_type__work_type').filter(
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
@@ -434,7 +459,7 @@ def set_pred_bills(request, form):
         operation_type__work_type__shop_id=shop.id,
         operation_type__do_forecast__in=[OperationType.FORECAST_HARD, OperationType.FORECAST_LITE],
     ).delete()
-
+    
     for period_demand_value in data['demand']:
         clients = period_demand_value['value']
         clients = 0 if clients < 0 else clients
