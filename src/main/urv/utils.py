@@ -1,7 +1,8 @@
 import functools
 from datetime import timedelta
 
-from django.db.models import F, Sum, Min, Q, Case, When, Value, IntegerField
+from django.db.models import (
+    F, Sum, Min, Q, Case, When, Value, IntegerField, DateTimeField, Exists, OuterRef)
 from django.db.models.functions import Extract
 
 from src.db.models import (
@@ -11,19 +12,15 @@ from src.db.models import (
 
 
 def get_queryset(request, form):
-    worker_ids = form['worker_ids']
-    from_dt = form['from_dt']
-    to_dt = form['to_dt']
-
     user_records = AttendanceRecords.objects.filter(
-        dttm__date__gte=from_dt,
-        dttm__date__lte=to_dt,
+        dttm__date__gte=form['from_dt'],
+        dttm__date__lte=form['to_dt'],
         shop_id=form['shop_id'],
     )
 
-    if len(worker_ids):
+    if len(form['worker_ids']):
         user_records = user_records.filter(
-            Q(user_id__in=worker_ids) |
+            Q(user_id__in=form['worker_ids']) |
             Q(user_id__isnull=True) |
             Q(user__attachment_group=User.GROUP_OUTSOURCE)
         )
@@ -84,8 +81,28 @@ def get_user_tick_map(tick_list):
 
     return user_dt_type
 
+def get_user_wd_map(wd_list):
+    """
+    конвертирует список отметок в словарь
+    :param wd_list:
+    :return: {worker_id: {dt: {C: dttm1,
+                             L: dttm2},
+                        dt2: ...
+                        }
+             ...
+             }
+    """
+    user_dt_type = {}
+    for wd in wd_list:
+        if wd.worker_id not in user_dt_type:
+            user_dt_type[wd.worker_id] = {}
+        if wd.dt not in user_dt_type[wd.worker_id]:
+            user_dt_type[wd.worker_id][wd.dt] = wd
 
-def working_hours_count(tick_list):
+    return user_dt_type
+
+
+def working_hours_count(tick_list, wd_list, only_total=False):
     """
     :param AttendanceRecords list
     :return: {user_id: {dt1: working_hours,
@@ -94,28 +111,52 @@ def working_hours_count(tick_list):
               user_id2: ...
     """
     stat = {}
-    user_dt_type = get_user_tick_map(tick_list)
+    user_dt_tick = get_user_tick_map(tick_list)
+    user_dt_wd = get_user_wd_map(wd_list)
+    total = 0
 
-    for user_id, dt_type in user_dt_type.items():
+    for user_id, dt_wd in user_dt_wd.items():
         stat[user_id] = {}
-        for dt, type_dttm in dt_type.items():
-            dttm_come = None
-            dttm_leave = None
-            if type_dttm[AttendanceRecords.TYPE_COMING]:
-                dttm_come = type_dttm[AttendanceRecords.TYPE_COMING]
+        for dt, wd in dt_wd.items():
+            if user_id in user_dt_tick and dt in user_dt_tick[user_id]:
+                type_dttm = user_dt_tick[user_id].pop(dt)
+                stat[user_id][dt] = 0
 
-            if type_dttm[AttendanceRecords.TYPE_LEAVING]:
+                dttm_come = type_dttm[AttendanceRecords.TYPE_COMING]
                 dttm_leave = type_dttm[AttendanceRecords.TYPE_LEAVING]
+
+                if not (dttm_come and dttm_leave):
+                    continue
+                if dttm_come < wd.dttm_work_start:
+                    dttm_come = wd.dttm_work_start
+
+                if dttm_leave > wd.dttm_work_end:
+                    dttm_leave = wd.dttm_work_end
+
+                if dttm_come < dttm_leave:
+                    stat[user_id][dt] = (dttm_leave - dttm_come).total_seconds() / 3600
+                    total += stat[user_id][dt]
+
+
+    for user_id, dt_type in user_dt_tick.items():
+        if user_id not in stat:
+            stat[user_id] = {}
+        for dt, type_dttm in dt_type.items():
+            dttm_come = type_dttm[AttendanceRecords.TYPE_COMING]
+            dttm_leave = type_dttm[AttendanceRecords.TYPE_LEAVING]
 
             if dttm_come and dttm_leave and dttm_come < dttm_leave:
                 stat[user_id][dt] = (dttm_leave - dttm_come).total_seconds() / 3600
-    return stat
+                total += stat[user_id][dt]
+    if only_total:
+        return round(total)
 
+    return stat
 
 
 def tick_stat_count(tick_list):
     stat = {
-        'hours_count': timedelta(hours=0),
+        # 'hours_count': timedelta(hours=0),
         'ticks_coming_count': 0,
         'ticks_leaving_count': 0,
     }
@@ -128,15 +169,15 @@ def tick_stat_count(tick_list):
             dttm_leave = None
             if type_dttm[AttendanceRecords.TYPE_COMING]:
                 stat['ticks_coming_count'] += 1
-                dttm_come = type_dttm[AttendanceRecords.TYPE_COMING]
+                # dttm_come = type_dttm[AttendanceRecords.TYPE_COMING]
 
             if type_dttm[AttendanceRecords.TYPE_LEAVING]:
                 stat['ticks_leaving_count'] += 1
-                dttm_leave = type_dttm[AttendanceRecords.TYPE_LEAVING]
+                # dttm_leave = type_dttm[AttendanceRecords.TYPE_LEAVING]
 
-            if dttm_come and dttm_leave and dttm_come < dttm_leave:
-                stat['hours_count'] += dttm_leave - dttm_come
-    stat['hours_count'] = stat['hours_count'].total_seconds() / 3600
+    #         if dttm_come and dttm_leave and dttm_come < dttm_leave:
+    #             stat['hours_count'] += dttm_leave - dttm_come
+    # stat['hours_count'] = stat['hours_count'].total_seconds() / 3600
     return stat
 
 
@@ -152,11 +193,16 @@ def wd_stat_count(worker_days):
         # leaving=Max('worker__attendancerecords__dttm',
         #               filter=Q(worker__attendancerecords__dttm__date=F('dt'),
         #                        worker__attendancerecords__type='L')),
-        # hours_fact=F('leaving') - F('coming'),
         hours_plan=F('dttm_work_end') - F('dttm_work_start'),
         is_late=Case(
             When(coming__gt=F('dttm_work_start')-timedelta(minutes=15), then=1),
-            default=Value(0), output_field=IntegerField())
+            default=Value(0), output_field=IntegerField()),
+        # hours_fact =
+        #     Case(When(leaving__gt=F('dttm_work_end'), then=F('dttm_work_end')),
+        #         default=F('leaving'), output_field=DateTimeField())
+        #     -
+        #     Case(When(coming__lt=F('dttm_work_start'), then=F('dttm_work_start')),
+        #         default=F('coming'), output_field=DateTimeField()),
     ).aggregate(
          # hours_fact_count=Extract(Sum('hours_fact'), 'epoch') / 3600,
          hours_count_plan=Extract(Sum('hours_plan'),'epoch') / 3600,

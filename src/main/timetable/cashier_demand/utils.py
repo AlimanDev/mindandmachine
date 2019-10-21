@@ -21,7 +21,7 @@ from src.db.models import (
 from src.util.collection import group_by
 from src.util.models_converter import BaseConverter
 from src.main.timetable.table.utils import count_work_month_stats
-from src.main.urv.utils import tick_stat_count
+from src.main.urv.utils import working_hours_count
 from ..utils import dttm_combine
 
 
@@ -312,10 +312,15 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
         dttm__lte=to_dt,
         # workerday__work_type_id__in=work_types.keys(),
     )
+    worker_days = WorkerDay.objects.qos_filter_version(1).filter(
+        dt__gte=from_dt,
+        dt__lte=to_dt,
+        worker__shop_id=shop_id,
+        type=WorkerDay.Type.TYPE_WORKDAY.value
+    )
 
     response.update({
         'indicators': {
-            ''
             'deadtime_part': deadtime_part,
             'cashier_amount': worker_amount,  # len(users_amount_set),
             'FOT': fot if fot else None,
@@ -328,7 +333,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
             'total_need': predict_needs.sum(),
             'total_go': finite_work.sum(),
             'total_plan': shop.staff_number * norm_work_hours,
-            'hours_count_fact': tick_stat_count(ticks)['hours_count']
+            'hours_count_fact': working_hours_count(ticks, worker_days, only_total=True),
         },
     })
     return response

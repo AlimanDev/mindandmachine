@@ -1,22 +1,17 @@
-from datetime import timedelta
 import functools
 
-from django.db.models import Q, F, Sum
-from django.db.models.functions import Coalesce
+from django.db.models import Q
 from django.core.paginator import Paginator, EmptyPage
 
 from src.db.models import (
     User,
-    AttendanceRecords,
-    # UserIdentifier,
-    Shop,
     WorkerDay
 )
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import AttendanceRecordsConverter
 from src.util.forms import FormUtil
-from .forms import GetUserUrvForm, ChangeAttendanceForm
-from .utils import get_queryset, tick_stat_count, wd_stat_count
+from .forms import GetUserUrvForm
+from .utils import get_queryset, tick_stat_count, wd_stat_count, working_hours_count
 
 
 @api_method('GET', GetUserUrvForm)
@@ -99,8 +94,6 @@ def get_indicators(request, form):
     if form['to_tm']:
         worker_days = worker_days.filter(dttm_work_end__time__lte=form['to_tm'])
 
-    select_not_verified = False
-    select_not_detected = False
     select_workers = False
     select_outstaff = False
 
@@ -115,23 +108,21 @@ def get_indicators(request, form):
         extra_filters = functools.reduce(lambda x, y: x | y, extra_filters)
         worker_days = worker_days.filter(extra_filters)
 
-
     ticks_count_plan = worker_days.count()
     if not form['type']:
         ticks_count_plan *= 2
 
     wd_stat = wd_stat_count(worker_days)
     tick_stat = tick_stat_count(ticks)
-
+    hours_count_fact = working_hours_count(ticks, worker_days, only_total=True)
     indicators = {
         'ticks_coming_count_fact': tick_stat['ticks_coming_count'],
         'ticks_leaving_count_fact': tick_stat['ticks_leaving_count'],
         'ticks_count_fact': tick_stat['ticks_coming_count'] + tick_stat['ticks_leaving_count'],
-        'hours_count_fact': tick_stat['hours_count'],
+        'hours_count_fact': hours_count_fact,
         'ticks_count_plan': ticks_count_plan,
         'hours_count_plan': wd_stat['hours_count_plan'],
         'lateness_count': wd_stat['lateness_count']
-
     }
 
     return JsonResponse.success(indicators)

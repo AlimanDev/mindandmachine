@@ -6,10 +6,10 @@ from dateutil.relativedelta import relativedelta
 from django.contrib.auth import update_session_auth_hash
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
-from django.db.models import Q
-from django.utils import timezone
-from src.main.urv.utils import tick_stat_count
 from django.db.models import Q, F
+from django.utils import timezone
+
+from src.main.urv.utils import working_hours_count
 from src.db.models import (
     AttendanceRecords,
     User,
@@ -23,10 +23,7 @@ from src.db.models import (
     WorkerDayCashboxDetails,
     UserWeekdaySlot,
 )
-from src.util.utils import (
-    JsonResponse,
-    api_method,
-)
+
 from src.main.other.notification.utils import send_notification
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
 from src.util.collection import group_by, count, range_u
@@ -406,7 +403,7 @@ def get_cashier_timetable(request, form):
             'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and
                                                                         x.dt in official_holidays),
             'change_amount': len(worker_day_change_log),
-            'hours_count_fact': tick_stat_count(ticks)['hours_count']
+            'hours_count_fact': working_hours_count(ticks, worker_days, only_total=True)
         }
 
         days_response = []
