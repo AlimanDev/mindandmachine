@@ -40,8 +40,8 @@ def get_indicators(request, form):
         url: /api/demand/get_indicators
         from_dt(QOS_DATE): required = True
         to_dt(QOS_DATE): required = True
-        work_type_id(int): required = True
-        shop_id(int): required = False
+        work_type_id(int): required = False
+        shop_id(int): required = True
 
     Returns:
         {
@@ -54,14 +54,13 @@ def get_indicators(request, form):
     dt_from = form['from_dt']
     dt_to = form['to_dt']
     shop_id = form['shop_id']
-    work_type_id = form['work_type_id']
+    work_type_id = form.get('work_type_id')
 
     if not work_type_id:
         # work_type_filter_list = WorkType.objects.qos_filter_active(dt_from, dt_to).values_list('id', flat=True)
         work_type_filter_list = WorkType.objects.values_list('id', flat=True)
     else:
         work_type_filter_list = [work_type_id]
-
     # if not len(work_type_filter_list):
     #     return JsonResponse.internal_error('Нет активных касс в данный период')
 
@@ -71,7 +70,6 @@ def get_indicators(request, form):
         'dttm_forecast__gte': datetime.combine(dt_from, time()),
         'dttm_forecast__lt': datetime.combine(dt_to, time()) + timedelta(days=1)
     }
-
     clients = PeriodClients.objects.select_related(
         'operation_type',
         'operation_type__work_type'
@@ -112,7 +110,7 @@ def get_forecast(request, form):
         from_dt(QOS_DATE): required = True
         to_dt(QOS_DATE): required = True
         operation_type_ids(list): список типов касс (либо [] -- для всех типов)
-        shop_id(int): required = False
+        shop_id(int): required = True
 
     Returns:
 
@@ -134,7 +132,6 @@ def get_forecast(request, form):
     operation_type_ids = form['operation_type_ids']
 
     shop = request.shop
-
     period_clients = PeriodClients.objects.select_related('operation_type__work_type').filter(
         operation_type__work_type__shop_id=shop.id
     )
@@ -144,22 +141,18 @@ def get_forecast(request, form):
     period_queues = PeriodQueues.objects.select_related('operation_type__work_type').filter(
         operation_type__work_type__shop_id=shop.id
     )
-
+    
     if len(operation_type_ids) > 0:
         period_clients = [x for x in period_clients if x.operation_type_id in operation_type_ids]
         period_products = [x for x in period_products if x.operation_type_id in operation_type_ids]
         period_queues = [x for x in period_queues if x.operation_type_id in operation_type_ids]
-
     period_clients = _create_demands_dict(period_clients)
     period_products = _create_demands_dict(period_products)
     period_queues = _create_demands_dict(period_queues)
-
     dttm_from = datetime.combine(form['from_dt'], time())
     dttm_to = datetime.combine(form['to_dt'], time()) + timedelta(days=1)
     dttm_step = timedelta(seconds=shop.system_step_in_minutes() * 60)
-
     forecast_periods = {x[0]: [] for x in PeriodClients.FORECAST_TYPES}
-
     for forecast_type, forecast_data in forecast_periods.items():
         for dttm in range_u(dttm_from, dttm_to, dttm_step, False):
             clients = 0
@@ -199,39 +192,62 @@ def set_demand(request, form):
 
     Args:
         method: POST
-        url: /api/demand/set_forecast
+        url: /api/demand/set_demand
         from_dttm(QOS_DATETIME): required = True
         to_dttm(QOS_DATETIME): required = True
-        work_type_id(list): список типов касс (либо [] -- если для всех)
+        operation_type_id(list): список типов касс (либо [] -- если для всех)
         multiply_coef(float): required = False
         set_value(float): required = False
         shop_id(int): required = True
 
     """
-    work_type_ids = form['work_type_id']
+    operation_type_ids = form.get('operation_type_id', [])
     dttm_from = form['from_dttm']
     dttm_to = form['to_dttm']
     multiply_coef = form.get('multiply_coef')
     set_value = form.get('set_value')
     shop_id = request.shop.id
-
-    if not len(work_type_ids):
-        work_type_ids = WorkType.objects.qos_filter_active(
-            dttm_from=dttm_from,
-            dttm_to=dttm_to,
-            shop_id=shop_id
-        )
-
+    if not len(operation_type_ids):
+        operation_type_ids = OperationType.objects.select_related(
+            'work_type'
+        ).filter(
+            dttm_added__gte=dttm_from,
+            dttm_added__lte=dttm_to,
+            work_type__shop_id=shop_id
+        ).values_list('id', flat=True)
     period_clients = PeriodClients.objects.select_related(
         'operation_type__work_type'
     ).filter(
         operation_type__work_type__shop_id=shop_id,
         type=PeriodClients.LONG_FORECASE_TYPE,
-        dttm_forecast__gte=dttm_from,
-        dttm_forecast__lte=dttm_to,
-        operation_type__work_type_id__in=work_type_ids
+        dttm_forecast__time__gte=dttm_from.time(),
+        dttm_forecast__time__lte=dttm_to.time(),
+        dttm_forecast__date__gte=dttm_from.date(),
+        dttm_forecast__date__lte=dttm_to.date(),
+        operation_type_id__in=operation_type_ids
     )
-
+    if (set_value is not None):
+        dttm_step = timedelta(seconds=request.shop.system_step_in_minutes() * 60)
+        dates_needed = set()
+        '''
+        Создаем множество с нужными датами
+        '''
+        for date in range_u(dttm_from, dttm_to, timedelta(days=1)):
+            date_from = datetime.combine(date, dttm_from.time())
+            date_to = datetime.combine(date, dttm_to.time())
+            for time in range_u(date_from, date_to, dttm_step):
+                dates_needed.add(time)
+        '''
+        Проходимся по всем операциям, для каждой операции получаем множетсво дат, которые уже
+        указаны. Затем вычитаем из множества с нужными датами множество дат, которые уже есть.
+        Потом итерируемся по резальтирующему множеству и для каждого элемента создаем PeriodClient
+        с нужной датой, операцией и значением.
+        '''
+        for o_id in operation_type_ids:
+            dates_to_add = set(period_clients.filter(operation_type_id = o_id).values_list('dttm_forecast', flat=True))
+            dates_to_add = dates_needed.difference(dates_to_add)
+            for date in dates_to_add:
+                PeriodClients.objects.create(dttm_forecast = date, operation_type_id = o_id, value = set_value)
     changed_operation_type_ids = []
     for x in period_clients:
         if multiply_coef is not None:
@@ -243,7 +259,7 @@ def set_demand(request, form):
 
         if x.operation_type_id not in changed_operation_type_ids:
             changed_operation_type_ids.append(x.operation_type_id)
-
+    
     for x in changed_operation_type_ids:
         PeriodDemandChangeLog.objects.create(
             dttm_from=dttm_from,
@@ -252,7 +268,6 @@ def set_demand(request, form):
             multiply_coef=multiply_coef,
             set_value=set_value
         )
-
     return JsonResponse.success()
 
 
@@ -271,6 +286,7 @@ def get_demand_change_logs(request, form):
          work_type_ids(list): required = True
          from_dt(QOS_DATE): required = True
          to_dt(QOS_DATE): required = True
+         shop_id(int): required = True
     """
     from_dt = form['from_dt']
     to_dt = form['to_dt']
@@ -285,7 +301,6 @@ def get_demand_change_logs(request, form):
         dttm_from__date__gte=from_dt,
         dttm_to__date__lte=to_dt,
     ).order_by('dttm_added')
-
     return JsonResponse.success([
         {
             'dttm_added': BaseConverter.convert_datetime(x.dttm_added),
@@ -340,7 +355,6 @@ def get_visitors_info(request, form):
         query_sets[model_name] = apps.get_model('db', model_name).objects.filter(**filter_dict).values_list(
             'dttm_forecast', 'value'
         )
-
     dttm = dttm_from
     while dttm < dttm_to:
         for model_name, qs in query_sets.items():

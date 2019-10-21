@@ -1,30 +1,3 @@
-"""
-Note:
-    Во всех функциях, которые ищут сотрудников для замены в качестве аргумента используется
-
-    arguments_dict = {
-        | 'shop_id': int,
-        | 'dttm_exchange_start(datetime.datetime): дата-время, на которые искать замену,
-        | 'dttm_exchange_end(datetime.datetime): дата-время, на которые искать замену,
-        | 'work_type'(int): на какую специализацию ищем замену,
-        | 'predict_demand'(list): QuerySet PeriodDemand'ов,
-        | 'mean_bills_per_step'(dict): по ключу -- id типа кассы, по значению -- средняя скорость,
-        | 'work_types_dict'(dict): по ключу -- id типа кассы, по значению -- объект
-        | 'users_who_can_work(list): список пользователей, которые могут работать на ct_type
-    }
-
-    Если одна из функций падает, рейзим ValueError, во вьюхе это отлавливается, и возвращается в 'info' в какой \
-    именно функции произошла ошибка.
-
-    А возвращается:
-        {
-            user_id: {
-                | 'type': ,
-                | 'tm_start': ,
-                | 'tm_end':
-            }, ..
-        }
-"""
 from datetime import date, timedelta
 from django.utils.timezone import now
 from django.db.models.functions import Greatest
