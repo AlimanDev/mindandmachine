@@ -292,6 +292,8 @@ class ChangeCashierInfo(forms.Form):
     phone_number = forms.CharField(max_length=32, required=False)
     tabel_code = forms.CharField(max_length=15, required=False)
     group = forms.CharField(max_length=1, required=False)
+    position_id = forms.IntegerField(required=False)
+
 
 
 class GetWorkerDayChangeLogsForm(forms.Form):
