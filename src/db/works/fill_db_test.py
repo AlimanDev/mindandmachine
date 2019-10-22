@@ -405,8 +405,8 @@ def main(date=None, shops=None, lang='ru'):
     # print(start_date, end_date, predict_date, worker_days, demand_days)
 
     root_shop = Shop.objects.create(title=lang_data['root_shop'])
-    parent_shop1 = Shop.objects.create(title=f'{lang_data['super_shop']} № 1', parent = root_shop)
-    parent_shop2 = Shop.objects.create(title=f'{lang_data['super_shop']} № 2', parent = root_shop)
+    parent_shop1 = Shop.objects.create(title=f'{lang_data["super_shop"]} № 1', parent = root_shop)
+    parent_shop2 = Shop.objects.create(title=f'{lang_data["super_shop"]} № 2', parent = root_shop)
     for shop_ind, shop_size in enumerate(shops, start=1):
         shop = create_shop(parent_shop1.id)
         work_types_dict = create_work_types(data['work_types'], shop)
