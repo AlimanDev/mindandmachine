@@ -156,7 +156,6 @@ def working_hours_count(tick_list, wd_list, only_total=False):
 
 def tick_stat_count(tick_list):
     stat = {
-        # 'hours_count': timedelta(hours=0),
         'ticks_coming_count': 0,
         'ticks_leaving_count': 0,
     }
@@ -169,15 +168,10 @@ def tick_stat_count(tick_list):
             dttm_leave = None
             if type_dttm[AttendanceRecords.TYPE_COMING]:
                 stat['ticks_coming_count'] += 1
-                # dttm_come = type_dttm[AttendanceRecords.TYPE_COMING]
 
             if type_dttm[AttendanceRecords.TYPE_LEAVING]:
                 stat['ticks_leaving_count'] += 1
-                # dttm_leave = type_dttm[AttendanceRecords.TYPE_LEAVING]
 
-    #         if dttm_come and dttm_leave and dttm_come < dttm_leave:
-    #             stat['hours_count'] += dttm_leave - dttm_come
-    # stat['hours_count'] = stat['hours_count'].total_seconds() / 3600
     return stat
 
 
