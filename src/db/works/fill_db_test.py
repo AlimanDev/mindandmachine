@@ -141,7 +141,7 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt: timezone.date
     add_clients_models(None)  # send query to db
 
 
-def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_size):
+def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_size, lang='ru'):
     def add_models(lst, model_type, model):
         if model is None:
             create = True
@@ -159,10 +159,25 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
     details = []
     models = []
     models_attendance = []
-    infos = []
+    infos = [] 
+    lang_data = {
+        'cashier': 'Кассир',
+        'supervisor' : 'Руководитель',
+        'f_name' : 'Иван',
+        's_name' : 'Иванов'
+    }
 
-    cashier_group, created = Group.objects.get_or_create(name='Кассир')
-    supervisor_group, created = Group.objects.get_or_create(name='Руководитель')
+    if (lang == 'en'):
+        lang_data = {
+            'cashier': 'Cahier',
+            'supervisor' : 'Supervisor',
+            'f_name' : 'John',
+            's_name' : 'Smith'
+        }
+        
+
+    cashier_group, created = Group.objects.get_or_create(name=lang_data['cashier'])
+    supervisor_group, created = Group.objects.get_or_create(name=lang_data['supervisor'])
 
     for func in FunctionGroup.FUNCS:
         FunctionGroup.objects.get_or_create(
@@ -185,8 +200,8 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                 password='test{}'.format(shop.id),
                 salary=60000
             )
-            worker.first_name = 'Иван'
-            worker.last_name = 'Иванов'
+            worker.first_name = lang_data['f_name']
+            worker.last_name = lang_data['s_name']
             worker.function_group = supervisor_group
 
             worker.shop = shop
@@ -353,8 +368,22 @@ def create_notifications():
     Event.objects.bulk_create(list_event)
 
 
-def main(date=None, shops=None):
-    f = open('src/db/works/test_data.json')
+def main(date=None, shops=None, lang='ru'):
+    f_name = 'src/db/works/test_data.json'
+    lang_data = {
+        'root_shop': 'Корневой магазин',
+        'super_shop': 'Супер Магазин'
+    }
+
+    if (lang == 'en'):
+        lang_data = {
+            'root_shop': 'Root shop',
+            'super_shop': 'Super Shop'
+        }
+        f_name = 'src/db/works/test_data_en.json'
+    
+
+    f = open(f_name)
     data = json.load(f)
     f.close()
     ExchangeSettings.objects.create()
@@ -375,14 +404,14 @@ def main(date=None, shops=None):
     demand_days = (predict_date - start_date).days + 1
     # print(start_date, end_date, predict_date, worker_days, demand_days)
 
-    root_shop = Shop.objects.create(title='Корневой магазин')
-    parent_shop1 = Shop.objects.create(title='Супер Магазин № 1', parent = root_shop)
-    parent_shop2 = Shop.objects.create(title='Супер Магазин № 2', parent = root_shop)
+    root_shop = Shop.objects.create(title=lang_data['root_shop'])
+    parent_shop1 = Shop.objects.create(title=f'{lang_data['super_shop']} № 1', parent = root_shop)
+    parent_shop2 = Shop.objects.create(title=f'{lang_data['super_shop']} № 2', parent = root_shop)
     for shop_ind, shop_size in enumerate(shops, start=1):
         shop = create_shop(parent_shop1.id)
         work_types_dict = create_work_types(data['work_types'], shop)
         create_forecast(data['demand'], work_types_dict, start_date, demand_days)
-        create_users_workdays(data['cashiers'], work_types_dict, start_date, worker_days, shop, shop_size)
+        create_users_workdays(data['cashiers'], work_types_dict, start_date, worker_days, shop, shop_size, lang=lang)
         dttm_curr = datetime.now().replace(day=1)
         dttm_prev = dttm_curr - relativedelta(months=1)
         create_timetable(shop.id, dttm_curr)
