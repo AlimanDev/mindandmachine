@@ -248,11 +248,14 @@ def set_demand(request, form):
         '''
         Создаем множество с нужными датами
         '''
-        for date in range_u(dttm_from, dttm_to, timedelta(days=1)):
-            date_from = datetime.combine(date, dttm_from.time())
-            date_to = datetime.combine(date, dttm_to.time())
-            for time in range_u(date_from, date_to, dttm_step):
-                dates_needed.add(time)
+        time_from = dttm_from.time()
+        time_to = dttm_to.time()
+        for date in range_u(dttm_from, dttm_to, timedelta(days=1)): #работает только с range_u
+            date_from = datetime.combine(date, time_from)
+            date_to = datetime.combine(date, time_to)
+            dates_needed = dates_needed | {date for date in range_u(date_from, date_to, dttm_step)}
+            #for time in range(date_from, date_to, dttm_step):
+            #    dates_needed.add(time)
         '''
         Проходимся по всем операциям, для каждой операции получаем множетсво дат, которые уже
         указаны. Затем вычитаем из множества с нужными датами множество дат, которые уже есть.
@@ -260,7 +263,7 @@ def set_demand(request, form):
         с нужной датой, операцией и значением.
         '''
         for o_id in operation_type_ids:
-            dates_to_add = set(period_clients.filter(operation_type_id = o_id).values_list('dttm_forecast', flat=True))
+            dates_to_add = set(period_clients.filter(operation_type_id=o_id).values_list('dttm_forecast', flat=True))
             dates_to_add = dates_needed.difference(dates_to_add)
             for date in dates_to_add:
                 save_models(

@@ -28,24 +28,24 @@ class TestDemand(LocalTestCase):
                 'name' : ''
             }
         o_type_1 = OperationType.objects.update_or_create(
-            id = 5,
-            defaults = def_d
+            id=5,
+            defaults=def_d
             )[0]
         o_type_2 = OperationType.objects.update_or_create(
-            id = 6,
-            defaults = def_wf
+            id=6,
+            defaults=def_wf
             )[0]
         o_type_3 = OperationType.objects.update_or_create(
-            id = 7,
-            defaults = def_d
+            id=7,
+            defaults=def_d
             )[0]
         o_type_4 = OperationType.objects.update_or_create(
-            id = 8,
-            defaults = def_wf
+            id=8,
+            defaults=def_wf
             )[0]
         self.o_type_5 = OperationType.objects.update_or_create(
-            id = 9,
-            defaults = {
+            id=9,
+            defaults={
                 'work_type' :w_type_2,
                 'name' : ''
             }
@@ -387,9 +387,9 @@ class TestSetDemand(TestDemand):
         self.data['multiply_coef'] = 0.2
         response = self.api_post('/api/demand/set_demand', data=self.data) 
         self.assertEqual(response.status_code, 200)
-        operations_count_before = PeriodClients.objects.filter(operation_type__work_type__shop_id = 13).count()
+        operations_count_before = PeriodClients.objects.filter(operation_type__work_type__shop_id=13).count()
         self.assertEqual(
-            PeriodClients.objects.filter(operation_type__work_type__shop_id = 13).count(), 
+            PeriodClients.objects.filter(operation_type__work_type__shop_id=13).count(), 
             operations_count_before
         )
         self.assertEqual(
@@ -408,9 +408,9 @@ class TestSetDemand(TestDemand):
         correct_data = [20.0, 20.0, 20.0, 20.0, 20.0]
         self.assertEqual(
             list(PeriodClients.objects.filter(
-                operation_type__work_type__shop_id = 13,
-                dttm_forecast__lte = datetime.combine(self.date + timedelta(days=1), time(13, 0)),
-                dttm_forecast__gte = datetime.combine(self.date, time(12, 0))
+                operation_type__work_type__shop_id=13,
+                dttm_forecast__lte=datetime.combine(self.date + timedelta(days=1), time(13, 0)),
+                dttm_forecast__gte=datetime.combine(self.date, time(12, 0))
             )[:5].values_list('value', flat=True)), 
             correct_data
         )
@@ -468,8 +468,8 @@ class TestSetDemand(TestDemand):
         ]
         self.assertEqual(response.status_code, 200)
         self.assertEqual(list(PeriodClients.objects.filter(
-                operation_type__work_type__shop_id = 13,
-                operation_type_id = 8
+                operation_type__work_type__shop_id=13,
+                operation_type_id=8
             ).values('dttm_forecast', 'type', 'operation_type_id', 'value').order_by('dttm_forecast')),
             correct_data
         )
@@ -513,8 +513,8 @@ class TestSetDemand(TestDemand):
         ]
         self.assertEqual(response.status_code, 200)
         self.assertEqual(list(PeriodClients.objects.filter(
-            operation_type__work_type__shop_id = 13,
-            operation_type_id = 8
+            operation_type__work_type__shop_id=13,
+            operation_type_id=8
             ).values('dttm_forecast', 'type', 'operation_type_id', 'value').order_by('dttm_forecast')),
             correct_data
         )
@@ -680,9 +680,9 @@ class TestSetPredBills(TestDemand):
             }
         ]
         self.assertEqual(list(PeriodClients.objects.filter(
-            dttm_forecast__gte = datetime(2019, 9, 1, 10),
-            dttm_forecast__lte = datetime(2019, 9, 1, 11, 30),
-            operation_type_id = 5
+            dttm_forecast__gte=datetime(2019, 9, 1, 10),
+            dttm_forecast__lte=datetime(2019, 9, 1, 11, 30),
+            operation_type_id=5
         ).values('dttm_forecast', 'value', 'operation_type_id', 'type')), correct_data)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Event.objects.get(pk=1).text, 'Cоставлен новый спрос на период с 01.09.2019 по 02.11.2019')
