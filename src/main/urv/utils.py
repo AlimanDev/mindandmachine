@@ -7,7 +7,8 @@ from django.db.models.functions import Extract
 
 from src.db.models import (
     AttendanceRecords,
-    User
+    User,
+    WorkerDay
 )
 
 
@@ -94,6 +95,9 @@ def get_user_wd_map(wd_list):
     """
     user_dt_type = {}
     for wd in wd_list:
+        if wd.type != WorkerDay.Type.TYPE_WORKDAY.value:
+            continue
+
         if wd.worker_id not in user_dt_type:
             user_dt_type[wd.worker_id] = {}
         if wd.dt not in user_dt_type[wd.worker_id]:
@@ -111,6 +115,7 @@ def working_hours_count(tick_list, wd_list, only_total=False):
               user_id2: ...
     """
     stat = {}
+
     user_dt_tick = get_user_tick_map(tick_list)
     user_dt_wd = get_user_wd_map(wd_list)
     total = 0

@@ -484,7 +484,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,
         )
-        cashbox = Cashbox.objects.all()[worker.id]
+        cashbox = Cashbox.objects.first()
         WorkerDayCashboxDetails.objects.create(
             worker_day=worker_day,
             on_cashbox=cashbox,
