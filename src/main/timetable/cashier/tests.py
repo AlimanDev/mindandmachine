@@ -138,84 +138,51 @@ class TestGetCashierList(LocalTestCase):
         super().setUp(worker_day)
         self.staff1 = create_stuff(self.root_shop.id)
 
-    def test_filter_defaults(self):
-        # staff1 meets both defaults
+    def test_dt_from(self):
+        # staff1 included - fired after dt_from filter
         with self.auth_user():
             response = self.api_get(self.url, {
                 'shop_id': 1,
-            })
-        self.assertResponseCodeEqual(response, 200)
-        self.assertResponseDataListCount(response, 2)
-
-        self.staff1.dt_hired = timezone.now() + datetime.timedelta(days=11)
-        self.staff1.save()
-
-        # staff1 hired after default dt_hired_before
-        with self.auth_user():
-            response = self.api_get(self.url, {
-                'shop_id': 1,
-            })
-        self.assertResponseCodeEqual(response, 200)
-        self.assertResponseDataListCount(response, 1)
-
-        self.staff1.dt_hired = timezone.now() - datetime.timedelta(days=5)
-        self.staff1.dt_fired = timezone.now() - datetime.timedelta(days=1)
-        self.staff1.save()
-
-        # staff1 fired before default dt_fired_after
-        with self.auth_user():
-            response = self.api_get(self.url, {
-                'shop_id': 1,
-            })
-        self.assertResponseCodeEqual(response, 200)
-        self.assertResponseDataListCount(response, 1)
-
-        # show_all = true
-        with self.auth_user():
-            response = self.api_get(self.url, {
-                'shop_id': 1,
-                'show_all': True,
-            })
-        self.assertResponseCodeEqual(response, 200)
-        self.assertResponseDataListCount(response, 2)
-
-    def test_dt_hired_before(self):
-        # staff1 included - hired before dt_hired_before filter
-        with self.auth_user():
-            response = self.api_get(self.url, {
-                'shop_id': 1,
-                'dt_hired_before': (timezone.now() - datetime.timedelta(days=3)).date().strftime(
+                'dt_from': (timezone.now() - datetime.timedelta(days=10)).date().strftime(
+                    settings.QOS_DATE_FORMAT),
+                'dt_to': (timezone.now() - datetime.timedelta(days=5)).date().strftime(
                     settings.QOS_DATE_FORMAT),
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertResponseDataListCount(response, 2)
 
-        # staff1 excluded - hired after dt_hired_before filter
+        # staff1 excluded - fired before dt_from filter
         with self.auth_user():
             response = self.api_get(self.url, {
                 'shop_id': 1,
-                'dt_hired_before': (timezone.now() - datetime.timedelta(days=8)).date().strftime(
+                'dt_from': (timezone.now() - datetime.timedelta(days=10)).date().strftime(
+                    settings.QOS_DATE_FORMAT),
+                'dt_to': (timezone.now() - datetime.timedelta(days=6)).date().strftime(
                     settings.QOS_DATE_FORMAT),
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertResponseDataListCount(response, 1)
 
-    def test_dt_fired_after(self):
-        # staff1 included - fired after dt_fired_after value
+    def test_dt_to(self):
+        # staff1 included - hired before dt_to value
         with self.auth_user():
             response = self.api_get(self.url, {
                 'shop_id': 1,
-                'dt_fired_after': (timezone.now() + datetime.timedelta(days=1)).date().strftime(
+                'dt_from': (timezone.now() + datetime.timedelta(days=1)).date().strftime(
+                    settings.QOS_DATE_FORMAT),
+                'dt_to': (timezone.now() + datetime.timedelta(days=10)).date().strftime(
                     settings.QOS_DATE_FORMAT),
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertResponseDataListCount(response, 2)
 
-        # staff1 excluded - fired before dt_fired_after value
+        # staff1 excluded - hired after dt_to value
         with self.auth_user():
             response = self.api_get(self.url, {
                 'shop_id': 1,
-                'dt_fired_after': (timezone.now() + datetime.timedelta(days=5)).date().strftime(
+                'dt_from': (timezone.now() + datetime.timedelta(days=3)).date().strftime(
+                    settings.QOS_DATE_FORMAT),
+                'dt_to': (timezone.now() + datetime.timedelta(days=5)).date().strftime(
                     settings.QOS_DATE_FORMAT),
             })
         self.assertResponseCodeEqual(response, 200)
@@ -239,6 +206,10 @@ class TestGetCashierList(LocalTestCase):
         with self.auth_user():
             response = self.api_get(self.url, {
                 'shop_id': 1,
+                'dt_from': timezone.now().date().strftime(
+                    settings.QOS_DATE_FORMAT),
+                'dt_to': (timezone.now() + datetime.timedelta(days=10)).date().strftime(
+                    settings.QOS_DATE_FORMAT),
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertResponseDataListCount(response, 2)
@@ -247,78 +218,72 @@ class TestGetCashierList(LocalTestCase):
             response = self.api_get(self.url, {
                 'shop_id': 1,
                 'consider_outsource': True,
+                'dt_from': timezone.now().date().strftime(
+                    settings.QOS_DATE_FORMAT),
+                'dt_to': (timezone.now() + datetime.timedelta(days=10)).date().strftime(
+                    settings.QOS_DATE_FORMAT),
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertResponseDataListCount(response, 3)
 
 
-class TestGetNotWorkingCashiersList(LocalTestCase):
+class TestGetNotWorkingCashierList(LocalTestCase):
     url = '/api/timetable/cashier/get_not_working_cashiers_list'
 
     def setUp(self, worker_day=False):
         super().setUp(worker_day)
-        self.staff1 = create_stuff(self.root_shop.id)
+        self.staff1 = create_stuff(self.shop.id)
         self.wd: WorkerDay = WorkerDay.objects.create(
-            type=WorkerDay.Type.TYPE_VACATION.value, worker=self.staff1,
+            type=WorkerDay.Type.TYPE_VACATION.value,
+            worker=self.staff1,
             dt=timezone.now().date(),
         )
 
-    def test_filter_defaults(self):
-        self.wd.type = WorkerDay.Type.TYPE_WORKDAY.value
-        self.wd.save()
+    def test_dt_from(self):
+        # staff1 included - fired after dt_from value
         with self.auth_user():
             response = self.api_get(self.url, {
-                'shop_id': self.root_shop.id,
-            })
-        self.assertResponseCodeEqual(response, 200)
-        self.assertResponseDataListCount(response, 0)
-
-        self.wd.type = WorkerDay.Type.TYPE_VACATION.value
-        self.wd.save()
-        with self.auth_user():
-            response = self.api_get(self.url, {
-                'shop_id': self.root_shop.id,
-            })
-        self.assertResponseCodeEqual(response, 200)
-        self.assertResponseDataListCount(response, 1)
-
-    def test_dt_hired_before(self):
-        # staff1 included - hired before dt_hired_before filter
-        with self.auth_user():
-            response = self.api_get(self.url, {
-                'shop_id': self.root_shop.id,
-                'dt_hired_before': (timezone.now() - datetime.timedelta(days=3)).date().strftime(
+                'shop_id': self.shop.id,
+                'dt_from': (timezone.now() + datetime.timedelta(days=2)).date().strftime(
+                    settings.QOS_DATE_FORMAT),
+                'dt_to': (timezone.now() + datetime.timedelta(days=10)).date().strftime(
                     settings.QOS_DATE_FORMAT),
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertResponseDataListCount(response, 1)
 
-        # staff1 excluded - hired after dt_hired_before filter
+        # staff1 excluded - fired before dt_from value
         with self.auth_user():
             response = self.api_get(self.url, {
-                'shop_id': self.root_shop.id,
-                'dt_hired_before': (timezone.now() - datetime.timedelta(days=8)).date().strftime(
+                'shop_id': self.shop.id,
+                'dt_from': (timezone.now() + datetime.timedelta(days=3)).date().strftime(
+                    settings.QOS_DATE_FORMAT),
+                'dt_to': (timezone.now() + datetime.timedelta(days=10)).date().strftime(
                     settings.QOS_DATE_FORMAT),
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertResponseDataListCount(response, 0)
 
-    def test_dt_fired_after(self):
-        # staff1 included - fired after dt_fired_after value
+    def test_dt_to(self):
+        # staff1 included - hired before dt_to filter
         with self.auth_user():
             response = self.api_get(self.url, {
-                'shop_id': self.root_shop.id,
-                'dt_fired_after': (timezone.now() + datetime.timedelta(days=1)).date().strftime(
+                'shop_id': self.shop.id,
+                'dt_from': (timezone.now() - datetime.timedelta(days=10)).date().strftime(
+                    settings.QOS_DATE_FORMAT),
+                'dt_to': (timezone.now() - datetime.timedelta(days=5)).date().strftime(
                     settings.QOS_DATE_FORMAT),
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertResponseDataListCount(response, 1)
 
-        # staff1 excluded - fired before dt_fired_after value
+        # staff1 excluded - hired after dt_to filter
         with self.auth_user():
             response = self.api_get(self.url, {
-                'shop_id': self.root_shop.id,
-                'dt_fired_after': (timezone.now() + datetime.timedelta(days=5)).date().strftime(
+                'shop_id': self.shop.id,
+                'dt_from': (timezone.now() - datetime.timedelta(days=10)).date().strftime(
+                    settings.QOS_DATE_FORMAT),
+                'dt_to': (timezone.now() - datetime.timedelta(days=6)).date().strftime(
                     settings.QOS_DATE_FORMAT),
             })
         self.assertResponseCodeEqual(response, 200)
@@ -467,7 +432,7 @@ class TestDeleteWorkerDay(LocalTestCase):
     def setUp(self, worker_day=False):
         super().setUp(worker_day)
         self.now = timezone.now()
-        self.staff = create_stuff(self.root_shop.pk)
+        self.staff = create_stuff(self.shop.pk)
         self.wd_root = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.Type.TYPE_WORKDAY.value,
                                                 dt=self.now.date())
         self.wd_child = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.Type.TYPE_VACATION.value,
@@ -519,7 +484,7 @@ class TestCreateCashier(LocalTestCase):
                 "username": "jb007",
                 "password": "mi7",
                 "dt_hired": BaseConverter.convert_date(now),
-                "shop_id": self.root_shop.pk,
+                "shop_id": self.shop.pk,
             })
         self.assertResponseCodeEqual(response, 200)
         uid = response.json()['data'].get("id")
@@ -532,7 +497,7 @@ class TestCreateCashier(LocalTestCase):
         self.assertEqual(user.username, f"u{uid}")
         self.assertEqual(user.dt_hired, now.date())
         self.assertIsNone(user.dt_fired)
-        self.assertEqual(user.shop_id, self.root_shop.pk)
+        self.assertEqual(user.shop_id, self.shop.pk)
         self.assertTrue(user.check_password("mi7"))
 
 #
@@ -546,7 +511,7 @@ class TestDeleteCashier(LocalTestCase):
     def setUp(self, worker_day=False):
         super().setUp(worker_day)
         self.now = timezone.now()
-        self.user = create_stuff(self.root_shop.pk)
+        self.user = create_stuff(self.shop.pk)
         self.user.dt_fired = None
         self.user.save()
 
@@ -576,7 +541,7 @@ class TestGetChangeRequest(LocalTestCase):
 
     def setUp(self, worker_day=False):
         super().setUp(worker_day)
-        self.user = create_stuff(self.root_shop.pk)
+        self.user = create_stuff(self.shop.pk)
         self.now = timezone.now().replace(microsecond=0)
         self.wd_today = WorkerDayChangeRequest.objects.create(
             worker_id=self.user.pk, dt=self.now.date(),
@@ -622,13 +587,13 @@ class TestRequestWorkerDay(LocalTestCase):
 
     def setUp(self, worker_day=False):
         super().setUp(worker_day)
-        self.staff = create_stuff(self.root_shop.id)
+        self.staff = create_stuff(self.shop.id)
 
     def test_required(self):
         with self.auth_user():
             response = self.api_post(self.url, {
                 "worker_id": self.staff.id,
-                "shop_id": self.root_shop.id,
+                "shop_id": self.shop.id,
                 "dt": BaseConverter.convert_date(timezone.now().date()),
                 "type": 'V'
             })
@@ -646,7 +611,7 @@ class TestRequestWorkerDay(LocalTestCase):
         with self.auth_user():
             response = self.api_post(self.url, {
                 "worker_id": self.staff.id,
-                "shop_id": self.root_shop.id,
+                "shop_id": self.shop.id,
                 "dt": BaseConverter.convert_date(now.date()),
                 "type": 'V',
                 'tm_work_start': BaseConverter.convert_time(now),
