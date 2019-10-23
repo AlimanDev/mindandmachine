@@ -5,7 +5,7 @@ from datetime import date
 from django.conf import settings
 from django.utils import timezone
 
-from src.db.models import User, WorkerDay, WorkerDayChangeRequest, WorkerCashboxInfo
+from src.db.models import User, WorkerDay, WorkerDayChangeRequest
 from src.util.models_converter import BaseConverter, WorkerDayConverter
 from src.util.test import LocalTestCase
 
