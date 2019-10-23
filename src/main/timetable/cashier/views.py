@@ -71,13 +71,13 @@ def get_cashiers_list(request, form):
     """
     Возвращает список кассиров в данном магазине
 
-    Уволенных позже чем dt_fired_after и нанятых раньше, чем dt_hired_before.
+    Уволенных позже чем dt_from и нанятых раньше, чем dt_to.
 
     Args:
         method: GET
         url: /api/timetable/cashier/get_cashiers_list
-        dt_hired_before(QOS_DATE): required = False.
-        dt_fired_after(QOS_DATE): required False
+        dt_from(QOS_DATE): required = False.
+        dt_to(QOS_DATE): required False
         shop_id(int): required = True
         consider_outsource(bool): required = False (учитывать outsource работников)
 
@@ -109,8 +109,8 @@ def get_cashiers_list(request, form):
 
     q = Q()
     if not form['show_all']:
-        q &= Q(dt_hired__isnull=True) | Q(dt_hired__lte=form['dt_hired_before'])
-        q &= Q(dt_fired__isnull=True) | Q(dt_fired__gt=form['dt_fired_after'])
+        q &= Q(dt_hired__isnull=True) | Q(dt_hired__lte=form['dt_to'])
+        q &= Q(dt_fired__isnull=True) | Q(dt_fired__gt=form['dt_from'])
 
     users_qs = User.objects.filter(
         shop_id=shop_id,
@@ -128,8 +128,8 @@ def get_not_working_cashiers_list(request, form):
     Args:
         method: GET
         url: /api/timetable/cashier/get_not_working_cashiers_list
-        dt_hired_before(QOS_DATE): required = False.
-        dt_fired_after(QOS_DATE): required False
+        dt_from(QOS_DATE): required = False.
+        dt_to(QOS_DATE): required False
         shop_id(int): required = True
 
     Returns:
@@ -164,8 +164,8 @@ def get_not_working_cashiers_list(request, form):
             worker__shop_id=shop_id,
             worker__attachment_group=User.GROUP_STAFF
     ).filter(
-        (Q(worker__dt_hired__isnull=True) | Q(worker__dt_hired__lte=form['dt_hired_before'])) &
-        (Q(worker__dt_fired__isnull=True) | Q(worker__dt_fired__gt=form['dt_fired_after']))
+        (Q(worker__dt_hired__isnull=True) | Q(worker__dt_hired__lte=form['dt_to'])) &
+        (Q(worker__dt_fired__isnull=True) | Q(worker__dt_fired__gt=form['dt_from']))
     ).exclude(
         type=WorkerDay.Type.TYPE_WORKDAY.value
     ).order_by(
@@ -317,7 +317,7 @@ def get_cashier_timetable(request, form):
             Q(dt__lt=F('worker__dt_fired')) |
             Q(worker__dt_fired__isnull=True),
 
-            Q(worker__dt_hired__lt=to_dt) &
+            Q(worker__dt_hired__lte=to_dt) &
             Q(dt__gte=F('worker__dt_hired')) |
             Q(worker__dt_hired__isnull=True),
 
