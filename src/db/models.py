@@ -258,6 +258,8 @@ class User(DjangoAbstractUser):
     is_ready_for_overworkings = models.BooleanField(default=False)
     access_token = models.CharField(max_length=64, blank=True, null=True)
 
+    dt_new_week_availability_from = models.DateField(null=True, blank=True)
+
     objects = WorkerManager()
 
 

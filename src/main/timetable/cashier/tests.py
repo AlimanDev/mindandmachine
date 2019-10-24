@@ -470,6 +470,84 @@ class TestDeleteWorkerDay(LocalTestCase):
 class TestSetWorkerRestrictions(LocalTestCase):
     url = '/api/timetable/cashier/set_worker_restrictions'
 
+    def setUp(self):
+        super().setUp()
+        
+    
+    def test_set_week_availability(self):
+        with self.auth_user():
+            
+            response = self.api_post(self.url, {
+                "worker_id": 1,
+                "week_availability": 4,
+                "dt_new_week_availability_from": date(2019, 2, 10).strftime('%d.%m.%Y'),
+                "shift_hours_length": '-',
+                'norm_work_hours': 100
+            })
+            self.assertEqual(response.json()['code'], 200)
+            correct_data = {
+                'week_availability': 4,
+                'dt_new_week_availability_from': date(2019, 2, 10)
+            }
+            self.assertEqual(
+                User.objects.filter(pk=1).values(
+                    'week_availability', 
+                    'dt_new_week_availability_from'
+                )[0],
+                correct_data
+            )
+    
+    def test_set_data(self):
+        with self.auth_user():
+            response = self.api_post(self.url, {
+                "worker_id": 1,
+                "worker_sex": "F",
+                "work_type_info": "[{\"work_type_id\":1,\"priority\":0}]",
+                "is_ready_for_overworkings" : True,
+                "is_fixed_hours" : True,
+                "norm_work_hours": 50,
+                "shift_hours_length": "6-8",
+                "week_availability" : 7
+            })
+            correct_data = {
+                'sex': 'F',
+                'is_ready_for_overworkings': True,
+                'is_fixed_hours': True,
+                'norm_work_hours': 50,
+                'shift_hours_length_min': 6,
+                'shift_hours_length_max': 8,
+                'week_availability': 7,
+            }
+            self.assertEqual(response.json()['code'], 200)
+            self.assertEqual(
+                User.objects.filter(pk=1).values(
+                    'sex', 
+                    'is_ready_for_overworkings', 
+                    'is_fixed_hours', 
+                    'norm_work_hours', 
+                    'shift_hours_length_min',
+                    'shift_hours_length_max',
+                    'week_availability'
+                )[0],
+                correct_data
+            )
+
+    def test_set_week_availability_without_date(self):
+        with self.auth_user():
+            response = self.api_post(self.url, {
+                "worker_id": 1,
+                "week_availability": 4,
+                "shift_hours_length": '-'
+            })
+            correct_data = {
+                'code': 400, 
+                'data': {
+                    'error_type': 'ValueException', 
+                    'error_message': "[('week_availability', ['week_availability != 7 dt_new_week_availability_from should be defined'])]"
+                }, 
+                    'info': None
+            }
+            self.assertEqual(response.json(), correct_data)
 
 class TestCreateCashier(LocalTestCase):
     url = '/api/timetable/cashier/create_cashier'

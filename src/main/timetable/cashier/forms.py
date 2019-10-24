@@ -213,25 +213,35 @@ class SetWorkerRestrictionsForm(forms.Form):
     is_ready_for_overworkings = forms.BooleanField(required=False)
     is_fixed_hours = forms.BooleanField(required=False)
     worker_slots = forms.CharField(required=False)
+    dt_new_week_availability_from = util_forms.DateField(required=False)
     week_availability = forms.IntegerField(required=False)
     norm_work_hours = forms.IntegerField(required=False)
     shift_hours_length = util_forms.RangeField(required=False)
     min_time_btw_shifts = forms.IntegerField(required=False)
 
+    def clean_week_availability(self):
+        
+        week_availability = self.cleaned_data.get('week_availability')
+        date = self.cleaned_data.get('dt_new_week_availability_from')
+        if (week_availability and week_availability != 7 and not date):
+            raise ValidationError('week_availability != 7 dt_new_week_availability_from should be defined')
+        return week_availability
+
     def clean_work_type_info(self):
         try:
             value = self.cleaned_data.get('work_type_info')
             if value is None or value == '':
-                return None
+                return []
             return json.loads(value)
         except:
             raise ValidationError('Invalid work_type_info data')
 
     def clean_norm_work_hours(self):
         value = self.cleaned_data.get('norm_work_hours')
-        if value < 0 or value > 500:
-            raise ValidationError('norm_work_hours should be percents value (0 < val < 100)')
-        return value
+        if value is not None:
+            if value < 0 or value > 500:
+                raise ValidationError('norm_work_hours should be percents value (0 < val < 500)')
+            return value
 
     def clean_constraints(self):
         try:
