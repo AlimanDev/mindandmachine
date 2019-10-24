@@ -21,5 +21,6 @@ urlpatterns = [
     path('request_worker_day', views.request_worker_day),
     path('get_change_request', views.get_change_request),
     path('handle_change_request', views.handle_worker_day_request),
+    path('get_worker_position_list', views.get_worker_position_list),
 ]
 

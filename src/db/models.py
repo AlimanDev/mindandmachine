@@ -258,6 +258,8 @@ class User(DjangoAbstractUser):
     is_ready_for_overworkings = models.BooleanField(default=False)
     access_token = models.CharField(max_length=64, blank=True, null=True)
 
+    dt_new_week_availability_from = models.DateField(null=True, blank=True)
+
     objects = WorkerManager()
 
 
@@ -279,102 +281,122 @@ class FunctionGroup(models.Model):
     )
 
     FUNCS = (
+        'signout',
+        'password_edit',
+
         'get_worker_day_approves',
         'create_worker_day_approve',
         'delete_worker_day_approve',
+
+        'get_cashboxes',
+        'get_cashboxes_info',
         'get_cashboxes_open_time',
-        'get_workers',
-        'get_demand_change_logs',
-        'edit_work_type',
         'get_cashboxes_used_resource',
+        'create_cashbox',
+        'update_cashbox',
+        'delete_cashbox',
+
+        'get_types',
+        'create_work_type',
+        'edit_work_type',
+        'delete_work_type',
+
         'get_notifications',
         'get_notifications2',
-        'get_cashboxes_info',
-        'get_department',
-        'update_cashbox',
-        'delete_work_type',
-        'get_outsource_workers',
-        'change_cashier_info',
-        'get_not_working_cashiers_list',
-        'get_table',
+        'set_notifications_read',
+
+
         'get_worker_day',
-        'create_cashbox',
-        'set_worker_day',
-        'signout',
-        'create_timetable',
-        'get_regions',
-        'get_slots',
-        'get_user_urv',
-        'get_cashboxes',
-        'get_cashier_timetable',
-        'select_cashiers',
+        'delete_worker_day',
         'request_worker_day',
-        'add_outsource_workers',
-        'set_worker_restrictions',
+        'set_worker_day',
+        'handle_worker_day_request',
+        'get_worker_day_logs',
+
+        'get_cashier_info',
+        'change_cashier_info',
         'create_cashier',
         'get_cashiers_info',
-        'create_work_type',
-        'get_visitors_info',
-        'get_time_distribution',
-        'set_queue',
-        'set_notifications_read',
-        'get_status',
-        'get_forecast',
+        'select_cashiers',
+        'get_not_working_cashiers_list',
         'get_cashiers_list',
-        'get_change_request',
-        'delete_timetable',
-        'get_types',
-        'get_all_slots',
-        'get_cashiers_timetable',
-        'set_demand',
-        'dublicate_cashier_table',
-        'get_month_stat',
-        'handle_worker_day_request',
-        'get_workers_to_exchange',
-        'get_tabel',
-        'delete_cashier',
-        'get_worker_day_logs',
-        'password_edit',
-        'get_cashier_info',
         'change_cashier_status',
         'set_selected_cashiers',
-        'get_indicators',
+        'delete_cashier',
+
+        'set_timetable',
+        'create_timetable',
+        'delete_timetable',
+        'get_cashier_timetable',
+        'get_cashiers_timetable',
+        'dublicate_cashier_table',
+
+        'get_slots',
+        'get_all_slots',
+
+        'get_workers',
+        'get_outsource_workers',
+        'add_outsource_workers',
+
+        'get_user_urv',
+        'upload_urv',
+        'change_user_urv',
+
+        'get_forecast',
+        'process_forecast',
+
         'upload_demand',
         'upload_timetable',
-        'change_user_urv',
-        'get_parent',
-        'delete_cashbox',
-        'set_timetable',
-        'delete_worker_day',
-        'create_predbills_request',
-        'process_forecast',
+
         'notify_workers_about_vacancy',
-        'show_vacancy',
-        'cancel_vacancy',
-        'confirm_vacancy',
         'do_notify_action',
+
+        'get_workers_to_exchange',
         'exchange_workers_day',
-        'upload_urv',
+
+        #algo callbacks
+        'set_queue',
+        'set_demand',
+        'set_pred_bills',
+
 
         'get_operation_templates',
         'create_operation_template',
         'update_operation_template',
         'delete_operation_template',
-        'set_pred_bills',
+
+        'show_vacancy',
+        'cancel_vacancy',
+        'confirm_vacancy',
 
         # download/
         'get_demand_xlsx',
         'get_department_stats_xlsx',
         'get_timetable_xlsx',
         'get_urv_xlsx',
+        'get_tabel',
 
         # shop/
+        'get_department',
+        'get_parent',
         'add_department',
         'edit_department',
         'get_department_list',
         'get_department_stats',
         'get_parameters',
         'set_parameters',
+
+        'get_demand_change_logs',
+        'get_table',
+        'get_visitors_info',
+        'get_time_distribution',
+        'get_status',
+        'get_change_request',
+        'get_month_stat',
+        'get_indicators',
+        'get_worker_position_list',
+        'set_worker_restrictions',
+        'create_predbills_request',
     )
 
     FUNCS_TUPLE = ((f, f) for f in FUNCS)

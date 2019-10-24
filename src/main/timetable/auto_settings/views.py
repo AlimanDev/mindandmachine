@@ -614,6 +614,7 @@ def create_timetable(request, form):
                 'min_shift_len': u.shift_hours_length_min if u.shift_hours_length_min else 0,
                 'max_shift_len': u.shift_hours_length_max if u.shift_hours_length_max else 24,
                 'min_time_between_slots': u.min_time_btw_shifts if u.min_time_btw_shifts else 0,
+                'dt_new_week_availability_from': u.dt_new_week_availability_from,
             }
             for u in users
         ],
