@@ -1,15 +1,11 @@
 import datetime
 from django.db.models import (
     Avg, Sum,
-    F, Q,
-    Case, When,
-    CharField, FloatField, IntegerField,
-    Subquery, Value, OuterRef
+    FloatField, IntegerField,
+    Subquery, OuterRef
     )
 from django.db.models.functions import Coalesce
-from django.db.models.query import QuerySet
 from src.db.models import (
-    FunctionGroup,
     Shop,
     Timetable,
 )
