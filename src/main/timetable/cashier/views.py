@@ -19,8 +19,9 @@ from src.db.models import (
     ProductionDay,
     WorkerCashboxInfo,
     WorkerConstraint,
-    WorkType,
     WorkerDayCashboxDetails,
+    WorkerPosition,
+    WorkType,
     UserWeekdaySlot,
 )
 
@@ -36,6 +37,7 @@ from src.util.models_converter import (
     WorkTypeConverter,
     BaseConverter,
     WorkerDayChangeLogConverter,
+    WorkerPositionConverter
 )
 from src.util.utils import (
     JsonResponse,
@@ -1008,6 +1010,7 @@ def set_worker_restrictions(request, form):
         # norm_work_hours(int): отклонение от нормы рабочих часов для сотрудника
         # shift_hours_length(str): длина смен в часах в формате '5-12'
         # min_time_btw_shifts(int): минимальное время между сменами
+        # dt_new_week_availability_from(QOS_date): дата с которой нужно строить новый период
 
     Returns:
         {}
@@ -1017,12 +1020,14 @@ def set_worker_restrictions(request, form):
         worker = User.objects.get(id=form['worker_id'])
     except User.DoesNotExist:
         return JsonResponse.value_error('Invalid worker_id')
-
+    
     # WorkTypes
     work_type_info = form.get('work_type_info', [])
     curr_work_types = {wci.work_type_id: wci for wci in WorkerCashboxInfo.objects.filter(worker=worker,)}
+    
     for work_type in work_type_info:
         wci = curr_work_types.pop(work_type['work_type_id'], None)
+        
         if wci:
             wci.priority = work_type['priority']
             wci.save()
@@ -1035,10 +1040,10 @@ def set_worker_restrictions(request, form):
                 )
             except IntegrityError:
                 pass
-
+    
     del_old_wcis_ids = [wci.id for wci in curr_work_types.values()]
     WorkerCashboxInfo.objects.filter(id__in=del_old_wcis_ids).delete()
-
+    
     if type(form.get('constraints')) == list:
         new_constraints = form['constraints']
         WorkerConstraint.objects.filter(worker=worker).delete()
@@ -1054,7 +1059,7 @@ def set_worker_restrictions(request, form):
                 )
             )
         WorkerConstraint.objects.bulk_create(constraints_to_create)
-
+    
     if type(form.get('worker_slots')) == list:
         new_slots = form['worker_slots']
         UserWeekdaySlot.objects.filter(worker=worker).delete()
@@ -1070,16 +1075,17 @@ def set_worker_restrictions(request, form):
                 )
             )
         UserWeekdaySlot.objects.bulk_create(slots_to_create)
-
-    worker.sex = form['worker_sex']
-    worker.week_availability = form['week_availability']
-    worker.is_fixed_hours = form['is_fixed_hours']
+    
+    worker.sex = form.get('worker_sex', 'M')
+    worker.week_availability = form.get('week_availability', 7)
+    worker.is_fixed_hours = form.get('is_fixed_hours', False)    
     worker.shift_hours_length_min = form['shift_hours_length'][0]
     worker.shift_hours_length_max = form['shift_hours_length'][1]
-    worker.is_ready_for_overworkings = form['is_ready_for_overworkings']
-    worker.norm_work_hours = form['norm_work_hours']
-    worker.min_time_btw_shifts = form['min_time_btw_shifts']
-
+    worker.is_ready_for_overworkings = form.get('is_ready_for_overworkings', False)
+    worker.norm_work_hours = form.get('norm_work_hours', 100)
+    worker.min_time_btw_shifts = form.get('min_time_btw_shifts') 
+    worker.dt_new_week_availability_from = form.get('dt_new_week_availability_from')
+    
     worker.save()
 
     return JsonResponse.success()
@@ -1401,6 +1407,9 @@ def change_cashier_info(request, form):
             status=WorkerDayCashboxDetails.TYPE_DELETED,
         )
 
+    if form['position_id']:
+        user.position_id = form['position_id']
+
     user.save()
 
     return JsonResponse.success()
@@ -1530,3 +1539,8 @@ def handle_worker_day_request(request, form):
     # Notifications.objects.filter(object_id=change_request.id).delete()
 
     return JsonResponse.success()
+
+@api_method('GET', check_permissions=False)
+def get_worker_position_list(request):
+    worker_positions = WorkerPosition.objects.all()
+    return JsonResponse.success([WorkerPositionConverter.convert(wp) for wp in worker_positions])

@@ -5,11 +5,13 @@ from src.conf.djconfig import (
     QOS_DATETIME_FORMAT,
     QOS_TIME_FORMAT,
 )
+
 from src.db.models import (
     WorkerDay,
     Timetable,
     AttendanceRecords,
-    User)
+    User
+)
 
 
 class BaseConverter(object):
@@ -77,7 +79,8 @@ class UserConverter(BaseConverter):
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
             'attachment_group': obj.attachment_group,
-            'position': obj.position.title if getattr(obj, 'position', None) is not None else '',
+            'position': obj.position.title if obj.position_id is not None else '',
+            'position_id': obj.position_id if obj.position_id is not None else '',
             'identifier': getattr(obj, 'identifier', None),
         }
 
@@ -172,6 +175,14 @@ class WorkerDayChangeRequestConverter(BaseConverter):
             'type': WorkerDayConverter.convert_type(obj.type),
             'dttm_work_start': __work_tm(obj.dttm_work_start),
             'dttm_work_end': __work_tm(obj.dttm_work_end),
+        }
+
+class WorkerPositionConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj):
+        return {
+            'id': obj.id,
+            'title': obj.title,
         }
 
 
@@ -319,6 +330,7 @@ class ShopConverter(BaseConverter):
             'dt_closed': cls.convert_date(obj.dt_closed),
         }
 
+
 class TimetableConverter(BaseConverter):
     __STATUSES = {
         Timetable.Status.READY.value: 'R',
@@ -449,4 +461,3 @@ class WorkerDayApproveConverter(BaseConverter):
             'dt_approved': cls.convert_date(obj.dt_approved),
             'dttm_added': cls.convert_datetime(obj.dttm_added),
         }
-
