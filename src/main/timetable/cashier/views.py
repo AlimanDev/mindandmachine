@@ -6,7 +6,6 @@ from dateutil.relativedelta import relativedelta
 from django.contrib.auth import update_session_auth_hash
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
-from django.db.models import Q
 from django.utils import timezone
 from src.main.urv.utils import tick_stat_count
 from django.db.models import Q, F
@@ -19,14 +18,12 @@ from src.db.models import (
     ProductionDay,
     WorkerCashboxInfo,
     WorkerConstraint,
-    WorkType,
     WorkerDayCashboxDetails,
+    WorkerPosition,
+    WorkType,
     UserWeekdaySlot,
 )
-from src.util.utils import (
-    JsonResponse,
-    api_method,
-)
+
 from src.main.other.notification.utils import send_notification
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
 from src.util.collection import group_by, count, range_u
@@ -39,6 +36,7 @@ from src.util.models_converter import (
     WorkTypeConverter,
     BaseConverter,
     WorkerDayChangeLogConverter,
+    WorkerPositionConverter
 )
 from src.util.utils import (
     JsonResponse,
@@ -1408,6 +1406,9 @@ def change_cashier_info(request, form):
             status=WorkerDayCashboxDetails.TYPE_DELETED,
         )
 
+    if form['position_id']:
+        user.position_id = form['position_id']
+
     user.save()
 
     return JsonResponse.success()
@@ -1537,3 +1538,8 @@ def handle_worker_day_request(request, form):
     # Notifications.objects.filter(object_id=change_request.id).delete()
 
     return JsonResponse.success()
+
+@api_method('GET', check_permissions=False)
+def get_worker_position_list(request):
+    worker_positions = WorkerPosition.objects.all()
+    return JsonResponse.success([WorkerPositionConverter.convert(wp) for wp in worker_positions])
