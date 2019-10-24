@@ -377,7 +377,8 @@ def get_cashier_timetable(request, form):
         ]
 
         wd_logs = WorkerDay.objects.select_related('worker').filter(
-            Q(parent_worker_day__isnull=False) | Q(created_by__isnull=False),
+            Q(created_by__isnull=False),
+            # Q(parent_worker_day__isnull=False) | Q(created_by__isnull=False),
             worker_id=worker_id,
             dt__gte=from_dt,
             dt__lte=to_dt,
