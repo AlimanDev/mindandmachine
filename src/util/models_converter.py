@@ -152,6 +152,7 @@ class WorkerDayChangeLogConverter(BaseConverter):
                 'worker_day': obj.id,
                 'dttm_changed': BaseConverter.convert_datetime(obj.dttm_added),
                 'changed_by': obj.created_by_id,
+                'change_by_fio': obj.created_by.last_name + ' ' + obj.created_by.first_name if obj.created_by_id else '',
                 'comment': obj.comment,
                 'to_tm_work_start': __work_tm(obj.dttm_work_start),
                 'to_tm_work_end': __work_tm(obj.dttm_work_end),
