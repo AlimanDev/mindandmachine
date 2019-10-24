@@ -304,12 +304,12 @@ def create_timetable(request, form):
     except:
         return JsonResponse.already_exists_error()
 
-    users = User.objects.qos_filter_active(
+    users = list(User.objects.qos_filter_active(
         dt_from,
         dt_to,
         shop_id=shop_id,
         auto_timetable=True,
-    ).select_related('position')
+    ).select_related('position'))
     shop = request.shop
     period_step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
 
