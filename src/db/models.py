@@ -1021,6 +1021,8 @@ class WorkerDay(models.Model):
     parent_worker_day = models.OneToOneField('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child')
     # fixme: better change parent to child as usual check if this is the last version of WorkerDay
 
+    comment = models.TextField(null=True, blank=True)
+
     @classmethod
     def is_type_with_tm_range(cls, t):
         return t in (cls.Type.TYPE_WORKDAY.value, cls.Type.TYPE_BUSINESS_TRIP.value, cls.Type.TYPE_QUALIFICATION.value)
