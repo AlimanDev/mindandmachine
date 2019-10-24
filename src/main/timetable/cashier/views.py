@@ -1386,8 +1386,6 @@ def change_cashier_info(request, form):
         user.dt_hired = form['dt_hired']
     if form['dt_fired']:
         user.dt_fired = form['dt_fired']
-    if form['position_id']:
-        user.position_id = form['position_id']
 
         WorkerDayCashboxDetails.objects.filter(
             worker_day__worker=user,
@@ -1403,6 +1401,9 @@ def change_cashier_info(request, form):
             dttm_deleted=timezone.now(),
             status=WorkerDayCashboxDetails.TYPE_DELETED,
         )
+
+    if form['position_id']:
+        user.position_id = form['position_id']
 
     user.save()
 
@@ -1534,8 +1535,7 @@ def handle_worker_day_request(request, form):
 
     return JsonResponse.success()
 
-
-@api_method('GET')
-def get_worker_position_list(request, form):
+@api_method('GET', check_permissions=False)
+def get_worker_position_list(request):
     worker_positions = WorkerPosition.objects.all()
-    return JsonResponse.success([WorkerPositionConverter(wp) for wp in worker_positions])
+    return JsonResponse.success([WorkerPositionConverter.convert(wp) for wp in worker_positions])
