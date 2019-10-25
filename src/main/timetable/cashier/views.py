@@ -1372,7 +1372,7 @@ def change_cashier_info(request, form):
 
     if form['dt_fired']:
 
-        # убрать увольнение
+        #TODO убрать удаление расписания
         WorkerDayCashboxDetails.objects.filter(
             worker_day__worker=user,
             worker_day__dt__gte=form['dt_fired'],
