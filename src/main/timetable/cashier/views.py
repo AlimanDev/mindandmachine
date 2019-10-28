@@ -510,7 +510,7 @@ def get_cashier_info(request, form):
             'shift_length_max': worker.shift_hours_length_max,
             'norm_work_hours': worker.norm_work_hours,
             'week_availability': worker.week_availability,
-            'dt_new_week_availability_from': worker.dt_new_week_availability_from,
+            'dt_new_week_availability_from': BaseConverter.convert_date(worker.dt_new_week_availability_from),
         }
 
     if 'constraints_info' in form['info']:
