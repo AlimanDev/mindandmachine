@@ -12,7 +12,6 @@ from src.db.models import (
     WorkerDay,
     User,
     WorkType,
-    WorkerCashboxInfo,
     WorkerDayCashboxDetails,
     PeriodClients,
     ProductionMonth,
@@ -21,8 +20,7 @@ from src.db.models import (
 from src.util.collection import group_by
 from src.util.models_converter import BaseConverter
 from src.main.timetable.table.utils import count_work_month_stats
-from src.main.urv.utils import working_hours_count
-from ..utils import dttm_combine
+from src.main.urv.utils import wd_stat_count_total
 
 
 def filter_worker_day_by_dttm(shop_id, day_type, dttm_from, dttm_to):
@@ -306,12 +304,6 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
 
     revenue = 1000000
 
-    ticks = AttendanceRecords.objects.filter(
-        user__shop_id=shop_id,
-        dttm__gte=from_dt,
-        dttm__lte=to_dt,
-        # workerday__work_type_id__in=work_types.keys(),
-    )
     worker_days = WorkerDay.objects.qos_filter_version(1).filter(
         dt__gte=from_dt,
         dt__lte=to_dt,
@@ -333,7 +325,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
             'total_need': predict_needs.sum(),
             'total_go': finite_work.sum(),
             'total_plan': shop.staff_number * norm_work_hours,
-            'hours_count_fact': working_hours_count(ticks, worker_days, only_total=True),
+            'hours_count_fact': wd_stat_count_total(worker_days)['hours_count_fact'],
         },
     })
     return response

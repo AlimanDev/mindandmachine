@@ -15,7 +15,7 @@ from src.db.models import (
 
 from src.main.shop.forms import GetDepartmentListForm
 from src.main.shop.utils import get_shop_list_stats
-from src.main.urv.utils import working_hours_count
+from src.main.urv.utils import wd_stat_count
 from src.util.forms import FormUtil
 from src.util.models_converter import AttendanceRecordsConverter
 from src.util.utils import api_method, JsonResponse
@@ -74,13 +74,12 @@ def get_tabel(request, workbook, form):
         dt__lte=to_dt,
     ).order_by('worker__position_id', 'worker__last_name', 'worker__first_name', 'worker__tabel_code', 'dt')
 
-    records = list(AttendanceRecords.objects.select_related('user').filter(
-        dttm__date__gte=from_dt,
-        dttm__date__lte=to_dt,
-        shop_id=shop.id,
-    ).order_by('dttm', 'user'))
-
-    working_hours = working_hours_count(records, workdays)
+    wd_stat = wd_stat_count(workdays)
+    working_hours = {}
+    for wd in wd_stat:
+        if wd['worker_id'] not in working_hours:
+            working_hours[wd['worker_id']] = {}
+        working_hours[wd['worker_id']][wd['dt']] = wd['hours_fact']
 
     breaktimes = json.loads(shop.break_triplets)
     breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))

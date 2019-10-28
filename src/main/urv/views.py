@@ -1,9 +1,11 @@
+from datetime import datetime
 import functools
 
 from django.db.models import Q
 from django.core.paginator import Paginator, EmptyPage
 
 from src.db.models import (
+    AttendanceRecords,
     User,
     WorkerDay
 )
@@ -11,7 +13,7 @@ from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import AttendanceRecordsConverter
 from src.util.forms import FormUtil
 from .forms import GetUserUrvForm
-from .utils import get_queryset, tick_stat_count, wd_stat_count, working_hours_count
+from .utils import wd_stat_count_total
 
 
 @api_method('GET', GetUserUrvForm)
@@ -30,11 +32,49 @@ def get_user_urv(request, form):
         {}
     """
 
+    from_dt = form['from_dt']
+    to_dt = form['to_dt']
+
+    if form['from_tm']:
+        from_dt = datetime.combine(from_dt, form['from_tm'])
+    if form['to_tm']:
+        to_dt = datetime.combine(to_dt, form['to_tm'])
+
+    user_records = AttendanceRecords.objects.filter(
+        dttm__date__gte=from_dt,
+        dttm__date__lte=to_dt,
+        shop_id=form['shop_id'],
+    ).order_by('dttm')
+
+    if len(form['worker_ids']):
+        user_records = user_records.filter(
+            Q(user_id__in=form['worker_ids']) |
+            Q(user_id__isnull=True) |
+            Q(user__attachment_group=User.GROUP_OUTSOURCE)
+        )
+    if form['type']:
+        user_records = user_records.filter(type=form['type'])
+
+    extra_filters = []
+    if form['show_not_verified']:
+        extra_filters.append(Q(verified=False))
+
+    if form['show_not_detected']:
+        extra_filters.append(Q(user_id__isnull=True))
+
+    if form['show_workers']:
+        extra_filters.append(Q(user__attachment_group=User.GROUP_STAFF))
+
+    if form['show_outstaff']:
+        extra_filters.append(Q(user__attachment_group=User.GROUP_OUTSOURCE))
+
+    if len(extra_filters):
+        extra_filters = functools.reduce(lambda x, y: x | y, extra_filters)
+        user_records = user_records.filter(extra_filters)
+
+
     amount_per_page = form['amount_per_page'] if form['amount_per_page'] else 50
     offset = form['offset'] if form['offset'] else 1
-
-    user_records = get_queryset(request, form)
-    user_records = user_records.order_by('-dttm')
 
     paginator = Paginator(user_records, amount_per_page)
     try:
@@ -63,8 +103,6 @@ def get_indicators(request, form):
          worker_ids(list): список айдишников юзеров, для которых выгружать
          from_dt(QOS_DATE): с какого числа выгружать данные
          to_dt(QOS_DATE): по какое
-         offset(int): смещение по страницам (по дефолту первая)
-         amount_per_page(int): количество результатов на с траницу (по умолчанию 50)
          from_tm: время с
          to_tm: время по
          shop_id: id магазина
@@ -73,9 +111,14 @@ def get_indicators(request, form):
          show_not_verified
          show_not_detected
     """
-    ticks = get_queryset(request, form)
     from_dt = form['from_dt']
     to_dt = form['to_dt']
+
+    if form['from_tm']:
+        from_dt = datetime.combine(from_dt, form['from_tm'])
+    if form['to_tm']:
+        to_dt = datetime.combine(to_dt, form['to_tm'])
+
     worker_ids = form['worker_ids']
 
     checkpoint = FormUtil.get_checkpoint(form)
@@ -89,8 +132,10 @@ def get_indicators(request, form):
         worker_days = worker_days.filter(
             worker_id__in=worker_ids,
         )
+
     if form['from_tm']:
         worker_days = worker_days.filter(dttm_work_start__time__gte=form['from_tm'])
+
     if form['to_tm']:
         worker_days = worker_days.filter(dttm_work_end__time__lte=form['to_tm'])
 
@@ -112,14 +157,12 @@ def get_indicators(request, form):
     if not form['type']:
         ticks_count_plan *= 2
 
-    wd_stat = wd_stat_count(worker_days)
-    tick_stat = tick_stat_count(ticks)
-    hours_count_fact = working_hours_count(ticks, worker_days, only_total=True)
+    wd_stat = wd_stat_count_total(worker_days)
     indicators = {
-        'ticks_coming_count_fact': tick_stat['ticks_coming_count'],
-        'ticks_leaving_count_fact': tick_stat['ticks_leaving_count'],
-        'ticks_count_fact': tick_stat['ticks_coming_count'] + tick_stat['ticks_leaving_count'],
-        'hours_count_fact': hours_count_fact,
+        'ticks_coming_count_fact': wd_stat['ticks_coming_count'],
+        'ticks_leaving_count_fact': wd_stat['ticks_leaving_count'],
+        'ticks_count_fact': wd_stat['ticks_coming_count'] + wd_stat['ticks_leaving_count'],
+        'hours_count_fact': wd_stat['hours_count_fact'],
         'ticks_count_plan': ticks_count_plan,
         'hours_count_plan': wd_stat['hours_count_plan'],
         'lateness_count': wd_stat['lateness_count']

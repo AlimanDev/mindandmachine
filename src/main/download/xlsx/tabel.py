@@ -1,5 +1,5 @@
 from .base_class import Xlsx_base
-from math import ceil, floor
+from math import ceil
 from src.db.models import (
     ProductionDay,
     WorkerDay,
