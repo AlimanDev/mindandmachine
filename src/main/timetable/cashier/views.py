@@ -1359,25 +1359,20 @@ def change_cashier_info(request, form):
     else:
         user = request.user
 
-    if form['first_name']:
-        user.first_name = form['first_name']
-    if form['middle_name']:
-        user.middle_name = form['middle_name']
-    if form['last_name']:
-        user.last_name = form['last_name']
-    if form['tabel_code']:
-        user.tabel_code = form['tabel_code']
-    if form['salary']:
-        user.salary = form['salary']
-    if form['phone_number']:
-        user.phone_number = form['phone_number']
-    if form['email']:
-        user.email = form['email']
-    if form['dt_hired']:
-        user.dt_hired = form['dt_hired']
-    if form['dt_fired']:
-        user.dt_fired = form['dt_fired']
+    user.first_name = form['first_name']
+    user.middle_name = form['middle_name']
+    user.last_name = form['last_name']
+    user.tabel_code = form['tabel_code']
+    user.salary = form['salary'] if form['salary'] else  0
+    user.phone_number = form['phone_number']
+    user.email = form['email']
+    user.dt_hired = form['dt_hired']
+    user.position_id = form['position_id']
+    user.dt_fired = form['dt_fired']
 
+    if form['dt_fired']:
+
+        #TODO убрать удаление расписания
         WorkerDayCashboxDetails.objects.filter(
             worker_day__worker=user,
             worker_day__dt__gte=form['dt_fired'],
@@ -1393,8 +1388,6 @@ def change_cashier_info(request, form):
             status=WorkerDayCashboxDetails.TYPE_DELETED,
         )
 
-    if form['position_id']:
-        user.position_id = form['position_id']
 
     user.save()
 
