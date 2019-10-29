@@ -401,7 +401,7 @@ def create_timetable(request, form):
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
         worker__shop_id=form['shop_id'],
         dt__gte=dt_from,
-        dt__lte=dt_to,
+        dt__lt=dt_to,
     ).exclude(
         type=WorkerDay.Type.TYPE_EMPTY.value
     ).order_by(
