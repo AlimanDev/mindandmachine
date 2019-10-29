@@ -308,7 +308,7 @@ def create_timetable(request, form):
         dt_from,
         dt_to,
         shop_id=shop_id,
-        auto_timetable=True,
+        # auto_timetable=True,
     ).select_related('position'))
     shop = request.shop
     period_step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
@@ -586,6 +586,28 @@ def create_timetable(request, form):
                 tt.delete()
                 return JsonResponse.value_error(status_message)
 
+    # Если для сотрудника не составляем расписание, его все равно нужно учитывать, так как он покрывает спрос
+    # Реализация через фиксированных сотрудников, чтобы не повторять функционал
+
+    dates = [dt_from + timedelta(days=i) for i in range((dt_to -  dt_from).days)]
+    for user in users:
+        if not user.auto_timetable:
+            user.is_fixed_hours = True
+            workers_month_days = worker_day[user.id]
+            workers_month_days.sort(key=lambda wd: wd.dt)
+            workers_month_days_new = []
+            wd_index = 0
+            for dt in dates:
+                if workers_month_days[wd_index].dt == dt:
+                    workers_month_days_new.append(workers_month_days[wd_index])
+                    wd_index += 1
+                else:
+                    workers_month_days_new.append(WorkerDay(
+                        type=WorkerDay.Type.TYPE_HOLIDAY.value,
+                        dt=dt,
+                        worker_id=user.id,
+                    ))
+
     demands = [{
         'dttm_forecast': BaseConverter.convert_datetime(x[0]),
         'work_type': x[1],
@@ -614,7 +636,7 @@ def create_timetable(request, form):
                 'min_shift_len': u.shift_hours_length_min if u.shift_hours_length_min else 0,
                 'max_shift_len': u.shift_hours_length_max if u.shift_hours_length_max else 24,
                 'min_time_between_slots': u.min_time_btw_shifts if u.min_time_btw_shifts else 0,
-                'dt_new_week_availability_from': u.dt_new_week_availability_from,
+                'dt_new_week_availability_from': BaseConverter.convert_date(u.dt_new_week_availability_from),
             }
             for u in users
         ],
