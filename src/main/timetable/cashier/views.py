@@ -10,7 +10,7 @@ from django.db import IntegrityError
 from django.db.models import Q, F
 from django.utils import timezone
 
-
+from src.main.urv.utils import wd_stat_count_total
 from src.db.models import (
     AttendanceRecords,
     User,
@@ -28,7 +28,6 @@ from src.db.models import (
 
 from src.main.other.notification.utils import send_notification
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
-from src.main.urv.utils import tick_stat_count
 from src.util.collection import group_by, count, range_u
 from src.util.forms import FormUtil
 from src.util.models_converter import (
@@ -311,7 +310,7 @@ def get_cashier_timetable(request, form):
     response = {}
     # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_ids']:
-        worker_days_db = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+        worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').prefetch_related('work_types').filter(
             Q(worker__dt_fired__gt=from_dt) &
             Q(dt__lt=F('worker__dt_fired')) |
             Q(worker__dt_fired__isnull=True),
@@ -326,47 +325,7 @@ def get_cashier_timetable(request, form):
             dt__lte=to_dt,
         ).order_by(
             'dt'
-        ).values(
-            'id',
-            'type',
-            'dttm_added',
-            'dt',
-            'worker_id',
-            'dttm_work_start',
-            'dttm_work_end',
-            'work_types__id',
-            'comment',
-            'worker_day_approve_id',
         )
-
-        worker_days = []
-        worker_days_mask = {}
-        for wd in worker_days_db:
-            if (wd['id'] in worker_days_mask) and wd['work_types__id']:
-                ind = worker_days_mask[wd['id']]
-                worker_days[ind].work_types_ids.append(wd['work_types__id'])
-            else:
-                worker_days_mask[wd['id']] = len(worker_days)
-                wd_m = WorkerDay(
-                    id=wd['id'],
-                    type=wd['type'],
-                    dttm_added=wd['dttm_added'],
-                    dt=wd['dt'],
-                    worker_id=wd['worker_id'],
-                    dttm_work_start=wd['dttm_work_start'],
-                    dttm_work_end=wd['dttm_work_end'],
-                    comment=wd['comment'],
-                    worker_day_approve_id=wd['worker_day_approve_id'],
-                )
-                if wd['work_types__id']:
-                    wd_m.work_types_ids = [wd['work_types__id']]
-                    work_type = work_types[wd_m.work_types_ids[0]]
-                    if work_type.shop_id != form['shop_id']:
-                        wd_m.other_shop = work_type.shop.title
-
-                worker_days.append(
-                    wd_m
-                )
 
         official_holidays = [
             x.dt for x in ProductionDay.objects.filter(
@@ -395,13 +354,6 @@ def get_cashier_timetable(request, form):
             sort_reverse=True
         )
 
-        ticks = AttendanceRecords.objects.filter(
-            user_id=worker_id,
-            user__shop_id=form['shop_id'],
-            dttm__gte=from_dt,
-            dttm__lte=to_dt,
-        )
-
         indicators_response = {
             'work_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value),
             'holiday_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value),
@@ -410,15 +362,19 @@ def get_cashier_timetable(request, form):
             'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and
                                                                         x.dt in official_holidays),
             'change_amount': len(worker_day_change_log),
-            'hours_count_fact': tick_stat_count(ticks)['hours_count']
+            'hours_count_fact': wd_stat_count_total(worker_days)['hours_count_fact']
         }
 
         days_response = []
-        for obj in worker_days:
+        for wd in worker_days:
+            work_type=wd.work_types.first()
+            if work_type and work_type.shop_id != form['shop_id']:
+                wd.other_shop = work_type.shop.title
+
             days_response.append({
-                'day': WorkerDayConverter.convert(obj),
+                'day': WorkerDayConverter.convert(wd),
                 'change_log': [WorkerDayChangeLogConverter.convert(x) for x in
-                               worker_day_change_log.get(obj.id, [])],
+                               worker_day_change_log.get(wd.id, [])],
                 'change_requests': []
                 # 'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in
                 #                     worker_day_change_requests.get(obj.id, [])[:10]]

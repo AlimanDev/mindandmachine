@@ -1,13 +1,7 @@
-from src.util.utils import api_method
-from .utils import xlsx_method
-from .forms import (
-    GetTable,
-    GetDemandXlsxForm,
-    GetUrvXlsxForm,
-)
-from src.main.shop.forms import GetDepartmentListForm
-from src.main.shop.utils import get_shop_list_stats
-from src.main.urv.utils import working_hours_count
+from datetime import time, timedelta, datetime, date
+from dateutil.relativedelta import relativedelta
+from django.apps import apps
+import json
 
 from src.db.models import (
     Shop,
@@ -19,16 +13,20 @@ from src.db.models import (
     AttendanceRecords,
 )
 
-from datetime import time, timedelta, datetime, date
-from dateutil.relativedelta import relativedelta
-from django.apps import apps
-from src.util.utils import JsonResponse
+from src.main.shop.forms import GetDepartmentListForm
+from src.main.shop.utils import get_shop_list_stats
+from src.main.urv.utils import wd_stat_count
+from src.util.forms import FormUtil
 from src.util.models_converter import AttendanceRecordsConverter
+from src.util.utils import api_method, JsonResponse
+from .utils import xlsx_method
+from .forms import (
+    GetTable,
+    GetDemandXlsxForm,
+    GetUrvXlsxForm,
+)
 
 from .xlsx.tabel import Tabel_xlsx
-from src.util.forms import FormUtil
-import json
-import pandas as pd
 
 
 @api_method('GET', GetTable)
@@ -64,27 +62,27 @@ def get_tabel(request, workbook, form):
     from_dt = tabel.prod_days[0].dt
     to_dt = tabel.prod_days[-1].dt
 
-    records = list(AttendanceRecords.objects.select_related('user').filter(
-        dttm__date__gte=from_dt,
-        dttm__date__lte=to_dt,
-        shop_id=shop.id,
-    ).order_by('dttm', 'user'))
-    working_hours = working_hours_count(records)
-
     users = list(User.objects.qos_filter_active(
-        dt_from=tabel.prod_days[-1].dt,
-        dt_to=tabel.prod_days[0].dt,
+        dt_from=from_dt,
+        dt_to=to_dt,
         shop=shop,
     ).select_related('position').order_by('position_id', 'last_name', 'first_name', 'tabel_code'))
 
-    breaktimes = json.loads(shop.break_triplets)
-    breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
-
     workdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
         worker__in=users,
-        dt__gte=tabel.prod_days[0].dt,
-        dt__lte=tabel.prod_days[-1].dt,
+        dt__gte=from_dt,
+        dt__lte=to_dt,
     ).order_by('worker__position_id', 'worker__last_name', 'worker__first_name', 'worker__tabel_code', 'dt')
+
+    wd_stat = wd_stat_count(workdays)
+    working_hours = {}
+    for wd in wd_stat:
+        if wd['worker_id'] not in working_hours:
+            working_hours[wd['worker_id']] = {}
+        working_hours[wd['worker_id']][wd['dt']] = wd['hours_fact']
+
+    breaktimes = json.loads(shop.break_triplets)
+    breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
     if form.get('inspection_version', False):
         tabel.change_for_inspection(tabel.prod_month.norm_work_hours, workdays)
@@ -102,11 +100,8 @@ def get_tabel(request, workbook, form):
     tabel.construct_dates('d%d', 15, 6)
 
     tabel.construnts_users_info(users, 16, 0, ['code', 'fio', 'position', 'hired'], extra_row=True)
-
     tabel.fill_table(workdays, users, breaktimes, working_hours, 16, 6)
-
     tabel.add_xlsx_functions(len(users), 12, 37, extra_row=True)
-
     tabel.add_sign(16 + len(users) * 2 + 2)
 
     return workbook, 'Tabel'

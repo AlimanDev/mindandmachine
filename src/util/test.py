@@ -317,7 +317,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             dt_to = dt_from + relativedelta(months=1)
             while dt_from < dt_to:
                 for user in User.objects.all():
-                    create_worker_day(
+                    self.create_worker_day(
                         worker=user,
                         dt=dt_from,
                         dttm_work_start=datetime.datetime.combine(dt_from, datetime.time(9, 0)),
@@ -469,6 +469,31 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         return item.__class__.objects.get(pk=item.pk)
 
 
+    def create_worker_day(
+            self,
+            worker,
+            dt,
+            dttm_work_start,
+            dttm_work_end,
+            type=WorkerDay.Type.TYPE_WORKDAY.value
+    ):
+        worker_day = WorkerDay.objects.create(
+            worker=worker,
+            type=type,
+            dt=dt,
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+        )
+        cashbox = Cashbox.objects.first()
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=worker_day,
+            on_cashbox=cashbox,
+            work_type=cashbox.type,
+            dttm_from=worker_day.dttm_work_start,
+            dttm_to=worker_day.dttm_work_end,
+        )
+        return worker_day
+
 def create_user(user_id, shop_id, username, dt_fired=None, first_name='', last_name=''):
     user = User.objects.create(
         id=user_id,
@@ -481,29 +506,6 @@ def create_user(user_id, shop_id, username, dt_fired=None, first_name='', last_n
     return user
 
 
-def create_worker_day(
-        worker,
-        dt,
-        dttm_work_start,
-        dttm_work_end,
-        type=WorkerDay.Type.TYPE_WORKDAY.value
-):
-    worker_day = WorkerDay.objects.create(
-        worker=worker,
-        type=type,
-        dt=dt,
-        dttm_work_start=dttm_work_start,
-        dttm_work_end=dttm_work_end,
-    )
-    cashbox = Cashbox.objects.all()[worker.id]
-    WorkerDayCashboxDetails.objects.create(
-        worker_day=worker_day,
-        on_cashbox=cashbox,
-        work_type=cashbox.type,
-        dttm_from=worker_day.dttm_work_start,
-        dttm_to=worker_day.dttm_work_end,
-    )
-    return worker_day
 
 
 def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
