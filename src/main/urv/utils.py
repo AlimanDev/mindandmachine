@@ -6,11 +6,14 @@ from django.db.models.functions import Extract, Coalesce, Cast
 
 from src.db.models import (
     AttendanceRecords,
+    WorkerDay
 )
 
 
 def wd_stat_count(worker_days):
-    return worker_days.values('worker_id', 'dt', 'dttm_work_start','dttm_work_end').annotate(
+    return worker_days.filter(
+        type=WorkerDay.Type.TYPE_WORKDAY.value
+    ).values('worker_id', 'dt', 'dttm_work_start','dttm_work_end').annotate(
         coming=Min('worker__attendancerecords__dttm', filter=Q(
             worker__attendancerecords__dttm__date=F('dt'),
             worker__attendancerecords__type=AttendanceRecords.TYPE_COMING
