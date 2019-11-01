@@ -96,6 +96,7 @@ def set_selected_cashiers(request, form):
         Всем другим сотрудникам из этого магаза проставляется значение противоположное value
     """
     if (not form['worker_ids']):
+        User.objects.filter(shop_id=form['shop_id'], attachment_group=User.GROUP_STAFF).update(auto_timetable=False)
         return JsonResponse.success()
     shop_workers = User.objects.filter(shop_id=form['shop_id'], attachment_group=User.GROUP_STAFF)
     shop_workers.exclude(id__in=form['worker_ids']).update(auto_timetable=False)
