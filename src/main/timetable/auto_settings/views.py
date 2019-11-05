@@ -313,6 +313,8 @@ def create_timetable(request, form):
     shop = request.shop
     period_step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
 
+    ########### Проверки ###########
+
     # проверка что у всех юзеров указаны специализации
     users_without_spec = []
     for u in users:
@@ -361,43 +363,44 @@ def create_timetable(request, form):
         )
         tt.delete()
         return JsonResponse.value_error(status_message)
+    
+    # проверки для фиксированных чуваков
+    for user in users:
+        if user.is_fixed_hours:
+            availability_info = availabilities.get(user.id, [])
+            if not (len(availability_info)):
+                print(f'Warning! User {user.id} {user.last_name} {user.first_name} с фиксированными часами, но нет набора смен, на которых может работать!')
+            mask = [0 for _ in range(len(availability_info))]
+            for info_day in availability_info:
+                mask[info_day.weekday] += 1
+            if mask.count(1) != len(mask):
+                status_message = f'Ошибка! Работник {user.id} {user.last_name} {user.first_name} с фиксированными часами, но на один день выбрано больше одной смены)!'
+                tt.delete()
+                return JsonResponse.value_error(status_message)
+    
+    #################################
 
-    periods = PeriodClients.objects.filter(
-        operation_type__dttm_deleted__isnull=True,
-        operation_type__work_type__shop_id=shop_id,
-        operation_type__work_type__dttm_deleted__isnull=True,
-        type=PeriodClients.LONG_FORECASE_TYPE,
-        dttm_forecast__date__gte=dt_from,
-        dttm_forecast__date__lt=dt_to,
-    ).values(
-        'dttm_forecast',
-        'operation_type__work_type_id',
-    ).annotate(
-        clients=Sum(F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + (shop.absenteeism / 100)))
-    ).values_list(
-        'dttm_forecast',
-        'operation_type__work_type_id',
-        'clients'
-    )
+    # Функция для заполнения расписания
+    def fill_wd_array(worker_days_db, array):
+        worker_days_mask = {}
+        for wd in worker_days_db:
+            if (wd['id'] in worker_days_mask) and wd['work_types__id']:
+                continue
 
-    constraints = group_by(
-        collection=WorkerConstraint.objects.select_related('worker').filter(worker__shop_id=shop_id),
-        group_key=lambda x: x.worker_id
-    )
-
-    availabilities = group_by(
-        collection=UserWeekdaySlot.objects.select_related('worker').filter(worker__shop_id=shop_id),
-        group_key=lambda x: x.worker_id
-    )
-
-    # todo: tooooo slow
-    worker_cashbox_info = group_by(
-        collection=WorkerCashboxInfo.objects.select_related('work_type').filter(work_type__shop_id=shop_id, is_active=True),
-        group_key=lambda x: x.worker_id
-    )
+            worker_days_mask[wd['id']] = len(array)
+            wd_mod = WorkerDay(
+                id=wd['id'],
+                type=wd['type'],
+                dttm_added=wd['dttm_added'],
+                dt=wd['dt'],
+                worker_id=wd['worker_id'],
+                dttm_work_start=wd['dttm_work_start'],
+                dttm_work_end=wd['dttm_work_end'],
+            )
+            wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
+            array.append(wd_mod)
 
     new_worker_days = []
-    worker_days_mask = {}
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
         worker__shop_id=form['shop_id'],
         dt__gte=dt_from,
@@ -416,30 +419,10 @@ def create_timetable(request, form):
         'dttm_work_end',
         'work_types__id',
     )
-    for wd in worker_days_db:
-        if (wd['id'] in worker_days_mask) and wd['work_types__id']:
-            continue
+    fill_wd_array(worker_days_db, new_worker_days)
 
-        worker_days_mask[wd['id']] = len(new_worker_days)
-        wd_mod = WorkerDay(
-            id=wd['id'],
-            type=wd['type'],
-            dttm_added=wd['dttm_added'],
-            dt=wd['dt'],
-            worker_id=wd['worker_id'],
-            dttm_work_start=wd['dttm_work_start'],
-            dttm_work_end=wd['dttm_work_end'],
-        )
-        wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
-        new_worker_days.append(wd_mod)
-
-    worker_day = group_by(
-        collection=new_worker_days,
-        group_key=lambda x: x.worker_id
-    )
 
     prev_worker_days = []
-    worker_days_mask = {}
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
         worker__shop_id=form['shop_id'],
         dt__gte=dt_from - timedelta(days=7),
@@ -458,26 +441,8 @@ def create_timetable(request, form):
         'dttm_work_end',
         'work_types__id',
     )
-    for wd in worker_days_db:
-        if (wd['id'] in worker_days_mask) and wd['work_types__id']:
-            continue
-        worker_days_mask[wd['id']] = len(prev_worker_days)
-        wd_mod = WorkerDay(
-            id=wd['id'],
-            type=wd['type'],
-            dttm_added=wd['dttm_added'],
-            dt=wd['dt'],
-            worker_id=wd['worker_id'],
-            dttm_work_start=wd['dttm_work_start'],
-            dttm_work_end=wd['dttm_work_end'],
-        )
-        wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
-        prev_worker_days.append(wd_mod)
+    fill_wd_array(worker_days_db, prev_worker_days)
 
-    prev_data = group_by(
-        collection=prev_worker_days,
-        group_key=lambda x: x.worker_id
-    )
 
     if shop.process_type == Shop.YEAR_NORM:
         max_work_coef = (1 + shop.more_norm / 100)
@@ -512,40 +477,48 @@ def create_timetable(request, form):
         'idle': shop.idle,
     }
 
-    cashboxes = [
-        WorkTypeConverter.convert(x) for x in WorkType.objects.filter(
-            dttm_deleted__isnull=True,
-            shop_id=shop_id,
-        )
-    ]
 
+    user_info = count_difference_of_normal_days(dt_end=dt_from, usrs=users)
+
+    ########### Группируем ###########
+
+    # Ограничения сотрудников
+    constraints = group_by(
+        collection=WorkerConstraint.objects.select_related('worker').filter(worker__shop_id=shop_id),
+        group_key=lambda x: x.worker_id
+    )
+
+    # Возможности сотрудников
+    availabilities = group_by(
+        collection=UserWeekdaySlot.objects.select_related('worker').filter(worker__shop_id=shop_id),
+        group_key=lambda x: x.worker_id
+    )
+
+    # todo: tooooo slow
+    # Информация по кассам для каждого сотрудника
+    need_work_types = WorkType.objects.filter(shop_id=shop_id).values_list('id', flat=True)
+    worker_cashbox_info = group_by(
+        collection=WorkerCashboxInfo.objects.filter(work_type_id__in=need_work_types, is_active=True),
+        group_key=lambda x: x.worker_id
+    )
+
+    # Уже составленное расписание
+    worker_day = group_by(
+        collection=new_worker_days,
+        group_key=lambda x: x.worker_id
+    )
+
+    # Расписание за прошлую неделю от даты составления
+    prev_data = group_by(
+        collection=prev_worker_days,
+        group_key=lambda x: x.worker_id
+    )
+
+    # Слоты
     slots_all = group_by(
         collection=Slot.objects.filter(shop_id=shop_id),
         group_key=lambda x: x.work_type_id,
     )
-
-    slots_periods_dict = {k['id']: [] for k in cashboxes}
-    for key, slots in slots_all.items():
-        for slot in slots:
-            slots_periods_dict[key].append({
-                'tm_start': BaseConverter.convert_time(slot.tm_start),
-                'tm_end': BaseConverter.convert_time(slot.tm_end),
-            })
-
-    for cashbox in cashboxes:
-        cashbox['slots'] = slots_periods_dict[cashbox['id']]
-
-    init_params = json.loads(shop.init_params)
-    work_days = list(ProductionDay.objects.filter(
-        dt__gte=dt_from,
-        dt__lt=dt_to,
-        type__in=ProductionDay.WORK_TYPES,
-    ))
-    work_hours = sum([ProductionDay.WORK_NORM_HOURS[wd.type] for wd in work_days])  # норма рабочего времени за период (за месяц)
-
-    init_params['n_working_days_optimal'] = len(work_days)
-
-    user_info = count_difference_of_normal_days(dt_end=dt_from, usrs=users)
 
     # инфа за предыдущую неделю
 
@@ -557,6 +530,9 @@ def create_timetable(request, form):
         ),
         group_key=lambda x: x.worker_id,
     )
+
+    #################################
+
     # если стоит флаг shop.paired_weekday, смотрим по юзерам, нужны ли им в этом месяце выходные в выходные
     resting_states_list = [WorkerDay.Type.TYPE_HOLIDAY.value]
     if shop.paired_weekday:
@@ -572,46 +548,10 @@ def create_timetable(request, form):
 
             user_info[user.id]['required_coupled_hol_in_hol'] = 0 if coupled_weekdays else 1
 
-    # проверки для фиксированных чуваков
-    for user in users:
-        if user.is_fixed_hours:
-            availability_info = availabilities.get(user.id, [])
-            if not (len(availability_info)):
-                print(f'Warning! User {user.id} {user.last_name} {user.first_name} с фиксированными часами, но нет набора смен, на которых может работать!')
-            mask = [0 for _ in range(len(availability_info))]
-            for info_day in availability_info:
-                mask[info_day.weekday] += 1
-            if mask.count(1) != len(mask):
-                status_message = f'Ошибка! Работник {user.id} {user.last_name} {user.first_name} с фиксированными часами, но на один день выбрано больше одной смены)!'
-                tt.delete()
-                return JsonResponse.value_error(status_message)
-
-    # Если для сотрудника не составляем расписание, его все равно нужно учитывать, так как он покрывает спрос
-    # Реализация через фиксированных сотрудников, чтобы не повторять функционал
-
+    ########### Корректировка рабочих ###########
     dates = [dt_from + timedelta(days=i) for i in range((dt_to -  dt_from).days)]
     for user in users:
-        if not user.auto_timetable:
-            user.is_fixed_hours = True
-            workers_month_days = worker_day[user.id]
-            workers_month_days.sort(key=lambda wd: wd.dt)
-            workers_month_days_new = []
-            wd_index = 0
-            for dt in dates:
-                if workers_month_days[wd_index].dt == dt:
-                    workers_month_days_new.append(workers_month_days[wd_index])
-                    wd_index += 1
-                else:
-                    workers_month_days_new.append(WorkerDay(
-                        type=WorkerDay.Type.TYPE_HOLIDAY.value,
-                        dt=dt,
-                        worker_id=user.id,
-                    ))
-            worker_day[user.id] = workers_month_days_new
-
-    # Для уволенных сотрудников
-
-    for user in users:
+        # Для уволенных сотрудников
         if user.dt_fired:
             workers_month_days = worker_day[user.id]
             workers_month_days.sort(key=lambda wd: wd.dt)
@@ -629,14 +569,87 @@ def create_timetable(request, form):
                         dt=dt,
                         worker_id=user.id,
                     ))
+            worker_day[user.id] = workers_month_days_new 
+        # Если для сотрудника не составляем расписание, его все равно нужно учитывать, так как он покрывает спрос
+        # Реализация через фиксированных сотрудников, чтобы не повторять функционал
+        elif not user.auto_timetable:
+            user.is_fixed_hours = True
+            workers_month_days = worker_day[user.id]
+            workers_month_days.sort(key=lambda wd: wd.dt)
+            workers_month_days_new = []
+            wd_index = 0
+            for dt in dates:
+                if workers_month_days[wd_index].dt == dt:
+                    workers_month_days_new.append(workers_month_days[wd_index])
+                    wd_index += 1
+                else:
+                    workers_month_days_new.append(WorkerDay(
+                        type=WorkerDay.Type.TYPE_HOLIDAY.value,
+                        dt=dt,
+                        worker_id=user.id,
+                    ))
             worker_day[user.id] = workers_month_days_new
+    
+    #################################
 
+    ########### Выборки из базы данных ###########
+
+    # Спрос
+    periods = PeriodClients.objects.filter(
+        operation_type__dttm_deleted__isnull=True,
+        operation_type__work_type__shop_id=shop_id,
+        operation_type__work_type__dttm_deleted__isnull=True,
+        type=PeriodClients.LONG_FORECASE_TYPE,
+        dttm_forecast__date__gte=dt_from,
+        dttm_forecast__date__lt=dt_to,
+    ).values(
+        'dttm_forecast',
+        'operation_type__work_type_id',
+    ).annotate(
+        clients=Sum(F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + (shop.absenteeism / 100)))
+    ).values_list(
+        'dttm_forecast',
+        'operation_type__work_type_id',
+        'clients'
+    )
 
     demands = [{
         'dttm_forecast': BaseConverter.convert_datetime(x[0]),
         'work_type': x[1],
         'clients': x[2],
     } for x in periods]
+
+    # Кассы
+    cashboxes = [
+        WorkTypeConverter.convert(x) for x in WorkType.objects.filter(
+            dttm_deleted__isnull=True,
+            shop_id=shop_id,
+        )
+    ]
+
+    slots_periods_dict = {k['id']: [] for k in cashboxes}
+    for key, slots in slots_all.items():
+        for slot in slots:
+            slots_periods_dict[key].append({
+                'tm_start': BaseConverter.convert_time(slot.tm_start),
+                'tm_end': BaseConverter.convert_time(slot.tm_end),
+            })
+
+    for cashbox in cashboxes:
+        cashbox['slots'] = slots_periods_dict[cashbox['id']]
+
+    # Параметры инициализации
+    init_params = json.loads(shop.init_params)
+    work_days = list(ProductionDay.objects.filter(
+        dt__gte=dt_from,
+        dt__lt=dt_to,
+        type__in=ProductionDay.WORK_TYPES,
+    ))
+    work_hours = sum([ProductionDay.WORK_NORM_HOURS[wd.type] for wd in work_days])  # норма рабочего времени за период (за месяц)
+
+    init_params['n_working_days_optimal'] = len(work_days)
+
+    #################################
 
     data = {
         'IP': settings.HOST_IP,
