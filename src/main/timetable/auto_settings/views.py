@@ -553,6 +553,7 @@ def create_timetable(request, form):
     for user in users:
         # Для уволенных сотрудников
         if user.dt_fired:
+            user.is_fixed_hours = True
             workers_month_days = worker_day[user.id]
             workers_month_days.sort(key=lambda wd: wd.dt)
             workers_month_days_new = []
@@ -560,7 +561,7 @@ def create_timetable(request, form):
             for dt in dates:
                 if workers_month_days[wd_index].dt == dt and dt < user.dt_fired:
                     workers_month_days_new.append(workers_month_days[wd_index])
-                    wd_index += 1
+                    wd_index += 1 if wd_index + 1 < len(workers_month_days) else 0
                 else:
                     if workers_month_days[wd_index].dt == dt:
                         workers_month_days.pop(wd_index)
@@ -581,7 +582,7 @@ def create_timetable(request, form):
             for dt in dates:
                 if workers_month_days[wd_index].dt == dt:
                     workers_month_days_new.append(workers_month_days[wd_index])
-                    wd_index += 1
+                    wd_index += 1 if wd_index + 1 < len(workers_month_days) else 0
                 else:
                     workers_month_days_new.append(WorkerDay(
                         type=WorkerDay.Type.TYPE_HOLIDAY.value,
