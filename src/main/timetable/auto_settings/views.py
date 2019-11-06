@@ -378,7 +378,7 @@ def create_timetable(request, form):
                 tt.delete()
                 return JsonResponse.value_error(status_message)
     
-    #################################
+    ##################################################################
 
     # Функция для заполнения расписания
     def fill_wd_array(worker_days_db, array):
@@ -420,7 +420,6 @@ def create_timetable(request, form):
         'work_types__id',
     )
     fill_wd_array(worker_days_db, new_worker_days)
-
 
     prev_worker_days = []
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
@@ -494,7 +493,7 @@ def create_timetable(request, form):
         group_key=lambda x: x.worker_id
     )
 
-    # todo: tooooo slow
+    # Оптимизировал
     # Информация по кассам для каждого сотрудника
     need_work_types = WorkType.objects.filter(shop_id=shop_id).values_list('id', flat=True)
     worker_cashbox_info = group_by(
@@ -531,7 +530,7 @@ def create_timetable(request, form):
         group_key=lambda x: x.worker_id,
     )
 
-    #################################
+    ##################################################################
 
     # если стоит флаг shop.paired_weekday, смотрим по юзерам, нужны ли им в этом месяце выходные в выходные
     resting_states_list = [WorkerDay.Type.TYPE_HOLIDAY.value]
@@ -554,18 +553,20 @@ def create_timetable(request, form):
         # Для уволенных сотрудников
         if user.dt_fired:
             user.is_fixed_hours = True
-            workers_month_days = worker_day[user.id]
+            workers_month_days = worker_day.get(user.id, []) # Может случиться так что для этого работника еще никаким образом расписание не составлялось
             workers_month_days.sort(key=lambda wd: wd.dt)
             workers_month_days_new = []
             wd_index = 0
             for dt in dates:
-                if workers_month_days[wd_index].dt == dt and dt < user.dt_fired:
+                if (workers_month_days[wd_index].dt if\
+                     wd_index < len(workers_month_days) else None) and dt < user.dt_fired: #Если вернется пустой список, нужно исключать ошибку out of range
                     workers_month_days_new.append(workers_month_days[wd_index])
-                    wd_index += 1 if wd_index + 1 < len(workers_month_days) else 0
+                    wd_index += 1
                 else:
                     if workers_month_days[wd_index].dt == dt:
-                        workers_month_days.pop(wd_index)
-                    workers_month_days_new.append(WorkerDay(
+                        wd_del = workers_month_days.pop(wd_index)
+                        wd_del.delete()
+                    workers_month_days_new.append(WorkerDay.objects.create(
                         type=WorkerDay.Type.TYPE_HOLIDAY.value,
                         dt=dt,
                         worker_id=user.id,
@@ -575,23 +576,24 @@ def create_timetable(request, form):
         # Реализация через фиксированных сотрудников, чтобы не повторять функционал
         elif not user.auto_timetable:
             user.is_fixed_hours = True
-            workers_month_days = worker_day[user.id]
+            workers_month_days = worker_day.get(user.id, []) # Может случиться так что для этого работника еще никаким образом расписание не составлялось
             workers_month_days.sort(key=lambda wd: wd.dt)
             workers_month_days_new = []
             wd_index = 0
             for dt in dates:
-                if workers_month_days[wd_index].dt == dt:
+                if (workers_month_days[wd_index].dt if\
+                     wd_index < len(workers_month_days) else None) == dt: #Если вернется пустой список, нужно исключать ошибку out of range
                     workers_month_days_new.append(workers_month_days[wd_index])
-                    wd_index += 1 if wd_index + 1 < len(workers_month_days) else 0
+                    wd_index += 1
                 else:
-                    workers_month_days_new.append(WorkerDay(
+                    workers_month_days_new.append(WorkerDay.objects.create(
                         type=WorkerDay.Type.TYPE_HOLIDAY.value,
                         dt=dt,
                         worker_id=user.id,
                     ))
             worker_day[user.id] = workers_month_days_new
     
-    #################################
+    ##################################################################
 
     ########### Выборки из базы данных ###########
 
@@ -650,7 +652,7 @@ def create_timetable(request, form):
 
     init_params['n_working_days_optimal'] = len(work_days)
 
-    #################################
+    ##################################################################
 
     data = {
         'IP': settings.HOST_IP,
