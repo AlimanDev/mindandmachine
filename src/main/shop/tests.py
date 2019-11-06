@@ -1,10 +1,10 @@
-from datetime import datetime
+from datetime import datetime, time
 
 from dateutil.relativedelta import relativedelta
 
 from src.db.models import Timetable
 from src.util.test import LocalTestCase
-
+from src.db.models import Shop
 
 class TestShop(LocalTestCase):
 
@@ -178,3 +178,89 @@ class TestShop(LocalTestCase):
                  'fot_revenue': {'prev': 5.0, 'curr': 10.0, 'change': -100}}]
         }
         self.assertEqual(response.json()['data'], data)
+
+    def test_get_parameters(self):
+        self.auth()
+        response = self.api_get(f'/api/shop/get_parameters?shop_id={self.shop.id}')
+        correct_data ={
+            'code': 200, 
+            'data': {
+                'queue_length': 3.0, 
+                'idle': 0, 
+                'fot': 0, 
+                'less_norm': 0, 
+                'more_norm': 0, 
+                'tm_shop_opens': '07:00:00', 
+                'tm_shop_closes': '00:00:00', 
+                'shift_start': 6, 
+                'shift_end': 12, 
+                'restricted_start_times': '[]', 
+                'restricted_end_times': '[]', 
+                'min_change_time': 12, 
+                'absenteeism': 0, 
+                'even_shift': False, 
+                'paired_weekday': False, 
+                'exit1day': False, 
+                'exit42hours': False, 
+                'process_type': 'N'
+            }, 
+            'info': None
+        }
+        res = response.json()
+        self.assertEqual(res, correct_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(res['code'], 200)
+
+    def test_set_parameters(self):
+        self.auth()
+        data = {
+            'shop_id': self.shop.id,
+            'queue_length': 4.0, 
+            'idle': 2, 
+            'fot': 1, 
+            'less_norm': 4, 
+            'more_norm': 6, 
+            'tm_shop_opens': '04:00:00', 
+            'tm_shop_closes': '00:00:00', 
+            'shift_start': 5, 
+            'shift_end': 14, 
+            'restricted_start_times': '[]', 
+            'restricted_end_times': '[]', 
+            'min_change_time': 10, 
+            'absenteeism': 1, 
+            'even_shift_morning_evening': True, 
+            'paired_weekday': True, 
+            'exit1day': True, 
+            'exit42hours': True, 
+            'process_type': 'P'
+        }
+        response = self.api_post(
+            '/api/shop/set_parameters',
+            data
+        )
+        self.assertEqual(response.json()['code'], 200)
+        self.assertEqual(response.status_code, 200)
+        data.pop('shop_id')
+        data['tm_shop_opens'] = time(4, 0)
+        data['tm_shop_closes'] = time(0, 0)
+        shop_dict = Shop.objects.filter(id=self.shop.id).values(
+            'queue_length', 
+            'idle', 
+            'fot', 
+            'less_norm', 
+            'more_norm', 
+            'tm_shop_opens', 
+            'tm_shop_closes', 
+            'shift_start', 
+            'shift_end', 
+            'restricted_start_times', 
+            'restricted_end_times', 
+            'min_change_time', 
+            'absenteeism', 
+            'even_shift_morning_evening', 
+            'paired_weekday', 
+            'exit1day', 
+            'exit42hours', 
+            'process_type',
+        )[0]
+        self.assertEqual(shop_dict, data)
