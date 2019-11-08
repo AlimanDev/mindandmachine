@@ -562,15 +562,15 @@ def create_timetable(request, form):
                      wd_index < len(workers_month_days) else None) and dt < user.dt_fired: #Если вернется пустой список, нужно исключать ошибку out of range
                     workers_month_days_new.append(workers_month_days[wd_index])
                     wd_index += 1
+                elif dt < user.dt_fired and user.auto_timetable:
+                    continue
                 else:
-                    if workers_month_days[wd_index].dt == dt:
-                        wd_del = workers_month_days.pop(wd_index)
-                        wd_del.delete()
-                    workers_month_days_new.append(WorkerDay.objects.create(
-                        type=WorkerDay.Type.TYPE_HOLIDAY.value,
-                        dt=dt,
-                        worker_id=user.id,
-                    ))
+                    workers_month_days_new.append(WorkerDay(
+                            type=WorkerDay.Type.TYPE_HOLIDAY.value,
+                            dt=dt,
+                            worker_id=user.id,
+                        )
+                    )
             worker_day[user.id] = workers_month_days_new 
         # Если для сотрудника не составляем расписание, его все равно нужно учитывать, так как он покрывает спрос
         # Реализация через фиксированных сотрудников, чтобы не повторять функционал
@@ -586,7 +586,7 @@ def create_timetable(request, form):
                     workers_month_days_new.append(workers_month_days[wd_index])
                     wd_index += 1
                 else:
-                    workers_month_days_new.append(WorkerDay.objects.create(
+                    workers_month_days_new.append(WorkerDay(
                         type=WorkerDay.Type.TYPE_HOLIDAY.value,
                         dt=dt,
                         worker_id=user.id,
