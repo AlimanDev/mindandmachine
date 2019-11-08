@@ -12,6 +12,7 @@ from requests import Response
 
 from src.db.models import (
     AttendanceRecords,
+    Employment,
     Group,
     Timetable,
     FunctionGroup,
@@ -164,20 +165,36 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             self.USER_EMAIL,
             self.USER_PASSWORD,
             id=1,
-            shop=self.root_shop,
-            function_group=self.admin_group,
             last_name='Дурак',
             first_name='Иван',
         )
-        self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2', first_name='Иван2', last_name='Иванов')
+        self.employment1 = Employment.objects.create(
+            user=self.user1,
+            shop=self.root_shop,
+            function_group = self.admin_group,
+        )
+        self.user2 = User.objects.create_user(
+            'user2',
+            'u2@b.b',
+            '4242',
+            id=2,
+            first_name='Иван2',
+            last_name='Иванов')
+        self.employment2 = Employment.objects.create(
+            user=self.user2,
+            shop=self.shop,
+        )
         self.user3 = User.objects.create_user(
             'user3',
             'u3@b.b',
             '4242',
             id=3,
-            shop_id=self.shop.id,
             first_name='Иван3',
             last_name='Сидоров',
+        )
+        self.employment3 = Employment.objects.create(
+            user=self.user3,
+            shop=self.shop,
             auto_timetable=False
         )
 
@@ -186,10 +203,13 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             '4b@b.b',
             '4242',
             id=4,
-            shop=self.shop,
-            function_group=self.admin_group,
             last_name='Петров',
             first_name='Иван4',
+        )
+        self.employment4 = Employment.objects.create(
+            user=self.user4,
+            shop=self.shop,
+            function_group=self.admin_group,
         )
 
 
@@ -198,30 +218,41 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             'm@m.m',
             '4242',
             id=5,
-            shop=self.reg_shop1,
-            function_group=self.chief_group,
             last_name='Дурак5',
             first_name='Иван5',
         )
+        self.employment5 = Employment.objects.create(
+            user=self.user5,
+            shop=self.reg_shop1,
+            function_group=self.chief_group,
+        )
+
         self.user6 = User.objects.create_user(
             'user6',
             'b@b.b',
             '4242',
             id=6,
-            shop=self.shop,
-            function_group=self.chief_group,
             last_name='Дурак6',
             first_name='Иван6',
         )
+        self.employment6 = Employment.objects.create(
+            user=self.user6,
+            shop=self.shop,
+            function_group=self.chief_group,
+        )
+
         self.user7 = User.objects.create_user(
             'user7',
             'k@k.k',
             '4242',
             id=7,
-            shop=self.shop,
-            function_group=self.employee_group,
             last_name='Дурак7',
             first_name='Иван7',
+        )
+        self.employment7 = Employment.objects.create(
+            user=self.user7,
+            shop=self.shop,
+            function_group=self.employee_group,
         )
 
         # work_types
@@ -493,19 +524,6 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             dttm_to=worker_day.dttm_work_end,
         )
         return worker_day
-
-def create_user(user_id, shop_id, username, dt_fired=None, first_name='', last_name=''):
-    user = User.objects.create(
-        id=user_id,
-        username=username,
-        shop=shop_id,
-        dt_fired=dt_fired,
-        first_name=first_name,
-        last_name=last_name,
-    )
-    return user
-
-
 
 
 def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
