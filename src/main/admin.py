@@ -1,5 +1,6 @@
 from django.contrib import admin
 from src.db.models import (
+    Employment,
     User,
     Shop,
     WorkerDay,
@@ -58,28 +59,28 @@ class OperationTypeAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class QsUserAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'shop_title', 'parent_title', 'work_type_name', 'id')
-    search_fields = ('first_name', 'last_name', 'shop__parent__title', 'workercashboxinfo__work_type__name', 'id')
-    list_filter = ('shop', )
+    list_display = ('first_name', 'last_name', 'shop_title', 'work_type_name', 'id')
+    search_fields = ('first_name', 'last_name', 'shop_title', 'workercashboxinfo__work_type__name', 'id')
+    # list_filter = ('employment__shop', )
 
-    @staticmethod
-    def parent_title(instance: User):
-        if instance.shop and instance.shop.parent:
-            return instance.shop.parent_title()
-        return 'без магазина'
+    # list_display = ('first_name', 'last_name', 'employment__shop__title', 'parent_title', 'work_type_name', 'id')
+    # search_fields = ('first_name', 'last_name', 'employment__shop__parent__title', 'workercashboxinfo__work_type__name', 'id')
+
+    # @staticmethod
+    # def parent_title(instance: User):
+    #     if instance.shop and instance.shop.parent:
+    #         return instance.shop.parent_title()
+    #     return 'без магазина'
 
     @staticmethod
     def shop_title(instance: User):
-        if instance.shop and instance.shop.parent:
-            return instance.shop.title
-        return 'без магазина'
+        res = ', '.join(i.shop.title for i in instance.employment_set.all().select_related('shop'))
+        return res
 
     @staticmethod
     def work_type_name(instance: User):
-        cashboxinfo_set = instance.workercashboxinfo_set.all()
+        cashboxinfo_set = instance.workercashboxinfo_set.all().select_related('work_type')
         return ' '.join(['"{}"'.format(cbi.work_type.name) for cbi in cashboxinfo_set])
-
-
 
 
 @admin.register(Shop)
@@ -131,9 +132,9 @@ class SlotAdmin(admin.ModelAdmin):
 class UserWeekDaySlotAdmin(admin.ModelAdmin):
     list_display = ('worker_first_name', 'worker_last_name', 'shop_title', 'parent_title', 'slot_name',
                     'weekday', 'id')
-    search_fields = ('worker__first_name','worker__last_name', 'worker__shop__title', 'worker__shop__parent__title',
+    search_fields = ('worker__first_name','worker__last_name', 'slot__shop__title', 'slot__shop__parent__title',
                      'slot__name', 'id')
-    list_filter = ('worker__shop', )
+    list_filter = ('slot__shop', )
 
     @staticmethod
     def worker_first_name(instance: UserWeekdaySlot):
@@ -190,7 +191,6 @@ class PeriodClientsAdmin(PeriodDemandAdmin):
     pass
 
 
-
 @admin.register(PeriodQueues)
 class PeriodQueuesAdmin(PeriodDemandAdmin):
     pass
@@ -235,7 +235,7 @@ class WorkerCashboxInfoAdmin(admin.ModelAdmin):
 class WorkerConstraintAdmin(admin.ModelAdmin):
     list_display = ('worker_last_name', 'weekday', 'tm', 'id')
     search_fields = ('worker__last_name',)
-    list_filter = ('worker__shop',)
+    list_filter = ('shop',)
 
     @staticmethod
     def worker_last_name(instance: WorkerConstraint):
@@ -246,10 +246,10 @@ class WorkerConstraintAdmin(admin.ModelAdmin):
 class WorkerDayAdmin(admin.ModelAdmin):
     list_display = ('worker_last_name', 'shop_title', 'parent_title', 'dt', 'type', 'id', 'dttm_work_start',
                     'dttm_work_end')
-    search_fields = ('worker__last_name', 'worker__shop__title', 'worker__shop__parent__title', 'id', 'dt')
-    list_filter = ('worker__shop', 'type')
+    search_fields = ('worker__last_name', 'shop_title', 'parent_title', 'id', 'dt')
+    list_filter = ('shop', 'type')
     raw_id_fields = ('parent_worker_day',)
-    list_select_related = ('worker', 'worker__shop')
+    list_select_related = ('worker', 'shop')
 
     @staticmethod
     def worker_last_name(instance: WorkerConstraint):
@@ -257,11 +257,12 @@ class WorkerDayAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: WorkerDay):
-        return instance.worker.shop.title
+        return instance.shop.title if instance.shop else ''
+
 
     @staticmethod
-    def parent_title(instance: WorkerDay):
-        return instance.worker.shop.parent_title()
+    def parent_title(instance: Timetable):
+        return instance.shop.parent_title() if instance.shop else ''
 
 
 @admin.register(WorkerDayCashboxDetails)
@@ -269,11 +270,11 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
     # todo: upd: сервак просто падает если туда зайти
     list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_work_type', 'id', 'dttm_from', 'dttm_to')
-    search_fields = ('worker_day__worker__last_name', 'worker_day__worker__shop__title', 'id')
-    list_filter = ('worker_day__worker__shop', 'is_vacancy')
+    search_fields = ('worker_day__worker__last_name', 'worker_day__shop__title', 'id')
+    list_filter = ('worker_day__shop', 'is_vacancy')
     raw_id_fields = ('worker_day',)
     list_select_related = (
-        'worker_day__worker', 'worker_day__worker__shop', 'work_type')
+        'worker_day__worker', 'worker_day__shop', 'work_type')
 
     @staticmethod
     def worker_last_name(instance: WorkerDayCashboxDetails):
@@ -295,20 +296,20 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
 @admin.register(Notifications)
 class NotificationsAdmin(admin.ModelAdmin):
     list_display = ('worker_last_name', 'shop_title', 'parent_title', 'dttm_added', 'id')
-    search_fields = ('to_worker__last_name', 'to_worker__shop__title', 'to_worker__shop__parent__title', 'id')
-    list_filter = ('to_worker__shop',)
+    search_fields = ('worker_last_name', 'shop_title', 'parent_title', 'id')
+    list_filter = ('shop',)
 
     @staticmethod
-    def worker_last_name(instance: Notifications):
+    def worker_last_name(instance: Timetable):
         return instance.to_worker.last_name
 
     @staticmethod
-    def parent_title(instance: Notifications):
-        return instance.to_worker.shop.parent_title() if instance.to_worker.shop else ''
+    def shop_title(instance: Timetable):
+        return instance.shop.title
 
     @staticmethod
-    def shop_title(instance: Notifications):
-        return instance.to_worker.shop.title if instance.to_worker.shop else ''
+    def parent_title(instance: Timetable):
+        return instance.shop.parent_title()
 
 
 @admin.register(Timetable)
@@ -402,7 +403,6 @@ class AttendanceRecordsAdmin(admin.ModelAdmin):
     list_filter = ('type', 'verified', 'type')
 
 
-
 @admin.register(ExchangeSettings)
 class ExchangeSettingsAdmin(admin.ModelAdmin):
     pass
@@ -419,3 +419,9 @@ class OperationTemplateAdmin(admin.ModelAdmin):
     list_filter = ('operation_type', )
     search_fields = ('name',)
 
+
+@admin.register(Employment)
+class EmploymentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'shop', 'user')
+    list_filter = ('shop', 'user')
+    search_fields = ('user__first_name', 'user__last_name', 'shop__title', 'shop__parent__title')
