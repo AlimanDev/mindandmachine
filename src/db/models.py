@@ -143,9 +143,11 @@ class WorkerPosition(models.Model):
     def __str__(self):
         return '{}, {}'.format(self.title, self.id)
 
-
 class WorkerManager(UserManager):
-    def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
+    pass
+
+class EmploymentManager(models.Manager):
+    def get_active(self, dt_from, dt_to, *args, **kwargs):
         """
         hired earlier then dt_from, hired later then dt_to
         :param dt_from:
@@ -157,10 +159,7 @@ class WorkerManager(UserManager):
 
         return self.filter(
             models.Q(dt_hired__lte=dt_to) | models.Q(dt_hired__isnull=True),
-            attachment_group=User.GROUP_STAFF
-        ).filter(
             models.Q(dt_fired__gte=dt_from) | models.Q(dt_fired__isnull=True),
-            attachment_group=User.GROUP_STAFF
         ).filter(*args, **kwargs)
 
 
@@ -189,11 +188,11 @@ class User(DjangoAbstractUser):
         verbose_name_plural = 'Пользователи'
 
     def __str__(self):
-        if self.shop and self.shop.parent:
-            ss_title = self.shop.parent.title
-        else:
-            ss_title = None
-        return '{}, {}, {}, {}'.format(self.first_name, self.last_name, ss_title, self.id)
+        # if self.shop and self.shop.parent:
+        #     ss_title = self.shop.parent.title
+        # else:
+        #     ss_title = None
+        return '{}, {}, {}'.format(self.first_name, self.last_name, self.id)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -210,24 +209,16 @@ class User(DjangoAbstractUser):
     )
 
     id = models.BigAutoField(primary_key=True)
-    position = models.ForeignKey(WorkerPosition, null=True, blank=True, on_delete=models.PROTECT)
-    shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)  # todo: make immutable
-    is_fixed_hours = models.BooleanField(default=False)
-    function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
-    attachment_group = models.CharField(
-        max_length=1,
-        default=GROUP_STAFF,
-        choices=ATTACHMENT_TYPE
-    )
-
     middle_name = models.CharField(max_length=64, blank=True, null=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
-    dt_hired = models.DateField(default=datetime.date(2019, 1, 1))
-    dt_fired = models.DateField(null=True, blank=True)
-    salary = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    attachment_group = models.CharField(
+        max_length=1,
+        default=GROUP_STAFF,
+        choices=ATTACHMENT_TYPE
+    )
 
     birthday = models.DateField(null=True, blank=True)
     SEX_FEMALE = 'F'
@@ -242,7 +233,45 @@ class User(DjangoAbstractUser):
         choices=SEX_CHOICES,
     )
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
-    extra_info = models.CharField(max_length=512, default='', blank=True)
+    phone_number = models.CharField(max_length=32, null=True, blank=True)
+    access_token = models.CharField(max_length=64, blank=True, null=True)
+
+
+class Employment(models.Model):
+
+    class Meta:
+        verbose_name = 'Трудоустройство'
+        verbose_name_plural = 'Трудоустройства'
+
+    def __str__(self):
+        return '{}, {}, {}'.format(self.id, self.shop, self.user)
+
+    GROUP_STAFF = 'S'
+    GROUP_OUTSOURCE = 'O'
+
+    ATTACHMENT_TYPE = (
+        (GROUP_STAFF, 'staff'),
+        (GROUP_OUTSOURCE, 'outsource'),
+    )
+
+    id = models.BigAutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_query_name="employments")
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_query_name="employments")
+    function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
+    position = models.ForeignKey(WorkerPosition, null=True, blank=True, on_delete=models.PROTECT)
+    is_fixed_hours = models.BooleanField(default=False)
+    attachment_group = models.CharField(
+        max_length=1,
+        default=GROUP_STAFF,
+        choices=ATTACHMENT_TYPE
+    )
+
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    dttm_deleted = models.DateTimeField(null=True, blank=True)
+
+    dt_hired = models.DateField(default=datetime.date(2019, 1, 1))
+    dt_fired = models.DateField(null=True, blank=True)
+    salary = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     # new worker restrictions
     week_availability = models.SmallIntegerField(default=7)
@@ -254,13 +283,11 @@ class User(DjangoAbstractUser):
     auto_timetable = models.BooleanField(default=True)
 
     tabel_code = models.CharField(max_length=15, null=True, blank=True)
-    phone_number = models.CharField(max_length=32, null=True, blank=True)
     is_ready_for_overworkings = models.BooleanField(default=False)
-    access_token = models.CharField(max_length=64, blank=True, null=True)
 
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
 
-    objects = WorkerManager()
+    objects = EmploymentManager()
 
 
 class FunctionGroup(models.Model):
@@ -909,6 +936,7 @@ class WorkerConstraint(models.Model):
         return '{} {}, {}, {}, {}'.format(self.worker.last_name, self.worker.id, self.weekday, self.tm, self.id)
 
     id = models.BigAutoField(primary_key=True)
+    shop = models.ForeignKey(Shop, blank=True, null=True, on_delete=models.PROTECT, related_name='worker_constraints')
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
@@ -994,8 +1022,8 @@ class WorkerDay(models.Model):
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}'.format(
             self.worker.last_name,
-            self.worker.shop.title,
-            self.worker.shop.parent.title,
+            self.shop.title if self.shop else '',
+            self.shop.parent.title if self.shop else '',
             self.dt,
             self.Type.get_name_by_value(self.type),
             self.id
@@ -1005,6 +1033,8 @@ class WorkerDay(models.Model):
         return self.__str__()
 
     id = models.BigAutoField(primary_key=True)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
+    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dt = models.DateField()  # todo: make immutable
@@ -1018,17 +1048,15 @@ class WorkerDay(models.Model):
 
     worker_day_approve = models.ForeignKey(WorkerDayApprove, on_delete=models.PROTECT, blank=True, null=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
-    parent_worker_day = models.OneToOneField('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child')
-    # fixme: better change parent to child as usual check if this is the last version of WorkerDay
 
     comment = models.TextField(null=True, blank=True)
+    parent_worker_day = models.OneToOneField('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child')
 
     @classmethod
     def is_type_with_tm_range(cls, t):
         return t in (cls.Type.TYPE_WORKDAY.value, cls.Type.TYPE_BUSINESS_TRIP.value, cls.Type.TYPE_QUALIFICATION.value)
 
     objects = WorkerDayManager()
-
 
 class WorkerDayCashboxDetailsManager(models.Manager):
     def qos_current_version(self):
@@ -1290,13 +1318,14 @@ class Notifications(models.Model):
     def __str__(self):
         return '{}, {}, {}, id: {}'.format(
             self.to_worker.last_name,
-            self.to_worker.shop.title if self.to_worker.shop else 'no shop',
+            self.shop.title if self.shop else 'no shop',
             self.dttm_added,
             # self.text[:60],
             self.id
         )
 
     id = models.BigAutoField(primary_key=True)
+    shop = models.ForeignKey(Shop, null=True, on_delete=models.PROTECT, related_name='notifications')
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     to_worker = models.ForeignKey(User, on_delete=models.PROTECT)
