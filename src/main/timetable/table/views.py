@@ -6,12 +6,13 @@ from dateutil.relativedelta import relativedelta
 from django.http import HttpResponse
 from functools import reduce
 from src.db.models import (
+    Employment,
+    OperationType,
+    PeriodClients,
     User,
     WorkerDay,
     WorkerDayCashboxDetails,
-    PeriodClients,
     WorkType,
-    OperationType,
 )
 from src.util.forms import FormUtil
 from src.util.models_converter import (
@@ -346,32 +347,31 @@ def get_month_stat(request, form):
     dt_start = datetime.date(form['dt'].year, form['dt'].month, 1)
     dt_start_year = datetime.date(dt_start.year, 1, 1)
     dt_end = dt_start + relativedelta(months=+1)
-    usrs = User.objects.qos_filter_active(form['dt'], dt_end)
+    employments = Employment.objects.get_active(
+        form['dt'], dt_end
+    ).select_related('user').order_by('id')
+
     # todo: add code for permissions check (check stat of workers from another shops)
     worker_ids = form['worker_ids']
-
-    if (worker_ids is None) or (len(worker_ids) == 0):
-        shop_id = FormUtil.get_shop_id(request, form)
-
-        usrs = usrs.filter(shop_id=shop_id)
+    if worker_ids and len(worker_ids):
+        employments=employments.filter(user__id__in=worker_ids)
     else:
-        usrs = usrs.filter(id__in=worker_ids)
-    usrs = usrs.order_by('id')
+        shop = request.shop
+        employments = employments.filter(shop_id=shop.id)
 
     # count info of current month
-    month_info = count_work_month_stats(dt_start, dt_end, usrs)
+    month_info = count_work_month_stats(dt_start, dt_end, employments)
 
-    user_info_dict = count_difference_of_normal_days(dt_end=dt_start, usrs=usrs)
+    user_info_dict = count_difference_of_normal_days(dt_end=dt_start, usrs=employments)
 
-    for u_it in range(len(usrs)):
-        month_info[usrs[u_it].id].update({
-            'diff_prev_paid_days': user_info_dict[usrs[u_it].id]['diff_prev_paid_days'],
-            'diff_prev_paid_hours': user_info_dict[usrs[u_it].id]['diff_prev_paid_hours'],
-            'diff_total_paid_days': user_info_dict[usrs[u_it].id]['diff_prev_paid_days'] + month_info[usrs[u_it].id]['diff_norm_days'],
-            'diff_total_paid_hours': user_info_dict[usrs[u_it].id]['diff_prev_paid_hours'] + month_info[usrs[u_it].id]['diff_norm_hours'],
+    for u_it in range(len(employments)):
+        month_info[employments[u_it].id].update({
+            'diff_prev_paid_days': user_info_dict[employments[u_it].id]['diff_prev_paid_days'],
+            'diff_prev_paid_hours': user_info_dict[employments[u_it].id]['diff_prev_paid_hours'],
+            'diff_total_paid_days': user_info_dict[employments[u_it].id]['diff_prev_paid_days'] + month_info[employments[u_it].id]['diff_norm_days'],
+            'diff_total_paid_hours': user_info_dict[employments[u_it].id]['diff_prev_paid_hours'] + month_info[employments[u_it].id]['diff_norm_hours'],
         })
     return JsonResponse.success({'users_info': month_info})
-
 
 
 @api_method(
