@@ -3,12 +3,12 @@ from src.util import forms as util_forms
 
 
 class GetCashboxesInfo(forms.Form):
-    shop_id = forms.IntegerField(required=False)
+    shop_id = forms.IntegerField()
     checkpoint = forms.IntegerField(required=False)
 
 
 class GetCashiersInfo(forms.Form):
-    shop_id = forms.IntegerField(required=False)
+    shop_id = forms.IntegerField()
     dttm = util_forms.DatetimeField()
 
 

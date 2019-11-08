@@ -60,7 +60,7 @@ def get_cashboxes_info(request, form):
     response = {}
     dttm_now = now() + timedelta(hours=3)
 
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     checkpoint = FormUtil.get_checkpoint(form)
 
     list_of_cashbox = Cashbox.objects.qos_filter_active(
@@ -174,7 +174,7 @@ def get_cashiers_info(request, form):
 
     """
 
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     dttm = form['dttm']
     response = {}
 
@@ -184,10 +184,10 @@ def get_cashiers_info(request, form):
     time_without_rest = {}
 
     status = WorkerDayCashboxDetails.objects.qos_current_version().filter(
-        Q(worker_day__worker__dt_fired__gt=dttm.date()) | Q(worker_day__worker__dt_fired__isnull=True),
+        Q(worker_day__employment__dt_fired__gt=dttm.date()) | Q(worker_day__employment__dt_fired__isnull=True),
         worker_day__dttm_work_start__lte=dttm + timedelta(minutes=30),
         worker_day__dt=(dttm - timedelta(hours=2)).date(),
-        worker_day__worker__shop__id=shop_id,
+        worker_day__employment__shop__id=shop_id,
     ).order_by('id')
 
     for item in status:
