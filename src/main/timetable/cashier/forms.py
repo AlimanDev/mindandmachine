@@ -130,6 +130,7 @@ class DublicateCashierTimetableForm(forms.Form):
 
 class GetCashierInfoForm(forms.Form):
     worker_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     info = util_forms.MultipleChoiceField(['general_info', 'work_type_info', 'constraints_info', 'work_hours'])
 
 
@@ -285,6 +286,7 @@ class DeleteCashierForm(forms.Form):
 
 class PasswordChangeForm(forms.Form):
     user_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     old_password = forms.CharField(max_length=128, required=False)
     new_password = forms.CharField(max_length=128)
 

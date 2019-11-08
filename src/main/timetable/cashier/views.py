@@ -7,12 +7,12 @@ from dateutil.relativedelta import relativedelta
 from django.contrib.auth import update_session_auth_hash
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
-from django.db.models import Q, F
+from django.db.models import Q, F, Exists
 from django.utils import timezone
 
 from src.main.urv.utils import wd_stat_count_total
 from src.db.models import (
-    AttendanceRecords,
+    Employment,
     User,
     Shop,
     WorkerDay,
@@ -31,6 +31,7 @@ from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_va
 from src.util.collection import group_by, count, range_u
 from src.util.forms import FormUtil
 from src.util.models_converter import (
+    EmploymentConverter,
     UserConverter,
     WorkerDayConverter,
     WorkerConstraintConverter,
@@ -110,12 +111,12 @@ def get_cashiers_list(request, form):
         q &= Q(dt_hired__isnull=True) | Q(dt_hired__lte=form['dt_to'])
         q &= Q(dt_fired__isnull=True) | Q(dt_fired__gt=form['dt_from'])
 
-    users_qs = User.objects.filter(
+    employments = Employment.objects.filter(
         shop_id=shop_id,
-        attachment_group__in=attachment_groups
-    ).filter(q).select_related('position').order_by('id')
+        # attachment_group__in=attachment_groups
+    ).filter(q).select_related('user').order_by('id')
 
-    return JsonResponse.success([UserConverter.convert(x) for x in users_qs])
+    return JsonResponse.success([EmploymentConverter.convert(x) for x in employments])
 
 
 @api_method('GET', GetCashiersListForm)
@@ -162,8 +163,8 @@ def get_not_working_cashiers_list(request, form):
             worker__shop_id=shop_id,
             worker__attachment_group=User.GROUP_STAFF
     ).filter(
-        (Q(worker__dt_hired__isnull=True) | Q(worker__dt_hired__lte=form['dt_to'])) &
-        (Q(worker__dt_fired__isnull=True) | Q(worker__dt_fired__gt=form['dt_from']))
+        (Q(employment__dt_hired__isnull=True) | Q(employment__dt_hired__lte=form['dt_to'])) &
+        (Q(employment__dt_fired__isnull=True) | Q(employment__dt_fired__gt=form['dt_from']))
     ).exclude(
         type=WorkerDay.Type.TYPE_WORKDAY.value
     ).order_by(
@@ -193,27 +194,32 @@ def select_cashiers(request, form):
     shop_id = form['shop_id']
     checkpoint = FormUtil.get_checkpoint(form)
 
-    users = User.objects.qos_filter_active(
+    employments = Employment.objects.get_active(
         dt_from=date.today(),
         dt_to=date.today() + relativedelta(days=31),
         shop_id=shop_id,
         attachment_group=User.GROUP_STAFF,
     )
 
-    cashboxes_type_ids = set(form.get('work_types', []))
-    if len(cashboxes_type_ids) > 0:
-        users_hits = set()
-        for x in WorkerCashboxInfo.objects.select_related('work_type').filter(work_type__shop_id=shop_id, is_active=True):
-            if x.work_type_id in cashboxes_type_ids:
-                users_hits.add(x.worker_id)
-
-        users = [x for x in users if x.id in users_hits]
-
     worker_ids = set(form.get('worker_ids', []))
     if len(worker_ids) > 0:
-        users = [x for x in users if x.id in worker_ids]
+        employments = employments.filter(
+            user_id__in=worker_ids
+        )
 
-    worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(worker__shop_id=shop_id)
+    work_types = set(form.get('work_types', []))
+    if len(work_types) > 0:
+        user_ids = WorkerCashboxInfo.objects.select_related('work_type').filter(
+            work_type__shop_id=shop_id,
+            is_active=True,
+            work_type_id__in=work_types
+        ).values_list('worker_id', flat=True)
+
+        employments = employments.filter(user_id__in=user_ids)
+
+
+
+    worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(shop_id=shop_id)
 
     workday_type = form.get('workday_type')
     if workday_type is not None:
@@ -223,7 +229,7 @@ def select_cashiers(request, form):
     if len(workdays) > 0:
         worker_days = worker_days.filter(dt__in=workdays)
 
-    users = [x for x in users if x.id in set(y.worker_id for y in worker_days)]
+    employments = employments.annotate(wd=Exists(worker_days)).filter(wd=True)
 
     work_workdays = form.get('work_workdays', [])
     if len(work_workdays) > 0:
@@ -242,7 +248,7 @@ def select_cashiers(request, form):
                 return False
 
         worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
-            worker__shop_id=shop_id,
+            shop_id=shop_id,
             type=WorkerDay.Type.TYPE_WORKDAY.value,
             dt__in=work_workdays
         )
@@ -252,9 +258,9 @@ def select_cashiers(request, form):
         if tm_from is not None and tm_to is not None:
             worker_days = [x for x in worker_days if __is_match_tm(x, tm_from, tm_to)]
 
-        users = [x for x in users if x.id in set(y.worker_id for y in worker_days)]
+        employments = [x for x in employments if x.user_id in set(y.worker_id for y in worker_days)]
 
-    return JsonResponse.success([UserConverter.convert(x) for x in users])
+    return JsonResponse.success([EmploymentConverter.convert(x) for x in employments])
 
 
 @api_method('GET', GetCashierTimetableForm)
@@ -310,17 +316,22 @@ def get_cashier_timetable(request, form):
     response = {}
     # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_ids']:
-        worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').prefetch_related('work_types').filter(
-            Q(worker__dt_fired__gt=from_dt) &
-            Q(dt__lt=F('worker__dt_fired')) |
-            Q(worker__dt_fired__isnull=True),
+        try:
+            employment = Employment.objects.get(user_id=worker_id,shop_id=form['shop_id'])
+        except ObjectDoesNotExist:
+            continue
 
-            Q(worker__dt_hired__lte=to_dt) &
-            Q(dt__gte=F('worker__dt_hired')) |
-            Q(worker__dt_hired__isnull=True),
+        worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('employment').prefetch_related('work_types').filter(
+            Q(employment__dt_fired__gt=from_dt) &
+            Q(dt__lt=F('employment__dt_fired')) |
+            Q(employment__dt_fired__isnull=True),
 
-            worker_id=worker_id,
-            worker__shop_id=form['shop_id'],
+            Q(employment__dt_hired__lte=to_dt) &
+            Q(dt__gte=F('employment__dt_hired')) |
+            Q(employment__dt_hired__isnull=True),
+
+            employment__user_id=worker_id,
+            employment__shop_id=form['shop_id'],
             dt__gte=from_dt,
             dt__lte=to_dt,
         ).order_by(
@@ -335,7 +346,7 @@ def get_cashier_timetable(request, form):
             )
         ]
 
-        wd_logs = WorkerDay.objects.select_related('worker').filter(
+        wd_logs = WorkerDay.objects.select_related('employment').filter(
             Q(created_by__isnull=False),
             # Q(parent_worker_day__isnull=False) | Q(created_by__isnull=False),
             worker_id=worker_id,
@@ -380,12 +391,11 @@ def get_cashier_timetable(request, form):
                 #                     worker_day_change_requests.get(obj.id, [])[:10]]
             })
 
-        user = User.objects.select_related('position').get(id=worker_id)
 
         response[worker_id] = {
             'indicators': indicators_response,
             'days': days_response,
-            'user': UserConverter.convert(user)
+            'user': EmploymentConverter.convert(employment)
         }
     return JsonResponse.success(response)
 
@@ -393,7 +403,6 @@ def get_cashier_timetable(request, form):
 @api_method(
     'GET',
     GetCashierInfoForm,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id']).shop
 )
 def get_cashier_info(request, form):
     """
@@ -452,8 +461,12 @@ def get_cashier_info(request, form):
     response = {}
 
     try:
+        employment = Employment.objects.get(
+            user_id=form['worker_id'],
+            shop_id=form['shop_id'],
+        )
         worker = User.objects.get(id=form['worker_id'])
-    except User.DoesNotExist:
+    except Employment.DoesNotExist:
         return JsonResponse.value_error('Invalid worker_id')
 
     if 'general_info' in form['info']:
@@ -461,24 +474,24 @@ def get_cashier_info(request, form):
 
     if 'work_type_info' in form['info']:
         worker_cashbox_info = WorkerCashboxInfo.objects.filter(worker_id=worker.id, is_active=True)
-        work_types = WorkType.objects.filter(shop_id=worker.shop_id)
+        work_types = WorkType.objects.filter(shop_id=form['shop_id'])
         response['work_type_info'] = {
             'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info],
             'work_type': {x.id: WorkTypeConverter.convert(x) for x in work_types}, # todo: delete this -- seems not needed
-            'min_time_between_shifts': worker.min_time_btw_shifts,
-            'shift_length_min': worker.shift_hours_length_min,
-            'shift_length_max': worker.shift_hours_length_max,
-            'norm_work_hours': worker.norm_work_hours,
-            'week_availability': worker.week_availability,
-            'dt_new_week_availability_from': BaseConverter.convert_date(worker.dt_new_week_availability_from),
+            'min_time_between_shifts': employment.min_time_btw_shifts,
+            'shift_length_min': employment.shift_hours_length_min,
+            'shift_length_max': employment.shift_hours_length_max,
+            'norm_work_hours': employment.norm_work_hours,
+            'week_availability': employment.week_availability,
+            'dt_new_week_availability_from': BaseConverter.convert_date(employment.dt_new_week_availability_from),
         }
 
     if 'constraints_info' in form['info']:
         constraints = WorkerConstraint.objects.filter(worker_id=worker.id)
         response['constraints_info'] = [WorkerConstraintConverter.convert(x) for x in constraints]
         response['shop_times'] = {
-            'tm_start': BaseConverter.convert_time(worker.shop.tm_shop_opens),
-            'tm_end': BaseConverter.convert_time(worker.shop.tm_shop_closes)
+            'tm_start': BaseConverter.convert_time(request.shop.tm_shop_opens),
+            'tm_end': BaseConverter.convert_time(request.shop.tm_shop_closes)
         }
 
     if 'work_hours' in form['info']:
@@ -834,16 +847,16 @@ def get_worker_day_logs(request, form):
         except WorkerDay.DoesNotExist:
             return JsonResponse.does_not_exists_error('Ошибка. Такого рабочего дня в расписании нет.')
 
-    active_users = User.objects.qos_filter_active(
+    user_ids = Employment.objects.get_active(
         dt_from=form['from_dt'],
         dt_to=form['to_dt'],
         shop_id=shop_id,
-        attachment_group=User.GROUP_STAFF
-    )
+        # attachment_group=Employment.GROUP_STAFF
+    ).values_list('user_id', flat=True)
 
     child_worker_days = WorkerDay.objects.select_related('worker', 'parent_worker_day', 'created_by').filter(
         Q(parent_worker_day__isnull=False) | Q(created_by__isnull=False),
-        worker__in=active_users,
+        worker_id__in=user_ids,
         dt__gte=form['from_dt'],
         dt__lte=form['to_dt'],
     ).order_by('-dttm_added')
@@ -862,7 +875,7 @@ def get_worker_day_logs(request, form):
 @api_method(
     'POST',
     DeleteWorkerDayChangeLogsForm,
-    lambda_func=lambda x: WorkerDay.objects.get(id=x['worker_day_id']).worker.shop
+    lambda_func=lambda x: WorkerDay.objects.get(id=x['worker_day_id']).shop
 )
 def delete_worker_day(request, form):
     """
@@ -1074,20 +1087,26 @@ def create_cashier(request, form):
     """
     username = str(time_in_seconds.time() * 1000000)[:-2]
     try:
-        user = User.objects.create_user(username=username, password=form['password'])
-        user.first_name = form['first_name']
-        user.middle_name = form['middle_name']
-        user.last_name = form['last_name']
-        user.shop_id = form['shop_id']
-        user.dt_hired = form['dt_hired']
+        user = User.objects.create_user(
+            username=username,
+            password=form['password'],
+            first_name = form['first_name'],
+            middle_name = form['middle_name'],
+            last_name = form['last_name'],
+        )
         user.username = 'u' + str(user.id)
         user.save()
+        employment = Employment.objects.create(
+            user_id = user.id,
+            shop_id = form['shop_id'],
+            dt_hired = form['dt_hired'],
+        )
     except:
         return JsonResponse.already_exists_error()
 
     send_notification('C', user, sender=request.user)
 
-    return JsonResponse.success(UserConverter.convert(user))
+    return JsonResponse.success(EmploymentConverter.convert(employment))
 
 
 @api_method('POST', DublicateCashierTimetableForm)
@@ -1412,7 +1431,7 @@ def request_worker_day(request, form):
 @api_method(
     'POST',
     HandleWorkerDayRequestForm,
-    lambda_func=lambda x: WorkerDayChangeRequest.objects.get(id=x['request_id']).worker.shop
+    lambda_func=lambda x: WorkerDayChangeRequest.objects.get(id=x['request_id']).shop
 )
 def handle_worker_day_request(request, form):
     """

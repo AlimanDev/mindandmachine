@@ -5,23 +5,28 @@ from datetime import date
 from django.conf import settings
 from django.utils import timezone
 
-from src.db.models import User, WorkerDay, WorkerDayChangeRequest
+from src.db.models import (
+    Employment,
+    User,
+    WorkerDay,
+    WorkerDayChangeRequest
+)
 from src.util.models_converter import BaseConverter, WorkerDayConverter
 from src.util.test import LocalTestCase
 
 
-def create_stuff(shop_id: int) -> User:
-    return User.objects.create_user(
-        'staff1',
-        'staff1@test.ru',
-        '4242',
-        shop_id=shop_id,
-        attachment_group=User.GROUP_STAFF,
-        last_name='Иванов',
-        first_name='Иван',
-        dt_hired=timezone.now() - datetime.timedelta(days=5),
-        dt_fired=timezone.now() + datetime.timedelta(days=3),
-    )
+# def create_stuff(shop_id: int) -> User:
+#     return User.objects.create_user(
+#         'staff1',
+#         'staff1@test.ru',
+#         '4242',
+#         shop_id=shop_id,
+#         attachment_group=User.GROUP_STAFF,
+#         last_name='Иванов',
+#         first_name='Иван',
+#         dt_hired=timezone.now() - datetime.timedelta(days=5),
+#         dt_fired=timezone.now() + datetime.timedelta(days=3),
+#     )
 
 
 class TestCashier(LocalTestCase):
@@ -136,7 +141,7 @@ class TestGetCashierList(LocalTestCase):
 
     def setUp(self, worker_day=False):
         super().setUp(worker_day)
-        self.staff1 = create_stuff(self.root_shop.id)
+        self.staff1 = self.user1
 
     def test_dt_from(self):
         # staff1 included - fired after dt_from filter
@@ -232,7 +237,7 @@ class TestGetNotWorkingCashierList(LocalTestCase):
 
     def setUp(self, worker_day=False):
         super().setUp(worker_day)
-        self.staff1 = create_stuff(self.shop.id)
+        self.staff1 = self.user2
         self.wd: WorkerDay = WorkerDay.objects.create(
             type=WorkerDay.Type.TYPE_VACATION.value,
             worker=self.staff1,
@@ -338,6 +343,7 @@ class TestGetCashierInfo(LocalTestCase):
         with self.auth_user():
             response = self.api_get(self.url, {
                 "worker_id": self.user2.pk,
+                "shop_id": self.shop.id,
                 "info": "general_info"
             })
         self.assertResponseCodeEqual(response, 200)
@@ -347,6 +353,7 @@ class TestGetCashierInfo(LocalTestCase):
         with self.auth_user():
             response = self.api_get(self.url, {
                 "worker_id": self.user2.pk,
+                "shop_id": self.shop.id,
                 "info": "work_type_info"
             })
         self.assertResponseCodeEqual(response, 200)
@@ -356,6 +363,7 @@ class TestGetCashierInfo(LocalTestCase):
         with self.auth_user():
             response = self.api_get(self.url, {
                 "worker_id": self.user2.pk,
+                "shop_id": self.shop.id,
                 "info": "constraints_info"
             })
         self.assertResponseCodeEqual(response, 200)
@@ -365,6 +373,7 @@ class TestGetCashierInfo(LocalTestCase):
         with self.auth_user():
             response = self.api_get(self.url, {
                 "worker_id": self.user2.pk,
+                "shop_id": self.shop.id,
                 "info": "work_hours"
             })
         self.assertResponseCodeEqual(response, 200)
@@ -432,7 +441,7 @@ class TestDeleteWorkerDay(LocalTestCase):
     def setUp(self, worker_day=False):
         super().setUp(worker_day)
         self.now = timezone.now()
-        self.staff = create_stuff(self.shop.pk)
+        self.staff = self.user2
         self.wd_root = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.Type.TYPE_WORKDAY.value,
                                                 dt=self.now.date())
         self.wd_child = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.Type.TYPE_VACATION.value,
@@ -569,49 +578,54 @@ class TestCreateCashier(LocalTestCase):
         self.assertIsNotNone(uid)
 
         user = User.objects.get(pk=uid)
+        employment = Employment.objects.get(
+            user=user,
+            shop=self.shop
+        )
         self.assertEqual(user.first_name, "James")
         self.assertEqual(user.last_name, "Bond")
         self.assertEqual(user.middle_name, "007")
         self.assertEqual(user.username, f"u{uid}")
-        self.assertEqual(user.dt_hired, now.date())
-        self.assertIsNone(user.dt_fired)
-        self.assertEqual(user.shop_id, self.shop.pk)
         self.assertTrue(user.check_password("mi7"))
+
+        self.assertEqual(employment.dt_hired, now.date())
+        self.assertIsNone(employment.dt_fired)
+        self.assertEqual(employment.shop_id, self.shop.pk)
 
 #
 # class TestDublicateCashierTable(LocalTestCase):
 #     url = '/api/timetable/cashier/dublicate_cashier_table'
 
 
-class TestDeleteCashier(LocalTestCase):
-    url = '/api/timetable/cashier/delete_cashier'
-
-    def setUp(self, worker_day=False):
-        super().setUp(worker_day)
-        self.now = timezone.now()
-        self.user = create_stuff(self.shop.pk)
-        self.user.dt_fired = None
-        self.user.save()
-
-    def test_success(self):
-        self.assertIsNone(self.user.dt_fired)
-        with self.auth_user():
-            response = self.api_post(self.url, {
-                "user_id": self.user.pk,
-                "dt_fired": BaseConverter.convert_date(self.now)
-            })
-        self.assertResponseCodeEqual(response, 200)
-        self.user = self.refresh_model(self.user)
-        self.assertEqual(self.user.dt_fired, self.now.date())
-
-    def test_not_found(self):
-        with self.auth_user():
-            response = self.api_post(self.url, {
-                "user_id": -1,
-                "dt_fired": BaseConverter.convert_date(self.now)
-            })
-        self.assertResponseCodeEqual(response, 400)
-        self.assertErrorType(response, "DoesNotExist")
+# class TestDeleteCashier(LocalTestCase):
+#     url = '/api/timetable/cashier/delete_cashier'
+#
+#     def setUp(self, worker_day=False):
+#         super().setUp(worker_day)
+#         self.now = timezone.now()
+#         self.user = self.user2
+#         self.user.dt_fired = None
+#         self.user.save()
+#
+#     def test_success(self):
+#         self.assertIsNone(self.user.dt_fired)
+#         with self.auth_user():
+#             response = self.api_post(self.url, {
+#                 "user_id": self.user.pk,
+#                 "dt_fired": BaseConverter.convert_date(self.now)
+#             })
+#         self.assertResponseCodeEqual(response, 200)
+#         self.user = self.refresh_model(self.user)
+#         self.assertEqual(self.user.dt_fired, self.now.date())
+#
+#     def test_not_found(self):
+#         with self.auth_user():
+#             response = self.api_post(self.url, {
+#                 "user_id": -1,
+#                 "dt_fired": BaseConverter.convert_date(self.now)
+#             })
+#         self.assertResponseCodeEqual(response, 400)
+#         self.assertErrorType(response, "DoesNotExist")
 
 
 class TestGetChangeRequest(LocalTestCase):
@@ -619,7 +633,7 @@ class TestGetChangeRequest(LocalTestCase):
 
     def setUp(self, worker_day=False):
         super().setUp(worker_day)
-        self.user = create_stuff(self.shop.pk)
+        self.user = self.user2
         self.now = timezone.now().replace(microsecond=0)
         self.wd_today = WorkerDayChangeRequest.objects.create(
             worker_id=self.user.pk, dt=self.now.date(),
@@ -665,7 +679,7 @@ class TestRequestWorkerDay(LocalTestCase):
 
     def setUp(self, worker_day=False):
         super().setUp(worker_day)
-        self.staff = create_stuff(self.shop.id)
+        self.staff = self.user2
 
     def test_required(self):
         with self.auth_user():
@@ -712,7 +726,7 @@ class TestHandleWorkerDayRequest(LocalTestCase):
 
     def setUp(self, worker_day=False):
         super().setUp(worker_day)
-        self.worker: User = create_stuff(self.root_shop.id)
+        self.worker = self.user2
         self.req: WorkerDayChangeRequest = WorkerDayChangeRequest.objects.create(
             worker=self.worker, dt=timezone.now().today(), type=WorkerDay.Type.TYPE_VACATION.value,
         )
