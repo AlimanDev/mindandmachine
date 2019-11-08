@@ -4,7 +4,6 @@ import json
 from src.db.models import (
     WorkType,
     Cashbox,
-    User,
     Shop,
     OperationType,
     Slot,
@@ -28,7 +27,6 @@ from .forms import (
     EditWorkTypeForm,
     DeleteWorkTypeForm,
     CashboxesOpenTime,
-    CashboxesUsedResource,
 )
 
 from src.main.tablet.utils import time_diff
@@ -57,7 +55,7 @@ def get_types(request, form):
             },...
         ]
     """
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
 
     types = WorkType.objects.filter(
         shop_id=shop_id,
@@ -105,7 +103,7 @@ def get_cashboxes(request, form):
             ]
         }
     """
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     dt_from = FormUtil.get_dt_from(form)
     dt_to = FormUtil.get_dt_to(form)
     work_type_ids = form['work_type_ids']
@@ -542,7 +540,7 @@ def get_cashboxes_open_time(request, form):
 
     """
     response = {}
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     dt_from = FormUtil.get_dt_from(form)
     dt_to = FormUtil.get_dt_to(form)
 
