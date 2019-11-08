@@ -86,9 +86,7 @@ def get_department(request, form):
 @api_method(
     'GET',
     GetDepartmentListForm,
-    # lambda_func=lambda x: False
-    # lambda_func=lambda params, request: (Shop.objects.get(id=params['shop_id']) if params.get('shop_id') else request.user.shop)
-    # lambda_func=lambda params: Shop.objects.get(id=params['shop_id']) if params.get('shop_id')
+    lambda_func=lambda params: (Shop.objects.get(id=params['shop_id']) if params.get('shop_id') else None)
 )
 
 def get_department_list(request, form):

@@ -6,6 +6,7 @@ from django.db.models import (
     )
 from django.db.models.functions import Coalesce
 from src.db.models import (
+    Employment,
     Shop,
     Timetable,
 )
@@ -43,7 +44,6 @@ def calculate_supershop_stats(month, shop_ids):
 
 
 def get_shop_list_stats(form, request, display_format='raw'):
-    shop = request.shop
     pointer = form['pointer']
     amount = form['items_per_page']
     sort_type = form['sort_type']
@@ -98,10 +98,20 @@ def get_shop_list_stats(form, request, display_format='raw'):
     )
 
 
-    shops = shop.get_children().filter(
-        dttm_deleted__isnull=True,
-        **filter_dict
-    )
+    if request.shop:
+        shops = request.shop.get_children()
+    else:
+        shop_ids = Employment.objects.get_active(dt_curr, dt_curr).filter(
+            user=request.user,
+        ).values_list('shop_id', flat=True)
+
+        shops = Shop.objects.filter(id__in=shop_ids)
+
+    shops=shops.filter(
+            dttm_deleted__isnull=True,
+            **filter_dict
+        )
+
     total = shops.count()
 
     shops=shops.annotate(
