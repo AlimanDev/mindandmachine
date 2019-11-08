@@ -99,11 +99,13 @@ def get_notifications2(request, form):
         count = 20
 
     notifies = Notifications.objects.mm_filter(
-        Q(event__workerday_details_id__isnull=True) | Q(
-        Q(event__workerday_details__dttm_deleted__isnull=True) |
-        Q(event__workerday_details__worker_day__worker=request.user),
-        Q(event__workerday_details__work_type__shop__dttm_deleted__isnull=True),
-        Q(event__workerday_details__dttm_from__gt=now())),
+        Q(event__workerday_details_id__isnull=True) |
+        Q(
+            Q(event__workerday_details__dttm_deleted__isnull=True) |
+            Q(event__workerday_details__worker_day__worker=request.user),
+            Q(event__workerday_details__work_type__shop__dttm_deleted__isnull=True),
+            Q(event__workerday_details__dttm_from__gt=now())
+        ),
         to_worker=request.user
     ).order_by('-id')
 

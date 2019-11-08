@@ -41,10 +41,7 @@ def get_outsource_workers(request, form):
         'dates': {}
     }
 
-    try:
-        shop = Shop.objects.get(id=form['shop_id'])
-    except Shop.DoesNotExist:
-        return JsonResponse.does_not_exists_error('Такого магазина не существует.')
+    shop = request.shop
 
     from_dt = form['from_dt']
     to_dt = form['to_dt']
@@ -64,7 +61,7 @@ def get_outsource_workers(request, form):
     outsource_workerdays = WorkerDayCashboxDetails.objects.select_related(
         'worker_day',
         'worker_day__worker',
-        'worker_day__worker__shop',
+        'worker_day__shop',
         'work_type',
     ).filter(
         dttm_deleted__isnull=True,
@@ -78,7 +75,7 @@ def get_outsource_workers(request, form):
     # outsource_workerdays = WorkerDay.objects.qos_current_version(
     #     ).select_related('worker').filter(
     #     worker__shop=shop,
-    #     worker__attachment_group=User.GROUP_OUTSOURCE,
+    #     worker__attachment_group=Employment.GROUP_OUTSOURCE,
     #     worker__dt_hired__gte=from_dt + timedelta(days=date),
     #     worker__dt_fired__lte=from_dt + timedelta(days=date),
     # )
@@ -99,7 +96,7 @@ def get_outsource_workers(request, form):
                 data['type'] = WorkerDayConverter.convert_type(wd.worker_day.type)
                 data['first_name'] = wd.worker_day.worker.first_name
                 data['last_name'] = wd.worker_day.worker.last_name
-                data['shop'] = wd.worker_day.worker.shop.title
+                data['shop'] = wd.worker_day.employment.shop.title
 
             date_response_dict[converted_date]['outsource_workers'].append(data)
             date_response_dict[converted_date]['amount'] += 1
@@ -151,10 +148,10 @@ def add_outsource_workers(request, form):
 
     last_outsourcer_in_day = WorkerDay.objects.select_related('worker').filter(
         worker__shop_id=shop_id,
-        worker__attachment_group=User.GROUP_OUTSOURCE,
+        worker__attachment_group=Employment.GROUP_OUTSOURCE,
         dt=dt,
     ).last()
-    last_outsourcer_in_db = User.objects.filter(attachment_group=User.GROUP_OUTSOURCE).order_by('date_joined').last()
+    last_outsourcer_in_db = User.objects.filter(attachment_group=Employment.GROUP_OUTSOURCE).order_by('date_joined').last()
     if last_outsourcer_in_day:
         last_outsourcer_in_day_number = last_outsourcer_in_day.worker.first_name[1:]
     else:
@@ -171,7 +168,7 @@ def add_outsource_workers(request, form):
         # try:
         added = User.objects.create(
             shop_id=shop_id,
-            attachment_group=User.GROUP_OUTSOURCE,
+            attachment_group=Employment.GROUP_OUTSOURCE,
             first_name='№' + outsourcer_number,
             last_name='Наемный сотрудник',
             dt_hired=dt,
