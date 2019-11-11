@@ -41,7 +41,7 @@ def get_workers(request, form):
     checkpoint = FormUtil.get_checkpoint(form)
     from_dttm = form['from_dttm']
     to_dttm = form['to_dttm']
-    shop = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
 
     response = {}
 
@@ -50,7 +50,7 @@ def get_workers(request, form):
     ).filter(
         Q(worker_day__worker__dt_fired__gt=from_dttm.date()) | Q(worker_day__worker__dt_fired__isnull=True),
         Q(worker_day__worker__dt_hired__lt=to_dttm.date()) | Q(worker_day__worker__dt_fired__isnull=True),
-        worker_day__worker__shop_id=shop,
+        worker_day__worker__shop_id=shop_id,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         worker_day__dt=from_dttm.date(),
         worker_day__dttm_work_start__lte=from_dttm,
@@ -99,7 +99,7 @@ def get_timetable_xlsx(request, form):
     Returns:
         Файл расписания
     """
-    shop = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     dt_from = datetime(year=form['from_dt'].year, month=form['from_dt'].month, day=1)
     dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
     output = io.BytesIO()
@@ -109,7 +109,7 @@ def get_timetable_xlsx(request, form):
 
     row = 6
     col = 5
-    for user in User.objects.qos_filter_active(dt_from, dt_to, shop=shop).order_by('id'):
+    for user in User.objects.qos_filter_active(dt_from, dt_to, shop=shop_id).order_by('id'):
         worksheet.write(row, 0, "{} {} {}".format(user.last_name, user.first_name, user.middle_name))
         for i in range(dt_to.day):
             worksheet.write(row, col + 3 * i + 0, 'НД')
@@ -203,7 +203,7 @@ def get_cashiers_timetable(request, form):
     """
     if form['format'] == 'excel':
         return download(request, form)
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     res = get_worker_timetable(shop_id, form)
     if type(res) == dict:
         res = JsonResponse.success(res)
