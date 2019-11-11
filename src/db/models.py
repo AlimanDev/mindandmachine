@@ -200,25 +200,11 @@ class User(DjangoAbstractUser):
     def get_fio(self):
         return self.last_name + ' ' + self.first_name
 
-    GROUP_STAFF = 'S'
-    GROUP_OUTSOURCE = 'O'
-
-    ATTACHMENT_TYPE = (
-        (GROUP_STAFF, 'staff'),
-        (GROUP_OUTSOURCE, 'outsource'),
-    )
-
     id = models.BigAutoField(primary_key=True)
     middle_name = models.CharField(max_length=64, blank=True, null=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
-
-    attachment_group = models.CharField(
-        max_length=1,
-        default=GROUP_STAFF,
-        choices=ATTACHMENT_TYPE
-    )
 
     birthday = models.DateField(null=True, blank=True)
     SEX_FEMALE = 'F'
@@ -246,25 +232,12 @@ class Employment(models.Model):
     def __str__(self):
         return '{}, {}, {}'.format(self.id, self.shop, self.user)
 
-    GROUP_STAFF = 'S'
-    GROUP_OUTSOURCE = 'O'
-
-    ATTACHMENT_TYPE = (
-        (GROUP_STAFF, 'staff'),
-        (GROUP_OUTSOURCE, 'outsource'),
-    )
-
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_query_name="employments")
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_query_name="employments")
     function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
     position = models.ForeignKey(WorkerPosition, null=True, blank=True, on_delete=models.PROTECT)
     is_fixed_hours = models.BooleanField(default=False)
-    attachment_group = models.CharField(
-        max_length=1,
-        default=GROUP_STAFF,
-        choices=ATTACHMENT_TYPE
-    )
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
@@ -363,7 +336,6 @@ class FunctionGroup(models.Model):
 
         'get_workers',
         'get_outsource_workers',
-        'add_outsource_workers',
 
         'get_user_urv',
         'upload_urv',

@@ -267,7 +267,6 @@ def get_cashiers_info(request, form):
             response[item.worker_day.worker_id] = {
                 "worker_id": item.worker_day.worker_id,
                 "status": item.status,
-                "attachment_group": item.worker_day.worker.attachment_group,
                 "worker_day_id": item.worker_day_id,
                 "tm_work_start": str(item.dttm_from.time()),
                 "tm_work_end": str(item.worker_day.dttm_work_end.time()),

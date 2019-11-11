@@ -103,7 +103,6 @@ def get_cashiers_list(request, form):
         ]}
 
     """
-    attachment_groups = [User.GROUP_STAFF, User.GROUP_OUTSOURCE if form['consider_outsource'] else None]
     shop_id = form['shop_id']
 
     q = Q()
@@ -113,7 +112,6 @@ def get_cashiers_list(request, form):
 
     employments = Employment.objects.filter(
         shop_id=shop_id,
-        # attachment_group__in=attachment_groups
     ).filter(q).select_related('user').order_by('id')
 
     return JsonResponse.success([EmploymentConverter.convert(x) for x in employments])
@@ -161,7 +159,6 @@ def get_not_working_cashiers_list(request, form):
     users_not_working_today = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
             dt=dt_now.date(),
             worker__shop_id=shop_id,
-            worker__attachment_group=User.GROUP_STAFF
     ).filter(
         (Q(employment__dt_hired__isnull=True) | Q(employment__dt_hired__lte=form['dt_to'])) &
         (Q(employment__dt_fired__isnull=True) | Q(employment__dt_fired__gt=form['dt_from']))
@@ -198,7 +195,6 @@ def select_cashiers(request, form):
         dt_from=date.today(),
         dt_to=date.today() + relativedelta(days=31),
         shop_id=shop_id,
-        attachment_group=User.GROUP_STAFF,
     )
 
     worker_ids = set(form.get('worker_ids', []))
@@ -352,7 +348,6 @@ def get_cashier_timetable(request, form):
             worker_id=worker_id,
             dt__gte=from_dt,
             dt__lte=to_dt,
-            worker__attachment_group=User.GROUP_STAFF
         )
         if approved_only:
             wd_logs = wd_logs.filter(
@@ -728,23 +723,12 @@ def set_worker_day(request, form):
         if old_wd.type == form['type'] and not WorkerDay.is_type_with_tm_range(form['type']):
             return JsonResponse.success()
 
-        # этот блок вводит логику относительно аутсорс сотрудников. у них выходных нет, поэтому их мы просто удаляем
-        if old_wd.worker.attachment_group == User.GROUP_OUTSOURCE:
-            try:
-                WorkerDayCashboxDetails.objects.filter(worker_day=old_wd).delete()
-            except ObjectDoesNotExist:
-                pass
-            old_wd.delete()
-            old_wd = None
-
     response = {
         'action': action
     }
 
     work_type = WorkType.objects.get(id=form['work_type']) if form['work_type'] else None
-    if worker.attachment_group == User.GROUP_STAFF \
-            or worker.attachment_group == User.GROUP_OUTSOURCE \
-                    and form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
+    if form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
         new_worker_day = WorkerDay.objects.create(
             worker_id=worker.id,
             parent_worker_day=old_wd,
@@ -773,9 +757,6 @@ def set_worker_day(request, form):
                 )
 
         response['day'] = WorkerDayConverter.convert(new_worker_day)
-
-    elif worker.attachment_group == User.GROUP_OUTSOURCE:
-        worker.delete()
 
     old_cashboxdetails = WorkerDayCashboxDetails.objects.filter(
         worker_day=old_wd,
@@ -851,7 +832,6 @@ def get_worker_day_logs(request, form):
         dt_from=form['from_dt'],
         dt_to=form['to_dt'],
         shop_id=shop_id,
-        # attachment_group=Employment.GROUP_STAFF
     ).values_list('user_id', flat=True)
 
     child_worker_days = WorkerDay.objects.select_related('worker', 'parent_worker_day', 'created_by').filter(

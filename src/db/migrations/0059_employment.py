@@ -27,7 +27,6 @@ def forwards_func(apps, schema_editor):
             function_group=user.function_group,
             position=user.position,
             is_fixed_hours=user.is_fixed_hours,
-            attachment_group = user.attachment_group,
             dt_hired=user.dt_hired,
             dt_fired=user.dt_fired,
             salary=user.salary,

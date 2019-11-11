@@ -5,10 +5,11 @@ from datetime import datetime, timedelta, date
 
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
-from django.db.models import Q, Avg, Sum
+from django.db.models import Q, Sum
 from src.celery.tasks import cancel_shop_vacancies, create_shop_vacancies_and_notify
 
 from src.db.models import (
+    Employment,
     Timetable,
     User,
     WorkType,
@@ -95,9 +96,16 @@ def set_selected_cashiers(request, form):
     Note:
         Всем другим сотрудникам из этого магаза проставляется значение противоположное value
     """
-    shop_workers = User.objects.filter(shop_id=form['shop_id'], attachment_group=User.GROUP_STAFF)
-    shop_workers.exclude(id__in=form['worker_ids']).update(auto_timetable=False)
-    User.objects.filter(id__in=form['worker_ids']).update(auto_timetable=True)
+    employments = Employment.objects.filter(shop_id=form['shop_id'])
+
+    employments.filter(
+        user_id__in=form['worker_ids']
+    ).update(auto_timetable=True)
+
+    employments.exclude(
+        user_id__in=form['worker_ids']
+    ).update(auto_timetable=False)
+
     return JsonResponse.success()
 
 
@@ -804,7 +812,7 @@ def set_timetable(request, form):
         return JsonResponse.success(timetable.status_message)
 
     if data['users']:
-        users = {x.id: x for x in User.objects.filter(id__in=list(data['users']), attachment_group=User.GROUP_STAFF)}
+        users = {x.id: x for x in User.objects.filter(id__in=list(data['users']))}
 
         for uid, v in data['users'].items():
             for wd in v['workdays']:

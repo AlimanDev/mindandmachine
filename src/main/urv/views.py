@@ -48,9 +48,7 @@ def get_user_urv(request, form):
 
     if len(form['worker_ids']):
         user_records = user_records.filter(
-            Q(user_id__in=form['worker_ids']) |
-            Q(user_id__isnull=True) |
-            Q(user__attachment_group=User.GROUP_OUTSOURCE)
+            user_id__in=form['worker_ids']
         )
     if form['type']:
         user_records = user_records.filter(type=form['type'])
@@ -61,12 +59,6 @@ def get_user_urv(request, form):
 
     if form['show_not_detected']:
         extra_filters.append(Q(user_id__isnull=True))
-
-    if form['show_workers']:
-        extra_filters.append(Q(user__attachment_group=User.GROUP_STAFF))
-
-    if form['show_outstaff']:
-        extra_filters.append(Q(user__attachment_group=User.GROUP_OUTSOURCE))
 
     if len(extra_filters):
         extra_filters = functools.reduce(lambda x, y: x | y, extra_filters)
@@ -141,12 +133,6 @@ def get_indicators(request, form):
 
     select_workers = False
     select_outstaff = False
-
-    if form['show_workers']:
-        select_workers = Q(worker__attachment_group=User.GROUP_STAFF)
-
-    if form['show_outstaff']:
-        select_outstaff = Q(worker__attachment_group=User.GROUP_OUTSOURCE)
 
     extra_filters = list(filter(lambda x: x, [select_workers, select_outstaff]))
     if len(extra_filters):

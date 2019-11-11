@@ -15,20 +15,6 @@ from src.util.models_converter import BaseConverter, WorkerDayConverter
 from src.util.test import LocalTestCase
 
 
-# def create_stuff(shop_id: int) -> User:
-#     return User.objects.create_user(
-#         'staff1',
-#         'staff1@test.ru',
-#         '4242',
-#         shop_id=shop_id,
-#         attachment_group=User.GROUP_STAFF,
-#         last_name='Иванов',
-#         first_name='Иван',
-#         dt_hired=timezone.now() - datetime.timedelta(days=5),
-#         dt_fired=timezone.now() + datetime.timedelta(days=3),
-#     )
-
-
 class TestCashier(LocalTestCase):
     def test_change_password(self):
         self.auth()
@@ -192,44 +178,6 @@ class TestGetCashierList(LocalTestCase):
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertResponseDataListCount(response, 1)
-
-    def test_consider_outsource(self):
-        User.objects.create_user(
-            'outscore1',
-            'outscoer1@test.ru',
-            '4242',
-            shop=self.root_shop,
-            function_group=self.employee_group,
-            attachment_group=User.GROUP_OUTSOURCE,
-            last_name='Дурак7',
-            first_name='Иван7',
-            id=98,
-            dt_hired=timezone.now() - datetime.timedelta(days=5),
-            dt_fired=timezone.now() + datetime.timedelta(days=3),
-        )
-
-        with self.auth_user():
-            response = self.api_get(self.url, {
-                'shop_id': 1,
-                'dt_from': timezone.now().date().strftime(
-                    settings.QOS_DATE_FORMAT),
-                'dt_to': (timezone.now() + datetime.timedelta(days=10)).date().strftime(
-                    settings.QOS_DATE_FORMAT),
-            })
-        self.assertResponseCodeEqual(response, 200)
-        self.assertResponseDataListCount(response, 2)
-
-        with self.auth_user():
-            response = self.api_get(self.url, {
-                'shop_id': 1,
-                'consider_outsource': True,
-                'dt_from': timezone.now().date().strftime(
-                    settings.QOS_DATE_FORMAT),
-                'dt_to': (timezone.now() + datetime.timedelta(days=10)).date().strftime(
-                    settings.QOS_DATE_FORMAT),
-            })
-        self.assertResponseCodeEqual(response, 200)
-        self.assertResponseDataListCount(response, 3)
 
 
 class TestGetNotWorkingCashierList(LocalTestCase):
