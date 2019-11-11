@@ -2,13 +2,14 @@ import json
 from unittest import skip
 
 from src.db.models import User
-from src.util.test import LocalTestCase
-
+from src.util.test import LocalTestCase, WorkerCashboxInfo, Slot, Timetable
+from src.util.models_converter import BaseConverter
+from datetime import datetime
 
 class TestAutoSettings(LocalTestCase):
 
     def setUp(self):
-        super().setUp()
+        super().setUp(worker_day=True)
 
     def test_get_status(self):
         self.auth()
@@ -40,3 +41,36 @@ class TestAutoSettings(LocalTestCase):
         response = self.api_post('/api/timetable/auto_settings/set_timetable', {'data': json.dumps({})})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
+
+    def test_create_timetable(self):
+        self.auth()
+        WorkerCashboxInfo.objects.create(
+            id=5,
+            worker=self.user6,
+            work_type=self.work_type1,
+        )
+        WorkerCashboxInfo.objects.create(
+            id=6,
+            worker=self.user7,
+            work_type=self.work_type1,
+        )
+        Slot.objects.all().update(work_type=self.work_type1)
+        response = self.api_post('/api/timetable/auto_settings/create_timetable', {
+            'shop_id': self.shop.id,
+            'dt': BaseConverter.convert_date(datetime.now().date()),
+        })
+        correct_res = {
+            'code': 500, 
+            'data': {
+                'error_type': 'InternalError', 
+                'error_message': 'Error sending data to server'
+            }, 
+            'info': None
+        }
+        self.assertEqual(response.json(), correct_res)
+        correct_tt = {
+            'shop_id': 13,
+            'status_message': '<urlopen error [Errno 111] Connection refused>',
+            'status': 3,
+        }
+        self.assertEqual(Timetable.objects.all().values('shop_id', 'status_message', 'status').last(), correct_tt)
