@@ -310,7 +310,6 @@ class FunctionGroup(models.Model):
         'delete_worker_day',
         'request_worker_day',
         'set_worker_day',
-        'set_worker_day_range',
         'handle_worker_day_request',
         'get_worker_day_logs',
 

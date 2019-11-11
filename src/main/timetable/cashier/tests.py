@@ -420,18 +420,12 @@ class TestSetWorkerDay(LocalTestCase):
         self.assertEqual(wd.dttm_work_end, datetime.datetime.combine(timezone.now().date(), datetime.time(12, 00)))
         self.assertEqual(wd.type, WorkerDay.Type.TYPE_BUSINESS_TRIP.value)
         self.assertIsNotNone(wd.parent_worker_day)
-
-class TestSetWorkerDayRange(LocalTestCase):
-    url = '/api/timetable/cashier/set_worker_day_range'
-
-    def setUp(self, worker_day=True):
-        super().setUp(worker_day)
-
-    def test_update(self):
+        
+    def test_update_range(self):
         with self.auth_user():
             response = self.api_post(self.url, {
                 "worker_id": self.user2.pk,
-                "dt_from": BaseConverter.convert_date(timezone.now()),
+                "dt": BaseConverter.convert_date(timezone.now()),
                 "dt_to": BaseConverter.convert_date(timezone.now() + datetime.timedelta(days=2)),
                 "tm_work_start": "11:00:00",
                 "tm_work_end": "12:00:00",
@@ -453,7 +447,7 @@ class TestSetWorkerDayRange(LocalTestCase):
         self.assertEqual(wd2.type, WorkerDay.Type.TYPE_BUSINESS_TRIP.value)
         self.assertIsNotNone(wd2.parent_worker_day)
 
-    def test_create(self):
+    def test_create_range(self):
         user = User.objects.create_user(
             'user8',
             'k@k.k',
@@ -467,7 +461,7 @@ class TestSetWorkerDayRange(LocalTestCase):
         with self.auth_user():
             response = self.api_post(self.url, {
                 "worker_id": user.pk,
-                "dt_from": BaseConverter.convert_date(timezone.now()),
+                "dt": BaseConverter.convert_date(timezone.now()),
                 "dt_to": BaseConverter.convert_date(timezone.now() + datetime.timedelta(days=2)),
                 "tm_work_start": "11:00:00",
                 "tm_work_end": "12:00:00",

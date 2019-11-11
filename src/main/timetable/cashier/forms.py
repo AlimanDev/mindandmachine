@@ -179,35 +179,7 @@ class SetWorkerDaysForm(forms.Form):
 class SetWorkerDayForm(forms.Form):
     worker_id = forms.IntegerField()
     dt = util_forms.DateField()
-    type = forms.CharField()
-    tm_work_start = util_forms.TimeField(required=False)
-    tm_work_end = util_forms.TimeField(required=False)
-    wish_text = forms.CharField(required=False, max_length=512)
-
-    work_type = forms.IntegerField(required=False)
-    comment = forms.CharField(max_length=128, required=False)
-    details = forms.CharField(required=False)
-
-    def clean_type(self):
-        value = WorkerDayConverter.parse_type(self.cleaned_data['type'])
-        if value is None:
-            raise ValidationError('Invalid enum value')
-        return value
-
-    def clean(self):
-        if self.errors:
-            return
-
-        if WorkerDay.is_type_with_tm_range(self.cleaned_data['type']):
-            if self.cleaned_data.get('tm_work_start') is None:
-                raise ValidationError('tm_work_start is required')
-            if self.cleaned_data.get('tm_work_end') is None:
-                raise ValidationError('tm_work_end is required')
-
-class SetWorkerDayRangeForm(forms.Form):
-    worker_id = forms.IntegerField()
-    dt_from = util_forms.DateField()
-    dt_to = util_forms.DateField()
+    dt_to = util_forms.DateField(required=False)
     type = forms.CharField()
     tm_work_start = util_forms.TimeField(required=False)
     tm_work_end = util_forms.TimeField(required=False)

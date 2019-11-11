@@ -22,6 +22,5 @@ urlpatterns = [
     path('get_change_request', views.get_change_request),
     path('handle_change_request', views.handle_worker_day_request),
     path('get_worker_position_list', views.get_worker_position_list),
-    path('set_worker_day_range', views.set_worker_day_range),
 ]
 

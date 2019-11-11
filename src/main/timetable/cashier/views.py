@@ -61,7 +61,6 @@ from .forms import (
     DeleteWorkerDayChangeLogsForm,
     GetWorkerChangeRequestsForm,
     HandleWorkerDayRequestForm,
-    SetWorkerDayRangeForm,
 )
 
 
@@ -648,7 +647,8 @@ def set_worker_day(request, form):
         method: POST
         url: /api/timetable/cashier/set_worker_day
         worker_id(int): required = True
-        dt(QOS_DAT): дата рабочего дня
+        dt(QOS_DATE): дата рабочего дня / дата с которой менять
+        dt_to(QOS_DATE): required = False / дата до которой менять
         type(str): required = True. новый тип рабочего дня
         tm_work_start(QOS_TIME): новое время начала рабочего дня
         tm_work_end(QOS_TIME): новое время конца рабочего дня
@@ -679,155 +679,7 @@ def set_worker_day(request, form):
     if form['details']:
         details = json.loads(form['details'])
 
-    dt = form['dt']
-    worker = User.objects.get(id=form['worker_id'])
-
-    wd_args = {
-        'dt': dt,
-        'type': form['type'],
-        'dttm_work_start': None,
-        'dttm_work_end': None,
-    }
-
-    if WorkerDay.is_type_with_tm_range(form['type']):
-        dttm_work_start = datetime.combine(dt, form['tm_work_start'])  # на самом деле с фронта приходят время а не дата-время
-        tm_work_end = form['tm_work_end']
-        dttm_work_end = datetime.combine(form['dt'], tm_work_end) if tm_work_end > form['tm_work_start'] else \
-            datetime.combine(dt + timedelta(days=1), tm_work_end)
-        wd_args.update({
-            'dttm_work_start': dttm_work_start,
-            'dttm_work_end': dttm_work_end,
-        })
-
-    try:
-        old_wd = WorkerDay.objects.qos_current_version().get(
-            worker_id=worker.id,
-            dt=form['dt']
-        )
-        action = 'update'
-    except WorkerDay.DoesNotExist:
-        old_wd = None
-        action = 'create'
-    except WorkerDay.MultipleObjectsReturned:
-        return JsonResponse.multiple_objects_returned()
-
-    if old_wd:
-        # Не пересохраняем, если тип не изменился
-        if old_wd.type == form['type'] and not WorkerDay.is_type_with_tm_range(form['type']):
-            return JsonResponse.success()
-
-        # этот блок вводит логику относительно аутсорс сотрудников. у них выходных нет, поэтому их мы просто удаляем
-        if old_wd.worker.attachment_group == User.GROUP_OUTSOURCE:
-            try:
-                WorkerDayCashboxDetails.objects.filter(worker_day=old_wd).delete()
-            except ObjectDoesNotExist:
-                pass
-            old_wd.delete()
-            old_wd = None
-
-    response = {
-        'action': action
-    }
-
-    work_type = WorkType.objects.get(id=form['work_type']) if form['work_type'] else None
-    if worker.attachment_group == User.GROUP_STAFF \
-            or worker.attachment_group == User.GROUP_OUTSOURCE \
-                    and form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
-        new_worker_day = WorkerDay.objects.create(
-            worker_id=worker.id,
-            parent_worker_day=old_wd,
-            created_by=request.user,
-            comment=form['comment'],
-            **wd_args
-        )
-        if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
-            if len(details):
-                for item in details:
-                    dttm_to = BaseConverter.parse_time(item['dttm_to'])
-                    dttm_from = BaseConverter.parse_time(item['dttm_from'])
-                    WorkerDayCashboxDetails.objects.create(
-                        work_type_id=item['work_type'],
-                        worker_day=new_worker_day,
-                        dttm_from=datetime.combine(dt, dttm_from),
-                        dttm_to=datetime.combine(dt, dttm_to) if dttm_to > dttm_from\
-                            else datetime.combine(dt + timedelta(days=1), dttm_to)
-                    )
-            else:
-                WorkerDayCashboxDetails.objects.create(
-                    work_type=work_type,
-                    worker_day=new_worker_day,
-                    dttm_from=new_worker_day.dttm_work_start,
-                    dttm_to=new_worker_day.dttm_work_end
-                )
-
-        response['day'] = WorkerDayConverter.convert(new_worker_day)
-
-    elif worker.attachment_group == User.GROUP_OUTSOURCE:
-        worker.delete()
-
-    old_cashboxdetails = WorkerDayCashboxDetails.objects.filter(
-        worker_day=old_wd,
-        dttm_deleted__isnull=True
-    ).first()
-
-    if work_type and form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
-        cancel_vacancies(work_type.shop_id, work_type.id)
-    if old_cashboxdetails:
-        create_vacancies_and_notify(old_cashboxdetails.work_type.shop_id, old_cashboxdetails.work_type_id)
-
-    return JsonResponse.success(response)
-
-@api_method(
-    'POST',
-    SetWorkerDayRangeForm,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id']).shop
-)
-def set_worker_day_range(request, form):
-    """
-    Меняет рабочие дни в периоде
-
-    Args:
-        method: POST
-        url: /api/timetable/cashier/set_worker_day_range
-        worker_id(int): required = True
-        dt_from(QOS_DATE): дата с которой менять
-        dt_to(QOS_DATE):дата до которой менять
-        type(str): required = True. новый тип рабочего дня
-        tm_work_start(QOS_TIME): новое время начала рабочего дня
-        tm_work_end(QOS_TIME): новое время конца рабочего дня
-        work_type(int): required = False. на какой специализации он будет работать
-        comment(str): max_length=128, required = False
-        details(srt): детали рабочего дня (заносятся в WorkerDayCashboxDetails)
-
-    Returns:
-        {
-            [
-                {
-                    'day': {
-                        | 'id': id нового WorkerDay'a,
-                        | 'dttm_added': сейчас,
-                        | 'dt': дата WorkerDay'a,
-                        | 'worker': id worker'a,
-                        | 'type': тип,
-                        | 'dttm_work_start': время начала рабочего дня,
-                        | 'dttm_work_end': время конца рабочего дня,
-                        | 'work_types'(list): специализации (id'шники типов касс)
-                    },\n
-                    'action': 'update'/'create'/'MultypleObjectsReturnedError'/'TypeNotChanged',\n
-                    'cashbox_updated': True/False,\n
-                    'dt': дата WorkerDay'a,
-                }
-            ]
-        }
-    Raises:
-        JsonResponse.multiple_objects_returned
-    """
-
-    details = []
-    if form['details']:
-        details = json.loads(form['details'])
-
-    dt_from = form['dt_from']
+    dt_from = form['dt']
     dt_to = form['dt_to']
     worker = User.objects.get(id=form['worker_id'])
 
@@ -835,6 +687,9 @@ def set_worker_day_range(request, form):
 
     response = []
     old_wds = []
+
+    if (not dt_to):
+        dt_to = dt_from
 
     for dt in range_u(dt_from, dt_to, timedelta(days=1)):
 
@@ -864,15 +719,19 @@ def set_worker_day_range(request, form):
             old_wd = None
             action = 'create'
         except WorkerDay.MultipleObjectsReturned:
+            if (not form['dt_to']):
+                return JsonResponse.multiple_objects_returned()
             response.append({
                 'action': 'MultypleObjectsReturnedError',
                 'dt': dt,
-            }) #Определиться с ошибкой
+            })
             continue
 
         if old_wd:
             # Не пересохраняем, если тип не изменился
             if old_wd.type == form['type'] and not is_type_with_tm_range:
+                if (not form['dt_to']):
+                    return JsonResponse.success()
                 response.append({
                     'action': 'TypeNotChanged',
                     'dt': dt
@@ -942,6 +801,9 @@ def set_worker_day_range(request, form):
         cancel_vacancies(work_type.shop_id, work_type.id)
     if old_cashboxdetails:
         create_vacancies_and_notify(old_cashboxdetails.work_type.shop_id, old_cashboxdetails.work_type_id)
+
+    if (not form['dt_to']):
+        response = response[0]
 
     return JsonResponse.success(response)
 
