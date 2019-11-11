@@ -356,8 +356,8 @@ def download(request, workbook, form):
         prod_days=None
     )
     users = list(User.objects.qos_filter_active(
-        dt_from=timetable.prod_days[-1].dt,
-        dt_to=timetable.prod_days[0].dt,
+        dt_from=timetable.prod_days[0].dt,
+        dt_to=timetable.prod_days[-1].dt,
         shop=shop,
     ).select_related('position').order_by('position_id', 'last_name', 'first_name', 'tabel_code'))
 
