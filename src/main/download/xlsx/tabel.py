@@ -362,15 +362,15 @@ class Tabel_xlsx(Xlsx_base):
                     self.workbook.add_format(cell_format)
                 )
                 dt = self.month.replace(day=day+1)
-                wh = working_hours.get(user.id, {}).get(dt, 0)
-                brk = 0
-                for x in triplets:
-                    if x[0] <= wh and x[1] >= wh:
-                        brk = x[2]
+                user_working_hours = round(working_hours.get(user.id, {}).get(dt, 0))
+                breaktime = 0
+                for triplet in triplets:
+                    if triplet[0] <= user_working_hours and triplet[1] >= user_working_hours:
+                        breaktime = triplet[2]
                 self.worksheet.write(
                     row_s + row_shift * 2 + 1,
                     col_s + day,
-                    round(wh - brk),
+                    user_working_hours - breaktime if user_working_hours > 0 else 0,
                     self.workbook.add_format(cell_format)
                 )
 
