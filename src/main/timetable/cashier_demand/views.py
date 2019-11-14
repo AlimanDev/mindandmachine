@@ -11,7 +11,7 @@ from src.db.models import (
     WorkerDayCashboxDetails,
 )
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
-from src.util.models_converter import UserConverter, BaseConverter
+from src.util.models_converter import EmploymentConverter, BaseConverter
 from src.util.utils import api_method, JsonResponse
 from src.util.forms import FormUtil
 from src.conf.djconfig import QOS_DATETIME_FORMAT
@@ -46,11 +46,11 @@ def get_workers(request, form):
     response = {}
 
     worker_day_cashbox_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related(
-        'worker_day', 'worker_day__worker', 'worker_day__worker__position'
+        'worker_day', 'worker_day__worker', 'worker_day__employment__position'
     ).filter(
-        Q(worker_day__worker__dt_fired__gt=from_dttm.date()) | Q(worker_day__worker__dt_fired__isnull=True),
-        Q(worker_day__worker__dt_hired__lt=to_dttm.date()) | Q(worker_day__worker__dt_fired__isnull=True),
-        worker_day__worker__shop_id=shop_id,
+        Q(worker_day__employment__dt_fired__gt=from_dttm.date()) | Q(worker_day__employment__dt_fired__isnull=True),
+        Q(worker_day__employment__dt_hired__lt=to_dttm.date()) | Q(worker_day__employment__dt_fired__isnull=True),
+        worker_day__shop_id=shop_id,
         worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
         worker_day__dt=from_dttm.date(),
         worker_day__dttm_work_start__lte=from_dttm,
@@ -74,7 +74,7 @@ def get_workers(request, form):
             'on_cashbox': x.on_cashbox_id,
             'work_type': x.work_type_id,
             'status': x.status,
-            'user_info': UserConverter.convert(x.worker_day.worker)
+            'user_info': EmploymentConverter.convert(x.worker_day.employment)
         }
 
     return JsonResponse.success(response)

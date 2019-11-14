@@ -3,12 +3,11 @@ import numpy as np
 from decimal import Decimal
 
 
-from django.db.models import Q, F, Sum
-# from django.db.models.functions import Coalesce
+from django.db.models import Q, F
 
 
 from src.db.models import (
-    AttendanceRecords,
+    Employment,
     WorkerDay,
     User,
     WorkType,
@@ -203,13 +202,13 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
         status_list.append(WorkerDayCashboxDetails.TYPE_VACANCY)
 
     cashbox_details = WorkerDayCashboxDetails.objects.filter(
-        Q(worker_day__worker__dt_fired__gt=from_dt) &
-        Q(dttm_to__lt=F('worker_day__worker__dt_fired')) |
-        Q(worker_day__worker__dt_fired__isnull=True),
+        Q(worker_day__employment__dt_fired__gt=from_dt) &
+        Q(dttm_to__lt=F('worker_day__employment__dt_fired')) |
+        Q(worker_day__employment__dt_fired__isnull=True),
 
-        Q(worker_day__worker__dt_hired__lt=to_dt) &
-        Q(dttm_from__gte = F('worker_day__worker__dt_hired')) |
-        Q(worker_day__worker__dt_hired__isnull=True),
+        Q(worker_day__employment__dt_hired__lt=to_dt) &
+        Q(dttm_from__gte = F('worker_day__employment__dt_hired')) |
+        Q(worker_day__employment__dt_hired__isnull=True),
 
         dttm_from__gte=from_dt,
         dttm_to__lte=to_dt,
@@ -230,18 +229,20 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
         lambda_add_work_details,
     )
 
-    workers = list(User.objects.filter(id__in=cashbox_details.values_list('worker_day__worker')))
+    employments = Employment.objects.filter(id__in=cashbox_details.values_list('worker_day__employment'))
+    workers = list(User.objects.filter(id__in=employments.values('user_id')))
     month_work_stat = count_work_month_stats(
         dt_start=from_dt,
         dt_end=form['to_dt'], # original date
-        users=workers
+        users=employments,
+        # users=workers
     )
     fot = 0
     norm_work_hours = ProductionMonth.objects.get(dt_first=from_dt.replace(day=1)).norm_work_hours
     for worker_id in month_work_stat.keys():
         fot += round(
             Decimal(month_work_stat[worker_id]['paid_hours']) *
-            list(filter(lambda x: x.id == worker_id, workers))[0].salary / Decimal(norm_work_hours)
+            list(filter(lambda x: x.id == worker_id, employments))[0].salary / Decimal(norm_work_hours)
         )
 
     finite_workdetails = list(cashbox_details.filter(worker_day__child__id__isnull=True).select_related('worker_day'))
@@ -307,7 +308,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
     worker_days = WorkerDay.objects.qos_filter_version(1).filter(
         dt__gte=from_dt,
         dt__lte=to_dt,
-        worker__shop_id=shop_id,
+        employment__shop_id=shop_id,
         type=WorkerDay.Type.TYPE_WORKDAY.value
     )
 
@@ -383,8 +384,8 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
 #         worker_day_cashbox_detail_filter['worker_day__worker__position_id'] = form['position_id']
 #
 #     cashbox_details_current = WorkerDayCashboxDetails.objects.qos_current_version().filter(
-#         Q(worker_day__worker__dt_fired__gt=form['to_dt']) | Q(worker_day__worker__dt_fired__isnull=True),
-#         Q(worker_day__worker__dt_hired__lt=form['from_dt']) | Q(worker_day__worker__dt_fired__isnull=True),
+#         Q(worker_day__employment__dt_fired__gt=form['to_dt']) | Q(worker_day__employment__dt_fired__isnull=True),
+#         Q(worker_day__employment__dt_hired__lt=form['from_dt']) | Q(worker_day__employment__dt_fired__isnull=True),
 #         **worker_day_cashbox_detail_filter,
 #     ).exclude(
 #         status=WorkerDayCashboxDetails.TYPE_BREAK
@@ -394,8 +395,8 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
 #         'dttm_to',
 #     )
 #     cashbox_details_initial = WorkerDayCashboxDetails.objects.qos_initial_version().filter(
-#         Q(worker_day__worker__dt_fired__gt=form['to_dt']) | Q(worker_day__worker__dt_fired__isnull=True),
-#         Q(worker_day__worker__dt_hired__lt=form['from_dt']) | Q(worker_day__worker__dt_fired__isnull=True),
+#         Q(worker_day__employment__dt_fired__gt=form['to_dt']) | Q(worker_day__employment__dt_fired__isnull=True),
+#         Q(worker_day__employment__dt_hired__lt=form['from_dt']) | Q(worker_day__employment__dt_fired__isnull=True),
 #         **worker_day_cashbox_detail_filter,
 #     ).exclude(
 #         status=WorkerDayCashboxDetails.TYPE_BREAK
@@ -655,12 +656,12 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
 #     changed_amount = WorkerDay.objects.select_related('worker').filter(
 #         dt__gte=form['from_dt'],
 #         dt__lte=form['to_dt'],
-#         worker__shop_id=shop_id,
+#         employment__shop_id=shop_id,
 #         worker__attachment_group=User.GROUP_STAFF,
 #     ).count() - WorkerDay.objects.select_related('worker').filter(
 #         dt__gte=form['from_dt'],
 #         dt__lte=form['to_dt'],
-#         worker__shop_id=shop_id,
+#         employment__shop_id=shop_id,
 #         parent_worker_day__isnull=True,
 #         worker__attachment_group=User.GROUP_STAFF,
 #     ).count()
