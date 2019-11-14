@@ -3,6 +3,7 @@ from django.db.models import Q
 import json
 
 from src.db.models import (
+    Employment,
     CameraCashboxStat,
     Cashbox,
     WorkerDayCashboxDetails,
@@ -10,7 +11,6 @@ from src.db.models import (
     WorkerDay,
     WorkType,
     Shop,
-    User
 )
 from django.db.models import Avg
 from src.util.utils import api_method, JsonResponse
@@ -94,7 +94,7 @@ def get_cashboxes_info(request, form):
             on_cashbox=cashbox,
             dttm_to__isnull=True,
             worker_day__dt=(dttm_now-timedelta(hours=2)).date(),
-            worker_day__worker__shop_id=shop_id,
+            worker_day__employment__shop_id=shop_id,
         )
 
         user_id = None
@@ -311,7 +311,7 @@ def get_cashiers_info(request, form):
 @api_method(
     'POST',
     ChangeCashierStatus,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id']).shop
+    lambda_func=lambda x: Employment.objects.get(user_id=x['worker_id'], shop_id=x['shop_id']).shop
 )
 def change_cashier_status(request, form):
     """
@@ -344,6 +344,7 @@ def change_cashier_status(request, form):
 
     """
     worker_id = form['worker_id']
+    shop_id = form['shop_id']
     new_user_status = form['status']
     cashbox_id = form['cashbox_id']
     is_current_time = form['is_current_time']
@@ -368,7 +369,7 @@ def change_cashier_status(request, form):
     ).order_by('id').last()
 
     try:
-        worker_day = WorkerDay.objects.qos_current_version().get(dt=dt, worker_id=worker_id)
+        worker_day = WorkerDay.objects.qos_current_version().get(dt=dt, worker_id=worker_id,shop_id=shop_id)
     except WorkerDay.DoesNotExist:
         return JsonResponse.does_not_exists_error('Такого дня нет в расписании.')
     except WorkerDay.MultipleObjectsReturned:

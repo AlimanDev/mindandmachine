@@ -47,6 +47,7 @@ class TestTablet(LocalTestCase):
         def api_change_cashier_status(worker_id, status, cashbox_id=None):
             response = self.api_post('/api/tablet/change_cashier_status', {
                 'worker_id': worker_id,
+                'shop_id': self.shop.id,
                 'status': status,
                 'cashbox_id': self.cashbox2.id,
             })
@@ -60,6 +61,7 @@ class TestTablet(LocalTestCase):
 
         response = self.api_post('/api/tablet/change_cashier_status', {
             'worker_id': self.user2.id,
+            'shop_id': self.shop.id,
             'status': WorkerDayCashboxDetails.TYPE_WORK,
             'cashbox_id': self.cashbox1.id,
         })

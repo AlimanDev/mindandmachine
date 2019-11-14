@@ -13,6 +13,7 @@ class GetCashiersInfo(forms.Form):
 
 
 class ChangeCashierStatus(forms.Form):
+    shop_id = forms.IntegerField()
     worker_id = forms.IntegerField()
     status = forms.CharField()
     cashbox_id = forms.IntegerField(required=False)
