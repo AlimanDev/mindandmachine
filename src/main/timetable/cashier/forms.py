@@ -136,12 +136,14 @@ class GetCashierInfoForm(forms.Form):
 
 class GetWorkerDayForm(forms.Form):
     worker_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     dt = util_forms.DateField()
     checkpoint = forms.IntegerField(required=False)
 
 
 class SetWorkerDaysForm(forms.Form):
     worker_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     dt_begin = util_forms.DateField()
     dt_end = util_forms.DateField()
     type = forms.CharField()
@@ -179,6 +181,7 @@ class SetWorkerDaysForm(forms.Form):
 
 class SetWorkerDayForm(forms.Form):
     worker_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     dt = util_forms.DateField()
     type = forms.CharField()
     tm_work_start = util_forms.TimeField(required=False)
@@ -208,6 +211,7 @@ class SetWorkerDayForm(forms.Form):
 
 class SetWorkerRestrictionsForm(forms.Form):
     worker_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     worker_sex = forms.CharField(required=False)
     work_type_info = forms.CharField(required=False)
     constraints = forms.CharField(required=False)
@@ -281,6 +285,7 @@ class CreateCashierForm(forms.Form):
 
 class DeleteCashierForm(forms.Form):
     user_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     dt_fired = util_forms.DateField()
 
 
@@ -293,6 +298,7 @@ class PasswordChangeForm(forms.Form):
 
 class ChangeCashierInfo(forms.Form):
     user_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     password = forms.CharField()
     first_name = forms.CharField(max_length=30, required=False)
     middle_name = forms.CharField(max_length=64, required=False)
@@ -320,6 +326,7 @@ class DeleteWorkerDayChangeLogsForm(forms.Form):
 
 
 class GetWorkerChangeRequestsForm(forms.Form):
+    shop_id = forms.IntegerField()
     dt = util_forms.DateField()
     worker_id = forms.IntegerField()
 
