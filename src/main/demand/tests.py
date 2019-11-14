@@ -646,11 +646,12 @@ class TestSetPredBills(TestDemand):
     def test_correct(self):
         self.auth()
         test_data = {
+            "shop_id": self.shop.id,
             "access_token": "a", 
             "key": "a", 
             "data": "{\"status\": \"R\", \"demand\": [{\"dttm\": \"10:00:00 01.09.2019\", \"value\": 2.1225757598876953, \"work_type\": 5}, {\"dttm\": \"10:30:00 01.09.2019\", \"value\": 2.2346010208129883, \"work_type\": 5}, {\"dttm\": \"11:00:00 01.09.2019\", \"value\": 2.195962905883789, \"work_type\": 5}, {\"dttm\": \"11:30:00 01.09.2019\", \"value\": 2.307988166809082, \"work_type\": 5}], \"dt_from\": \"01.09.2019\", \"dt_to\": \"02.11.2019\", \"shop_id\": 1}"
         }
-        
+
         
         response = self.api_post('/api/demand/set_predbills', test_data)
         correct_data = [
@@ -685,18 +686,4 @@ class TestSetPredBills(TestDemand):
             operation_type_id=5
         ).values('dttm_forecast', 'value', 'operation_type_id', 'type')), correct_data)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(Event.objects.get(pk=1).text, 'Cоставлен новый спрос на период с 01.09.2019 по 02.11.2019')
-
-    def test_data_not_setted(self):
-        self.auth()
-
-        response = self.api_post('/api/demand/set_predbills')
-        correct_data = {
-            'code': 400, 
-            'data': {
-                'error_type': 'ValueException', 
-                'error_message': "[('data', ['This field is required.'])]"
-            },
-            'info': None
-        }
-        self.assertEqual(response.json(), correct_data)
+        self.assertEqual(Event.objects.first().text, 'Cоставлен новый спрос на период с 01.09.2019 по 02.11.2019')
