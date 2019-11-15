@@ -11,7 +11,6 @@ from src.db.models import (
     PeriodQueues,
 )
 from dateutil.relativedelta import relativedelta
-from src.util.forms import FormUtil
 from src.util.utils import api_method, outer_server
 from .forms import (
     GetTimeDistributionForm,
@@ -48,7 +47,7 @@ def get_indicators(request, form):
 
     """
     forecast_type = form['type']
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     from_dttm = datetime.combine(form['from_dt'], time())
     to_dttm = datetime.combine(form['to_dt'], time())
 
@@ -167,10 +166,9 @@ def process_forecast(request, form):
 
     predict2days = 62
 
-    shop_id = FormUtil.get_shop_id(request, form)
-    shop = Shop.objects.get(id=shop_id)
+    shop = request.shop
     dt_now = datetime.now().date()
-    work_type = WorkType.objects.filter(shop_id=shop_id).order_by('id').first()
+    work_type = WorkType.objects.filter(shop=shop).order_by('id').first()
 
     day_info = ProductionDay.objects.filter(
         dt__gte=dt_now - timedelta(days=366),
@@ -203,8 +201,8 @@ def process_forecast(request, form):
     }
 
 
-    data_prev = get_worker_timetable(shop_id, form_tt_prev)
-    data_predict = get_worker_timetable(shop_id, form_tt_predict)
+    data_prev = get_worker_timetable(shop.id, form_tt_prev)
+    data_predict = get_worker_timetable(shop.id, form_tt_predict)
 
     if type(data_prev) == dict and type(data_predict) == dict:
         # train set
