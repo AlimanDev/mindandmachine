@@ -130,14 +130,14 @@ class Timetable_xlsx(Tabel_xlsx):
         it = 0
         cell_format = dict(self.day_type)
         n_workdays = len(workdays)
-        for row_shift, user in enumerate(employments):
+        for row_shift, employment in enumerate(employments):
             night_hours = 0
             for day in range(len(self.prod_days)):
-                if (it < n_workdays) and (workdays[it].worker_id == user.id) and (day + 1 == workdays[it].dt.day):
+                if (it < n_workdays) and (workdays[it].worker_id == employment.user_id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
                     if wd.type == WorkerDay.Type.TYPE_WORKDAY.value:
-                        total_h, night_h = self._count_time(wd.dttm_work_start.time(), wd.dttm_work_end.time(), (0, 0),
-                                                            triplets)
+                        total_h, night_h = self._count_time(
+                            wd.dttm_work_start.time(), wd.dttm_work_end.time(), (0, 0), triplets)
                         if night_h == 'all':  # night_work
                             wd.type = 'night_work'
                         if (type(night_h) != str) and (night_h > 0):
@@ -178,7 +178,7 @@ class Timetable_xlsx(Tabel_xlsx):
                     self.workbook.add_format(cell_format)
                 )
 
-            worker_days = {x.dt: x for x in workdays if x.worker_id == user.id}
+            worker_days = {x.dt: x for x in workdays if x.worker_id == employment.user_id}
             format_holiday_debt = self.workbook.add_format(fmt(font_size=10, border=1, bg_color='#FEFF99'))
 
             self.worksheet.write_string(
@@ -359,8 +359,8 @@ def download(request, workbook, form):
     )
 
     employments = Employment.objects.get_active(
-        dt_from=timetable.prod_days[-1].dt,
-        dt_to=timetable.prod_days[0].dt,
+        dt_from=timetable.prod_days[0].dt,
+        dt_to=timetable.prod_days[-1].dt,
         shop=shop,
     ).order_by('position_id', 'user__last_name', 'user__first_name', 'user__middle_name', 'tabel_code')
 
