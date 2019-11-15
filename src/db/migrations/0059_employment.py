@@ -146,6 +146,11 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='worker_constraints', to='db.Shop'),
         ),
         migrations.AddField(
+            model_name='workerconstraint',
+            name='employment',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='worker_constraints', to='db.Employment'),
+        ),
+        migrations.AddField(
             model_name='workerday',
             name='shop',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='db.Shop'),
@@ -157,8 +162,7 @@ class Migration(migrations.Migration):
         ),
         migrations.RunPython(forwards_func),
         migrations.RunSQL([
-            "update  db_workerconstraint as w set shop_id=u.shop_id from  db_user u where w.worker_id=u.id",
-            "update  db_workerday as w set shop_id=e.shop_id, employment_id=e.id from db_employment e where w.worker_id=e.user_id",
-            "update  db_notifications as n set shop_id=u.shop_id from  db_user u where n.to_worker_id=u.id",
-        ])
+            "update db_workerday as w set shop_id=e.shop_id, employment_id=e.id from db_employment e where w.worker_id=e.user_id",
+            "update db_notifications as n set shop_id=u.shop_id from  db_user u where n.to_worker_id=u.id",
+            "update db_workerconstraint c set employment_id = e.id, shop_id=e.shop_id from db_employment e where c.worker_id = e.user_id"])
     ]

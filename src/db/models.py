@@ -233,8 +233,8 @@ class Employment(models.Model):
         return '{}, {}, {}'.format(self.id, self.shop, self.user)
 
     id = models.BigAutoField(primary_key=True)
-    user = models.ForeignKey(User, on_delete=models.PROTECT, related_query_name="employments")
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_query_name="employments")
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="employments")
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name="employments")
     function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
     position = models.ForeignKey(WorkerPosition, null=True, blank=True, on_delete=models.PROTECT)
     is_fixed_hours = models.BooleanField(default=False)
@@ -909,6 +909,7 @@ class WorkerConstraint(models.Model):
 
     id = models.BigAutoField(primary_key=True)
     shop = models.ForeignKey(Shop, blank=True, null=True, on_delete=models.PROTECT, related_name='worker_constraints')
+    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
