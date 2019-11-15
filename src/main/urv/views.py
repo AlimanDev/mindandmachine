@@ -117,7 +117,7 @@ def get_indicators(request, form):
     worker_days = WorkerDay.objects.qos_filter_version(checkpoint).filter(
         dt__gte=from_dt,
         dt__lte=to_dt,
-        worker__shop_id=form['shop_id'],
+        employment__shop_id=form['shop_id'],
         type=WorkerDay.Type.TYPE_WORKDAY.value
     )
     if len(worker_ids):
@@ -130,14 +130,6 @@ def get_indicators(request, form):
 
     if form['to_tm']:
         worker_days = worker_days.filter(dttm_work_end__time__lte=form['to_tm'])
-
-    select_workers = False
-    select_outstaff = False
-
-    extra_filters = list(filter(lambda x: x, [select_workers, select_outstaff]))
-    if len(extra_filters):
-        extra_filters = functools.reduce(lambda x, y: x | y, extra_filters)
-        worker_days = worker_days.filter(extra_filters)
 
     ticks_count_plan = worker_days.count()
     if not form['type']:
