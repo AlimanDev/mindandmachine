@@ -344,7 +344,6 @@ def get_month_stat(request, form):
     """
     # prepare data
     dt_start = datetime.date(form['dt'].year, form['dt'].month, 1)
-    dt_start_year = datetime.date(dt_start.year, 1, 1)
     dt_end = dt_start + relativedelta(months=+1)
     usrs = User.objects.qos_filter_active(form['dt'], dt_end)
     # todo: add code for permissions check (check stat of workers from another shops)
@@ -371,7 +370,6 @@ def get_month_stat(request, form):
             'diff_total_paid_hours': user_info_dict[usrs[u_it].id]['diff_prev_paid_hours'] + month_info[usrs[u_it].id]['diff_norm_hours'],
         })
     return JsonResponse.success({'users_info': month_info})
-
 
 
 @api_method(
