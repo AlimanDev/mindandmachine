@@ -226,7 +226,7 @@ def delete_cashbox(request, form):
     Note:
         Отправляет уведомление об удаленной кассе
     """
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
 
     try:
         cashbox = Cashbox.objects.select_related(
@@ -348,7 +348,7 @@ def create_work_type(request, form):
     Raises:
         JsonResponse.already_exists_error: если тип касс с таким именем уже существует
     """
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     name = form['name']
 
     if WorkType.objects.filter(name=name, shop_id=shop_id, dttm_deleted__isnull=True).count() > 0:

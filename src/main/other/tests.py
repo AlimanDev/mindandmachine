@@ -10,11 +10,14 @@ class TestWorkTypes(LocalTestCase):
 
         self.auth()
 
-        response = self.api_get('/api/other/get_slots?user_id=1')
+        response = self.api_get('/api/other/get_slots?user_id={}&shop_id={}'.format(
+            self.user1.id, self.root_shop.id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
 
-        response = self.api_get('/api/other/get_slots?user_id=3')
+        response = self.api_get('/api/other/get_slots?user_id={}&shop_id={}'.format(
+            self.user3.id, self.shop.id
+        ))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
         self.assertEqual(response.json()['data'], {})

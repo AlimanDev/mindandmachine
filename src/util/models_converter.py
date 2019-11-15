@@ -284,7 +284,7 @@ class WorkerConstraintConverter(BaseConverter):
         return {
             'id': obj.id,
             'worker': obj.worker_id,
-            'week_length': obj.worker.week_availability,
+            'week_length': obj.employment.week_availability,
             'weekday': obj.weekday,
             'tm': cls.convert_time(obj.tm),
             'is_lite': obj.is_lite,

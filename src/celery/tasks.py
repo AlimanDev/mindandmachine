@@ -473,7 +473,7 @@ def allocation_of_time_for_work_on_cashbox():
                     worker_day__dt__gte=prev_month,
                     worker_day__dt__lt=dt,
                     dttm_to__isnull=False,
-                    worker_day__worker__dt_fired__isnull=True
+                    worker_day__employment__dt_fired__isnull=True
                 ).order_by('worker_day__worker', 'worker_day__dt')
 
                 for detail in worker_day_cashbox_details:
