@@ -125,8 +125,8 @@ def get_table(request, form):
         row = 3
         start_row = row
         workerdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
-            worker__shop__id=shop_id,
-            worker__shop__title="Кассиры",
+            shop__id=shop_id,
+            # shop__title="Кассиры",
             dt=weekday,
         ).order_by(
             'dttm_work_start',
@@ -295,7 +295,7 @@ def get_table(request, form):
                 worksheet.write_blank(row + i, col, '', mix_formats(workbook, size_format, border))
 
     output = io.BytesIO()
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     weekday = form['weekday']
 
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})

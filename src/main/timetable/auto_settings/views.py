@@ -312,12 +312,13 @@ def create_timetable(request, form):
     except:
         return JsonResponse.already_exists_error()
 
-    users = list(User.objects.qos_filter_active(
+    employments=Employment.objects.get_active(
         dt_from,
         dt_to,
         shop_id=shop_id,
-        # auto_timetable=True,
-    ).select_related('position'))
+        auto_timetable=True,
+    ).values_list('user_id', flat=True)
+    users = User.objects.filter(id__in=employments)
     shop = request.shop
     period_step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
 
@@ -389,12 +390,12 @@ def create_timetable(request, form):
     )
 
     constraints = group_by(
-        collection=WorkerConstraint.objects.select_related('worker').filter(worker__shop_id=shop_id),
+        collection=WorkerConstraint.objects.select_related('worker').filter(employment__shop_id=shop_id),
         group_key=lambda x: x.worker_id
     )
 
     availabilities = group_by(
-        collection=UserWeekdaySlot.objects.select_related('worker').filter(worker__shop_id=shop_id),
+        collection=UserWeekdaySlot.objects.select_related('worker').filter(employment__shop_id=shop_id),
         group_key=lambda x: x.worker_id
     )
 
@@ -407,7 +408,7 @@ def create_timetable(request, form):
     new_worker_days = []
     worker_days_mask = {}
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
-        worker__shop_id=form['shop_id'],
+        employment__shop_id=form['shop_id'],
         dt__gte=dt_from,
         dt__lt=dt_to,
     ).exclude(
@@ -449,7 +450,7 @@ def create_timetable(request, form):
     prev_worker_days = []
     worker_days_mask = {}
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
-        worker__shop_id=form['shop_id'],
+        employment__shop_id=form['shop_id'],
         dt__gte=dt_from - timedelta(days=7),
         dt__lte=dt_from,
     ).exclude(
@@ -559,7 +560,7 @@ def create_timetable(request, form):
 
     prev_month_data = group_by(
         collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
-            worker__shop_id=shop_id,
+            employment__shop_id=shop_id,
             dt__gte=dt_from - timedelta(days=7),
             dt__lt=dt_from,
         ),
@@ -719,10 +720,10 @@ def delete_timetable(request, form):
 
 
     WorkerDayCashboxDetails.objects.filter(
-        worker_day__worker__shop_id=shop_id,
+        worker_day__employment__shop_id=shop_id,
         worker_day__dt__gte=dt_from,
         worker_day__dt__lt=dt_to,
-        worker_day__worker__auto_timetable=True,
+        worker_day__employment__auto_timetable=True,
         is_vacancy=False,
     ).filter(
         Q(worker_day__created_by__isnull=True) |
@@ -732,20 +733,20 @@ def delete_timetable(request, form):
     )
 
     WorkerDayCashboxDetails.objects.filter(
-        worker_day__worker__shop_id=shop_id,
+        worker_day__employment__shop_id=shop_id,
         worker_day__dt__gte=dt_from,
         worker_day__dt__lt=dt_to,
-        worker_day__worker__auto_timetable=True,
+        worker_day__employment__auto_timetable=True,
         is_vacancy=True,
     ).update(
         worker_day=None
     )
 
     wdays = WorkerDay.objects.filter(
-        worker__shop_id=shop_id,
+        employment__shop_id=shop_id,
         dt__gte=dt_from,
         dt__lt=dt_to,
-        worker__auto_timetable=True,
+        employment__auto_timetable=True,
         child__id__isnull=True
     ).filter(
         created_by__isnull=True,

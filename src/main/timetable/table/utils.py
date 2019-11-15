@@ -80,11 +80,13 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
         Q(workerdaycashboxdetails__status__in=WorkerDayCashboxDetails.WORK_TYPES_LIST) | Q(workerdaycashboxdetails=None), # for doing left join
         dt__gte=dt_start,
         dt__lte=dt_end,
-        worker_id__in=users_ids.keys(),
+        employment_id__in=users_ids.keys(),
         child__isnull=True,
     ).values(
         'id',
         'worker_id',
+        'employment_id',
+        'shop_id',
         'dt',
         'type',
         'dttm_work_start',
@@ -104,9 +106,9 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
 
     # t = check_time(t)
     for row in wdds:
-        if worker_id != row['worker_id']:
+        if worker_id != row['employment_id']:
             workers_info[worker_id] = worker
-            worker_id = row['worker_id']
+            worker_id = row['employment_id']
 
             user = users_ids[worker_id]
             norm_days = total_norm
