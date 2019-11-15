@@ -305,11 +305,11 @@ class Tabel_xlsx(Xlsx_base):
             # print(night_hs, night_edges[0] < tm_end, night_edges[1] >= tm_end)
         return total, night_hs
 
-    def fill_table(self, workdays, users, triplets, working_hours, row_s, col_s):
+    def fill_table(self, workdays, employments, triplets, working_hours, row_s, col_s):
         """
         одинаковая сортировка у workdays и users должна быть
         :param workdays:
-        :param users:
+        :param employments:
         :param triplets:
         :return:
         """
@@ -317,10 +317,10 @@ class Tabel_xlsx(Xlsx_base):
         it = 0
         cell_format = dict(self.day_type)
         n_workdays = len(workdays)
-        for row_shift, user in enumerate(users):
+        for row_shift, employment in enumerate(employments):
             for day in range(len(self.prod_days)):
 
-                if (it < n_workdays) and (workdays[it].worker_id == user.id) and (day + 1 == workdays[it].dt.day):
+                if (it < n_workdays) and (workdays[it].employment_id == employment.id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
                     if wd.type == WorkerDay.Type.TYPE_WORKDAY.value:
                         total_h, night_h = self._count_time(wd.dttm_work_start.time(), wd.dttm_work_end.time(), (0, 0), triplets)
@@ -365,7 +365,7 @@ class Tabel_xlsx(Xlsx_base):
                 self.worksheet.write(
                     row_s + row_shift * 2 + 1,
                     col_s + day,
-                    round(working_hours.get(user.id, {}).get(dt, 0)),
+                    round(working_hours.get(employment.user_id, {}).get(dt, 0)),
                     self.workbook.add_format(cell_format)
                 )
 
@@ -670,7 +670,7 @@ class Tabel_xlsx(Xlsx_base):
     def change_for_inspection(month_norm_hours, workdays):
         break_triplets = json.loads(workdays[0].worker.shop.break_triplets)
 
-        workdays = group_by(workdays, group_key=lambda _: _.worker_id)
+        workdays = group_by(workdays, group_key=lambda _: _.user_id)
         actual_hours = {}
 
         def from_workday_to_holiday(wd):

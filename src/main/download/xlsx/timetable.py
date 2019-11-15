@@ -7,10 +7,10 @@ import json
 from src.util.forms import FormUtil
 
 from src.db.models import (
+    Employment,
     WorkerDay,
     User,
     ProductionDay,
-    Shop,
 )
 
 from src.main.download.xlsx.tabel import Tabel_xlsx
@@ -118,11 +118,11 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.write_string('AM10', 'В', format_header_text)
         self.worksheet.write_string('AN10', 'ОТ', format_header_text)
 
-    def fill_table(self, workdays, users, triplets, row_s, col_s):
+    def fill_table(self, workdays, employments, triplets, row_s, col_s):
         """
         одинаковая сортировка у workdays и users должна быть
         :param workdays:
-        :param users:
+        :param employments:
         :param triplets:
         :return:
         """
@@ -130,7 +130,7 @@ class Timetable_xlsx(Tabel_xlsx):
         it = 0
         cell_format = dict(self.day_type)
         n_workdays = len(workdays)
-        for row_shift, user in enumerate(users):
+        for row_shift, user in enumerate(employments):
             night_hours = 0
             for day in range(len(self.prod_days)):
                 if (it < n_workdays) and (workdays[it].worker_id == user.id) and (day + 1 == workdays[it].dt.day):
@@ -253,7 +253,9 @@ class Timetable_xlsx(Tabel_xlsx):
         }
 
         prev_user_data = None
-        workers = User.objects.qos_filter_active(dt_to, dt_from, shop_id=shop.id).order_by('id')
+        employments = Employment.objects.get_active(
+            dt_to, dt_from, shop_id=shop.id).values_list('user_id', flat=True)
+        workers = User.objects.filter(id__in=employments).order_by('id')
         last_worker = len(workers) - 1
         for i, worker in enumerate(workers):
             worker_days = {x.dt: x for x in workdays if x.worker_id == worker.id}
@@ -345,7 +347,7 @@ class Timetable_xlsx(Tabel_xlsx):
 def download(request, workbook, form):
     ws = workbook.add_worksheet('Расписание на подпись')
 
-    shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
+    shop = request.shop
     checkpoint = FormUtil.get_checkpoint(form)
 
     timetable = Timetable_xlsx(
@@ -355,25 +357,30 @@ def download(request, workbook, form):
         worksheet=ws,
         prod_days=None
     )
-    users = list(User.objects.qos_filter_active(
+
+    employments = Employment.objects.get_active(
         dt_from=timetable.prod_days[-1].dt,
         dt_to=timetable.prod_days[0].dt,
         shop=shop,
-    ).select_related('position').order_by('position_id', 'last_name', 'first_name', 'tabel_code'))
+    ).order_by('position_id', 'user__last_name', 'user__first_name', 'user__middle_name', 'tabel_code')
+
+    # users = User.objects.filter(id__in=employments).order_by( 'last_name', 'first_name', 'middle_name', 'id')
 
     breaktimes = json.loads(shop.break_triplets)
     breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
     workdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
-        worker__in=users,
+        employment__in=employments,
+        # worker__in=users,
         dt__gte=timetable.prod_days[0].dt,
         dt__lte=timetable.prod_days[-1].dt,
-    ).order_by('worker__position_id', 'worker__last_name', 'worker__first_name', 'worker__tabel_code', 'dt')
+    ).order_by(
+        'employment__position_id', 'worker__last_name', 'worker__first_name', 'worker__middle_name', 'employment__tabel_code', 'dt')
 
     if form.get('inspection_version', False):
         timetable.change_for_inspection(timetable.prod_month.norm_work_hours, workdays)
 
-    timetable.format_cells(len(users))
+    timetable.format_cells(len(employments))
     timetable.add_main_info()
 
     # construct weekday
@@ -383,10 +390,10 @@ def download(request, workbook, form):
     timetable.construct_dates('%d.%m', 9, 4)
 
     # construct user info
-    timetable.construnts_users_info(users, 11, 0, ['code', 'fio', 'position'])
+    timetable.construnts_users_info(employments, 11, 0, ['code', 'fio', 'position'])
 
     # fill page 1
-    timetable.fill_table(workdays, users, breaktimes, 11, 4)
+    timetable.fill_table(workdays, employments, breaktimes, 11, 4)
 
     # fill page 2
     timetable.fill_table2(shop, timetable.prod_days[-1].dt, workdays)
