@@ -56,7 +56,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
     def setUp(self, worker_day=False):
         super().setUp()
-        logging.disable(logging.CRITICAL)
+        # logging.disable(logging.CRITICAL)
 
         # Restart sequences from high value to not catch AlreadyExists errors on normal objects creation
         # TODO: remove explicit object ids in object.create-s below and this sequence restart
@@ -347,9 +347,9 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             dt_from = (dttm_now - relativedelta(days=15)).date()
             dt_to = dt_from + relativedelta(months=1)
             while dt_from < dt_to:
-                for user in User.objects.all():
+                for employment in Employment.objects.all():
                     self.create_worker_day(
-                        worker=user,
+                        employment=employment,
                         dt=dt_from,
                         dttm_work_start=datetime.datetime.combine(dt_from, datetime.time(9, 0)),
                         dttm_work_end=datetime.datetime.combine(dt_from, datetime.time(18, 0)),
@@ -502,20 +502,22 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
     def create_worker_day(
             self,
-            worker,
+            employment,
             dt,
             dttm_work_start,
             dttm_work_end,
             type=WorkerDay.Type.TYPE_WORKDAY.value
     ):
         worker_day = WorkerDay.objects.create(
-            worker=worker,
+            employment=employment,
+            worker=employment.user,
+            shop=employment.shop,
             type=type,
             dt=dt,
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,
         )
-        cashbox = Cashbox.objects.first()
+        cashbox = self.cashbox3
         WorkerDayCashboxDetails.objects.create(
             worker_day=worker_day,
             on_cashbox=cashbox,
