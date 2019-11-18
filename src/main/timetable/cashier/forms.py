@@ -80,7 +80,7 @@ class SelectCashiersForm(forms.Form):
 
 
 class GetCashierTimetableForm(forms.Form):
-    worker_ids = util_forms.IntegersList(required=True)
+    worker_ids = util_forms.IntegersList()
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
     shop_id = forms.IntegerField()

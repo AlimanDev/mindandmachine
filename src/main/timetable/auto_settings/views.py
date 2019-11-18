@@ -98,6 +98,9 @@ def set_selected_cashiers(request, form):
     """
     employments = Employment.objects.filter(shop_id=form['shop_id'])
 
+    if (not form['worker_ids']):
+        employments.update(auto_timetable=False)
+
     employments.filter(
         user_id__in=form['worker_ids']
     ).update(auto_timetable=True)
@@ -106,7 +109,7 @@ def set_selected_cashiers(request, form):
         user_id__in=form['worker_ids']
     ).update(auto_timetable=False)
 
-    return JsonResponse.success()
+   return JsonResponse.success()
 
 
 @api_method(

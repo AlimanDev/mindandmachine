@@ -256,7 +256,7 @@ def delete_cashbox(request, form):
 @api_method(
     'POST',
     UpdateCashboxForm,
-    lambda_func=lambda x: WorkType.objects.get(id=x['to_work_type_id'].shop)
+    lambda_func=lambda x: WorkType.objects.get(id=x['to_work_type_id']).shop
 )
 def update_cashbox(request, form):
     """
@@ -300,7 +300,7 @@ def update_cashbox(request, form):
     try:
         cashbox = Cashbox.objects.select_related(
             'type'
-        ).filter(
+        ).get(
             type__id=from_work_type.id,
             type__shop_id=from_work_type.shop_id,
             dttm_deleted=None,
