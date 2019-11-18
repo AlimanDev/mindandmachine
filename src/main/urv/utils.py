@@ -34,7 +34,7 @@ def wd_stat_count(worker_days):
                 Case(When(coming__lt=F('dttm_work_start'), then=F('dttm_work_start')),
                     default=F('coming'), output_field=DateTimeField()),
                 timedelta(hours=0)), 'epoch') / 3600,
-            FloatField()),
+            IntegerField()),
     )
 
 
