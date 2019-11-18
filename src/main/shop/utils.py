@@ -106,6 +106,8 @@ def get_shop_list_stats(form, request, display_format='raw'):
         ).values_list('shop_id', flat=True)
 
         shops = Shop.objects.filter(id__in=shop_ids)
+        if len(shops)==1:
+            shops = shops[0].get_children()
 
     shops=shops.filter(
             dttm_deleted__isnull=True,
