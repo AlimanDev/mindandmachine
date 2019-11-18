@@ -109,7 +109,7 @@ def set_selected_cashiers(request, form):
         user_id__in=form['worker_ids']
     ).update(auto_timetable=False)
 
-   return JsonResponse.success()
+    return JsonResponse.success()
 
 
 @api_method(
