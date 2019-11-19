@@ -74,7 +74,7 @@ def get_tabel(request, workbook, form):
         dt__lte=to_dt,
     ).order_by('worker__position_id', 'worker__last_name', 'worker__first_name', 'worker__tabel_code', 'dt')
 
-    wd_stat = wd_stat_count(workdays)
+    wd_stat = wd_stat_count(workdays, shop)
     working_hours = {}
     for wd in wd_stat:
         if wd['worker_id'] not in working_hours:

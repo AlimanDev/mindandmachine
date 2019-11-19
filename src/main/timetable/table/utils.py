@@ -158,7 +158,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
     workers_info[worker_id] = worker
     workers_info.pop(0)
 
-    hours_stat = wd_stat_count(wdds)
+    hours_stat = wd_stat_count(wdds, shop)
     for wd in hours_stat:
         if 'hours_fact' not in workers_info[wd['worker_id']]:
             workers_info[wd['worker_id']]['hours_fact'] = 0

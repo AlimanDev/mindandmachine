@@ -325,7 +325,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
             'total_need': predict_needs.sum(),
             'total_go': finite_work.sum(),
             'total_plan': shop.staff_number * norm_work_hours,
-            'hours_count_fact': wd_stat_count_total(worker_days)['hours_count_fact'],
+            'hours_count_fact': wd_stat_count_total(worker_days, shop)['hours_count_fact'],
         },
     })
     return response
