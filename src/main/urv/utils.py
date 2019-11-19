@@ -12,18 +12,20 @@ from src.db.models import (
 
 
 def wd_stat_count(worker_days, shop):
-    breaks = json.loads(shop.break_triplets)
-    breaks = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaks))
-    if breaks:
+    break_triplets = json.loads(shop.break_triplets)
+    break_triplets = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), break_triplets))
+    breaktime_plan = Value(0, output_field=FloatField())
+    breaktime_fact = Value(0, output_field=FloatField())
+    if break_triplets:
         whens = [
             When(Q(hours_plan_0__gte=break_triplet[0], hours_plan_0__lte=break_triplet[1]),
                       then = break_triplet[2])
-            for break_triplet in breaks]
+            for break_triplet in break_triplets]
         breaktime_plan = Case(*whens, output_field=FloatField())
         whens = [
             When(Q(hours_fact_0__gte=break_triplet[0], hours_fact_0__lte=break_triplet[1]),
                       then = break_triplet[2])
-            for break_triplet in breaks]
+            for break_triplet in break_triplets]
         breaktime_fact = Case(*whens, output_field=FloatField())
 
     return worker_days.filter(

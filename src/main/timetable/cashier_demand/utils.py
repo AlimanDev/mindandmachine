@@ -232,6 +232,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
 
     workers = list(User.objects.filter(id__in=cashbox_details.values_list('worker_day__worker')))
     month_work_stat = count_work_month_stats(
+        shop=shop,
         dt_start=from_dt,
         dt_end=form['to_dt'], # original date
         users=workers

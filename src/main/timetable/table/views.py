@@ -357,8 +357,9 @@ def get_month_stat(request, form):
         usrs = usrs.filter(id__in=worker_ids)
     usrs = usrs.order_by('id')
 
+    shop = Shop.objects.get(id=form['shop_id'])
     # count info of current month
-    month_info = count_work_month_stats(dt_start, dt_end, usrs)
+    month_info = count_work_month_stats(shop, dt_start, dt_end, usrs)
 
     user_info_dict = count_difference_of_normal_days(dt_end=dt_start, usrs=usrs)
 
