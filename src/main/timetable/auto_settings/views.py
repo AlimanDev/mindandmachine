@@ -365,6 +365,11 @@ def create_timetable(request, form):
         return JsonResponse.value_error(status_message)
     
     # проверки для фиксированных чуваков
+    # Возможности сотрудников
+    availabilities = group_by(
+        collection=UserWeekdaySlot.objects.select_related('worker').filter(worker__shop_id=shop_id),
+        group_key=lambda x: x.worker_id
+    )
     for user in users:
         if user.is_fixed_hours:
             availability_info = availabilities.get(user.id, [])
@@ -484,12 +489,6 @@ def create_timetable(request, form):
     # Ограничения сотрудников
     constraints = group_by(
         collection=WorkerConstraint.objects.select_related('worker').filter(worker__shop_id=shop_id),
-        group_key=lambda x: x.worker_id
-    )
-
-    # Возможности сотрудников
-    availabilities = group_by(
-        collection=UserWeekdaySlot.objects.select_related('worker').filter(worker__shop_id=shop_id),
         group_key=lambda x: x.worker_id
     )
 
