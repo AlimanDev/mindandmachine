@@ -38,6 +38,7 @@ def get_uploaded_file(func):
     Проверят загруженный на сервак файл(есть ли вообще файл в запросе и какого он формата)
     18.11.2018 -- пока поддерживаем только excel
 
+    запускать с api_method
     Args:
         request(WSGIrequest): request
 
@@ -56,14 +57,7 @@ def get_uploaded_file(func):
         if not file.name.split('/')[-1].split('.', file.name.split('/')[-1].count('.'))[-1] in ALLOWED_UPLOAD_EXTENSIONS:
             return JsonResponse.value_error('Файлы с таким расширением не поддерживается.')
 
-        try:
-            return func(request, form, file, *args, **kwargs)
-        except Exception as e:
-            print(e)
-            if settings.DEBUG:
-                raise e
-            else:
-                return JsonResponse.internal_error('error in get_uploaded_file decorator')
+        return func(request, form, file, *args, **kwargs)
     return wrapper
 
 def upload_vacation_util(vacation_file):
