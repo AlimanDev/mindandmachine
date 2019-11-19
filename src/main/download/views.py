@@ -27,7 +27,7 @@ from .forms import (
 )
 
 from .xlsx.tabel import Tabel_xlsx
-
+from django.db.models import F, Q
 
 @api_method('GET', GetTable)
 @xlsx_method
@@ -69,8 +69,9 @@ def get_tabel(request, workbook, form):
     ).select_related('position').order_by('position_id', 'last_name', 'first_name', 'tabel_code'))
 
     workdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+        Q(dt__lt=F('worker__dt_fired')) | Q(worker__dt_fired__isnull=True),
+        Q(dt__gte=F('worker__dt_hired')) & Q(dt__gte=from_dt),
         worker__in=users,
-        dt__gte=from_dt,
         dt__lte=to_dt,
     ).order_by('worker__position_id', 'worker__last_name', 'worker__first_name', 'worker__tabel_code', 'dt')
 
