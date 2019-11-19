@@ -420,7 +420,65 @@ class TestSetWorkerDay(LocalTestCase):
         self.assertEqual(wd.dttm_work_end, datetime.datetime.combine(timezone.now().date(), datetime.time(12, 00)))
         self.assertEqual(wd.type, WorkerDay.Type.TYPE_BUSINESS_TRIP.value)
         self.assertIsNotNone(wd.parent_worker_day)
+        
+    def test_update_range(self):
+        with self.auth_user():
+            response = self.api_post(self.url, {
+                "worker_id": self.user2.pk,
+                "dt": BaseConverter.convert_date(timezone.now()),
+                "dt_to": BaseConverter.convert_date(timezone.now() + datetime.timedelta(days=2)),
+                "tm_work_start": "11:00:00",
+                "tm_work_end": "12:00:00",
+                "type": WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_BUSINESS_TRIP.value),
+                "comment": "I'm a test"
+            })
+        self.assertResponseCodeEqual(response, 200)
+        data = response.json()['data']
+        self.assertEqual(data[0]['action'], 'update', data)
 
+        wd: WorkerDay = WorkerDay.objects.filter(worker_id=self.user2.pk, dt=timezone.now().date()).last()
+        wd2: WorkerDay = WorkerDay.objects.filter(worker_id=self.user2.pk, dt=timezone.now().date() + datetime.timedelta(days=1)).last()
+        self.assertEqual(wd.dttm_work_start, datetime.datetime.combine(timezone.now().date(), datetime.time(11, 00)))
+        self.assertEqual(wd.dttm_work_end, datetime.datetime.combine(timezone.now().date(), datetime.time(12, 00)))
+        self.assertEqual(wd.type, WorkerDay.Type.TYPE_BUSINESS_TRIP.value)
+        self.assertIsNotNone(wd.parent_worker_day)
+        self.assertEqual(wd2.dttm_work_start, datetime.datetime.combine(timezone.now().date() + datetime.timedelta(days=1), datetime.time(11, 00)))
+        self.assertEqual(wd2.dttm_work_end, datetime.datetime.combine(timezone.now().date() + datetime.timedelta(days=1), datetime.time(12, 00)))
+        self.assertEqual(wd2.type, WorkerDay.Type.TYPE_BUSINESS_TRIP.value)
+        self.assertIsNotNone(wd2.parent_worker_day)
+
+    def test_create_range(self):
+        user = User.objects.create_user(
+            'user8',
+            'k@k.k',
+            '4242',
+            id=8,
+            shop=self.shop,
+            function_group=self.employee_group,
+            last_name='Дурак7',
+            first_name='Иван7',
+        )
+        with self.auth_user():
+            response = self.api_post(self.url, {
+                "worker_id": user.pk,
+                "dt": BaseConverter.convert_date(timezone.now()),
+                "dt_to": BaseConverter.convert_date(timezone.now() + datetime.timedelta(days=2)),
+                "tm_work_start": "11:00:00",
+                "tm_work_end": "12:00:00",
+                "type": WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_WORKDAY.value),
+                "comment": "I'm a test"
+            })
+        self.assertResponseCodeEqual(response, 200)
+        data = response.json()['data']
+        self.assertEqual(data[0]['action'], 'create', data)
+        wd: WorkerDay = WorkerDay.objects.filter(worker_id=8, dt=timezone.now().date()).last()
+        wd2: WorkerDay = WorkerDay.objects.filter(worker_id=8, dt=timezone.now().date() + datetime.timedelta(days=1)).last()
+        self.assertEqual(wd.dttm_work_start, datetime.datetime.combine(timezone.now().date(), datetime.time(11, 00)))
+        self.assertEqual(wd.dttm_work_end, datetime.datetime.combine(timezone.now().date(), datetime.time(12, 00)))
+        self.assertEqual(wd.type, WorkerDay.Type.TYPE_WORKDAY.value)
+        self.assertEqual(wd2.dttm_work_start, datetime.datetime.combine(timezone.now().date() + datetime.timedelta(days=1), datetime.time(11, 00)))
+        self.assertEqual(wd2.dttm_work_end, datetime.datetime.combine(timezone.now().date() + datetime.timedelta(days=1), datetime.time(12, 00)))
+        self.assertEqual(wd2.type, WorkerDay.Type.TYPE_WORKDAY.value)
 #
 # class TestGetWorkerDayLogs(LocalTestCase):
 #     url = '/api/timetable/cashier/get_worker_day_logs'

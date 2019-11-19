@@ -16,7 +16,7 @@ from src.db.models import (
 from src.main.download.xlsx.tabel import Tabel_xlsx
 from src.util.collection import range_u, count
 from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
-
+from django.db.models import F, Q
 
 class Cell(object):
     def __init__(self, dttm, format=None):
@@ -356,8 +356,8 @@ def download(request, workbook, form):
         prod_days=None
     )
     users = list(User.objects.qos_filter_active(
-        dt_from=timetable.prod_days[-1].dt,
-        dt_to=timetable.prod_days[0].dt,
+        dt_from=timetable.prod_days[0].dt,
+        dt_to=timetable.prod_days[-1].dt,
         shop=shop,
     ).select_related('position').order_by('position_id', 'last_name', 'first_name', 'tabel_code'))
 
@@ -365,8 +365,9 @@ def download(request, workbook, form):
     breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
     workdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+        Q(dt__lt=F('worker__dt_fired')) | Q(worker__dt_fired__isnull=True),
+        Q(dt__gte=F('worker__dt_hired')) & Q(dt__gte=timetable.prod_days[0].dt),
         worker__in=users,
-        dt__gte=timetable.prod_days[0].dt,
         dt__lte=timetable.prod_days[-1].dt,
     ).order_by('worker__position_id', 'worker__last_name', 'worker__first_name', 'worker__tabel_code', 'dt')
 

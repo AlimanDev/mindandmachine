@@ -1,4 +1,4 @@
-from src.util.test import LocalTestCase, WorkType, datetime
+from src.util.test import LocalTestCase, WorkType, datetime, Cashbox
 
 
 class TestCashbox(LocalTestCase):
@@ -64,3 +64,109 @@ class TestCashbox(LocalTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 400)
         self.assertEqual(response.json()['data']['error_type'], 'AlreadyExist')
+
+    def test_delete_cashbox(self):
+        '''
+        Note: Внутри данной функции используется дополнительная функция send_notification
+        '''
+        self.auth()
+        data = {
+            'shop_id': self.shop.id,
+            'work_type_id': self.work_type1.id,
+            'number': self.cashbox1.number,
+            'bio': 'Cashbox crashed',
+        }
+        response = self.api_post(
+            '/api/cashbox/delete_cashbox',
+            data
+        )
+        res_json = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(res_json['code'], 200)
+        self.assertEqual(res_json['data']['id'], 1)
+        self.assertEqual(res_json['data']['dttm_added'], "08:30:00 01.01.2018")
+        self.assertEqual(res_json['data']['type'], 1)
+        self.assertEqual(res_json['data']['number'], 1)
+        self.assertEqual(res_json['data']['bio'], 'Cashbox crashed')
+
+    def test_update_cashbox(self):
+        self.auth()
+        Cashbox.objects.filter(id=1).update(id=200)
+        data = {
+            'from_work_type_id': self.work_type2.id,
+            'to_work_type_id': self.work_type1.id,
+            'number': self.cashbox2.number,
+        }
+        response = self.api_post(
+            '/api/cashbox/update_cashbox',
+            data
+        )
+        res_json = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(res_json['code'], 200)
+        self.assertEqual(res_json['data']['id'], 1)
+        self.assertEqual(res_json['data']['type'], 1)
+        self.assertEqual(res_json['data']['number'], '2')
+        self.assertEqual(res_json['data']['bio'], '')
+    
+    def test_create_work_type(self):
+        '''
+        Note: Внутри данной функции используется дополнительная функция send_notification
+        '''
+        self.auth()
+        WorkType.objects.filter(id=1).update(id=200)
+        data = {
+            'shop_id': self.shop.id,
+            'name': 'Уборка'
+        }
+        response = self.api_post(
+            '/api/cashbox/create_work_type',
+            data
+        )
+        res_json = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(res_json['code'], 200)
+        self.assertEqual(res_json['data']['id'], 1)
+        self.assertEqual(res_json['data']['dttm_deleted'], None)
+        self.assertEqual(res_json['data']['shop'], 13)
+        self.assertEqual(res_json['data']['priority'], 100)
+        self.assertEqual(res_json['data']['name'], 'Уборка')
+        self.assertEqual(res_json['data']['prob'], 1.0)
+        self.assertEqual(res_json['data']['prior_weight'], 1.0)
+        self.assertEqual(res_json['data']['min_workers_amount'], 0)
+        self.assertEqual(res_json['data']['max_workers_amount'], 20)
+        
+    def test_delete_work_type(self):
+        '''
+        Note: Внутри данной функции используется дополнительная функция send_notification
+        '''
+        self.auth()
+        data = {
+            'work_type_id' : self.work_type1.id,
+        }
+        response = self.api_post(
+            '/api/cashbox/delete_work_type',
+            data
+        )
+        res_json = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(res_json['code'], 500)
+        self.assertEqual(res_json['data']['error_type'], 'InternalError')
+        self.assertEqual(res_json['data']['error_message'], 'there are cashboxes on this type')
+        Cashbox.objects.filter(type_id=self.work_type1.id).update(type=self.work_type2)
+        response = self.api_post(
+            '/api/cashbox/delete_work_type',
+            data
+        )
+        res_json = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(res_json['code'], 200)
+        self.assertEqual(res_json['data']['id'], 1)
+        self.assertEqual(res_json['data']['dttm_added'], '00:00:00 01.01.2018')
+        self.assertEqual(res_json['data']['shop'], 13)
+        self.assertEqual(res_json['data']['priority'], 100)
+        self.assertEqual(res_json['data']['name'], 'Кассы')
+        self.assertEqual(res_json['data']['prob'], 1.0)
+        self.assertEqual(res_json['data']['prior_weight'], 1.0)
+        self.assertEqual(res_json['data']['min_workers_amount'], 0)
+        self.assertEqual(res_json['data']['max_workers_amount'], 20)
