@@ -369,18 +369,19 @@ def create_notifications():
 
 
 def main(date=None, shops=None, lang='ru', count_of_month=None):
-    f_name = 'src/db/works/test_data.json'
+    f_name = 'etc/scripts/test_data.json'
+
     lang_data = {
         'root_shop': 'Корневой магазин',
         'super_shop': 'Супер Магазин'
     }
 
-    if (lang == 'en'):
+    if lang == 'en':
         lang_data = {
             'root_shop': 'Root shop',
             'super_shop': 'Super Shop'
         }
-        f_name = 'src/db/works/test_data_en.json'
+        f_name = 'etc/scripts/test_data_en.json'
     
 
     f = open(f_name)
@@ -402,10 +403,11 @@ def main(date=None, shops=None, lang='ru', count_of_month=None):
         else:
             start_date = (date - timezone.timedelta(days=day_step)).replace(day=1)
         end_date = (start_date + timezone.timedelta(days=day_step * 4)).replace(day=1)
+
     predict_date = (end_date + timezone.timedelta(days=day_step * 2)).replace(day=1)
     worker_days = (end_date - start_date).days
     demand_days = (predict_date - start_date).days + 1
-    print(start_date, end_date, predict_date, worker_days, demand_days)
+    # print(start_date, end_date, predict_date, worker_days, demand_days)
 
     root_shop = Shop.objects.create(title=lang_data['root_shop'])
     parent_shop1 = Shop.objects.create(title=f'{lang_data["super_shop"]} № 1', parent = root_shop)

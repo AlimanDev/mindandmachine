@@ -25,6 +25,24 @@ cd QoS_backend/
 python manage.py runserver
 ```
 
+Есть набор тестовых данных для наполнения бд и удобного отображения в интерфейсе:
+
+```
+source venv/bin/activate
+python manage.py shell
+from etc.scripts import fill_db_test
+fill_db_test.main()
+```
+
+для создания групп доступа:
+```
+source venv/bin/activate
+python manage.py shell
+from etc.scripts import create_access_groups
+create_access_groups.main()
+```
+
+
 Для запуска всех тестов:
 ```
 ./manage.py test 
