@@ -32,7 +32,7 @@ def fill_months(from_year, to_year):
          to_year(int): e.g. 2020
     """
     data = pd.read_csv(
-        'src/db/works/fill_production_calendar/work_data.csv',
+        'src/db/work_data.csv',
         index_col='Год/Месяц'
     )
 
@@ -63,7 +63,7 @@ def fill_days(from_date, to_date):
         to_date(str): e.g. '2019.1.1'
     """
     data = pd.read_csv(
-        'src/db/works/fill_production_calendar/work_data.csv',
+        'src/db/work_data.csv',
         index_col='Год/Месяц'
     )
 

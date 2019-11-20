@@ -1,5 +1,5 @@
 from django.db import migrations
-from src.db.works.fill_production_calendar import fill_calendar
+from src.db import fill_calendar
 
 
 def fill_days(apps, schema_editor):
