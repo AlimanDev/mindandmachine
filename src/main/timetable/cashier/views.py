@@ -343,10 +343,12 @@ def get_cashier_timetable(request, form):
             dt__lte=to_dt,
             worker__attachment_group=User.GROUP_STAFF
         )
+
         if approved_only:
             wd_logs = wd_logs.filter(
                 worker_day_approve_id__isnull = False
             )
+
         worker_day_change_log = group_by(
             wd_logs,
             group_key=lambda _: WorkerDay.objects.qos_get_current_worker_day(_).id,
@@ -362,7 +364,7 @@ def get_cashier_timetable(request, form):
             'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and
                                                                         x.dt in official_holidays),
             'change_amount': len(worker_day_change_log),
-            'hours_count_fact': wd_stat_count_total(worker_days)['hours_count_fact']
+            'hours_count_fact': wd_stat_count_total(worker_days, request.shop)['hours_count_fact']
         }
 
         days_response = []
