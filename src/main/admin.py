@@ -74,7 +74,7 @@ class QsUserAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: User):
-        res = ', '.join(i.shop.title for i in instance.employment_set.all().select_related('shop'))
+        res = ', '.join(i.shop.title for i in instance.employments.all().select_related('shop'))
         return res
 
     @staticmethod
