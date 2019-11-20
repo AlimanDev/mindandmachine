@@ -405,13 +405,13 @@ class TestSetDemand(TestDemand):
         self.data['set_value'] = 20
         response = self.api_post('/api/demand/set_demand', data=self.data)
         self.assertEqual(response.status_code, 200)
-        correct_data = [20.0, 20.0, 20.0, 20.0, 20.0]
+        correct_data = [20.0, 20.0, 20.0, 10.0, 20.0]
         self.assertEqual(
             list(PeriodClients.objects.filter(
                 operation_type__work_type__shop_id=13,
                 dttm_forecast__lte=datetime.combine(self.date + timedelta(days=1), time(13, 0)),
                 dttm_forecast__gte=datetime.combine(self.date, time(12, 0))
-            )[:5].values_list('value', flat=True)), 
+            ).order_by('dttm_forecast').values('dttm_forecast', 'value').distinct()[:5].values_list('value', flat=True)), 
             correct_data
         )
         
