@@ -368,19 +368,20 @@ def create_notifications():
     Event.objects.bulk_create(list_event)
 
 
-def main(date=None, shops=None, lang='ru'):
-    f_name = 'src/db/works/test_data.json'
+def main(date=None, shops=None, lang='ru', count_of_month=None):
+    f_name = 'etc/scripts/test_data.json'
+
     lang_data = {
         'root_shop': 'Корневой магазин',
         'super_shop': 'Супер Магазин'
     }
 
-    if (lang == 'en'):
+    if lang == 'en':
         lang_data = {
             'root_shop': 'Root shop',
             'super_shop': 'Super Shop'
         }
-        f_name = 'src/db/works/test_data_en.json'
+        f_name = 'etc/scripts/test_data_en.json'
     
 
     f = open(f_name)
@@ -392,13 +393,17 @@ def main(date=None, shops=None, lang='ru'):
 
     if shops is None:
         shops = ['small', 'normal', 'big']
-
     day_step = 18
-    if date.day > day_step:
-        start_date = date.replace(day=1)
+    if count_of_month is not None:
+        start_date = (date - timezone.timedelta(days=30*count_of_month)).replace(day=1)
+        end_date = (date + timezone.timedelta(days=30)).replace(day=1)
     else:
-        start_date = (date - timezone.timedelta(days=day_step)).replace(day=1)
-    end_date = (start_date + timezone.timedelta(days=day_step * 4)).replace(day=1)
+        if date.day > day_step:
+            start_date = date.replace(day=1)
+        else:
+            start_date = (date - timezone.timedelta(days=day_step)).replace(day=1)
+        end_date = (start_date + timezone.timedelta(days=day_step * 4)).replace(day=1)
+
     predict_date = (end_date + timezone.timedelta(days=day_step * 2)).replace(day=1)
     worker_days = (end_date - start_date).days
     demand_days = (predict_date - start_date).days + 1

@@ -12,6 +12,8 @@
 from uuid import uuid4
 from django.utils import timezone
 from src.db.models import Shop
+
+
 def password_generator(len=14):
     return str(uuid4()).replace('-', '')[:len]  # algo based on SHA-1 (not safe enough nowdays)
 
