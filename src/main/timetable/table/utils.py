@@ -15,7 +15,7 @@ from django.db.models.functions import Coalesce
 from src.util.models_converter import WorkerDayConverter
 from src.main.urv.utils import wd_stat_count
 
-def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
+def count_work_month_stats(shop, dt_start, dt_end, users, times_borders=None):
     """
     Функция для посчета статистики работника за месяц
 

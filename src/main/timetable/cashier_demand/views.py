@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 
 from django.http import HttpResponse
 from django.db.models import Q
