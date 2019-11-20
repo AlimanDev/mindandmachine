@@ -196,7 +196,7 @@ class TestGetCashierList(LocalTestCase):
             shop=self.root_shop,
             function_group=self.employee_group,
             attachment_group=User.GROUP_OUTSOURCE,
-            last_name='Дурак7',
+            last_name='Васнецов7',
             first_name='Иван7',
             id=98,
             dt_hired=timezone.now() - datetime.timedelta(days=5),

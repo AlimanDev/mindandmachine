@@ -23,7 +23,7 @@ class TestDownload(LocalTestCase):
         ))
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(tabel[tabel.columns[1]][15], 'Дурак6 Иван6 None')
+        self.assertEqual(tabel[tabel.columns[1]][15], 'Васнецов6 Иван6 None')
 
 
     def test_get_demand_xlsx(self):
@@ -64,7 +64,7 @@ class TestURVDownload(LocalTestCase):
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[0]][0], '01.06.2019')
-        self.assertEqual(tabel[tabel.columns[1]][0], 'Дурак Иван')
+        self.assertEqual(tabel[tabel.columns[1]][0], 'Васнецов Иван')
         self.assertEqual(tabel[tabel.columns[2]][0], '09:00')
         self.assertEqual(tabel[tabel.columns[3]][0], 'пришел')
 

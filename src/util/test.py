@@ -166,7 +166,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             id=1,
             shop=self.root_shop,
             function_group=self.admin_group,
-            last_name='Дурак',
+            last_name='Васнецов',
             first_name='Иван',
         )
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2', first_name='Иван2', last_name='Иванов')
@@ -200,7 +200,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             id=5,
             shop=self.reg_shop1,
             function_group=self.chief_group,
-            last_name='Дурак5',
+            last_name='Васнецов5',
             first_name='Иван5',
         )
         self.user6 = User.objects.create_user(
@@ -210,7 +210,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             id=6,
             shop=self.shop,
             function_group=self.chief_group,
-            last_name='Дурак6',
+            last_name='Васнецов6',
             first_name='Иван6',
         )
         self.user7 = User.objects.create_user(
@@ -220,7 +220,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             id=7,
             shop=self.shop,
             function_group=self.employee_group,
-            last_name='Дурак7',
+            last_name='Васнецов7',
             first_name='Иван7',
         )
 
