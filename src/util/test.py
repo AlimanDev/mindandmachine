@@ -195,7 +195,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         self.employment3 = Employment.objects.create(
             user=self.user3,
             shop=self.shop,
-            auto_timetable=False
+            auto_timetable=False,
         )
 
         self.user4 = User.objects.create_user(

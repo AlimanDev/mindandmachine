@@ -89,7 +89,7 @@ def get_outsource_workers(request, form):
                 data['type'] = WorkerDayConverter.convert_type(wd.worker_day.type)
                 data['first_name'] = wd.worker_day.worker.first_name
                 data['last_name'] = wd.worker_day.worker.last_name
-                data['shop'] = wd.worker_day.employment.shop.title
+                data['shop'] = wd.worker_day.shop.title
 
             date_response_dict[converted_date]['outsource_workers'].append(data)
             date_response_dict[converted_date]['amount'] += 1

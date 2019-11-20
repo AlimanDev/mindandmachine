@@ -12,6 +12,7 @@ from django.core.exceptions import (
 from django.http import HttpResponse
 from django.views.debug import ExceptionReporter
 from django.views.decorators.csrf import csrf_exempt
+from django.utils.timezone import now
 
 from src.db.models import (
     Employment,
@@ -235,19 +236,23 @@ def api_method(
                         return JsonResponse.value_error('No shop id')
                         # shop = request.user.shop
 
+
                 request.shop = shop
                 if not skip_check_permissions:
-                    try:
-                        employment = Employment.objects.get(
-                            shop__in=shop.get_ancestors(include_self=True, ascending=True),
-                            user=request.user)
-                    except ObjectDoesNotExist:
+                    dt = now().date()
+
+                    employments = Employment.objects.get_active(
+                        dt, dt,
+                        shop__in=shop.get_ancestors(include_self=True, ascending=True),
+                        user=request.user)
+
+                    if not len(employments):
                         return JsonResponse.access_forbidden(
                             'Вы не можете просматрировать информацию по другим магазинам'
                         )
 
-                    function_group_id = employment.function_group_id
-                    if not function_group_id:
+                    function_group_id = list(employments.values_list('function_group_id', flat=True))
+                    if not len(function_group_id):
                         return JsonResponse.internal_error(
                             'У пользователя {} {} не указана группа'.format(
                                 request.user.first_name,
@@ -255,17 +260,21 @@ def api_method(
                             )
                         )
 
-                    function_to_check = FunctionGroup.objects.filter(group__id=function_group_id,
+                    function_to_check = FunctionGroup.objects.filter(group__id__in=function_group_id,
                                                                      func=func.__name__).first()
                     if function_to_check is None:
                         return JsonResponse.access_forbidden(
                             'Для вашей группы пользователей не разрешено просматривать или изменять запрашиваемые данные.'
                         )
+                    authorized=False
+                    for employment in employments:
+                        parent = employment.shop
+                        level = parent.get_level_of(shop)
+                        if level <= function_to_check.level_down:
+                            authorized=True
+                            break
 
-                    # parent = shop.get_ancestor_by_level_distance(function_to_check.level_up)
-                    parent = employment.shop
-                    level = parent.get_level_of(shop)
-                    if level > function_to_check.level_down:
+                    if not authorized:
                         return JsonResponse.access_forbidden(
                             'Вы не можете просматрировать информацию по другим магазинам'
                         )
