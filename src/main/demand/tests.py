@@ -685,7 +685,7 @@ class TestSetPredBills(TestDemand):
             operation_type_id=5
         ).values('dttm_forecast', 'value', 'operation_type_id', 'type')), correct_data)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(Event.objects.get(pk=1).text, 'Cоставлен новый спрос на период с 01.09.2019 по 02.11.2019')
+        self.assertEqual(Event.objects.first().text, 'Cоставлен новый спрос на период с 01.09.2019 по 02.11.2019')
 
     def test_data_not_setted(self):
         self.auth()
