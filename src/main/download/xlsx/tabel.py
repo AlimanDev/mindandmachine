@@ -362,7 +362,7 @@ class Tabel_xlsx(Xlsx_base):
                     self.workbook.add_format(cell_format)
                 )
                 dt = self.month.replace(day=day+1)
-                user_working_hours = working_hours.get(user.id, {}).get(dt, 0)
+                user_working_hours = working_hours.get(employment.user_id, {}).get(dt, 0)
                 breaktime = 0
                 for triplet in triplets:
                     if triplet[0] <= user_working_hours and triplet[1] >= user_working_hours:
