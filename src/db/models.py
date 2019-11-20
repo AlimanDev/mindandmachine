@@ -290,7 +290,7 @@ class FunctionGroup(models.Model):
 
         'get_cashboxes',
         'get_cashboxes_info',
-        'get_cashboxes_open_time',
+        # 'get_cashboxes_open_time',
         'get_cashboxes_used_resource',
         'create_cashbox',
         'update_cashbox',
@@ -526,6 +526,7 @@ class OperationType(models.Model):
         default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 200, "reg_lambda": 2, "silent": 1, "iterations": 20}'
     )
 
+
 class OperationTemplate(models.Model):
     """
         Шаблоны операций.
@@ -659,6 +660,7 @@ class OperationTemplate(models.Model):
 
             dt_from += datetime.timedelta(days=1)
             day = lambda_get_day(dt_from)
+
 
 class UserWeekdaySlot(models.Model):
     class Meta(object):
@@ -1145,7 +1147,6 @@ class WorkerDayChangeRequest(models.Model):
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
     wish_text = models.CharField(null=True, blank=True, max_length=512)
-
 
 
 class EventManager(models.Manager):

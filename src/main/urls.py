@@ -1,11 +1,11 @@
 from django.conf import settings
-from django.conf.urls import include, url
+from django.conf.urls import include
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path
 
 from .auth import urls as auth_urls
-from .camera import urls as camera_urls
+from etc._old_code.camera import urls as camera_urls
 from .cashbox import urls as cashbox_urls
 from .download import urls as download_urls
 from .demand import urls as demand_urls
