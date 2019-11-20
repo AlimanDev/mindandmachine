@@ -12,6 +12,7 @@ from src.db.models import (
     PeriodClients,
     WorkType,
     OperationType,
+    Shop
 )
 from src.util.forms import FormUtil
 from src.util.models_converter import (

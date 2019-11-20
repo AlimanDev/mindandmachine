@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.db.models import (
     Count, F, Sum, Min, Max, Q, Case, When, Value, IntegerField, DateTimeField, FloatField)
-from django.db.models.functions import Extract, Coalesce, Cast
+from django.db.models.functions import Extract, Coalesce, Cast, Ceil
 
 from src.db.models import (
     AttendanceRecords,
@@ -39,21 +39,23 @@ def wd_stat_count(worker_days, shop):
         leaving=Max('worker__attendancerecords__dttm',
                       filter=Q(worker__attendancerecords__dttm__date=F('dt'),
                                worker__attendancerecords__type='L')),
-        hours_plan_0=Cast(Extract(F('dttm_work_end') - F('dttm_work_start'), 'epoch') / 3600, FloatField()),
         is_late=Case(
             When(coming__gt=F('dttm_work_start')-timedelta(minutes=15), then=1),
             default=Value(0), output_field=IntegerField()),
-        hours_fact_0=Cast(Extract(Coalesce(
-            Case(When(leaving__gt=F('dttm_work_end'), then=F('dttm_work_end')),
-                    default=F('leaving'), output_field=DateTimeField())
-            -
-            Case(When(coming__lt=F('dttm_work_start'), then=F('dttm_work_start')),
-                default=F('coming'), output_field=DateTimeField()),
-            timedelta(hours=0)), 'epoch') / 3600, FloatField()),
-        breaktime_plan=breaktime_plan,
-        breaktime_fact=breaktime_fact,
-        hours_fact=Cast(F('hours_fact_0') - F('breaktime_fact'), IntegerField()),
-        hours_plan=Cast(F('hours_plan_0') - F('breaktime_plan'), IntegerField())
+        hours_plan_0=Cast(Extract(F('dttm_work_end') - F('dttm_work_start'), 'epoch') / 3600, FloatField()),
+        hours_fact_0=Cast(
+            Extract(
+                Coalesce(
+                    Case(When(leaving__gt=F('dttm_work_end'), then=F('dttm_work_end')),
+                            default=F('leaving'), output_field=DateTimeField())
+                    -
+                    Case(When(coming__lt=F('dttm_work_start'), then=F('dttm_work_start')),
+                        default=F('coming'), output_field=DateTimeField()),
+                    timedelta(hours=0)),
+                'epoch') / 3600,
+            FloatField()),
+        hours_fact=Ceil(F('hours_fact_0') - breaktime_fact),
+        hours_plan=Ceil(F('hours_plan_0') - breaktime_plan)
     )
 
 
