@@ -240,7 +240,7 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERYD_CONCURRENCY = 2
 CELERYD_PREFETCH_MULTIPLIER = 1
 BACKEND_QUEUE = 'backend_queue'
-
+CELERY_TASK_DEFAULT_QUEUE = BACKEND_QUEUE
 # for change celery configs must be before (for BACKEND_QUEUE)
 # todo: do normal parameters changer
 if is_config_exists('djconfig_local.py'):
