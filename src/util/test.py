@@ -165,7 +165,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             self.USER_EMAIL,
             self.USER_PASSWORD,
             id=1,
-            last_name='Дурак',
+            last_name='Васнецов',
             first_name='Иван',
         )
         self.employment1 = Employment.objects.create(
@@ -218,7 +218,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             'm@m.m',
             '4242',
             id=5,
-            last_name='Дурак5',
+            last_name='Васнецов5',
             first_name='Иван5',
         )
         self.employment5 = Employment.objects.create(
@@ -232,7 +232,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             'b@b.b',
             '4242',
             id=6,
-            last_name='Дурак6',
+            last_name='Васнецов6',
             first_name='Иван6',
         )
         self.employment6 = Employment.objects.create(
@@ -246,7 +246,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             'k@k.k',
             '4242',
             id=7,
-            last_name='Дурак7',
+            last_name='Васнецов7',
             first_name='Иван7',
         )
         self.employment7 = Employment.objects.create(

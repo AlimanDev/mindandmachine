@@ -232,6 +232,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
     employments = Employment.objects.filter(id__in=cashbox_details.values_list('worker_day__employment'))
     workers = list(User.objects.filter(id__in=employments.values('user_id')))
     month_work_stat = count_work_month_stats(
+        shop=shop,
         dt_start=from_dt,
         dt_end=form['to_dt'], # original date
         users=employments,
@@ -326,7 +327,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
             'total_need': predict_needs.sum(),
             'total_go': finite_work.sum(),
             'total_plan': shop.staff_number * norm_work_hours,
-            'hours_count_fact': wd_stat_count_total(worker_days)['hours_count_fact'],
+            'hours_count_fact': wd_stat_count_total(worker_days, shop)['hours_count_fact'],
         },
     })
     return response

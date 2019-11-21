@@ -13,6 +13,7 @@ from src.db.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     WorkType,
+    Shop
 )
 from src.util.forms import FormUtil
 from src.util.models_converter import (
@@ -345,7 +346,6 @@ def get_month_stat(request, form):
     """
     # prepare data
     dt_start = datetime.date(form['dt'].year, form['dt'].month, 1)
-    dt_start_year = datetime.date(dt_start.year, 1, 1)
     dt_end = dt_start + relativedelta(months=+1)
     employments = Employment.objects.get_active(
         form['dt'], dt_end
@@ -359,8 +359,9 @@ def get_month_stat(request, form):
         shop = request.shop
         employments = employments.filter(shop_id=shop.id)
 
+    shop = Shop.objects.get(id=form['shop_id'])
     # count info of current month
-    month_info = count_work_month_stats(dt_start, dt_end, employments)
+    month_info = count_work_month_stats(shop, dt_start, dt_end, employments)
 
     user_info_dict = count_difference_of_normal_days(dt_end=dt_start, usrs=employments)
 

@@ -135,7 +135,7 @@ def get_indicators(request, form):
     if not form['type']:
         ticks_count_plan *= 2
 
-    wd_stat = wd_stat_count_total(worker_days)
+    wd_stat = wd_stat_count_total(worker_days, request.shop)
     indicators = {
         'ticks_coming_count_fact': wd_stat['ticks_coming_count'],
         'ticks_leaving_count_fact': wd_stat['ticks_leaving_count'],

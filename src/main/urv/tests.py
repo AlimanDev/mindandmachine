@@ -80,9 +80,9 @@ class TestURV(LocalTestCase):
                     'ticks_coming_count_fact': 2,
                     'ticks_leaving_count_fact': 1,
                     'ticks_count_fact': 3,
-                    'hours_count_fact': 10,
+                    'hours_count_fact': 9,
                     'ticks_count_plan': 4,
-                    'hours_count_plan': 20,
+                    'hours_count_plan': 18,
                     'lateness_count': 1},
                 'info': None}
 
