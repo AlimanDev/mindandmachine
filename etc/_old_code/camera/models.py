@@ -58,3 +58,53 @@ class CameraClientEvent(models.Model):
     def __str__(self):
         return 'id {}: {}, {}, {}'.format(self.id, self.dttm, self.type, self.gate.name)
 
+
+class PeriodVisitors(models.Model):
+    LONG_FORECASE_TYPE = 'L'
+    SHORT_FORECAST_TYPE = 'S'
+    FACT_TYPE = 'F'
+
+    FORECAST_TYPES = (
+        (LONG_FORECASE_TYPE, 'Long'),
+        (SHORT_FORECAST_TYPE, 'Short'),
+        (FACT_TYPE, 'Fact'),
+    )
+
+    class Meta:
+        abstract = True
+
+    id = models.BigAutoField(primary_key=True)
+    dttm_forecast = models.DateTimeField()
+    type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
+    work_type = models.ForeignKey('WorkType', on_delete=models.PROTECT)
+
+
+class IncomeVisitors(PeriodVisitors):
+    class Meta(object):
+        verbose_name = 'Входящие посетители (по периодам)'
+
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.work_type, self.value)
+
+    value = models.FloatField(default=0)
+
+
+class EmptyOutcomeVisitors(PeriodVisitors):
+    class Meta(object):
+        verbose_name = 'Выходящие без покупок посетители (по периодам)'
+
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.work_type, self.value)
+
+    value = models.FloatField(default=0)
+
+
+class PurchasesOutcomeVisitors(PeriodVisitors):
+    class Meta(object):
+        verbose_name = 'Выходящие с покупками посетители (по периодам)'
+
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.work_type, self.value)
+
+    value = models.FloatField(default=0)
+

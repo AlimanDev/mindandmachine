@@ -2,8 +2,6 @@ from datetime import datetime, timedelta, time, date
 
 from src.db.models import (
     PeriodClients,
-    PeriodProducts,
-    PeriodQueues,
     WorkType,
     PeriodDemandChangeLog,
     Shop,
@@ -23,11 +21,9 @@ from .forms import (
     GetIndicatorsForm,
     CreatePredictBillsRequestForm,
     GetDemandChangeLogsForm,
-    GetVisitorsInfoForm,
     SetPredictBillsForm,
 )
 from .utils import create_predbills_request_function
-from django.apps import apps
 import json
 
 
@@ -135,20 +131,20 @@ def get_forecast(request, form):
     period_clients = PeriodClients.objects.select_related('operation_type__work_type').filter(
         operation_type__work_type__shop_id=shop.id
     )
-    period_products = PeriodProducts.objects.select_related('operation_type__work_type').filter(
-        operation_type__work_type__shop_id=shop.id
-    )
-    period_queues = PeriodQueues.objects.select_related('operation_type__work_type').filter(
-        operation_type__work_type__shop_id=shop.id
-    )
+    # period_products = PeriodProducts.objects.select_related('operation_type__work_type').filter(
+    #     operation_type__work_type__shop_id=shop.id
+    # )
+    # period_queues = PeriodQueues.objects.select_related('operation_type__work_type').filter(
+    #     operation_type__work_type__shop_id=shop.id
+    # )
     
     if len(operation_type_ids) > 0:
         period_clients = [x for x in period_clients if x.operation_type_id in operation_type_ids]
-        period_products = [x for x in period_products if x.operation_type_id in operation_type_ids]
-        period_queues = [x for x in period_queues if x.operation_type_id in operation_type_ids]
+        # period_products = [x for x in period_products if x.operation_type_id in operation_type_ids]
+        # period_queues = [x for x in period_queues if x.operation_type_id in operation_type_ids]
     period_clients = _create_demands_dict(period_clients)
-    period_products = _create_demands_dict(period_products)
-    period_queues = _create_demands_dict(period_queues)
+    # period_products = _create_demands_dict(period_products)
+    # period_queues = _create_demands_dict(period_queues)
     dttm_from = datetime.combine(form['from_dt'], time())
     dttm_to = datetime.combine(form['to_dt'], time()) + timedelta(days=1)
     dttm_step = timedelta(seconds=shop.system_step_in_minutes() * 60)
@@ -156,27 +152,27 @@ def get_forecast(request, form):
     for forecast_type, forecast_data in forecast_periods.items():
         for dttm in range_u(dttm_from, dttm_to, dttm_step, False):
             clients = 0
-            products = 0
-            queue_wait_length = 0
+            # products = 0
+            # queue_wait_length = 0
 
             for x in period_clients.get(dttm.date(), {}).get(dttm.time(), []):
                 if x.type != forecast_type:
                     continue
                 clients += x.value
-            for x in period_products.get(dttm.date(), {}).get(dttm.time(), []):
-                if x.type != forecast_type:
-                    continue
-                products += x.value
-            for x in period_queues.get(dttm.date(), {}).get(dttm.time(), []):
-                if x.type != forecast_type:
-                    continue
-                queue_wait_length += x.value
+            # for x in period_products.get(dttm.date(), {}).get(dttm.time(), []):
+            #     if x.type != forecast_type:
+            #         continue
+            #     products += x.value
+            # for x in period_queues.get(dttm.date(), {}).get(dttm.time(), []):
+            #     if x.type != forecast_type:
+            #         continue
+            #     queue_wait_length += x.value
 
             forecast_data.append({
                 'dttm': BaseConverter.convert_datetime(dttm),
                 'clients': clients,
-                'products': products,
-                'queue': queue_wait_length
+                # 'products': products,
+                # 'queue': queue_wait_length
             })
 
     return JsonResponse.success({k: v for k, v in forecast_periods.items()})
@@ -341,58 +337,6 @@ def get_demand_change_logs(request, form):
     ])
 
 
-@api_method('GET', GetVisitorsInfoForm)
-def get_visitors_info(request, form):
-    """
-    Отдает информацию с камер по количеству посетителей
-
-    Args:
-        method: GET
-        url: /api/demand/get_visitors_info
-        from_dt(QOS_DATE): с какой даты смотрим
-        to_dt(QOS_DATE):
-        shop_id(int): чисто для api_method'a
-    Returns:
-        {
-            'IncomeVisitors': [], |
-            'PurchasesOutcomeVisitors': [], |
-            'EmptyOutcomeVisitors': []
-        }
-    """
-    def filter_qs(query_set, dttm):
-        value_dttm_tuple = list(filter(lambda item_in_qs: item_in_qs[0] == dttm, query_set))
-        return value_dttm_tuple[0][1] if value_dttm_tuple else 0
-
-    dttm_from = datetime.combine(form['from_dt'], time())
-    dttm_to = datetime.combine(form['to_dt'] + timedelta(days=1), time())
-
-    filter_dict = {
-        'type': PeriodClients.FACT_TYPE,
-        'dttm_forecast__gte': dttm_from,
-        'dttm_forecast__lte': dttm_to,
-    }
-
-    return_dict = {
-        'IncomeVisitors': [],
-        'PurchasesOutcomeVisitors': [],
-        'EmptyOutcomeVisitors': []
-    }
-    query_sets = {}
-
-    for model_name in return_dict.keys():
-        query_sets[model_name] = apps.get_model('db', model_name).objects.filter(**filter_dict).values_list(
-            'dttm_forecast', 'value'
-        )
-    dttm = dttm_from
-    while dttm < dttm_to:
-        for model_name, qs in query_sets.items():
-            return_dict[model_name].append({
-                'dttm': BaseConverter.convert_datetime(dttm),
-                'value': filter_qs(qs, dttm)
-            })
-        dttm += timedelta(minutes=30)
-
-    return JsonResponse.success(return_dict)
 
 
 @api_method('POST', CreatePredictBillsRequestForm)

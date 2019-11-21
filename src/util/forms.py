@@ -154,8 +154,6 @@ class FormUtil(object):
 
     @staticmethod
     def get_dt_from(form):
-        import pdb
-        pdb.set_trace()
         return form.get('from_dt') or datetime.datetime.now().date()
 
     @staticmethod
