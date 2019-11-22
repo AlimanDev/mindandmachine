@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 from django.contrib.auth import update_session_auth_hash
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
-from django.db.models import Q, F, Count
+from django.db.models import Q, F
 from django.utils import timezone
 
 from src.main.urv.utils import wd_stat_count_total
