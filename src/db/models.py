@@ -291,7 +291,7 @@ class FunctionGroup(models.Model):
         'get_cashboxes',
         'get_cashboxes_info',
         # 'get_cashboxes_open_time',
-        'get_cashboxes_used_resource',
+        # 'get_cashboxes_used_resource',
         'create_cashbox',
         'update_cashbox',
         'delete_cashbox',
@@ -317,6 +317,7 @@ class FunctionGroup(models.Model):
         'change_cashier_info',
         'create_cashier',
         'get_cashiers_info',
+
         'select_cashiers',
         'get_not_working_cashiers_list',
         'get_cashiers_list',
@@ -340,7 +341,6 @@ class FunctionGroup(models.Model):
 
         'get_user_urv',
         'upload_urv',
-        'change_user_urv',
 
         'get_forecast',
 
@@ -354,7 +354,6 @@ class FunctionGroup(models.Model):
         'exchange_workers_day',
 
         #algo callbacks
-        'set_queue',
         'set_demand',
         'set_pred_bills',
 
@@ -377,7 +376,6 @@ class FunctionGroup(models.Model):
 
         # shop/
         'get_department',
-        'get_parent',
         'add_department',
         'edit_department',
         'get_department_list',
