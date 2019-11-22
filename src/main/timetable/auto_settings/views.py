@@ -411,7 +411,7 @@ def create_timetable(request, form):
     new_worker_days = []
     worker_days_mask = {}
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
-        employment__shop_id=form['shop_id'],
+        shop_id=form['shop_id'],
         dt__gte=dt_from,
         dt__lt=dt_to,
     ).exclude(
@@ -557,7 +557,7 @@ def create_timetable(request, form):
 
     init_params['n_working_days_optimal'] = len(work_days)
 
-    user_info = count_difference_of_normal_days(dt_end=dt_from, usrs=users)
+    user_info = count_difference_of_normal_days(dt_end=dt_from, employments=employments)
 
     # инфа за предыдущую неделю
 

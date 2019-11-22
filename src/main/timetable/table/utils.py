@@ -1,4 +1,5 @@
 from src.db.models import (
+    Employment,
     WorkerDay,
     WorkerDayCashboxDetails,
     ProductionDay,
@@ -157,8 +158,8 @@ def count_work_month_stats(shop, dt_start, dt_end, employments, times_borders=No
         workers_info[wd['worker_id']]['paid_hours'] += round(wd['hours_plan'] or 0)
 
     for worker_id, worker in workers_info.items():
-        workers_info[worker_id]['diff_norm_days'] = worker['paid_days'] - worker['diff_norm_days']
-        workers_info[worker_id]['diff_norm_hours'] = worker['paid_hours'] - worker['diff_norm_hours']
+        worker['diff_norm_days'] = worker['paid_days'] - worker['diff_norm_days']
+        worker['diff_norm_hours'] = worker['paid_hours'] - worker['diff_norm_hours']
     #
     # t = check_time(t)
     return workers_info
@@ -200,14 +201,14 @@ def count_normal_days(dt_start, dt_end, employments):
     return dts_start_count_dict, year_days
 
 
-def count_difference_of_normal_days(dt_end, usrs, dt_start=None):
+def count_difference_of_normal_days(dt_end, employments, dt_start=None):
     """
     Функция для подсчета разница между нормальным количеством отработанных дней и часов и фактическими
 
     Args:
         dt_start(datetime.date):
         dt_end(datetime.date):
-        usrs(QuerySet):
+        employments(QuerySet):
 
     Returns:
         (dict): словарь с id'шниками пользователей -- по ключам, и 'diff_prev_paid_days' и 'diff_prev_paid_hours' \
@@ -215,11 +216,11 @@ def count_difference_of_normal_days(dt_end, usrs, dt_start=None):
     """
 
     dt_start = dt_start if dt_start else dt.date(dt_end.year, 1, 1)
-    dts_start_count_dict, _ = count_normal_days(dt_start, dt_end, usrs)
+    dts_start_count_dict, _ = count_normal_days(dt_start, dt_end, employments)
 
-    usrs_ids = [u.id for u in usrs]
+    usrs_ids = [u.id for u in employments]
 
-    prev_info = list(User.objects.filter(
+    prev_info = list(Employment.objects.filter(
         Q(workermonthstat__month__dt_first__gte=dt_start,
           workermonthstat__month__dt_first__lt=dt_end) |
         Q(workermonthstat=None), # for doing left join
@@ -231,15 +232,15 @@ def count_difference_of_normal_days(dt_end, usrs, dt_start=None):
     prev_info = {user['id']: user for user in prev_info}
     user_info_dict = {}
 
-    for u_it in range(len(usrs)):
-        dt_u_st = usrs[u_it].dt_hired if usrs[u_it].dt_hired and (usrs[u_it].dt_hired > dt_start) else dt_start
+    for u_it in range(len(employments)):
+        dt_u_st = employments[u_it].dt_hired if employments[u_it].dt_hired and (employments[u_it].dt_hired > dt_start) else dt_start
         total_norm_days, total_norm_hours = dts_start_count_dict[dt_u_st]
-        diff_prev_days = prev_info[usrs[u_it].id]['count_workdays'] - total_norm_days if prev_info.get(
-            usrs[u_it].id, None) else 0 - total_norm_days
-        diff_prev_hours = prev_info[usrs[u_it].id]['count_hours'] - total_norm_hours if prev_info.get(
-            usrs[u_it].id, None) else 0 - total_norm_hours
+        diff_prev_days = prev_info[employments[u_it].id]['count_workdays'] - total_norm_days if prev_info.get(
+            employments[u_it].id, None) else 0 - total_norm_days
+        diff_prev_hours = prev_info[employments[u_it].id]['count_hours'] - total_norm_hours if prev_info.get(
+            employments[u_it].id, None) else 0 - total_norm_hours
 
-        user_info_dict[usrs[u_it].id] = {
+        user_info_dict[employments[u_it].id] = {
             'diff_prev_paid_days': diff_prev_days,
             'diff_prev_paid_hours': diff_prev_hours
         }

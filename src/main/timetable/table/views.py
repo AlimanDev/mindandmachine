@@ -361,14 +361,19 @@ def get_month_stat(request, form):
     # count info of current month
     month_info = count_work_month_stats(shop, dt_start, dt_end, employments)
 
-    user_info_dict = count_difference_of_normal_days(dt_end=dt_start, employments=employments)
+    stat_prev_month = count_difference_of_normal_days(dt_end=dt_start, employments=employments)
 
-    for u_it in range(len(employments)):
-        month_info[employments[u_it].user_id].update({
-            'diff_prev_paid_days': user_info_dict[employments[u_it].id]['diff_prev_paid_days'],
-            'diff_prev_paid_hours': user_info_dict[employments[u_it].id]['diff_prev_paid_hours'],
-            'diff_total_paid_days': user_info_dict[employments[u_it].id]['diff_prev_paid_days'] + month_info[employments[u_it].id]['diff_norm_days'],
-            'diff_total_paid_hours': user_info_dict[employments[u_it].id]['diff_prev_paid_hours'] + month_info[employments[u_it].id]['diff_norm_hours'],
+    for employment in employments:
+        if employment.user_id not in month_info:
+            continue
+        emp_prev_stat = stat_prev_month[employment.id]
+        emp_month_info = month_info[employment.user_id]
+
+        emp_month_info.update({
+            'diff_prev_paid_days': emp_prev_stat['diff_prev_paid_days'],
+            'diff_prev_paid_hours': emp_prev_stat['diff_prev_paid_hours'],
+            'diff_total_paid_days': emp_prev_stat['diff_prev_paid_days'] + emp_month_info['diff_norm_days'],
+            'diff_total_paid_hours': emp_prev_stat['diff_prev_paid_hours'] + emp_month_info['diff_norm_hours'],
         })
     return JsonResponse.success({'users_info': month_info})
 

@@ -232,7 +232,7 @@ def update_worker_month_stat():
             time_break_triplets = 0
 
         worker_days = WorkerDay.objects.qos_current_version().select_related('worker').filter(
-            worker__shop=shop,
+            shop=shop,
             dt__lt=dt,
             dt__gte=dt2,
         ).order_by('worker', 'dt')

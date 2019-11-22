@@ -1423,9 +1423,12 @@ class ProductionDay(models.Model):
 
 class WorkerMonthStat(models.Model):
     class Meta(object):
-        verbose_name = 'Статистика по рабоче сотрудника за месяц'
+        verbose_name = 'Статистика по работе сотрудника за месяц'
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
+    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
+
     month = models.ForeignKey(ProductionMonth, on_delete=models.PROTECT)
 
     work_days = models.SmallIntegerField()
