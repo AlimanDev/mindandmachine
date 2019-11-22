@@ -12,7 +12,6 @@ Examples:
 """
 import pandas as pd
 import datetime
-from src.util.months import month_dict
 from calendar import monthrange
 from src.db.models import (
     ProductionMonth,
@@ -22,6 +21,21 @@ from src.db.models import (
 # произдственный календарь время от времени обновляется
 # csv скачивать отсюда (какой-то гос сайт с открытыми данными)
 # https://data.gov.ru/opendata/7708660670-proizvcalendar (мб со временем ссылка поменяется,но все равно сайт тотже)
+
+month_dict = {
+    1: 'январь',
+    2: 'февраль',
+    3: 'март',
+    4: 'апрель',
+    5: 'май',
+    6: 'июнь',
+    7: 'июль',
+    8: 'август',
+    9: 'сентябрь',
+    10: 'октябрь',
+    11: 'ноябрь',
+    12: 'декабрь',
+}
 
 
 def fill_months(from_year, to_year):

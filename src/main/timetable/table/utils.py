@@ -37,6 +37,7 @@ def count_work_month_stats(shop, dt_start, dt_end, users, times_borders=None):
 
     def init_values(times_borders, norm_days):
         dict = {
+            'hours_fact': 0,
             'paid_days': 0,
             'paid_hours': 0.0,
             'diff_norm_days': norm_days['days'],
@@ -162,7 +163,7 @@ def count_work_month_stats(shop, dt_start, dt_end, users, times_borders=None):
     for wd in hours_stat:
         if 'hours_fact' not in workers_info[wd['worker_id']]:
             workers_info[wd['worker_id']]['hours_fact'] = 0
-        workers_info[wd['worker_id']]['hours_fact'] += round(wd['hours_fact'])
+        workers_info[wd['worker_id']]['hours_fact'] += round(wd['hours_fact'] or 0)
 
     for worker_id, worker in workers_info.items():
         workers_info[worker_id]['diff_norm_days'] = worker['paid_days'] - worker['diff_norm_days']
