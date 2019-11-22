@@ -19,7 +19,7 @@ from src.db.models import (
 from src.util.collection import group_by
 from src.util.models_converter import BaseConverter
 from src.main.timetable.table.utils import count_work_month_stats
-from src.main.urv.utils import wd_stat_count_total
+from src.main.urv.utils import wd_stat_count_total, wd_stat_count
 
 
 def filter_worker_day_by_dttm(shop_id, day_type, dttm_from, dttm_to):
@@ -230,20 +230,23 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
     )
 
     employments = Employment.objects.filter(id__in=cashbox_details.values_list('worker_day__employment'))
-    workers = list(User.objects.filter(id__in=employments.values('user_id')))
-    month_work_stat = count_work_month_stats(
-        shop=shop,
-        dt_start=from_dt,
-        dt_end=form['to_dt'], # original date
-        users=employments,
-        # users=workers
+    employment_dict= {e.id: e for e in employments}
+
+    worker_days = WorkerDay.objects.qos_filter_version(1).filter(
+        dt__gte=from_dt,
+        dt__lte=to_dt,
+        employment__in=employments,
+        # employment__shop_id=shop_id,
+        type=WorkerDay.Type.TYPE_WORKDAY.value
     )
+
+    hours_stat = wd_stat_count(worker_days, shop)
     fot = 0
     norm_work_hours = ProductionMonth.objects.get(dt_first=from_dt.replace(day=1)).norm_work_hours
-    for worker_id in month_work_stat.keys():
+    for row in hours_stat:
         fot += round(
-            Decimal(month_work_stat[worker_id]['paid_hours']) *
-            list(filter(lambda x: x.id == worker_id, employments))[0].salary / Decimal(norm_work_hours)
+            Decimal(row['hours_plan']) *
+            employment_dict(row['employment_id']).salary / Decimal(norm_work_hours)
         )
 
     finite_workdetails = list(cashbox_details.filter(worker_day__child__id__isnull=True).select_related('worker_day'))
@@ -306,12 +309,6 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
 
     revenue = 1000000
 
-    worker_days = WorkerDay.objects.qos_filter_version(1).filter(
-        dt__gte=from_dt,
-        dt__lte=to_dt,
-        employment__shop_id=shop_id,
-        type=WorkerDay.Type.TYPE_WORKDAY.value
-    )
 
     response.update({
         'indicators': {

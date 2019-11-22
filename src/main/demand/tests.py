@@ -688,16 +688,3 @@ class TestSetPredBills(TestDemand):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Event.objects.first().text, 'Cоставлен новый спрос на период с 01.09.2019 по 02.11.2019')
 
-    def test_data_not_setted(self):
-        self.auth()
-
-        response = self.api_post('/api/demand/set_predbills')
-        correct_data = {
-            'code': 400, 
-            'data': {
-                'error_type': 'ValueException', 
-                'error_message': "[('data', ['This field is required.'])]"
-            },
-            'info': None
-        }
-        self.assertEqual(response.json(), correct_data)

@@ -15,14 +15,14 @@ from django.db.models.functions import Coalesce
 from src.util.models_converter import WorkerDayConverter
 from src.main.urv.utils import wd_stat_count
 
-def count_work_month_stats(shop, dt_start, dt_end, users, times_borders=None):
+def count_work_month_stats(shop, dt_start, dt_end, employments, times_borders=None):
     """
     Функция для посчета статистики работника за месяц
 
     Args:
          dt_start(datetime.date): дата начала подсчета
          dt_end(datetime.date): дата конца подсчета
-         users(QuerySet): список пользователей для которых считать
+         employments(QuerySet): список пользователей для которых считать
     """
     def get_norm_work_periods(days, dt_start, dt_end):
         norm = {
@@ -61,10 +61,10 @@ def count_work_month_stats(shop, dt_start, dt_end, users, times_borders=None):
         ]
 
     # t = check_time()
-    users_ids = {u.id: u for u in users}
+    ids = {u.id: u for u in employments}
     prod_days_list = list(ProductionDay.objects.filter(dt__gte=dt_start, dt__lte=dt_end).order_by('dt'))
 
-    shop_ids = list(set(user.shop_id for user in users))
+    shop_ids = list(set(user.shop_id for user in employments))
     shops = Shop.objects.filter(id__in=shop_ids)
 
     shops_triplets_dict = {}
@@ -81,7 +81,7 @@ def count_work_month_stats(shop, dt_start, dt_end, users, times_borders=None):
         Q(workerdaycashboxdetails__status__in=WorkerDayCashboxDetails.WORK_TYPES_LIST) | Q(workerdaycashboxdetails=None), # for doing left join
         dt__gte=dt_start,
         dt__lte=dt_end,
-        employment_id__in=users_ids.keys(),
+        employment_id__in=ids.keys(),
         child__isnull=True,
     ).values(
         'id',
@@ -107,16 +107,16 @@ def count_work_month_stats(shop, dt_start, dt_end, users, times_borders=None):
 
     # t = check_time(t)
     for row in wdds:
-        if worker_id != row['employment_id']:
+        if worker_id != row['worker_id']:
             workers_info[worker_id] = worker
-            worker_id = row['employment_id']
+            worker_id = row['worker_id']
 
-            user = users_ids[worker_id]
+            employment = ids[row['employment_id']]
             norm_days = total_norm
-            if (user.dt_hired and (user.dt_hired > dt_start)) or \
-               (user.dt_fired and (user.dt_fired < dt_end)):
-                dt_u_st = user.dt_hired if user.dt_hired else dt_start
-                dt_e_st = user.dt_fired if user.dt_fired else dt_end
+            if (employment.dt_hired and (employment.dt_hired > dt_start)) or \
+               (employment.dt_fired and (employment.dt_fired < dt_end)):
+                dt_u_st = employment.dt_hired if employment.dt_hired else dt_start
+                dt_e_st = employment.dt_fired if employment.dt_fired else dt_end
                 norm_days = get_norm_work_periods(prod_days_list, dt_u_st, dt_e_st)
 
             worker = init_values(times_borders, norm_days)
@@ -143,20 +143,6 @@ def count_work_month_stats(shop, dt_start, dt_end, users, times_borders=None):
                 if dt.day - 1 < len(prod_days_list) and prod_days_list[dt.day - 1] == ProductionDay.TYPE_HOLIDAY:
                     worker['work_in_holidays'] += 1
 
-        if row['workerdaycashboxdetails__dttm_from'] and row['workerdaycashboxdetails__dttm_to']:
-            duration_of_workerday = round(timediff(
-                row['workerdaycashboxdetails__dttm_from'],
-                row['workerdaycashboxdetails__dttm_to'],
-            ))
-
-            list_of_break_triplets = shops_triplets_dict[user.shop_id]
-            time_break_triplets = 0
-            for triplet in list_of_break_triplets:
-                if float(triplet[0]) < duration_of_workerday * 60 <= float(triplet[1]):
-                    time_break_triplets = triplet[2]
-            duration_of_workerday -= round(time_break_triplets / 60, 3)
-            worker['paid_hours'] += duration_of_workerday
-
     # t = check_time(t)
     workers_info[worker_id] = worker
     workers_info.pop(0)
@@ -165,27 +151,27 @@ def count_work_month_stats(shop, dt_start, dt_end, users, times_borders=None):
     for wd in hours_stat:
         if 'hours_fact' not in workers_info[wd['worker_id']]:
             workers_info[wd['worker_id']]['hours_fact'] = 0
+            workers_info[wd['worker_id']]['paid_hours'] = 0
+
         workers_info[wd['worker_id']]['hours_fact'] += round(wd['hours_fact'] or 0)
+        workers_info[wd['worker_id']]['paid_hours'] += round(wd['hours_plan'] or 0)
 
     for worker_id, worker in workers_info.items():
         workers_info[worker_id]['diff_norm_days'] = worker['paid_days'] - worker['diff_norm_days']
         workers_info[worker_id]['diff_norm_hours'] = worker['paid_hours'] - worker['diff_norm_hours']
-
-    for worker_id in users_ids.keys():
-        if worker_id not in workers_info.keys():
-            workers_info[worker_id] = init_values(times_borders, total_norm)
+    #
     # t = check_time(t)
     return workers_info
 
 
-def count_normal_days(dt_start, dt_end, usrs):
+def count_normal_days(dt_start, dt_end, employments):
     """
     Считает количество нормального количества рабочих дней и рабочих часов от dt_start до dt_end
 
     Args:
         dt_start(datetime.date): дата начала подсчета
         dt_end(datetime.date): дата конца подсчета
-        usrs(QuerySet): список пользователей для которых считать
+        employments(QuerySet): список пользователей для которых считать
 
     """
 
@@ -193,7 +179,7 @@ def count_normal_days(dt_start, dt_end, usrs):
         dt__gte=dt_start,
         dt__lt=dt_end,
     )
-    dts_start_count = list(set([dt_start] + [u.dt_hired for u in usrs if u.dt_hired and (u.dt_hired > dt_start)]))
+    dts_start_count = list(set([dt_start] + [u.dt_hired for u in employments if u.dt_hired and (u.dt_hired > dt_start)]))
     dts_start_count.sort()
     ind = len(dts_start_count) - 1
     ind_dt = len(year_days) - 1

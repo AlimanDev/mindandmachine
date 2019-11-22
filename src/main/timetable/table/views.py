@@ -347,26 +347,24 @@ def get_month_stat(request, form):
     # prepare data
     dt_start = datetime.date(form['dt'].year, form['dt'].month, 1)
     dt_end = dt_start + relativedelta(months=+1)
+    shop = request.shop
     employments = Employment.objects.get_active(
-        form['dt'], dt_end
+        dt_start, dt_end,
+        shop_id=shop.id
     ).select_related('user').order_by('id')
 
     # todo: add code for permissions check (check stat of workers from another shops)
     worker_ids = form['worker_ids']
     if worker_ids and len(worker_ids):
-        employments=employments.filter(user__id__in=worker_ids)
-    else:
-        shop = request.shop
-        employments = employments.filter(shop_id=shop.id)
+        employments=employments.filter(user_id__in=worker_ids)
 
-    shop = Shop.objects.get(id=form['shop_id'])
     # count info of current month
     month_info = count_work_month_stats(shop, dt_start, dt_end, employments)
 
-    user_info_dict = count_difference_of_normal_days(dt_end=dt_start, usrs=employments)
+    user_info_dict = count_difference_of_normal_days(dt_end=dt_start, employments=employments)
 
     for u_it in range(len(employments)):
-        month_info[employments[u_it].id].update({
+        month_info[employments[u_it].user_id].update({
             'diff_prev_paid_days': user_info_dict[employments[u_it].id]['diff_prev_paid_days'],
             'diff_prev_paid_hours': user_info_dict[employments[u_it].id]['diff_prev_paid_hours'],
             'diff_total_paid_days': user_info_dict[employments[u_it].id]['diff_prev_paid_days'] + month_info[employments[u_it].id]['diff_norm_days'],

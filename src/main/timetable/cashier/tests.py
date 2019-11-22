@@ -420,6 +420,7 @@ class TestSetWorkerDay(LocalTestCase):
         with self.auth_user():
             response = self.api_post(self.url, {
                 "worker_id": self.user2.pk,
+                "shop_id": self.shop.id,
                 "dt": BaseConverter.convert_date(timezone.now()),
                 "dt_to": BaseConverter.convert_date(timezone.now() + datetime.timedelta(days=2)),
                 "tm_work_start": "11:00:00",
@@ -448,14 +449,18 @@ class TestSetWorkerDay(LocalTestCase):
             'k@k.k',
             '4242',
             id=8,
-            shop=self.shop,
-            function_group=self.employee_group,
             last_name='Дурак7',
             first_name='Иван7',
+        )
+        employment = Employment.objects.create(
+            user=user,
+            shop=self.shop,
+            function_group=self.employee_group,
         )
         with self.auth_user():
             response = self.api_post(self.url, {
                 "worker_id": user.pk,
+                'shop_id': self.shop.id,
                 "dt": BaseConverter.convert_date(timezone.now()),
                 "dt_to": BaseConverter.convert_date(timezone.now() + datetime.timedelta(days=2)),
                 "tm_work_start": "11:00:00",
