@@ -246,7 +246,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
     for row in hours_stat:
         fot += round(
             Decimal(row['hours_plan']) *
-            employment_dict(row['employment_id']).salary / Decimal(norm_work_hours)
+            employment_dict[row['employment_id']].salary / Decimal(norm_work_hours)
         )
 
     finite_workdetails = list(cashbox_details.filter(worker_day__child__id__isnull=True).select_related('worker_day'))
