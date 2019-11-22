@@ -4,7 +4,6 @@ import json
 from django import forms
 from django.core.exceptions import ValidationError
 
-from src.util.dict import DictUtil
 from src.conf.djconfig import (
     QOS_DATE_FORMAT,
     QOS_DATETIME_FORMAT,
@@ -151,16 +150,16 @@ class IntegersList(forms.CharField):
 class FormUtil(object):
     @staticmethod
     def get_shop_id(request, form):
-        return DictUtil.get_not_none(form, 'shop_id', request.user.shop_id)
+        return form.get('shop_id') or request.user.shop_id
 
     @staticmethod
     def get_dt_from(form):
-        return DictUtil.get_not_none(form, 'from_dt', datetime.date(year=1971, month=1, day=1))
+        return form.get('from_dt') or datetime.datetime.now().date()
 
     @staticmethod
     def get_checkpoint(form):
-        return DictUtil.get_not_none(form, 'checkpoint', 1)
+        return form['checkpoint'] if form.get('checkpoint') is not None else 1
 
     @staticmethod
     def get_dt_to(form):
-        return DictUtil.get_not_none(form, 'to_dt', datetime.date(year=2037, month=1, day=1))
+        return form.get('to_dt') or datetime.datetime.now().date()

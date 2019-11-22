@@ -290,8 +290,8 @@ class FunctionGroup(models.Model):
 
         'get_cashboxes',
         'get_cashboxes_info',
-        'get_cashboxes_open_time',
-        'get_cashboxes_used_resource',
+        # 'get_cashboxes_open_time',
+        # 'get_cashboxes_used_resource',
         'create_cashbox',
         'update_cashbox',
         'delete_cashbox',
@@ -317,6 +317,7 @@ class FunctionGroup(models.Model):
         'change_cashier_info',
         'create_cashier',
         'get_cashiers_info',
+
         'select_cashiers',
         'get_not_working_cashiers_list',
         'get_cashiers_list',
@@ -340,10 +341,8 @@ class FunctionGroup(models.Model):
 
         'get_user_urv',
         'upload_urv',
-        'change_user_urv',
 
         'get_forecast',
-        'process_forecast',
 
         'upload_demand',
         'upload_timetable',
@@ -355,7 +354,6 @@ class FunctionGroup(models.Model):
         'exchange_workers_day',
 
         #algo callbacks
-        'set_queue',
         'set_demand',
         'set_pred_bills',
 
@@ -378,7 +376,6 @@ class FunctionGroup(models.Model):
 
         # shop/
         'get_department',
-        'get_parent',
         'add_department',
         'edit_department',
         'get_department_list',
@@ -388,8 +385,7 @@ class FunctionGroup(models.Model):
 
         'get_demand_change_logs',
         'get_table',
-        'get_visitors_info',
-        'get_time_distribution',
+
         'get_status',
         'get_change_request',
         'get_month_stat',
@@ -526,6 +522,7 @@ class OperationType(models.Model):
         default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 200, "reg_lambda": 2, "silent": 1, "iterations": 20}'
     )
 
+
 class OperationTemplate(models.Model):
     """
         Шаблоны операций.
@@ -660,6 +657,7 @@ class OperationTemplate(models.Model):
             dt_from += datetime.timedelta(days=1)
             day = lambda_get_day(dt_from)
 
+
 class UserWeekdaySlot(models.Model):
     class Meta(object):
         verbose_name = 'Пользовательский слот'
@@ -728,8 +726,8 @@ class CashboxManager(models.Manager):
 
 class Cashbox(models.Model):
     class Meta:
-        verbose_name = 'Касса'
-        verbose_name_plural = 'Кассы'
+        verbose_name = 'Рабочее место '
+        verbose_name_plural = 'Рабочие места'
 
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(
@@ -774,82 +772,13 @@ class PeriodDemand(models.Model):
 
 class PeriodClients(PeriodDemand):
     class Meta(object):
-        verbose_name = 'Спрос по клиентам'
+        verbose_name = 'Значение операций'
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
     value = models.FloatField(default=0)
 
-
-class PeriodProducts(PeriodDemand):
-    class Meta(object):
-        verbose_name = 'Спрос по продуктам'
-
-    def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
-
-    value = models.FloatField(default=0)
-
-
-class PeriodQueues(PeriodDemand):
-    class Meta(object):
-        verbose_name = 'Очереди'
-
-    def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
-
-    value = models.FloatField(default=0)
-
-
-class PeriodVisitors(models.Model):
-    LONG_FORECASE_TYPE = 'L'
-    SHORT_FORECAST_TYPE = 'S'
-    FACT_TYPE = 'F'
-
-    FORECAST_TYPES = (
-        (LONG_FORECASE_TYPE, 'Long'),
-        (SHORT_FORECAST_TYPE, 'Short'),
-        (FACT_TYPE, 'Fact'),
-    )
-
-    class Meta:
-        abstract = True
-
-    id = models.BigAutoField(primary_key=True)
-    dttm_forecast = models.DateTimeField()
-    type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
-    work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
-
-
-class IncomeVisitors(PeriodVisitors):
-    class Meta(object):
-        verbose_name = 'Входящие посетители (по периодам)'
-
-    def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.work_type, self.value)
-
-    value = models.FloatField(default=0)
-
-
-class EmptyOutcomeVisitors(PeriodVisitors):
-    class Meta(object):
-        verbose_name = 'Выходящие без покупок посетители (по периодам)'
-
-    def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.work_type, self.value)
-
-    value = models.FloatField(default=0)
-
-
-class PurchasesOutcomeVisitors(PeriodVisitors):
-    class Meta(object):
-        verbose_name = 'Выходящие с покупками посетители (по периодам)'
-
-    def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.work_type, self.value)
-
-    value = models.FloatField(default=0)
 
 
 class PeriodDemandChangeLog(models.Model):
@@ -1147,7 +1076,6 @@ class WorkerDayChangeRequest(models.Model):
     wish_text = models.CharField(null=True, blank=True, max_length=512)
 
 
-
 class EventManager(models.Manager):
     def mm_event_create(self, users, push_title=None, **kwargs):
         event = self.create(**kwargs)
@@ -1428,64 +1356,6 @@ class WorkerMonthStat(models.Model):
 
     work_days = models.SmallIntegerField()
     work_hours = models.FloatField()
-
-
-class CameraCashbox(models.Model):
-    class Meta(object):
-        verbose_name = 'Камеры-кассы'
-
-    name = models.CharField(max_length=64)
-    cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
-
-    def __str__(self):
-        return '{}, {}, {}'.format(self.name, self.cashbox, self.id)
-
-
-class CameraCashboxStat(models.Model):
-    class Meta(object):
-        verbose_name = 'Статистика по модели камера-касса'
-
-    camera_cashbox = models.ForeignKey(CameraCashbox, on_delete=models.PROTECT)
-    dttm = models.DateTimeField()
-    queue = models.FloatField()
-
-    def __str__(self):
-        return '{}, {}, {}'.format(self.dttm, self.camera_cashbox.name, self.id)
-
-
-class CameraClientGate(models.Model):
-    TYPE_ENTRY = 'E'
-    TYPE_OUT = 'O'
-    TYPE_SERVICE = 'S'
-
-    GATE_TYPES = (
-        (TYPE_ENTRY, 'entry'),
-        (TYPE_OUT, 'exit'),
-        (TYPE_SERVICE, 'service')
-    )
-
-    name = models.CharField(max_length=64)
-    type = models.CharField(max_length=1, choices=GATE_TYPES)
-
-    def __str__(self):
-        return '{}, {}'.format(self.type, self.name)
-
-
-class CameraClientEvent(models.Model):
-    TYPE_TOWARD = 'T'
-    TYPE_BACKWARD = 'B'
-
-    DIRECTION_TYPES = (
-        (TYPE_TOWARD, 'toward'),
-        (TYPE_BACKWARD, 'backward')
-    )
-
-    dttm = models.DateTimeField()
-    gate = models.ForeignKey(CameraClientGate, on_delete=models.PROTECT)
-    type = models.CharField(max_length=1, choices=DIRECTION_TYPES)
-
-    def __str__(self):
-        return 'id {}: {}, {}, {}'.format(self.id, self.dttm, self.type, self.gate.name)
 
 
 class AttendanceRecords(models.Model):
