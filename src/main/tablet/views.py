@@ -3,7 +3,7 @@ from django.db.models import Q
 import json
 
 from src.db.models import (
-    CameraCashboxStat,
+    # CameraCashboxStat,
     Cashbox,
     WorkerDayCashboxDetails,
     WorkerCashboxInfo,
@@ -77,11 +77,11 @@ def get_cashboxes_info(request, form):
         else:
             with_queue = True
             # супер костыль в dttm__gte, так как время с камер пишется в UTC+6
-            mean_queue = CameraCashboxStat.objects.filter(
-                camera_cashbox__cashbox_id=cashbox.id,
-                dttm__gte=dttm_now - timedelta(seconds=100),
-                dttm__lte=dttm_now + timedelta(seconds=60)
-            ).aggregate(mean_queue=Avg('queue'))
+            # mean_queue = CameraCashboxStat.objects.filter(
+            #     camera_cashbox__cashbox_id=cashbox.id,
+            #     dttm__gte=dttm_now - timedelta(seconds=100),
+            #     dttm__lte=dttm_now + timedelta(seconds=60)
+            # ).aggregate(mean_queue=Avg('queue'))
             if mean_queue:
                 try:
                     # todo fix this

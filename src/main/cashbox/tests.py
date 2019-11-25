@@ -7,27 +7,6 @@ class TestCashbox(LocalTestCase):
         super().setUp()
         WorkType.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 0, 0, 0))
 
-    def test_get_cashboxes_open_time(self):
-        self.auth()
-        response = self.api_get('/api/cashbox/get_cashboxes_open_time?shop_id={}&from_dt=02.6.2018&to_dt=2.6.2018'.format(
-            self.shop.id
-        ))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['code'], 200)
-        # {'1': {'share_time': 0}, '2': {'share_time': 0}, '3': {'share_time': 0}
-        # self.assertEqual(response.json()['data'], {
-        #     '1': {'share_time': 88.237},
-        #     '2': {'share_time': 35.295}})
-        response = self.api_get('/api/cashbox/get_cashboxes_open_time?shop_id={}&from_dt=02.6.2018&to_dt=20.8.2018'.format(
-            self.shop.id
-        ))
-        self.assertEqual(response.status_code, 200)
-        # {'1': {'share_time': 0}, '2': {'share_time': 0}, '3': {'share_time': 0}}
-        # self.assertEqual(response.json()['code'], 200)
-        # self.assertEqual(response.json()['data'], {
-        #     '1': {'share_time': 20.956},
-        #     '2': {'share_time': 8.382}})
-
 
     def test_get_types(self):
         self.auth()
@@ -52,8 +31,8 @@ class TestCashbox(LocalTestCase):
         ))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
-        self.assertEqual(len(response.json()['data']['work_types']), 3)
-        self.assertEqual(len(response.json()['data']['cashboxes']), 3)
+        self.assertEqual(len(response.json()['data']['work_types']), 2)
+        self.assertEqual(len(response.json()['data']['cashboxes']), 2)
 
     def test_create_cashbox(self):
         self.auth()

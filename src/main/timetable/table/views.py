@@ -12,6 +12,7 @@ from src.db.models import (
     PeriodClients,
     WorkType,
     OperationType,
+    Shop
 )
 from src.util.forms import FormUtil
 from src.util.models_converter import (
@@ -344,7 +345,6 @@ def get_month_stat(request, form):
     """
     # prepare data
     dt_start = datetime.date(form['dt'].year, form['dt'].month, 1)
-    dt_start_year = datetime.date(dt_start.year, 1, 1)
     dt_end = dt_start + relativedelta(months=+1)
     usrs = User.objects.qos_filter_active(form['dt'], dt_end)
     # todo: add code for permissions check (check stat of workers from another shops)
@@ -358,8 +358,9 @@ def get_month_stat(request, form):
         usrs = usrs.filter(id__in=worker_ids)
     usrs = usrs.order_by('id')
 
+    shop = Shop.objects.get(id=form['shop_id'])
     # count info of current month
-    month_info = count_work_month_stats(dt_start, dt_end, usrs)
+    month_info = count_work_month_stats(shop, dt_start, dt_end, usrs)
 
     user_info_dict = count_difference_of_normal_days(dt_end=dt_start, usrs=usrs)
 
@@ -371,7 +372,6 @@ def get_month_stat(request, form):
             'diff_total_paid_hours': user_info_dict[usrs[u_it].id]['diff_prev_paid_hours'] + month_info[usrs[u_it].id]['diff_norm_hours'],
         })
     return JsonResponse.success({'users_info': month_info})
-
 
 
 @api_method(

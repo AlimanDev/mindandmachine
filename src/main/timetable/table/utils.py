@@ -13,9 +13,9 @@ from django.db.models import Sum, Q
 from django.db.models.functions import Coalesce
 
 from src.util.models_converter import WorkerDayConverter
+from src.main.urv.utils import wd_stat_count
 
-
-def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
+def count_work_month_stats(shop, dt_start, dt_end, users, times_borders=None):
     """
     Функция для посчета статистики работника за месяц
 
@@ -37,6 +37,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
 
     def init_values(times_borders, norm_days):
         dict = {
+            'hours_fact': 0,
             'paid_days': 0,
             'paid_hours': 0.0,
             'diff_norm_days': norm_days['days'],
@@ -76,7 +77,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
 
     total_norm = get_norm_work_periods(prod_days_list, dt_start, dt_end)
 
-    wdds = list(WorkerDay.objects.filter(
+    wdds = WorkerDay.objects.filter(
         Q(workerdaycashboxdetails__status__in=WorkerDayCashboxDetails.WORK_TYPES_LIST) | Q(workerdaycashboxdetails=None), # for doing left join
         dt__gte=dt_start,
         dt__lte=dt_end,
@@ -95,7 +96,7 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
         'worker_id',
         'dt',
         'workerdaycashboxdetails__dttm_from',
-    ))
+    )
 
     workers_info = {}
     worker = {}
@@ -157,9 +158,16 @@ def count_work_month_stats(dt_start, dt_end, users, times_borders=None):
     # t = check_time(t)
     workers_info[worker_id] = worker
     workers_info.pop(0)
-    for key, worker in workers_info.items():
-        workers_info[key]['diff_norm_days'] = worker['paid_days'] - worker['diff_norm_days']
-        workers_info[key]['diff_norm_hours'] = worker['paid_hours'] - worker['diff_norm_hours']
+
+    hours_stat = wd_stat_count(wdds, shop)
+    for wd in hours_stat:
+        if 'hours_fact' not in workers_info[wd['worker_id']]:
+            workers_info[wd['worker_id']]['hours_fact'] = 0
+        workers_info[wd['worker_id']]['hours_fact'] += round(wd['hours_fact'] or 0)
+
+    for worker_id, worker in workers_info.items():
+        workers_info[worker_id]['diff_norm_days'] = worker['paid_days'] - worker['diff_norm_days']
+        workers_info[worker_id]['diff_norm_hours'] = worker['paid_hours'] - worker['diff_norm_hours']
 
     for worker_id in users_ids.keys():
         if worker_id not in workers_info.keys():
