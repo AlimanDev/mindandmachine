@@ -46,7 +46,7 @@ class TestNotifications(LocalTestCase):
             worker=self.user1,
             dt=dt
         ).first()
-        self.user_worker_day.type = WorkerDay.Type.TYPE_HOLIDAY.value
+        self.user_worker_day.type = WorkerDay.TYPE_HOLIDAY
         self.user_worker_day.save()
 
         event = Event.objects.create(

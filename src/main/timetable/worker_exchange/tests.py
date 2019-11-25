@@ -47,7 +47,7 @@ class TestWorkerExchange(LocalTestCase):
 
         worker_day = WorkerDay.objects.create(
             worker=user,
-            type=WorkerDay.Type.TYPE_WORKDAY.value,
+            type=WorkerDay.TYPE_WORKDAY,
             dt=wd_dttm_from.date(),
             dttm_work_start=wd_dttm_from ,
             dttm_work_end=wd_dttm_to,
@@ -278,7 +278,7 @@ class Test_auto_worker_exchange(TestCase):
             wd = WorkerDay.objects.create(
                 worker=user,
                 dt=self.dt_now,
-                type=WorkerDay.Type.TYPE_WORKDAY.value,
+                type=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start='{} 09:00:00'.format(self.dt_now),
                 dttm_work_end='{} 21:00:00'.format(self.dt_now),
             )

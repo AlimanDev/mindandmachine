@@ -39,7 +39,6 @@ class SelectCashiersForm(forms.Form):
         if value is None or value == '':
             return None
 
-        value = WorkerDayConverter.parse_type(value)
         if value is None:
             raise ValidationError('invalid')
 
@@ -159,7 +158,6 @@ class SetWorkerDaysForm(forms.Form):
         return worker
 
     def clean_type(self):
-        value = WorkerDayConverter.parse_type(self.cleaned_data['type'])
         if value is None:
             raise ValidationError('Invalid enum value')
         return value
@@ -189,11 +187,6 @@ class SetWorkerDayForm(forms.Form):
     comment = forms.CharField(max_length=128, required=False)
     details = forms.CharField(required=False)
 
-    def clean_type(self):
-        value = WorkerDayConverter.parse_type(self.cleaned_data['type'])
-        if value is None:
-            raise ValidationError('Invalid enum value')
-        return value
 
     def clean(self):
         if self.errors:

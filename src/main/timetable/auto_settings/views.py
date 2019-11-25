@@ -406,7 +406,7 @@ def create_timetable(request, form):
         dt__gte=dt_from,
         dt__lt=dt_to,
     ).exclude(
-        type=WorkerDay.Type.TYPE_EMPTY.value
+        type=WorkerDay.TYPE_EMPTY
     ).order_by(
         'dt'
     ).values(
@@ -448,7 +448,7 @@ def create_timetable(request, form):
         dt__gte=dt_from - timedelta(days=7),
         dt__lte=dt_from,
     ).exclude(
-        type=WorkerDay.Type.TYPE_EMPTY.value
+        type=WorkerDay.TYPE_EMPTY
     ).order_by(
         'dt'
     ).values(
@@ -561,7 +561,7 @@ def create_timetable(request, form):
         group_key=lambda x: x.worker_id,
     )
     # если стоит флаг shop.paired_weekday, смотрим по юзерам, нужны ли им в этом месяце выходные в выходные
-    resting_states_list = [WorkerDay.Type.TYPE_HOLIDAY.value]
+    resting_states_list = [WorkerDay.TYPE_HOLIDAY]
     if shop.paired_weekday:
         for user in users:
             coupled_weekdays = 0
@@ -606,7 +606,7 @@ def create_timetable(request, form):
                     wd_index += 1
                 else:
                     workers_month_days_new.append(WorkerDay(
-                        type=WorkerDay.Type.TYPE_HOLIDAY.value,
+                        type=WorkerDay.TYPE_HOLIDAY,
                         dt=dt,
                         worker_id=user.id,
                     ))
@@ -721,7 +721,7 @@ def delete_timetable(request, form):
         is_vacancy=False,
     ).filter(
         Q(worker_day__created_by__isnull=True) |
-        Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
+        Q(worker_day__type=WorkerDay.TYPE_EMPTY)
     ).update(
         dttm_deleted=timezone.now()
     )
@@ -745,10 +745,10 @@ def delete_timetable(request, form):
     ).filter(
         created_by__isnull=True,
     ).exclude(
-        type=WorkerDay.Type.TYPE_EMPTY.value
+        type=WorkerDay.TYPE_EMPTY
     )
     wds = [WorkerDay(
-        type=WorkerDay.Type.TYPE_EMPTY.value,
+        type=WorkerDay.TYPE_EMPTY,
         dt = wd.dt,
         parent_worker_day=wd,
         worker_id=wd.worker_id,
@@ -826,12 +826,12 @@ def set_timetable(request, form):
                     child__id__isnull=True
                 ).first()
                 if parent_wd_obj:
-                    if parent_wd_obj.type != WorkerDay.Type.TYPE_EMPTY.value:
+                    if parent_wd_obj.type != WorkerDay.TYPE_EMPTY:
                         continue
                     wd_obj.parent_worker_day = parent_wd_obj
 
                 wd_obj.worker.shop_id = users[int(uid)].shop_id
-                wd_obj.type = WorkerDayConverter.parse_type(wd['type'])
+                wd_obj.type = wd['type']
                 if WorkerDay.is_type_with_tm_range(wd_obj.type):
                     wd_obj.dttm_work_start = BaseConverter.parse_datetime(wd['dttm_work_start'])
                     wd_obj.dttm_work_end = BaseConverter.parse_datetime(wd['dttm_work_end'])

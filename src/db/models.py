@@ -884,40 +884,63 @@ class WorkerDay(models.Model):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
+    
+    TYPE_HOLIDAY = 'H'
+    TYPE_WORKDAY = 'W'
+    TYPE_VACATION = 'V'
+    TYPE_SICK = 'S'
+    TYPE_QUALIFICATION = 'Q'
+    TYPE_ABSENSE = 'A'
+    TYPE_MATERNITY = 'M'
+    TYPE_BUSINESS_TRIP = 'T'
 
-    class Type(utils.Enum):
-        TYPE_HOLIDAY = 1
-        TYPE_WORKDAY = 2
-        TYPE_VACATION = 3
-        TYPE_SICK = 4
-        TYPE_QUALIFICATION = 5
-        TYPE_ABSENSE = 6
-        TYPE_MATERNITY = 7
-        TYPE_BUSINESS_TRIP = 8
+    TYPE_ETC = 'O'
+    TYPE_DELETED = 'D'
+    TYPE_EMPTY = 'E'
 
-        TYPE_ETC = 9
-        TYPE_DELETED = 10
-        TYPE_EMPTY = 11
+    TYPE_HOLIDAY_WORK = 'HW'
+    TYPE_REAL_ABSENCE = 'RA'
+    TYPE_EXTRA_VACATION = 'EV'
+    TYPE_TRAIN_VACATION = 'TV'
+    TYPE_SELF_VACATION = 'SV'
+    TYPE_SELF_VACATION_TRUE = 'ST'
+    TYPE_GOVERNMENT = 'G'
+    TYPE_HOLIDAY_SPECIAL = 'HS'
 
-        TYPE_HOLIDAY_WORK = 12
-        TYPE_REAL_ABSENCE = 13
-        TYPE_EXTRA_VACATION = 14
-        TYPE_TRAIN_VACATION = 15
-        TYPE_SELF_VACATION = 16
-        TYPE_SELF_VACATION_TRUE = 17
-        TYPE_GOVERNMENT = 18
-        TYPE_HOLIDAY_SPECIAL = 19
+    TYPE_MATERNITY_CARE = 'MC'
+    TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE = 'C'
 
-        TYPE_MATERNITY_CARE = 20
-        TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE = 21
+    TYPES = [
+        (TYPE_HOLIDAY, 'Выходной'),
+        (TYPE_WORKDAY, 'Рабочий день'),
+        (TYPE_VACATION, 'Отпуск'),
+        (TYPE_SICK, 'Больничный лист'),
+        (TYPE_QUALIFICATION, 'Квалификация'),
+        (TYPE_ABSENSE, 'Неявка до выяснения обстоятельств'),
+        (TYPE_MATERNITY, 'Б/л по беременноси и родам'),
+        (TYPE_BUSINESS_TRIP, 'Командировка'),
+        (TYPE_ETC, 'Другое'),
+        (TYPE_DELETED, 'Удален'),
+        (TYPE_EMPTY, 'Пусто'),
+        (TYPE_HOLIDAY_WORK, 'Работа в выходной день'),
+        (TYPE_REAL_ABSENCE, 'Прогул на основании акта'),
+        (TYPE_EXTRA_VACATION, 'Доп. отпуск'),
+        (TYPE_TRAIN_VACATION, 'Учебный отпуск'),
+        (TYPE_SELF_VACATION, 'Отпуск за свой счёт'),
+        (TYPE_SELF_VACATION_TRUE, 'Отпуск за свой счёт по уважительной причине'),
+        (TYPE_GOVERNMENT, 'Гос. обязанности'),
+        (TYPE_HOLIDAY_SPECIAL, 'Спец. выходной'),
+        (TYPE_MATERNITY_CARE, 'Отпуск по уходу за ребёнком до 3-х лет'),
+        (TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE, 'Выходные дни по уходу'),
+    ]
 
     TYPES_PAID = [
-        Type.TYPE_WORKDAY.value,
-        Type.TYPE_QUALIFICATION.value,
-        Type.TYPE_BUSINESS_TRIP.value,
-        Type.TYPE_HOLIDAY_WORK.value,
-        Type.TYPE_EXTRA_VACATION.value,
-        Type.TYPE_TRAIN_VACATION.value,
+        TYPE_WORKDAY,
+        TYPE_QUALIFICATION,
+        TYPE_BUSINESS_TRIP,
+        TYPE_HOLIDAY_WORK,
+        TYPE_EXTRA_VACATION,
+        TYPE_TRAIN_VACATION,
     ]
 
     def __str__(self):
@@ -926,7 +949,7 @@ class WorkerDay(models.Model):
             self.worker.shop.title,
             self.worker.shop.parent.title,
             self.dt,
-            self.Type.get_name_by_value(self.type),
+            self.type,
             self.id
         )
 
@@ -941,7 +964,7 @@ class WorkerDay(models.Model):
     dttm_work_end = models.DateTimeField(null=True, blank=True)
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)  # todo: make immutable
-    type = utils.EnumField(Type)
+    type = models.CharField(choices=TYPES, max_length=2, default=TYPE_EMPTY)
 
     work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')
 
@@ -954,7 +977,7 @@ class WorkerDay(models.Model):
 
     @classmethod
     def is_type_with_tm_range(cls, t):
-        return t in (cls.Type.TYPE_WORKDAY.value, cls.Type.TYPE_BUSINESS_TRIP.value, cls.Type.TYPE_QUALIFICATION.value)
+        return t in (cls.TYPE_WORKDAY, cls.TYPE_BUSINESS_TRIP, cls.TYPE_QUALIFICATION)
 
     objects = WorkerDayManager()
 
@@ -1069,7 +1092,7 @@ class WorkerDayChangeRequest(models.Model):
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     dt = models.DateField()
-    type = utils.EnumField(WorkerDay.Type)
+    type = models.CharField(choices=WorkerDay.TYPES, max_length=2, default=WorkerDay.TYPE_EMPTY)
 
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
@@ -1148,7 +1171,7 @@ class Event(models.Model):
 
             if user_worker_day and vacancy:
                 is_updated = False
-                update_condition = user_worker_day.type != WorkerDay.Type.TYPE_WORKDAY.value or \
+                update_condition = user_worker_day.type != WorkerDay.TYPE_WORKDAY or \
                                    WorkerDayCashboxDetails.objects.filter(
                                        models.Q(dttm_from__gte=vacancy.dttm_from, dttm_from__lt=vacancy.dttm_to) |
                                        models.Q(dttm_to__gt=vacancy.dttm_from, dttm_to__lte=vacancy.dttm_to) |
@@ -1170,7 +1193,7 @@ class Event(models.Model):
                     )
 
                     if is_updated:
-                        user_worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
+                        user_worker_day.type = WorkerDay.TYPE_WORKDAY
 
                         if (user_worker_day.dttm_work_start is None) or (user_worker_day.dttm_work_start > vacancy.dttm_from):
                             user_worker_day.dttm_work_start = vacancy.dttm_from

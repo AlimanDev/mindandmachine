@@ -165,7 +165,7 @@ def get_not_working_cashiers_list(request, form):
         (Q(worker__dt_hired__isnull=True) | Q(worker__dt_hired__lte=form['dt_to'])) &
         (Q(worker__dt_fired__isnull=True) | Q(worker__dt_fired__gt=form['dt_from']))
     ).exclude(
-        type=WorkerDay.Type.TYPE_WORKDAY.value
+        type=WorkerDay.TYPE_WORKDAY
     ).order_by(
         'worker__last_name',
         'worker__first_name'
@@ -243,7 +243,7 @@ def select_cashiers(request, form):
 
         worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
             worker__shop_id=shop_id,
-            type=WorkerDay.Type.TYPE_WORKDAY.value,
+            type=WorkerDay.TYPE_WORKDAY,
             dt__in=work_workdays
         )
 
@@ -361,11 +361,11 @@ def get_cashier_timetable(request, form):
         indicators_response = {}
         if (len(form['worker_ids']) == 1):
             indicators_response = {
-                'work_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value),
-                'holiday_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value),
-                'sick_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_SICK.value),
-                'vacation_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_VACATION.value),
-                'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and
+                'work_day_amount': count(worker_days, lambda x: x.type == WorkerDay.TYPE_WORKDAY),
+                'holiday_amount': count(worker_days, lambda x: x.type == WorkerDay.TYPE_HOLIDAY),
+                'sick_day_amount': count(worker_days, lambda x: x.type == WorkerDay.TYPE_SICK),
+                'vacation_day_amount': count(worker_days, lambda x: x.type == WorkerDay.TYPE_VACATION),
+                'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.TYPE_WORKDAY and
                                                                             x.dt in official_holidays),
                 'change_amount': len(worker_day_change_log),
                 'hours_count_fact': wd_stat_count_total(worker_days, request.shop)['hours_count_fact']
@@ -755,7 +755,7 @@ def set_worker_day(request, form):
         work_type = WorkType.objects.get(id=form['work_type']) if form['work_type'] else None
         if worker.attachment_group == User.GROUP_STAFF \
                 or worker.attachment_group == User.GROUP_OUTSOURCE \
-                        and form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
+                        and form['type'] == WorkerDay.TYPE_WORKDAY:
             new_worker_day = WorkerDay.objects.create(
                 worker_id=worker.id,
                 parent_worker_day=old_wd,
@@ -763,7 +763,7 @@ def set_worker_day(request, form):
                 comment=form['comment'],
                 **wd_args
             )
-            if new_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
+            if new_worker_day.type == WorkerDay.TYPE_WORKDAY:
                 if len(details):
                     for item in details:
                         dttm_to = BaseConverter.parse_time(item['dttm_to'])
@@ -799,7 +799,7 @@ def set_worker_day(request, form):
         dttm_deleted__isnull=True
     ).first()
 
-    if work_type and form['type'] == WorkerDay.Type.TYPE_WORKDAY.value:
+    if work_type and form['type'] == WorkerDay.TYPE_WORKDAY:
         cancel_vacancies(work_type.shop_id, work_type.id)
     if old_cashboxdetails:
         create_vacancies_and_notify(old_cashboxdetails.work_type.shop_id, old_cashboxdetails.work_type_id)
@@ -835,14 +835,14 @@ def get_worker_day_logs(request, form):
 
     def convert_change_log(obj):
         def __work_dttm(__field):
-            return BaseConverter.convert_datetime(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+            return BaseConverter.convert_datetime(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
 
         res = {
             'id': obj.id,
             'dttm_added': BaseConverter.convert_datetime(obj.dttm_added),
             'dt': BaseConverter.convert_date(obj.dt),
             'worker': obj.worker_id,
-            'type': WorkerDayConverter.convert_type(obj.type),
+            'type': obj.type,
             'dttm_work_start': __work_dttm(obj.dttm_work_start),
             'dttm_work_end': __work_dttm(obj.dttm_work_end),
             'created_by': obj.created_by_id,
@@ -850,7 +850,7 @@ def get_worker_day_logs(request, form):
             'created_by_fio': obj.created_by.get_fio() if obj.created_by else '',
         }
         if obj.parent_worker_day:
-            res['prev_type'] = WorkerDayConverter.convert_type(obj.parent_worker_day.type)
+            res['prev_type'] = obj.parent_worker_day.type
             res['prev_dttm_work_start'] = __work_dttm(obj.parent_worker_day.dttm_work_start)
             res['prev_dttm_work_end']  = __work_dttm(obj.parent_worker_day.dttm_work_end)
         return res
@@ -1300,7 +1300,7 @@ def get_change_request(request, form):
         change_request = WorkerDayChangeRequest.objects.get(dt=form['dt'], worker_id=form['worker_id'])
         return JsonResponse.success({
             'dt': BaseConverter.convert_date(change_request.dt),
-            'type': WorkerDayConverter.convert_type(change_request.type),
+            'type': change_request.type,
             'dttm_work_start': BaseConverter.convert_datetime(change_request.dttm_work_start),
             'dttm_work_end': BaseConverter.convert_datetime(change_request.dttm_work_end),
             'wish_text': change_request.wish_text,

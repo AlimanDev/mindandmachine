@@ -309,7 +309,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
         dt__gte=from_dt,
         dt__lte=to_dt,
         worker__shop_id=shop_id,
-        type=WorkerDay.Type.TYPE_WORKDAY.value
+        type=WorkerDay.TYPE_WORKDAY
     )
 
     response.update({

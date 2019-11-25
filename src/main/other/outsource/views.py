@@ -91,12 +91,12 @@ def get_outsource_workers(request, form):
             data = {
                 'dttm_work_start': BaseConverter.convert_time(wd.dttm_from.time()),
                 'dttm_work_end': BaseConverter.convert_time(wd.dttm_to.time()),
-                'work_type': wd.work_type_id,  #if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None
-                'work_type_name': wd.work_type.name,  #if wd.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+                'work_type': wd.work_type_id,  #if wd.type == WorkerDay.TYPE_WORKDAY else None
+                'work_type_name': wd.work_type.name,  #if wd.type == WorkerDay.TYPE_WORKDAY else None
                 'id': wd.id,
             }
             if wd.worker_day:
-                data['type'] = WorkerDayConverter.convert_type(wd.worker_day.type)
+                data['type'] = wd.worker_day.type
                 data['first_name'] = wd.worker_day.worker.first_name
                 data['last_name'] = wd.worker_day.worker.last_name
                 data['shop'] = wd.worker_day.worker.shop.title
@@ -187,7 +187,7 @@ def add_outsource_workers(request, form):
 
         outsourcer_worker_day = WorkerDay.objects.create(
             worker=added,
-            type=WorkerDay.Type.TYPE_WORKDAY.value,
+            type=WorkerDay.TYPE_WORKDAY,
             dt=dt,
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,

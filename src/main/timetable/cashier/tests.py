@@ -234,7 +234,7 @@ class TestGetNotWorkingCashierList(LocalTestCase):
         super().setUp(worker_day)
         self.staff1 = create_stuff(self.shop.id)
         self.wd: WorkerDay = WorkerDay.objects.create(
-            type=WorkerDay.Type.TYPE_VACATION.value,
+            type=WorkerDay.TYPE_VACATION,
             worker=self.staff1,
             dt=timezone.now().date(),
         )
@@ -408,7 +408,7 @@ class TestSetWorkerDay(LocalTestCase):
                 "dt": BaseConverter.convert_date(timezone.now()),
                 "tm_work_start": "11:00:00",
                 "tm_work_end": "12:00:00",
-                "type": WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_BUSINESS_TRIP.value),
+                "type": WorkerDay.TYPE_BUSINESS_TRIP,
                 "comment": "I'm a test"
             })
         self.assertResponseCodeEqual(response, 200)
@@ -418,7 +418,7 @@ class TestSetWorkerDay(LocalTestCase):
         wd: WorkerDay = WorkerDay.objects.filter(worker_id=self.user2.pk, dt=timezone.now().date()).last()
         self.assertEqual(wd.dttm_work_start, datetime.datetime.combine(timezone.now().date(), datetime.time(11, 00)))
         self.assertEqual(wd.dttm_work_end, datetime.datetime.combine(timezone.now().date(), datetime.time(12, 00)))
-        self.assertEqual(wd.type, WorkerDay.Type.TYPE_BUSINESS_TRIP.value)
+        self.assertEqual(wd.type, WorkerDay.TYPE_BUSINESS_TRIP)
         self.assertIsNotNone(wd.parent_worker_day)
         
     def test_update_range(self):
@@ -429,7 +429,7 @@ class TestSetWorkerDay(LocalTestCase):
                 "dt_to": BaseConverter.convert_date(timezone.now() + datetime.timedelta(days=2)),
                 "tm_work_start": "11:00:00",
                 "tm_work_end": "12:00:00",
-                "type": WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_BUSINESS_TRIP.value),
+                "type": WorkerDay.TYPE_BUSINESS_TRIP,
                 "comment": "I'm a test"
             })
         self.assertResponseCodeEqual(response, 200)
@@ -440,11 +440,11 @@ class TestSetWorkerDay(LocalTestCase):
         wd2: WorkerDay = WorkerDay.objects.filter(worker_id=self.user2.pk, dt=timezone.now().date() + datetime.timedelta(days=1)).last()
         self.assertEqual(wd.dttm_work_start, datetime.datetime.combine(timezone.now().date(), datetime.time(11, 00)))
         self.assertEqual(wd.dttm_work_end, datetime.datetime.combine(timezone.now().date(), datetime.time(12, 00)))
-        self.assertEqual(wd.type, WorkerDay.Type.TYPE_BUSINESS_TRIP.value)
+        self.assertEqual(wd.type, WorkerDay.TYPE_BUSINESS_TRIP)
         self.assertIsNotNone(wd.parent_worker_day)
         self.assertEqual(wd2.dttm_work_start, datetime.datetime.combine(timezone.now().date() + datetime.timedelta(days=1), datetime.time(11, 00)))
         self.assertEqual(wd2.dttm_work_end, datetime.datetime.combine(timezone.now().date() + datetime.timedelta(days=1), datetime.time(12, 00)))
-        self.assertEqual(wd2.type, WorkerDay.Type.TYPE_BUSINESS_TRIP.value)
+        self.assertEqual(wd2.type, WorkerDay.TYPE_BUSINESS_TRIP)
         self.assertIsNotNone(wd2.parent_worker_day)
 
     def test_create_range(self):
@@ -465,7 +465,7 @@ class TestSetWorkerDay(LocalTestCase):
                 "dt_to": BaseConverter.convert_date(timezone.now() + datetime.timedelta(days=2)),
                 "tm_work_start": "11:00:00",
                 "tm_work_end": "12:00:00",
-                "type": WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_WORKDAY.value),
+                "type": WorkerDay.TYPE_WORKDAY,
                 "comment": "I'm a test"
             })
         self.assertResponseCodeEqual(response, 200)
@@ -475,10 +475,10 @@ class TestSetWorkerDay(LocalTestCase):
         wd2: WorkerDay = WorkerDay.objects.filter(worker_id=8, dt=timezone.now().date() + datetime.timedelta(days=1)).last()
         self.assertEqual(wd.dttm_work_start, datetime.datetime.combine(timezone.now().date(), datetime.time(11, 00)))
         self.assertEqual(wd.dttm_work_end, datetime.datetime.combine(timezone.now().date(), datetime.time(12, 00)))
-        self.assertEqual(wd.type, WorkerDay.Type.TYPE_WORKDAY.value)
+        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(wd2.dttm_work_start, datetime.datetime.combine(timezone.now().date() + datetime.timedelta(days=1), datetime.time(11, 00)))
         self.assertEqual(wd2.dttm_work_end, datetime.datetime.combine(timezone.now().date() + datetime.timedelta(days=1), datetime.time(12, 00)))
-        self.assertEqual(wd2.type, WorkerDay.Type.TYPE_WORKDAY.value)
+        self.assertEqual(wd2.type, WorkerDay.TYPE_WORKDAY)
 #
 # class TestGetWorkerDayLogs(LocalTestCase):
 #     url = '/api/timetable/cashier/get_worker_day_logs'
@@ -491,11 +491,11 @@ class TestDeleteWorkerDay(LocalTestCase):
         super().setUp(worker_day)
         self.now = timezone.now()
         self.staff = create_stuff(self.shop.pk)
-        self.wd_root = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.Type.TYPE_WORKDAY.value,
+        self.wd_root = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.TYPE_WORKDAY,
                                                 dt=self.now.date())
-        self.wd_child = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.Type.TYPE_VACATION.value,
+        self.wd_child = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.TYPE_VACATION,
                                                  dt=self.now.date(), parent_worker_day_id=self.wd_root.pk)
-        self.wd_child2 = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.Type.TYPE_VACATION.value,
+        self.wd_child2 = WorkerDay.objects.create(worker_id=self.staff.pk, type=WorkerDay.TYPE_VACATION,
                                                   dt=self.now.date(), parent_worker_day_id=self.wd_child.pk)
 
     def test_success(self):
@@ -681,11 +681,11 @@ class TestGetChangeRequest(LocalTestCase):
         self.now = timezone.now().replace(microsecond=0)
         self.wd_today = WorkerDayChangeRequest.objects.create(
             worker_id=self.user.pk, dt=self.now.date(),
-            type=WorkerDay.Type.TYPE_VACATION.value
+            type=WorkerDay.TYPE_VACATION
         )
         self.wd_tomorrow = WorkerDayChangeRequest.objects.create(
             worker_id=self.user.pk, dt=(self.now + datetime.timedelta(days=1)).date(),
-            type=WorkerDay.Type.TYPE_WORKDAY.value
+            type=WorkerDay.TYPE_WORKDAY
         )
 
     def test_success(self):
@@ -697,7 +697,7 @@ class TestGetChangeRequest(LocalTestCase):
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertEqual(response.json()['data']['type'],
-                         WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_VACATION.value))
+                        WorkerDay.TYPE_VACATION)
 
         # Tomorrow request
         with self.auth_user():
@@ -707,7 +707,7 @@ class TestGetChangeRequest(LocalTestCase):
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertEqual(response.json()['data']['type'],
-                         WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_WORKDAY.value))
+                        WorkerDay.TYPE_WORKDAY)
 
         # Yesterday request - no request
         with self.auth_user():
@@ -735,7 +735,7 @@ class TestRequestWorkerDay(LocalTestCase):
             })
         self.assertResponseCodeEqual(response, 200)
         req = WorkerDayChangeRequest.objects.filter(
-            worker_id=self.staff.id, type=WorkerDay.Type.TYPE_VACATION.value
+            worker_id=self.staff.id, type=WorkerDay.TYPE_VACATION
         ).first()
         self.assertIsNotNone(req)
         self.assertIsNone(req.dttm_work_start)
@@ -757,7 +757,7 @@ class TestRequestWorkerDay(LocalTestCase):
         self.assertResponseCodeEqual(response, 200)
 
         req = WorkerDayChangeRequest.objects.filter(
-            worker_id=self.staff.id, type=WorkerDay.Type.TYPE_VACATION.value
+            worker_id=self.staff.id, type=WorkerDay.TYPE_VACATION
         ).first()
         self.assertIsNotNone(req)
         self.assertEqual(req.dttm_work_start, now)
@@ -772,7 +772,7 @@ class TestHandleWorkerDayRequest(LocalTestCase):
         super().setUp(worker_day)
         self.worker: User = create_stuff(self.root_shop.id)
         self.req: WorkerDayChangeRequest = WorkerDayChangeRequest.objects.create(
-            worker=self.worker, dt=timezone.now().today(), type=WorkerDay.Type.TYPE_VACATION.value,
+            worker=self.worker, dt=timezone.now().today(), type=WorkerDay.TYPE_VACATION,
         )
 
     def test_approve(self):

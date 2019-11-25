@@ -48,7 +48,7 @@ def count_work_month_stats(shop, dt_start, dt_end, users, times_borders=None):
             '{}_days_periods'.format(i[1]): 0 for i in times_borders  # days periods counts
         })
         dict.update({
-            WorkerDayConverter.convert_type(i.value): 0 for i in WorkerDay.Type  # days types
+            i[0]: 0 for i in WorkerDay.TYPES  # days types
         })
         return dict
 
@@ -122,11 +122,11 @@ def count_work_month_stats(shop, dt_start, dt_end, users, times_borders=None):
         if dt != row['dt']:
             dt = row['dt']
 
-            worker[WorkerDayConverter.convert_type(row['type'])] += 1
+            worker[row['type']] += 1
 
             if row['type'] in WorkerDay.TYPES_PAID:
                 worker['paid_days'] += 1
-                if row['type'] != WorkerDay.Type.TYPE_WORKDAY.value:
+                if row['type'] != WorkerDay.TYPE_WORKDAY:
                     worker['paid_hours'] += ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK]
                 else:
                     # todo: из расписания перерывы вычитать

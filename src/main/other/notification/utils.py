@@ -8,10 +8,10 @@ from src.db.models import (
 )
 
 work_types = {
-    WorkerDay.Type.TYPE_WORKDAY.value: 'рабочий день',
-    WorkerDay.Type.TYPE_ABSENSE.value: 'отсутствие',
-    WorkerDay.Type.TYPE_HOLIDAY.value: 'выходной',
-    WorkerDay.Type.TYPE_VACATION.value: 'отпуск',
+    WorkerDay.TYPE_WORKDAY: 'рабочий день',
+    WorkerDay.TYPE_ABSENSE: 'отсутствие',
+    WorkerDay.TYPE_HOLIDAY: 'выходной',
+    WorkerDay.TYPE_VACATION: 'отпуск',
 }
 
 
@@ -69,7 +69,7 @@ def create_notification(action, instance, requester=None):
     #
     #     elif isinstance(instance, WorkerDayChangeRequest):
     #         change_request_info = ''
-    #         if instance.type == WorkerDay.Type.TYPE_WORKDAY.value:
+    #         if instance.type == WorkerDay.TYPE_WORKDAY:
     #             change_request_info = ' с {} по {}'.format(
     #                 instance.dttm_work_start.strftime('%H:%M'),
     #                 instance.dttm_work_end.strftime('%H:%M')
