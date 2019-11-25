@@ -668,6 +668,8 @@ class UserWeekdaySlot(models.Model):
         return '{}, {}, {}, {}'.format(self.worker.last_name, self.slot.name, self.weekday, self.id)
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, blank=True, null=True, on_delete=models.PROTECT)
+    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
     slot = models.ForeignKey('Slot', on_delete=models.CASCADE)
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
     is_suitable = models.BooleanField(default=True)
