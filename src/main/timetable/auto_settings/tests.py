@@ -69,8 +69,7 @@ class TestAutoSettings(LocalTestCase):
         }
         self.assertEqual(response.json(), correct_res)
         correct_tt = {
-            'shop_id': 13,
-            'status_message': '<urlopen error [Errno 111] Connection refused>',
+            'shop_id': self.shop.id,
             'status': 3,
         }
-        self.assertEqual(Timetable.objects.all().values('shop_id', 'status_message', 'status').last(), correct_tt)
+        self.assertEqual(Timetable.objects.all().values('shop_id', 'status').last(), correct_tt)
