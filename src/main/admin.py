@@ -5,8 +5,6 @@ from src.db.models import (
     Shop,
     WorkerDay,
     PeriodClients,
-    PeriodQueues,
-    PeriodProducts,
     PeriodDemandChangeLog,
     WorkType,
     Cashbox,
@@ -21,17 +19,10 @@ from src.db.models import (
     ProductionDay,
     ProductionMonth,
     WorkerMonthStat,
-    CameraCashboxStat,
-    CameraCashbox,
-    CameraClientGate,
-    CameraClientEvent,
     Group,
     FunctionGroup,
     WorkerPosition,
     OperationType,
-    IncomeVisitors,
-    EmptyOutcomeVisitors,
-    PurchasesOutcomeVisitors,
     WorkerDayChangeRequest,
     AttendanceRecords,
     ExchangeSettings,
@@ -191,16 +182,6 @@ class PeriodClientsAdmin(PeriodDemandAdmin):
     pass
 
 
-@admin.register(PeriodQueues)
-class PeriodQueuesAdmin(PeriodDemandAdmin):
-    pass
-
-
-@admin.register(PeriodProducts)
-class PeriodClientsAdmin(PeriodDemandAdmin):
-    pass
-
-
 @admin.register(PeriodDemandChangeLog)
 class PeriodDemandChangeLogAdmin(admin.ModelAdmin):
     list_display = ('operation_type_name', 'dttm_from', 'dttm_to')
@@ -338,27 +319,6 @@ class WorkerMonthStatAdmin(admin.ModelAdmin):
     list_display = ('worker_id', 'month')
 
 
-@admin.register(CameraCashboxStat)
-class CameraCashboxStatAdmin(admin.ModelAdmin):
-    list_display = ('camera_cashbox', 'dttm', 'queue')
-
-
-@admin.register(CameraCashbox)
-class CameraCashboxStatAdmin(admin.ModelAdmin):
-    list_display = ('name', 'cashbox')
-
-
-@admin.register(CameraClientGate)
-class CameraClientGateAdmin(admin.ModelAdmin):
-    list_display = ('name', 'type')
-
-
-@admin.register(CameraClientEvent)
-class CameraClientEventAdmin(admin.ModelAdmin):
-    list_display = ('dttm', 'gate', 'type')
-    list_filter = ('gate', 'type')
-
-
 @admin.register(Group)
 class GroupAdmin(admin.ModelAdmin):
     list_dispaly = ('id', 'dttm_added', 'name', 'subordinates')
@@ -371,20 +331,6 @@ class FunctionGroupAdmin(admin.ModelAdmin):
     list_filter = ('access_type', 'group', 'func')
     search_fields = ('id',)
 
-
-@admin.register(IncomeVisitors)
-class IncomeVisitorsAdmin(admin.ModelAdmin):
-    list_display = [f.name for f in IncomeVisitors._meta.get_fields()]
-
-
-@admin.register(EmptyOutcomeVisitors)
-class EmptyOutcomeVisitorsAdmin(admin.ModelAdmin):
-    list_display = [f.name for f in EmptyOutcomeVisitors._meta.get_fields()]
-
-
-@admin.register(PurchasesOutcomeVisitors)
-class PurchaseOutcomeVisitorsAdmin(admin.ModelAdmin):
-    list_display = [f.name for f in PurchasesOutcomeVisitors._meta.get_fields()]
 
 
 @admin.register(WorkerDayChangeRequest)

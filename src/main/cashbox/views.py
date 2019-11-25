@@ -9,7 +9,6 @@ from src.db.models import (
     Slot,
     WorkerDayCashboxDetails,
 )
-from src.util.db import WorkTypeUtil
 from src.util.forms import FormUtil
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import (
@@ -108,22 +107,23 @@ def get_cashboxes(request, form):
     dt_to = FormUtil.get_dt_to(form)
     work_type_ids = form['work_type_ids']
 
-    cashboxes = Cashbox.objects.select_related(
-        'type'
-    ).filter(
-        type__shop_id=shop_id,
+    work_types = WorkType.objects.qos_filter_active(
+        dt_from,
+        dt_to,
+        shop_id=shop_id,
     )
-
-    types = WorkTypeUtil.fetch_from_cashboxes(cashboxes)
-
     if len(work_type_ids) > 0:
-        cashboxes = [x for x in cashboxes if x.type_id in work_type_ids]
+        work_types = work_types.filter(id__in=work_type_ids)
 
-    cashboxes = [x for x in cashboxes if
-                 dt_from <= x.dttm_added.date() <= dt_to or dt_from <= x.dttm_deleted.date() <= dt_to]
+    work_types = list(work_types.order_by('id'))
+
+    cashboxes = Cashbox.objects.filter(
+        type__id__in=list(map(lambda x: x.id, work_types)),
+        dttm_deleted__isnull=True,
+    ).order_by('number', 'id')
 
     return JsonResponse.success({
-        'work_types': {x.id: WorkTypeConverter.convert(x) for x in WorkTypeUtil.sort(types)},
+        'work_types': {x.id: WorkTypeConverter.convert(x) for x in work_types},
         'cashboxes': [CashboxConverter.convert(x) for x in cashboxes]
     })
 
@@ -518,76 +518,3 @@ def edit_work_type(request, form):
         ]
     })
 
-
-@api_method('GET', CashboxesOpenTime)
-def get_cashboxes_open_time(request, form):
-    """
-    Возвращает процент "используемости" касс по отношению к периоду
-
-    Args:
-        method: GET
-        url: /api/cashbox/get_cashboxes_open_time
-        shop_id(int): required = False
-        from_dt(QOS_DATE): с какого периода
-        to_dt(QOS_DATE): по какой период
-
-    Returns:
-        {
-            cashbox_id: {
-                'share_time': float
-            },..
-        }
-
-    """
-    response = {}
-    shop_id = form['shop_id']
-    dt_from = FormUtil.get_dt_from(form)
-    dt_to = FormUtil.get_dt_to(form)
-
-    def update_response(last_cashbox_id, share_of_open_time, duration_of_the_shop):
-        percent = round(share_of_open_time * 100 / duration_of_the_shop, 3)
-        response[last_cashbox_id] = {
-            'share_time': percent if percent < 100 else 100
-        }
-
-    cashboxes = Cashbox.objects.qos_filter_active(
-        dt_from,
-        dt_to,
-        type__shop=shop_id
-    )
-    for cashbox in cashboxes:
-        response[cashbox.id] = {
-            'share_time': 0
-        }
-
-    worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related(
-        'work_type__shop',
-        'worker_day',
-    ).filter(
-        status=WorkerDayCashboxDetails.TYPE_WORK,
-        work_type__shop=shop_id,
-        on_cashbox__isnull=False,
-        worker_day__dt__gte=dt_from,
-        worker_day__dt__lte=dt_to,
-        dttm_to__isnull=False,
-        is_tablet=True,
-    ).order_by('on_cashbox')
-
-    if len(worker_day_cashbox_details):
-        share_of_open_time = 0
-        last_cashbox = worker_day_cashbox_details[0].on_cashbox
-        duration_of_the_shop = time_diff(worker_day_cashbox_details[0].work_type.shop.dt_opened,
-                                         worker_day_cashbox_details[0].work_type.shop.dt_closed) * (
-                                       (dt_to - dt_from).days + 1)
-
-        for detail in worker_day_cashbox_details:
-            if detail.on_cashbox == last_cashbox:
-                share_of_open_time += (detail.dttm_to - detail.dttm_from).total_seconds()
-            else:
-                update_response(last_cashbox.id, share_of_open_time, duration_of_the_shop)
-                last_cashbox = detail.on_cashbox
-                share_of_open_time = (detail.dttm_to - detail.dttm_from).total_seconds()
-
-        update_response(last_cashbox.id, share_of_open_time, duration_of_the_shop)
-
-    return JsonResponse.success(response)

@@ -3,9 +3,7 @@ from src.db.models import (
     PeriodClients, 
     OperationType, 
     WorkType, 
-    Shop, 
-    PeriodProducts, 
-    PeriodQueues,
+    Shop,
     Event
 )
 from datetime import datetime, timedelta, time
@@ -191,117 +189,118 @@ class TestGetForecast(TestDemand):
 
     def setUp(self):
         super().setUp()
-        test_data = {
-            'PeriodProducts':[
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[0],
-                    'value' : 13
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[1],
-                    'value' : 25
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[2],
-                    'value' : 20
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[0],
-                    'value' : 12,
-                    'type' : PeriodQueues.FACT_TYPE
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[1],
-                    'value' : 25,
-                    'type' : PeriodQueues.FACT_TYPE
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[2],
-                    'value' : 9,
-                    'type' : PeriodQueues.FACT_TYPE
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[0],
-                    'value' : 15,
-                    'type' : PeriodQueues.SHORT_FORECAST_TYPE
-                },
-                {
-                    'dttm_forecast':datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[1],
-                    'value' : 23,
-                    'type' : PeriodQueues.SHORT_FORECAST_TYPE
-                },
-                {
-                    'dttm_forecast':datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[2],
-                    'value' : 7,
-                    'type' : PeriodQueues.SHORT_FORECAST_TYPE
-                }
-            ],
-            'PeriodQueues' : [
-                {
-                    'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[0],
-                    'value' : 4
-                },
-                {
-                    'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[1],
-                    'value' : 50
-                },
-                {
-                    'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[2],
-                    'value' : 21
-                },
-                {
-                    'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[0],
-                    'value' : 5,
-                    'type' : PeriodProducts.FACT_TYPE
-                },
-                {
-                    'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[1],
-                    'value' : 39,
-                    'type' : PeriodProducts.FACT_TYPE
-                },
-                {
-                    'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[2],
-                    'value' : 21,
-                    'type' : PeriodProducts.FACT_TYPE
-                },
-                {
-                    'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[0],
-                    'value' : 4,
-                    'type' : PeriodProducts.SHORT_FORECAST_TYPE
-                },
-                {
-                    'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[1],
-                    'value' : 35,
-                    'type' : PeriodProducts.SHORT_FORECAST_TYPE
-                },
-                {
-                    'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
-                    'operation_type' : self.o_types[2],
-                    'value' : 26,
-                    'type' : PeriodProducts.SHORT_FORECAST_TYPE
-                }
-            ]
-        }
-        for model in test_data.keys():
-            for data in test_data[model]:
-                apps.get_model('db', model).objects.create(**data) 
+
+        # test_data = {
+        #     'PeriodProducts':[
+        #         {
+        #             'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[0],
+        #             'value' : 13
+        #         },
+        #         {
+        #             'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[1],
+        #             'value' : 25
+        #         },
+        #         {
+        #             'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[2],
+        #             'value' : 20
+        #         },
+        #         {
+        #             'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[0],
+        #             'value' : 12,
+        #             'type' : PeriodQueues.FACT_TYPE
+        #         },
+        #         {
+        #             'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[1],
+        #             'value' : 25,
+        #             'type' : PeriodQueues.FACT_TYPE
+        #         },
+        #         {
+        #             'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[2],
+        #             'value' : 9,
+        #             'type' : PeriodQueues.FACT_TYPE
+        #         },
+        #         {
+        #             'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[0],
+        #             'value' : 15,
+        #             'type' : PeriodQueues.SHORT_FORECAST_TYPE
+        #         },
+        #         {
+        #             'dttm_forecast':datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[1],
+        #             'value' : 23,
+        #             'type' : PeriodQueues.SHORT_FORECAST_TYPE
+        #         },
+        #         {
+        #             'dttm_forecast':datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[2],
+        #             'value' : 7,
+        #             'type' : PeriodQueues.SHORT_FORECAST_TYPE
+        #         }
+        #     ],
+        #     'PeriodQueues' : [
+        #         {
+        #             'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[0],
+        #             'value' : 4
+        #         },
+        #         {
+        #             'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[1],
+        #             'value' : 50
+        #         },
+        #         {
+        #             'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[2],
+        #             'value' : 21
+        #         },
+        #         {
+        #             'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[0],
+        #             'value' : 5,
+        #             'type' : PeriodProducts.FACT_TYPE
+        #         },
+        #         {
+        #             'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[1],
+        #             'value' : 39,
+        #             'type' : PeriodProducts.FACT_TYPE
+        #         },
+        #         {
+        #             'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[2],
+        #             'value' : 21,
+        #             'type' : PeriodProducts.FACT_TYPE
+        #         },
+        #         {
+        #             'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[0],
+        #             'value' : 4,
+        #             'type' : PeriodProducts.SHORT_FORECAST_TYPE
+        #         },
+        #         {
+        #             'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[1],
+        #             'value' : 35,
+        #             'type' : PeriodProducts.SHORT_FORECAST_TYPE
+        #         },
+        #         {
+        #             'dttm_forecast' : datetime(2018, 6, 7, 9, 0),
+        #             'operation_type' : self.o_types[2],
+        #             'value' : 26,
+        #             'type' : PeriodProducts.SHORT_FORECAST_TYPE
+        #         }
+        #     ]
+        # }
+        # for model in test_data.keys():
+        #     for data in test_data[model]:
+        #         apps.get_model('db', model).objects.create(**data)
 
     def test_correct_all_operations(self):
         self.auth()
@@ -310,20 +309,20 @@ class TestGetForecast(TestDemand):
         correct_L = {
             'dttm': '09:00:00 07.06.2018',
             'clients': 55.0, 
-            'products': 58.0, 
-            'queue': 75.0
+            # 'products': 58.0,
+            # 'queue': 75.0
         }
         correct_F = {
             'dttm': '09:00:00 07.06.2018', 
             'clients': 39.0, 
-            'products': 46.0, 
-            'queue': 65.0
+            # 'products': 46.0,
+            # 'queue': 65.0
         }
         correct_S = {
             'dttm': '09:00:00 07.06.2018', 
             'clients': 28.0, 
-            'products': 45.0, 
-            'queue': 65.0
+            # 'products': 45.0,
+            # 'queue': 65.0
         }
         self.assertEqual(response.json()['data']['L'][18], correct_L)
         self.assertEqual(response.json()['data']['F'][18], correct_F)
@@ -336,20 +335,20 @@ class TestGetForecast(TestDemand):
         correct_L = {
             'dttm': '09:00:00 07.06.2018',
             'clients': 50.0, 
-            'products': 38.0, 
-            'queue': 54.0
+            # 'products': 38.0,
+            # 'queue': 54.0
         }
         correct_F = {
             'dttm': '09:00:00 07.06.2018', 
             'clients': 34.0, 
-            'products': 37.0, 
-            'queue': 44.0
+            # 'products': 37.0,
+            # 'queue': 44.0
         }
         correct_S = {
             'dttm': '09:00:00 07.06.2018', 
             'clients': 22.0, 
-            'products': 38.0, 
-            'queue': 39.0
+            # 'products': 38.0,
+            # 'queue': 39.0
         }
         self.assertEqual(response.json()['data']['L'][18], correct_L)
         self.assertEqual(response.json()['data']['F'][18], correct_F)

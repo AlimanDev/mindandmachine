@@ -1,4 +1,4 @@
-from src.db.models import (
+from .models import (
     CameraCashboxStat,
     CameraCashbox,
     CameraClientGate,
@@ -6,10 +6,12 @@ from src.db.models import (
 )
 import datetime
 from src.util.utils import outer_server, JsonResponse, api_method
-from .forms import CameraStatFrom, CamRequestForm
+from .forms import CameraStatFrom, CamRequestForm, GetVisitorsInfoForm
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 import json
+from django.apps import apps
+from datetime import datetime, timedelta, time, date
 
 
 @csrf_exempt
@@ -116,3 +118,57 @@ def set_events(request, json_data):
     bulk_create_camera_event(obj=None)
 
     return JsonResponse.success()
+
+
+@api_method('GET', GetVisitorsInfoForm)
+def get_visitors_info(request, form):
+    """
+    Отдает информацию с камер по количеству посетителей
+
+    Args:
+        method: GET
+        url: /api/demand/get_visitors_info
+        from_dt(QOS_DATE): с какой даты смотрим
+        to_dt(QOS_DATE):
+        shop_id(int): чисто для api_method'a
+    Returns:
+        {
+            'IncomeVisitors': [], |
+            'PurchasesOutcomeVisitors': [], |
+            'EmptyOutcomeVisitors': []
+        }
+    """
+    def filter_qs(query_set, dttm):
+        value_dttm_tuple = list(filter(lambda item_in_qs: item_in_qs[0] == dttm, query_set))
+        return value_dttm_tuple[0][1] if value_dttm_tuple else 0
+
+    dttm_from = datetime.combine(form['from_dt'], time())
+    dttm_to = datetime.combine(form['to_dt'] + timedelta(days=1), time())
+
+    filter_dict = {
+        'type': PeriodClients.FACT_TYPE,
+        'dttm_forecast__gte': dttm_from,
+        'dttm_forecast__lte': dttm_to,
+    }
+
+    return_dict = {
+        'IncomeVisitors': [],
+        'PurchasesOutcomeVisitors': [],
+        'EmptyOutcomeVisitors': []
+    }
+    query_sets = {}
+
+    for model_name in return_dict.keys():
+        query_sets[model_name] = apps.get_model('db', model_name).objects.filter(**filter_dict).values_list(
+            'dttm_forecast', 'value'
+        )
+    dttm = dttm_from
+    while dttm < dttm_to:
+        for model_name, qs in query_sets.items():
+            return_dict[model_name].append({
+                'dttm': BaseConverter.convert_datetime(dttm),
+                'value': filter_qs(qs, dttm)
+            })
+        dttm += timedelta(minutes=30)
+
+    return JsonResponse.success(return_dict)

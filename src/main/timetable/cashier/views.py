@@ -307,7 +307,10 @@ def get_cashier_timetable(request, form):
     checkpoint = FormUtil.get_checkpoint(form)
     approved_only = form['approved_only']
     work_types = {w.id: w for w in WorkType.objects.select_related('shop').all()}
-
+    def check_wd(wd):
+            work_type=wd.work_types.first()
+            if work_type and work_type.shop_id != form['shop_id']:
+                wd.other_shop = work_type.shop.title
     response = {}
     # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_ids']:
@@ -360,33 +363,30 @@ def get_cashier_timetable(request, form):
             sort_key=lambda _: _.id,
             sort_reverse=True
         )
-
-        indicators_response = {
-            'work_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value),
-            'holiday_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value),
-            'sick_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_SICK.value),
-            'vacation_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_VACATION.value),
-            'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and
-                                                                        x.dt in official_holidays),
-            'change_amount': len(worker_day_change_log),
-            'hours_count_fact': wd_stat_count_total(worker_days, request.shop)['hours_count_fact']
-        }
-
-        days_response = []
-        for wd in worker_days:
-            work_type=wd.work_types.first()
-            if work_type and work_type.shop_id != form['shop_id']:
-                wd.other_shop = work_type.shop.title
-
-            days_response.append({
+        indicators_response = {}
+        if (len(form['worker_ids']) == 1):
+            indicators_response = {
+                'work_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value),
+                'holiday_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_HOLIDAY.value),
+                'sick_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_SICK.value),
+                'vacation_day_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_VACATION.value),
+                'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.Type.TYPE_WORKDAY.value and
+                                                                            x.dt in official_holidays),
+                'change_amount': len(worker_day_change_log),
+                'hours_count_fact': wd_stat_count_total(worker_days, request.shop)['hours_count_fact']
+            }
+        map(check_wd, worker_days)
+        days_response = [
+            {
                 'day': WorkerDayConverter.convert(wd),
                 'change_log': [WorkerDayChangeLogConverter.convert(x) for x in
                                worker_day_change_log.get(wd.id, [])],
                 'change_requests': []
                 # 'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in
                 #                     worker_day_change_requests.get(obj.id, [])[:10]]
-            })
-
+            }
+            for wd in worker_days
+        ]
 
         response[worker_id] = {
             'indicators': indicators_response,

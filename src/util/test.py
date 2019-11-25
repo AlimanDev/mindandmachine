@@ -18,19 +18,15 @@ from src.db.models import (
     FunctionGroup,
     User,
     WorkerDay,
-    CameraCashboxStat,
     WorkType,
     OperationType,
     PeriodClients,
     Shop,
     Cashbox,
-    CameraCashbox,
     WorkerDayCashboxDetails,
     Slot,
     UserWeekdaySlot,
     WorkerCashboxInfo,
-    CameraClientGate,
-    CameraClientEvent
 )
 
 
@@ -307,8 +303,8 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         Cashbox.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0))
 
         # CameraGates
-        self.entry_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_ENTRY, name='Вход')
-        self.exit_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_OUT, name='Выход')
+        # self.entry_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_ENTRY, name='Вход')
+        # self.exit_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_OUT, name='Выход')
 
         # if periodclients:
         #
@@ -374,13 +370,13 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         )
 
         # CameraCashbox
-        self.camera_cashbox = CameraCashbox.objects.create(name='Camera_1', cashbox=self.cashbox1)
+        # self.camera_cashbox = CameraCashbox.objects.create(name='Camera_1', cashbox=self.cashbox1)
 
         # CameraCashboxStat
-        test_time = dttm_now
-        for i in range(1, 20):
-            create_camera_cashbox_stat(self.camera_cashbox, test_time - datetime.timedelta(minutes=30 * i), i)
-            test_time -= datetime.timedelta(seconds=10)
+        # test_time = dttm_now
+        # for i in range(1, 20):
+        #     create_camera_cashbox_stat(self.camera_cashbox, test_time - datetime.timedelta(minutes=30 * i), i)
+        #     test_time -= datetime.timedelta(seconds=10)
 
         # Slots
         self.slot1 = Slot.objects.create(
@@ -437,13 +433,13 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         )
 
         # CameraClientEvent
-        gates = [self.exit_gate, self.entry_gate]
-        for i in range(15):
-            CameraClientEvent.objects.create(
-                dttm=dttm_now - datetime.timedelta(minutes=2 * i),
-                gate=gates[i % 2],
-                type=CameraClientEvent.DIRECTION_TYPES[i % 2][0],  # TOWARD / BACKWARD
-            )
+        # gates = [self.exit_gate, self.entry_gate]
+        # for i in range(15):
+        #     CameraClientEvent.objects.create(
+        #         dttm=dttm_now - datetime.timedelta(minutes=2 * i),
+        #         gate=gates[i % 2],
+        #         type=CameraClientEvent.DIRECTION_TYPES[i % 2][0],  # TOWARD / BACKWARD
+        #     )
 
     def auth(self):
         self.client.post(
@@ -537,12 +533,12 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         return worker_day
 
 
-def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
-    CameraCashboxStat.objects.create(
-        camera_cashbox=camera_cashbox_obj,
-        dttm=dttm,
-        queue=queue,
-    )
+# def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
+#     CameraCashboxStat.objects.create(
+#         camera_cashbox=camera_cashbox_obj,
+#         dttm=dttm,
+#         queue=queue,
+#     )
 
 
 def create_work_type(shop, name, dttm_last_update_queue=None, dttm_deleted=None, id=None):
