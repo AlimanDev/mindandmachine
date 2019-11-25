@@ -24,7 +24,6 @@ from src.main.timetable.worker_exchange.utils import (
 from src.main.demand.utils import create_predbills_request_function
 from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
 
-from src.util.models_converter import BaseConverter
 
 from src.main.timetable.worker_exchange.utils import search_candidates, send_noti2candidates
 from src.main.operation_template.utils import build_period_clients

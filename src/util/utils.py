@@ -222,7 +222,7 @@ def api_method(
                     try:
                         shop = lambda_func(form.cleaned_data)
                     except ObjectDoesNotExist:
-                        return JsonResponse.does_not_exists_error('error in api_method')
+                        return JsonResponse.does_not_exists_error("Can't get shop")
                     except MultipleObjectsReturned:
                         return JsonResponse.multiple_objects_returned()
                     if shop is None:

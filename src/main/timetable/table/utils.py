@@ -230,7 +230,7 @@ def count_difference_of_normal_days(dt_end, employments, dt_start=None):
         count_hours=Coalesce(Sum('workermonthstat__work_hours'), 0),
     ).order_by('id'))
     prev_info = {user['id']: user for user in prev_info}
-    user_info_dict = {}
+    employment_stat_dict = {}
 
     for u_it in range(len(employments)):
         dt_u_st = employments[u_it].dt_hired if employments[u_it].dt_hired and (employments[u_it].dt_hired > dt_start) else dt_start
@@ -240,9 +240,9 @@ def count_difference_of_normal_days(dt_end, employments, dt_start=None):
         diff_prev_hours = prev_info[employments[u_it].id]['count_hours'] - total_norm_hours if prev_info.get(
             employments[u_it].id, None) else 0 - total_norm_hours
 
-        user_info_dict[employments[u_it].id] = {
+        employment_stat_dict[employments[u_it].id] = {
             'diff_prev_paid_days': diff_prev_days,
             'diff_prev_paid_hours': diff_prev_hours
         }
 
-    return user_info_dict
+    return employment_stat_dict

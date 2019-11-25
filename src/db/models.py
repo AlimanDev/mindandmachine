@@ -998,7 +998,7 @@ class WorkerDay(models.Model):
         return '{}, {}, {}, {}, {}, {}'.format(
             self.worker.last_name,
             self.shop.title if self.shop else '',
-            self.shop.parent.title if self.shop else '',
+            self.shop.parent.title if self.shop and self.shop.parent else '',
             self.dt,
             self.Type.get_name_by_value(self.type),
             self.id

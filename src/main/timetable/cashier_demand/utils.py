@@ -9,7 +9,6 @@ from django.db.models import Q, F
 from src.db.models import (
     Employment,
     WorkerDay,
-    User,
     WorkType,
     WorkerDayCashboxDetails,
     PeriodClients,
@@ -18,7 +17,6 @@ from src.db.models import (
 )
 from src.util.collection import group_by
 from src.util.models_converter import BaseConverter
-from src.main.timetable.table.utils import count_work_month_stats
 from src.main.urv.utils import wd_stat_count_total, wd_stat_count
 
 
