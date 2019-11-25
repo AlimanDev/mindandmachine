@@ -27,7 +27,7 @@ types = [
     WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE,
 ]
 
-def change_wroker_days(apps, shema_editor):
+def change_worker_days(apps, shema_editor):
         WorkerDay = apps.get_model('db', 'WorkerDay')
         WorkerDayChangeRequest = apps.get_model('db', 'WorkerDayChangeRequest')
         for wd in WorkerDay.objects.all():
@@ -55,5 +55,5 @@ class Migration(migrations.Migration):
             name='type',
             field=models.CharField(choices=[('H', 'Выходной'), ('W', 'Рабочий день'), ('V', 'Отпуск'), ('S', 'Больничный лист'), ('Q', 'Квалификация'), ('A', 'Неявка до выяснения обстоятельств'), ('M', 'Б/л по беременноси и родам'), ('T', 'Командировка'), ('O', 'Другое'), ('D', 'Удален'), ('E', 'Пусто'), ('HW', 'Работа в выходной день'), ('RA', 'Прогул на основании акта'), ('EV', 'Доп. отпуск'), ('TV', 'Учебный отпуск'), ('SV', 'Отпуск за свой счёт'), ('ST', 'Отпуск за свой счёт по уважительной причине'), ('G', 'Гос. обязанности'), ('HS', 'Спец. выходной'), ('MC', 'Отпуск по уходу за ребёнком до 3-х лет'), ('C', 'Выходные дни по уходу')], default='E', max_length=2),
         ),
-        migrations.RunPython(change_wroker_days),
+        migrations.RunPython(change_worker_days),
     ]
