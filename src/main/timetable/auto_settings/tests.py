@@ -1,15 +1,16 @@
 import json
-from unittest import skip
+import datetime
 
-from src.db.models import User, Employment
+from src.db.models import Employment, Timetable, WorkerDay, WorkerDayCashboxDetails
 from src.util.test import LocalTestCase
+from django.utils.timezone import now
 
+from src.util.models_converter import BaseConverter
+
+from django.conf import settings
+settings.CELERY_TASK_ALWAYS_EAGER = True
 
 class TestAutoSettings(LocalTestCase):
-
-    def setUp(self):
-        super().setUp()
-
     def test_get_status(self):
         self.auth()
 
@@ -47,10 +48,98 @@ class TestAutoSettings(LocalTestCase):
         self.assertEqual(employments.count(), employment_cnt - 2)
 
     # {'error_type': 'InternalError', 'error_message': 'Внутренняя ошибка сервера'} // no timetable_id
-    @skip("set timetable 500")
+    # @skip("set timetable 500")
     def test_set_timetable(self):
+
         self.auth()
 
-        response = self.api_post('/api/timetable/auto_settings/set_timetable', {'data': json.dumps({})})
+        timetable = Timetable.objects.create(
+            shop = self.shop,
+            dt = now().date().replace(day=1),
+            status = Timetable.Status.PROCESSING.value,
+            dttm_status_change = now()
+        )
+        dt = now().date()
+        tm_from = datetime.time(10,0,0)
+        tm_to = datetime.time(20,0,0)
+
+        dttm_from = BaseConverter.convert_datetime(
+            datetime.datetime.combine(dt, tm_from),
+        )
+
+        dttm_to = BaseConverter.convert_datetime(
+            datetime.datetime.combine(dt, tm_to),
+        )
+
+        self.assertEqual(len(WorkerDay.objects.all()), 0)
+        self.assertEqual(len(WorkerDayCashboxDetails.objects.all()), 0)
+
+        response = self.api_post('/api/timetable/auto_settings/set_timetable', {
+            'timetable_id': timetable.id,
+            'data': json.dumps({
+                'timetable_status': 'R',
+                'users': {
+                    self.user3.id:{
+                        'workdays': [
+                            {'dt': BaseConverter.convert_date(dt),
+                             'type':'W',
+                             'dttm_work_start': dttm_from,
+                             'dttm_work_end': dttm_to,
+                             'details': [{
+                                 'dttm_from': dttm_from,
+                                 'dttm_to': dttm_to,
+                                 'type': self.work_type2.id
+                             }]
+
+                             }
+                        ]
+                    },
+                    self.user4.id: {
+                        'workdays': [
+                            {'dt': BaseConverter.convert_date(dt),
+                             'type':'H',
+                             'dttm_work_start': dttm_from,
+                             'dttm_work_end': dttm_to,
+                             }
+                        ]
+                    }
+                }
+            })
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['code'], 200)
+
+        wd = WorkerDay.objects.filter(
+            shop=self.shop,
+            worker=self.user3,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, tm_from),
+            dttm_work_end=datetime.datetime.combine(dt, tm_to),
+            type=WorkerDay.Type.TYPE_WORKDAY.value
+        )
+        self.assertEqual(len(wd), 1)
+
+        self.assertEqual(WorkerDayCashboxDetails.objects.filter(
+            worker_day=wd[0],
+            dttm_from=datetime.datetime.combine(dt, tm_from),
+            dttm_to=datetime.datetime.combine(dt, tm_to),
+            work_type=self.work_type2,
+        ).count(), 1)
+
+        self.assertEqual(WorkerDay.objects.filter(
+            shop=self.shop,
+            worker=self.user4,
+            type=WorkerDay.Type.TYPE_HOLIDAY.value,
+            dt=dt
+        ).count(), 1)
+
+    def test_create_timetable(self):
+        self.auth()
+
+        response = self.api_post('/api/timetable/auto_settings/create_timetable', {
+            'shop_id': self.shop.id,
+            'dt': BaseConverter.convert_date(now())
+            })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
