@@ -158,6 +158,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
         )
+        Shop.objects.rebuild()
 
         # users
         self.user1 = User.objects.create_user(
@@ -407,23 +408,31 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
         # WorkerCashboxInfo
         WorkerCashboxInfo.objects.create(
-            id=1,
             worker=self.user1,
             work_type=self.work_type1,
         )
         WorkerCashboxInfo.objects.create(
-            id=2,
             worker=self.user2,
             work_type=self.work_type3,
         )
         WorkerCashboxInfo.objects.create(
-            id=3,
             worker=self.user3,
             work_type=self.work_type2,
         )
         WorkerCashboxInfo.objects.create(
-            id=4,
             worker=self.user4,
+            work_type=self.work_type1,
+        )
+        WorkerCashboxInfo.objects.create(
+            worker=self.user5,
+            work_type=self.work_type3,
+        )
+        WorkerCashboxInfo.objects.create(
+            worker=self.user6,
+            work_type=self.work_type1,
+        )
+        WorkerCashboxInfo.objects.create(
+            worker=self.user7,
             work_type=self.work_type1,
         )
 
