@@ -1,5 +1,5 @@
 from django import forms
-from src.db.models import CameraCashboxStat
+from .models import CameraCashboxStat
 
 
 class CamRequestForm(forms.Form):
@@ -16,4 +16,11 @@ class CameraStatFrom(forms.ModelForm):
         ]
 
     name = forms.CharField()
+
+
+class GetVisitorsInfoForm(forms.Form):
+    from_dt = forms.DateField()
+    to_dt = forms.DateField()
+    shop_id = forms.IntegerField()
+
 

@@ -12,7 +12,6 @@ from src.db.models import (
     Shop,
     User,
     PeriodClients,
-    PeriodQueues,
     WorkerDay,
     WorkerConstraint,
     WorkerDayCashboxDetails,
@@ -89,9 +88,9 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt: timezone.date
             queues_models.append(model)
             create = len(queues_models) == 1000
 
-        if create:
-            PeriodQueues.objects.bulk_create(queues_models)
-            queues_models[:] = []
+        # if create:
+        #     PeriodQueues.objects.bulk_create(queues_models)
+        #     queues_models[:] = []
 
     def add_clients_models(model):
         if model is None:
@@ -118,12 +117,12 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt: timezone.date
         wt_df_index = 0
         while day < days:
             item = wt_df.iloc[wt_df_index]
-            add_queues_models(PeriodQueues(
-                value=item['clients'] * (1 + (np.random.rand() - 0.5) / 5) / 50,
-                dttm_forecast=item['dttm_forecast'] + dt_diff,
-                type=PeriodQueues.LONG_FORECASE_TYPE,
-                operation_type=wt.work_type_reversed.all()[0],
-            ))
+            # add_queues_models(PeriodQueues(
+            #     value=item['clients'] * (1 + (np.random.rand() - 0.5) / 5) / 50,
+            #     dttm_forecast=item['dttm_forecast'] + dt_diff,
+            #     type=PeriodQueues.LONG_FORECASE_TYPE,
+            #     operation_type=wt.work_type_reversed.all()[0],
+            # ))
             add_clients_models(PeriodClients(
                 value=item['clients'] * (1 + (np.random.rand() - 0.5) / 10),
                 dttm_forecast=item['dttm_forecast'] + dt_diff,
@@ -368,19 +367,20 @@ def create_notifications():
     Event.objects.bulk_create(list_event)
 
 
-def main(date=None, shops=None, lang='ru'):
-    f_name = 'src/db/works/test_data.json'
+def main(date=None, shops=None, lang='ru', count_of_month=None):
+    f_name = 'etc/scripts/test_data.json'
+
     lang_data = {
         'root_shop': 'Корневой магазин',
         'super_shop': 'Супер Магазин'
     }
 
-    if (lang == 'en'):
+    if lang == 'en':
         lang_data = {
             'root_shop': 'Root shop',
             'super_shop': 'Super Shop'
         }
-        f_name = 'src/db/works/test_data_en.json'
+        f_name = 'etc/scripts/test_data_en.json'
     
 
     f = open(f_name)
@@ -392,13 +392,17 @@ def main(date=None, shops=None, lang='ru'):
 
     if shops is None:
         shops = ['small', 'normal', 'big']
-
     day_step = 18
-    if date.day > day_step:
-        start_date = date.replace(day=1)
+    if count_of_month is not None:
+        start_date = (date - timezone.timedelta(days=30*count_of_month)).replace(day=1)
+        end_date = (date + timezone.timedelta(days=30)).replace(day=1)
     else:
-        start_date = (date - timezone.timedelta(days=day_step)).replace(day=1)
-    end_date = (start_date + timezone.timedelta(days=day_step * 4)).replace(day=1)
+        if date.day > day_step:
+            start_date = date.replace(day=1)
+        else:
+            start_date = (date - timezone.timedelta(days=day_step)).replace(day=1)
+        end_date = (start_date + timezone.timedelta(days=day_step * 4)).replace(day=1)
+
     predict_date = (end_date + timezone.timedelta(days=day_step * 2)).replace(day=1)
     worker_days = (end_date - start_date).days
     demand_days = (predict_date - start_date).days + 1

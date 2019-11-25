@@ -18,11 +18,16 @@ def is_config_exists(file_name):
     return os.path.isfile(os.path.join(BASE_DIR, 'src', 'conf', file_name))
 
 
-if is_config_exists('qosconfig.py'):
-    from .qosconfig import *
+QOS_DEV_STATIC_ENABLED = False
+QOS_DEV_CSRF_DISABLED = False
+QOS_DEV_AUTOLOGIN_ENABLED = False
+QOS_DEV_AUTOLOGIN_USERNAME = None
+QOS_DEV_AUTOLOGIN_PASSWORD = None
 
-if is_config_exists('qosconfig_local.py'):
-    from .qosconfig_local import *
+QOS_CAMERA_KEY = '1'
+
+HOST_IP = '127.0.0.1:8000' # dev
+TIMETABLE_IP = "127.0.0.1:5000"
 
 
 SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
@@ -61,7 +66,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'src.middleware.csrf.CsrfMiddleware',
+    'src.util.csrf.CsrfMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -235,7 +240,7 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERYD_CONCURRENCY = 2
 CELERYD_PREFETCH_MULTIPLIER = 1
 BACKEND_QUEUE = 'backend_queue'
-
+CELERY_TASK_DEFAULT_QUEUE = BACKEND_QUEUE
 # for change celery configs must be before (for BACKEND_QUEUE)
 # todo: do normal parameters changer
 if is_config_exists('djconfig_local.py'):

@@ -1,19 +1,11 @@
-from src.db.models import Notifications
+
 from django.utils.timezone import now
 from django.db.models.query import QuerySet
 from datetime import timedelta
 from fcm_django.models import FCMDevice
 from src.db.models import (
-    WorkType,
-    Cashbox,
-    User,
-    Timetable,
-    WorkerDayChangeRequest,
     WorkerDay,
-    FunctionGroup
 )
-from django.contrib.contenttypes.models import ContentType
-from src.util.months import month_dict
 
 work_types = {
     WorkerDay.Type.TYPE_WORKDAY.value: 'рабочий день',

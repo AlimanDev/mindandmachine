@@ -17,19 +17,15 @@ from src.db.models import (
     FunctionGroup,
     User,
     WorkerDay,
-    CameraCashboxStat,
     WorkType,
     OperationType,
     PeriodClients,
     Shop,
     Cashbox,
-    CameraCashbox,
     WorkerDayCashboxDetails,
     Slot,
     UserWeekdaySlot,
     WorkerCashboxInfo,
-    CameraClientGate,
-    CameraClientEvent
 )
 
 
@@ -166,7 +162,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             id=1,
             shop=self.root_shop,
             function_group=self.admin_group,
-            last_name='Дурак',
+            last_name='Васнецов',
             first_name='Иван',
         )
         self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2', first_name='Иван2', last_name='Иванов')
@@ -200,7 +196,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             id=5,
             shop=self.reg_shop1,
             function_group=self.chief_group,
-            last_name='Дурак5',
+            last_name='Васнецов5',
             first_name='Иван5',
         )
         self.user6 = User.objects.create_user(
@@ -210,7 +206,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             id=6,
             shop=self.shop,
             function_group=self.chief_group,
-            last_name='Дурак6',
+            last_name='Васнецов6',
             first_name='Иван6',
         )
         self.user7 = User.objects.create_user(
@@ -220,7 +216,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             id=7,
             shop=self.shop,
             function_group=self.employee_group,
-            last_name='Дурак7',
+            last_name='Васнецов7',
             first_name='Иван7',
         )
 
@@ -275,8 +271,8 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         Cashbox.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0))
 
         # CameraGates
-        self.entry_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_ENTRY, name='Вход')
-        self.exit_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_OUT, name='Выход')
+        # self.entry_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_ENTRY, name='Вход')
+        # self.exit_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_OUT, name='Выход')
 
         # if periodclients:
         #
@@ -342,13 +338,13 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         )
 
         # CameraCashbox
-        self.camera_cashbox = CameraCashbox.objects.create(name='Camera_1', cashbox=self.cashbox1)
+        # self.camera_cashbox = CameraCashbox.objects.create(name='Camera_1', cashbox=self.cashbox1)
 
         # CameraCashboxStat
-        test_time = dttm_now
-        for i in range(1, 20):
-            create_camera_cashbox_stat(self.camera_cashbox, test_time - datetime.timedelta(minutes=30 * i), i)
-            test_time -= datetime.timedelta(seconds=10)
+        # test_time = dttm_now
+        # for i in range(1, 20):
+        #     create_camera_cashbox_stat(self.camera_cashbox, test_time - datetime.timedelta(minutes=30 * i), i)
+        #     test_time -= datetime.timedelta(seconds=10)
 
         # Slots
         self.slot1 = Slot.objects.create(
@@ -397,13 +393,13 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         )
 
         # CameraClientEvent
-        gates = [self.exit_gate, self.entry_gate]
-        for i in range(15):
-            CameraClientEvent.objects.create(
-                dttm=dttm_now - datetime.timedelta(minutes=2 * i),
-                gate=gates[i % 2],
-                type=CameraClientEvent.DIRECTION_TYPES[i % 2][0],  # TOWARD / BACKWARD
-            )
+        # gates = [self.exit_gate, self.entry_gate]
+        # for i in range(15):
+        #     CameraClientEvent.objects.create(
+        #         dttm=dttm_now - datetime.timedelta(minutes=2 * i),
+        #         gate=gates[i % 2],
+        #         type=CameraClientEvent.DIRECTION_TYPES[i % 2][0],  # TOWARD / BACKWARD
+        #     )
 
     def auth(self):
         self.client.post(
@@ -508,12 +504,12 @@ def create_user(user_id, shop_id, username, dt_fired=None, first_name='', last_n
 
 
 
-def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
-    CameraCashboxStat.objects.create(
-        camera_cashbox=camera_cashbox_obj,
-        dttm=dttm,
-        queue=queue,
-    )
+# def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
+#     CameraCashboxStat.objects.create(
+#         camera_cashbox=camera_cashbox_obj,
+#         dttm=dttm,
+#         queue=queue,
+#     )
 
 
 def create_work_type(shop, name, dttm_last_update_queue=None, dttm_deleted=None, id=None):

@@ -8,6 +8,7 @@ import json
 from src.util.forms import IntegersList
 from django.core.exceptions import ValidationError
 
+
 class IntegerListField(models.TextField):
 
     def get_prep_value(self, value):
@@ -52,6 +53,7 @@ class IntegerListField(models.TextField):
                 raise ValidationError('invalid IntegerListType')
 
         return value
+
 
 class EnumField(models.IntegerField):
     def __init__(self, to_enum, *args, **kwargs):
