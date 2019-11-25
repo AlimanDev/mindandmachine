@@ -42,7 +42,7 @@ def create_shop(shop_id):
 
 def create_timetable(shop_id, dttm):
     tt = Timetable.objects.create(
-        status=Timetable.Status.READY.value,
+        status=Timetable.READY,
         shop_id=shop_id,
         dt=dttm.date(),
         dttm_status_change=dttm,

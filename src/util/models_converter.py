@@ -86,21 +86,6 @@ class UserConverter(BaseConverter):
 
 
 class WorkerDayConverter(BaseConverter):
-    __WORKER_DAY_TYPE = {
-        WorkerDay.TYPE_HOLIDAY: 'H',
-        WorkerDay.TYPE_WORKDAY: 'W',
-        WorkerDay.TYPE_VACATION: 'V',
-        WorkerDay.TYPE_SICK: 'S',
-        WorkerDay.TYPE_QUALIFICATION: 'Q',
-        WorkerDay.TYPE_ABSENSE: 'A',
-        WorkerDay.TYPE_MATERNITY: 'M',
-        WorkerDay.TYPE_BUSINESS_TRIP: 'T',
-        WorkerDay.TYPE_ETC: 'O',
-        WorkerDay.TYPE_DELETED: 'D',
-        WorkerDay.TYPE_EMPTY: 'E',
-    }
-
-    __WORKER_DAY_TYPE_REVERSED = {v: k for k, v in __WORKER_DAY_TYPE.items()}
 
     @classmethod
     def convert(cls, obj):
@@ -330,29 +315,14 @@ class ShopConverter(BaseConverter):
 
 
 class TimetableConverter(BaseConverter):
-    __STATUSES = {
-        Timetable.Status.READY.value: 'R',
-        Timetable.Status.PROCESSING.value: 'P',
-        Timetable.Status.ERROR.value: 'E'
-    }
-
-    __STATUSES_REVERSED = {v: k for k, v in __STATUSES.items()}
-
-    @classmethod
-    def convert_status(cls, status_obj):
-        return cls.__STATUSES.get(status_obj, '')
-
-    @classmethod
-    def parse_status(cls, status_obj):
-        return cls.__STATUSES_REVERSED.get(status_obj)
-
+    
     @classmethod
     def convert(cls, obj):
         return {
             'id': obj.id,
             'shop': obj.shop_id,
             'dt': cls.convert_date(obj.dt),
-            'status': cls.convert_status(obj.status),
+            'status': obj.status,
             'dttm_status_change': cls.convert_datetime(obj.dttm_status_change)
         }
 

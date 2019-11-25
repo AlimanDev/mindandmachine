@@ -399,7 +399,7 @@ def update_shop_stats(dt=None):
     if not dt:
         dt = date.today().replace(day=1)
     shops = Shop.objects.filter(dttm_deleted__isnull=True)
-    tts = Timetable.objects.filter(shop__in=shops, dt__gte=dt, status=Timetable.Status.READY.value)
+    tts = Timetable.objects.filter(shop__in=shops, dt__gte=dt, status=Timetable.READY)
     for timetable in tts:
         stats = get_shop_stats(
             shop_id=timetable.shop_id,

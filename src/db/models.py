@@ -1280,10 +1280,15 @@ class Timetable(models.Model):
         verbose_name = 'Расписание'
         verbose_name_plural = 'Расписания'
 
-    class Status(utils.Enum):
-        READY = 1
-        PROCESSING = 2
-        ERROR = 3
+    READY = 'R'
+    PROCESSING = 'P'
+    ERROR = 'E'
+
+    STATUS = [
+        (READY, 'Готово'),
+        (PROCESSING, 'В процессе'),
+        (ERROR, 'Ошибка')
+    ]
 
     def __str__(self):
         return 'id: {}, shop: {}, status: {}'.format(
@@ -1297,7 +1302,7 @@ class Timetable(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='timetable')
     status_message = models.CharField(max_length=256, null=True, blank=True)
     dt = models.DateField()
-    status = utils.EnumField(Status)
+    status = models.CharField(choices=STATUS, default=PROCESSING, max_length=1)
     dttm_status_change = models.DateTimeField()
 
     # statistics

@@ -325,7 +325,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         self.timetable1 = Timetable.objects.create(
             shop = self.shop,
             dt = datetime.date(2019, 6, 1),
-            status = 1,
+            status = Timetable.READY,
             dttm_status_change = datetime.datetime(2019, 6, 1, 9, 30, 0)
         )
 

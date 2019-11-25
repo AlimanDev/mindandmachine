@@ -301,7 +301,7 @@ def create_timetable(request, form):
         tt = Timetable.objects.create(
             shop_id=shop_id,
             dt=dt_first,
-            status=Timetable.Status.PROCESSING.value,
+            status=Timetable.PROCESSING,
             dttm_status_change=datetime.now()
         )
     except:
@@ -326,7 +326,7 @@ def create_timetable(request, form):
         if not worker_cashbox_info.exists():
             users_without_spec.append(u.first_name + ' ' + u.last_name)
     if users_without_spec:
-        tt.status = Timetable.Status.ERROR.value
+        tt.status = Timetable.ERROR
         status_message = 'Не проставлены типы работ у пользователей: {}.'.format(', '.join(users_without_spec))
         tt.delete()
         return JsonResponse.value_error(status_message)
@@ -662,11 +662,11 @@ def create_timetable(request, form):
             res = response.read().decode('utf-8')
         tt.task_id = json.loads(res).get('task_id', '')
         if tt.task_id is None:
-            tt.status = Timetable.Status.ERROR.value
+            tt.status = Timetable.ERROR
             tt.save()
     except Exception as e:
         print(e)
-        tt.status = Timetable.Status.ERROR.value
+        tt.status = Timetable.ERROR
         tt.status_message = str(e)
         tt.save()
         return JsonResponse.internal_error('Error sending data to server')
@@ -702,7 +702,7 @@ def delete_timetable(request, form):
 
     tts = Timetable.objects.filter(shop_id=shop_id, dt=dt_first)
     for tt in tts:
-        if (tt.status == Timetable.Status.PROCESSING.value) and (not tt.task_id is None):
+        if (tt.status == Timetable.PROCESSING) and (not tt.task_id is None):
             try:
                 requests.post(
                     'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
@@ -800,10 +800,10 @@ def set_timetable(request, form):
 
     timetable = Timetable.objects.get(id=form['timetable_id'])
 
-    timetable.status = TimetableConverter.parse_status(data['timetable_status'])
+    timetable.status = data['timetable_status']
     timetable.status_message = data.get('status_message', False)
     timetable.save()
-    if timetable.status != Timetable.Status.READY.value and timetable.status_message:
+    if timetable.status != Timetable.READY and timetable.status_message:
         return JsonResponse.success(timetable.status_message)
 
     if data['users']:

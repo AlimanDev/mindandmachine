@@ -58,12 +58,12 @@ def create_notification(action, instance, requester=None):
     #     elif isinstance(instance, WorkType):
     #         notification_text = 'Был добавлен тип работ {}.'.format(instance.name)
     #     elif isinstance(instance, Timetable):
-    #         if instance.status == Timetable.Status.PROCESSING.value:
+    #         if instance.status == Timetable.PROCESSING:
     #             notification_text = 'Расписание на ' + get_month_name(instance.dt) + ' начало составляться.'
-    #         elif instance.status == Timetable.Status.READY.value:
+    #         elif instance.status == Timetable.READY:
     #             notification_text = 'Расписание на ' + get_month_name(instance.dt) + ' составлено.'
     #             notification_type = Notifications.TYPE_SUCCESS
-    #         elif instance.status == Timetable.Status.ERROR.value:
+    #         elif instance.status == Timetable.ERROR:
     #             notification_text = 'Ошибка при составлении расписания на ' + get_month_name(instance.dt) + '.'
     #             notification_type = Notifications.TYPE_ERROR
     #
