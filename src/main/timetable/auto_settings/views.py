@@ -1,5 +1,5 @@
 import json
-import urllib.request
+import requests
 from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 
@@ -43,7 +43,7 @@ from .forms import (
     DeleteTimetableForm,
     SetTimetableForm,
 )
-import requests
+
 from ..table.utils import count_difference_of_normal_days
 from src.main.other.notification.utils import send_notification
 from django.db.models import F
@@ -666,17 +666,15 @@ def create_timetable(request, form):
     tt.save()
     data = json.dumps(data).encode('ascii')
     try:
-        # with open('./send_data_tmp.json', 'wb+') as f:
-        #     f.write(data)
-        req = urllib.request.Request('http://{}/'.format(settings.TIMETABLE_IP), data=data, headers={'content-type': 'application/json'})
-        with urllib.request.urlopen(req) as response:
-            res = response.read().decode('utf-8')
-        tt.task_id = json.loads(res).get('task_id', '')
+        r= requests.post('http://{}/'.format(settings.TIMETABLE_IP), data=data )
+        res = r.json()
+
+        tt.task_id = res.get('task_id', '')
         if tt.task_id is None:
             tt.status = Timetable.Status.ERROR.value
             tt.save()
     except Exception as e:
-        print(e)
+        print(e.with_traceback())
         tt.status = Timetable.Status.ERROR.value
         tt.status_message = str(e)
         tt.save()

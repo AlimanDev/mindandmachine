@@ -8,7 +8,11 @@ from django.utils.timezone import now
 from src.util.models_converter import BaseConverter
 
 from django.conf import settings
+from unittest.mock import Mock, patch
+
+
 settings.CELERY_TASK_ALWAYS_EAGER = True
+
 
 class TestAutoSettings(LocalTestCase):
     def test_get_status(self):
@@ -134,12 +138,18 @@ class TestAutoSettings(LocalTestCase):
             dt=dt
         ).count(), 1)
 
-    def test_create_timetable(self):
+    @patch("src.main.timetable.auto_settings.views.requests.post")
+    def test_create_timetable(self, mockpost):
         self.auth()
+
+        mockresponse = Mock()
+        mockpost.return_value = mockresponse
+        mockresponse.json = lambda: {'task_id': 1}
 
         response = self.api_post('/api/timetable/auto_settings/create_timetable', {
             'shop_id': self.shop.id,
             'dt': BaseConverter.convert_date(now())
             })
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
