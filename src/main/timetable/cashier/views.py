@@ -313,7 +313,7 @@ def get_cashier_timetable(request, form):
     response = {}
     # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_ids']:
-        worker_days = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').prefetch_related('work_types').filter(
+        worker_days_filter = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').prefetch_related('work_types').filter(
             Q(worker__dt_fired__gt=from_dt) &
             Q(dt__lt=F('worker__dt_fired')) |
             Q(worker__dt_fired__isnull=True),
@@ -329,6 +329,7 @@ def get_cashier_timetable(request, form):
         ).order_by(
             'dt'
         )
+        worker_days = list(worker_days_filter)
 
         official_holidays = [
             x.dt for x in ProductionDay.objects.filter(
@@ -349,9 +350,9 @@ def get_cashier_timetable(request, form):
 
         if approved_only:
             wd_logs = wd_logs.filter(
-                worker_day_approve_id__isnull = False
+                worker_day_approve_id__isnull=False
             )
-
+        wd_logs = list(wd_logs)
         worker_day_change_log = group_by(
             wd_logs,
             group_key=lambda _: WorkerDay.objects.qos_get_current_worker_day(_).id,
@@ -368,7 +369,7 @@ def get_cashier_timetable(request, form):
                 'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.TYPE_WORKDAY and
                                                                             x.dt in official_holidays),
                 'change_amount': len(worker_day_change_log),
-                'hours_count_fact': wd_stat_count_total(worker_days, request.shop)['hours_count_fact']
+                'hours_count_fact': wd_stat_count_total(worker_days_filter, request.shop)['hours_count_fact']
             }
         map(check_wd, worker_days)
         days_response = [
