@@ -1,12 +1,13 @@
 from django.contrib.auth import authenticate, login, logout
 from django.middleware.csrf import rotate_token
+from django.utils import timezone
+from django.db.models import Q
+from fcm_django.models import FCMDevice
 
-from src.db.models import User
+from src.db.models import User, Employment
 from src.util.models_converter import UserConverter
 from src.util.utils import JsonResponse, api_method
 from .forms import SigninForm, FCMTokenForm
-from fcm_django.models import FCMDevice
-from django.utils import timezone
 
 
 @api_method('GET', auth_required=False, check_permissions=False)
@@ -40,14 +41,17 @@ def signin(request, form):
         user = authenticate(request, username=form['username'], password=form['password'])
         if user is None:
             return JsonResponse.auth_error()
-        if user.dt_fired is not None and user.dt_fired <= timezone.now().date():
-            return JsonResponse.not_active_error()
-        elif user.dt_hired is None or user.dt_hired > timezone.now().date():
+        employments = Employment.objects.filter(
+            Q(dt_fired__gt=timezone.now().date())| Q(dt_fired__isnull=True),
+            dt_hired__lte=timezone.now().date(),
+            user=user,
+        )
+        if not employments.exists():
             return JsonResponse.not_active_error()
         login(request, user)
-    user = User.objects.select_related('position').get(id=request.user.id)
+    # user = User.objects.select_related('position').get(id=request.user.id)
 
-    return JsonResponse.success(UserConverter.convert(user))
+    return JsonResponse.success(UserConverter.convert(request.user))
 
 
 @api_method('POST', check_permissions=False)
@@ -81,7 +85,7 @@ def is_signed(request):
     }
 
     if request.user.is_authenticated:
-        user = User.objects.select_related('position').get(id=request.user.id)
+        user = User.objects.get(id=request.user.id)
         data['user'] = UserConverter.convert(user)
 
     return JsonResponse.success(data)

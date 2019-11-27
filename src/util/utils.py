@@ -12,11 +12,13 @@ from django.core.exceptions import (
 from django.http import HttpResponse
 from django.views.debug import ExceptionReporter
 from django.views.decorators.csrf import csrf_exempt
+from django.utils.timezone import now
 
 from src.db.models import (
-    User,
-    Shop,
+    Employment,
     FunctionGroup,
+    Shop,
+    User,
 )
 
 
@@ -214,10 +216,43 @@ def api_method(
                 if not request.user.check_password(form.cleaned_data['password']):
                     return JsonResponse.access_forbidden('Неверный пароль')
 
-            if check_permissions:
-                if auth_required and request.user.is_authenticated:
-                    function_group_id = request.user.function_group_id
-                    if not function_group_id:
+            if check_permissions and auth_required:
+                skip_check_permissions=False
+                if lambda_func:
+                    try:
+                        shop = lambda_func(form.cleaned_data)
+                    except ObjectDoesNotExist:
+                        return JsonResponse.does_not_exists_error("Can't get shop")
+                    except MultipleObjectsReturned:
+                        return JsonResponse.multiple_objects_returned()
+                    if shop is None:
+                        skip_check_permissions = True
+                else:
+                    if form.cleaned_data.get('shop_id'):
+                        shop = Shop.objects.filter(id=form.cleaned_data['shop_id']).first()
+                        if not shop:
+                            return JsonResponse.does_not_exists_error('No such department')
+                    else:
+                        return JsonResponse.value_error('No shop id')
+                        # shop = request.user.shop
+
+
+                request.shop = shop
+                if not skip_check_permissions:
+                    dt = now().date()
+
+                    employments = Employment.objects.get_active(
+                        dt, dt,
+                        shop__in=shop.get_ancestors(include_self=True, ascending=True),
+                        user=request.user)
+
+                    if not len(employments):
+                        return JsonResponse.access_forbidden(
+                            'Вы не можете просматрировать информацию по другим магазинам'
+                        )
+
+                    function_group_id = list(employments.values_list('function_group_id', flat=True))
+                    if not len(function_group_id):
                         return JsonResponse.internal_error(
                             'У пользователя {} {} не указана группа'.format(
                                 request.user.first_name,
@@ -225,92 +260,24 @@ def api_method(
                             )
                         )
 
-                    function_to_check = FunctionGroup.objects.filter(group__id=function_group_id,
+                    function_to_check = FunctionGroup.objects.filter(group__id__in=function_group_id,
                                                                      func=func.__name__).first()
                     if function_to_check is None:
                         return JsonResponse.access_forbidden(
                             'Для вашей группы пользователей не разрешено просматривать или изменять запрашиваемые данные.'
                         )
+                    authorized=False
+                    for employment in employments:
+                        parent = employment.shop
+                        level = parent.get_level_of(shop)
+                        if level <= function_to_check.level_down:
+                            authorized=True
+                            break
 
-                    shop = None
-                    if lambda_func:
-                        try:
-                            shop = lambda_func(form.cleaned_data)
-                        except ObjectDoesNotExist:
-                            return JsonResponse.does_not_exists_error('error in api_method')
-                        except MultipleObjectsReturned:
-                            return JsonResponse.multiple_objects_returned()
-
-                    if not shop:
-                        if form.cleaned_data.get('shop_id'):
-                            shop = Shop.objects.filter(id=form.cleaned_data['shop_id']).first()
-                            if not shop:
-                                return JsonResponse.does_not_exists_error('No such department')
-                        else:
-                            shop = request.user.shop
-
-                    request.shop = shop
-
-                    parent = request.user.shop.get_ancestor_by_level_distance(function_to_check.level_up)
-                    level = parent.get_level_of(shop)
-                    if level is None or level < 0 or level > function_to_check.level_down:
+                    if not authorized:
                         return JsonResponse.access_forbidden(
                             'Вы не можете просматрировать информацию по другим магазинам'
                         )
-
-                    #cleaned_data = shop
-                    # if isinstance(cleaned_data, User):
-                    #     shop = cleaned_data.shop
-                    # elif isinstance(cleaned_data, QuerySet):
-                    #     # todo: сделать нормально во всех вьюхах
-                    #     shop = Shop.objects.filter(user__id=cleaned_data[0]).first()
-
-
-                    # access_type = function_to_check.access_type
-
-                    # if cleaned_data is False or access_type == FunctionGroup.TYPE_ALL:
-                    #     pass
-                    # else:
-                    # todo: aa: делать проверку с QuerySet лучше, потому что QuerySet
-                    # может быть магазинов и могут совпасть id просто
-                    # (но вроде сейчас нет QuerySet таких
-                    # if access_type == FunctionGroup.TYPE_SELF:
-                    #     if isinstance(cleaned_data, QuerySet):
-                    #         if request.user.id not in cleaned_data:
-                    #             return JsonResponse.access_forbidden(
-                    #                 'Вы не можете просматрировать информацию о других пользователях'
-                    #             )
-                    #         else:
-                    #             kwargs['form']['worker_ids'] = [request.user.id]
-                    #     elif not (isinstance(cleaned_data, User) and request.user.id == cleaned_data.id):
-                    #         return JsonResponse.access_forbidden(
-                    #             'Вы не можете просматрировать информацию о других пользователях'
-                    #         )
-                    # else:
-                    #     if isinstance(cleaned_data, User):
-                    #         cleaned_data = cleaned_data.shop
-                    #     elif isinstance(cleaned_data, QuerySet):
-                    #         # todo: сделать нормально во всех вьюхах
-                    #         cleaned_data = Shop.objects.filter(user__id=cleaned_data[0]).first()
-                    #
-                    #     if access_type == FunctionGroup.TYPE_SHOP:
-                    #         if request.user.shop_id != cleaned_data.id:
-                    #             return
-                    #         return JsonResponse.access_forbidden (
-                    #             'Вы не можете просматрировать информацию по другим отделам'
-                    #         )
-                    #     elif access_type == FunctionGroup.TYPE_SUPERSHOP:
-                    #         level = request.user.shop.get_level(cleaned_data)
-                    #         if level is None or level < -function_to_check.level_down \
-                    #                 or level > function_to_check.level_up:
-                    #             return JsonResponse.access_forbidden(
-                    #                 'Вы не можете просматрировать информацию по другим магазинам'
-                    #             )
-                    #     else:
-                    #         return JsonResponse.access_forbidden (
-                    #             'Не определены права доступа для этого запроса'
-                    #         )
-
             try:
                 return func(request, *args, **kwargs)
             except Exception as e:
