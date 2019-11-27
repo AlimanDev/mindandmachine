@@ -100,7 +100,7 @@ def create_worker_day_approve(request, form):
     )
 
     WorkerDay.objects.filter(
-        worker__shop_id=form['shop_id'],
+        employment__shop_id=form['shop_id'],
         dt__gte=dt,
         dt__lt=dt_end,
         worker_day_approve_id__isnull=True

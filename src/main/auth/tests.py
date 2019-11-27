@@ -1,6 +1,6 @@
 from django.utils.timezone import now
 
-from src.db.models import User
+from src.db.models import Employment
 from src.util.test import LocalTestCase
 
 
@@ -29,9 +29,12 @@ class AuthTestCase(LocalTestCase):
         response = self.api_get('/api/auth/is_signed')
         self.assertEqual(response.json()['data']['is_signed'], False)
 
-        user = User.objects.get(pk=1)
-        user.dt_fired = now().date()
-        user.save()
+        employment = Employment.objects.get(
+            user=self.user1,
+            shop=self.root_shop
+        )
+        employment.dt_fired = now().date()
+        employment.save()
 
         response = self.api_post(
             '/api/auth/signin',

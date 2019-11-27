@@ -122,12 +122,12 @@ class Xlsx_base:
             self.worksheet.write_string(row, col + i, '', text_type)
             i += 1
 
-    def construnts_users_info(self, users, row, col, ordered_columns, extra_row=False):
+    def construnts_users_info(self, employments, row, col, ordered_columns, extra_row=False):
         """
         Записывает в столбик информацию по сотрудникам начиная с row строки в колонки [col, col + len(ordered_columns)].
         В ordered_columns указаны какие поля в каком порядке указывать.
 
-        :param users: queryset
+        :param employments: queryset
         :param row: int
         :param col: int
         :param ordered_columns: list из 'code', 'fio', 'position', 'hired'
@@ -140,17 +140,17 @@ class Xlsx_base:
         format_s['num_format'] = 'dd.mm.yyyy'
         date_format = self.workbook.add_format(format_s)
 
-        user_elem_dict = {
-            'code': (lambda u: u.tabel_code, text_format, self.worksheet.write_string),
-            'fio': (lambda u: '{} {} {}'.format(u.last_name, u.first_name, u.middle_name), text_format,
+        col_func_dict = {
+            'code': (lambda e: str(e.tabel_code), text_format, self.worksheet.write_string),
+            'fio': (lambda e: '{} {} {}'.format(e.user.last_name, e.user.first_name, e.user.middle_name), text_format,
                     self.worksheet.write_string),
-            'position': (lambda u: u.position.title if u.position else 'Не указано', text_format, self.worksheet.write_string),
-            'hired': (lambda u: BaseConverter.convert_date(u.dt_hired), date_format, self.worksheet.write_datetime),
+            'position': (lambda e: e.position.title if e.position else 'Не указано', text_format, self.worksheet.write_string),
+            'hired': (lambda e: BaseConverter.convert_date(e.dt_hired), date_format, self.worksheet.write_datetime),
         }
 
-        for it, user in enumerate(list(users)):
-            for col_shift, elem in enumerate(ordered_columns):
-                lambda_f, data_format, writer = user_elem_dict[elem]
+        for it, employment in enumerate(list(employments)):
+            for col_shift, col_name in enumerate(ordered_columns):
+                lambda_f, data_format, writer = col_func_dict[col_name]
                 try:
                     if extra_row:
                         shift = 2
@@ -159,14 +159,14 @@ class Xlsx_base:
                             col + col_shift,
                             row + it * shift + 1,
                             col + col_shift,
-                            lambda_f(user) or '',
+                            lambda_f(employment) or '',
                             data_format
                         )
                     else:
                         self.worksheet.write(
                             row + it,
                             col + col_shift,
-                            lambda_f(user) or '',
+                            lambda_f(employment) or '',
                             data_format
                         )
 

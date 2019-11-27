@@ -155,7 +155,7 @@ def create_predbills_request_function(shop_id, dt=None):
     try:
         response = request.urlopen(req)
     except request.HTTPError:
-        raise JsonResponse.algo_internal_error('Ошибка при чтении ответа от второго сервера.')
+        return JsonResponse.algo_internal_error('Ошибка при чтении ответа от второго сервера.')
     except error.URLError:
         return JsonResponse.algo_internal_error('Сервер для обработки алгоритма недоступен.')
     task_id = json.loads(response.read().decode('utf-8')).get('task_id')

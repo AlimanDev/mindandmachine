@@ -3,11 +3,11 @@ from src.util import forms as util_forms
 
 
 class GetTypesForm(forms.Form):
-    shop_id = forms.IntegerField(required=False)
+    shop_id = forms.IntegerField()
 
 
 class GetCashboxesForm(forms.Form):
-    shop_id = forms.IntegerField(required=False)
+    shop_id = forms.IntegerField()
     from_dt = util_forms.DateField(required=False)
     to_dt = util_forms.DateField(required=False)
     work_type_ids = util_forms.IntegersList()
@@ -49,7 +49,7 @@ class EditWorkTypeForm(forms.Form):
 
 
 class CashboxesOpenTime(forms.Form):
-    shop_id = forms.IntegerField(required=False)
+    shop_id = forms.IntegerField()
     from_dt = util_forms.DateField()
     to_dt = util_forms.DateField()
 

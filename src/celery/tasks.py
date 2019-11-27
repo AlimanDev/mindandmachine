@@ -24,7 +24,6 @@ from src.main.timetable.worker_exchange.utils import (
 from src.main.demand.utils import create_predbills_request_function
 from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
 
-from src.util.models_converter import BaseConverter
 
 from src.main.timetable.worker_exchange.utils import search_candidates, send_noti2candidates
 from src.main.operation_template.utils import build_period_clients
@@ -118,7 +117,7 @@ def update_worker_month_stat():
             time_break_triplets = 0
 
         worker_days = WorkerDay.objects.qos_current_version().select_related('worker').filter(
-            worker__shop=shop,
+            shop=shop,
             dt__lt=dt,
             dt__gte=dt2,
         ).order_by('worker', 'dt')
@@ -359,7 +358,7 @@ def allocation_of_time_for_work_on_cashbox():
                     worker_day__dt__gte=prev_month,
                     worker_day__dt__lt=dt,
                     dttm_to__isnull=False,
-                    worker_day__worker__dt_fired__isnull=True
+                    worker_day__employment__dt_fired__isnull=True
                 ).order_by('worker_day__worker', 'worker_day__dt')
 
                 for detail in worker_day_cashbox_details:

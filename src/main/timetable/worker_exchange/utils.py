@@ -35,6 +35,7 @@ from src.conf.djconfig import (
     QOS_DATETIME_FORMAT,
 )
 from src.db.models import (
+    Employment,
     ExchangeSettings,
     WorkerDay,
     Event,
@@ -72,20 +73,21 @@ def search_candidates(wd_details, **kwargs):
     # todo: 1. add time gap for check if different shop
     # todo: 2. add WorkerCashboxInfo check if necessary
     # todo: 3. add Location check
-    workers = User.objects.filter(
+    employments = Employment.objects.filter(
         depart_filter,
         dt_fired__isnull=True,
         is_ready_for_overworkings=True,
     ).annotate(
         no_wdays=~Exists(WorkerDay.objects.filter(
-            worker=OuterRef('pk'),
+            worker=OuterRef('user_id'),
             dttm_work_start__lte=wd_details.dttm_to,
             dttm_work_end__gte=wd_details.dttm_from,
             dt=wd_details.dttm_from.date(),
+            child__id__isnull=True
             ))
-    ).filter(no_wdays=True)
+    ).filter(no_wdays=True).values('user_id')
 
-    return workers
+    return User.objects.filter(id__in=employments)
 
 
 def send_noti2candidates(users, worker_day_detail):

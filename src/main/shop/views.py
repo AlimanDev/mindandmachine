@@ -11,7 +11,6 @@ from .utils import (
     get_shop_list_stats,
 )
 from dateutil.relativedelta import relativedelta
-from src.util.forms import FormUtil
 from src.util.models_converter import (
     ShopConverter,
     BaseConverter,
@@ -86,9 +85,7 @@ def get_department(request, form):
 @api_method(
     'GET',
     GetDepartmentListForm,
-    # lambda_func=lambda x: False
-    # lambda_func=lambda params, request: (Shop.objects.get(id=params['shop_id']) if params.get('shop_id') else request.user.shop)
-    # lambda_func=lambda params: Shop.objects.get(id=params['shop_id']) if params.get('shop_id')
+    lambda_func=lambda params: (Shop.objects.get(id=params['shop_id']) if params.get('shop_id') else None)
 )
 
 def get_department_list(request, form):
@@ -206,7 +203,7 @@ def get_parameters(request, form):
             | process_type: 'N'/'P' (N -- po norme, P -- po proizvodst)
         }
     """
-    shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
+    shop = request.shop
 
     return JsonResponse.success({
         'queue_length': shop.mean_queue_length,

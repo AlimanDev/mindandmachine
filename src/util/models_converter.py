@@ -7,6 +7,7 @@ from src.conf.djconfig import (
 )
 
 from src.db.models import (
+    Employment,
     WorkerDay,
     Timetable,
     AttendanceRecords,
@@ -40,13 +41,33 @@ class BaseConverter(object):
         return obj.strftime(QOS_DATETIME_FORMAT) if obj is not None else None
 
 
+class EmploymentConverter(BaseConverter):
+    @classmethod
+    def convert(cls, obj: Employment):
+        user = obj.user
+        res = UserConverter.convert(user)
+        res.update({
+            'shop_id': obj.shop_id,
+            'dt_hired': cls.convert_date(obj.dt_hired),
+            'dt_fired': cls.convert_date(obj.dt_fired),
+            'auto_timetable': obj.auto_timetable,
+            'salary': float(obj.salary),
+            'is_fixed_hours': obj.is_fixed_hours,
+            'is_ready_for_overworkings': obj.is_ready_for_overworkings,
+            'tabel_code': obj.tabel_code,
+            'position': obj.position.title if obj.position_id is not None else '',
+            'position_id': obj.position_id if obj.position_id is not None else '',
+        })
+
+        return res
+
+
 class UserConverter(BaseConverter):
     @classmethod
     def convert_main(cls, obj: User):
         return {
             'id': obj.id,
             'username': obj.username,
-            'shop_id': obj.shop_id,
             'first_name': obj.first_name,
             'last_name': obj.last_name,
             'middle_name': obj.middle_name,
@@ -54,35 +75,11 @@ class UserConverter(BaseConverter):
             'sex': obj.sex,
             'phone_number': obj.phone_number,
             'email': obj.email,
-            'tabel_code': obj.tabel_code,
         }
 
     @classmethod
     def convert(cls, obj: User):
-        return {
-            'id': obj.id,
-            'username': obj.username,
-            'shop_id': obj.shop_id,
-            'first_name': obj.first_name,
-            'last_name': obj.last_name,
-            'middle_name': obj.middle_name,
-            'avatar_url': obj.avatar.url if obj.avatar else None,
-            'dt_hired': cls.convert_date(obj.dt_hired),
-            'dt_fired': cls.convert_date(obj.dt_fired),
-            'auto_timetable': obj.auto_timetable,
-            'extra_info': obj.extra_info,
-            'sex': obj.sex,
-            'salary': float(obj.salary),
-            'is_fixed_hours': obj.is_fixed_hours,
-            'phone_number': obj.phone_number,
-            'email': obj.email,
-            'is_ready_for_overworkings': obj.is_ready_for_overworkings,
-            'tabel_code': obj.tabel_code,
-            'attachment_group': obj.attachment_group,
-            'position': obj.position.title if obj.position_id is not None else '',
-            'position_id': obj.position_id if obj.position_id is not None else '',
-            'identifier': getattr(obj, 'identifier', None),
-        }
+        return cls.convert_main(obj)
 
 
 class WorkerDayConverter(BaseConverter):
@@ -287,7 +284,7 @@ class WorkerConstraintConverter(BaseConverter):
         return {
             'id': obj.id,
             'worker': obj.worker_id,
-            'week_length': obj.worker.week_availability,
+            'week_length': obj.employment.week_availability,
             'weekday': obj.weekday,
             'tm': cls.convert_time(obj.tm),
             'is_lite': obj.is_lite,
