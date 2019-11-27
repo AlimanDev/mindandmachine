@@ -126,16 +126,18 @@ def get_department_list(request, form):
 @api_method(
     'POST',
     AddDepartmentForm,
+    lambda_func=lambda params: (Shop.objects.get(id=params['parent_id']))
 )
 def add_department(request, form):
     created = Shop.objects.create(
         title=form['title'],
         tm_shop_opens=form['tm_shop_opens'],
         tm_shop_closes=form['tm_shop_closes'],
-        shop_id=form['shop_id'],
+        parent_id=form['parent_id'],
         code=form['code'],
         address=form['address'],
         dt_opened=form['dt_opened'],
+        timezone=form['timezone']
     )
     return JsonResponse.success(ShopConverter.convert(created))
 
@@ -154,6 +156,7 @@ def edit_department(request, form):
         shop.dttm_deleted = datetime.datetime.now()
     else:
         shop.title = form['title']
+        shop.timezone = form['timezone']
         shop.tm_shop_opens = form['tm_shop_opens']
         shop.tm_shop_closes = form['tm_shop_closes']
         shop.code = form['code']
