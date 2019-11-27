@@ -1,6 +1,7 @@
 from django import forms
 from src.util import forms as util_forms
 from django.core.exceptions import ValidationError
+from timezone_field import TimeZoneFormField
 
 
 class GetDepartmentForm(forms.Form):
@@ -29,6 +30,7 @@ class GetDepartmentListForm(forms.Form):
         if self.cleaned_data['format'] not in available_formats:
             raise ValidationError('unknown format')
 
+
 class AddEditDepartmentForm(forms.Form):
     title = forms.CharField(max_length=128)
     code = forms.CharField(max_length=64)
@@ -36,6 +38,7 @@ class AddEditDepartmentForm(forms.Form):
     tm_shop_opens = util_forms.TimeField()
     tm_shop_closes = util_forms.TimeField()
     parent_id = forms.IntegerField()
+    timezone = TimeZoneFormField()
 
 
 class AddDepartmentForm(AddEditDepartmentForm):
