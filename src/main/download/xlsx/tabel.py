@@ -674,8 +674,14 @@ class Tabel_xlsx(Xlsx_base):
     @staticmethod
     def change_for_inspection(month_norm_hours, workdays):
         break_triplets = json.loads(workdays[0].worker.shop.break_triplets)
-
-        workdays = group_by(workdays, group_key=lambda _: _.worker_id)
+        result = {}
+        for obj in workdays:
+            key = workdays.worker_id
+            if key not in result:
+                result[key] = []
+            result[key].append(obj)
+        #group_by(workdays, group_key=lambda _: _.worker_id)
+        workdays = result
         actual_hours = {}
 
         def from_workday_to_holiday(wd):

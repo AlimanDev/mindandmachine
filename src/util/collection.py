@@ -22,16 +22,3 @@ def group_by(collection, group_key, sort_key=None, sort_reverse=False):
 #
 #     return result
 
-def range_u(start, end, step, include_end=True):
-    curr = start
-    while curr < end or (include_end and curr == end):
-        yield curr
-        curr += step
-
-
-def count(collection, comparer):
-    c = 0
-    for x in collection:
-        if comparer(x):
-            c += 1
-    return c

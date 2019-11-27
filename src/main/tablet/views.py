@@ -300,7 +300,14 @@ def get_cashiers_info(request, form):
 
     user_ids = response.keys()
     worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('work_type').filter(worker_id__in=user_ids, is_active=True)
-    worker_cashboxes_types = group_by(list(worker_cashboxes_types), group_key=lambda _: _.worker_id,)
+    result = {}
+    for obj in list(worker_cashboxes_types):
+        key = obj.worker_id
+        if key not in result:
+            result[key] = []
+        result[key].append(obj)
+    worker_cashboxes_types = result
+    #group_by(list(worker_cashboxes_types), group_key=lambda _: _.worker_id,)
 
     for user_id in response.keys():
         if user_id in worker_cashboxes_types.keys():
