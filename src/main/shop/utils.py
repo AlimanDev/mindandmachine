@@ -100,14 +100,18 @@ def get_shop_list_stats(form, request, display_format='raw'):
 
     if request.shop:
         shops = request.shop.get_children()
+        if not shops:
+            shops=[request.shop]
     else:
-        shop_ids = Employment.objects.get_active(dt_curr, dt_curr).filter(
+        shop_ids = Employment.objects.get_active(datetime.datetime.today(), datetime.datetime.today()).filter(
             user=request.user,
         ).values_list('shop_id', flat=True)
 
         shops = Shop.objects.filter(id__in=shop_ids)
         if len(shops)==1:
-            shops = shops[0].get_children()
+            children = shops[0].get_children()
+            if children:
+                shops=children
 
     shops=shops.filter(
             dttm_deleted__isnull=True,
