@@ -364,11 +364,11 @@ def allocation_of_time_for_work_on_cashbox():
                 for detail in worker_day_cashbox_details:
                     if last_user is None:
                         last_work_type = work_type
-                        last_user = detail.worker_day.worker
+                        last_user = detail.worker_day.employment
 
                     if last_user != detail.worker_day.worker:
                         update_duration(last_user, last_work_type, duration)
-                        last_user = detail.worker_day.worker
+                        last_user = detail.worker_day.employment
                         last_work_type = work_type
                         duration = 0
 

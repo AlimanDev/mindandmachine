@@ -320,7 +320,7 @@ def create_timetable(request, form):
         dt_to,
         shop_id=shop_id,
         auto_timetable=True,
-    )
+    ).select_related('user')
 
     employment_ids = employments.values_list('user_id', flat=True)
 
@@ -335,13 +335,13 @@ def create_timetable(request, form):
 
     # проверка что у всех юзеров указаны специализации
     users_without_spec = []
-    for u in users:
+    for employment in employments:
         worker_cashbox_info = WorkerCashboxInfo.objects.filter(
-            worker=u,
+            worker=employment,
             is_active='True'
         )
         if not worker_cashbox_info.exists():
-            users_without_spec.append(u.first_name + ' ' + u.last_name)
+            users_without_spec.append(employment.user.first_name + ' ' + employment.user.last_name)
     if users_without_spec:
         tt.status = Timetable.Status.ERROR.value
         status_message = 'Не проставлены типы работ у пользователей: {}.'.format(', '.join(users_without_spec))
@@ -526,12 +526,11 @@ def create_timetable(request, form):
             'tm_end': BaseConverter.convert_time(slot.tm_end),
         })
 
-    # Оптимизировал
     # Информация по кассам для каждого сотрудника
     need_work_types = WorkType.objects.filter(shop_id=shop_id).values_list('id', flat=True)
     worker_cashbox_info = group_by(
         collection=WorkerCashboxInfo.objects.filter(work_type_id__in=need_work_types, is_active=True),
-        group_key=lambda x: x.worker_id
+        group_key=lambda x: x.worker.user_id
     )
 
     # Уже составленное расписание

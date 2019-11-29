@@ -50,7 +50,7 @@ class OperationTypeAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class QsUserAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'shop_title', 'work_type_name', 'id')
+    list_display = ('first_name', 'last_name', 'shop_title', 'id')
     search_fields = ('first_name', 'last_name', 'shop_title', 'workercashboxinfo__work_type__name', 'id')
     # list_filter = ('employment__shop', )
 
@@ -67,12 +67,12 @@ class QsUserAdmin(admin.ModelAdmin):
     def shop_title(instance: User):
         res = ', '.join(i.shop.title for i in instance.employments.all().select_related('shop'))
         return res
-
+    '''
     @staticmethod
     def work_type_name(instance: User):
         cashboxinfo_set = instance.workercashboxinfo_set.all().select_related('work_type')
         return ' '.join(['"{}"'.format(cbi.work_type.name) for cbi in cashboxinfo_set])
-
+    '''
 
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):

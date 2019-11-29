@@ -811,11 +811,11 @@ class WorkerCashboxInfo(models.Model):
         unique_together = (('worker', 'work_type'),)
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.worker.last_name, self.work_type.name, self.id)
+        return '{}, {}, {}'.format(self.worker.user.last_name, self.work_type.name, self.id)
 
     id = models.BigAutoField(primary_key=True)
 
-    worker = models.ForeignKey(User, on_delete=models.PROTECT)
+    worker = models.ForeignKey(Employment, on_delete=models.PROTECT)
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
 
     is_active = models.BooleanField(default=True)

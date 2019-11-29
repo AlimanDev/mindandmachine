@@ -204,13 +204,13 @@ def select_cashiers(request, form):
 
     work_types = set(form.get('work_types', []))
     if len(work_types) > 0:
-        user_ids = WorkerCashboxInfo.objects.select_related('work_type').filter(
+        employments_ids = WorkerCashboxInfo.objects.select_related('work_type').filter(
             work_type__shop_id=shop_id,
             is_active=True,
             work_type_id__in=work_types
         ).values_list('worker_id', flat=True)
 
-        employments = employments.filter(user_id__in=user_ids)
+        employments = employments.filter(id__in=employments)
 
 
 
@@ -1019,7 +1019,7 @@ def set_worker_restrictions(request, form):
 
     # WorkTypes
     work_type_info = form.get('work_type_info', [])
-    curr_work_types = {wci.work_type_id: wci for wci in WorkerCashboxInfo.objects.filter(worker=worker,)}
+    curr_work_types = {wci.work_type_id: wci for wci in WorkerCashboxInfo.objects.filter(worker=employment,)}
     
     for work_type in work_type_info:
         wci = curr_work_types.pop(work_type['work_type_id'], None)
@@ -1030,7 +1030,7 @@ def set_worker_restrictions(request, form):
         else:
             try:
                 WorkerCashboxInfo.objects.create(
-                    worker=worker,
+                    worker=employment,
                     work_type_id=work_type['work_type_id'],
                     priority=work_type['priority'],
                 )
@@ -1042,7 +1042,7 @@ def set_worker_restrictions(request, form):
     
     if type(form.get('constraints')) == list:
         new_constraints = form['constraints']
-        WorkerConstraint.objects.filter(worker=worker).delete()
+        WorkerConstraint.objects.filter(worker=employment).delete()
         constraints_to_create = []
 
         for constraint in new_constraints:

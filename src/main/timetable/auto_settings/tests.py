@@ -149,7 +149,7 @@ class TestAutoSettings(LocalTestCase):
 
         response = self.api_post('/api/timetable/auto_settings/create_timetable', {
             'shop_id': self.shop.id,
-            'dt': BaseConverter.convert_date(now())
+            'dt': BaseConverter.convert_date(now() + datetime.timedelta(days=2))
             })
 
         self.assertEqual(response.status_code, 200)
