@@ -3,6 +3,7 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
     UserManager
 )
+from timezone_field import TimeZoneField
 
 from . import utils
 import datetime
@@ -33,6 +34,7 @@ class Shop(MPTTModel):
     id = models.BigAutoField(primary_key=True)
 
     parent = TreeForeignKey('self', on_delete=models.PROTECT, null=True, blank=True, related_name='child')
+    timezone = TimeZoneField(default='Europe/Moscow')
 
     # full_interface = models.BooleanField(default=True)
 
@@ -49,6 +51,7 @@ class Shop(MPTTModel):
     code = models.CharField(max_length=64, null=True, blank=True)
     address = models.CharField(max_length=256, blank=True, null=True)
     type = models.CharField(max_length=1, choices=DEPARTMENT_TYPES, default=TYPE_SHOP)
+
     dt_opened = models.DateField(null=True, blank=True)
     dt_closed = models.DateField(null=True, blank=True)
 
@@ -120,6 +123,7 @@ class Shop(MPTTModel):
         if self.is_ancestor_of(shop) or self.is_descendant_of(shop):
                 return shop.level - self.level
         return None
+
     def get_ancestor_by_level_distance(self, level):
         if self.level == 0 or level == 0:
             return self
