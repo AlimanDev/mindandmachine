@@ -346,7 +346,7 @@ def get_month_stat(request, form):
     """
     # prepare data
     dt_start = datetime.date(form['dt'].year, form['dt'].month, 1)
-    dt_end = dt_start + relativedelta(months=+1)
+    dt_end = dt_start + relativedelta(months=+1) - datetime.timedelta(days=1)
     shop = request.shop
     employments = Employment.objects.get_active(
         dt_start, dt_end,
