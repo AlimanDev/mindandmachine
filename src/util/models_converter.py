@@ -1,5 +1,4 @@
 import datetime
-
 from src.conf.djconfig import (
     QOS_DATE_FORMAT,
     QOS_DATETIME_FORMAT,
@@ -331,6 +330,7 @@ class ShopConverter(BaseConverter):
             'type': obj.type,
             'dt_opened': cls.convert_date(obj.dt_opened),
             'dt_closed': cls.convert_date(obj.dt_closed),
+            'timezone': obj.timezone.zone,
         }
 
 

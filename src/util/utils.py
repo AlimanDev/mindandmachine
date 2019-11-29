@@ -149,6 +149,7 @@ def api_method(
         check_permissions=True,
         lambda_func=None,
         check_password=False,
+        allow_empty_shop=False,
 ):
     """
     Note:
@@ -225,7 +226,7 @@ def api_method(
                         return JsonResponse.does_not_exists_error("Can't get shop")
                     except MultipleObjectsReturned:
                         return JsonResponse.multiple_objects_returned()
-                    if shop is None:
+                    if shop is None and allow_empty_shop:
                         skip_check_permissions = True
                 else:
                     if form.cleaned_data.get('shop_id'):
