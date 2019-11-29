@@ -788,6 +788,7 @@ def delete_timetable(request, form):
     wds = [WorkerDay(
         type=WorkerDay.TYPE_EMPTY,
         dt = wd.dt,
+        shop_id=shop_id,
         parent_worker_day=wd,
         worker_id=wd.worker_id,
     ) for wd in wdays]
