@@ -325,7 +325,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     employment=employment,
                     dt=dt,
                     type=wd['type'],
-
+                    shop=shop,
                     dttm_work_start=None if wd['type'] ==
                                             WorkerDay.TYPE_HOLIDAY else dttm_work_start,
                     dttm_work_end=None if wd['type'] ==
