@@ -404,31 +404,31 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
         # WorkerCashboxInfo
         WorkerCashboxInfo.objects.create(
-            worker=self.user1,
+            worker=self.employment1,
             work_type=self.work_type1,
         )
         WorkerCashboxInfo.objects.create(
-            worker=self.user2,
+            worker=self.employment2,
             work_type=self.work_type3,
         )
         WorkerCashboxInfo.objects.create(
-            worker=self.user3,
+            worker=self.employment3,
             work_type=self.work_type2,
         )
         WorkerCashboxInfo.objects.create(
-            worker=self.user4,
+            worker=self.employment4,
             work_type=self.work_type1,
         )
         WorkerCashboxInfo.objects.create(
-            worker=self.user5,
+            worker=self.employment5,
             work_type=self.work_type3,
         )
         WorkerCashboxInfo.objects.create(
-            worker=self.user6,
+            worker=self.employment6,
             work_type=self.work_type1,
         )
         WorkerCashboxInfo.objects.create(
-            worker=self.user7,
+            worker=self.employment7,
             work_type=self.work_type1,
         )
 

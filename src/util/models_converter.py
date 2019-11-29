@@ -119,7 +119,7 @@ class WorkerDayConverter(BaseConverter):
             'type': cls.convert_type(obj.type),
             'dttm_work_start': __work_tm(obj.dttm_work_start),
             'dttm_work_end': __work_tm(obj.dttm_work_end),
-            'work_types': [w.id for w in obj.work_types.all()],
+            'work_types': [w.id for w in obj.work_types.all()] if obj.id else [],
             'work_type': obj.work_type_id if hasattr(obj, 'work_type_id') else None,
             'created_by': obj.created_by_id,
             'comment': obj.comment,

@@ -1,17 +1,18 @@
 import json
 import datetime
-
-from src.db.models import Employment, Timetable, WorkerDay, WorkerDayCashboxDetails
+from src.db.models import Employment, Timetable, WorkerDay, Slot, WorkerDayCashboxDetails, WorkerCashboxInfo
 from src.util.test import LocalTestCase
 from django.utils.timezone import now
 
 from src.util.models_converter import BaseConverter
+
 
 from django.conf import settings
 from unittest.mock import Mock, patch
 
 
 settings.CELERY_TASK_ALWAYS_EAGER = True
+
 
 
 class TestAutoSettings(LocalTestCase):
@@ -148,8 +149,41 @@ class TestAutoSettings(LocalTestCase):
 
         response = self.api_post('/api/timetable/auto_settings/create_timetable', {
             'shop_id': self.shop.id,
-            'dt': BaseConverter.convert_date(now())
+            'dt': BaseConverter.convert_date(now() + datetime.timedelta(days=2))
             })
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
+    '''
+    def test_create_timetable(self):
+        self.auth()
+        WorkerCashboxInfo.objects.create(
+            id=5,
+            worker=self.user6,
+            work_type=self.work_type1,
+        )
+        WorkerCashboxInfo.objects.create(
+            id=6,
+            worker=self.user7,
+            work_type=self.work_type1,
+        )
+        Slot.objects.all().update(work_type=self.work_type1)
+        response = self.api_post('/api/timetable/auto_settings/create_timetable', {
+            'shop_id': self.shop.id,
+            'dt': BaseConverter.convert_date(datetime.now().date()),
+        })
+        correct_res = {
+            'code': 500, 
+            'data': {
+                'error_type': 'InternalError', 
+                'error_message': 'Error sending data to server'
+            }, 
+            'info': None
+        }
+        self.assertEqual(response.json(), correct_res)
+        correct_tt = {
+            'shop_id': self.shop.id,
+            'status': 3,
+        }
+        self.assertEqual(Timetable.objects.all().values('shop_id', 'status').last(), correct_tt)
+        '''
