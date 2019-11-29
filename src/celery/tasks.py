@@ -349,7 +349,7 @@ def allocation_of_time_for_work_on_cashbox():
         if len(work_types):
             for work_type in work_types:
                 worker_day_cashbox_details = WorkerDayCashboxDetails.objects.select_related(
-                    'worker_day__worker',
+                    'worker_day__employment',
                     'worker_day'
                 ).filter(
                     status=WorkerDayCashboxDetails.TYPE_WORK,
@@ -359,7 +359,7 @@ def allocation_of_time_for_work_on_cashbox():
                     worker_day__dt__lt=dt,
                     dttm_to__isnull=False,
                     worker_day__employment__dt_fired__isnull=True
-                ).order_by('worker_day__worker', 'worker_day__dt')
+                ).order_by('worker_day__employment', 'worker_day__dt')
 
                 for detail in worker_day_cashbox_details:
                     if last_user is None:
