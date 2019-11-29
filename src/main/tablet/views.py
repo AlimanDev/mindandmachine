@@ -3,6 +3,7 @@ from django.db.models import Q
 import json
 
 from src.db.models import (
+    Employment,
     # CameraCashboxStat,
     Cashbox,
     WorkerDayCashboxDetails,
@@ -10,7 +11,6 @@ from src.db.models import (
     WorkerDay,
     WorkType,
     Shop,
-    User
 )
 from django.db.models import Avg
 from src.util.utils import api_method, JsonResponse
@@ -60,7 +60,7 @@ def get_cashboxes_info(request, form):
     response = {}
     dttm_now = now() + timedelta(hours=3)
 
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     checkpoint = FormUtil.get_checkpoint(form)
 
     list_of_cashbox = Cashbox.objects.qos_filter_active(
@@ -94,7 +94,7 @@ def get_cashboxes_info(request, form):
             on_cashbox=cashbox,
             dttm_to__isnull=True,
             worker_day__dt=(dttm_now-timedelta(hours=2)).date(),
-            worker_day__worker__shop_id=shop_id,
+            worker_day__employment__shop_id=shop_id,
         )
 
         user_id = None
@@ -174,7 +174,7 @@ def get_cashiers_info(request, form):
 
     """
 
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     dttm = form['dttm']
     response = {}
 
@@ -184,10 +184,10 @@ def get_cashiers_info(request, form):
     time_without_rest = {}
 
     status = WorkerDayCashboxDetails.objects.qos_current_version().filter(
-        Q(worker_day__worker__dt_fired__gt=dttm.date()) | Q(worker_day__worker__dt_fired__isnull=True),
+        Q(worker_day__employment__dt_fired__gt=dttm.date()) | Q(worker_day__employment__dt_fired__isnull=True),
         worker_day__dttm_work_start__lte=dttm + timedelta(minutes=30),
         worker_day__dt=(dttm - timedelta(hours=2)).date(),
-        worker_day__worker__shop__id=shop_id,
+        worker_day__employment__shop__id=shop_id,
     ).order_by('id')
 
     for item in status:
@@ -267,7 +267,6 @@ def get_cashiers_info(request, form):
             response[item.worker_day.worker_id] = {
                 "worker_id": item.worker_day.worker_id,
                 "status": item.status,
-                "attachment_group": item.worker_day.worker.attachment_group,
                 "worker_day_id": item.worker_day_id,
                 "tm_work_start": str(item.dttm_from.time()),
                 "tm_work_end": str(item.worker_day.dttm_work_end.time()),
@@ -299,7 +298,7 @@ def get_cashiers_info(request, form):
             })
 
     user_ids = response.keys()
-    worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('work_type').filter(worker_id__in=user_ids, is_active=True)
+    worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('work_type', 'worker').filter(worker__user_id__in=user_ids, is_active=True)
     worker_cashboxes_types = group_by(list(worker_cashboxes_types), group_key=lambda _: _.worker_id,)
 
     for user_id in response.keys():
@@ -312,7 +311,7 @@ def get_cashiers_info(request, form):
 @api_method(
     'POST',
     ChangeCashierStatus,
-    lambda_func=lambda x: User.objects.get(id=x['worker_id']).shop
+    lambda_func=lambda x: Employment.objects.get(user_id=x['worker_id'], shop_id=x['shop_id']).shop
 )
 def change_cashier_status(request, form):
     """
@@ -345,6 +344,7 @@ def change_cashier_status(request, form):
 
     """
     worker_id = form['worker_id']
+    shop_id = form['shop_id']
     new_user_status = form['status']
     cashbox_id = form['cashbox_id']
     is_current_time = form['is_current_time']
@@ -369,7 +369,7 @@ def change_cashier_status(request, form):
     ).order_by('id').last()
 
     try:
-        worker_day = WorkerDay.objects.qos_current_version().get(dt=dt, worker_id=worker_id)
+        worker_day = WorkerDay.objects.qos_current_version().get(dt=dt, worker_id=worker_id,shop_id=shop_id)
     except WorkerDay.DoesNotExist:
         return JsonResponse.does_not_exists_error('Такого дня нет в расписании.')
     except WorkerDay.MultipleObjectsReturned:

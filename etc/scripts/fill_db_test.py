@@ -24,6 +24,7 @@ from src.db.models import (
     FunctionGroup,
     Timetable,
     Notifications,
+    Employment,
 )
 from src.util.models_converter import (
     WorkerDayConverter,
@@ -197,7 +198,6 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                 username='test{}'.format(shop.id),
                 email='q@q.com',
                 password='test{}'.format(shop.id),
-                salary=60000
             )
             worker.first_name = lang_data['f_name']
             worker.last_name = lang_data['s_name']
@@ -205,12 +205,20 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
 
             worker.shop = shop
             worker.save()
+            employment = Employment.objects.create(
+                user=worker,
+                salary=60000,
+                shop=shop,
+            )
         else:
             worker = User.objects.create(
                 username='u_{}_{}'.format(shop.id, worker_ind),
                 last_name=worker_d['general_info']['first_name'],
-                function_group=cashier_group,
                 password='a',
+            )
+            employment = Employment.objects.create(
+                user=worker,
+                function_group=cashier_group,
                 tabel_code='{}{}'.format(shop.id, worker_ind),
                 salary=40000,
                 shop=shop,
@@ -222,7 +230,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
 
         for info in worker_d['worker_cashbox_info']:
             add_models(infos, WorkerCashboxInfo, WorkerCashboxInfo(
-                worker=worker,
+                worker=employment,
                 work_type=work_types_dict[info['work_type']],
                 mean_speed=info['mean_speed'],
             ))
@@ -253,9 +261,10 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             if wd['type'] == WorkerDay.TYPE_WORKDAY:
                 wd_model = WorkerDay.objects.create(
                     worker=worker,
+                    employment=employment,
                     dt=dt,
                     type=WorkerDay.TYPE_WORKDAY,
-
+                    shop=shop,
                     dttm_work_start=dttm_work_start,
                     dttm_work_end=dttm_work_end,
                 )
@@ -264,9 +273,10 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                         worker=worker,
                         dt=dt,
                         type=WorkerDay.TYPE_HOLIDAY,
-
+                        employment=employment,
                         dttm_work_start=None,
                         dttm_work_end=None,
+                        shop=shop,
                     )
                     wd_model.created_by=worker
                     wd_model.save()
@@ -312,6 +322,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             else:
                 add_models(models, WorkerDay, WorkerDay(
                     worker=worker,
+                    employment=employment,
                     dt=dt,
                     type=wd['type'],
 
@@ -337,16 +348,16 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             coef = 2
 
         WorkerCashboxInfo.objects.filter(worker__shop=shop).update(mean_speed=F('mean_speed') / coef)
-        User.objects.filter(shop=shop).update(dt_fired=timezone.datetime(2018, 1, 1).date())
+        #Employment.objects.filter(shop=shop).update(dt_fired=timezone.datetime(2018, 1, 1).date())
 
         for wt_key in work_types_dict.keys():
             wt_type = work_types_dict[wt_key]
-            wt_users = list(User.objects.filter(
+            wt_users = list(Employment.objects.filter(
                 workerday__workerdaycashboxdetails__work_type=wt_type,
                 shop=shop,
             ).distinct().values_list('id', flat=True))
             wt_users_id = wt_users[:int(len(wt_users) / coef + 0.5)]
-            User.objects.filter(id__in=wt_users_id).update(dt_fired=None)
+            Employment.objects.filter(id__in=wt_users_id).update(dt_fired=None)
 
     #  че то как-то не отнормированно получилось все
     WorkerCashboxInfo.objects.all().update(mean_speed=F('mean_speed'))

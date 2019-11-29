@@ -22,6 +22,7 @@ from src.db.models import (
     WorkerCashboxInfo,
     WorkerPosition,
     AttendanceRecords,
+    Employment,
 )
 from src.main.demand.utils import create_predbills_request_function
 from src.util.models_converter import BaseConverter
@@ -173,13 +174,22 @@ def upload_timetable_util(form, timetable_file):
                 # except User.DoesNotExist:
                 #     return JsonResponse.value_error('Не могу найти пользователя на строке {}'.format(cell.row))
                 if create:
+                    employment = Employment.objects.create(
+                        user=u,
+                        shop_id=shop_id,
+                    )
                     u.username = 'u' + str(u.id)
                     u.save()
+                else:
+                    employment, _ = Employment.objects.get_or_create(
+                        user=u,
+                        shop_id=shop_id,
+                    )
             elif column_index == work_type_column:
                 user_work_type = shop_work_types.get(cell.value, None)
                 if user_work_type:
                     WorkerCashboxInfo.objects.get_or_create(
-                        worker=u,
+                        worker=employment,
                         work_type=user_work_type,
                     )
 
@@ -210,6 +220,7 @@ def upload_timetable_util(form, timetable_file):
                     wd.delete()
                 new_wd = WorkerDay.objects.create(
                     worker=u,
+                    employment=employment,
                     dt=dt,
                     dttm_work_start=dttm_work_start,
                     dttm_work_end=dttm_work_end,

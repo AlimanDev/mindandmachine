@@ -30,15 +30,16 @@ def wd_stat_count(worker_days, shop):
 
     return worker_days.filter(
         type=WorkerDay.TYPE_WORKDAY
-    ).values('worker_id', 'dt', 'dttm_work_start','dttm_work_end').annotate(
+    ).values('worker_id','employment_id', 'dt', 'dttm_work_start','dttm_work_end').annotate(
         coming=Min('worker__attendancerecords__dttm', filter=Q(
+            worker__attendancerecords__shop=shop,
             worker__attendancerecords__dttm__date=F('dt'),
-            worker__attendancerecords__type=AttendanceRecords.TYPE_COMING
+            worker__attendancerecords__type=AttendanceRecords.TYPE_COMING,
         )),
-
-        leaving=Max('worker__attendancerecords__dttm',
-                      filter=Q(worker__attendancerecords__dttm__date=F('dt'),
-                               worker__attendancerecords__type='L')),
+        leaving=Max('worker__attendancerecords__dttm', filter=Q(
+            worker__attendancerecords__shop=shop,
+            worker__attendancerecords__dttm__date=F('dt'),
+            worker__attendancerecords__type=AttendanceRecords.TYPE_LEAVING)),
         is_late=Case(
             When(coming__gt=F('dttm_work_start')-timedelta(minutes=15), then=1),
             default=Value(0), output_field=IntegerField()),

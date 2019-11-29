@@ -6,6 +6,7 @@ import json
 
 class GetSlots(forms.Form):
     user_id = forms.IntegerField(required=True)
+    shop_id = forms.IntegerField(required=True)
 
 
 class GetAllSlots(forms.Form):

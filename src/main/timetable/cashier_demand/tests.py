@@ -13,7 +13,7 @@ class TestCashierDemand(LocalTestCase):
     def test_get_workers(self):
         def get_count(shop, time1, time2):
             count = len(WorkerDayCashboxDetails.objects.select_related('worker_day').filter(
-                worker_day__worker__shop_id=shop,
+                worker_day__shop_id=shop,
                 worker_day__type=WorkerDay.TYPE_WORKDAY,
                 dttm_from__lte=time1,
                 dttm_to__gte=time2,

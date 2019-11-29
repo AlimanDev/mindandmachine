@@ -11,7 +11,6 @@ from .utils import (
     get_shop_list_stats,
 )
 from dateutil.relativedelta import relativedelta
-from src.util.forms import FormUtil
 from src.util.models_converter import (
     ShopConverter,
     BaseConverter,
@@ -86,9 +85,8 @@ def get_department(request, form):
 @api_method(
     'GET',
     GetDepartmentListForm,
-    # lambda_func=lambda x: False
-    # lambda_func=lambda params, request: (Shop.objects.get(id=params['shop_id']) if params.get('shop_id') else request.user.shop)
-    # lambda_func=lambda params: Shop.objects.get(id=params['shop_id']) if params.get('shop_id')
+    lambda_func=lambda params: (Shop.objects.get(id=params['shop_id']) if params.get('shop_id') else None,),
+    allow_empty_shop=True
 )
 
 def get_department_list(request, form):
@@ -129,16 +127,18 @@ def get_department_list(request, form):
 @api_method(
     'POST',
     AddDepartmentForm,
+    lambda_func=lambda params: (Shop.objects.get(id=params['parent_id']))
 )
 def add_department(request, form):
     created = Shop.objects.create(
         title=form['title'],
         tm_shop_opens=form['tm_shop_opens'],
         tm_shop_closes=form['tm_shop_closes'],
-        shop_id=form['shop_id'],
+        parent_id=form['parent_id'],
         code=form['code'],
         address=form['address'],
         dt_opened=form['dt_opened'],
+        timezone=form['timezone']
     )
     return JsonResponse.success(ShopConverter.convert(created))
 
@@ -157,6 +157,7 @@ def edit_department(request, form):
         shop.dttm_deleted = datetime.datetime.now()
     else:
         shop.title = form['title']
+        shop.timezone = form['timezone']
         shop.tm_shop_opens = form['tm_shop_opens']
         shop.tm_shop_closes = form['tm_shop_closes']
         shop.code = form['code']
@@ -206,7 +207,7 @@ def get_parameters(request, form):
             | process_type: 'N'/'P' (N -- po norme, P -- po proizvodst)
         }
     """
-    shop = Shop.objects.get(id=FormUtil.get_shop_id(request, form))
+    shop = request.shop
 
     return JsonResponse.success({
         'queue_length': shop.mean_queue_length,

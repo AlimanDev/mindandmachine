@@ -12,6 +12,7 @@ from requests import Response
 
 from src.db.models import (
     AttendanceRecords,
+    Employment,
     Group,
     Timetable,
     FunctionGroup,
@@ -51,7 +52,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
     def setUp(self, worker_day=False):
         super().setUp()
-        logging.disable(logging.CRITICAL)
+        # logging.disable(logging.CRITICAL)
 
         # Restart sequences from high value to not catch AlreadyExists errors on normal objects creation
         # TODO: remove explicit object ids in object.create-s below and this sequence restart
@@ -153,6 +154,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
         )
+        Shop.objects.rebuild()
 
         # users
         self.user1 = User.objects.create_user(
@@ -160,21 +162,37 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             self.USER_EMAIL,
             self.USER_PASSWORD,
             id=1,
-            shop=self.root_shop,
-            function_group=self.admin_group,
             last_name='Васнецов',
             first_name='Иван',
         )
-        self.user2 = create_user(user_id=2, shop_id=self.shop, username='user2', first_name='Иван2', last_name='Иванов')
+        self.employment1 = Employment.objects.create(
+            user=self.user1,
+            shop=self.root_shop,
+            function_group = self.admin_group,
+        )
+        self.user2 = User.objects.create_user(
+            'user2',
+            'u2@b.b',
+            '4242',
+            id=2,
+            first_name='Иван2',
+            last_name='Иванов')
+        self.employment2 = Employment.objects.create(
+            user=self.user2,
+            shop=self.shop,
+        )
         self.user3 = User.objects.create_user(
             'user3',
             'u3@b.b',
             '4242',
             id=3,
-            shop_id=self.shop.id,
             first_name='Иван3',
             last_name='Сидоров',
-            auto_timetable=False
+        )
+        self.employment3 = Employment.objects.create(
+            user=self.user3,
+            shop=self.shop,
+            auto_timetable=False,
         )
 
         self.user4 = User.objects.create_user(
@@ -182,10 +200,13 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             '4b@b.b',
             '4242',
             id=4,
-            shop=self.shop,
-            function_group=self.admin_group,
             last_name='Петров',
             first_name='Иван4',
+        )
+        self.employment4 = Employment.objects.create(
+            user=self.user4,
+            shop=self.shop,
+            function_group=self.admin_group,
         )
 
 
@@ -194,30 +215,41 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             'm@m.m',
             '4242',
             id=5,
-            shop=self.reg_shop1,
-            function_group=self.chief_group,
             last_name='Васнецов5',
             first_name='Иван5',
         )
+        self.employment5 = Employment.objects.create(
+            user=self.user5,
+            shop=self.reg_shop1,
+            function_group=self.chief_group,
+        )
+
         self.user6 = User.objects.create_user(
             'user6',
             'b@b.b',
             '4242',
             id=6,
-            shop=self.shop,
-            function_group=self.chief_group,
             last_name='Васнецов6',
             first_name='Иван6',
         )
+        self.employment6 = Employment.objects.create(
+            user=self.user6,
+            shop=self.shop,
+            function_group=self.chief_group,
+        )
+
         self.user7 = User.objects.create_user(
             'user7',
             'k@k.k',
             '4242',
             id=7,
-            shop=self.shop,
-            function_group=self.employee_group,
             last_name='Васнецов7',
             first_name='Иван7',
+        )
+        self.employment7 = Employment.objects.create(
+            user=self.user7,
+            shop=self.shop,
+            function_group=self.employee_group,
         )
 
         # work_types
@@ -312,9 +344,9 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             dt_from = (dttm_now - relativedelta(days=15)).date()
             dt_to = dt_from + relativedelta(months=1)
             while dt_from < dt_to:
-                for user in User.objects.all():
+                for employment in Employment.objects.all():
                     self.create_worker_day(
-                        worker=user,
+                        employment=employment,
                         dt=dt_from,
                         dttm_work_start=datetime.datetime.combine(dt_from, datetime.time(9, 0)),
                         dttm_work_end=datetime.datetime.combine(dt_from, datetime.time(18, 0)),
@@ -372,23 +404,31 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
         # WorkerCashboxInfo
         WorkerCashboxInfo.objects.create(
-            id=1,
-            worker=self.user1,
+            worker=self.employment1,
             work_type=self.work_type1,
         )
         WorkerCashboxInfo.objects.create(
-            id=2,
-            worker=self.user2,
+            worker=self.employment2,
             work_type=self.work_type3,
         )
         WorkerCashboxInfo.objects.create(
-            id=3,
-            worker=self.user3,
+            worker=self.employment3,
             work_type=self.work_type2,
         )
         WorkerCashboxInfo.objects.create(
-            id=4,
-            worker=self.user4,
+            worker=self.employment4,
+            work_type=self.work_type1,
+        )
+        WorkerCashboxInfo.objects.create(
+            worker=self.employment5,
+            work_type=self.work_type3,
+        )
+        WorkerCashboxInfo.objects.create(
+            worker=self.employment6,
+            work_type=self.work_type1,
+        )
+        WorkerCashboxInfo.objects.create(
+            worker=self.employment7,
             work_type=self.work_type1,
         )
 
@@ -467,20 +507,22 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
     def create_worker_day(
             self,
-            worker,
+            employment,
             dt,
             dttm_work_start,
             dttm_work_end,
             type=WorkerDay.TYPE_WORKDAY
     ):
         worker_day = WorkerDay.objects.create(
-            worker=worker,
+            employment=employment,
+            worker=employment.user,
+            shop=employment.shop,
             type=type,
             dt=dt,
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,
         )
-        cashbox = Cashbox.objects.first()
+        cashbox = self.cashbox3
         WorkerDayCashboxDetails.objects.create(
             worker_day=worker_day,
             on_cashbox=cashbox,
@@ -489,19 +531,6 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             dttm_to=worker_day.dttm_work_end,
         )
         return worker_day
-
-def create_user(user_id, shop_id, username, dt_fired=None, first_name='', last_name=''):
-    user = User.objects.create(
-        id=user_id,
-        username=username,
-        shop=shop_id,
-        dt_fired=dt_fired,
-        first_name=first_name,
-        last_name=last_name,
-    )
-    return user
-
-
 
 
 # def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):

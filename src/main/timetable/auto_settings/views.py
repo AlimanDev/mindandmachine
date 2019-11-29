@@ -1,14 +1,16 @@
 import json
-import urllib.request
-
+import requests
 from datetime import datetime, timedelta, date
-
 from dateutil.relativedelta import relativedelta
+
 from django.conf import settings
-from django.db.models import Q, Avg, Sum
+from django.db.models import Q, Sum
+from django.utils import timezone
+
 from src.celery.tasks import cancel_shop_vacancies, create_shop_vacancies_and_notify
 
 from src.db.models import (
+    Employment,
     Timetable,
     User,
     WorkType,
@@ -26,7 +28,7 @@ from src.util.collection import group_by
 from src.util.models_converter import (
     TimetableConverter,
     WorkTypeConverter,
-    UserConverter,
+    EmploymentConverter,
     WorkerConstraintConverter,
     WorkerCashboxInfoConverter,
     WorkerDayConverter,
@@ -41,12 +43,11 @@ from .forms import (
     DeleteTimetableForm,
     SetTimetableForm,
 )
-import requests
+
 from ..table.utils import count_difference_of_normal_days
 from src.main.other.notification.utils import send_notification
 from django.db.models import F
 from .utils import set_timetable_date_from
-from django.utils import timezone
 
 
 @api_method('GET', GetStatusForm)
@@ -95,12 +96,19 @@ def set_selected_cashiers(request, form):
     Note:
         Всем другим сотрудникам из этого магаза проставляется значение противоположное value
     """
+    employments = Employment.objects.filter(shop_id=form['shop_id'])
+
     if (not form['worker_ids']):
-        User.objects.filter(shop_id=form['shop_id'], attachment_group=User.GROUP_STAFF).update(auto_timetable=False)
-        return JsonResponse.success()
-    shop_workers = User.objects.filter(shop_id=form['shop_id'], attachment_group=User.GROUP_STAFF)
-    shop_workers.exclude(id__in=form['worker_ids']).update(auto_timetable=False)
-    User.objects.filter(id__in=form['worker_ids']).update(auto_timetable=True)
+        employments.update(auto_timetable=False)
+
+    employments.filter(
+        user_id__in=form['worker_ids']
+    ).update(auto_timetable=True)
+
+    employments.exclude(
+        user_id__in=form['worker_ids']
+    ).update(auto_timetable=False)
+
     return JsonResponse.success()
 
 
@@ -307,24 +315,33 @@ def create_timetable(request, form):
     except:
         return JsonResponse.already_exists_error()
 
-    users = list(User.objects.qos_filter_active(
+    employments=Employment.objects.get_active(
         dt_from,
         dt_to,
         shop_id=shop_id,
-        # auto_timetable=True,
-    ).select_related('position'))
+        auto_timetable=True,
+    ).select_related('user')
+
+    employment_ids = employments.values_list('user_id', flat=True)
+
+    users = User.objects.filter(id__in=employment_ids)
+    user_dict = {u.id: u for u in users}
+
     shop = request.shop
+
     period_step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
+
+    ########### Проверки ###########
 
     # проверка что у всех юзеров указаны специализации
     users_without_spec = []
-    for u in users:
+    for employment in employments:
         worker_cashbox_info = WorkerCashboxInfo.objects.filter(
-            worker=u,
+            worker=employment,
             is_active='True'
         )
         if not worker_cashbox_info.exists():
-            users_without_spec.append(u.first_name + ' ' + u.last_name)
+            users_without_spec.append(employment.user.first_name + ' ' + employment.user.last_name)
     if users_without_spec:
         tt.status = Timetable.ERROR
         status_message = 'Не проставлены типы работ у пользователей: {}.'.format(', '.join(users_without_spec))
@@ -364,45 +381,55 @@ def create_timetable(request, form):
         )
         tt.delete()
         return JsonResponse.value_error(status_message)
-
-    periods = PeriodClients.objects.filter(
-        operation_type__dttm_deleted__isnull=True,
-        operation_type__work_type__shop_id=shop_id,
-        operation_type__work_type__dttm_deleted__isnull=True,
-        type=PeriodClients.LONG_FORECASE_TYPE,
-        dttm_forecast__date__gte=dt_from,
-        dttm_forecast__date__lt=dt_to,
-    ).values(
-        'dttm_forecast',
-        'operation_type__work_type_id',
-    ).annotate(
-        clients=Sum(F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + (shop.absenteeism / 100)))
-    ).values_list(
-        'dttm_forecast',
-        'operation_type__work_type_id',
-        'clients'
-    )
-
-    constraints = group_by(
-        collection=WorkerConstraint.objects.select_related('worker').filter(worker__shop_id=shop_id),
-        group_key=lambda x: x.worker_id
-    )
-
+    
+    # проверки для фиксированных чуваков
+    # Возможности сотрудников
     availabilities = group_by(
-        collection=UserWeekdaySlot.objects.select_related('worker').filter(worker__shop_id=shop_id),
+        collection=UserWeekdaySlot.objects.select_related('worker').filter(
+            employment__shop_id=shop_id),
         group_key=lambda x: x.worker_id
     )
+    for employment in employments:
+        user_id = employment.user_id
+        user = user_dict[user_id]
+        if employment.is_fixed_hours:
+            availability_info = availabilities.get(user_id, [])
+            if not (len(availability_info)):
+                print(f'Warning! User {user_id} {user.last_name} {user.first_name} с фиксированными часами, но нет набора смен, на которых может работать!')
+            mask = [0 for _ in range(len(availability_info))]
+            for info_day in availability_info:
+                mask[info_day.weekday] += 1
+            if mask.count(1) != len(mask):
+                status_message = f'Ошибка! Работник {user_id} {user.last_name} {user.first_name} с фиксированными часами, но на один день выбрано больше одной смены)!'
+                tt.delete()
+                return JsonResponse.value_error(status_message)
+    
+    ##################################################################
 
-    # todo: tooooo slow
-    worker_cashbox_info = group_by(
-        collection=WorkerCashboxInfo.objects.select_related('work_type').filter(work_type__shop_id=shop_id, is_active=True),
-        group_key=lambda x: x.worker_id
-    )
+    # Функция для заполнения расписания
+    def fill_wd_array(worker_days_db, array):
+        worker_days_mask = {}
+        for wd in worker_days_db:
+            if (wd['id'] in worker_days_mask) and wd['work_types__id']:
+                continue
+
+            worker_days_mask[wd['id']] = len(array)
+            wd_mod = WorkerDay(
+                id=wd['id'],
+                type=wd['type'],
+                dttm_added=wd['dttm_added'],
+                dt=wd['dt'],
+                worker_id=wd['worker_id'],
+                dttm_work_start=wd['dttm_work_start'],
+                dttm_work_end=wd['dttm_work_end'],
+            )
+            wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
+            array.append(wd_mod)
+
 
     new_worker_days = []
-    worker_days_mask = {}
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
-        worker__shop_id=form['shop_id'],
+        shop_id=form['shop_id'],
         dt__gte=dt_from,
         dt__lt=dt_to,
     ).exclude(
@@ -419,32 +446,11 @@ def create_timetable(request, form):
         'dttm_work_end',
         'work_types__id',
     )
-    for wd in worker_days_db:
-        if (wd['id'] in worker_days_mask) and wd['work_types__id']:
-            continue
-
-        worker_days_mask[wd['id']] = len(new_worker_days)
-        wd_mod = WorkerDay(
-            id=wd['id'],
-            type=wd['type'],
-            dttm_added=wd['dttm_added'],
-            dt=wd['dt'],
-            worker_id=wd['worker_id'],
-            dttm_work_start=wd['dttm_work_start'],
-            dttm_work_end=wd['dttm_work_end'],
-        )
-        wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
-        new_worker_days.append(wd_mod)
-
-    worker_day = group_by(
-        collection=new_worker_days,
-        group_key=lambda x: x.worker_id
-    )
+    fill_wd_array(worker_days_db, new_worker_days)
 
     prev_worker_days = []
-    worker_days_mask = {}
     worker_days_db = WorkerDay.objects.qos_current_version().select_related('worker').filter(
-        worker__shop_id=form['shop_id'],
+        employment__shop_id=form['shop_id'],
         dt__gte=dt_from - timedelta(days=7),
         dt__lte=dt_from,
     ).exclude(
@@ -461,26 +467,8 @@ def create_timetable(request, form):
         'dttm_work_end',
         'work_types__id',
     )
-    for wd in worker_days_db:
-        if (wd['id'] in worker_days_mask) and wd['work_types__id']:
-            continue
-        worker_days_mask[wd['id']] = len(prev_worker_days)
-        wd_mod = WorkerDay(
-            id=wd['id'],
-            type=wd['type'],
-            dttm_added=wd['dttm_added'],
-            dt=wd['dt'],
-            worker_id=wd['worker_id'],
-            dttm_work_start=wd['dttm_work_start'],
-            dttm_work_end=wd['dttm_work_end'],
-        )
-        wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
-        prev_worker_days.append(wd_mod)
+    fill_wd_array(worker_days_db, prev_worker_days)
 
-    prev_data = group_by(
-        collection=prev_worker_days,
-        group_key=lambda x: x.worker_id
-    )
 
     if shop.process_type == Shop.YEAR_NORM:
         max_work_coef = (1 + shop.more_norm / 100)
@@ -515,29 +503,146 @@ def create_timetable(request, form):
         'idle': shop.idle,
     }
 
-    cashboxes = [
-        WorkTypeConverter.convert(x) for x in WorkType.objects.filter(
+
+    ########### Группируем ###########
+
+    # Ограничения сотрудников
+    constraints = group_by(
+        collection=WorkerConstraint.objects.select_related('worker').filter(
+            employment__shop_id=shop_id),
+        group_key=lambda x: x.worker_id
+    )
+    work_types = {
+        x.id: dict(WorkTypeConverter.convert(x),slots=[])  for x in WorkType.objects.filter(
             dttm_deleted__isnull=True,
             shop_id=shop_id,
         )
-    ]
+    }
 
-    slots_all = group_by(
-        collection=Slot.objects.filter(shop_id=shop_id),
-        group_key=lambda x: x.work_type_id,
+    slots=Slot.objects.filter(shop_id=shop_id, work_type_id__isnull=False)
+    for slot in slots:
+        work_types[slot.work_type_id]['slots'].append({
+            'tm_start': BaseConverter.convert_time(slot.tm_start),
+            'tm_end': BaseConverter.convert_time(slot.tm_end),
+        })
+
+    # Информация по кассам для каждого сотрудника
+    need_work_types = WorkType.objects.filter(shop_id=shop_id).values_list('id', flat=True)
+    worker_cashbox_info = group_by(
+        collection=WorkerCashboxInfo.objects.filter(work_type_id__in=need_work_types, is_active=True),
+        group_key=lambda x: x.worker.user_id
     )
 
-    slots_periods_dict = {k['id']: [] for k in cashboxes}
-    for key, slots in slots_all.items():
-        for slot in slots:
-            slots_periods_dict[key].append({
-                'tm_start': BaseConverter.convert_time(slot.tm_start),
-                'tm_end': BaseConverter.convert_time(slot.tm_end),
-            })
+    # Уже составленное расписание
+    worker_day = group_by(
+        collection=new_worker_days,
+        group_key=lambda x: x.worker_id
+    )
 
-    for cashbox in cashboxes:
-        cashbox['slots'] = slots_periods_dict[cashbox['id']]
+    # Расписание за прошлую неделю от даты составления
+    prev_data = group_by(
+        collection=prev_worker_days,
+        group_key=lambda x: x.worker_id
+    )
+    employment_stat_dict = count_difference_of_normal_days(dt_end=dt_from, employments=employments)
 
+
+   
+
+    ##################################################################
+
+    # если стоит флаг shop.paired_weekday, смотрим по юзерам, нужны ли им в этом месяце выходные в выходные
+    resting_states_list = [WorkerDay.TYPE_HOLIDAY]
+    if shop.paired_weekday:
+        for employment in employments:
+            coupled_weekdays = 0
+            month_info = prev_data.get(employment.user_id, [])
+            for day in range(len(month_info) - 1):
+                day_info = month_info[day]
+                if day_info.dt.weekday() == 5 and day_info.type in resting_states_list:
+                    next_day_info = month_info[day + 1]
+                    if next_day_info.dt.weekday() == 6 and next_day_info.type in resting_states_list:
+                        coupled_weekdays += 1
+
+            employment_stat_dict[employment.id]['required_coupled_hol_in_hol'] = 0 if coupled_weekdays else 1
+
+    ########### Корректировка рабочих ###########
+    dates = [dt_from + timedelta(days=i) for i in range((dt_to -  dt_from).days)]
+    for employment in employments:
+        # Для уволенных сотрудников
+        if employment.dt_fired:
+            employment.is_fixed_hours = True
+            workers_month_days = worker_day.get(employment.user_id, []) # Может случиться так что для этого работника еще никаким образом расписание не составлялось
+            workers_month_days.sort(key=lambda wd: wd.dt)
+            workers_month_days_new = []
+            wd_index = 0
+            for dt in dates:
+                if (workers_month_days[wd_index].dt if\
+                     wd_index < len(workers_month_days) else None) and dt < employment.dt_fired: #Если вернется пустой список, нужно исключать ошибку out of range
+                    workers_month_days_new.append(workers_month_days[wd_index])
+                    wd_index += 1
+                elif dt < employment.dt_fired and employment.auto_timetable:
+                    continue
+                else:
+                    workers_month_days_new.append(WorkerDay(
+                            type=WorkerDay.TYPE_HOLIDAY,
+                            dt=dt,
+                            worker_id=employment.user_id,
+                        )
+                    )
+            worker_day[employment.user_id] = workers_month_days_new 
+        # Если для сотрудника не составляем расписание, его все равно нужно учитывать, так как он покрывает спрос
+        # Реализация через фиксированных сотрудников, чтобы не повторять функционал
+        elif not employment.auto_timetable:
+            employment.is_fixed_hours = True
+            workers_month_days = worker_day.get(employment.user_id, []) # Может случиться так что для этого работника еще никаким образом расписание не составлялось
+            workers_month_days.sort(key=lambda wd: wd.dt)
+            workers_month_days_new = []
+            wd_index = 0
+            for dt in dates:
+                if (workers_month_days[wd_index].dt if\
+                     wd_index < len(workers_month_days) else None) == dt: #Если вернется пустой список, нужно исключать ошибку out of range
+                    workers_month_days_new.append(workers_month_days[wd_index])
+                    wd_index += 1
+                else:
+                    workers_month_days_new.append(WorkerDay(
+                        type=WorkerDay.TYPE_HOLIDAY,
+                        dt=dt,
+                        worker_id=employment.user_id,
+                    ))
+            worker_day[employment.user_id] = workers_month_days_new
+    
+    ##################################################################
+
+    ########### Выборки из базы данных ###########
+
+    # Спрос
+    periods = PeriodClients.objects.filter(
+        operation_type__dttm_deleted__isnull=True,
+        operation_type__work_type__shop_id=shop_id,
+        operation_type__work_type__dttm_deleted__isnull=True,
+        type=PeriodClients.LONG_FORECASE_TYPE,
+        dttm_forecast__date__gte=dt_from,
+        dttm_forecast__date__lt=dt_to,
+    ).values(
+        'dttm_forecast',
+        'operation_type__work_type_id',
+    ).annotate(
+        clients=Sum(F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + (shop.absenteeism / 100)))
+    ).values_list(
+        'dttm_forecast',
+        'operation_type__work_type_id',
+        'clients'
+    )
+
+    demands = [{
+        'dttm_forecast': BaseConverter.convert_datetime(x[0]),
+        'work_type': x[1],
+        'clients': x[2],
+    } for x in periods]
+
+
+    # Параметры инициализации
     init_params = json.loads(shop.init_params)
     work_days = list(ProductionDay.objects.filter(
         dt__gte=dt_from,
@@ -548,100 +653,33 @@ def create_timetable(request, form):
 
     init_params['n_working_days_optimal'] = len(work_days)
 
-    user_info = count_difference_of_normal_days(dt_end=dt_from, usrs=users)
-
-    # инфа за предыдущую неделю
-
-    prev_month_data = group_by(
-        collection=WorkerDay.objects.qos_current_version().select_related('worker').filter(
-            worker__shop_id=shop_id,
-            dt__gte=dt_from - timedelta(days=7),
-            dt__lt=dt_from,
-        ),
-        group_key=lambda x: x.worker_id,
-    )
-    # если стоит флаг shop.paired_weekday, смотрим по юзерам, нужны ли им в этом месяце выходные в выходные
-    resting_states_list = [WorkerDay.TYPE_HOLIDAY]
-    if shop.paired_weekday:
-        for user in users:
-            coupled_weekdays = 0
-            month_info = sorted(prev_month_data.get(user.id, []), key=lambda x: x.dt)
-            for day in range(len(month_info) - 1):
-                day_info = month_info[day]
-                if day_info.dt.weekday() == 5 and day_info.type in resting_states_list:
-                    next_day_info = month_info[day + 1]
-                    if next_day_info.dt.weekday() == 6 and next_day_info.type in resting_states_list:
-                        coupled_weekdays += 1
-
-            user_info[user.id]['required_coupled_hol_in_hol'] = 0 if coupled_weekdays else 1
-
-    # проверки для фиксированных чуваков
-    for user in users:
-        if user.is_fixed_hours:
-            availability_info = availabilities.get(user.id, [])
-            if not (len(availability_info)):
-                print(f'Warning! User {user.id} {user.last_name} {user.first_name} с фиксированными часами, но нет набора смен, на которых может работать!')
-            mask = [0 for _ in range(len(availability_info))]
-            for info_day in availability_info:
-                mask[info_day.weekday] += 1
-            if mask.count(1) != len(mask):
-                status_message = f'Ошибка! Работник {user.id} {user.last_name} {user.first_name} с фиксированными часами, но на один день выбрано больше одной смены)!'
-                tt.delete()
-                return JsonResponse.value_error(status_message)
-
-    # Если для сотрудника не составляем расписание, его все равно нужно учитывать, так как он покрывает спрос
-    # Реализация через фиксированных сотрудников, чтобы не повторять функционал
-
-    dates = [dt_from + timedelta(days=i) for i in range((dt_to -  dt_from).days)]
-    for user in users:
-        if not user.auto_timetable:
-            user.is_fixed_hours = True
-            workers_month_days = worker_day[user.id]
-            workers_month_days.sort(key=lambda wd: wd.dt)
-            workers_month_days_new = []
-            wd_index = 0
-            for dt in dates:
-                if workers_month_days[wd_index].dt == dt:
-                    workers_month_days_new.append(workers_month_days[wd_index])
-                    wd_index += 1
-                else:
-                    workers_month_days_new.append(WorkerDay(
-                        type=WorkerDay.TYPE_HOLIDAY,
-                        dt=dt,
-                        worker_id=user.id,
-                    ))
-
-    demands = [{
-        'dttm_forecast': BaseConverter.convert_datetime(x[0]),
-        'work_type': x[1],
-        'clients': x[2],
-    } for x in periods]
+    ##################################################################
 
     data = {
         'IP': settings.HOST_IP,
         'timetable_id': tt.id,
         'forecast_step_minutes': shop.forecast_step_minutes.minute,
-        'work_types': cashboxes,
+        'work_types': list(work_types.values()),
         'shop': shop_dict,
         'demand': demands,
         'cashiers': [
             {
-                'general_info': UserConverter.convert(u),
-                'constraints_info': [WorkerConstraintConverter.convert(x) for x in constraints.get(u.id, [])],
-                'availability_info': [UserWeekdaySlotConverter.convert(x) for x in availabilities.get(u.id, [])],
-                'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(u.id, [])],
-                'workdays': [WorkerDayConverter.convert(x) for x in worker_day.get(u.id, [])],
-                'prev_data': [WorkerDayConverter.convert(x) for x in prev_data.get(u.id, [])],
-                'overworking_hours': user_info[u.id].get('diff_prev_paid_hours', 0),
-                'overworking_days': user_info[u.id].get('diff_prev_paid_days', 0),
-                'norm_work_amount': work_hours * u.norm_work_hours / 100,
-                'required_coupled_hol_in_hol': user_info[u.id].get('required_coupled_hol_in_hol', 0),
-                'min_shift_len': u.shift_hours_length_min if u.shift_hours_length_min else 0,
-                'max_shift_len': u.shift_hours_length_max if u.shift_hours_length_max else 24,
-                'min_time_between_slots': u.min_time_btw_shifts if u.min_time_btw_shifts else 0,
-                'dt_new_week_availability_from': BaseConverter.convert_date(u.dt_new_week_availability_from),
+                'general_info': EmploymentConverter.convert(e),
+                'constraints_info': [WorkerConstraintConverter.convert(x) for x in constraints.get(e.user_id, [])],
+                'availability_info': [UserWeekdaySlotConverter.convert(x) for x in availabilities.get(e.user_id, [])],
+                'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(e.user_id, [])],
+                'workdays': [WorkerDayConverter.convert(x) for x in worker_day.get(e.user_id, [])],
+                'prev_data': [WorkerDayConverter.convert(x) for x in prev_data.get(e.user_id, [])],
+                'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),
+                'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),
+                'norm_work_amount': work_hours * e.norm_work_hours / 100,
+                'required_coupled_hol_in_hol': employment_stat_dict[e.id].get('required_coupled_hol_in_hol', 0),
+                'min_shift_len': e.shift_hours_length_min if e.shift_hours_length_min else 0,
+                'max_shift_len': e.shift_hours_length_max if e.shift_hours_length_max else 24,
+                'min_time_between_slots': e.min_time_btw_shifts if e.min_time_btw_shifts else 0,
+                'dt_new_week_availability_from': BaseConverter.convert_date(e.dt_new_week_availability_from),
             }
-            for u in users
+            for e in employments
         ],
         'algo_params': {
             'min_add_coef': shop.mean_queue_length,
@@ -653,20 +691,20 @@ def create_timetable(request, form):
     }
 
     tt.save()
+    data = json.dumps(data).encode('ascii')
     try:
-        data = json.dumps(data).encode('ascii')
-        # with open('./send_data_tmp.json', 'wb+') as f:
-        #     f.write(data)
-        req = urllib.request.Request('http://{}/'.format(settings.TIMETABLE_IP), data=data, headers={'content-type': 'application/json'})
-        with urllib.request.urlopen(req) as response:
-            res = response.read().decode('utf-8')
-        tt.task_id = json.loads(res).get('task_id', '')
+        r= requests.post('http://{}/'.format(settings.TIMETABLE_IP), data=data )
+        res = r.json()
+
+        tt.task_id = res.get('task_id', '')
         if tt.task_id is None:
             tt.status = Timetable.ERROR
             tt.save()
     except Exception as e:
-        print(e)
+
+        print(e.with_traceback())
         tt.status = Timetable.ERROR
+
         tt.status_message = str(e)
         tt.save()
         return JsonResponse.internal_error('Error sending data to server')
@@ -714,10 +752,10 @@ def delete_timetable(request, form):
 
 
     WorkerDayCashboxDetails.objects.filter(
-        worker_day__worker__shop_id=shop_id,
+        worker_day__employment__shop_id=shop_id,
         worker_day__dt__gte=dt_from,
         worker_day__dt__lt=dt_to,
-        worker_day__worker__auto_timetable=True,
+        worker_day__employment__auto_timetable=True,
         is_vacancy=False,
     ).filter(
         Q(worker_day__created_by__isnull=True) |
@@ -727,20 +765,20 @@ def delete_timetable(request, form):
     )
 
     WorkerDayCashboxDetails.objects.filter(
-        worker_day__worker__shop_id=shop_id,
+        worker_day__employment__shop_id=shop_id,
         worker_day__dt__gte=dt_from,
         worker_day__dt__lt=dt_to,
-        worker_day__worker__auto_timetable=True,
+        worker_day__employment__auto_timetable=True,
         is_vacancy=True,
     ).update(
         worker_day=None
     )
 
     wdays = WorkerDay.objects.filter(
-        worker__shop_id=shop_id,
+        employment__shop_id=shop_id,
         dt__gte=dt_from,
         dt__lt=dt_to,
-        worker__auto_timetable=True,
+        employment__auto_timetable=True,
         child__id__isnull=True
     ).filter(
         created_by__isnull=True,
@@ -800,6 +838,8 @@ def set_timetable(request, form):
 
     timetable = Timetable.objects.get(id=form['timetable_id'])
 
+    shop = request.shop
+
     timetable.status = data['timetable_status']
     timetable.status_message = data.get('status_message', False)
     timetable.save()
@@ -807,9 +847,15 @@ def set_timetable(request, form):
         return JsonResponse.success(timetable.status_message)
 
     if data['users']:
-        users = {x.id: x for x in User.objects.filter(id__in=list(data['users']), attachment_group=User.GROUP_STAFF)}
+        users = {x.id: x for x in User.objects.filter(id__in=list(data['users']))}
+        employments = {x.user_id: x for x in Employment.objects.get_active(
+            dt_from=timetable.dt,
+            dt_to=timetable.dt+relativedelta(months=1),
+            shop=shop,
+            user_id__in=list(data['users']))}
 
         for uid, v in data['users'].items():
+            uid = int(uid)
             for wd in v['workdays']:
                 # todo: actually use a form here is better
                 # todo: too much request to db
@@ -818,20 +864,23 @@ def set_timetable(request, form):
                 wd_obj = WorkerDay(
                     dt=dt,
                     worker_id=uid,
+                    shop=shop,
+                    employment=employments[uid],
+                    type=wd['type']
                 )
 
                 parent_wd_obj = WorkerDay.objects.filter(
                     worker_id=uid,
+                    shop=shop,
                     dt=dt,
                     child__id__isnull=True
                 ).first()
+
                 if parent_wd_obj:
                     if parent_wd_obj.type != WorkerDay.TYPE_EMPTY:
                         continue
                     wd_obj.parent_worker_day = parent_wd_obj
 
-                wd_obj.worker.shop_id = users[int(uid)].shop_id
-                wd_obj.type = wd['type']
                 if WorkerDay.is_type_with_tm_range(wd_obj.type):
                     wd_obj.dttm_work_start = BaseConverter.parse_datetime(wd['dttm_work_start'])
                     wd_obj.dttm_work_end = BaseConverter.parse_datetime(wd['dttm_work_end'])

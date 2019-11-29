@@ -11,8 +11,8 @@
 
 from uuid import uuid4
 from django.utils import timezone
-from src.db.models import Shop
-
+from src.db.models import Shop, Employment
+import datetime
 
 def password_generator(len=14):
     return str(uuid4()).replace('-', '')[:len]  # algo based on SHA-1 (not safe enough nowdays)
@@ -65,11 +65,14 @@ def main(hq_accs=2):
         is_staff=True,
         is_superuser=True,
         username='qadmin',
-        function_group=admin_group,
         first_name='Admin',
         last_name='Admin',
+    )
+    Employment.objects.create(
+        user=admin,
+        function_group=admin_group,
         dt_hired=timezone.now().date(),
-        shop = root_shop
+        shop=root_shop,
     )
     u_pass = password_generator()
     admin.set_password(u_pass)
@@ -83,10 +86,13 @@ def main(hq_accs=2):
             username=username,
             first_name='ЦО',
             last_name='',
-            function_group=admin_group,
-            shop = middle_shops[i]
         )
-
+        Employment.objects.create(
+            user=hq_acc,
+            function_group=admin_group,
+            dt_hired=datetime.date(2019, 1, 1),
+            shop=middle_shops[i],
+        )
         u_pass = password_generator()
         hq_acc.set_password(u_pass)
         hq_acc.save()
