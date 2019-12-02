@@ -4,7 +4,6 @@ from src.db.models import (
     ProductionDay,
     WorkerDay,
 )
-from src.util.collection import group_by
 from .colors import *
 import datetime
 import json
@@ -675,8 +674,14 @@ class Tabel_xlsx(Xlsx_base):
     @staticmethod
     def change_for_inspection(month_norm_hours, workdays):
         break_triplets = json.loads(workdays[0].shop.break_triplets)
-
-        workdays = group_by(workdays, group_key=lambda _: _.worker_id)
+        result = {}
+        for workday in workdays:
+            key = workday.user_id
+            if key not in result:
+                result[key] = []
+            result[key].append(workday)
+        #group_by(workdays, group_key=lambda _: _.worker_id)
+        workdays = result
         actual_hours = {}
 
         def from_workday_to_holiday(wd):

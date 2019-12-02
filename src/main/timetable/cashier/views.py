@@ -27,7 +27,6 @@ from src.db.models import (
 
 from src.main.other.notification.utils import send_notification
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
-from src.util.collection import group_by, count, range_u
 from src.util.forms import FormUtil
 from src.util.models_converter import (
     EmploymentConverter,
@@ -357,6 +356,14 @@ def get_cashier_timetable(request, form):
             wd_logs = wd_logs.filter(
                 worker_day_approve_id__isnull=False
             )
+        worker_day_change_log = {}
+        for wd_log in list(wd_logs.order_by('-id')):
+            key = WorkerDay.objects.qos_get_current_worker_day(wd_log).id
+            if key not in worker_day_change_log:
+                worker_day_change_log[key] = []
+            worker_day_change_log[key].append(wd_log)
+        '''
+
         wd_logs = list(wd_logs)
         worker_day_change_log = group_by(
             wd_logs,
@@ -364,14 +371,15 @@ def get_cashier_timetable(request, form):
             sort_key=lambda _: _.id,
             sort_reverse=True
         )
+        '''
         indicators_response = {}
         if (len(form['worker_ids']) == 1):
             indicators_response = {
-                'work_day_amount': count(worker_days, lambda x: x.type == WorkerDay.TYPE_WORKDAY),
-                'holiday_amount': count(worker_days, lambda x: x.type == WorkerDay.TYPE_HOLIDAY),
-                'sick_day_amount': count(worker_days, lambda x: x.type == WorkerDay.TYPE_SICK),
-                'vacation_day_amount': count(worker_days, lambda x: x.type == WorkerDay.TYPE_VACATION),
-                'work_day_in_holidays_amount': count(worker_days, lambda x: x.type == WorkerDay.TYPE_WORKDAY and
+                'work_day_amount': sum(1 for x in worker_days if x.type == WorkerDay.TYPE_WORKDAY),
+                'holiday_amount': sum(1 for x in worker_days if x.type == WorkerDay.TYPE_HOLIDAY),
+                'sick_day_amount': sum(1 for x in worker_days if x.type == WorkerDay.TYPE_SICK),
+                'vacation_day_amount': sum(1 for x in worker_days if x.type == WorkerDay.TYPE_VACATION),
+                'work_day_in_holidays_amount': sum(1 for x in worker_days if x.type == WorkerDay.TYPE_WORKDAY and
                                                                             x.dt in official_holidays),
                 'change_amount': len(worker_day_change_log),
                 'hours_count_fact': wd_stat_count_total(worker_days_filter, request.shop)['hours_count_fact']
@@ -509,8 +517,8 @@ def get_cashier_info(request, form):
         dttm_to = dttm_from + timedelta(days=1)
         dttm_step = timedelta(minutes=30)
         for weekday, constraint_times in constraint_times_all.items():
-            times = [dttm for dttm in range_u(dttm_from, dttm_to, dttm_step, False) if
-                     dttm.time() not in constraint_times]
+            times = [datetime.fromtimestamp(dttm) for dttm in range(int(dttm_from.timestamp()), int(dttm_to.timestamp()), int(dttm_step.total_seconds())) if
+                     datetime.fromtimestamp(dttm).time() not in constraint_times]
             work_hours = []
 
             if len(times) > 0:
@@ -618,7 +626,8 @@ def get_worker_day(request, form):
     dttm_step = timedelta(minutes=30)
 
     constraint_times = set(x.tm for x in WorkerConstraint.objects.filter(worker_id=worker_id, weekday=dt.weekday()))
-    times = [dttm for dttm in range_u(dttm_from, dttm_to, dttm_step, False) if dttm.time() not in constraint_times]
+    times = [datetime.fromtimestamp(dttm) for dttm in range(int(dttm_from.timestamp()), \
+        int(dttm_to.timestamp()), int(dttm_step.total_seconds())) if datetime.fromtimestamp(dttm).time() not in constraint_times]
     work_hours = []
 
     def __create_time_obj(__from, __to):
@@ -719,7 +728,8 @@ def set_worker_day(request, form):
 
     work_type = WorkType.objects.get(id=form['work_type']) if form['work_type'] else None
 
-    for dt in range_u(dt_from, dt_to, timedelta(days=1)):
+    for dt in range(int(dt_from.toordinal()), int(dt_to.toordinal()) + 1, 1):
+        dt = date.fromordinal(dt)
         try:
             old_wd = WorkerDay.objects.qos_current_version().get(
                 worker_id=worker.id,

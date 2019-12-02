@@ -13,7 +13,6 @@ from src.db.models import (
 )
 from dateutil.relativedelta import relativedelta
 from django.db.models import Sum
-from src.util.collection import range_u
 from src.util.models_converter import BaseConverter, PeriodDemandChangeLogConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import (
@@ -151,7 +150,8 @@ def get_forecast(request, form):
     dttm_step = timedelta(seconds=shop.system_step_in_minutes() * 60)
     forecast_periods = {x[0]: [] for x in PeriodClients.FORECAST_TYPES}
     for forecast_type, forecast_data in forecast_periods.items():
-        for dttm in range_u(dttm_from, dttm_to, dttm_step, False):
+        for dttm in range(int(dttm_from.timestamp()), int(dttm_to.timestamp()), dttm_step.seconds):
+            dttm = datetime.fromtimestamp(dttm)
             clients = 0
             # products = 0
             # queue_wait_length = 0
@@ -247,10 +247,12 @@ def set_demand(request, form):
         '''
         time_from = dttm_from.time()
         time_to = dttm_to.time()
-        for date in range_u(dttm_from, dttm_to, timedelta(days=1)): #работает только с range_u
+        for date in range(int(dttm_from.timestamp()), int(dttm_to.timestamp()) + 1, int(timedelta(days=1).total_seconds())):
+            date = datetime.fromtimestamp(date)
             date_from = datetime.combine(date, time_from)
             date_to = datetime.combine(date, time_to)
-            dates_needed = dates_needed | {date for date in range_u(date_from, date_to, dttm_step)}
+            dates_needed = dates_needed | {datetime.fromtimestamp(date) \
+                 for date in range(int(date_from.timestamp()), int(date_to.timestamp()), dttm_step.seconds)}
             #for time in range(date_from, date_to, dttm_step):
             #    dates_needed.add(time)
         '''

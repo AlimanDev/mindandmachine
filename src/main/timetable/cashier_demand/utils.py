@@ -15,7 +15,6 @@ from src.db.models import (
     ProductionMonth,
     Shop,
 )
-from src.util.collection import group_by
 from src.util.models_converter import BaseConverter
 from src.main.urv.utils import wd_stat_count_total, wd_stat_count
 
@@ -164,7 +163,11 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
         work_types = work_types.filter(id__in=form['work_type_ids'])
         if len(work_types) != len(form['work_type_ids']):
             return 'bad work_type_ids'
-    work_types = group_by(work_types, group_key=lambda x: x.id)
+    work_types = {
+        wt.id: wt
+        for wt in work_types
+    }
+    #work_types = group_by(work_types, group_key=lambda x: x.id)
 
     # query selecting PeriodClients
     need_workers = PeriodClients.objects.annotate(

@@ -14,7 +14,6 @@ from src.db.models import (
 )
 
 from src.main.download.xlsx.tabel import Tabel_xlsx
-from src.util.collection import range_u, count
 from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
 from django.db.models import F, Q
 
@@ -190,7 +189,7 @@ class Timetable_xlsx(Tabel_xlsx):
             format_text = self.workbook.add_format(fmt(font_size=12, border=1, bold=True))
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 1,
-                str(count(worker_days.values(), lambda x: x.type in [WorkerDay.TYPE_WORKDAY,
+                str(sum(1 for x in worker_days.values() if x.type in [WorkerDay.TYPE_WORKDAY,
                                                                      WorkerDay.TYPE_HOLIDAY_WORK])),
                 format_text
             )
@@ -209,13 +208,13 @@ class Timetable_xlsx(Tabel_xlsx):
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 4,
-                str(count(worker_days.values(), lambda x: x.type == WorkerDay.TYPE_HOLIDAY)),
+                str(sum(1 for x in worker_days.values() if x.type == WorkerDay.TYPE_HOLIDAY)),
                 format_text
             )
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 5,
-                str(count(worker_days.values(), lambda x: x.type == WorkerDay.TYPE_VACATION)),
+                str(sum(1 for x in worker_days.values() if x.type == WorkerDay.TYPE_VACATION)),
                 format_text
             )
 
@@ -266,7 +265,8 @@ class Timetable_xlsx(Tabel_xlsx):
                 weekdays_dts = []
                 work_begin = []
                 work_end = []
-                for xdt in range_u(dt, dt + timedelta(days=7), timedelta(days=1), False):
+                for xdt in range(int(dt.timestamp()), int((dt + timedelta(days=7)).timestamp()), timedelta(days=1).total_seconds()):
+                    xdt = datetime.fromtimestamp(xdt)
                     wd = worker_days.get(xdt.date())
 
                     weekdays_dts.append(Cell(xdt, format_date if xdt.weekday() != 6 else format_date_bottom))
