@@ -674,11 +674,11 @@ class Tabel_xlsx(Xlsx_base):
     def change_for_inspection(month_norm_hours, workdays):
         break_triplets = json.loads(workdays[0].worker.shop.break_triplets)
         result = {}
-        for obj in workdays:
-            key = workdays.user_id
+        for workday in workdays:
+            key = workday.user_id
             if key not in result:
                 result[key] = []
-            result[key].append(obj)
+            result[key].append(workday)
         #group_by(workdays, group_key=lambda _: _.worker_id)
         workdays = result
         actual_hours = {}

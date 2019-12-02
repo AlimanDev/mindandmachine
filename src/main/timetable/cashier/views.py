@@ -357,11 +357,11 @@ def get_cashier_timetable(request, form):
                 worker_day_approve_id__isnull=False
             )
         worker_day_change_log = {}
-        for obj in list(wd_logs.order_by('-id')):
-            key = WorkerDay.objects.qos_get_current_worker_day(obj).id
+        for wd_log in list(wd_logs.order_by('-id')):
+            key = WorkerDay.objects.qos_get_current_worker_day(wd_log).id
             if key not in worker_day_change_log:
                 worker_day_change_log[key] = []
-            worker_day_change_log[key].append(obj)
+            worker_day_change_log[key].append(wd_log)
         '''
 
         wd_logs = list(wd_logs)
