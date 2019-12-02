@@ -29,8 +29,8 @@ from src.util.models_converter import BaseConverter
 from src.conf.djconfig import SFTP_IP, SFTP_PASSWORD, SFTP_USERNAME, SFTP_PATH
 
 WORK_TYPES = {
-    'В': WorkerDay.Type.TYPE_HOLIDAY.value,
-    'ОТ': WorkerDay.Type.TYPE_VACATION.value,
+    'В': WorkerDay.TYPE_HOLIDAY,
+    'ОТ': WorkerDay.TYPE_VACATION,
 }
 
 
@@ -110,7 +110,7 @@ def upload_vacation_util(vacation_file):
             list_to_create.append(
                 WorkerDay(
                     worker=user,
-                    type=WorkerDay.Type.TYPE_VACATION.value,
+                    type=WorkerDay.TYPE_VACATION,
                     dt=from_dt,
                     dttm_work_start=None,
                     dttm_work_end=None,
@@ -200,7 +200,7 @@ def upload_timetable_util(form, timetable_file):
                 #  todo: если будут типы с цифрами, надо будет переделать
                 if bool(re.search(r'\d', cell.value)):
                     times = cell.value.split('-')
-                    work_type = WorkerDay.Type.TYPE_WORKDAY.value
+                    work_type = WorkerDay.TYPE_WORKDAY
                     dttm_work_start = datetime.datetime.combine(
                         dt, BaseConverter.parse_time(times[0] + ':00')
                     )
@@ -226,7 +226,7 @@ def upload_timetable_util(form, timetable_file):
                     dttm_work_end=dttm_work_end,
                     type=work_type
                 )
-                if work_type == WorkerDay.Type.TYPE_WORKDAY.value:
+                if work_type == WorkerDay.TYPE_WORKDAY:
                     WorkerDayCashboxDetails.objects.create(
                         worker_day=new_wd,
                         dttm_from=dttm_work_start,

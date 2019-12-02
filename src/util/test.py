@@ -357,7 +357,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         self.timetable1 = Timetable.objects.create(
             shop = self.shop,
             dt = datetime.date(2019, 6, 1),
-            status = 1,
+            status = Timetable.READY,
             dttm_status_change = datetime.datetime(2019, 6, 1, 9, 30, 0)
         )
 
@@ -484,7 +484,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
                 wd = WorkerDay.objects.create(
                     dttm_work_start=datetime.datetime.combine(dt, time_start),
                     dttm_work_end=datetime.datetime.combine(dt + datetime.timedelta(days=1), time_end),
-                    type=WorkerDay.Type.TYPE_WORKDAY.value,
+                    type=WorkerDay.TYPE_WORKDAY,
                     dt=dt,
                     worker=user
                 )
@@ -511,7 +511,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             dt,
             dttm_work_start,
             dttm_work_end,
-            type=WorkerDay.Type.TYPE_WORKDAY.value
+            type=WorkerDay.TYPE_WORKDAY
     ):
         worker_day = WorkerDay.objects.create(
             employment=employment,

@@ -61,7 +61,7 @@ class TestAutoSettings(LocalTestCase):
         timetable = Timetable.objects.create(
             shop = self.shop,
             dt = now().date().replace(day=1),
-            status = Timetable.Status.PROCESSING.value,
+            status = Timetable.PROCESSING,
             dttm_status_change = now()
         )
         dt = now().date()
@@ -121,7 +121,7 @@ class TestAutoSettings(LocalTestCase):
             dt=dt,
             dttm_work_start=datetime.datetime.combine(dt, tm_from),
             dttm_work_end=datetime.datetime.combine(dt, tm_to),
-            type=WorkerDay.Type.TYPE_WORKDAY.value
+            type=WorkerDay.TYPE_WORKDAY
         )
         self.assertEqual(len(wd), 1)
 
@@ -135,7 +135,7 @@ class TestAutoSettings(LocalTestCase):
         self.assertEqual(WorkerDay.objects.filter(
             shop=self.shop,
             worker=self.user4,
-            type=WorkerDay.Type.TYPE_HOLIDAY.value,
+            type=WorkerDay.TYPE_HOLIDAY,
             dt=dt
         ).count(), 1)
 

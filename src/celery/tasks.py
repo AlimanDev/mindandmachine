@@ -131,8 +131,8 @@ def update_worker_month_stat():
             duration_of_workerday = 0
 
             if worker_day.type in WorkerDay.TYPES_PAID:
-                if worker_day.type != WorkerDay.Type.TYPE_WORKDAY.value and \
-                        worker_day.type != WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
+                if worker_day.type != WorkerDay.TYPE_WORKDAY and \
+                        worker_day.type != WorkerDay.TYPE_HOLIDAY_WORK:
                     duration_of_workerday = ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK]
                 else:
                     duration_of_workerday = round((worker_day.dttm_work_end - worker_day.dttm_work_start)
@@ -398,7 +398,7 @@ def update_shop_stats(dt=None):
     if not dt:
         dt = date.today().replace(day=1)
     shops = Shop.objects.filter(dttm_deleted__isnull=True)
-    tts = Timetable.objects.filter(shop__in=shops, dt__gte=dt, status=Timetable.Status.READY.value)
+    tts = Timetable.objects.filter(shop__in=shops, dt__gte=dt, status=Timetable.READY)
     for timetable in tts:
         stats = get_shop_stats(
             shop_id=timetable.shop_id,

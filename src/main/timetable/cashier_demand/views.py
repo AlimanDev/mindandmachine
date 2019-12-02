@@ -51,7 +51,7 @@ def get_workers(request, form):
         Q(worker_day__employment__dt_fired__gt=from_dttm.date()) | Q(worker_day__employment__dt_fired__isnull=True),
         Q(worker_day__employment__dt_hired__lt=to_dttm.date()) | Q(worker_day__employment__dt_fired__isnull=True),
         worker_day__shop_id=shop_id,
-        worker_day__type=WorkerDay.Type.TYPE_WORKDAY.value,
+        worker_day__type=WorkerDay.TYPE_WORKDAY,
         worker_day__dt=from_dttm.date(),
         worker_day__dttm_work_start__lte=from_dttm,
         worker_day__dttm_work_end__gte=to_dttm,
@@ -117,10 +117,10 @@ def get_timetable_xlsx(request, form):
 
         for wd in WorkerDay.objects.qos_filter_version(checkpoint).filter(worker=user, dt__gte=dt_from,
                                                                           dt__lte=dt_to).order_by('dt'):
-            if wd.type == WorkerDay.Type.TYPE_HOLIDAY.value:
+            if wd.type == WorkerDay.TYPE_HOLIDAY:
                 cell_1 = 'В'
                 cell_2 = 'В'
-            elif wd.type == WorkerDay.Type.TYPE_VACATION.value:
+            elif wd.type == WorkerDay.TYPE_VACATION:
                 cell_1 = 'ОТ'
                 cell_2 = 'ОТ'
             else:

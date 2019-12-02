@@ -10,6 +10,15 @@ import django.utils.timezone
 import src.db.models
 import src.db.utils
 
+class EnumField(models.IntegerField):
+    def __init__(self, to_enum, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.enum = to_enum
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        kwargs['to_enum'] = self.enum
+        return name, path, args, kwargs
 
 class Migration(migrations.Migration):
 
@@ -35,7 +44,7 @@ class Migration(migrations.Migration):
                 ('is_active', models.BooleanField(default=True, help_text='Designates whether this user should be treated as active. Unselect this instead of deleting accounts.', verbose_name='active')),
                 ('date_joined', models.DateTimeField(default=django.utils.timezone.now, verbose_name='date joined')),
                 ('id', models.BigAutoField(primary_key=True, serialize=False)),
-                ('work_type', src.db.utils.EnumField(blank=True, null=True, to_enum=[0, 1])),
+                ('work_type', EnumField(blank=True, null=True, to_enum=[0, 1])),
                 ('is_fixed_hours', models.BooleanField(default=False)),
                 ('is_fixed_days', models.BooleanField(default=False)),
                 ('group', models.CharField(choices=[('C', 'cashiers'), ('M', 'manager'), ('S', 'supervisor'), ('D', 'director'), ('H', 'headquarter')], default='C', max_length=1)),
@@ -120,7 +129,7 @@ class Migration(migrations.Migration):
             name='LevelType',
             fields=[
                 ('id', models.BigAutoField(primary_key=True, serialize=False)),
-                ('type', src.db.utils.EnumField(to_enum=[0, 1])),
+                ('type', EnumField(to_enum=[0, 1])),
                 ('weekday', models.PositiveSmallIntegerField()),
                 ('tm_from', models.TimeField()),
                 ('tm_to', models.TimeField()),
@@ -296,7 +305,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(primary_key=True, serialize=False)),
                 ('status_message', models.CharField(blank=True, max_length=256, null=True)),
                 ('dt', models.DateField()),
-                ('status', src.db.utils.EnumField(to_enum=src.db.models.Timetable.Status)),
+                ('status', EnumField(to_enum=[1, 2, 3])),
                 ('dttm_status_change', models.DateTimeField()),
                 ('task_id', models.CharField(blank=True, max_length=256, null=True)),
                 ('shop', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='db.Shop')),
@@ -352,7 +361,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(primary_key=True, serialize=False)),
                 ('dttm_added', models.DateTimeField(auto_now_add=True)),
                 ('dt', models.DateField()),
-                ('type', src.db.utils.EnumField(to_enum=src.db.models.WorkerDay.Type)),
+                ('type', EnumField(to_enum=[1, 2])),
                 ('dttm_work_start', models.DateTimeField(blank=True, null=True)),
                 ('dttm_work_end', models.DateTimeField(blank=True, null=True)),
                 ('tm_break_start', models.TimeField(blank=True, null=True)),
@@ -379,7 +388,7 @@ class Migration(migrations.Migration):
                 ('dttm_added', models.DateTimeField(auto_now_add=True)),
                 ('status_type', models.CharField(choices=[('A', 'Approved'), ('D', 'Declined'), ('P', 'Pending')], default='P', max_length=1)),
                 ('dt', models.DateField()),
-                ('type', src.db.utils.EnumField(to_enum=src.db.models.WorkerDay.Type)),
+                ('type', EnumField(to_enum=[1, 2])),
                 ('dttm_work_start', models.DateTimeField(blank=True, null=True)),
                 ('dttm_work_end', models.DateTimeField(blank=True, null=True)),
                 ('tm_break_start', models.TimeField(blank=True, null=True)),

@@ -13,55 +13,55 @@ import json
 class Tabel_xlsx(Xlsx_base):
     # (font; background)
     WORKERDAY_TYPE_COLORS = {
-        WorkerDay.Type.TYPE_WORKDAY.value: (COLOR_BLACK, COLOR_WHITE),
-        WorkerDay.Type.TYPE_BUSINESS_TRIP.value: (COLOR_RED, COLOR_WHITE),
-        WorkerDay.Type.TYPE_HOLIDAY.value: (COLOR_BLACK, COLOR_GREEN),
-        WorkerDay.Type.TYPE_HOLIDAY_WORK.value: (COLOR_BLACK, COLOR_GREEN),
-        WorkerDay.Type.TYPE_ABSENSE.value: (COLOR_BLACK, COLOR_YELLOW2),
-        WorkerDay.Type.TYPE_REAL_ABSENCE.value: (COLOR_BLACK, COLOR_RED),
-        WorkerDay.Type.TYPE_SICK.value: (COLOR_BLACK, COLOR_1),
-        WorkerDay.Type.TYPE_VACATION.value: (COLOR_BLACK, COLOR_BLUE),
-        WorkerDay.Type.TYPE_EXTRA_VACATION.value: (COLOR_RED, COLOR_BLUE),
-        WorkerDay.Type.TYPE_TRAIN_VACATION.value: (COLOR_BLACK, COLOR_DARK_BLUE),
-        WorkerDay.Type.TYPE_SELF_VACATION.value: (COLOR_BLACK, COLOR_BLUE2),
-        WorkerDay.Type.TYPE_SELF_VACATION_TRUE.value: (COLOR_BLACK, COLOR_LITE_GREEN),
-        WorkerDay.Type.TYPE_GOVERNMENT.value: (COLOR_BLACK, COLOR_PINK3),
-        WorkerDay.Type.TYPE_MATERNITY.value: (COLOR_BLACK, COLOR_YELLOW3),
-        WorkerDay.Type.TYPE_MATERNITY_CARE.value: (COLOR_BLACK, COLOR_PURPLE),
-        WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value: (COLOR_BLACK, COLOR_GREEN2),
-        WorkerDay.Type.TYPE_ETC.value: (COLOR_GREY, COLOR_GREY),
-        WorkerDay.Type.TYPE_EMPTY.value: (COLOR_GREY, COLOR_GREY),
-        WorkerDay.Type.TYPE_QUALIFICATION.value: (COLOR_GREY, COLOR_GREY),
+        WorkerDay.TYPE_WORKDAY: (COLOR_BLACK, COLOR_WHITE),
+        WorkerDay.TYPE_BUSINESS_TRIP: (COLOR_RED, COLOR_WHITE),
+        WorkerDay.TYPE_HOLIDAY: (COLOR_BLACK, COLOR_GREEN),
+        WorkerDay.TYPE_HOLIDAY_WORK: (COLOR_BLACK, COLOR_GREEN),
+        WorkerDay.TYPE_ABSENSE: (COLOR_BLACK, COLOR_YELLOW2),
+        WorkerDay.TYPE_REAL_ABSENCE: (COLOR_BLACK, COLOR_RED),
+        WorkerDay.TYPE_SICK: (COLOR_BLACK, COLOR_1),
+        WorkerDay.TYPE_VACATION: (COLOR_BLACK, COLOR_BLUE),
+        WorkerDay.TYPE_EXTRA_VACATION: (COLOR_RED, COLOR_BLUE),
+        WorkerDay.TYPE_TRAIN_VACATION: (COLOR_BLACK, COLOR_DARK_BLUE),
+        WorkerDay.TYPE_SELF_VACATION: (COLOR_BLACK, COLOR_BLUE2),
+        WorkerDay.TYPE_SELF_VACATION_TRUE: (COLOR_BLACK, COLOR_LITE_GREEN),
+        WorkerDay.TYPE_GOVERNMENT: (COLOR_BLACK, COLOR_PINK3),
+        WorkerDay.TYPE_MATERNITY: (COLOR_BLACK, COLOR_YELLOW3),
+        WorkerDay.TYPE_MATERNITY_CARE: (COLOR_BLACK, COLOR_PURPLE),
+        WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: (COLOR_BLACK, COLOR_GREEN2),
+        WorkerDay.TYPE_ETC: (COLOR_GREY, COLOR_GREY),
+        WorkerDay.TYPE_EMPTY: (COLOR_GREY, COLOR_GREY),
+        WorkerDay.TYPE_QUALIFICATION: (COLOR_GREY, COLOR_GREY),
 
         'night_work': (COLOR_BLACK, COLOR_PINK2),
 
     }
 
     WORKERDAY_TYPE_VALUE = {
-        WorkerDay.Type.TYPE_BUSINESS_TRIP.value: 'К',
-        WorkerDay.Type.TYPE_HOLIDAY.value: 'В',
-        WorkerDay.Type.TYPE_ABSENSE.value: 'Н',
-        WorkerDay.Type.TYPE_REAL_ABSENCE.value: 'ПР',
-        WorkerDay.Type.TYPE_QUALIFICATION.value: 'КВ',
-        WorkerDay.Type.TYPE_SICK.value: 'Б',
-        WorkerDay.Type.TYPE_VACATION.value: 'ОТ',
-        WorkerDay.Type.TYPE_EXTRA_VACATION.value: 'ОД',
-        WorkerDay.Type.TYPE_TRAIN_VACATION.value: 'У',
-        WorkerDay.Type.TYPE_SELF_VACATION.value: 'ДО',
-        WorkerDay.Type.TYPE_SELF_VACATION_TRUE.value: 'ОЗ',
-        WorkerDay.Type.TYPE_GOVERNMENT.value: 'Г',
-        # WorkerDay.Type.TYPE_MATERNITY.value: 'Р',
-        WorkerDay.Type.TYPE_MATERNITY.value: 'ОЖ',
-        WorkerDay.Type.TYPE_MATERNITY_CARE.value: 'Р',
-        WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value: 'ОВ',
-        WorkerDay.Type.TYPE_ETC.value: '',
-        WorkerDay.Type.TYPE_EMPTY.value: '',
+        WorkerDay.TYPE_BUSINESS_TRIP: 'К',
+        WorkerDay.TYPE_HOLIDAY: 'В',
+        WorkerDay.TYPE_ABSENSE: 'Н',
+        WorkerDay.TYPE_REAL_ABSENCE: 'ПР',
+        WorkerDay.TYPE_QUALIFICATION: 'КВ',
+        WorkerDay.TYPE_SICK: 'Б',
+        WorkerDay.TYPE_VACATION: 'ОТ',
+        WorkerDay.TYPE_EXTRA_VACATION: 'ОД',
+        WorkerDay.TYPE_TRAIN_VACATION: 'У',
+        WorkerDay.TYPE_SELF_VACATION: 'ДО',
+        WorkerDay.TYPE_SELF_VACATION_TRUE: 'ОЗ',
+        WorkerDay.TYPE_GOVERNMENT: 'Г',
+        # WorkerDay.TYPE_MATERNITY: 'Р',
+        WorkerDay.TYPE_MATERNITY: 'ОЖ',
+        WorkerDay.TYPE_MATERNITY_CARE: 'Р',
+        WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: 'ОВ',
+        WorkerDay.TYPE_ETC: '',
+        WorkerDay.TYPE_EMPTY: '',
     }
 
     WORKERDAY_TYPE_CHANGE2HOLIDAY = [
-        WorkerDay.Type.TYPE_MATERNITY.value,
-        WorkerDay.Type.TYPE_MATERNITY_CARE.value,
-        WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value
+        WorkerDay.TYPE_MATERNITY,
+        WorkerDay.TYPE_MATERNITY_CARE,
+        WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE
     ]
 
     def __init__(self, *args, **kwargs):
@@ -206,15 +206,15 @@ class Tabel_xlsx(Xlsx_base):
             return it_row
 
         seria_types = (
-            (WorkerDay.Type.TYPE_WORKDAY.value, '8', ' - явка'),
-            (WorkerDay.Type.TYPE_WORKDAY.value, '8_1', ' - явка с ночными часами'),
+            (WorkerDay.TYPE_WORKDAY, '8', ' - явка'),
+            (WorkerDay.TYPE_WORKDAY, '8_1', ' - явка с ночными часами'),
             ('night_work', '7', ' - явка с ночными часами'),
-            (WorkerDay.Type.TYPE_BUSINESS_TRIP.value, 'К', ' - командировка'),
-            (WorkerDay.Type.TYPE_HOLIDAY.value, 'В', ' - выходной день'),
-            (WorkerDay.Type.TYPE_HOLIDAY_WORK.value, 'В8', ' - работа в выходной день'),
-            (WorkerDay.Type.TYPE_ABSENSE.value, 'Н', ' - неявки до выяснения обстоятельств'),
-            (WorkerDay.Type.TYPE_REAL_ABSENCE.value, 'ПР', ' - прогул на основании акта'),
-            (WorkerDay.Type.TYPE_SICK.value, 'Б', ' - больничный лист (при '),
+            (WorkerDay.TYPE_BUSINESS_TRIP, 'К', ' - командировка'),
+            (WorkerDay.TYPE_HOLIDAY, 'В', ' - выходной день'),
+            (WorkerDay.TYPE_HOLIDAY_WORK, 'В8', ' - работа в выходной день'),
+            (WorkerDay.TYPE_ABSENSE, 'Н', ' - неявки до выяснения обстоятельств'),
+            (WorkerDay.TYPE_REAL_ABSENCE, 'ПР', ' - прогул на основании акта'),
+            (WorkerDay.TYPE_SICK, 'Б', ' - больничный лист (при '),
         )
 
         it_row = add_seria(seria_types, 8)
@@ -226,16 +226,16 @@ class Tabel_xlsx(Xlsx_base):
         # add second seria
 
         seria_types = (
-            (WorkerDay.Type.TYPE_VACATION.value, 'ОТ', ' - отпуск'),
-            (WorkerDay.Type.TYPE_EXTRA_VACATION.value, 'ОД', ' - доп. отпуск'),
-            (WorkerDay.Type.TYPE_TRAIN_VACATION.value, 'У', ' - учебный отпуск'),
-            (WorkerDay.Type.TYPE_SELF_VACATION.value, 'ДО', ' - отпуск за свой счет'),
-            (WorkerDay.Type.TYPE_SELF_VACATION_TRUE.value, 'ОЗ', ' - за свой счет по уважительной причине'),
-            (WorkerDay.Type.TYPE_GOVERNMENT.value, 'Г', ' - гос. обязанности'),
-            (WorkerDay.Type.TYPE_MATERNITY.value, 'Р', ' - б/л по беремености и родам'),
-            (WorkerDay.Type.TYPE_MATERNITY_CARE.value, 'ОЖ', ' - отпуск по уходу за ребенком до 3-х лет'),
+            (WorkerDay.TYPE_VACATION, 'ОТ', ' - отпуск'),
+            (WorkerDay.TYPE_EXTRA_VACATION, 'ОД', ' - доп. отпуск'),
+            (WorkerDay.TYPE_TRAIN_VACATION, 'У', ' - учебный отпуск'),
+            (WorkerDay.TYPE_SELF_VACATION, 'ДО', ' - отпуск за свой счет'),
+            (WorkerDay.TYPE_SELF_VACATION_TRUE, 'ОЗ', ' - за свой счет по уважительной причине'),
+            (WorkerDay.TYPE_GOVERNMENT, 'Г', ' - гос. обязанности'),
+            (WorkerDay.TYPE_MATERNITY, 'Р', ' - б/л по беремености и родам'),
+            (WorkerDay.TYPE_MATERNITY_CARE, 'ОЖ', ' - отпуск по уходу за ребенком до 3-х лет'),
 
-            (WorkerDay.Type.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE.value, 'ОВ', ' - выходние дни по уходу'),
+            (WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE, 'ОВ', ' - выходние дни по уходу'),
         )
         it_row = add_seria(seria_types, 20)
         self.worksheet.write_string(2 + it_row, 21, 'за детьми ивалидами,  дополнительный выходной доноров', day_text)
@@ -322,7 +322,7 @@ class Tabel_xlsx(Xlsx_base):
 
                 if (it < n_workdays) and (workdays[it].employment_id == employment.id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
-                    if wd.type == WorkerDay.Type.TYPE_WORKDAY.value:
+                    if wd.type == WorkerDay.TYPE_WORKDAY:
                         total_h, night_h = self._count_time(wd.dttm_work_start.time(), wd.dttm_work_end.time(), (0, 0), triplets)
                         if night_h == 'all':  # night_work
                             wd.type = 'night_work'
@@ -331,13 +331,13 @@ class Tabel_xlsx(Xlsx_base):
                         else:
                             text = str(total_h)
 
-                    elif wd.type == WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
+                    elif wd.type == WorkerDay.TYPE_HOLIDAY_WORK:
                         total_h = ceil(self._time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), triplets))
                         text = 'В{}'.format(total_h)
 
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
                             and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
-                        wd.type = WorkerDay.Type.TYPE_HOLIDAY.value
+                        wd.type = WorkerDay.TYPE_HOLIDAY
                         text = self.WORKERDAY_TYPE_VALUE[wd.type]
 
                     else:
@@ -679,7 +679,7 @@ class Tabel_xlsx(Xlsx_base):
         actual_hours = {}
 
         def from_workday_to_holiday(wd):
-            wd.type = WorkerDay.Type.TYPE_HOLIDAY.value
+            wd.type = WorkerDay.TYPE_HOLIDAY
             wd.dttm_work_start = None
             wd.dttm_work_end = None
 
@@ -721,7 +721,7 @@ class Tabel_xlsx(Xlsx_base):
                     if days_to_change == 1 and diff_days != int(diff_days):
                         for j in range(i, worker_workdays_len):
                             worker_day = workdays[worker_id][j]
-                            if worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value:
+                            if worker_day.type == WorkerDay.TYPE_WORKDAY:
                                 wd_duration = (worker_day.dttm_work_end - worker_day.dttm_work_start).total_seconds() / 60
                                 no_breaks_duration = concat_breaks(wd_duration)
                                 new_duration = no_breaks_duration * (1 - diff_days + int(diff_days))
@@ -732,7 +732,7 @@ class Tabel_xlsx(Xlsx_base):
                                 days_to_change -= 1
                                 break
                             if j == worker_workdays_len - 1:
-                                worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
+                                worker_day.type = WorkerDay.TYPE_WORKDAY
                                 worker_day.dttm_work_start = workdays[worker_id][j - 1].dttm_work_start
                                 wd_duration = 540
                                 no_breaks_duration = concat_breaks(wd_duration)
@@ -745,12 +745,12 @@ class Tabel_xlsx(Xlsx_base):
                     if days_to_change == 0:
                         break
                     if i % each == 0:
-                        if workdays[worker_id][i].type == WorkerDay.Type.TYPE_WORKDAY.value:
+                        if workdays[worker_id][i].type == WorkerDay.TYPE_WORKDAY:
                             from_workday_to_holiday(workdays[worker_id][i])
                             days_to_change -= 1
                         else:
                             for j in range(i, worker_workdays_len - days_to_change):
-                                if workdays[worker_id][j].type == WorkerDay.Type.TYPE_WORKDAY.value:
+                                if workdays[worker_id][j].type == WorkerDay.TYPE_WORKDAY:
                                     from_workday_to_holiday(workdays[worker_id][j])
                                     days_to_change -= 1
                                     break
