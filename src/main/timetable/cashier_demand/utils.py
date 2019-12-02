@@ -15,7 +15,6 @@ from src.db.models import (
     ProductionMonth,
     Shop,
 )
-from src.util.collection import group_by
 from src.util.models_converter import BaseConverter
 from src.main.urv.utils import wd_stat_count_total, wd_stat_count
 

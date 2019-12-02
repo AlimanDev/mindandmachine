@@ -24,7 +24,6 @@ from src.db.models import (
     UserWeekdaySlot,
     ProductionDay,
 )
-from src.util.collection import group_by
 from src.util.models_converter import (
     TimetableConverter,
     WorkTypeConverter,
@@ -384,11 +383,13 @@ def create_timetable(request, form):
     
     # проверки для фиксированных чуваков
     # Возможности сотрудников
-    availabilities = group_by(
-        collection=UserWeekdaySlot.objects.select_related('worker').filter(
-            employment__shop_id=shop_id),
-        group_key=lambda x: x.worker_id
-    )
+    availabilities = {}
+    for user_weekday_slot in list(UserWeekdaySlot.objects.select_related('worker').filter(
+            employment__shop_id=shop_id)):
+        key = user_weekday_slot.worker_id
+        if key not in availabilities:
+            availabilities[key] = []
+        availabilities[key].append(user_weekday_slot)
     for employment in employments:
         user_id = employment.user_id
         user = user_dict[user_id]
@@ -507,11 +508,13 @@ def create_timetable(request, form):
     ########### Группируем ###########
 
     # Ограничения сотрудников
-    constraints = group_by(
-        collection=WorkerConstraint.objects.select_related('worker').filter(
-            employment__shop_id=shop_id),
-        group_key=lambda x: x.worker_id
-    )
+    constraints = {}
+    for worker_constraint in list(WorkerConstraint.objects.select_related('worker').filter(
+            employment__shop_id=shop_id)):
+        key = worker_constraint.worker_id
+        if key not in constraints:
+            constraints[key] = []
+        constraints[key].append(worker_constraint)
     work_types = {
         x.id: dict(WorkTypeConverter.convert(x),slots=[])  for x in WorkType.objects.filter(
             dttm_deleted__isnull=True,
@@ -528,22 +531,29 @@ def create_timetable(request, form):
 
     # Информация по кассам для каждого сотрудника
     need_work_types = WorkType.objects.filter(shop_id=shop_id).values_list('id', flat=True)
-    worker_cashbox_info = group_by(
-        collection=WorkerCashboxInfo.objects.filter(work_type_id__in=need_work_types, is_active=True),
-        group_key=lambda x: x.worker.user_id
-    )
+    worker_cashbox_info = {}
+    for worker_cashbox_inf in list(WorkerCashboxInfo.objects.select_related('worker').filter(work_type_id__in=need_work_types, is_active=True)):
+        key = worker_cashbox_inf.worker.user_id
+        if key not in worker_cashbox_info:
+            worker_cashbox_info[key] = []
+        worker_cashbox_info[key].append(worker_cashbox_inf)
 
     # Уже составленное расписание
-    worker_day = group_by(
-        collection=new_worker_days,
-        group_key=lambda x: x.worker_id
-    )
+    worker_day = {}
+    for worker_d in new_worker_days:
+        key = worker_d.worker_id
+        if key not in worker_day:
+            worker_day[key] = []
+        worker_day[key].append(worker_d)
 
     # Расписание за прошлую неделю от даты составления
-    prev_data = group_by(
-        collection=prev_worker_days,
-        group_key=lambda x: x.worker_id
-    )
+    prev_data = {}
+    for worker_d in prev_worker_days:
+        key = worker_d.worker_id
+        if key not in prev_data:
+            prev_data[key] = []
+        prev_data[key].append(worker_d)
+    
     employment_stat_dict = count_difference_of_normal_days(dt_end=dt_from, employments=employments)
 
 

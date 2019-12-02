@@ -18,7 +18,6 @@ from src.util.forms import FormUtil
 from .forms import GetCashboxesInfo, GetCashiersInfo, ChangeCashierStatus
 from django.utils.timezone import now
 from src.util.models_converter import WorkerCashboxInfoConverter
-from src.util.collection import group_by
 
 
 @api_method('GET', GetCashboxesInfo)

@@ -4,7 +4,6 @@ from src.db.models import (
     ProductionDay,
     WorkerDay,
 )
-from src.util.collection import group_by
 from .colors import *
 import datetime
 import json

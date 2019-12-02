@@ -27,7 +27,6 @@ from src.db.models import (
 
 from src.main.other.notification.utils import send_notification
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify
-from src.util.collection import group_by
 from src.util.forms import FormUtil
 from src.util.models_converter import (
     EmploymentConverter,
