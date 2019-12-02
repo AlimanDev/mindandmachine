@@ -118,7 +118,7 @@ def get_indicators(request, form):
         dt__gte=from_dt,
         dt__lte=to_dt,
         employment__shop_id=form['shop_id'],
-        type=WorkerDay.Type.TYPE_WORKDAY.value
+        type=WorkerDay.TYPE_WORKDAY
     )
     if len(worker_ids):
         worker_days = worker_days.filter(

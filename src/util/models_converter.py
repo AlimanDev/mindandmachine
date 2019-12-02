@@ -82,41 +82,18 @@ class UserConverter(BaseConverter):
 
 
 class WorkerDayConverter(BaseConverter):
-    __WORKER_DAY_TYPE = {
-        WorkerDay.Type.TYPE_HOLIDAY.value: 'H',
-        WorkerDay.Type.TYPE_WORKDAY.value: 'W',
-        WorkerDay.Type.TYPE_VACATION.value: 'V',
-        WorkerDay.Type.TYPE_SICK.value: 'S',
-        WorkerDay.Type.TYPE_QUALIFICATION.value: 'Q',
-        WorkerDay.Type.TYPE_ABSENSE.value: 'A',
-        WorkerDay.Type.TYPE_MATERNITY.value: 'M',
-        WorkerDay.Type.TYPE_BUSINESS_TRIP.value: 'T',
-        WorkerDay.Type.TYPE_ETC.value: 'O',
-        WorkerDay.Type.TYPE_DELETED.value: 'D',
-        WorkerDay.Type.TYPE_EMPTY.value: 'E',
-    }
-
-    __WORKER_DAY_TYPE_REVERSED = {v: k for k, v in __WORKER_DAY_TYPE.items()}
-
-    @classmethod
-    def convert_type(cls, obj_type):
-        return cls.__WORKER_DAY_TYPE.get(obj_type, '')
-
-    @classmethod
-    def parse_type(cls, obj_type):
-        return cls.__WORKER_DAY_TYPE_REVERSED.get(obj_type)
 
     @classmethod
     def convert(cls, obj):
         def __work_tm(__field):
-            return cls.convert_time(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+            return cls.convert_time(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
 
         data = {
             'id': obj.id,
             'dttm_added': cls.convert_datetime(obj.dttm_added),
             'dt': cls.convert_date(obj.dt),
             'worker': obj.worker_id,
-            'type': cls.convert_type(obj.type),
+            'type': obj.type,
             'dttm_work_start': __work_tm(obj.dttm_work_start),
             'dttm_work_end': __work_tm(obj.dttm_work_end),
             'work_types': [w.id for w in obj.work_types.all()] if obj.id else [],
@@ -135,11 +112,11 @@ class WorkerDayChangeLogConverter(BaseConverter):
     @classmethod
     def convert(cls, obj):
         def __work_tm(__field):
-            return cls.convert_time(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+            return cls.convert_time(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
 
         def __parent_work_tm(__tm):
             return cls.convert_time(__tm) if\
-                obj.parent_worker_day and obj.parent_worker_day.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+                obj.parent_worker_day and obj.parent_worker_day.type == WorkerDay.TYPE_WORKDAY else None
 
         parent = obj.parent_worker_day
         res = {}
@@ -152,14 +129,14 @@ class WorkerDayChangeLogConverter(BaseConverter):
                 'comment': obj.comment,
                 'to_tm_work_start': __work_tm(obj.dttm_work_start),
                 'to_tm_work_end': __work_tm(obj.dttm_work_end),
-                'to_type': WorkerDayConverter.convert_type(obj.type),
+                'to_type': obj.type,
             }
             if parent:
                 res['from_tm_work_start'] = __parent_work_tm(parent.dttm_work_start)
                 res['from_tm_work_end'] = __parent_work_tm(parent.dttm_work_end)
-                res['from_type'] = WorkerDayConverter.convert_type(parent.type)
+                res['from_type'] = parent.type
             else:
-                res['from_type'] = WorkerDayConverter.convert_type(WorkerDay.Type.TYPE_EMPTY.value)
+                res['from_type'] = WorkerDay.TYPE_EMPTY
 
         return res
 
@@ -168,13 +145,13 @@ class WorkerDayChangeRequestConverter(BaseConverter):
     @classmethod
     def convert(cls, obj):
         def __work_tm(__field):
-            return cls.convert_time(__field) if obj.type == WorkerDay.Type.TYPE_WORKDAY.value else None
+            return cls.convert_time(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
 
         return {
             'id': obj.id,
             'dttm_added': cls.convert_datetime(obj.dttm_added),
             'worker_day': obj.worker_day_id,
-            'type': WorkerDayConverter.convert_type(obj.type),
+            'type': obj.type,
             'dttm_work_start': __work_tm(obj.dttm_work_start),
             'dttm_work_end': __work_tm(obj.dttm_work_end),
         }
@@ -335,29 +312,14 @@ class ShopConverter(BaseConverter):
 
 
 class TimetableConverter(BaseConverter):
-    __STATUSES = {
-        Timetable.Status.READY.value: 'R',
-        Timetable.Status.PROCESSING.value: 'P',
-        Timetable.Status.ERROR.value: 'E'
-    }
-
-    __STATUSES_REVERSED = {v: k for k, v in __STATUSES.items()}
-
-    @classmethod
-    def convert_status(cls, status_obj):
-        return cls.__STATUSES.get(status_obj, '')
-
-    @classmethod
-    def parse_status(cls, status_obj):
-        return cls.__STATUSES_REVERSED.get(status_obj)
-
+    
     @classmethod
     def convert(cls, obj):
         return {
             'id': obj.id,
             'shop': obj.shop_id,
             'dt': cls.convert_date(obj.dt),
-            'status': cls.convert_status(obj.status),
+            'status': obj.status,
             'dttm_status_change': cls.convert_datetime(obj.dttm_status_change)
         }
 

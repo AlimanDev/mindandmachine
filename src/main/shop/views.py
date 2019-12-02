@@ -294,7 +294,7 @@ def get_department_stats(request, form):
     successful_tts = Timetable.objects.select_related('shop').filter(
         dt=dt_now + relativedelta(months=1),
         shop_id__in=shop_ids,
-        status=Timetable.Status.READY.value,
+        status=Timetable.READY,
     ).count()
 
     fot_revenue_stats = []

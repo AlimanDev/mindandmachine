@@ -80,9 +80,9 @@ def get_status_and_details(worker_id, dttm):
             day_detail = None
 
     if day_detail is None:
-        if worker_day.type == WorkerDay.Type.TYPE_ABSENSE:
+        if worker_day.type == WorkerDay.TYPE_ABSENSE:
             status = WorkerDayCashboxDetails.TYPE_ABSENCE
-        elif worker_day.type == WorkerDay.Type.TYPE_WORKDAY and \
+        elif worker_day.type == WorkerDay.TYPE_WORKDAY and \
                 (dt.datetime.combine(worker_day.dt, worker_day.tm_work_start) < dttm):
             status = WorkerDayCashboxDetails.TYPE_SOON
         else:

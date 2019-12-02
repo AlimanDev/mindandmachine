@@ -239,7 +239,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
         dt__lte=to_dt,
         employment__in=employments,
         # employment__shop_id=shop_id,
-        type=WorkerDay.Type.TYPE_WORKDAY.value
+        type=WorkerDay.TYPE_WORKDAY
     )
 
     hours_stat = wd_stat_count(worker_days, shop)
@@ -310,7 +310,6 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
     need_cashier_amount = np.maximum(days_diff[np.argsort(days_diff)[-1:]], 0).sum() # todo: redo with logic
 
     revenue = 1000000
-
 
     response.update({
         'indicators': {

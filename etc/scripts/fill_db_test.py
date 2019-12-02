@@ -43,7 +43,7 @@ def create_shop(shop_id):
 
 def create_timetable(shop_id, dttm):
     tt = Timetable.objects.create(
-        status=Timetable.Status.READY.value,
+        status=Timetable.READY,
         shop_id=shop_id,
         dt=dttm.date(),
         dttm_status_change=dttm,
@@ -258,12 +258,12 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             if dttm_work_start and dttm_work_end and (dttm_work_end < dttm_work_start):
                 dttm_work_end += timezone.timedelta(days=1)
 
-            if WorkerDayConverter.parse_type(wd['type']) == WorkerDay.Type.TYPE_WORKDAY.value:
+            if wd['type'] == WorkerDay.TYPE_WORKDAY:
                 wd_model = WorkerDay.objects.create(
                     worker=worker,
                     employment=employment,
                     dt=dt,
-                    type=WorkerDay.Type.TYPE_WORKDAY.value,
+                    type=WorkerDay.TYPE_WORKDAY,
                     shop=shop,
                     dttm_work_start=dttm_work_start,
                     dttm_work_end=dttm_work_end,
@@ -272,7 +272,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     wd_model.parent_worker_day = WorkerDay.objects.create(
                         worker=worker,
                         dt=dt,
-                        type=WorkerDay.Type.TYPE_HOLIDAY.value,
+                        type=WorkerDay.TYPE_HOLIDAY,
                         employment=employment,
                         dttm_work_start=None,
                         dttm_work_end=None,
@@ -324,12 +324,12 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     worker=worker,
                     employment=employment,
                     dt=dt,
-                    type=WorkerDayConverter.parse_type(wd['type']),
+                    type=wd['type'],
                     shop=shop,
-                    dttm_work_start=None if WorkerDayConverter.parse_type(wd['type']) ==
-                                            WorkerDay.Type.TYPE_HOLIDAY.value else dttm_work_start,
-                    dttm_work_end=None if WorkerDayConverter.parse_type(wd['type']) ==
-                                          WorkerDay.Type.TYPE_HOLIDAY.value else dttm_work_end,
+                    dttm_work_start=None if wd['type'] ==
+                                            WorkerDay.TYPE_HOLIDAY else dttm_work_start,
+                    dttm_work_end=None if wd['type'] ==
+                                          WorkerDay.TYPE_HOLIDAY else dttm_work_end,
                 ))
             day += 1
             day_ind = (day_ind + 1) % wds.shape[0]

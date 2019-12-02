@@ -309,7 +309,7 @@ def create_timetable(request, form):
         tt = Timetable.objects.create(
             shop_id=shop_id,
             dt=dt_first,
-            status=Timetable.Status.PROCESSING.value,
+            status=Timetable.PROCESSING,
             dttm_status_change=datetime.now()
         )
     except:
@@ -343,7 +343,7 @@ def create_timetable(request, form):
         if not worker_cashbox_info.exists():
             users_without_spec.append(employment.user.first_name + ' ' + employment.user.last_name)
     if users_without_spec:
-        tt.status = Timetable.Status.ERROR.value
+        tt.status = Timetable.ERROR
         status_message = 'Не проставлены типы работ у пользователей: {}.'.format(', '.join(users_without_spec))
         tt.delete()
         return JsonResponse.value_error(status_message)
@@ -433,7 +433,7 @@ def create_timetable(request, form):
         dt__gte=dt_from,
         dt__lt=dt_to,
     ).exclude(
-        type=WorkerDay.Type.TYPE_EMPTY.value
+        type=WorkerDay.TYPE_EMPTY
     ).order_by(
         'dt'
     ).values(
@@ -454,7 +454,7 @@ def create_timetable(request, form):
         dt__gte=dt_from - timedelta(days=7),
         dt__lte=dt_from,
     ).exclude(
-        type=WorkerDay.Type.TYPE_EMPTY.value
+        type=WorkerDay.TYPE_EMPTY
     ).order_by(
         'dt'
     ).values(
@@ -552,7 +552,7 @@ def create_timetable(request, form):
     ##################################################################
 
     # если стоит флаг shop.paired_weekday, смотрим по юзерам, нужны ли им в этом месяце выходные в выходные
-    resting_states_list = [WorkerDay.Type.TYPE_HOLIDAY.value]
+    resting_states_list = [WorkerDay.TYPE_HOLIDAY]
     if shop.paired_weekday:
         for employment in employments:
             coupled_weekdays = 0
@@ -585,7 +585,7 @@ def create_timetable(request, form):
                     continue
                 else:
                     workers_month_days_new.append(WorkerDay(
-                            type=WorkerDay.Type.TYPE_HOLIDAY.value,
+                            type=WorkerDay.TYPE_HOLIDAY,
                             dt=dt,
                             worker_id=employment.user_id,
                         )
@@ -606,7 +606,7 @@ def create_timetable(request, form):
                     wd_index += 1
                 else:
                     workers_month_days_new.append(WorkerDay(
-                        type=WorkerDay.Type.TYPE_HOLIDAY.value,
+                        type=WorkerDay.TYPE_HOLIDAY,
                         dt=dt,
                         worker_id=employment.user_id,
                     ))
@@ -698,11 +698,13 @@ def create_timetable(request, form):
 
         tt.task_id = res.get('task_id', '')
         if tt.task_id is None:
-            tt.status = Timetable.Status.ERROR.value
+            tt.status = Timetable.ERROR
             tt.save()
     except Exception as e:
+
         print(e.with_traceback())
-        tt.status = Timetable.Status.ERROR.value
+        tt.status = Timetable.ERROR
+
         tt.status_message = str(e)
         tt.save()
         return JsonResponse.internal_error('Error sending data to server')
@@ -738,7 +740,7 @@ def delete_timetable(request, form):
 
     tts = Timetable.objects.filter(shop_id=shop_id, dt=dt_first)
     for tt in tts:
-        if (tt.status == Timetable.Status.PROCESSING.value) and (not tt.task_id is None):
+        if (tt.status == Timetable.PROCESSING) and (not tt.task_id is None):
             try:
                 requests.post(
                     'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
@@ -757,7 +759,7 @@ def delete_timetable(request, form):
         is_vacancy=False,
     ).filter(
         Q(worker_day__created_by__isnull=True) |
-        Q(worker_day__type=WorkerDay.Type.TYPE_EMPTY.value)
+        Q(worker_day__type=WorkerDay.TYPE_EMPTY)
     ).update(
         dttm_deleted=timezone.now()
     )
@@ -781,11 +783,12 @@ def delete_timetable(request, form):
     ).filter(
         created_by__isnull=True,
     ).exclude(
-        type=WorkerDay.Type.TYPE_EMPTY.value
+        type=WorkerDay.TYPE_EMPTY
     )
     wds = [WorkerDay(
-        type=WorkerDay.Type.TYPE_EMPTY.value,
+        type=WorkerDay.TYPE_EMPTY,
         dt = wd.dt,
+        shop_id=shop_id,
         parent_worker_day=wd,
         worker_id=wd.worker_id,
     ) for wd in wdays]
@@ -838,10 +841,10 @@ def set_timetable(request, form):
 
     shop = request.shop
 
-    timetable.status = TimetableConverter.parse_status(data['timetable_status'])
+    timetable.status = data['timetable_status']
     timetable.status_message = data.get('status_message', False)
     timetable.save()
-    if timetable.status != Timetable.Status.READY.value and timetable.status_message:
+    if timetable.status != Timetable.READY and timetable.status_message:
         return JsonResponse.success(timetable.status_message)
 
     if data['users']:
@@ -864,7 +867,7 @@ def set_timetable(request, form):
                     worker_id=uid,
                     shop=shop,
                     employment=employments[uid],
-                    type=WorkerDayConverter.parse_type(wd['type'])
+                    type=wd['type']
                 )
 
                 parent_wd_obj = WorkerDay.objects.filter(
@@ -875,7 +878,7 @@ def set_timetable(request, form):
                 ).first()
 
                 if parent_wd_obj:
-                    if parent_wd_obj.type != WorkerDay.Type.TYPE_EMPTY.value:
+                    if parent_wd_obj.type != WorkerDay.TYPE_EMPTY:
                         continue
                     wd_obj.parent_worker_day = parent_wd_obj
 

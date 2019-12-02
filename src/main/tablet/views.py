@@ -400,7 +400,7 @@ def change_cashier_status(request, form):
         return JsonResponse.value_error('cashbox already opened')
 
     # todo: add other checks for change statuses
-    if (new_user_status == WorkerDayCashboxDetails.TYPE_FINISH) and (worker_day.type == WorkerDay.Type.TYPE_ABSENSE):
+    if (new_user_status == WorkerDayCashboxDetails.TYPE_FINISH) and (worker_day.type == WorkerDay.TYPE_ABSENSE):
         return JsonResponse.value_error('can not change the status to {}'.format(new_user_status))
 
     if new_user_status == WorkerDayCashboxDetails.TYPE_SOON:
@@ -416,7 +416,7 @@ def change_cashier_status(request, form):
         workerday_detail_obj.save()
 
     if new_user_status == WorkerDayCashboxDetails.TYPE_ABSENCE:
-        worker_day.type = WorkerDay.Type.TYPE_ABSENSE.value
+        worker_day.type = WorkerDay.TYPE_ABSENSE
         worker_day.save()
 
     elif new_user_status == WorkerDayCashboxDetails.TYPE_FINISH:
@@ -439,8 +439,8 @@ def change_cashier_status(request, form):
             is_tablet=True,
         )
 
-        if (new_user_status == WorkerDayCashboxDetails.TYPE_WORK) and (worker_day.type != WorkerDay.Type.TYPE_WORKDAY.value):
-            worker_day.type = WorkerDay.Type.TYPE_WORKDAY.value
+        if (new_user_status == WorkerDayCashboxDetails.TYPE_WORK) and (worker_day.type != WorkerDay.TYPE_WORKDAY):
+            worker_day.type = WorkerDay.TYPE_WORKDAY
             worker_day.dttm_work_start = dttm_now
             worker_day.dttm_work_end = dttm_work_end
             worker_day.save()

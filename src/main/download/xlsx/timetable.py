@@ -134,7 +134,8 @@ class Timetable_xlsx(Tabel_xlsx):
             for day in range(len(self.prod_days)):
                 if (it < n_workdays) and (workdays[it].worker_id == employment.user_id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
-                    if wd.type == WorkerDay.Type.TYPE_WORKDAY.value:
+
+                    if wd.type == WorkerDay.TYPE_WORKDAY:
                         total_h, night_h = self._count_time(
                             wd.dttm_work_start.time(), wd.dttm_work_end.time(), (0, 0), triplets)
                         if night_h == 'all':  # night_work
@@ -146,13 +147,13 @@ class Timetable_xlsx(Tabel_xlsx):
                             text = '{}-\n{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
                                                     wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
 
-                    elif wd.type == WorkerDay.Type.TYPE_HOLIDAY_WORK.value:
+                    elif wd.type == WorkerDay.TYPE_HOLIDAY_WORK:
                         total_h = ceil(self._time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), triplets))
                         text = 'В{}'.format(total_h)
 
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
                             and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
-                        wd.type = WorkerDay.Type.TYPE_HOLIDAY.value
+                        wd.type = WorkerDay.TYPE_HOLIDAY
                         text = self.WORKERDAY_TYPE_VALUE[wd.type]
 
                     else:
@@ -188,8 +189,8 @@ class Timetable_xlsx(Tabel_xlsx):
             format_text = self.workbook.add_format(fmt(font_size=12, border=1, bold=True))
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 1,
-                str(sum(1 for x in worker_days.values() if x.type in [WorkerDay.Type.TYPE_WORKDAY.value,
-                                                                     WorkerDay.Type.TYPE_HOLIDAY_WORK.value])),
+                str(sum(1 for x in worker_days.values() if x.type in [WorkerDay.TYPE_WORKDAY,
+                                                                     WorkerDay.TYPE_HOLIDAY_WORK])),
                 format_text
             )
 
@@ -207,13 +208,13 @@ class Timetable_xlsx(Tabel_xlsx):
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 4,
-                str(sum(1 for x in worker_days.values() if x.type == WorkerDay.Type.TYPE_HOLIDAY.value)),
+                str(sum(1 for x in worker_days.values() if x.type == WorkerDay.TYPE_HOLIDAY)),
                 format_text
             )
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 5,
-                str(sum(1 for x in worker_days.values() if x.type == WorkerDay.Type.TYPE_VACATION.value)),
+                str(sum(1 for x in worker_days.values() if x.type == WorkerDay.TYPE_VACATION)),
                 format_text
             )
 
@@ -274,7 +275,7 @@ class Timetable_xlsx(Tabel_xlsx):
                         work_end.append(Cell('', format_common if xdt.weekday() != 6 else format_common_bottom))
                         continue
 
-                    if wd.type == WorkerDay.Type.TYPE_WORKDAY.value:
+                    if wd.type == WorkerDay.TYPE_WORKDAY:
                         work_begin.append(
                             Cell(wd.dttm_work_start.time(), format_time if xdt.weekday() != 6 else format_time_bottom))
                         work_end.append(
@@ -282,9 +283,9 @@ class Timetable_xlsx(Tabel_xlsx):
                         continue
 
                     mapping = {
-                        WorkerDay.Type.TYPE_HOLIDAY.value: 'В',
-                        WorkerDay.Type.TYPE_VACATION.value: 'ОТ',
-                        WorkerDay.Type.TYPE_MATERNITY.value: 'ОЖ'
+                        WorkerDay.TYPE_HOLIDAY: 'В',
+                        WorkerDay.TYPE_VACATION: 'ОТ',
+                        WorkerDay.TYPE_MATERNITY: 'ОЖ'
                     }
 
                     text = mapping.get(wd.type)

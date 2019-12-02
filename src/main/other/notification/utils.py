@@ -8,10 +8,10 @@ from src.db.models import (
 )
 
 work_types = {
-    WorkerDay.Type.TYPE_WORKDAY.value: 'рабочий день',
-    WorkerDay.Type.TYPE_ABSENSE.value: 'отсутствие',
-    WorkerDay.Type.TYPE_HOLIDAY.value: 'выходной',
-    WorkerDay.Type.TYPE_VACATION.value: 'отпуск',
+    WorkerDay.TYPE_WORKDAY: 'рабочий день',
+    WorkerDay.TYPE_ABSENSE: 'отсутствие',
+    WorkerDay.TYPE_HOLIDAY: 'выходной',
+    WorkerDay.TYPE_VACATION: 'отпуск',
 }
 
 
@@ -58,18 +58,18 @@ def create_notification(action, instance, requester=None):
     #     elif isinstance(instance, WorkType):
     #         notification_text = 'Был добавлен тип работ {}.'.format(instance.name)
     #     elif isinstance(instance, Timetable):
-    #         if instance.status == Timetable.Status.PROCESSING.value:
+    #         if instance.status == Timetable.PROCESSING:
     #             notification_text = 'Расписание на ' + get_month_name(instance.dt) + ' начало составляться.'
-    #         elif instance.status == Timetable.Status.READY.value:
+    #         elif instance.status == Timetable.READY:
     #             notification_text = 'Расписание на ' + get_month_name(instance.dt) + ' составлено.'
     #             notification_type = Notifications.TYPE_SUCCESS
-    #         elif instance.status == Timetable.Status.ERROR.value:
+    #         elif instance.status == Timetable.ERROR:
     #             notification_text = 'Ошибка при составлении расписания на ' + get_month_name(instance.dt) + '.'
     #             notification_type = Notifications.TYPE_ERROR
     #
     #     elif isinstance(instance, WorkerDayChangeRequest):
     #         change_request_info = ''
-    #         if instance.type == WorkerDay.Type.TYPE_WORKDAY.value:
+    #         if instance.type == WorkerDay.TYPE_WORKDAY:
     #             change_request_info = ' с {} по {}'.format(
     #                 instance.dttm_work_start.strftime('%H:%M'),
     #                 instance.dttm_work_end.strftime('%H:%M')
