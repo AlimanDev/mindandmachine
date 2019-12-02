@@ -74,16 +74,17 @@ def get_workers_to_exchange(request, form):
     }
 
     workers = search_candidates(worker_day, **search_params)  # fixme: may return tooooo much users
-    workers = workers.annotate(
-        parent_title=F('shop__parent__title'),
-        shop_title=F('shop__title')
-    )  # fixme: delete this -- specially for current front
+    # workers = workers.prefetch_related('employments')
+    # workers = workers.annotate(
+    #     parent_title=F('shop__parent__title'),
+    #     shop_title=F('shop__title')
+    # )  # fixme: delete this -- specially for current front
 
     users = {}
     for worker in workers:
         worker_info = UserConverter.convert_main(worker)
-        worker_info['shop_title'] = worker.shop_title
-        worker_info['supershop_title'] = worker.parent_title
+        # worker_info['shop_title'] = list(worker.employments.all().values_list('shop__title', flat=True))
+        # worker_info['supershop_title'] = worker.parent_title
         users[worker.id] = {'info': worker_info, 'timetable': []}
 
     change_dt = form['dttm_start'].date()

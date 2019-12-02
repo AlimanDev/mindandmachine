@@ -130,17 +130,20 @@ class DublicateCashierTimetableForm(forms.Form):
 
 class GetCashierInfoForm(forms.Form):
     worker_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     info = util_forms.MultipleChoiceField(['general_info', 'work_type_info', 'constraints_info', 'work_hours'])
 
 
 class GetWorkerDayForm(forms.Form):
     worker_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     dt = util_forms.DateField()
     checkpoint = forms.IntegerField(required=False)
 
 
 class SetWorkerDaysForm(forms.Form):
     worker_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     dt_begin = util_forms.DateField()
     dt_end = util_forms.DateField()
     type = forms.CharField()
@@ -178,6 +181,7 @@ class SetWorkerDaysForm(forms.Form):
 
 class SetWorkerDayForm(forms.Form):
     worker_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     dt = util_forms.DateField()
     dt_to = util_forms.DateField(required=False)
     type = forms.CharField()
@@ -208,6 +212,7 @@ class SetWorkerDayForm(forms.Form):
 
 class SetWorkerRestrictionsForm(forms.Form):
     worker_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     worker_sex = forms.CharField(required=False)
     work_type_info = forms.CharField(required=False)
     constraints = forms.CharField(required=False)
@@ -281,17 +286,20 @@ class CreateCashierForm(forms.Form):
 
 class DeleteCashierForm(forms.Form):
     user_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     dt_fired = util_forms.DateField()
 
 
 class PasswordChangeForm(forms.Form):
     user_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     old_password = forms.CharField(max_length=128, required=False)
     new_password = forms.CharField(max_length=128)
 
 
 class ChangeCashierInfo(forms.Form):
     user_id = forms.IntegerField()
+    shop_id = forms.IntegerField()
     password = forms.CharField()
     first_name = forms.CharField(max_length=30, required=False)
     middle_name = forms.CharField(max_length=64, required=False)
@@ -319,6 +327,7 @@ class DeleteWorkerDayChangeLogsForm(forms.Form):
 
 
 class GetWorkerChangeRequestsForm(forms.Form):
+    shop_id = forms.IntegerField()
     dt = util_forms.DateField()
     worker_id = forms.IntegerField()
 

@@ -4,7 +4,6 @@ import json
 from src.db.models import (
     WorkType,
     Cashbox,
-    User,
     Shop,
     OperationType,
     Slot,
@@ -27,7 +26,6 @@ from .forms import (
     EditWorkTypeForm,
     DeleteWorkTypeForm,
     CashboxesOpenTime,
-    CashboxesUsedResource,
 )
 
 from src.main.tablet.utils import time_diff
@@ -56,7 +54,7 @@ def get_types(request, form):
             },...
         ]
     """
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
 
     types = WorkType.objects.filter(
         shop_id=shop_id,
@@ -104,8 +102,7 @@ def get_cashboxes(request, form):
             ]
         }
     """
-
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     dt_from = FormUtil.get_dt_from(form)
     dt_to = FormUtil.get_dt_to(form)
     work_type_ids = form['work_type_ids']
@@ -229,7 +226,7 @@ def delete_cashbox(request, form):
     Note:
         Отправляет уведомление об удаленной кассе
     """
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
 
     try:
         cashbox = Cashbox.objects.select_related(
@@ -351,7 +348,7 @@ def create_work_type(request, form):
     Raises:
         JsonResponse.already_exists_error: если тип касс с таким именем уже существует
     """
-    shop_id = FormUtil.get_shop_id(request, form)
+    shop_id = form['shop_id']
     name = form['name']
 
     if WorkType.objects.filter(name=name, shop_id=shop_id, dttm_deleted__isnull=True).count() > 0:
@@ -520,3 +517,4 @@ def edit_work_type(request, form):
             )
         ]
     })
+

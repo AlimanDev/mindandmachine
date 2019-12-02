@@ -4,6 +4,7 @@ from django.apps import apps
 import json
 
 from src.db.models import (
+    Employment,
     Shop,
     User,
     WorkerDay,
@@ -58,22 +59,21 @@ def get_tabel(request, workbook, form):
         prod_days=None
     )
 
-
     from_dt = tabel.prod_days[0].dt
     to_dt = tabel.prod_days[-1].dt
 
-    users = list(User.objects.qos_filter_active(
+    employments = Employment.objects.get_active(
         dt_from=from_dt,
         dt_to=to_dt,
         shop=shop,
-    ).select_related('position').order_by('position_id', 'last_name', 'first_name', 'tabel_code'))
+    ).select_related('position').order_by('position_id', 'user__last_name', 'user__first_name', 'tabel_code')
 
     workdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
-        Q(dt__lt=F('worker__dt_fired')) | Q(worker__dt_fired__isnull=True),
-        Q(dt__gte=F('worker__dt_hired')) & Q(dt__gte=from_dt),
-        worker__in=users,
+        Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True),
+        Q(dt__gte=F('employment__dt_hired')) & Q(dt__gte=from_dt),
+        employment__in=employments,
         dt__lte=to_dt,
-    ).order_by('worker__position_id', 'worker__last_name', 'worker__first_name', 'worker__tabel_code', 'dt')
+    ).order_by('employment__position_id', 'worker__last_name', 'worker__first_name', 'employment__tabel_code', 'dt')
 
     wd_stat = wd_stat_count(workdays, shop)
     working_hours = {}
@@ -88,7 +88,7 @@ def get_tabel(request, workbook, form):
     if form.get('inspection_version', False):
         tabel.change_for_inspection(tabel.prod_month.norm_work_hours, workdays)
 
-    tabel.format_cells(len(users))
+    tabel.format_cells(len(employments))
     tabel.add_main_info()
 
     # construct day
@@ -100,10 +100,10 @@ def get_tabel(request, workbook, form):
     # construct day 2
     tabel.construct_dates('d%d', 15, 6)
 
-    tabel.construnts_users_info(users, 16, 0, ['code', 'fio', 'position', 'hired'], extra_row=True)
-    tabel.fill_table(workdays, users, breaktimes, working_hours, 16, 6)
-    tabel.add_xlsx_functions(len(users), 12, 37, extra_row=True)
-    tabel.add_sign(16 + len(users) * 2 + 2)
+    tabel.construnts_users_info(employments, 16, 0, ['code', 'fio', 'position', 'hired'], extra_row=True)
+    tabel.fill_table(workdays, employments, breaktimes, working_hours, 16, 6)
+    tabel.add_xlsx_functions(len(employments), 12, 37, extra_row=True)
+    tabel.add_sign(16 + len(employments) * 2 + 2)
 
     return workbook, 'Tabel'
 

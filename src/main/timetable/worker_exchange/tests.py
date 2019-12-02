@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.utils.timezone import now
 
 from src.db.models import (
+    Employment,
     ExchangeSettings,
     WorkType,
     WorkerDayCashboxDetails,
@@ -39,19 +40,23 @@ class TestWorkerExchange(LocalTestCase):
         self.auth()
 
         user = self.user3
-        user.is_ready_for_overworkings = True
-        user.save()
+        employment = self.employment3
+        employment.is_ready_for_overworkings = True
+        employment.save()
 
         wd_dttm_from = (self.dttm - relativedelta(days=5)).replace(hour=9, minute=0,)
         wd_dttm_to = (self.dttm - relativedelta(days=5)).replace(hour=18, minute=0,)
 
         worker_day = WorkerDay.objects.create(
             worker=user,
+            employment=employment,
+            shop=self.shop,
             type=WorkerDay.Type.TYPE_WORKDAY.value,
             dt=wd_dttm_from.date(),
-            dttm_work_start=wd_dttm_from ,
+            dttm_work_start=wd_dttm_from,
             dttm_work_end=wd_dttm_to,
         )
+
         WorkerDayCashboxDetails.objects.create(
             worker_day=worker_day,
             work_type=self.work_type3,
@@ -62,12 +67,14 @@ class TestWorkerExchange(LocalTestCase):
         response = self.api_get(
             '/api/timetable/worker_exchange/get_workers_to_exchange?specialization=2&dttm_start=09:00:00 {0}&dttm_end=18:00:00 {0}'.format(
                 self.qos_dt))
+
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
         self.assertEqual(response.json()['data']['users']['3']['info'], {
             'id': 3,
             'username': 'user3',
-            'shop_id': self.shop.id,
+            # 'shop_id': self.shop.id,
             'first_name': 'Иван3',
             'last_name': 'Сидоров',
             'middle_name': None,
@@ -75,10 +82,11 @@ class TestWorkerExchange(LocalTestCase):
             'sex': 'F',
             'phone_number': None,
             'email': 'u3@b.b',
-            'tabel_code': None,
-            'shop_title': 'Shop1',
-            'supershop_title': 'Region Shop1',
+            # 'tabel_code': None,
+            # 'shop_title': 'Shop1',
+            # 'supershop_title': 'Region Shop1',
         })
+
         self.assertEqual(len(response.json()['data']['users']['3']['timetable']), 1)
         self.assertEqual(response.json()['data']['tt_from_dt'],
                          (self.dttm - relativedelta(days=10)).strftime('%d.%m.%Y'))
@@ -265,18 +273,23 @@ class Test_auto_worker_exchange(TestCase):
 
     def create_users(self, quantity):
         for number in range(1, quantity + 1):
-            User.objects.create_user(
+            user=User.objects.create_user(
                 username='User{}'.format(number),
                 email='test{}@test.ru'.format(number),
-                shop=self.shop2,
                 last_name='Имя{}'.format(number),
                 first_name='Фамилия{}'.format(number)
             )
+            Employment.objects.create(
+                shop = self.shop2,
+                user=user
+            )
 
     def create_worker_day(self):
-        for user in User.objects.all():
+        for employment in Employment.objects.all():
             wd = WorkerDay.objects.create(
-                worker=user,
+                employment=employment,
+                worker=employment.user,
+                shop=employment.shop,
                 dt=self.dt_now,
                 type=WorkerDay.Type.TYPE_WORKDAY.value,
                 dttm_work_start='{} 09:00:00'.format(self.dt_now),

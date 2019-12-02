@@ -13,13 +13,13 @@ class TestURV(LocalTestCase):
         tm_start = time(8,1,0)
         tm_end = time(18,1,0)
         self.create_worker_day(
-            self.user2,
+            self.employment2,
             dt,
             datetime.combine(dt, tm_start),
             datetime.combine(dt, tm_end),
         )
         self.create_worker_day(
-            self.user3,
+            self.employment3,
             dt,
             datetime.combine(dt, tm_start),
             datetime.combine(dt, tm_end),

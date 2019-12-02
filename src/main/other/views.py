@@ -18,7 +18,7 @@ from collections import defaultdict
 
 @api_method('GET', UserAllowedFuncsForm, check_permissions=False)
 def get_user_allowed_funcs(request, form):
-    allowed_functions = FunctionGroup.objects.filter(group__user__id=form['worker_id'])
+    allowed_functions = FunctionGroup.objects.filter(group__employment__user_id=form['worker_id'])
     return JsonResponse.success([
         {
             'name': x.func,
@@ -72,7 +72,6 @@ def get_all_slots(request, form):
 @api_method(
     'GET',
     GetSlots,
-    lambda_func=lambda x: User.objects.get(id=x['user_id']).shop
 )
 def get_slots(request, form):
     """

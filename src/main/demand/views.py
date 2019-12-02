@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, time, date
 
 from src.db.models import (
+    Employment,
     PeriodClients,
     WorkType,
     PeriodDemandChangeLog,
@@ -446,11 +447,16 @@ def set_pred_bills(request, form):
 
     save_models(models_list, None)
 
-    notify4users = User.objects.filter(
+    employments = Employment.objects.filter(
         function_group__allowed_functions__func='set_demand',
         function_group__allowed_functions__access_type__in=[FunctionGroup.TYPE_SHOP, FunctionGroup.TYPE_SUPERSHOP],
         shop=shop,
+    ).values_list('user_id', flat=True)
+
+    notify4users = User.objects.filter(
+        id__in=employments
     )
+
     Event.objects.mm_event_create(
         notify4users,
         text='Cоставлен новый спрос на период с {} по {}'.format(data['dt_from'], data['dt_to']),
