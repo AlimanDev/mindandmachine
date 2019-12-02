@@ -27,11 +27,13 @@ from .utils import (
 )
 
 from src.main.download.forms import GetTable
+from src.main.download.utils import xlsx_method
 from .utils import count_difference_of_normal_days
 
 
 @api_method('GET', GetTable)
-def get_table(request, form):
+@xlsx_method
+def get_table(request, workbook, form):
     """
     Args:
         method: GET
@@ -299,7 +301,7 @@ def get_table(request, form):
     shop_id = form['shop_id']
     weekday = form['weekday']
 
-    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    #workbook = xlsxwriter.Workbook(output, {'in_memory': True})
     # workbook = xlsxwriter.Workbook('hello.xlsx')
     worksheet = workbook.add_worksheet()
     # worksheet.set_column(0, 0, 23)
@@ -319,7 +321,7 @@ def get_table(request, form):
     write_overtime(workbook, worksheet, last_users_row)
     last_stats_row = write_stats(workbook, worksheet, stats, weekday, shop_id)
     write_stats_summary(workbook, worksheet, stats, last_stats_row)
-
+    '''
     workbook.close()
     output.seek(0)
 
@@ -328,8 +330,10 @@ def get_table(request, form):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
     response['Content-Disposition'] = 'attachment; filename="Tablet_{}.xlsx"'.format(BaseConverter.convert_date(weekday))
-
+    
     return response
+    '''
+    return workbook, f'Tablet_{BaseConverter.convert_date(weekday)}.xlsx'
 
 
 @api_method('GET', GetWorkerStatForm)

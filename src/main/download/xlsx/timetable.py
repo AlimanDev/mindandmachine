@@ -368,8 +368,8 @@ def download(request, workbook, form):
     breaktimes = json.loads(shop.break_triplets)
     breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
-    workdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
-        Q(dt__lt=F('employment__dt_fired')) | Q(worker__dt_fired__isnull=True),
+    workdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker', 'shop').filter(
+        Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True),
         Q(dt__gte=F('employment__dt_hired')) & Q(dt__gte=timetable.prod_days[0].dt),
         employment__in=employments,
         dt__lte=timetable.prod_days[-1].dt,

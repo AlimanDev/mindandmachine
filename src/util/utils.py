@@ -226,8 +226,12 @@ def api_method(
                         return JsonResponse.does_not_exists_error("Can't get shop")
                     except MultipleObjectsReturned:
                         return JsonResponse.multiple_objects_returned()
-                    if shop is None and allow_empty_shop:
-                        skip_check_permissions = True
+                    if shop is None:
+                        if allow_empty_shop:
+                            skip_check_permissions = True
+                        else:
+                            return JsonResponse.does_not_exists_error('No such department')
+
                 else:
                     if form.cleaned_data.get('shop_id'):
                         shop = Shop.objects.filter(id=form.cleaned_data['shop_id']).first()

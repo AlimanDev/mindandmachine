@@ -494,11 +494,13 @@ class TestDeleteWorkerDay(LocalTestCase):
         self.staff, self.employment = create_stuff(self.shop.id)
         self.wd_root = WorkerDay.objects.create(
             worker_id=self.staff.pk,
+            shop=self.employment.shop,
             employment=self.employment,
             type=WorkerDay.TYPE_WORKDAY,
             dt=self.now.date())
         self.wd_child = WorkerDay.objects.create(
             worker_id=self.staff.pk,
+            shop=self.employment.shop,
             employment=self.employment,
             type=WorkerDay.TYPE_VACATION,
             dt=self.now.date(),
@@ -506,6 +508,7 @@ class TestDeleteWorkerDay(LocalTestCase):
         )
         self.wd_child2 = WorkerDay.objects.create(
             worker_id=self.staff.pk,
+            shop=self.employment.shop,
             employment=self.employment,
             type=WorkerDay.TYPE_VACATION,
             dt=self.now.date(),

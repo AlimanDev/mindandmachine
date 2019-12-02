@@ -362,6 +362,7 @@ class Tabel_xlsx(Xlsx_base):
                 )
                 dt = self.month.replace(day=day+1)
                 user_working_hours = working_hours.get(employment.user_id, {}).get(dt, 0)
+                user_working_hours = user_working_hours if user_working_hours else 0
                 breaktime = 0
                 for triplet in triplets:
                     if triplet[0] <= user_working_hours and triplet[1] >= user_working_hours:
@@ -672,7 +673,7 @@ class Tabel_xlsx(Xlsx_base):
 
     @staticmethod
     def change_for_inspection(month_norm_hours, workdays):
-        break_triplets = json.loads(workdays[0].worker.shop.break_triplets)
+        break_triplets = json.loads(workdays[0].shop.break_triplets)
         result = {}
         for workday in workdays:
             key = workday.user_id
