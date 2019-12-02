@@ -68,7 +68,7 @@ def get_tabel(request, workbook, form):
         shop=shop,
     ).select_related('position').order_by('position_id', 'user__last_name', 'user__first_name', 'tabel_code')
 
-    workdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker').filter(
+    workdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker', 'shop').filter(
         Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True),
         Q(dt__gte=F('employment__dt_hired')) & Q(dt__gte=from_dt),
         employment__in=employments,
