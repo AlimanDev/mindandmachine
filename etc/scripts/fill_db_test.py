@@ -36,7 +36,7 @@ def create_shop(shop_id):
         parent_id=shop_id,
         title='department №1',
         forecast_step_minutes=time(minute=30),
-        break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]]]'
+        break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]], [900, 1200, [30, 30, 30]]]'
     )
     return shop
 

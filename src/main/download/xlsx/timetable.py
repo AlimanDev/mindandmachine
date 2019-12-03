@@ -265,7 +265,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 weekdays_dts = []
                 work_begin = []
                 work_end = []
-                for xdt in range(int(dt.timestamp()), int((dt + timedelta(days=7)).timestamp()), timedelta(days=1).total_seconds()):
+                for xdt in range(int(dt.timestamp()), int((dt + timedelta(days=7)).timestamp()), int(timedelta(days=1).total_seconds())):
                     xdt = datetime.fromtimestamp(xdt)
                     wd = worker_days.get(xdt.date())
 
