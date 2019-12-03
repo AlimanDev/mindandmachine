@@ -1054,7 +1054,7 @@ def set_worker_restrictions(request, form):
     
     if type(form.get('constraints')) == list:
         new_constraints = form['constraints']
-        WorkerConstraint.objects.filter(worker=employment).delete()
+        WorkerConstraint.objects.filter(employment=employment).delete()
         constraints_to_create = []
 
         for constraint in new_constraints:

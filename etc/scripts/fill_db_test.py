@@ -225,7 +225,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             )
 
         WorkerConstraint.objects.bulk_create([
-            WorkerConstraint(worker=worker, weekday=wc['weekday'], tm=wc['tm']) for wc in worker_d['constraints_info']
+            WorkerConstraint(worker=worker, employment=employment, weekday=wc['weekday'], tm=wc['tm']) for wc in worker_d['constraints_info']
         ])
 
         for info in worker_d['worker_cashbox_info']:

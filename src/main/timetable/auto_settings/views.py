@@ -699,7 +699,6 @@ def create_timetable(request, form):
             'init_params': init_params,
         },
     }
-    print(data)
     tt.save()
     data = json.dumps(data).encode('ascii')
     try:
