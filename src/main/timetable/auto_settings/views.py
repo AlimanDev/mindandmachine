@@ -581,7 +581,6 @@ def create_timetable(request, form):
     for employment in employments:
         # Для уволенных сотрудников
         if employment.dt_fired:
-            employment.is_fixed_hours = True
             workers_month_days = worker_day.get(employment.user_id, []) # Может случиться так что для этого работника еще никаким образом расписание не составлялось
             workers_month_days.sort(key=lambda wd: wd.dt)
             workers_month_days_new = []
