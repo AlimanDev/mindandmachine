@@ -621,7 +621,28 @@ def create_timetable(request, form):
                         worker_id=employment.user_id,
                     ))
             worker_day[employment.user_id] = workers_month_days_new
-    
+        if user.dt_hired > dt_from:
+            workers_month_days = worker_day.get(user.id, [])
+            workers_month_days.sort(key=lambda wd: wd.dt)
+            workers_month_days_new = []
+            wd_index = 0
+            user_dt = dt_from
+            while user_dt != user.dt_hired:
+                workers_month_days_new.append(WorkerDay(
+                        type=WorkerDay.Type.TYPE_HOLIDAY.value,
+                        dt=user_dt,
+                        worker_id=user.id,
+                ))
+                user_dt = user_dt + timedelta(days=1)
+            user_dt = user.dt_hired
+            while user_dt <= dt_to:
+                if (workers_month_days[wd_index].dt if\
+                     wd_index < len(workers_month_days) else None) == user_dt:
+                    workers_month_days_new.append(workers_month_days[wd_index])
+                    wd_index += 1
+                user_dt = user_dt + timedelta(days=1)
+
+            worker_day[user.id] = workers_month_days_new
     ##################################################################
 
     ########### Выборки из базы данных ###########
