@@ -620,8 +620,8 @@ def create_timetable(request, form):
                         worker_id=employment.user_id,
                     ))
             worker_day[employment.user_id] = workers_month_days_new
-        if user.dt_hired > dt_from:
-            workers_month_days = worker_day.get(user.id, [])
+        if employment.dt_hired > dt_from:
+            workers_month_days = worker_day.get(employment.user_id, [])
             workers_month_days.sort(key=lambda wd: wd.dt)
             workers_month_days_new = []
             wd_index = 0
@@ -630,10 +630,10 @@ def create_timetable(request, form):
                 workers_month_days_new.append(WorkerDay(
                         type=WorkerDay.Type.TYPE_HOLIDAY.value,
                         dt=user_dt,
-                        worker_id=user.id,
+                        worker_id=employment.user_id,
                 ))
                 user_dt = user_dt + timedelta(days=1)
-            user_dt = user.dt_hired
+            user_dt = employment.dt_hired
             while user_dt <= dt_to:
                 if (workers_month_days[wd_index].dt if\
                      wd_index < len(workers_month_days) else None) == user_dt:
@@ -641,7 +641,7 @@ def create_timetable(request, form):
                     wd_index += 1
                 user_dt = user_dt + timedelta(days=1)
 
-            worker_day[user.id] = workers_month_days_new
+            worker_day[employment.user_id] = workers_month_days_new
     ##################################################################
 
     ########### Выборки из базы данных ###########
@@ -731,7 +731,7 @@ def create_timetable(request, form):
             tt.save()
     except Exception as e:
 
-        print(e.with_traceback())
+        print(e)
         tt.status = Timetable.ERROR
 
         tt.status_message = str(e)
@@ -799,6 +799,7 @@ def delete_timetable(request, form):
         worker_day__dt__lt=dt_to,
         worker_day__employment__auto_timetable=True,
         is_vacancy=True,
+        worker_day__created_by__isnull=True, #fix me
     ).update(
         worker_day=None
     )
