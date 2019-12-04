@@ -982,10 +982,20 @@ class WorkerDay(models.Model):
 
     comment = models.TextField(null=True, blank=True)
     parent_worker_day = models.OneToOneField('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child')
+    work_hours = models.SmallIntegerField(default=0)
 
     @classmethod
     def is_type_with_tm_range(cls, t):
         return t in (cls.TYPE_WORKDAY, cls.TYPE_BUSINESS_TRIP, cls.TYPE_QUALIFICATION)
+
+    @staticmethod
+    def count_work_hours(break_triplets, dttm_work_start, dttm_work_end):
+        work_hours = int((dttm_work_end - dttm_work_start).total_seconds()) / 60
+        for break_triplet in break_triplets:
+            if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
+                work_hours = work_hours - sum(break_triplet[2])
+                break
+        return round(work_hours / 60)
 
     objects = WorkerDayManager()
 
@@ -1324,19 +1334,6 @@ class Timetable(models.Model):
     task_id = models.CharField(max_length=256, null=True, blank=True)
 
 
-class ProductionMonth(models.Model):
-    """
-    производственный календарь
-
-    """
-    class Meta(object):
-        verbose_name = 'Производственный календарь'
-        ordering = ('dt_first',)
-
-    dt_first = models.DateField()
-    total_days = models.SmallIntegerField()
-    norm_work_days = models.SmallIntegerField()
-    norm_work_hours = models.FloatField()
 
 
 class ProductionDay(models.Model):
@@ -1383,18 +1380,6 @@ class ProductionDay(models.Model):
         return '(dt {}, type {}, id {})'.format(self.dt, self.type, self.id)
 
 
-class WorkerMonthStat(models.Model):
-    class Meta(object):
-        verbose_name = 'Статистика по работе сотрудника за месяц'
-
-    worker = models.ForeignKey(User, on_delete=models.PROTECT)
-    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
-
-    month = models.ForeignKey(ProductionMonth, on_delete=models.PROTECT)
-
-    work_days = models.SmallIntegerField()
-    work_hours = models.FloatField()
 
 
 class AttendanceRecords(models.Model):

@@ -86,7 +86,7 @@ def get_tabel(request, workbook, form):
     breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
     if form.get('inspection_version', False):
-        tabel.change_for_inspection(tabel.prod_month.norm_work_hours, workdays)
+        tabel.change_for_inspection(tabel.prod_month.get('norm_work_hours', 0), workdays)
 
     tabel.format_cells(len(employments))
     tabel.add_main_info()

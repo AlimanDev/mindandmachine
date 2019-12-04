@@ -782,10 +782,12 @@ def set_worker_day(request, form):
             tm_work_end = form['tm_work_end']
             dttm_work_end = datetime.combine(dt, tm_work_end) if tm_work_end > form['tm_work_start'] else \
                 datetime.combine(dt + timedelta(days=1), tm_work_end)
-
+            break_triplets = json.loads(shop.break_triplets)
+            work_hours = WorkerDay.count_work_hours(break_triplets, dttm_work_start, dttm_work_end)
             wd_args.update({
                 'dttm_work_start': dttm_work_start,
                 'dttm_work_end': dttm_work_end,
+                'work_hours': work_hours,
             })
 
         new_worker_day = WorkerDay.objects.create(
@@ -1210,6 +1212,8 @@ def dublicate_cashier_table(request, form):
         new_wd = WorkerDay.objects.create(
             worker_id=to_worker_id,
             dt=blank_day.dt,
+            shop_id=blank_day.shop_id,
+            work_hours=blank_day.work_hours,
             type=blank_day.type,
             dttm_work_start=blank_day.dttm_work_start,
             dttm_work_end=blank_day.dttm_work_end,

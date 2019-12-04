@@ -17,8 +17,6 @@ from src.db.models import (
     WorkerConstraint,
     Timetable,
     ProductionDay,
-    ProductionMonth,
-    WorkerMonthStat,
     Group,
     FunctionGroup,
     WorkerPosition,
@@ -314,10 +312,6 @@ class ProductionDayAdmin(admin.ModelAdmin):
     list_display = ('dt', 'type')
 
 
-@admin.register(WorkerMonthStat)
-class WorkerMonthStatAdmin(admin.ModelAdmin):
-    list_display = ('worker_id', 'month')
-
 
 @admin.register(Group)
 class GroupAdmin(admin.ModelAdmin):
@@ -337,10 +331,6 @@ class FunctionGroupAdmin(admin.ModelAdmin):
 class WorkerDayChangeRequestAdmin(admin.ModelAdmin):
     pass
 
-
-@admin.register(ProductionMonth)
-class ProductionMonthAdmin(admin.ModelAdmin):
-    list_display = ('id', 'dt_first', 'total_days', 'norm_work_days', 'norm_work_hours')
 
 
 @admin.register(AttendanceRecords)

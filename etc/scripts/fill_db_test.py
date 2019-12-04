@@ -36,7 +36,7 @@ def create_shop(shop_id):
         parent_id=shop_id,
         title='department №1',
         forecast_step_minutes=time(minute=30),
-        break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]]]'
+        break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]], [900, 1200, [30, 30, 30]]]'
     )
     return shop
 
@@ -249,7 +249,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         while day < days:
             wd = wds.iloc[day_ind]
             dt = wd['dt'] + dt_diff
-
+            break_triplets = [[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]], [900, 1200, [30, 30, 30]]]
             default_dttm = timezone.datetime.combine(dt, time(15, 30))
             dttm_work_start = default_dttm if wd['dttm_work_start'] in [pd.NaT, np.NaN] else timezone.datetime.combine(
                 dt, wd['dttm_work_start'])
@@ -257,7 +257,10 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                 dt, wd['dttm_work_end'])
             if dttm_work_start and dttm_work_end and (dttm_work_end < dttm_work_start):
                 dttm_work_end += timezone.timedelta(days=1)
-
+            if dttm_work_start and dttm_work_end:
+                work_hours = WorkerDay.count_work_hours(break_triplets, dttm_work_start, dttm_work_end)
+            else:
+                work_hours = 0
             if wd['type'] == WorkerDay.TYPE_WORKDAY:
                 wd_model = WorkerDay.objects.create(
                     worker=worker,
@@ -265,6 +268,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     dt=dt,
                     type=WorkerDay.TYPE_WORKDAY,
                     shop=shop,
+                    work_hours=work_hours,
                     dttm_work_start=dttm_work_start,
                     dttm_work_end=dttm_work_end,
                 )
@@ -324,6 +328,8 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     worker=worker,
                     employment=employment,
                     dt=dt,
+                    work_hours=0 if wd['type'] ==
+                                            WorkerDay.TYPE_HOLIDAY else work_hours,
                     type=wd['type'],
                     shop=shop,
                     dttm_work_start=None if wd['type'] ==
