@@ -99,15 +99,15 @@ def fill_days(from_date, to_date, region_id):
                     day_type = ProductionDay.TYPE_WORK
                 ProductionDay.objects.update_or_create(
                     dt=dt,
+                    region_id=region_id,
                     defaults={
                         'type': day_type,
                         'is_celebration': False,
-                        'region_id': region_id,
                     }
                 )
 
 
-def main(from_date, to_date, region_id=1):
+def main(from_date, to_date, region_id):
     """
     including boundaries
     Args:

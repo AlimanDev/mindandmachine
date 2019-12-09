@@ -1350,6 +1350,7 @@ class ProductionDay(models.Model):
     """
     class Meta(object):
         verbose_name = 'День производственного календаря'
+        unique_together = ('dt', 'region')
 
 
     TYPE_WORK = 'W'
@@ -1372,7 +1373,7 @@ class ProductionDay(models.Model):
         TYPE_HOLIDAY: 0
     }
 
-    dt = models.DateField(unique=True)
+    dt = models.DateField()
     type = models.CharField(max_length=1, choices=TYPES)
     is_celebration = models.BooleanField(default=False)
     region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
