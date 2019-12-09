@@ -68,7 +68,7 @@ month_dict = {
 #             )
 
 
-def fill_days(from_date, to_date):
+def fill_days(from_date, to_date, region_id):
     """
     including boundaries
     Args:
@@ -101,19 +101,20 @@ def fill_days(from_date, to_date):
                     dt=dt,
                     defaults={
                         'type': day_type,
-                        'is_celebration': False
+                        'is_celebration': False,
+                        'region_id': region_id,
                     }
                 )
 
 
-def main(from_date, to_date):
+def main(from_date, to_date, region_id=1):
     """
     including boundaries
     Args:
         from_date(str): e.g. '2018.1.1'
         to_date(str): e.g. '2019.1.1'
     """
-    fill_days(from_date=from_date, to_date=to_date)
+    fill_days(from_date=from_date, to_date=to_date, region_id=region_id)
 
     from_date = datetime.datetime.strptime(from_date, '%Y.%m.%d').date()
     to_date = datetime.datetime.strptime(to_date, '%Y.%m.%d').date()

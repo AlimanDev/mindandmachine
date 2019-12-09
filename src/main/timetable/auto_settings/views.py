@@ -554,7 +554,7 @@ def create_timetable(request, form):
             prev_data[key] = []
         prev_data[key].append(worker_d)
     
-    employment_stat_dict = count_difference_of_normal_days(dt_end=dt_from, employments=employments)
+    employment_stat_dict = count_difference_of_normal_days(dt_end=dt_from, employments=employments, shop=shop)
 
 
    
@@ -658,6 +658,7 @@ def create_timetable(request, form):
         dt__gte=dt_from,
         dt__lt=dt_to,
         type__in=ProductionDay.WORK_TYPES,
+        region_id=shop.region_id,
     ))
     work_hours = sum([ProductionDay.WORK_NORM_HOURS[wd.type] for wd in work_days])  # норма рабочего времени за период (за месяц)
 

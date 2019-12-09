@@ -365,7 +365,7 @@ def get_month_stat(request, form):
     # count info of current month
     month_info = count_work_month_stats(shop, dt_start, dt_end, employments)
 
-    stat_prev_month = count_difference_of_normal_days(dt_end=dt_start, employments=employments)
+    stat_prev_month = count_difference_of_normal_days(dt_end=dt_start, employments=employments, shop=shop)
 
     for employment in employments:
         if employment.user_id not in month_info:

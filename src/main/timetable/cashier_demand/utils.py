@@ -247,6 +247,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
             dt__month=from_dt.month,
             dt__year=from_dt.year,
             type__in=ProductionDay.WORK_TYPES,
+            region_id=shop.region_id,
         ).annotate(
             work_hours=Case(
                 When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),

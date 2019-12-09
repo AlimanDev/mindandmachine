@@ -26,8 +26,12 @@ from src.db.models import (
     ExchangeSettings,
     Event,
     OperationTemplate,
+    Region,
 )
 
+@admin.register(Region)
+class RegionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'code')
 
 @admin.register(WorkerPosition)
 class WorkerPositionAdmin(admin.ModelAdmin):

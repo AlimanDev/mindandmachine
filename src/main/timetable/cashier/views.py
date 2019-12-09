@@ -23,6 +23,7 @@ from src.db.models import (
     WorkerPosition,
     WorkType,
     UserWeekdaySlot,
+    Shop,
 )
 
 from src.main.other.notification.utils import send_notification
@@ -301,6 +302,7 @@ def get_cashier_timetable(request, form):
         }
 
     """
+    shop = Shop.objects.get(id=form['shop_id'])
     from_dt = form['from_dt']
     to_dt = form['to_dt']
     checkpoint = FormUtil.get_checkpoint(form)
@@ -341,6 +343,7 @@ def get_cashier_timetable(request, form):
                 dt__gte=from_dt,
                 dt__lte=to_dt,
                 type=ProductionDay.TYPE_HOLIDAY,
+                region_id=shop.region_id,
             )
         ]
 

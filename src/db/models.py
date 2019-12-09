@@ -12,6 +12,12 @@ from fcm_django.models import FCMDevice
 from src.conf.djconfig import IS_PUSH_ACTIVE
 from mptt.models import MPTTModel, TreeForeignKey
 
+class Region(models.Model):
+    class Meta:
+        verbose_name = 'Регион'
+        verbose_name_plural = 'Регионы'
+    name = models.CharField(max_length=50)
+    code = models.SmallIntegerField()
 
 # на самом деле это отдел
 class Shop(MPTTModel):
@@ -105,6 +111,7 @@ class Shop(MPTTModel):
 
     staff_number = models.SmallIntegerField(default=0)
 
+    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
     def __str__(self):
         return '{}, {}, {}'.format(
             self.title,
@@ -1368,6 +1375,7 @@ class ProductionDay(models.Model):
     dt = models.DateField(unique=True)
     type = models.CharField(max_length=1, choices=TYPES)
     is_celebration = models.BooleanField(default=False)
+    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
 
     def __str__(self):
 

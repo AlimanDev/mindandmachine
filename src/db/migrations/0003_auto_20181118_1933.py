@@ -5,7 +5,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('db', '0002_fill_production_days_months'),
+        ('db', '0001_initial'),
     ]
 
     operations = [

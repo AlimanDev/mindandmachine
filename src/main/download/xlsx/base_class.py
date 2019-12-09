@@ -14,7 +14,7 @@ class Xlsx_base:
         6: 'Июнь',
         7: 'Июль',
         8: 'Август',
-        9: 'Сентбярь',
+        9: 'Сентябрь',
         10: 'Октябрь',
         11: 'Ноябрь',
         12: 'Декабрь',
@@ -54,12 +54,14 @@ class Xlsx_base:
         if prod_days is None:
             self.prod_days = list(ProductionDay.objects.filter(
                 dt__year=self.month.year,
-                dt__month=self.month.month
+                dt__month=self.month.month,
+                region_id=self.shop.region_id,
             ).order_by('dt'))
         self.prod_month = ProductionDay.objects.filter(
             dt__month=self.month.month,
             dt__year=self.month.year,
             type__in=ProductionDay.WORK_TYPES,
+            region_id=self.shop.region_id,
         ).annotate(
             work_hours=Case(
                 When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
