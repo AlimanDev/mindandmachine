@@ -36,7 +36,7 @@ def create_shop(shop_id):
         parent_id=shop_id,
         title='department №1',
         forecast_step_minutes=time(minute=30),
-        break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]]]'
+        break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]], [900, 1200, [30, 30, 30]]]'
     )
     return shop
 
@@ -225,7 +225,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             )
 
         WorkerConstraint.objects.bulk_create([
-            WorkerConstraint(worker=worker, weekday=wc['weekday'], tm=wc['tm']) for wc in worker_d['constraints_info']
+            WorkerConstraint(worker=worker, employment=employment, weekday=wc['weekday'], tm=wc['tm']) for wc in worker_d['constraints_info']
         ])
 
         for info in worker_d['worker_cashbox_info']:
