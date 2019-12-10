@@ -613,15 +613,9 @@ class TestCreatePredBillsRequest(TestDemand):
             'dt' : '07.07.2018'
         }
         response = self.api_post('/api/demand/create_predbills', data)
-        correct_answer = {
-            'code': 500, 
-            'data': {
-                'error_type': 'AlgorithmInternalError', 
-                'error_message': 'Сервер для обработки алгоритма недоступен.'
-                }, 
-            'info': None
-            }
-        self.assertEqual(response.json(), correct_answer)
+        res = response.json()
+        self.assertEqual(res['code'], 500)
+        self.assertEqual(res['data']['error_type'], 'AlgorithmInternalError')
 
     def test_data_not_setted(self):
         self.auth()
