@@ -116,13 +116,14 @@ def update_worker_month_stat():
             triplet[2] = time_break_triplets
             time_break_triplets = 0
 
-        worker_days = WorkerDay.objects.qos_current_version().select_related('worker').filter(
+        worker_days = WorkerDay.objects.qos_current_version().select_related('worker', 'employment').filter(
             shop=shop,
             dt__lt=dt,
             dt__gte=dt2,
         ).order_by('worker', 'dt')
 
         last_user = worker_days[0].worker if len(worker_days) else None
+        last_employment = worker_days[0].employment if len(worker_days) else None
         last_month_stat = worker_days[0].dt.month if len(worker_days) else None
         product_month = product_month_1 if last_month_stat == dt1.month else product_month_2
 
@@ -150,7 +151,9 @@ def update_worker_month_stat():
             else:
                 WorkerMonthStat.objects.update_or_create(
                     worker=last_user,
+                    employment=last_employment,
                     month=product_month,
+                    shop=shop,
                     defaults={
                         'work_days': work_days,
                         'work_hours': work_hours,
@@ -159,12 +162,14 @@ def update_worker_month_stat():
                 work_hours = duration_of_workerday
                 work_days = 1 if worker_day.type in WorkerDay.TYPES_PAID else 0
                 last_user = worker_day.worker
+                last_employment = worker_day.employment
                 last_month_stat = worker_day.dt.month
                 product_month = product_month_1 if last_month_stat == dt1.month else product_month_2
 
         if last_user:
             WorkerMonthStat.objects.update_or_create(
                 worker=last_user,
+                employment=last_employment,
                 month=product_month,
                 defaults={
                     'work_days': work_days,
