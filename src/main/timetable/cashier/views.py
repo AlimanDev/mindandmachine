@@ -310,6 +310,7 @@ def get_cashier_timetable(request, form):
             work_type=wd.work_types.first()
             if work_type and work_type.shop_id != form['shop_id']:
                 wd.other_shop = work_type.shop.title
+            return wd
     response = {}
     # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_ids']:
@@ -384,7 +385,7 @@ def get_cashier_timetable(request, form):
                 'change_amount': len(worker_day_change_log),
                 'hours_count_fact': wd_stat_count_total(worker_days_filter, request.shop)['hours_count_fact']
             }
-        map(check_wd, worker_days)
+        worker_days = list(map(check_wd, worker_days))
         days_response = [
             {
                 'day': WorkerDayConverter.convert(wd),

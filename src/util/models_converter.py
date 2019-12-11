@@ -12,33 +12,76 @@ from src.db.models import (
     AttendanceRecords,
     User
 )
+from django.db import models
+from django.forms.models import model_to_dict
 
 
 class BaseConverter(object):
-    @classmethod
-    def convert_date(cls, obj):
+    @staticmethod
+    def convert_date(obj):
         return obj.strftime(QOS_DATE_FORMAT) if obj is not None else None
 
-    @classmethod
-    def parse_date(cls, obj):
+    @staticmethod
+    def parse_date(obj):
         return datetime.datetime.strptime(obj, QOS_DATE_FORMAT).date()
 
-    @classmethod
-    def convert_time(cls, obj):
+    @staticmethod
+    def convert_time(obj):
         return obj.strftime(QOS_TIME_FORMAT) if obj is not None else None
 
-    @classmethod
-    def parse_time(cls, obj):
+    @staticmethod
+    def parse_time(obj):
         return datetime.datetime.strptime(obj, QOS_TIME_FORMAT).time()
 
-    @classmethod
-    def parse_datetime(cls, obj):
+    @staticmethod
+    def parse_datetime(obj):
         return datetime.datetime.strptime(obj, QOS_DATETIME_FORMAT)
 
-    @classmethod
-    def convert_datetime(cls, obj):
+    @staticmethod
+    def convert_datetime(obj):
         return obj.strftime(QOS_DATETIME_FORMAT) if obj is not None else None
 
+class Converter(BaseConverter):
+
+    
+    @classmethod
+    def convert(self, elements, ModelClass, fields=None):
+        self.special_converters = {}
+        # Получаем названия особенных полей
+        for field in fields if fields else ModelClass._meta.get_fields():
+            if isinstance(field, str):
+                field = field.split('__')
+                if len(field) == 1:
+                    field = getattr(ModelClass, field[0])
+                else:
+                    tmp_f = ModelClass
+                    for name in field:
+                        tmp_f = getattr(tmp_f, name)
+                    field = tmp_f
+            if isinstance(field, models.DateField):
+                self.special_converters[field.name] = self.convert_date
+            elif isinstance(field, models.DateTimeField):
+                self.special_converters[field.name] = self.convert_datetime
+            elif isinstance(field, models.TimeField):
+                self.special_converters[field.name] = self.convert_time
+        def apply_special_coverters(elm):
+            for key in self.special_converters.keys():
+                elm[key] = self.special_converters[key](elm[key])
+            return elm
+        if isinstance(elements, models.QuerySet):
+            if fields:
+                elements = elements.values(*fields)
+            else:
+                elements = elements.values()
+        else:
+            elements = [
+                model_to_dict(element, fields=fields)
+                for element in elements
+            ]
+        elements = list(map(apply_special_coverters, elements))
+
+        return elements
+    
 
 class EmploymentConverter(BaseConverter):
     @classmethod
