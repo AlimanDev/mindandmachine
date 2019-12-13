@@ -676,7 +676,7 @@ class Tabel_xlsx(Xlsx_base):
         break_triplets = json.loads(workdays[0].shop.break_triplets)
         result = {}
         for workday in workdays:
-            key = workday.user_id
+            key = workday.worker_id
             if key not in result:
                 result[key] = []
             result[key].append(workday)
