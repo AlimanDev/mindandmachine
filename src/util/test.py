@@ -52,7 +52,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self, worker_day=False):
+    def setUp(self, worker_day=False, calendar=False):
         super().setUp()
         # logging.disable(logging.CRITICAL)
 
@@ -68,8 +68,8 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             name='Москва',
             code=77,
         )
-
-        fill_calendar.main('2018.1.1', '2019.1.1', region_id=1)
+        if calendar:
+            fill_calendar.main('2018.1.1', '2019.1.1', region_id=1)
 
         # admin_group
         self.admin_group = Group.objects.create(name='Администратор')

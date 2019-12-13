@@ -79,7 +79,6 @@ def create_predbills_request_function(shop_id, dt=None):
 
     YEARS_TO_COLLECT = 3  # за последние YEARS_TO_COLLECT лет
     predict2days = 62  # на N дней прогноз
-    shop = Shop.objects.get(id=shop_id)
     dt_to = datetime.now().date() + timedelta(days=predict2days)
 
     if dt is None:
@@ -92,7 +91,7 @@ def create_predbills_request_function(shop_id, dt=None):
     day_info = ProductionDay.objects.filter(
         dt__gte=dt - relativedelta(years=YEARS_TO_COLLECT),
         dt__lte=dt_to,
-        region_id=shop.region_id
+        region__shop__id=shop_id,
     )
 
     shop = Shop.objects.filter(id=shop_id).first()
