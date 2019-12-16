@@ -208,9 +208,9 @@ def select_cashiers(request, form):
             work_type__shop_id=shop_id,
             is_active=True,
             work_type_id__in=work_types
-        ).values_list('worker_id', flat=True)
+        ).values_list('employment_id', flat=True)
 
-        employments = employments.filter(id__in=employments)
+        employments = employments.filter(id__in=employments_ids)
 
 
 
@@ -481,7 +481,7 @@ def get_cashier_info(request, form):
         response['general_info'] = EmploymentConverter.convert(employment)
 
     if 'work_type_info' in form['info']:
-        worker_cashbox_info = WorkerCashboxInfo.objects.filter(worker_id=worker.id, is_active=True)
+        worker_cashbox_info = WorkerCashboxInfo.objects.filter(employment=employment, is_active=True)
         work_types = WorkType.objects.filter(shop_id=form['shop_id'])
         response['work_type_info'] = {
             'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info],
@@ -1036,7 +1036,7 @@ def set_worker_restrictions(request, form):
 
     # WorkTypes
     work_type_info = form.get('work_type_info', [])
-    curr_work_types = {wci.work_type_id: wci for wci in WorkerCashboxInfo.objects.filter(worker=employment,)}
+    curr_work_types = {wci.work_type_id: wci for wci in WorkerCashboxInfo.objects.filter(employment=employment,)}
     
     for work_type in work_type_info:
         wci = curr_work_types.pop(work_type['work_type_id'], None)
@@ -1047,7 +1047,7 @@ def set_worker_restrictions(request, form):
         else:
             try:
                 WorkerCashboxInfo.objects.create(
-                    worker=employment,
+                    employment=employment,
                     work_type_id=work_type['work_type_id'],
                     priority=work_type['priority'],
                 )
