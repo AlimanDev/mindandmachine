@@ -45,47 +45,97 @@ class Converter(BaseConverter):
 
     
     @classmethod
-    def convert(self, elements, ModelClass, fields=None):
-        self.special_converters = {}
-        # Получаем названия особенных полей
-        for field in fields if fields else ModelClass._meta.get_fields():
-            if isinstance(field, str):
-                field = field.split('__')
-                if len(field) == 1:
-                    field = getattr(ModelClass, field[0])
-                else:
-                    tmp_f = ModelClass
-                    for name in field:
-                        tmp_f = getattr(tmp_f, name)
-                    field = tmp_f
-            if isinstance(field, models.DateField):
-                self.special_converters[field.name] = self.convert_date
-            elif isinstance(field, models.DateTimeField):
-                self.special_converters[field.name] = self.convert_datetime
-            elif isinstance(field, models.TimeField):
-                self.special_converters[field.name] = self.convert_time
+    def convert(self, elements, ModelClass=None, fields=None, special_converters={}):
+        '''
+        Функция для преобразования данных из базы данных в формат json
+        elements:list, tuple, QuerySet - данные
+        ModelClass - класс модели, которую конвертируем
+        fields: list - поля из модели, которые должны быть в результирующем json
+        special_converters: dict - словарь, где ключом является название поля, а значением
+        функция которая применяется к нему
+        '''
         def apply_special_coverters(elm):
             for key in self.special_converters.keys():
                 elm[key] = self.special_converters[key](elm[key])
             return elm
-        if isinstance(elements, models.QuerySet):
-            if fields:
-                elements = elements.values(*fields)
+        # В случае наследования для сложных данных или если тип list
+        if hasattr(self, 'convert_function'):
+            if isinstance(elements, list) or isinstance(elements, tuple) or isinstance(elements, models.QuerySet):
+                elements = [
+                    self.convert_function(element)
+                    for element in elements
+                ]
             else:
-                elements = elements.values()
+                elements = self.convert_function(elements)
+        #Для простого конвертирования
+        elif ModelClass:
+            self.special_converters = special_converters
+            # Получаем названия особенных полей
+            for field in fields if fields else ModelClass._meta.get_fields():
+                if isinstance(field, str):
+                    rel_fields = field.split('__')
+                    field_name = field
+                    if len(rel_fields) == 1:
+                        field = ModelClass._meta.get_field(field_name)
+                    else:
+                        tmp_model = ModelClass
+                        for name in rel_fields[:-1]:
+                            tmp_model = tmp_model._meta.get_field(name).remote_field.model
+                        field = tmp_model._meta.get_field(rel_fields[-1])
+                        field.name = field_name
+                    
+                if isinstance(field, models.DateField):
+                    self.special_converters[field.name] = self.convert_date
+                elif isinstance(field, models.DateTimeField):
+                    self.special_converters[field.name] = self.convert_datetime
+                elif isinstance(field, models.TimeField):
+                    self.special_converters[field.name] = self.convert_time
+            if isinstance(elements, models.QuerySet):
+                if fields:
+                    elements = elements.values(*fields)
+                else:
+                    elements = elements.values()
+            else:
+                if fields:
+                    result = []
+                    for element in elements:
+                        el = {}
+                        for field in fields:
+                            rel_fields = field.split('__')
+                            field_name = field
+                            if len(rel_fields) == 1:
+                                el[field_name] = getattr(element, field_name)
+                            else:
+                                tmp_obj = element
+                                for name in rel_fields[:-1]:
+                                    tmp_obj = getattr(tmp_obj, name)
+                                el[field_name] = getattr(tmp_obj, rel_fields[-1])
+                        result.append(el)
+                    elements = result
+                else:
+                    elements = [
+                        model_to_dict(element)
+                        for element in elements
+                    ]
+            elements = list(map(apply_special_coverters, elements))
         else:
+            print('Error, elements should be an QuerySet object or convert function should be defined.')
+            return
+            '''
+            element = models.QuerySet(ModelClass)
+            element._result_cache = elements
+            elements = element.values(*fields) if fields else element.values()
             elements = [
                 model_to_dict(element, fields=fields)
                 for element in elements
             ]
-        elements = list(map(apply_special_coverters, elements))
+            '''
 
         return elements
-    
 
-class EmploymentConverter(BaseConverter):
+class EmploymentConverter(Converter):
     @classmethod
-    def convert(cls, obj: Employment):
+    def convert_function(cls, obj: Employment):
         user = obj.user
         res = UserConverter.convert(user)
         res.update({
@@ -104,9 +154,9 @@ class EmploymentConverter(BaseConverter):
         return res
 
 
-class UserConverter(BaseConverter):
+class UserConverter(Converter):
     @classmethod
-    def convert_main(cls, obj: User):
+    def convert_function(cls, obj: User):
         return {
             'id': obj.id,
             'username': obj.username,
@@ -119,15 +169,11 @@ class UserConverter(BaseConverter):
             'email': obj.email,
         }
 
-    @classmethod
-    def convert(cls, obj: User):
-        return cls.convert_main(obj)
 
-
-class WorkerDayConverter(BaseConverter):
+class WorkerDayConverter(Converter):
 
     @classmethod
-    def convert(cls, obj):
+    def convert_function(cls, obj):
         def __work_tm(__field):
             return cls.convert_time(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
 
@@ -151,9 +197,9 @@ class WorkerDayConverter(BaseConverter):
         return data
 
 
-class WorkerDayChangeLogConverter(BaseConverter):
+class WorkerDayChangeLogConverter(Converter):
     @classmethod
-    def convert(cls, obj):
+    def convert_function(cls, obj):
         def __work_tm(__field):
             return cls.convert_time(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
 
@@ -184,9 +230,9 @@ class WorkerDayChangeLogConverter(BaseConverter):
         return res
 
 
-class WorkerDayChangeRequestConverter(BaseConverter):
+class WorkerDayChangeRequestConverter(Converter):
     @classmethod
-    def convert(cls, obj):
+    def convert_function(cls, obj):
         def __work_tm(__field):
             return cls.convert_time(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
 
@@ -199,9 +245,9 @@ class WorkerDayChangeRequestConverter(BaseConverter):
             'dttm_work_end': __work_tm(obj.dttm_work_end),
         }
 
-class WorkerPositionConverter(BaseConverter):
+class WorkerPositionConverter(Converter):
     @classmethod
-    def convert(cls, obj):
+    def convert_function(cls, obj):
         return {
             'id': obj.id,
             'title': obj.title,
@@ -241,9 +287,9 @@ class WorkTypeConverter(BaseConverter):
         return converted_dict
 
 
-class OperationTypeConverter(BaseConverter):
+class OperationTypeConverter(Converter):
     @classmethod
-    def convert(cls, obj):
+    def convert_function(cls, obj):
         return {
             'id': obj.id,
             'name': obj.name,

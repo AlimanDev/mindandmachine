@@ -82,7 +82,7 @@ def get_workers_to_exchange(request, form):
 
     users = {}
     for worker in workers:
-        worker_info = UserConverter.convert_main(worker)
+        worker_info = UserConverter.convert(worker)
         # worker_info['shop_title'] = list(worker.employments.all().values_list('shop__title', flat=True))
         # worker_info['supershop_title'] = worker.parent_title
         users[worker.id] = {'info': worker_info, 'timetable': []}
