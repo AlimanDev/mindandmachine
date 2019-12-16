@@ -377,7 +377,7 @@ def download(request, workbook, form):
         'employment__position_id', 'worker__last_name', 'worker__first_name', 'worker__middle_name', 'employment__tabel_code', 'dt')
 
     if form.get('inspection_version', False):
-        timetable.change_for_inspection(timetable.prod_month.norm_work_hours, workdays)
+        timetable.change_for_inspection(timetable.prod_month.get('norm_work_hours', 0), workdays)
 
     timetable.format_cells(len(employments))
     timetable.add_main_info()

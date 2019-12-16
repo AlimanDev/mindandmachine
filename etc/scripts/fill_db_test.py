@@ -25,18 +25,21 @@ from src.db.models import (
     Timetable,
     Notifications,
     Employment,
+    Region,
 )
+from src.db import fill_calendar
 from src.util.models_converter import (
     WorkerDayConverter,
 )
 
 
-def create_shop(shop_id):
+def create_shop(shop_id, region_id):
     shop = Shop.objects.create(
         parent_id=shop_id,
         title='department №1',
         forecast_step_minutes=time(minute=30),
-        break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]], [900, 1200, [30, 30, 30]]]'
+        break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]], [900, 1200, [30, 30, 30]]]',
+        region_id=region_id,
     )
     return shop
 
@@ -249,7 +252,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         while day < days:
             wd = wds.iloc[day_ind]
             dt = wd['dt'] + dt_diff
-
+            break_triplets = [[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]], [900, 1200, [30, 30, 30]]]
             default_dttm = timezone.datetime.combine(dt, time(15, 30))
             dttm_work_start = default_dttm if wd['dttm_work_start'] in [pd.NaT, np.NaN] else timezone.datetime.combine(
                 dt, wd['dttm_work_start'])
@@ -257,7 +260,10 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                 dt, wd['dttm_work_end'])
             if dttm_work_start and dttm_work_end and (dttm_work_end < dttm_work_start):
                 dttm_work_end += timezone.timedelta(days=1)
-
+            if dttm_work_start and dttm_work_end:
+                work_hours = WorkerDay.count_work_hours(break_triplets, dttm_work_start, dttm_work_end)
+            else:
+                work_hours = 0
             if wd['type'] == WorkerDay.TYPE_WORKDAY:
                 wd_model = WorkerDay.objects.create(
                     worker=worker,
@@ -265,6 +271,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     dt=dt,
                     type=WorkerDay.TYPE_WORKDAY,
                     shop=shop,
+                    work_hours=work_hours,
                     dttm_work_start=dttm_work_start,
                     dttm_work_end=dttm_work_end,
                 )
@@ -324,6 +331,8 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     worker=worker,
                     employment=employment,
                     dt=dt,
+                    work_hours=0 if wd['type'] ==
+                                            WorkerDay.TYPE_HOLIDAY else work_hours,
                     type=wd['type'],
                     shop=shop,
                     dttm_work_start=None if wd['type'] ==
@@ -418,12 +427,21 @@ def main(date=None, shops=None, lang='ru', count_of_month=None):
     worker_days = (end_date - start_date).days
     demand_days = (predict_date - start_date).days + 1
     # print(start_date, end_date, predict_date, worker_days, demand_days)
-
+    region1 = Region.objects.create(
+        name='Москва',
+        code=77,
+    )
+    region2 = Region.objects.create(
+        name='Санкт-Петербург',
+        code=78,
+    )
+    fill_calendar.main('2017.1.1', '2020.1.1', region1.id)
+    fill_calendar.main('2017.1.1', '2020.1.1', region2.id)
     root_shop = Shop.objects.create(title=lang_data['root_shop'])
-    parent_shop1 = Shop.objects.create(title=f'{lang_data["super_shop"]} № 1', parent = root_shop)
-    parent_shop2 = Shop.objects.create(title=f'{lang_data["super_shop"]} № 2', parent = root_shop)
+    parent_shop1 = Shop.objects.create(title=f'{lang_data["super_shop"]} № 1', parent=root_shop, region=region1)
+    parent_shop2 = Shop.objects.create(title=f'{lang_data["super_shop"]} № 2', parent=root_shop, region=region2)
     for shop_ind, shop_size in enumerate(shops, start=1):
-        shop = create_shop(parent_shop1.id)
+        shop = create_shop(parent_shop1.id, parent_shop1.region_id)
         work_types_dict = create_work_types(data['work_types'], shop)
         create_forecast(data['demand'], work_types_dict, start_date, demand_days)
         create_users_workdays(data['cashiers'], work_types_dict, start_date, worker_days, shop, shop_size, lang=lang)
@@ -436,7 +454,7 @@ def main(date=None, shops=None, lang='ru', count_of_month=None):
     dttm_prev = dttm_curr - relativedelta(months=1)
     create_notifications()
     for shop_ind in range(4, 2000):
-        shop = create_shop(parent_shop2.id)
+        shop = create_shop(parent_shop2.id, parent_shop2.region_id)
         shop_id = shop.id
         create_timetable(shop_id, dttm_curr)
         create_timetable(shop_id, dttm_prev)

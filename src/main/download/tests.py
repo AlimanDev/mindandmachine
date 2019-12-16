@@ -8,7 +8,7 @@ from src.conf.djconfig import QOS_DATE_FORMAT
 class TestDownload(LocalTestCase):
 
     def setUp(self):
-        super().setUp()
+        super().setUp(calendar=True)
 
     def api_get(self, *args, **kwargs):
         response = self.client.get(*args, **kwargs)

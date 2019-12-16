@@ -554,7 +554,7 @@ def create_timetable(request, form):
             prev_data[key] = []
         prev_data[key].append(worker_d)
     
-    employment_stat_dict = count_difference_of_normal_days(dt_end=dt_from, employments=employments)
+    employment_stat_dict = count_difference_of_normal_days(dt_end=dt_from, employments=employments, shop=shop)
 
 
    
@@ -678,6 +678,7 @@ def create_timetable(request, form):
         dt__gte=dt_from,
         dt__lt=dt_to,
         type__in=ProductionDay.WORK_TYPES,
+        region_id=shop.region_id,
     ))
     work_hours = sum([ProductionDay.WORK_NORM_HOURS[wd.type] for wd in work_days])  # норма рабочего времени за период (за месяц)
 
@@ -870,6 +871,7 @@ def set_timetable(request, form):
     timetable = Timetable.objects.get(id=form['timetable_id'])
 
     shop = request.shop
+    break_triplets = json.loads(shop.break_triplets)
 
     timetable.status = data['timetable_status']
     timetable.status_message = data.get('status_message', False)
@@ -915,6 +917,7 @@ def set_timetable(request, form):
                 if WorkerDay.is_type_with_tm_range(wd_obj.type):
                     wd_obj.dttm_work_start = BaseConverter.parse_datetime(wd['dttm_work_start'])
                     wd_obj.dttm_work_end = BaseConverter.parse_datetime(wd['dttm_work_end'])
+                    wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
                     wd_obj.save()
 
                     WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
