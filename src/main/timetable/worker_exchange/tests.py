@@ -17,7 +17,7 @@ from src.db.models import (
     Event,
     Region,
 )
-from src.db import fill_calendar
+from etc.scripts import fill_calendar
 from src.util.test import LocalTestCase
 from .utils import create_vacancies_and_notify, cancel_vacancies, workers_exchange
 
