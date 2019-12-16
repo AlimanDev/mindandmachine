@@ -9,6 +9,7 @@ from django.db import connection
 from django.test import TestCase
 from django.utils.timezone import now
 from requests import Response
+from src.db import fill_calendar
 
 from src.db.models import (
     AttendanceRecords,
@@ -27,6 +28,7 @@ from src.db.models import (
     Slot,
     UserWeekdaySlot,
     WorkerCashboxInfo,
+    Region,
 )
 
 
@@ -50,7 +52,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self, worker_day=False):
+    def setUp(self, worker_day=False, calendar=False):
         super().setUp()
         # logging.disable(logging.CRITICAL)
 
@@ -60,6 +62,14 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             cursor.execute("ALTER SEQUENCE db_user_id_seq RESTART WITH 100;")
 
         dttm_now = now()
+
+        self.region = Region.objects.create(
+            id=1,
+            name='Москва',
+            code=77,
+        )
+        if calendar:
+            fill_calendar.main('2018.1.1', '2019.1.1', region_id=1)
 
         # admin_group
         self.admin_group = Group.objects.create(name='Администратор')
@@ -121,6 +131,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
+            region=self.region,
         )
         self.reg_shop2 = Shop.objects.create(
             id=12,
@@ -128,6 +139,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             title='Region Shop2',
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
+            region=self.region,
         )
 
         # shops
@@ -138,6 +150,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
+            region=self.region,
         )
         self.shop2 = Shop.objects.create(
             id=2,
@@ -145,6 +158,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             title='Shop2',
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
+            region=self.region,
         )
 
         self.shop3 = Shop.objects.create(
@@ -153,6 +167,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             title='Shop3',
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
+            region=self.region,
         )
         Shop.objects.rebuild()
 

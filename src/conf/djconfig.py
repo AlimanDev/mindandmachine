@@ -272,11 +272,11 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
 
-    'task-update_worker_month_stat': {
-        'task': 'src.celery.tasks.update_worker_month_stat',
-        'schedule': crontab(day_of_month='1,15', hour=0, minute=0),
-        'options': {'queue': BACKEND_QUEUE}
-    },
+    # 'task-update_worker_month_stat': {
+    #     'task': 'src.celery.tasks.update_worker_month_stat',
+    #     'schedule': crontab(day_of_month='1,15', hour=0, minute=0),
+    #     'options': {'queue': BACKEND_QUEUE}
+    # },
 
     'task-vacancies_create_and_cancel': {
         'task': 'src.celery.tasks.vacancies_create_and_cancel',

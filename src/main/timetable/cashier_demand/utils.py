@@ -3,7 +3,7 @@ import numpy as np
 from decimal import Decimal
 
 
-from django.db.models import Q, F
+from django.db.models import Q, F, Case, When, Sum, Value, IntegerField
 
 
 from src.db.models import (
@@ -12,7 +12,7 @@ from src.db.models import (
     WorkType,
     WorkerDayCashboxDetails,
     PeriodClients,
-    ProductionMonth,
+    ProductionDay,
     Shop,
 )
 from src.util.models_converter import BaseConverter
@@ -243,7 +243,19 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
 
     hours_stat = wd_stat_count(worker_days, shop)
     fot = 0
-    norm_work_hours = ProductionMonth.objects.get(dt_first=from_dt.replace(day=1)).norm_work_hours
+    norm_work_hours = ProductionDay.objects.filter(
+            dt__month=from_dt.month,
+            dt__year=from_dt.year,
+            type__in=ProductionDay.WORK_TYPES,
+            region_id=shop.region_id,
+        ).annotate(
+            work_hours=Case(
+                When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
+                When(type=ProductionDay.TYPE_SHORT_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_SHORT_WORK])),
+            )
+        ).aggregate(
+            norm_work_hours=Sum('work_hours', output_field=IntegerField())
+        )['norm_work_hours']
     for row in hours_stat:
         fot += round(
             Decimal(row['hours_plan']) *

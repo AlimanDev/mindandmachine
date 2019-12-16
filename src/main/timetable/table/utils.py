@@ -10,7 +10,7 @@ import json
 from datetime import time
 from ..utils import timediff
 import datetime as dt
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q, Count
 from django.db.models.functions import Coalesce
 
 from src.util.models_converter import WorkerDayConverter
@@ -63,7 +63,7 @@ def count_work_month_stats(shop, dt_start, dt_end, employments, times_borders=No
 
     # t = check_time()
     ids = {u.id: u for u in employments}
-    prod_days_list = list(ProductionDay.objects.filter(dt__gte=dt_start, dt__lte=dt_end).order_by('dt'))
+    prod_days_list = list(ProductionDay.objects.filter(dt__gte=dt_start, dt__lte=dt_end, region_id=shop.region_id).order_by('dt'))
 
     shop_ids = list(set(user.shop_id for user in employments))
     shops = Shop.objects.filter(id__in=shop_ids)
@@ -165,7 +165,7 @@ def count_work_month_stats(shop, dt_start, dt_end, employments, times_borders=No
     return workers_info
 
 
-def count_normal_days(dt_start, dt_end, employments):
+def count_normal_days(dt_start, dt_end, employments, shop):
     """
     Считает количество нормального количества рабочих дней и рабочих часов от dt_start до dt_end
 
@@ -179,6 +179,7 @@ def count_normal_days(dt_start, dt_end, employments):
     year_days = ProductionDay.objects.filter(
         dt__gte=dt_start,
         dt__lt=dt_end,
+        region_id=shop.region_id,
     )
     dts_start_count = list(set([dt_start] + [u.dt_hired for u in employments if u.dt_hired and (u.dt_hired > dt_start)]))
     dts_start_count.sort()
@@ -201,7 +202,7 @@ def count_normal_days(dt_start, dt_end, employments):
     return dts_start_count_dict, year_days
 
 
-def count_difference_of_normal_days(dt_end, employments, dt_start=None):
+def count_difference_of_normal_days(dt_end, employments, dt_start=None, shop=None):
     """
     Функция для подсчета разница между нормальным количеством отработанных дней и часов и фактическими
 
@@ -216,18 +217,18 @@ def count_difference_of_normal_days(dt_end, employments, dt_start=None):
     """
 
     dt_start = dt_start if dt_start else dt.date(dt_end.year, 1, 1)
-    dts_start_count_dict, _ = count_normal_days(dt_start, dt_end, employments)
+    dts_start_count_dict, _ = count_normal_days(dt_start, dt_end, employments, shop)
 
     usrs_ids = [u.id for u in employments]
 
     prev_info = list(Employment.objects.filter(
-        Q(workermonthstat__month__dt_first__gte=dt_start,
-          workermonthstat__month__dt_first__lt=dt_end) |
-        Q(workermonthstat=None), # for doing left join
+        Q(workerday__dt__gte=dt_start,
+          workerday__dt__lt=dt_end) |
+        Q(workerday=None), # for doing left join
         id__in=usrs_ids,
     ).values('id').annotate(
-        count_workdays=Coalesce(Sum('workermonthstat__work_days'), 0),
-        count_hours=Coalesce(Sum('workermonthstat__work_hours'), 0),
+        count_workdays=Coalesce(Count('workerday', filter=Q(workerday__type__in=WorkerDay.TYPES_PAID)), 0),
+        count_hours=Coalesce(Sum('workerday__work_hours', filter=Q(workerday__type__in=WorkerDay.TYPES_PAID)), 0),
     ).order_by('id'))
     prev_info = {user['id']: user for user in prev_info}
     employment_stat_dict = {}

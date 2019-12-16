@@ -1,7 +1,8 @@
 import datetime
-from src.db.models import ProductionDay, ProductionMonth
+from src.db.models import ProductionDay
 from .colors import *
 from src.util.models_converter import BaseConverter
+from django.db.models import Case, When, Sum, Value, IntegerField
 
 class Xlsx_base:
     MONTH_NAMES = {
@@ -13,7 +14,7 @@ class Xlsx_base:
         6: 'Июнь',
         7: 'Июль',
         8: 'Август',
-        9: 'Сентбярь',
+        9: 'Сентябрь',
         10: 'Октябрь',
         11: 'Ноябрь',
         12: 'Декабрь',
@@ -53,14 +54,22 @@ class Xlsx_base:
         if prod_days is None:
             self.prod_days = list(ProductionDay.objects.filter(
                 dt__year=self.month.year,
-                dt__month=self.month.month
+                dt__month=self.month.month,
+                region_id=self.shop.region_id,
             ).order_by('dt'))
-
-        self.prod_month = ProductionMonth.objects.filter(
-            dt_first__month=self.month.month,
-            dt_first__year=self.month.year
-        ).first()
-
+        self.prod_month = ProductionDay.objects.filter(
+            dt__month=self.month.month,
+            dt__year=self.month.year,
+            type__in=ProductionDay.WORK_TYPES,
+            region_id=self.shop.region_id,
+        ).annotate(
+            work_hours=Case(
+                When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
+                When(type=ProductionDay.TYPE_SHORT_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_SHORT_WORK])),
+            )
+        ).aggregate(
+            norm_work_hours=Sum('work_hours', output_field=IntegerField())
+        )
     def construct_dates(self, format, row, col, xlsx_format=str):
         """
         Записывает даты в указанном в format типе в строку под номером row, начиная с col колонки в self.worksheet. Ячейки надо
