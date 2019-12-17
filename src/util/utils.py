@@ -87,7 +87,7 @@ class JsonResponse(object):
 
     @classmethod
     def does_not_exists_error(cls, msg=''):
-        return cls.__base_error_response(400, 'DoesNotExist', msg)
+        return cls.__base_error_response(404, 'DoesNotExist', msg)
 
     @classmethod
     def multiple_objects_returned(cls, msg=''):
