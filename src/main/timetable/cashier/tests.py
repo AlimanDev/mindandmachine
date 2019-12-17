@@ -550,7 +550,7 @@ class TestSetWorkerRestrictions(LocalTestCase):
     
     def test_set_week_availability(self):
         with self.auth_user():
-            
+
             response = self.api_post(self.url, {
                 "worker_id": 1,
                 "shop_id": self.root_shop.id,
@@ -565,7 +565,6 @@ class TestSetWorkerRestrictions(LocalTestCase):
                 'dt_new_week_availability_from': date(2019, 2, 10)
             }
             self.assertEqual(
-
                 Employment.objects.filter(
                     user_id=self.user1.id,
                     shop_id=self.root_shop.id

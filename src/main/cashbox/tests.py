@@ -40,7 +40,8 @@ class TestCashbox(LocalTestCase):
             'work_type_id': 1,
             'number': 1
         })
-        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()['code'], 400)
         self.assertEqual(response.json()['data']['error_type'], 'AlreadyExist')
 
@@ -128,7 +129,7 @@ class TestCashbox(LocalTestCase):
             data
         )
         res_json = response.json()
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 500)
         self.assertEqual(res_json['code'], 500)
         self.assertEqual(res_json['data']['error_type'], 'InternalError')
         self.assertEqual(res_json['data']['error_message'], 'there are cashboxes on this type')
