@@ -191,7 +191,7 @@ def upload_timetable_util(form, timetable_file):
                 user_work_type = shop_work_types.get(cell.value, None)
                 if user_work_type:
                     WorkerCashboxInfo.objects.get_or_create(
-                        worker=employment,
+                        employment=employment,
                         work_type=user_work_type,
                     )
 

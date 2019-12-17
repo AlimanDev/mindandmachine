@@ -244,7 +244,7 @@ class WorkerCashboxInfoConverter(BaseConverter):
     def convert(cls, obj):
         return {
             'id': obj.id,
-            'worker': obj.worker_id,
+            'worker': obj.employment.user_id,
             'work_type': obj.work_type_id,
             'mean_speed': obj.mean_speed,
             'bills_amount': obj.bills_amount,

@@ -336,7 +336,7 @@ def create_timetable(request, form):
     users_without_spec = []
     for employment in employments:
         worker_cashbox_info = WorkerCashboxInfo.objects.filter(
-            worker=employment,
+            employment=employment,
             is_active='True'
         )
         if not worker_cashbox_info.exists():
@@ -532,8 +532,8 @@ def create_timetable(request, form):
     # Информация по кассам для каждого сотрудника
     need_work_types = WorkType.objects.filter(shop_id=shop_id).values_list('id', flat=True)
     worker_cashbox_info = {}
-    for worker_cashbox_inf in list(WorkerCashboxInfo.objects.select_related('worker').filter(work_type_id__in=need_work_types, is_active=True)):
-        key = worker_cashbox_inf.worker.user_id
+    for worker_cashbox_inf in list(WorkerCashboxInfo.objects.select_related('employment').filter(work_type_id__in=need_work_types, is_active=True)):
+        key = worker_cashbox_inf.employment.user_id
         if key not in worker_cashbox_info:
             worker_cashbox_info[key] = []
         worker_cashbox_info[key].append(worker_cashbox_inf)

@@ -201,13 +201,14 @@ class PeriodDemandChangeLogAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerCashboxInfo)
 class WorkerCashboxInfoAdmin(admin.ModelAdmin):
-    list_display = ('worker_last_name', 'work_type_name', 'id')
-    search_fields = ('worker__last_name', 'work_type__name', 'id')
+    list_display = ('worker', 'work_type_name', 'id')
+    search_fields = ('employment__user__last_name', 'work_type__name', 'id')
     list_filter = ('work_type__shop',)
 
     @staticmethod
-    def worker_last_name(instance: WorkerCashboxInfo):
-        return instance.worker.last_name
+    def worker(instance: WorkerCashboxInfo):
+        user = instance.employment.user
+        return f"({user.id}) {user.last_name} {user.first_name}"
 
     @staticmethod
     def work_type_name(instance: WorkerCashboxInfo):

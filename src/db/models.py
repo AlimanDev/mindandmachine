@@ -819,14 +819,14 @@ class PeriodDemandChangeLog(models.Model):
 class WorkerCashboxInfo(models.Model):
     class Meta(object):
         verbose_name = 'Информация по сотруднику-типу работ'
-        unique_together = (('worker', 'work_type'),)
+        unique_together = (('employment', 'work_type'),)
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.worker.user.last_name, self.work_type.name, self.id)
+        return '{}, {}, {}'.format(self.employment.user.last_name, self.work_type.name, self.id)
 
     id = models.BigAutoField(primary_key=True)
 
-    worker = models.ForeignKey(Employment, on_delete=models.PROTECT)
+    employment = models.ForeignKey(Employment, on_delete=models.PROTECT)
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
 
     is_active = models.BooleanField(default=True)
