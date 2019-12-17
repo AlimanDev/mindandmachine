@@ -405,14 +405,20 @@ class FunctionGroup(models.Model):
         'create_predbills_request',
     )
 
-    FUNCS_TUPLE = ((f, f) for f in FUNCS)
+    METHODS = (
+        'GET',
+        'POST',
+        'PUT',
+        'DELETE'
+    )
 
-    __INSIDE_SHOP_TYPES__ = [TYPE_SHOP, TYPE_SUPERSHOP] # for notification
+    FUNCS_TUPLE = ((f, f) for f in FUNCS)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_modified = models.DateTimeField(blank=True, null=True)
     group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name='allowed_functions', blank=True, null=True)
     func = models.CharField(max_length=128, choices=FUNCS_TUPLE)
+    method = models.CharField(max_length=6, choices=((m,m) for m in METHODS), default='GET')
     access_type = models.CharField(choices=TYPES, max_length=32)
     level_up = models.IntegerField(default=0)
     level_down = models.IntegerField(default=100)
