@@ -1,7 +1,7 @@
 import json
 from datetime import date, time, datetime, timedelta
 
-from src.db.models import OperationTemplate, OperationType, PeriodClients
+from src.base.models import OperationTemplate, OperationType, PeriodClients
 from src.main.operation_template import utils
 from src.util.test import LocalTestCase
 

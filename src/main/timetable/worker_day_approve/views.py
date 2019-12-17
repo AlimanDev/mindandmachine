@@ -3,7 +3,7 @@ from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
 from datetime import date
 
-from src.db.models import (
+from src.timetable.models import (
     WorkerDay,
     WorkerDayApprove,
 )

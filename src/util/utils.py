@@ -14,7 +14,7 @@ from django.views.debug import ExceptionReporter
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
 
-from src.db.models import (
+from src.base.models import (
     Employment,
     FunctionGroup,
     Shop,

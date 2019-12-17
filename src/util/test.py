@@ -11,7 +11,7 @@ from django.utils.timezone import now
 from requests import Response
 from src.db import fill_calendar
 
-from src.db.models import (
+from src.base.models import (
     AttendanceRecords,
     Employment,
     Group,

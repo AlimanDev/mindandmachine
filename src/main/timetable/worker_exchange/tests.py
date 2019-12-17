@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from django.test import TestCase
 from django.utils.timezone import now
 
-from src.db.models import (
+from src.base.models import (
     Employment,
     ExchangeSettings,
     WorkType,

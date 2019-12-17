@@ -6,14 +6,18 @@ from decimal import Decimal
 from django.db.models import Q, F, Case, When, Sum, Value, IntegerField
 
 
-from src.db.models import (
+from src.base.models import (
     Employment,
+    Shop,
+)
+from src.timetable.models import (
     WorkerDay,
     WorkType,
     WorkerDayCashboxDetails,
-    PeriodClients,
     ProductionDay,
-    Shop,
+)
+from src.forecast.models import (
+    PeriodClients,
 )
 from src.util.models_converter import BaseConverter
 from src.main.urv.utils import wd_stat_count_total, wd_stat_count

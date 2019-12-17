@@ -2,17 +2,17 @@ from datetime import timedelta, datetime
 from django.db.models import Q
 import json
 
-from src.db.models import (
+from src.base.models import (
     Employment,
-    # CameraCashboxStat,
+    Shop,
+)
+from src.timetable.models import (
     Cashbox,
     WorkerDayCashboxDetails,
     WorkerCashboxInfo,
     WorkerDay,
     WorkType,
-    Shop,
 )
-from django.db.models import Avg
 from src.util.utils import api_method, JsonResponse
 from src.util.forms import FormUtil
 from .forms import GetCashboxesInfo, GetCashiersInfo, ChangeCashierStatus

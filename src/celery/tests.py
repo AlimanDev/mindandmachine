@@ -1,7 +1,7 @@
 from src.util.test import LocalTestCase
 
 
-from src.db.models import (
+from src.base.models import (
     WorkerCashboxInfo,
     WorkerDayCashboxDetails,
 )

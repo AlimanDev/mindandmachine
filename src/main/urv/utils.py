@@ -5,7 +5,7 @@ from django.db.models import (
     Count, F, Sum, Min, Max, Q, Case, When, Value, IntegerField, DateTimeField, FloatField)
 from django.db.models.functions import Extract, Coalesce, Cast, Ceil
 
-from src.db.models import (
+from src.timetable.models import (
     AttendanceRecords,
     WorkerDay
 )

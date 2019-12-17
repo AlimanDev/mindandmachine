@@ -6,10 +6,12 @@ from src.main.download.utils import xlsx_method
 import json
 from src.util.forms import FormUtil
 
-from src.db.models import (
+from src.base.models import (
     Employment,
-    WorkerDay,
     User,
+)
+from src.timetable.models import (
+    WorkerDay,
     ProductionDay,
 )
 

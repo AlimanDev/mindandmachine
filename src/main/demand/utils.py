@@ -6,14 +6,17 @@ from src.util.utils import JsonResponse
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 
-from src.db.models import (
-    PeriodClients,
-    WorkType,
-    OperationType,
-    ProductionDay,
+from src.base.models import (
     Shop,
-
 )
+from src.timetable.models import (
+    ProductionDay,
+)
+from src.forecast.models import (
+    PeriodClients,
+    OperationType,
+)
+
 from src.util.models_converter import BaseConverter, ProductionDayConverter
 from django.core.exceptions import EmptyResultSet
 

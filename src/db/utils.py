@@ -1,6 +1,5 @@
 from django.db import models
-import enum
-from . import models as db_models
+from src.base import models as qos_models
 from django.urls import URLPattern, URLResolver
 from django.conf import settings
 
@@ -86,7 +85,7 @@ def check_func_groups():
     all_views_names = get_all_view_names()
     missing_views = []
     for view in all_views_names:
-        if view not in db_models.FunctionGroup.FUNCS:
+        if view not in qos_models.FunctionGroup.FUNCS:
             missing_views.append(view)
             # if 'The following' not in error_group_message:
             #     error_group_message = 'The following views are not mentioned in FUNCS list: {}, '.format(view)

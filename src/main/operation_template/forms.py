@@ -1,6 +1,6 @@
 from django import forms
 from src.util import forms as util_forms
-from src.db.models import OperationTemplate
+from src.forecast.models import OperationTemplate
 
 
 class GetOperationTemplatesForm(forms.Form):

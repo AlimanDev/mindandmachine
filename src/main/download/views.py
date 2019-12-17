@@ -3,17 +3,19 @@ from dateutil.relativedelta import relativedelta
 from django.apps import apps
 import json
 
-from src.db.models import (
+from src.base.models import (
     Employment,
     Shop,
-    User,
+)
+from src.timetable.models import (
     WorkerDay,
-    PeriodClients,
-    OperationType,
     WorkType,
     AttendanceRecords,
 )
-
+from src.forecast.models import (
+    PeriodClients,
+    OperationType,
+)
 from src.main.shop.forms import GetDepartmentListForm
 from src.main.shop.utils import get_shop_list_stats
 from src.main.urv.utils import wd_stat_count

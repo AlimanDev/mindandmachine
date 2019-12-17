@@ -1,32 +1,36 @@
 from django.contrib import admin
-from src.db.models import (
+from src.base.models import (
     Employment,
     User,
     Shop,
-    WorkerDay,
+    Group,
+    FunctionGroup,
+    WorkerPosition,
+    Region,
+)
+from src.forecast.models import (
     PeriodClients,
     PeriodDemandChangeLog,
     WorkType,
+    PeriodDemand,
+    OperationType,
+    OperationTemplate,
+)
+from src.timetable.models import (
     Cashbox,
     WorkerCashboxInfo,
     WorkerDayCashboxDetails,
     Notifications,
     Slot,
-    PeriodDemand,
     UserWeekdaySlot,
     WorkerConstraint,
     Timetable,
     ProductionDay,
-    Group,
-    FunctionGroup,
-    WorkerPosition,
-    OperationType,
     WorkerDayChangeRequest,
     AttendanceRecords,
     ExchangeSettings,
     Event,
-    OperationTemplate,
-    Region,
+    WorkerDay,
 )
 
 @admin.register(Region)

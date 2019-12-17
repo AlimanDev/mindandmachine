@@ -1,7 +1,7 @@
 from datetime import datetime, time as datetime_time, timedelta
 import datetime as dt
 
-from src.db.models import WorkerDayCashboxDetails, WorkerDay
+from src.timetable.models import WorkerDayCashboxDetails, WorkerDay
 
 
 def time_diff(start, end):

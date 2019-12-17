@@ -3,7 +3,7 @@ from datetime import timedelta, datetime, time
 
 from django.utils.timezone import now
 
-from src.db.models import AttendanceRecords
+from src.base.models import AttendanceRecords
 
 
 class TestURV(LocalTestCase):

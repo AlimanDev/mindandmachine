@@ -11,16 +11,18 @@ from django.db.models import Q, F, Exists
 from django.utils import timezone
 
 from src.main.urv.utils import wd_stat_count_total
-from src.db.models import (
+from src.base.models import (
     Employment,
     User,
+    WorkerPosition,
+)
+from src.timetable.models import (
     WorkerDay,
     WorkerDayChangeRequest,
     ProductionDay,
     WorkerCashboxInfo,
     WorkerConstraint,
     WorkerDayCashboxDetails,
-    WorkerPosition,
     WorkType,
     UserWeekdaySlot,
     Shop,

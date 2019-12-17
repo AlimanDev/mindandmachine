@@ -1,6 +1,6 @@
 import json
 import datetime
-from src.db.models import Employment, Timetable, WorkerDay, Slot, WorkerDayCashboxDetails, WorkerCashboxInfo
+from src.base.models import Employment, Timetable, WorkerDay, Slot, WorkerDayCashboxDetails, WorkerCashboxInfo
 from src.util.test import LocalTestCase
 from django.utils.timezone import now
 

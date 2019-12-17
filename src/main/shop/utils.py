@@ -5,9 +5,11 @@ from django.db.models import (
     Subquery, OuterRef
     )
 from django.db.models.functions import Coalesce
-from src.db.models import (
+from src.base.models import (
     Employment,
     Shop,
+)
+from src.timetable.models import (
     Timetable,
 )
 from dateutil.relativedelta import relativedelta

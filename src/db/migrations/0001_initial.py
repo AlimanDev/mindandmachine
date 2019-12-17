@@ -7,7 +7,7 @@ import django.contrib.auth.validators
 from django.db import migrations, models
 import django.db.models.deletion
 import django.utils.timezone
-import src.db.models
+import src.base.models
 import src.db.utils
 
 class EnumField(models.IntegerField):
@@ -70,7 +70,7 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': 'Пользователи',
             },
             managers=[
-                ('objects', src.db.models.WorkerManager()),
+                ('objects', src.base.models.WorkerManager()),
             ],
         ),
         migrations.CreateModel(

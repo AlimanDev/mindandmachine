@@ -1,6 +1,6 @@
 from .base_class import Xlsx_base
 from math import ceil
-from src.db.models import (
+from src.timetable.models import (
     ProductionDay,
     WorkerDay,
 )

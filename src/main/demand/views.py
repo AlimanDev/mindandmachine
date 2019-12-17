@@ -1,14 +1,19 @@
 from datetime import datetime, timedelta, time, date
 
-from src.db.models import (
+from src.base.models import (
     Employment,
-    PeriodClients,
-    WorkType,
-    PeriodDemandChangeLog,
     Shop,
-    Event,
     User,
     FunctionGroup,
+)
+from src.timetable.models import (
+    WorkType,
+    Event,
+)
+
+from src.forecast.models import (
+    PeriodClients,
+    PeriodDemandChangeLog,
     OperationType,
 )
 from dateutil.relativedelta import relativedelta

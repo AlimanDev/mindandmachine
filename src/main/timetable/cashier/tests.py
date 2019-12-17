@@ -6,7 +6,7 @@ from unittest import skip
 from django.conf import settings
 from django.utils import timezone
 
-from src.db.models import (
+from src.base.models import (
     Employment,
     User,
     WorkerDay,

@@ -1,14 +1,14 @@
-from src.db.models import (
+from src.base.models import (
     Employment,
+    Shop,
+)
+from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     ProductionDay,
-    User,
-    Shop,
 )
 import json
 from datetime import time
-from ..utils import timediff
 import datetime as dt
 from django.db.models import Sum, Q, Count
 from django.db.models.functions import Coalesce

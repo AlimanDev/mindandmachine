@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from src.db.models import Notifications, Event, WorkerDayCashboxDetails, WorkerDay
+from src.base.models import Notifications, Event, WorkerDayCashboxDetails, WorkerDay
 from src.util.test import LocalTestCase
 
 
