@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='workercashboxinfo',
             name='employment',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='db.Employment'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='db.Employment'),
         ),
         migrations.RunSQL(
             'update db_workercashboxinfo as w set employment_id=e.id from db_employment e where w.worker_id=e.user_id'

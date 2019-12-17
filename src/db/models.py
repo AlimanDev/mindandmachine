@@ -822,7 +822,7 @@ class WorkerCashboxInfo(models.Model):
         unique_together = (('employment', 'work_type'),)
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.worker.user.last_name, self.work_type.name, self.id)
+        return '{}, {}, {}'.format(self.employment.user.last_name, self.work_type.name, self.id)
 
     id = models.BigAutoField(primary_key=True)
 
