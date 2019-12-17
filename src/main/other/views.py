@@ -15,7 +15,6 @@ from .forms import (
 from collections import defaultdict
 
 
-
 @api_method('GET', UserAllowedFuncsForm, check_permissions=False)
 def get_user_allowed_funcs(request, form):
     allowed_functions = FunctionGroup.objects.filter(group__employment__user_id=form['worker_id'])

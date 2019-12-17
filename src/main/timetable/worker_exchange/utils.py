@@ -138,7 +138,6 @@ def confirm_vacancy(vacancy_id, user):
     # todo: add better time checker if not the same
     WorkerDayCashboxDetails.objects.filter(
         worker_day=workerday,
-
     )
 
 
