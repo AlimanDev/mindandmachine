@@ -1,21 +1,4 @@
 from django.contrib import admin
-from src.base.models import (
-    Employment,
-    User,
-    Shop,
-    Group,
-    FunctionGroup,
-    WorkerPosition,
-    Region,
-)
-from src.forecast.models import (
-    PeriodClients,
-    PeriodDemandChangeLog,
-    WorkType,
-    PeriodDemand,
-    OperationType,
-    OperationTemplate,
-)
 from src.timetable.models import (
     Cashbox,
     WorkerCashboxInfo,
@@ -32,77 +15,6 @@ from src.timetable.models import (
     Event,
     WorkerDay,
 )
-
-@admin.register(Region)
-class RegionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'code')
-
-@admin.register(WorkerPosition)
-class WorkerPositionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title')
-    search_fields = ('title',)
-
-
-@admin.register(OperationType)
-class OperationTypeAdmin(admin.ModelAdmin):
-    list_display = ('id', 'work_type_name', 'name', 'speed_coef', 'do_forecast', 'period_demand_params')
-    list_filter = ('work_type__shop',)
-    search_fields = ('work_type__shop', 'name')
-
-    @staticmethod
-    def work_type_name(instance: OperationType):
-        return instance.work_type.name if instance.work_type else 'Без типа работ'
-
-
-@admin.register(User)
-class QsUserAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'shop_title', 'id')
-    search_fields = ('first_name', 'last_name', 'shop_title', 'workercashboxinfo__work_type__name', 'id')
-    # list_filter = ('employment__shop', )
-
-    # list_display = ('first_name', 'last_name', 'employment__shop__title', 'parent_title', 'work_type_name', 'id')
-    # search_fields = ('first_name', 'last_name', 'employment__shop__parent__title', 'workercashboxinfo__work_type__name', 'id')
-
-    # @staticmethod
-    # def parent_title(instance: User):
-    #     if instance.shop and instance.shop.parent:
-    #         return instance.shop.parent_title()
-    #     return 'без магазина'
-
-    @staticmethod
-    def shop_title(instance: User):
-        res = ', '.join(i.shop.title for i in instance.employments.all().select_related('shop'))
-        return res
-    '''
-    @staticmethod
-    def work_type_name(instance: User):
-        cashboxinfo_set = instance.workercashboxinfo_set.all().select_related('work_type')
-        return ' '.join(['"{}"'.format(cbi.work_type.name) for cbi in cashboxinfo_set])
-    '''
-
-@admin.register(Shop)
-class ShopAdmin(admin.ModelAdmin):
-    list_display = ('title', 'parent_title', 'id')
-    search_fields = ('title', 'parent__title', 'id')
-
-    @staticmethod
-    def parent_title(instance: Shop):
-        return instance.parent_title()
-
-
-@admin.register(WorkType)
-class WorkTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'shop_title', 'parent_title', 'dttm_added', 'id')
-    search_fields = ('name', 'shop__title', 'shop__parent__title', 'id')
-    list_filter = ('shop', )
-
-    @staticmethod
-    def shop_title(instance: WorkType):
-        return instance.shop.title
-
-    @staticmethod
-    def parent_title(instance: WorkType):
-        return instance.shop.parent_title()
 
 
 @admin.register(Slot)
@@ -172,35 +84,6 @@ class CashboxAdmin(admin.ModelAdmin):
     def parent_title(instance: Cashbox):
         return instance.type.shop.parent_title()
 
-
-class PeriodDemandAdmin(admin.ModelAdmin):
-    list_display = ('id', 'operation_type_name', 'value', 'dttm_forecast', 'type',)
-    search_fields = ('dttm_forecast', 'id')
-    list_filter = ('operation_type__work_type_id', 'type')
-
-    @staticmethod
-    def operation_type_name(instance: PeriodDemand):
-        return instance.operation_type.name or instance.operation_type.id
-
-
-@admin.register(PeriodClients)
-class PeriodClientsAdmin(PeriodDemandAdmin):
-    pass
-
-
-@admin.register(PeriodDemandChangeLog)
-class PeriodDemandChangeLogAdmin(admin.ModelAdmin):
-    list_display = ('operation_type_name', 'dttm_from', 'dttm_to')
-    search_fields = ('operation_type_name', 'operation_type__work_type__shop__title', 'id')
-    list_filter = ('operation_type__work_type__shop', )
-
-    @staticmethod
-    def operation_type_name(instance: PeriodDemandChangeLog):
-        return instance.operation_type.name
-
-    @staticmethod
-    def shop_title(instance: PeriodDemandChangeLog):
-        return instance.operation_type.work_type.shop.title
 
 
 @admin.register(WorkerCashboxInfo)
@@ -321,25 +204,9 @@ class ProductionDayAdmin(admin.ModelAdmin):
     list_display = ('dt', 'type')
 
 
-
-@admin.register(Group)
-class GroupAdmin(admin.ModelAdmin):
-    list_dispaly = ('id', 'dttm_added', 'name', 'subordinates')
-    list_filter = ('id', 'name')
-
-
-@admin.register(FunctionGroup)
-class FunctionGroupAdmin(admin.ModelAdmin):
-    list_display = ('id', 'access_type', 'group', 'func', 'level_down', 'level_up')
-    list_filter = ('access_type', 'group', 'func')
-    search_fields = ('id',)
-
-
-
 @admin.register(WorkerDayChangeRequest)
 class WorkerDayChangeRequestAdmin(admin.ModelAdmin):
     pass
-
 
 
 @admin.register(AttendanceRecords)
@@ -356,17 +223,3 @@ class ExchangeSettingsAdmin(admin.ModelAdmin):
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
     pass
-
-
-@admin.register(OperationTemplate)
-class OperationTemplateAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'operation_type')
-    list_filter = ('operation_type', )
-    search_fields = ('name',)
-
-
-@admin.register(Employment)
-class EmploymentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'shop', 'user')
-    list_filter = ('shop', 'user')
-    search_fields = ('user__first_name', 'user__last_name', 'shop__title', 'shop__parent__title')
