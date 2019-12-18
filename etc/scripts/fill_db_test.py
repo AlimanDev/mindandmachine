@@ -28,9 +28,6 @@ from src.db.models import (
     Region,
 )
 from etc.scripts import fill_calendar
-from src.util.models_converter import (
-    WorkerDayConverter,
-)
 
 
 def create_shop(shop_id, region_id):

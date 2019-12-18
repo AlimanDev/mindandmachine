@@ -10,7 +10,7 @@ from .forms import (
 )
 
 from src.util.utils import api_method, JsonResponse
-from src.util.models_converter import UserConverter, BaseConverter, WorkerDayConverter
+from src.util.models_converter import UserConverter, BaseConverter
 from datetime import datetime, timedelta
 from django.core.exceptions import ObjectDoesNotExist
 

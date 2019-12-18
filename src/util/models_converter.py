@@ -50,8 +50,9 @@ class Converter(BaseConverter):
         elements:list, tuple, QuerySet - данные
         ModelClass - класс модели, которую конвертируем
         fields: list - поля из модели, которые должны быть в результирующем json
-        special_converters: dict - словарь, где ключом является название поля, а значением
+        custom_converters: dict - словарь, где ключом является название поля, а значением
         функция которая применяется к нему
+        out_array: bool - на выходе должен быть список даже если элемент один
         '''
         special_converters = custom_converters if custom_converters else {}
         if not isinstance(elements, (list, tuple, models.QuerySet)):
@@ -136,9 +137,9 @@ class Converter(BaseConverter):
         return elements if len(elements) > 1 or out_array else elements[0]
 
 
-class EmploymentConverter(BaseConverter):
+class EmploymentConverter(Converter):
     @classmethod
-    def convert(cls, obj: Employment):
+    def convert_function(cls, obj: Employment):
         user = obj.user
         res = UserConverter.convert(user)
         res.update({
@@ -157,9 +158,9 @@ class EmploymentConverter(BaseConverter):
         return res
 
 
-class UserConverter(BaseConverter):
+class UserConverter(Converter):
     @classmethod
-    def convert(cls, obj: User):
+    def convert_function(cls, obj: User):
         return {
             'id': obj.id,
             'username': obj.username,
@@ -288,7 +289,7 @@ class NotificationConverter(Converter):
         }
 
 
-class AttendanceRecordsConverter(BaseConverter):
+class AttendanceRecordsConverter(Converter):
     __TYPES = {
         AttendanceRecords.TYPE_COMING: 'пришел',
         AttendanceRecords.TYPE_LEAVING: 'ушел',
@@ -301,7 +302,7 @@ class AttendanceRecordsConverter(BaseConverter):
         return cls.__TYPES.get(obj.type, '')
 
     @classmethod
-    def convert(cls, obj):
+    def convert_function(cls, obj):
         return {
             'id': obj.id,
             'dttm': cls.convert_datetime(obj.dttm),

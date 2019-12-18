@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 
 from src.db.models import WorkerDay, User
 from src.util import forms as util_forms
-from src.util.models_converter import WorkerDayConverter, BaseConverter
+from src.util.models_converter import BaseConverter
 
 
 class GetCashiersListForm(forms.Form):

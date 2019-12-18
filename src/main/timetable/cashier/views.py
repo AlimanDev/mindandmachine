@@ -110,7 +110,7 @@ def get_cashiers_list(request, form):
         shop_id=shop_id,
     ).filter(q).select_related('user').order_by('id'))
 
-    return JsonResponse.success([EmploymentConverter.convert(x) for x in employments])
+    return JsonResponse.success(EmploymentConverter.convert(employments, out_array=True))
 
 
 @api_method('GET', GetCashiersListForm)
@@ -252,7 +252,7 @@ def select_cashiers(request, form):
 
         employments = [x for x in employments if x.user_id in set(y.worker_id for y in worker_days)]
 
-    return JsonResponse.success([EmploymentConverter.convert(x) for x in employments])
+    return JsonResponse.success(EmploymentConverter.convert(employments, out_array=True))
 
 
 @api_method('GET', GetCashierTimetableForm)
@@ -389,8 +389,7 @@ def get_cashier_timetable(request, form):
         days_response = [
             {
                 'day': WorkerDayConverter.convert(wd),
-                'change_log': [WorkerDayChangeLogConverter.convert(x) for x in
-                               worker_day_change_log.get(wd.id, [])],
+                'change_log': WorkerDayChangeLogConverter.convert(worker_day_change_log.get(wd.id, [])),
                 'change_requests': [],
             }
             for wd in worker_days

@@ -79,10 +79,10 @@ def get_user_urv(request, form):
         'pages': paginator.count,
         'amount_per_page': amount_per_page,
     }
-
-    return JsonResponse.success([
-        AttendanceRecordsConverter.convert(record) for record in user_records
-    ], info)
+    return JsonResponse.success(
+        AttendanceRecordsConverter.convert(user_records.object_list), 
+        info
+    )
 
 
 @api_method('GET', GetUserUrvForm)
