@@ -75,6 +75,7 @@ class Converter(BaseConverter):
         elif ModelClass:
             # Получаем названия особенных полей
             for field in fields if fields else ModelClass._meta.get_fields():
+                field_name = ''
                 if isinstance(field, str):
                     rel_fields = field.split('__')
                     field_name = field
@@ -85,20 +86,20 @@ class Converter(BaseConverter):
                         for name in rel_fields[:-1]:
                             tmp_model = tmp_model._meta.get_field(name).remote_field.model
                         field = tmp_model._meta.get_field(rel_fields[-1])
-                        field.name = field_name
-                if field.name in special_converters:
+                field_name = field.name if not field_name else field_name
+                if field_name in special_converters:
                     continue
                 if isinstance(field, models.fields.DateTimeField):
-                    special_converters[field.name] = self.convert_datetime
+                    special_converters[field_name] = self.convert_datetime
                 elif isinstance(field, models.fields.DateField):
-                    special_converters[field.name] = self.convert_date
+                    special_converters[field_name] = self.convert_date
                 elif isinstance(field, models.fields.TimeField):
-                    special_converters[field.name] = self.convert_time
+                    special_converters[field_name] = self.convert_time
                 elif isinstance(field, models.ForeignKey):
-                    if fields and field.name + '_id' not in fields:
-                        special_converters[field.name] = lambda x: x.id if x and not isinstance(x, int) else x
+                    if fields and field_name + '_id' not in fields:
+                        special_converters[field_name] = lambda x: x.id if x and not isinstance(x, int) else x
                 elif isinstance(field, models.ManyToManyField):
-                    special_converters[field.name] = lambda x: [el.id for el in x] if x else []
+                    special_converters[field_name] = lambda x: [el.id for el in x] if x else []
             if isinstance(elements, models.QuerySet):
                 if fields:
                     elements = elements.values(*fields)
@@ -156,9 +157,9 @@ class EmploymentConverter(BaseConverter):
         return res
 
 
-class UserConverter(Converter):
+class UserConverter(BaseConverter):
     @classmethod
-    def convert_function(cls, obj: User):
+    def convert(cls, obj: User):
         return {
             'id': obj.id,
             'username': obj.username,

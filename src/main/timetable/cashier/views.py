@@ -106,9 +106,9 @@ def get_cashiers_list(request, form):
         q &= Q(dt_hired__isnull=True) | Q(dt_hired__lte=form['dt_to'])
         q &= Q(dt_fired__isnull=True) | Q(dt_fired__gt=form['dt_from'])
 
-    employments = Employment.objects.filter(
+    employments = list(Employment.objects.filter(
         shop_id=shop_id,
-    ).filter(q).select_related('user').order_by('id')
+    ).filter(q).select_related('user').order_by('id'))
 
     return JsonResponse.success([EmploymentConverter.convert(x) for x in employments])
 
