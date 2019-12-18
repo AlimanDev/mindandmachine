@@ -8,7 +8,7 @@ from src.conf.djconfig import QOS_DATE_FORMAT
 class TestDownload(LocalTestCase):
 
     def setUp(self):
-        super().setUp()
+        super().setUp(calendar=True)
 
     def api_get(self, *args, **kwargs):
         response = self.client.get(*args, **kwargs)
@@ -23,7 +23,7 @@ class TestDownload(LocalTestCase):
         ))
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(tabel[tabel.columns[1]][15], 'Васнецов6 Иван6 None')
+        self.assertEqual(tabel[tabel.columns[1]][1], 'Магазин: Shop1')
 
 
     def test_get_demand_xlsx(self):

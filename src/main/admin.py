@@ -17,8 +17,6 @@ from src.db.models import (
     WorkerConstraint,
     Timetable,
     ProductionDay,
-    ProductionMonth,
-    WorkerMonthStat,
     Group,
     FunctionGroup,
     WorkerPosition,
@@ -28,8 +26,12 @@ from src.db.models import (
     ExchangeSettings,
     Event,
     OperationTemplate,
+    Region,
 )
 
+@admin.register(Region)
+class RegionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'code')
 
 @admin.register(WorkerPosition)
 class WorkerPositionAdmin(admin.ModelAdmin):
@@ -199,13 +201,14 @@ class PeriodDemandChangeLogAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerCashboxInfo)
 class WorkerCashboxInfoAdmin(admin.ModelAdmin):
-    list_display = ('worker_last_name', 'work_type_name', 'id')
-    search_fields = ('worker__last_name', 'work_type__name', 'id')
+    list_display = ('worker', 'work_type_name', 'id')
+    search_fields = ('employment__user__last_name', 'work_type__name', 'id')
     list_filter = ('work_type__shop',)
 
     @staticmethod
-    def worker_last_name(instance: WorkerCashboxInfo):
-        return instance.worker.last_name
+    def worker(instance: WorkerCashboxInfo):
+        user = instance.employment.user
+        return f"({user.id}) {user.last_name} {user.first_name}"
 
     @staticmethod
     def work_type_name(instance: WorkerCashboxInfo):
@@ -314,10 +317,6 @@ class ProductionDayAdmin(admin.ModelAdmin):
     list_display = ('dt', 'type')
 
 
-@admin.register(WorkerMonthStat)
-class WorkerMonthStatAdmin(admin.ModelAdmin):
-    list_display = ('worker_id', 'month')
-
 
 @admin.register(Group)
 class GroupAdmin(admin.ModelAdmin):
@@ -337,10 +336,6 @@ class FunctionGroupAdmin(admin.ModelAdmin):
 class WorkerDayChangeRequestAdmin(admin.ModelAdmin):
     pass
 
-
-@admin.register(ProductionMonth)
-class ProductionMonthAdmin(admin.ModelAdmin):
-    list_display = ('id', 'dt_first', 'total_days', 'norm_work_days', 'norm_work_hours')
 
 
 @admin.register(AttendanceRecords)

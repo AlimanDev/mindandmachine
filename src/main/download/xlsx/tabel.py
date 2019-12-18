@@ -179,7 +179,7 @@ class Tabel_xlsx(Xlsx_base):
             'border': 1,
         })
         self.worksheet.write_string('C11', 'Запланированные часы', text_f)
-        self.worksheet.write_number('D11', self.prod_month.norm_work_hours, number_f)
+        self.worksheet.write_number('D11', self.prod_month.get('norm_work_hours', 0), number_f)
 
         #
         # add workday types:

@@ -23,6 +23,7 @@ from src.db.models import (
     WorkerPosition,
     WorkType,
     UserWeekdaySlot,
+    Shop,
 )
 
 from src.main.other.notification.utils import send_notification
@@ -204,9 +205,9 @@ def select_cashiers(request, form):
             work_type__shop_id=shop_id,
             is_active=True,
             work_type_id__in=work_types
-        ).values_list('worker_id', flat=True)
+        ).values_list('employment_id', flat=True)
 
-        employments = employments.filter(id__in=employments)
+        employments = employments.filter(id__in=employments_ids)
 
 
 
@@ -298,6 +299,7 @@ def get_cashier_timetable(request, form):
         }
 
     """
+    shop = Shop.objects.get(id=form['shop_id'])
     from_dt = form['from_dt']
     to_dt = form['to_dt']
     checkpoint = FormUtil.get_checkpoint(form)
@@ -339,6 +341,7 @@ def get_cashier_timetable(request, form):
                 dt__gte=from_dt,
                 dt__lte=to_dt,
                 type=ProductionDay.TYPE_HOLIDAY,
+                region_id=shop.region_id,
             )
         ]
 
@@ -474,13 +477,13 @@ def get_cashier_info(request, form):
         response['general_info'] = EmploymentConverter.convert(employment)
 
     if 'work_type_info' in form['info']:
-        worker_cashbox_info = WorkerCashboxInfo.objects.filter(worker_id=worker.id, is_active=True)
+        worker_cashbox_info = WorkerCashboxInfo.objects.filter(employment=employment, is_active=True)
         work_types = WorkType.objects.filter(shop_id=form['shop_id'])
         response['work_type_info'] = {
             'worker_cashbox_info': Converter.convert(
                 worker_cashbox_info, 
                 WorkerCashboxInfo, 
-                fields=['id', 'worker_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration']
+                fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration']
             ),
             'work_type': {
                 x['id']: x for x in Converter.convert(
@@ -796,10 +799,12 @@ def set_worker_day(request, form):
             tm_work_end = form['tm_work_end']
             dttm_work_end = datetime.combine(dt, tm_work_end) if tm_work_end > form['tm_work_start'] else \
                 datetime.combine(dt + timedelta(days=1), tm_work_end)
-
+            break_triplets = json.loads(shop.break_triplets)
+            work_hours = WorkerDay.count_work_hours(break_triplets, dttm_work_start, dttm_work_end)
             wd_args.update({
                 'dttm_work_start': dttm_work_start,
                 'dttm_work_end': dttm_work_end,
+                'work_hours': work_hours,
             })
 
         new_worker_day = WorkerDay.objects.create(
@@ -1045,7 +1050,7 @@ def set_worker_restrictions(request, form):
 
     # WorkTypes
     work_type_info = form.get('work_type_info', [])
-    curr_work_types = {wci.work_type_id: wci for wci in WorkerCashboxInfo.objects.filter(worker=employment,)}
+    curr_work_types = {wci.work_type_id: wci for wci in WorkerCashboxInfo.objects.filter(employment=employment,)}
     
     for work_type in work_type_info:
         wci = curr_work_types.pop(work_type['work_type_id'], None)
@@ -1056,7 +1061,7 @@ def set_worker_restrictions(request, form):
         else:
             try:
                 WorkerCashboxInfo.objects.create(
-                    worker=employment,
+                    employment=employment,
                     work_type_id=work_type['work_type_id'],
                     priority=work_type['priority'],
                 )
@@ -1224,6 +1229,8 @@ def dublicate_cashier_table(request, form):
         new_wd = WorkerDay.objects.create(
             worker_id=to_worker_id,
             dt=blank_day.dt,
+            shop_id=blank_day.shop_id,
+            work_hours=blank_day.work_hours,
             type=blank_day.type,
             dttm_work_start=blank_day.dttm_work_start,
             dttm_work_end=blank_day.dttm_work_end,

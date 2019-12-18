@@ -12,7 +12,7 @@ from src.db.models import (
     WorkerDay,
     WorkerDayChangeRequest
 )
-from src.util.models_converter import BaseConverter, WorkerDayConverter
+from src.util.models_converter import BaseConverter
 from src.util.test import LocalTestCase
 
 def create_stuff(shop_id: int) -> User:

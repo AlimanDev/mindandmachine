@@ -3,6 +3,7 @@ import re
 import time
 import datetime
 import paramiko
+import json
 from src.util.utils import JsonResponse
 from src.conf.djconfig import ALLOWED_UPLOAD_EXTENSIONS
 from django.utils.datastructures import MultiValueDictKeyError
@@ -132,6 +133,7 @@ def upload_timetable_util(form, timetable_file):
          shop_id(int): required = True
     """
     shop_id = form['shop_id']
+    shop = Shop.objects.get(id=shop_id)
 
     try:
         worksheet = load_workbook(timetable_file).active
@@ -189,7 +191,7 @@ def upload_timetable_util(form, timetable_file):
                 user_work_type = shop_work_types.get(cell.value, None)
                 if user_work_type:
                     WorkerCashboxInfo.objects.get_or_create(
-                        worker=employment,
+                        employment=employment,
                         work_type=user_work_type,
                     )
 
@@ -218,10 +220,16 @@ def upload_timetable_util(form, timetable_file):
                 ).delete()
                 for wd in wd_query_set.order_by('-id'):  # потому что могут быть родители у wd
                     wd.delete()
+                work_hours = 0
+                if (work_type in WorkerDay.TYPES_PAID):
+                    break_triplets = json.loads(shop.break_triplets)
+                    work_hours = WorkerDay.count_work_hours(break_triplets, dttm_work_start, dttm_work_end)
                 new_wd = WorkerDay.objects.create(
                     worker=u,
                     employment=employment,
+                    shop_id=shop_id,
                     dt=dt,
+                    work_hours=work_hours,
                     dttm_work_start=dttm_work_start,
                     dttm_work_end=dttm_work_end,
                     type=work_type

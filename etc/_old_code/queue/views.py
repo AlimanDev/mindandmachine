@@ -173,6 +173,7 @@ def process_forecast(request, form):
     day_info = ProductionDay.objects.filter(
         dt__gte=dt_now - timedelta(days=366),
         dt__lte=dt_now + timedelta(days=predict2days),
+        region_id=shop.region_id,
     )
 
     queue = PeriodQueues.objects.filter(

@@ -297,10 +297,11 @@ def get_cashiers_info(request, form):
             })
 
     user_ids = response.keys()
-    worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('work_type', 'worker').filter(worker__user_id__in=user_ids, is_active=True)
+    worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('work_type', 'employment').filter(
+        employment__user_id__in=user_ids, is_active=True)
     result = {}
     for worker_cashboxes_type in list(worker_cashboxes_types):
-        key = worker_cashboxes_type.worker_id
+        key = worker_cashboxes_type.employment.user_id
         if key not in result:
             result[key] = []
         result[key].append(worker_cashboxes_type)
@@ -311,7 +312,7 @@ def get_cashiers_info(request, form):
             response[user_id]['work_types'] = Converter.convert(
                 worker_cashboxes_types.get(user_id),
                 WorkerCashboxInfo,
-                fields=['id', 'worker_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],
+                fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],
             )
 
     return JsonResponse.success(response)

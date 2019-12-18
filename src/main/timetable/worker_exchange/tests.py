@@ -15,7 +15,9 @@ from src.db.models import (
     OperationType,
     PeriodClients,
     Event,
+    Region,
 )
+from etc.scripts import fill_calendar
 from src.util.test import LocalTestCase
 from .utils import create_vacancies_and_notify, cancel_vacancies, workers_exchange
 
@@ -200,6 +202,15 @@ class Test_auto_worker_exchange(TestCase):
     def setUp(self):
         super().setUp()
 
+        self.region = Region.objects.create(
+            id=1,
+            name='Москва',
+            code=77,
+        )
+
+        fill_calendar.main('2018.1.1', '2019.1.1', region_id=1)
+
+
         self.root_shop = Shop.objects.create(
             title='SuperShop1',
             tm_shop_opens=datetime.time(7, 0, 0),
@@ -208,12 +219,14 @@ class Test_auto_worker_exchange(TestCase):
 
         self.shop = Shop.objects.create(
             parent=self.root_shop,
-            title='Shop1'
+            title='Shop1',
+            region=self.region,
         )
 
         self.shop2 = Shop.objects.create(
             parent=self.root_shop,
-            title='Shop2'
+            title='Shop2',
+            region=self.region,
         )
 
         self.work_type1 = WorkType.objects.create(
