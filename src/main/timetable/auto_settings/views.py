@@ -25,14 +25,11 @@ from src.db.models import (
     ProductionDay,
 )
 from src.util.models_converter import (
-    TimetableConverter,
     WorkTypeConverter,
     EmploymentConverter,
-    WorkerConstraintConverter,
-    WorkerCashboxInfoConverter,
     WorkerDayConverter,
     BaseConverter,
-    UserWeekdaySlotConverter,
+    Converter,
 )
 from src.util.utils import api_method, JsonResponse
 from .forms import (
@@ -75,7 +72,7 @@ def get_status(request, form):
     except Timetable.DoesNotExist:
         return JsonResponse.does_not_exists_error()
 
-    return JsonResponse.success(TimetableConverter.convert(tt))
+    return JsonResponse.success(Converter.convert(tt, Timetable, fields=['id', 'shop_id', 'dt', 'status', 'dttm_status_change']))
 
 
 @api_method(
@@ -695,9 +692,30 @@ def create_timetable(request, form):
         'cashiers': [
             {
                 'general_info': EmploymentConverter.convert(e),
-                'constraints_info': [WorkerConstraintConverter.convert(x) for x in constraints.get(e.user_id, [])],
-                'availability_info': [UserWeekdaySlotConverter.convert(x) for x in availabilities.get(e.user_id, [])],
-                'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info.get(e.user_id, [])],
+                'constraints_info': Converter.convert(
+                    constraints.get(e.user_id, []), 
+                    WorkerConstraint, 
+                    fields=['id', 'worker_id', 'employment__week_availability', 'weekday', 'tm', 'is_lite'],#change algo worker -> worker_id
+                ),
+                'availability_info': Converter.convert(
+                    availabilities.get(e.user_id, []), 
+                    UserWeekdaySlot, 
+                    fields=['id', 'worker_id', 'employment__week_availability', 'weekday', 'slot', 'is_sutable'], #change algo worker -> worker_id
+                    custom_converters={
+                        'slot': lambda obj: {
+                            'id': obj.id,
+                            'shop': obj.shop_id,
+                            'tm_start': BaseConverter.convert_time(obj.tm_start),
+                            'tm_end':  BaseConverter.convert_time(obj.tm_end),
+                            'name': obj.name
+                        }
+                    }
+                ),
+                'worker_cashbox_info': Converter.convert(
+                    worker_cashbox_info.get(e.user_id, []), 
+                    WorkerCashboxInfo, 
+                    fields=['id', 'worker_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],#change algo worker -> worker_id work_type -> work_type_id
+                ),
                 'workdays': [WorkerDayConverter.convert(x) for x in worker_day.get(e.user_id, [])],
                 'prev_data': [WorkerDayConverter.convert(x) for x in prev_data.get(e.user_id, [])],
                 'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),

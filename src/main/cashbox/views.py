@@ -13,8 +13,7 @@ from src.util.forms import FormUtil
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import (
     WorkTypeConverter,
-    CashboxConverter,
-    OperationTypeConverter,
+    Converter,
 )
 from .forms import (
     GetTypesForm,
@@ -121,10 +120,18 @@ def get_cashboxes(request, form):
         type__id__in=list(map(lambda x: x.id, work_types)),
         dttm_deleted__isnull=True,
     ).order_by('number', 'id')
-
+    converted_work_types = Converter.convert(
+        work_types, 
+        WorkType, 
+        fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+    )
     return JsonResponse.success({
-        'work_types': {x.id: WorkTypeConverter.convert(x) for x in work_types},
-        'cashboxes': [CashboxConverter.convert(x) for x in cashboxes]
+        'work_types': {x['id']: x for x in converted_work_types},
+        'cashboxes': Converter.convert(
+            cashboxes, 
+            Cashbox, 
+            fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'number', 'bio'],
+        )
     })
 
 
@@ -191,8 +198,16 @@ def create_cashbox(request, form):
     send_notification('C', cashbox, sender=request.user)
 
     return JsonResponse.success({
-        'work_type': WorkTypeConverter.convert(work_type),
-        'cashbox': CashboxConverter.convert(cashbox)
+        'work_type': Converter.convert(
+            work_type, 
+            WorkType, 
+            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+        ),
+        'cashbox': Converter.convert(
+            cashbox, 
+            Cashbox, 
+            fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'number', 'bio'],
+        )
     })
 
 
@@ -249,7 +264,11 @@ def delete_cashbox(request, form):
     send_notification('D', cashbox, sender=request.user)
 
     return JsonResponse.success(
-        CashboxConverter.convert(cashbox)
+        Converter.convert(
+            cashbox, 
+            Cashbox, 
+            fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'number', 'bio']
+        )
     )
 
 
@@ -317,7 +336,11 @@ def update_cashbox(request, form):
     cashbox = Cashbox.objects.create(type=to_work_type, number=cashbox_number)
 
     return JsonResponse.success(
-        CashboxConverter.convert(cashbox)
+        Converter.convert(
+            cashbox, 
+            Cashbox, 
+            fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'number', 'bio']
+        )
     )
 
 
@@ -361,7 +384,12 @@ def create_work_type(request, form):
 
     send_notification('C', new_work_type, sender=request.user)
 
-    return JsonResponse.success(WorkTypeConverter.convert(new_work_type))
+    return JsonResponse.success(Converter.convert(
+            new_work_type,
+            WorkType,
+            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+        )
+    )
 
 
 @api_method(
@@ -405,7 +433,12 @@ def delete_work_type(request, form):
 
     send_notification('D', work_type, sender=request.user)
 
-    return JsonResponse.success(WorkTypeConverter.convert(work_type))
+    return JsonResponse.success(Converter.convert(
+            work_type,
+            WorkType,
+            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+        )
+    )
 
 
 @api_method(
@@ -511,10 +544,12 @@ def edit_work_type(request, form):
     Slot.objects.filter(id__in=existing_slots.keys()).update(dttm_deleted=datetime.datetime.now())
 
     return JsonResponse.success({
-        'active_operation_types': [
-            OperationTypeConverter.convert(ot) for ot in OperationType.objects.filter(
+        'active_operation_types': Converter.convert(
+            OperationType.objects.filter(
                 work_type_id=work_type_id, dttm_deleted__isnull=True
-            )
-        ]
+            ), 
+            OperationType, 
+            fields=['id', 'name', 'speed_coef', 'do_forecast', 'work_type_id'],
+        )
     })
 

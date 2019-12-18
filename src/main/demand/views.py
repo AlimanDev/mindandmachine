@@ -13,7 +13,7 @@ from src.db.models import (
 )
 from dateutil.relativedelta import relativedelta
 from django.db.models import Sum
-from src.util.models_converter import BaseConverter, PeriodDemandChangeLogConverter
+from src.util.models_converter import BaseConverter
 from src.util.utils import api_method, JsonResponse
 from .forms import (
     GetForecastForm,

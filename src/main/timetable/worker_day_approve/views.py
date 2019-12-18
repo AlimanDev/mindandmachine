@@ -10,7 +10,7 @@ from src.db.models import (
 
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import (
-    WorkerDayApproveConverter,
+    Converter,
 )
 from .forms import (
     GetWorkerDayApprovesForm,
@@ -62,9 +62,14 @@ def get_worker_day_approves(request, form):
         dttm_added__gte=form['dt_from'],
         )
 
-    return JsonResponse.success([
-        WorkerDayApproveConverter.convert(wda) for wda in worker_day_approve
-    ])
+    return JsonResponse.success(
+        Converter.convert(
+            worker_day_approve,
+            WorkerDayApprove,
+            fields=['id', 'shop_id', 'created_by_id', 'dt_approved', 'dttm_added'],
+            out_array=True,
+        )
+    )
 
 
 @api_method(
@@ -108,7 +113,7 @@ def create_worker_day_approve(request, form):
 
 
     return JsonResponse.success(
-        WorkerDayApproveConverter.convert(worker_day_approve)
+        Converter.convert(worker_day_approve, WorkerDayApprove, fields=['id', 'shop_id', 'created_by_id', 'dt_approved', 'dttm_added'])
     )
 
 

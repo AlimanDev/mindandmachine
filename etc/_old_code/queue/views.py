@@ -22,7 +22,7 @@ import urllib
 from src.util.utils import JsonResponse
 from django.conf import settings
 
-from src.util.models_converter import BaseConverter, ProductionDayConverter
+from src.util.models_converter import BaseConverter, Converter
 
 
 @api_method('GET', GetIndicatorsForm)
@@ -244,7 +244,7 @@ def process_forecast(request, form):
         aggregation_dict = {
             'IP': settings.HOST_IP,
             'algo_params': {
-                'days_info': [ProductionDayConverter.convert(day) for day in day_info],
+                'days_info': Converter.convert(day_info, ProductionDay, fields=['id', 'dt', 'type', 'is_celebration']),
                 'dt_from': BaseConverter.convert_date(dt_now),
                 'dt_to': BaseConverter.convert_date(dt_now + timedelta(days=predict2days)),
                 # 'dt_start': BaseConverter.convert_date(dt),

@@ -14,7 +14,7 @@ from src.db.models import (
     Shop,
 
 )
-from src.util.models_converter import BaseConverter, ProductionDayConverter
+from src.util.models_converter import BaseConverter, Converter
 from django.core.exceptions import EmptyResultSet
 
 
@@ -130,7 +130,7 @@ def create_predbills_request_function(shop_id, dt=None):
     aggregation_dict = {
         'IP': settings.HOST_IP,
         'algo_params': {
-            'days_info': [ProductionDayConverter.convert(day) for day in day_info],
+            'days_info': Converter.convert(day_info, ProductionDay, fields=['id', 'dt', 'type', 'is_celebration']),
             'dt_from': BaseConverter.convert_date(dt),
             'dt_to': BaseConverter.convert_date(dt_to),
             # 'dt_start': BaseConverter.convert_date(dt),

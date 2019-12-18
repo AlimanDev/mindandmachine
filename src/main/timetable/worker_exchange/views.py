@@ -185,7 +185,7 @@ def show_vacancy(request, form):
     ).select_related('worker_day', 'worker_day__worker').order_by('-id')[pointer * count: (pointer + 1) * count]
 
     res_dict = {
-        'vacancies': [VacancyConverter.convert(vac) for vac in vacancies],
+        'vacancies': VacancyConverter.convert(vacancies),
     }
     return JsonResponse.success(res_dict)
 

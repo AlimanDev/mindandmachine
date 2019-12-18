@@ -12,8 +12,8 @@ from .utils import (
 )
 from dateutil.relativedelta import relativedelta
 from src.util.models_converter import (
-    ShopConverter,
     BaseConverter,
+    Converter,
 )
 from .forms import (
     AddDepartmentForm,
@@ -60,7 +60,12 @@ def get_department(request, form):
     dynamic_values = dict()
 
     for child in childs:
-        converted = ShopConverter.convert(child)
+        converted = Converter.convert(
+            child, 
+            Shop, 
+            fields=['id', 'parent_id', 'title', 'tm_shop_opens', 'tm_shop_closes', 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone'],
+            custom_converters={'timezone':lambda x: x.zone},
+        )
         curr_stats = calculate_supershop_stats(dt_now, [child.id])
         prev_stats = calculate_supershop_stats(dt_now - relativedelta(months=1), [child.id])
         curr_stats.pop('revenue')
@@ -78,7 +83,12 @@ def get_department(request, form):
 
     return JsonResponse.success({
         'shops': return_list,
-        'super_shop': ShopConverter.convert(shop)
+        'super_shop': Converter.convert(
+            shop, 
+            Shop, 
+            fields=['id', 'parent_id', 'title', 'tm_shop_opens', 'tm_shop_closes', 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone'],
+            custom_converters={'timezone':lambda x: x.zone},
+        )
     })
 
 
@@ -140,7 +150,13 @@ def add_department(request, form):
         dt_opened=form['dt_opened'],
         timezone=form['timezone']
     )
-    return JsonResponse.success(ShopConverter.convert(created))
+    return JsonResponse.success(Converter.convert(
+            created, 
+            Shop,
+            fields=['id', 'parent_id', 'title', 'tm_shop_opens', 'tm_shop_closes', 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone'],
+            custom_converters={'timezone':lambda x: x.zone},
+        )
+    )
 
 
 @api_method(

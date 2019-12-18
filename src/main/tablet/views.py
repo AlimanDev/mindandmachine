@@ -17,7 +17,7 @@ from src.util.utils import api_method, JsonResponse
 from src.util.forms import FormUtil
 from .forms import GetCashboxesInfo, GetCashiersInfo, ChangeCashierStatus
 from django.utils.timezone import now
-from src.util.models_converter import WorkerCashboxInfoConverter
+from src.util.models_converter import Converter
 
 
 @api_method('GET', GetCashboxesInfo)
@@ -153,12 +153,12 @@ def get_cashiers_info(request, form):
                 'work_types': [
                     {
                         | 'bills_amount': количество чеков,
-                        | 'work_type: id типа кассы,
+                        | 'work_type_id': id типа кассы,
                         | 'id': id объекта WorkerCashboxInfo,
                         | 'mean_speed': средняя скорость,
                         | 'period': ,
                         | 'priority': ,
-                        | 'worker': id работника
+                        | 'worker_id': id работника
                     }
                 ],\n
                 | 'default_break_triplets' (str): "[15, 30, 15]", либо "[15, 30, 15, 15]" (например),
@@ -308,7 +308,11 @@ def get_cashiers_info(request, form):
     #group_by(list(worker_cashboxes_types), group_key=lambda _: _.worker_id,)
     for user_id in response.keys():
         if user_id in worker_cashboxes_types.keys():
-            response[user_id]['work_types'] = [WorkerCashboxInfoConverter.convert(x) for x in worker_cashboxes_types.get(user_id)]
+            response[user_id]['work_types'] = Converter.convert(
+                worker_cashboxes_types.get(user_id),
+                WorkerCashboxInfo,
+                fields=['id', 'worker_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],
+            )
 
     return JsonResponse.success(response)
 

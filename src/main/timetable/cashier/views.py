@@ -32,12 +32,9 @@ from src.util.models_converter import (
     EmploymentConverter,
     UserConverter,
     WorkerDayConverter,
-    WorkerConstraintConverter,
-    WorkerCashboxInfoConverter,
-    WorkTypeConverter,
     BaseConverter,
     WorkerDayChangeLogConverter,
-    WorkerPositionConverter
+    Converter,
 )
 from src.util.utils import (
     JsonResponse,
@@ -391,9 +388,7 @@ def get_cashier_timetable(request, form):
                 'day': WorkerDayConverter.convert(wd),
                 'change_log': [WorkerDayChangeLogConverter.convert(x) for x in
                                worker_day_change_log.get(wd.id, [])],
-                'change_requests': []
-                # 'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in
-                #                     worker_day_change_requests.get(obj.id, [])[:10]]
+                'change_requests': [],
             }
             for wd in worker_days
         ]
@@ -482,8 +477,18 @@ def get_cashier_info(request, form):
         worker_cashbox_info = WorkerCashboxInfo.objects.filter(worker_id=worker.id, is_active=True)
         work_types = WorkType.objects.filter(shop_id=form['shop_id'])
         response['work_type_info'] = {
-            'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info],
-            'work_type': {x.id: WorkTypeConverter.convert(x) for x in work_types}, # todo: delete this -- seems not needed
+            'worker_cashbox_info': Converter.convert(
+                worker_cashbox_info, 
+                WorkerCashboxInfo, 
+                fields=['id', 'worker_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration']
+            ),
+            'work_type': {
+                x['id']: x for x in Converter.convert(
+                    work_types, 
+                    WorkType, 
+                    fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+                )
+            }, # todo: delete this -- seems not needed
             'min_time_between_shifts': employment.min_time_btw_shifts,
             'shift_length_min': employment.shift_hours_length_min,
             'shift_length_max': employment.shift_hours_length_max,
@@ -494,7 +499,11 @@ def get_cashier_info(request, form):
 
     if 'constraints_info' in form['info']:
         constraints = WorkerConstraint.objects.filter(worker_id=worker.id)
-        response['constraints_info'] = [WorkerConstraintConverter.convert(x) for x in constraints]
+        response['constraints_info'] = Converter.convert(
+            constraints, 
+            WorkerConstraint, 
+            fields=['id', 'worker_id', 'eployment__week_availability', 'weekday', 'tm', 'is_lite'],
+        )
         response['shop_times'] = {
             'tm_start': BaseConverter.convert_time(request.shop.tm_shop_opens),
             'tm_end': BaseConverter.convert_time(request.shop.tm_shop_closes)
@@ -655,7 +664,11 @@ def get_worker_day(request, form):
             'dttm_to': BaseConverter.convert_time(x.dttm_to.time()) if x.dttm_to else None,
             'work_type': x.work_type_id,
         })
-        cashboxes_types[x.work_type_id] = WorkTypeConverter.convert(x.work_type)
+        cashboxes_types[x.work_type_id] = Converter.convert(
+            x.work_type, 
+            WorkType, 
+            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+        )
 
     return JsonResponse.success({
         'day': WorkerDayConverter.convert(wd),
@@ -1580,4 +1593,4 @@ def handle_worker_day_request(request, form):
 @api_method('GET', check_permissions=False)
 def get_worker_position_list(request):
     worker_positions = WorkerPosition.objects.all()
-    return JsonResponse.success([WorkerPositionConverter.convert(wp) for wp in worker_positions])
+    return JsonResponse.success(Converter.convert(worker_positions, WorkerPosition))
