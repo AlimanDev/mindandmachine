@@ -1,14 +1,15 @@
 from src.util.test import LocalTestCase
-from src.base.models import (
+from src.forecast.models import (
     PeriodClients, 
     OperationType, 
     WorkType, 
-    Shop,
+)
+from src.timetable.models import (
     Event
 )
+
 from datetime import datetime, timedelta, time
 from django.apps import apps
-import json
 
 class TestDemand(LocalTestCase):
     def setUp(self):
@@ -146,7 +147,7 @@ class TestDemand(LocalTestCase):
         self.o_types = [o_type_1, o_type_2, o_type_3, o_type_4, self.o_type_5]
         for model in test_data.keys():
             for data in test_data[model]:
-                apps.get_model('db', model).objects.create(**data)
+                apps.get_model('forecast', model).objects.create(**data)
 
         
 class TestGetIndicators(TestDemand):
@@ -554,7 +555,7 @@ class TestGetDemangChangeLogs(TestDemand):
         }
         for model in test_data.keys():
             for data in test_data[model]:
-                log = apps.get_model('db', model).objects.create(**data)
+                log = apps.get_model('forecast', model).objects.create(**data)
                 self.dates.append(log.dttm_added)
 
     def test_correct(self):

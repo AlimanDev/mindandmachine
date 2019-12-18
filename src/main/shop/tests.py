@@ -2,9 +2,9 @@ from datetime import datetime, time
 
 from dateutil.relativedelta import relativedelta
 
-from src.base.models import Timetable
-from src.util.test import LocalTestCase
 from src.base.models import Shop
+from src.timetable.models import Timetable
+from src.util.test import LocalTestCase
 
 class TestShop(LocalTestCase):
 

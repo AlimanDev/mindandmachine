@@ -9,6 +9,8 @@ from django.utils import timezone
 from src.base.models import (
     Employment,
     User,
+)
+from src.timetable.models import (
     WorkerDay,
     WorkerDayChangeRequest
 )

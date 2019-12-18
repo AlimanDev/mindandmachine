@@ -1,11 +1,11 @@
 from src.base.models import (
     Employment,
     Shop,
+    ProductionDay,
 )
 from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
-    ProductionDay,
 )
 import json
 from datetime import time

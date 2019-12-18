@@ -150,7 +150,7 @@ def get_demand_xlsx(request, workbook, form):
     worksheet.write(0, 3, 'Значение(фактический)')
 
     try:
-        model = apps.get_model('db', 'period{}'.format(
+        model = apps.get_model('forecast', 'period{}'.format(
             model_form_dict[form['demand_model']]
         ))
     except LookupError:

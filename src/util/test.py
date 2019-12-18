@@ -1,7 +1,5 @@
 import datetime
-import logging
 from contextlib import contextmanager
-from random import randint
 from typing import TypeVar
 
 from dateutil.relativedelta import relativedelta
@@ -12,23 +10,27 @@ from requests import Response
 from etc.scripts import fill_calendar
 
 from src.base.models import (
-    AttendanceRecords,
     Employment,
-    Group,
-    Timetable,
     FunctionGroup,
+    Group,
+    Region,
+    Shop,
     User,
-    WorkerDay,
+)
+from src.timetable.models import (
+    AttendanceRecords,
+    Cashbox,
+    Slot,
+    Timetable,
+    WorkerDayCashboxDetails,
+    WorkerCashboxInfo,
     WorkType,
+    WorkerDay,
+    UserWeekdaySlot
+)
+from src.forecast.models import (
     OperationType,
     PeriodClients,
-    Shop,
-    Cashbox,
-    WorkerDayCashboxDetails,
-    Slot,
-    UserWeekdaySlot,
-    WorkerCashboxInfo,
-    Region,
 )
 
 
@@ -59,7 +61,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         # Restart sequences from high value to not catch AlreadyExists errors on normal objects creation
         # TODO: remove explicit object ids in object.create-s below and this sequence restart
         with connection.cursor() as cursor:
-            cursor.execute("ALTER SEQUENCE db_user_id_seq RESTART WITH 100;")
+            cursor.execute("ALTER SEQUENCE base_user_id_seq RESTART WITH 100;")
 
         dttm_now = now()
 

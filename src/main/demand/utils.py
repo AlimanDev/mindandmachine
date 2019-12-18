@@ -8,10 +8,9 @@ from django.conf import settings
 
 from src.base.models import (
     Shop,
-)
-from src.timetable.models import (
     ProductionDay,
 )
+
 from src.forecast.models import (
     PeriodClients,
     OperationType,

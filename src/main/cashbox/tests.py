@@ -1,4 +1,5 @@
-from src.util.test import LocalTestCase, WorkType, datetime, Cashbox
+from src.util.test import LocalTestCase, datetime
+from src.timetable.models import WorkType, Cashbox
 
 
 class TestCashbox(LocalTestCase):

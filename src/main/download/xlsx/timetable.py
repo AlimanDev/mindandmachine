@@ -9,10 +9,10 @@ from src.util.forms import FormUtil
 from src.base.models import (
     Employment,
     User,
+    ProductionDay,
 )
 from src.timetable.models import (
     WorkerDay,
-    ProductionDay,
 )
 
 from src.main.download.xlsx.tabel import Tabel_xlsx

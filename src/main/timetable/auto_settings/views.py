@@ -13,6 +13,7 @@ from src.base.models import (
     Employment,
     User,
     Shop,
+    ProductionDay,
 )
 from src.timetable.models import (
     Timetable,
@@ -23,7 +24,6 @@ from src.timetable.models import (
     WorkerDayCashboxDetails,
     Slot,
     UserWeekdaySlot,
-    ProductionDay,
 )
 from src.forecast.models import (
     PeriodClients,

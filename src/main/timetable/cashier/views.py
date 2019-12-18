@@ -15,11 +15,11 @@ from src.base.models import (
     Employment,
     User,
     WorkerPosition,
+    ProductionDay,
 )
 from src.timetable.models import (
     WorkerDay,
     WorkerDayChangeRequest,
-    ProductionDay,
     WorkerCashboxInfo,
     WorkerConstraint,
     WorkerDayCashboxDetails,

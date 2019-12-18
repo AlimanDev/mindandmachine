@@ -2,7 +2,7 @@ import datetime
 
 from django.utils.timezone import now
 
-from src.base.models import WorkerDayCashboxDetails
+from src.timetable.models import WorkerDayCashboxDetails
 from src.util.models_converter import BaseConverter
 from src.util.test import LocalTestCase
 

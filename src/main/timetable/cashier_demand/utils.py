@@ -9,12 +9,12 @@ from django.db.models import Q, F, Case, When, Sum, Value, IntegerField
 from src.base.models import (
     Employment,
     Shop,
+    ProductionDay,
 )
 from src.timetable.models import (
     WorkerDay,
     WorkType,
     WorkerDayCashboxDetails,
-    ProductionDay,
 )
 from src.forecast.models import (
     PeriodClients,

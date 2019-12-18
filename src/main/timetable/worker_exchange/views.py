@@ -1,4 +1,3 @@
-from django.db.models import F
 from src.base.models import (
     Shop,
 )
