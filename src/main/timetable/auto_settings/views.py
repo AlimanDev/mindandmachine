@@ -715,10 +715,10 @@ def create_timetable(request, form):
                 'worker_cashbox_info': Converter.convert(
                     worker_cashbox_info.get(e.user_id, []), 
                     WorkerCashboxInfo, 
-                    fields=['id', 'worker_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],#change algo worker -> worker_id work_type -> work_type_id
+                    fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],#change algo worker -> employment__user_id work_type -> work_type_id
                 ),
-                'workdays': [WorkerDayConverter.convert(x) for x in worker_day.get(e.user_id, [])],
-                'prev_data': [WorkerDayConverter.convert(x) for x in prev_data.get(e.user_id, [])],
+                'workdays': WorkerDayConverter.convert(worker_day.get(e.user_id, [])),
+                'prev_data': WorkerDayConverter.convert(prev_data.get(e.user_id, [])),
                 'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),
                 'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),
                 'norm_work_amount': work_hours * e.norm_work_hours / 100,
@@ -738,6 +738,7 @@ def create_timetable(request, form):
             'init_params': init_params,
         },
     }
+    print(data)
     tt.save()
     data = json.dumps(data).encode('ascii')
     try:

@@ -28,7 +28,7 @@ class TestAutoSettings(LocalTestCase):
         data = {'code': 200,
             'data': {
               'shop_id': self.shop.id,
-              'created_by': self.user1.id,
+              'created_by_id': self.user1.id,
               'dt_approved': dt_approved,
             }
             , 'info': None

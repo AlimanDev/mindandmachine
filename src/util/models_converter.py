@@ -135,9 +135,9 @@ class Converter(BaseConverter):
         return elements if len(elements) > 1 or out_array else elements[0]
 
 
-class EmploymentConverter(Converter):
+class EmploymentConverter(BaseConverter):
     @classmethod
-    def convert_function(cls, obj: Employment):
+    def convert(cls, obj: Employment):
         user = obj.user
         res = UserConverter.convert(user)
         res.update({
