@@ -301,18 +301,4 @@ class Migration(migrations.Migration):
                 'unique_together': {('shop', 'dt')},
             },
         ),
-        migrations.CreateModel(
-            name='ProductionDay',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('dt', models.DateField()),
-                ('type', models.CharField(choices=[('W', 'workday'), ('H', 'holiday'), ('S', 'short workday')], max_length=1)),
-                ('is_celebration', models.BooleanField(default=False)),
-                ('region', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='base.Region')),
-            ],
-            options={
-                'verbose_name': 'День производственного календаря',
-                'unique_together': {('dt', 'region')},
-            },
-        ),
     ]

@@ -8,12 +8,14 @@ import datetime
 
 from mptt.models import MPTTModel, TreeForeignKey
 
+
 class Region(models.Model):
     class Meta:
         verbose_name = 'Регион'
         verbose_name_plural = 'Регионы'
     name = models.CharField(max_length=50)
     code = models.SmallIntegerField()
+
 
 # на самом деле это отдел
 class Shop(MPTTModel):
@@ -133,6 +135,7 @@ class Shop(MPTTModel):
         level = self.level - level if self.level > level else 0
         return self.get_ancestors().filter(level=level)[0]
 
+
 class EmploymentManager(models.Manager):
     def get_active(self, dt_from, dt_to, *args, **kwargs):
         """
@@ -166,6 +169,52 @@ class Group(models.Model):
             self.name,
             self.subordinates.all() if self.subordinates.all() else ''
         )
+
+
+class ProductionDay(models.Model):
+    """
+    день из производственного календаря короч.
+
+    """
+    class Meta(object):
+        verbose_name = 'День производственного календаря'
+        unique_together = ('dt', 'region')
+
+
+    TYPE_WORK = 'W'
+    TYPE_HOLIDAY = 'H'
+    TYPE_SHORT_WORK = 'S'
+    TYPES = (
+        (TYPE_WORK, 'workday'),
+        (TYPE_HOLIDAY, 'holiday'),
+        (TYPE_SHORT_WORK, 'short workday')
+    )
+
+    WORK_TYPES = [
+        TYPE_WORK,
+        TYPE_SHORT_WORK
+    ]
+
+    WORK_NORM_HOURS = {
+        TYPE_WORK: 8,
+        TYPE_SHORT_WORK: 7,
+        TYPE_HOLIDAY: 0
+    }
+
+    dt = models.DateField()
+    type = models.CharField(max_length=1, choices=TYPES)
+    is_celebration = models.BooleanField(default=False)
+    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
+
+    def __str__(self):
+
+        for tp in self.TYPES:
+            if tp[0] == self.type:
+                break
+        else:
+            tp = ('', 'bad_bal')
+
+        return '(dt {}, type {}, id {})'.format(self.dt, self.type, self.id)
 
 
 class User(DjangoAbstractUser):

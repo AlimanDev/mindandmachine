@@ -8,7 +8,6 @@ from src.timetable.models import (
     UserWeekdaySlot,
     WorkerConstraint,
     Timetable,
-    ProductionDay,
     WorkerDayChangeRequest,
     AttendanceRecords,
     ExchangeSettings,
@@ -197,11 +196,6 @@ class TimetableAdmin(admin.ModelAdmin):
     @staticmethod
     def shop_title(instance: Timetable):
         return instance.shop.title
-
-
-@admin.register(ProductionDay)
-class ProductionDayAdmin(admin.ModelAdmin):
-    list_display = ('dt', 'type')
 
 
 @admin.register(WorkerDayChangeRequest)

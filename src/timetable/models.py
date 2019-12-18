@@ -8,7 +8,7 @@ import datetime
 from fcm_django.models import FCMDevice
 from src.conf.djconfig import IS_PUSH_ACTIVE
 
-from src.base.models import Shop, Employment, User, Region
+from src.base.models import Shop, Employment, User
 
 
 
@@ -695,56 +695,6 @@ class Timetable(models.Model):
     fot_revenue = models.IntegerField(default=0, blank=True, null=True)
 
     task_id = models.CharField(max_length=256, null=True, blank=True)
-
-
-
-
-class ProductionDay(models.Model):
-    """
-    день из производственного календаря короч.
-
-    """
-    class Meta(object):
-        verbose_name = 'День производственного календаря'
-        unique_together = ('dt', 'region')
-
-
-    TYPE_WORK = 'W'
-    TYPE_HOLIDAY = 'H'
-    TYPE_SHORT_WORK = 'S'
-    TYPES = (
-        (TYPE_WORK, 'workday'),
-        (TYPE_HOLIDAY, 'holiday'),
-        (TYPE_SHORT_WORK, 'short workday')
-    )
-
-    WORK_TYPES = [
-        TYPE_WORK,
-        TYPE_SHORT_WORK
-    ]
-
-    WORK_NORM_HOURS = {
-        TYPE_WORK: 8,
-        TYPE_SHORT_WORK: 7,
-        TYPE_HOLIDAY: 0
-    }
-
-    dt = models.DateField()
-    type = models.CharField(max_length=1, choices=TYPES)
-    is_celebration = models.BooleanField(default=False)
-    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
-
-    def __str__(self):
-
-        for tp in self.TYPES:
-            if tp[0] == self.type:
-                break
-        else:
-            tp = ('', 'bad_bal')
-
-        return '(dt {}, type {}, id {})'.format(self.dt, self.type, self.id)
-
-
 
 
 class AttendanceRecords(models.Model):

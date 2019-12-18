@@ -7,16 +7,19 @@ from src.base.models import (
     FunctionGroup,
     WorkerPosition,
     Region,
+    ProductionDay
 )
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'code')
 
+
 @admin.register(WorkerPosition)
 class WorkerPositionAdmin(admin.ModelAdmin):
     list_display = ('id', 'title')
     search_fields = ('title',)
+
 
 @admin.register(User)
 class QsUserAdmin(admin.ModelAdmin):
@@ -67,10 +70,13 @@ class FunctionGroupAdmin(admin.ModelAdmin):
     search_fields = ('id',)
 
 
-
-
 @admin.register(Employment)
 class EmploymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop', 'user')
     list_filter = ('shop', 'user')
     search_fields = ('user__first_name', 'user__last_name', 'shop__title', 'shop__parent__title')
+
+
+@admin.register(ProductionDay)
+class ProductionDayAdmin(admin.ModelAdmin):
+    list_display = ('dt', 'type')

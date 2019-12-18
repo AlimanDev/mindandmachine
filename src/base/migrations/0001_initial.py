@@ -5,10 +5,25 @@ from django.conf import settings
 import django.contrib.auth.models
 import django.contrib.auth.validators
 from django.db import migrations, models
-import django.db.models.deletion
 import django.utils.timezone
 import mptt.fields
 import timezone_field.fields
+
+
+def create_shop_tree(apps, schema_editor):
+    Shop = apps.get_model('base', 'Shop')
+    shop = Shop.objects.create(
+        title='Корневой магазин',
+        level=0,
+        lft=0,
+        rght=0,
+        tree_id=0,
+    )
+
+    shops = Shop.objects.filter(
+        ~models.Q(id = shop.id)
+    ).update(parent=shop)
+    #Shop._tree_manager.rebuild()
 
 
 class Migration(migrations.Migration):
@@ -193,4 +208,23 @@ class Migration(migrations.Migration):
                 'unique_together': {('func', 'group')},
             },
         ),
+        migrations.CreateModel(
+            name='ProductionDay',
+            fields=[
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('dt', models.DateField()),
+                ('type',
+                 models.CharField(choices=[('W', 'workday'), ('H', 'holiday'), ('S', 'short workday')], max_length=1)),
+                ('is_celebration', models.BooleanField(default=False)),
+                ('region', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='base.Region')),
+            ],
+            options={
+                'verbose_name': 'День производственного календаря',
+                'unique_together': {('dt', 'region')},
+            },
+        ),
+        migrations.RunPython(create_shop_tree),
     ]
+
+
+
