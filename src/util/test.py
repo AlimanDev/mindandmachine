@@ -9,7 +9,7 @@ from django.db import connection
 from django.test import TestCase
 from django.utils.timezone import now
 from requests import Response
-from src.db import fill_calendar
+from etc.scripts import fill_calendar
 
 from src.db.models import (
     AttendanceRecords,

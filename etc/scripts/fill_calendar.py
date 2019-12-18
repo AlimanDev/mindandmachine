@@ -76,7 +76,7 @@ def fill_days(from_date, to_date, region_id):
         to_date(str): e.g. '2019.1.1'
     """
     data = pd.read_csv(
-        'src/db/work_data.csv',
+        'etc/scripts/work_data.csv',
         index_col='Год/Месяц'
     )
 
