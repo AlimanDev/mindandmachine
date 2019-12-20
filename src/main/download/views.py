@@ -3,17 +3,19 @@ from dateutil.relativedelta import relativedelta
 from django.apps import apps
 import json
 
-from src.db.models import (
+from src.base.models import (
     Employment,
     Shop,
-    User,
+)
+from src.timetable.models import (
     WorkerDay,
-    PeriodClients,
-    OperationType,
     WorkType,
     AttendanceRecords,
 )
-
+from src.forecast.models import (
+    PeriodClients,
+    OperationType,
+)
 from src.main.shop.forms import GetDepartmentListForm
 from src.main.shop.utils import get_shop_list_stats
 from src.main.urv.utils import wd_stat_count
@@ -148,7 +150,7 @@ def get_demand_xlsx(request, workbook, form):
     worksheet.write(0, 3, 'Значение(фактический)')
 
     try:
-        model = apps.get_model('db', 'period{}'.format(
+        model = apps.get_model('forecast', 'period{}'.format(
             model_form_dict[form['demand_model']]
         ))
     except LookupError:

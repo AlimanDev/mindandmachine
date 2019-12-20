@@ -1,5 +1,4 @@
 from datetime import date, timedelta
-import json
 import os
 
 from django.db.models import Avg, Q
@@ -28,20 +27,18 @@ from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get
 from src.main.timetable.worker_exchange.utils import search_candidates, send_noti2candidates
 from src.main.operation_template.utils import build_period_clients
 
-from src.db.models import (
-    Event,
+from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
-    # WorkerMonthStat,
-    # ProductionMonth,
-    WorkerDay,
-    # Notifications,
-    Shop,
-    User,
-    ProductionDay,
     WorkerCashboxInfo,
     Timetable,
     ExchangeSettings,
+)
+from src.base.models import (
+    Shop,
+    User,
+)
+from src.forecast.models import (
     OperationTemplate
 )
 from src.celery.celery import app

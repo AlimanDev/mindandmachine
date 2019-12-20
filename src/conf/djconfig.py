@@ -44,7 +44,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'src',
-    'src.db',
+    'src.base',
+    'src.forecast',
+    'src.timetable',
     'src.main',
     'django_celery_beat',
     'src.celery',
@@ -99,7 +101,7 @@ DATABASES = {
     }
 }
 
-AUTH_USER_MODEL = 'db.User'
+AUTH_USER_MODEL = 'base.User'
 
 AUTH_PASSWORD_VALIDATORS = [
     {

@@ -1,5 +1,5 @@
 import datetime
-from src.db.models import ProductionDay
+from src.base.models import ProductionDay
 from .colors import *
 from src.util.models_converter import Converter
 from django.db.models import Case, When, Sum, Value, IntegerField

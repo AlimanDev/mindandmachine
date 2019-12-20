@@ -1,4 +1,4 @@
-from src.db.models import Notifications
+from src.timetable.models import Notifications
 from src.util.utils import api_method, JsonResponse
 from src.util.models_converter import NotificationConverter
 from .forms import SetNotificationsReadForm, GetNotificationsForm, NotifyAction

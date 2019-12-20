@@ -1,6 +1,6 @@
 import datetime
 
-from src.db.models import WorkerDayCashboxDetails, WorkerDay
+from src.timetable.models import WorkerDayCashboxDetails, WorkerDay
 from src.util.models_converter import Converter
 from src.util.test import LocalTestCase
 

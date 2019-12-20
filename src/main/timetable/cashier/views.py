@@ -11,16 +11,18 @@ from django.db.models import Q, F, Exists
 from django.utils import timezone
 
 from src.main.urv.utils import wd_stat_count_total
-from src.db.models import (
+from src.base.models import (
     Employment,
     User,
+    WorkerPosition,
+    ProductionDay,
+)
+from src.timetable.models import (
     WorkerDay,
     WorkerDayChangeRequest,
-    ProductionDay,
     WorkerCashboxInfo,
     WorkerConstraint,
     WorkerDayCashboxDetails,
-    WorkerPosition,
     WorkType,
     UserWeekdaySlot,
     Shop,
@@ -1439,8 +1441,8 @@ def change_cashier_info(request, form):
     user.phone_number = form['phone_number']
     user.email = form['email']
 
-
-    employment.dt_hired = form['dt_hired']
+    if form['dt_hired']:
+        employment.dt_hired = form['dt_hired']
     employment.position_id = form['position_id']
     employment.dt_fired = form['dt_fired']
     employment.tabel_code = form['tabel_code']

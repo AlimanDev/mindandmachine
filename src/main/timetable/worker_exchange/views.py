@@ -1,12 +1,10 @@
-from django.db.models import F
-from src.db.models import (
-    WorkType,
+from src.base.models import (
     Shop,
+)
+from src.timetable.models import (
+    WorkType,
     WorkerDay,
     WorkerDayCashboxDetails,
-    User,
-    Event,
-    Notifications,
 )
 from src.util.models_converter import (
     WorkerDayConverter,

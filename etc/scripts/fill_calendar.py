@@ -13,7 +13,7 @@ Examples:
 import pandas as pd
 import datetime
 from calendar import monthrange
-from src.db.models import (
+from src.base.models import (
     ProductionDay
 )
 

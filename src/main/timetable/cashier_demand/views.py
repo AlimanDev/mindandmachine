@@ -5,9 +5,11 @@ from django.db.models import Q
 from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_worker_timetable
 from src.main.download.xlsx.timetable import download
 
-from src.db.models import (
-    WorkerDay,
+from src.base.models import (
     User,
+)
+from src.timetable.models import (
+    WorkerDay,
     WorkerDayCashboxDetails,
 )
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm

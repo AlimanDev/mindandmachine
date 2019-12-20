@@ -3,17 +3,18 @@ import datetime
 import io
 from dateutil.relativedelta import relativedelta
 
-from django.http import HttpResponse
 from functools import reduce
-from src.db.models import (
+from src.base.models import (
     Employment,
+)
+from src.forecast.models import (
     OperationType,
     PeriodClients,
-    User,
+)
+from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     WorkType,
-    Shop
 )
 from src.util.forms import FormUtil
 from src.util.models_converter import (

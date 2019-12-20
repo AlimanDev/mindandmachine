@@ -1,17 +1,13 @@
-from src.db.models import (
-    User,
-    Shop,
-    WorkerDay,
+from src.timetable.models import (
     WorkerDayCashboxDetails,
 )
 from .forms import (
     GetOutsourceWorkersForm,
-    AddOutsourceWorkersForm,
 )
 
 from src.util.utils import api_method, JsonResponse
-from src.util.models_converter import UserConverter, Converter
-from datetime import datetime, timedelta
+from src.util.models_converter import Converter
+from datetime import timedelta
 from django.core.exceptions import ObjectDoesNotExist
 
 

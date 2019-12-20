@@ -6,28 +6,42 @@ from random import randint
 import numpy as np
 from datetime import time, datetime
 from dateutil.relativedelta import relativedelta
-from src.db.models import (
+from src.base.models import (
+    User,
+    Shop,
+    Group,
+    Region,
+    FunctionGroup,
+)
+from src.forecast.models import (
+    OperationTemplate,
+    OperationType,
+    PeriodClients,
+
+)
+from src.timetable.models import (
     ExchangeSettings,
     Event,
-    Shop,
-    User,
-    PeriodClients,
     WorkerDay,
     WorkerConstraint,
     WorkerDayCashboxDetails,
     WorkerCashboxInfo,
     WorkType,
-    OperationType,
     Cashbox,
     AttendanceRecords,
-    Group,
-    FunctionGroup,
     Timetable,
     Notifications,
     Employment,
-    Region,
 )
+<<<<<<< HEAD
 from etc.scripts import fill_calendar
+=======
+
+from etc.scripts import fill_calendar
+from src.util.models_converter import (
+    WorkerDayConverter,
+)
+>>>>>>> 260668e13d37e12655ccf2b0c74ae498e162f024
 
 
 def create_shop(shop_id, region_id):

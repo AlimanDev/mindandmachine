@@ -1,4 +1,4 @@
-from src.db.models import WorkerDay
+from src.timetable.models import WorkerDay
 
 
 def prepare_worker_day_create_args(form, worker):

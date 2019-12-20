@@ -4,18 +4,23 @@ from dateutil.relativedelta import relativedelta
 from django.test import TestCase
 from django.utils.timezone import now
 
-from src.db.models import (
-    Employment,
-    ExchangeSettings,
-    WorkType,
-    WorkerDayCashboxDetails,
+from src.base.models import (
     Shop,
+    Employment,
     User,
+    Region,
+)
+from src.timetable.models import (
+    WorkType,
     WorkerDay,
+    WorkerDayCashboxDetails,
+    ExchangeSettings,
+    Event,
+)
+
+from src.forecast.models import (
     OperationType,
     PeriodClients,
-    Event,
-    Region,
 )
 from etc.scripts import fill_calendar
 from src.util.test import LocalTestCase

@@ -3,7 +3,8 @@ import json
 from django import forms
 from django.core.exceptions import ValidationError
 
-from src.db.models import WorkerDay, User
+from src.base.models import User
+from src.timetable.models import WorkerDay
 from src.util import forms as util_forms
 from src.util.models_converter import Converter
 

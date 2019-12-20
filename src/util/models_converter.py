@@ -5,12 +5,13 @@ from src.conf.djconfig import (
     QOS_TIME_FORMAT,
 )
 
-from src.db.models import (
+from src.base.models import (
     Employment,
-    WorkerDay,
-    Timetable,
-    AttendanceRecords,
     User
+)
+from src.timetable.models import (
+    WorkerDay,
+    AttendanceRecords,
 )
 from django.db import models
 from django.forms.models import model_to_dict
