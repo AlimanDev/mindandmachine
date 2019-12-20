@@ -258,6 +258,7 @@ class User(DjangoAbstractUser):
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     access_token = models.CharField(max_length=64, blank=True, null=True)
 
+
 class WorkerPosition(models.Model):
     """
     Describe employee's department and position
@@ -269,10 +270,11 @@ class WorkerPosition(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    title = models.CharField(max_length=64)
+    title = models.CharField(max_length=64) # todo: rename drop (use name)
 
     def __str__(self):
         return '{}, {}'.format(self.title, self.id)
+
 
 class Employment(models.Model):
 
