@@ -33,15 +33,11 @@ from src.timetable.models import (
     Notifications,
     Employment,
 )
-<<<<<<< HEAD
-from etc.scripts import fill_calendar
-=======
 
 from etc.scripts import fill_calendar
 from src.util.models_converter import (
     WorkerDayConverter,
 )
->>>>>>> 260668e13d37e12655ccf2b0c74ae498e162f024
 
 
 def create_shop(shop_id, region_id):
