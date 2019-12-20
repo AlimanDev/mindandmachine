@@ -4,9 +4,8 @@ import functools
 from django.db.models import Q
 from django.core.paginator import Paginator, EmptyPage
 
-from src.db.models import (
+from src.timetable.models import (
     AttendanceRecords,
-    User,
     WorkerDay
 )
 from src.util.utils import JsonResponse, api_method

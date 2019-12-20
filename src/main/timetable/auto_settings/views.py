@@ -9,20 +9,24 @@ from django.utils import timezone
 
 from src.celery.tasks import cancel_shop_vacancies, create_shop_vacancies_and_notify
 
-from src.db.models import (
+from src.base.models import (
     Employment,
-    Timetable,
     User,
+    Shop,
+    ProductionDay,
+)
+from src.timetable.models import (
+    Timetable,
     WorkType,
-    PeriodClients,
     WorkerConstraint,
     WorkerCashboxInfo,
     WorkerDay,
     WorkerDayCashboxDetails,
-    Shop,
     Slot,
     UserWeekdaySlot,
-    ProductionDay,
+)
+from src.forecast.models import (
+    PeriodClients,
 )
 from src.util.models_converter import (
     TimetableConverter,

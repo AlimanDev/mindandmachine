@@ -1,14 +1,18 @@
 import datetime
 import json
 
-from src.db.models import (
+from src.base.models import (
+    Shop,
+)
+from src.timetable.models import (
     WorkType,
     Cashbox,
-    Shop,
-    OperationType,
     Slot,
-    WorkerDayCashboxDetails,
 )
+from src.forecast.models import (
+    OperationType,
+)
+
 from src.util.forms import FormUtil
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import (

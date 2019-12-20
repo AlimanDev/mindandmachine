@@ -34,14 +34,16 @@ from django.utils.timezone import now
 from src.conf.djconfig import (
     QOS_DATETIME_FORMAT,
 )
-from src.db.models import (
+from src.base.models import (
     Employment,
+    User,
+    Shop
+)
+from src.timetable.models import (
     ExchangeSettings,
     WorkerDay,
     Event,
-    User,
     WorkerDayCashboxDetails,
-    Shop
 )
 from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
 from src.util.models_converter import BaseConverter
@@ -138,7 +140,6 @@ def confirm_vacancy(vacancy_id, user):
     # todo: add better time checker if not the same
     WorkerDayCashboxDetails.objects.filter(
         worker_day=workerday,
-
     )
 
 

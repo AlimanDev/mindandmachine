@@ -6,9 +6,11 @@ from unittest import skip
 from django.conf import settings
 from django.utils import timezone
 
-from src.db.models import (
+from src.base.models import (
     Employment,
     User,
+)
+from src.timetable.models import (
     WorkerDay,
     WorkerDayChangeRequest
 )
@@ -43,7 +45,7 @@ class TestCashier(LocalTestCase):
             'old_password': 'qqq',
             'new_password': 'new_password',
         })
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 403)
         # {'error_type': 'AccessForbidden', 'error_message': ''}
         self.assertEqual(response.json()['code'], 403)
         self.assertEqual(response.json()['data']['error_type'], 'AccessForbidden')
@@ -54,9 +56,9 @@ class TestCashier(LocalTestCase):
             'old_password': self.USER_PASSWORD,
             'new_password': 'new_password',
         })
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 403)
         # {'error_type': 'DoesNotExist', 'error_message': 'error in api_method'}
-        # self.assertEqual(response.json()['code'], 403)
+        self.assertEqual(response.json()['code'], 403)
         # self.assertEqual(response.json()['data']['error_type'], 'AccessForbidden')
         # self.assertEqual(response.json()['data']['error_message'], 'You are not allowed to edit this user')
 
@@ -94,25 +96,30 @@ class TestCashier(LocalTestCase):
         self.auth()
         response = self.api_post('/api/timetable/cashier/change_cashier_info', {
             'user_id': 1,
+            'shop_id': self.shop.id,
             'first_name': 'Benedick',
+            'password': self.USER_PASSWORD
         })
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 404)
         # 'error_message': "[('password', ['This field is required.'])]"
         # self.assertEqual(response.json()['code'], 200)
         # self.assertEqual(response.json()['data']['new_first_name'], 'Benedick')
 
         response = self.api_post('/api/timetable/cashier/change_cashier_info', {
-            'user_id': 5,
+            'user_id': 4,
+            'shop_id': self.shop.id,
             'first_name': 'Boss',
+            'password': self.USER_PASSWORD
         })
         self.assertEqual(response.status_code, 200)
-        # 'error_message': "[('password', ['This field is required.'])]"
         # self.assertEqual(response.json()['code'], 403)
         # self.assertEqual(response.json()['data']['error_message'], 'You are not allowed to edit this user')
 
         response = self.api_post('/api/timetable/cashier/change_cashier_info', {
             'user_id': 2,
+            'shop_id': self.shop.id,
             'first_name': 'Viktor',
+            'password': self.USER_PASSWORD
         })
         self.assertEqual(response.status_code, 200)
         # 'error_message': "[('password', ['This field is required.'])]"
@@ -121,7 +128,9 @@ class TestCashier(LocalTestCase):
 
         response = self.api_post('/api/timetable/cashier/change_cashier_info', {
             'user_id': 1,
+            'shop_id': self.root_shop.id,
             'first_name': 'Viktor',
+            'password': self.USER_PASSWORD
         })
         self.assertEqual(response.status_code, 200)
         # 'error_message': "[('password', ['This field is required.'])]"
@@ -130,12 +139,13 @@ class TestCashier(LocalTestCase):
 
         response = self.api_post('/api/timetable/cashier/change_cashier_info', {
             'user_id': 1,
+            'shop_id': self.root_shop.id,
             'first_name': 'Viktor',
             'middle_name': 'middle_name',
             'last_name': 'last_name',
             'birthday': date(1990, 2, 3),
         })
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 400)
         # 'error_message': "[('password', ['This field is required.'])]"
         # self.assertEqual(response.json()['code'], 200)
         # self.assertEqual(response.json()['data']['new_first_name'], 'Viktor')
@@ -383,15 +393,15 @@ class TestGetWorkerDay(LocalTestCase):
                 "shop_id": self.shop.id,
                 "dt": BaseConverter.convert_date(timezone.now() - datetime.timedelta(days=16)),
             })
-        self.assertResponseCodeEqual(response, 400)
+        self.assertResponseCodeEqual(response, 404)
         self.assertErrorType(response, 'DoesNotExist')
 
 
 class TestSetWorkerDay(LocalTestCase):
     url = '/api/timetable/cashier/set_worker_day'
 
-    def setUp(self, worker_day=True):
-        super().setUp(worker_day)
+    def setUp(self):
+        super().setUp(worker_day=True)
 
     def test_success(self):
         with self.auth_user():
@@ -529,7 +539,7 @@ class TestDeleteWorkerDay(LocalTestCase):
             response = self.api_post(self.url, {
                 "worker_day_id": -1
             })
-        self.assertResponseCodeEqual(response, 400)
+        self.assertResponseCodeEqual(response, 404)
         self.assertErrorType(response, "DoesNotExist")
 
     def test_no_parent(self):
@@ -550,7 +560,7 @@ class TestSetWorkerRestrictions(LocalTestCase):
     
     def test_set_week_availability(self):
         with self.auth_user():
-            
+
             response = self.api_post(self.url, {
                 "worker_id": 1,
                 "shop_id": self.root_shop.id,
@@ -565,7 +575,6 @@ class TestSetWorkerRestrictions(LocalTestCase):
                 'dt_new_week_availability_from': date(2019, 2, 10)
             }
             self.assertEqual(
-
                 Employment.objects.filter(
                     user_id=self.user1.id,
                     shop_id=self.root_shop.id

@@ -1,10 +1,11 @@
 from src.util.test import LocalTestCase
 
 
-from src.db.models import (
+from src.timetable.models import (
     WorkerCashboxInfo,
     WorkerDayCashboxDetails,
 )
+
 from .tasks import (
     # update_worker_month_stat,
     allocation_of_time_for_work_on_cashbox,

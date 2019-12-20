@@ -1,9 +1,10 @@
-from src.db.models import (
-    User,
+from src.base.models import (
+    FunctionGroup,
+)
+from src.timetable.models import (
     Slot,
     UserWeekdaySlot,
     WorkType,
-    FunctionGroup,
 )
 from src.util.models_converter import BaseConverter
 from src.util.utils import api_method, JsonResponse
@@ -13,7 +14,6 @@ from .forms import (
     UserAllowedFuncsForm,
 )
 from collections import defaultdict
-
 
 
 @api_method('GET', UserAllowedFuncsForm, check_permissions=False)

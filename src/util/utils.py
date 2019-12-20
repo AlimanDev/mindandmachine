@@ -14,7 +14,7 @@ from django.views.debug import ExceptionReporter
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
 
-from src.db.models import (
+from src.base.models import (
     Employment,
     FunctionGroup,
     Shop,
@@ -87,7 +87,7 @@ class JsonResponse(object):
 
     @classmethod
     def does_not_exists_error(cls, msg=''):
-        return cls.__base_error_response(400, 'DoesNotExist', msg)
+        return cls.__base_error_response(404, 'DoesNotExist', msg)
 
     @classmethod
     def multiple_objects_returned(cls, msg=''):
@@ -132,13 +132,14 @@ class JsonResponse(object):
     @classmethod
     def __base_response(cls, code, data, additional_info=None):
         response_data = {
-            'code': code,
+            'code': code,  # fixme: deprecated -- used normal status code
             'data': data,
             'info': additional_info
         }
         return HttpResponse(
             json.dumps(response_data, separators=(',', ':'), ensure_ascii=False),
-            content_type='application/json'
+            content_type='application/json',
+            status=code,
         )
 
 

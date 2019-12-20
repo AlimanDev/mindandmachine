@@ -3,7 +3,7 @@ from django.utils.timezone import now
 from django.db.models.functions import Greatest
 from django.db.models import F
 
-from src.db.models import (
+from src.forecast.models import (
     OperationTemplate,
     PeriodClients
 )

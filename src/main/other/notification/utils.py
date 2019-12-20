@@ -3,7 +3,7 @@ from django.utils.timezone import now
 from django.db.models.query import QuerySet
 from datetime import timedelta
 from fcm_django.models import FCMDevice
-from src.db.models import (
+from src.timetable.models import (
     WorkerDay,
 )
 

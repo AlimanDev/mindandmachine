@@ -15,5 +15,5 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "src.conf.djconfig")
 
 application = get_wsgi_application()
 
-from src.db.utils import check_func_groups
+from src.base.models_utils import check_func_groups
 check_func_groups()

@@ -1,5 +1,5 @@
 from src.util.test import LocalTestCase
-from src.db.models import WorkerDayApprove
+from src.timetable.models import WorkerDayApprove
 from dateutil.relativedelta import relativedelta
 from django.utils.timezone import now
 

@@ -1,6 +1,6 @@
 from django.utils.timezone import now
 
-from src.db.models import Employment
+from src.base.models import Employment
 from src.util.test import LocalTestCase
 
 

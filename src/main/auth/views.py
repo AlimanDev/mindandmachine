@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.db.models import Q
 from fcm_django.models import FCMDevice
 
-from src.db.models import User, Employment
+from src.base.models import User, Employment
 from src.util.models_converter import UserConverter
 from src.util.utils import JsonResponse, api_method
 from .forms import SigninForm, FCMTokenForm

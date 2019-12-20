@@ -1,7 +1,8 @@
 import datetime
-from src.db.models import (
+from src.base.models import (
     Shop,
-    User,
+)
+from src.timetable.models import (
     Timetable,
 )
 from math import ceil

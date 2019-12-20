@@ -1,15 +1,15 @@
 from django.utils.timezone import now
 
 from datetime import datetime, timedelta
-import json
 
 from .utils import build_period_clients
-from src.db.models import (
-    OperationTemplate,
-    OperationType,
+from src.base.models import (
     Shop
 )
-
+from src.forecast.models import (
+    OperationTemplate,
+    OperationType,
+)
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import (
     OperationTemplateConverter,
