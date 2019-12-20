@@ -1,7 +1,7 @@
 import datetime
 
 from src.db.models import WorkerDayCashboxDetails, WorkerDay
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import Converter
 from src.util.test import LocalTestCase
 
 
@@ -25,7 +25,7 @@ class TestCashierDemand(LocalTestCase):
         time3 = datetime.datetime(2018, 6, 15, 16, 30, 0)
         time4 = datetime.datetime(2018, 6, 15, 16, 55, 0)
         response = self.api_get('/api/timetable/needs/get_workers?shop_id=1&work_type_ids=[]&from_dttm={}&to_dttm={}'
-                                .format(BaseConverter.convert_datetime(time1), BaseConverter.convert_datetime(time2)))
+                                .format(Converter.convert_datetime(time1), Converter.convert_datetime(time2)))
         len_wdcd = get_count(self.shop, time1, time2)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
@@ -34,7 +34,7 @@ class TestCashierDemand(LocalTestCase):
         # self.assertEqual(len(response.json()['data']['users']), len_wdcd)
 
         response = self.api_get('/api/timetable/needs/get_workers?shop_id=1&work_type_ids=[]&from_dttm={}&to_dttm={}'
-                                .format(BaseConverter.convert_datetime(time3), BaseConverter.convert_datetime(time4)))
+                                .format(Converter.convert_datetime(time3), Converter.convert_datetime(time4)))
         len_wdcd = get_count(self.shop, time3, time4)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)

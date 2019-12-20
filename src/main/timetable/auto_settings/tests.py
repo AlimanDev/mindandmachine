@@ -4,7 +4,7 @@ from src.db.models import Employment, Timetable, WorkerDay, Slot, WorkerDayCashb
 from src.util.test import LocalTestCase
 from django.utils.timezone import now
 
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import Converter
 
 
 from django.conf import settings
@@ -68,11 +68,11 @@ class TestAutoSettings(LocalTestCase):
         tm_from = datetime.time(10,0,0)
         tm_to = datetime.time(20,0,0)
 
-        dttm_from = BaseConverter.convert_datetime(
+        dttm_from = Converter.convert_datetime(
             datetime.datetime.combine(dt, tm_from),
         )
 
-        dttm_to = BaseConverter.convert_datetime(
+        dttm_to = Converter.convert_datetime(
             datetime.datetime.combine(dt, tm_to),
         )
 
@@ -86,7 +86,7 @@ class TestAutoSettings(LocalTestCase):
                 'users': {
                     self.user3.id:{
                         'workdays': [
-                            {'dt': BaseConverter.convert_date(dt),
+                            {'dt': Converter.convert_date(dt),
                              'type':'W',
                              'dttm_work_start': dttm_from,
                              'dttm_work_end': dttm_to,
@@ -101,7 +101,7 @@ class TestAutoSettings(LocalTestCase):
                     },
                     self.user4.id: {
                         'workdays': [
-                            {'dt': BaseConverter.convert_date(dt),
+                            {'dt': Converter.convert_date(dt),
                              'type':'H',
                              'dttm_work_start': dttm_from,
                              'dttm_work_end': dttm_to,
@@ -149,7 +149,7 @@ class TestAutoSettings(LocalTestCase):
 
         response = self.api_post('/api/timetable/auto_settings/create_timetable', {
             'shop_id': self.shop.id,
-            'dt': BaseConverter.convert_date(now() + datetime.timedelta(days=2))
+            'dt': Converter.convert_date(now() + datetime.timedelta(days=2))
             })
 
         self.assertEqual(response.status_code, 200)
@@ -170,7 +170,7 @@ class TestAutoSettings(LocalTestCase):
         Slot.objects.all().update(work_type=self.work_type1)
         response = self.api_post('/api/timetable/auto_settings/create_timetable', {
             'shop_id': self.shop.id,
-            'dt': BaseConverter.convert_date(datetime.now().date()),
+            'dt': Converter.convert_date(datetime.now().date()),
         })
         correct_res = {
             'code': 500, 

@@ -16,7 +16,7 @@ from django.db import models
 from django.forms.models import model_to_dict
 
 
-class BaseConverter(object):
+class Converter:
     @staticmethod
     def convert_date(obj):
         return obj.strftime(QOS_DATE_FORMAT) if obj is not None else None
@@ -41,8 +41,6 @@ class BaseConverter(object):
     def convert_datetime(obj):
         return obj.strftime(QOS_DATETIME_FORMAT) if obj is not None else None
 
-
-class Converter(BaseConverter):
     @classmethod
     def convert(self, elements, ModelClass=None, fields=None, custom_converters=None, out_array=False):
         '''
@@ -216,7 +214,7 @@ class WorkerDayChangeLogConverter(Converter):
         if parent or obj.created_by_id:
             res = {
                 'worker_day': obj.id,
-                'dttm_changed': BaseConverter.convert_datetime(obj.dttm_added),
+                'dttm_changed': Converter.convert_datetime(obj.dttm_added),
                 'changed_by': obj.created_by_id,
                 'change_by_fio': obj.created_by.last_name + ' ' + obj.created_by.first_name if obj.created_by_id else '',
                 'comment': obj.comment,
@@ -234,7 +232,7 @@ class WorkerDayChangeLogConverter(Converter):
         return res
 
 
-class WorkTypeConverter(BaseConverter):
+class WorkTypeConverter(Converter):
     @classmethod
     def convert_operation_type(cls, obj):
         return {
@@ -276,7 +274,7 @@ class NotificationConverter(Converter):
     def convert_function(cls, obj):
         return {
             'id': obj.id,
-            'dttm_added': BaseConverter.convert_datetime(obj.dttm_added),
+            'dttm_added': Converter.convert_datetime(obj.dttm_added),
             'to_worker': obj.to_worker_id,
             'was_read': obj.was_read,
 

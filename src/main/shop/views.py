@@ -12,7 +12,7 @@ from .utils import (
 )
 from dateutil.relativedelta import relativedelta
 from src.util.models_converter import (
-    BaseConverter,
+    Converter,
     Converter,
 )
 from .forms import (
@@ -231,8 +231,8 @@ def get_parameters(request, form):
         'fot': shop.fot,
         'less_norm': shop.less_norm,
         'more_norm': shop.more_norm,
-        'tm_shop_opens': BaseConverter.convert_time(shop.tm_shop_opens),
-        'tm_shop_closes': BaseConverter.convert_time(shop.tm_shop_closes),
+        'tm_shop_opens': Converter.convert_time(shop.tm_shop_opens),
+        'tm_shop_closes': Converter.convert_time(shop.tm_shop_closes),
         'shift_start': shop.shift_start,
         'shift_end': shop.shift_end,
         'restricted_start_times': shop.restricted_start_times,
@@ -317,7 +317,7 @@ def get_department_stats(request, form):
 
     while dt_from <= dt_now:
         fot_revenue_stats.append({
-            'dt': BaseConverter.convert_date(dt_from),
+            'dt': Converter.convert_date(dt_from),
             'value': calculate_supershop_stats(dt_from, shop_ids).pop('fot_revenue')
         })
         dt_from += relativedelta(months=1)

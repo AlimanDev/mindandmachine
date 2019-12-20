@@ -4,7 +4,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from src.util import forms as util_forms
-from src.util.models_converter import UserConverter, BaseConverter
+from src.util.models_converter import UserConverter, Converter
 
 
 class GetWorkerStatForm(forms.Form):

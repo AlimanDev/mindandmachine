@@ -44,7 +44,7 @@ from src.db.models import (
     Shop
 )
 from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import Converter
 
 
 def search_candidates(wd_details, **kwargs):
@@ -93,7 +93,7 @@ def search_candidates(wd_details, **kwargs):
 def send_noti2candidates(users, worker_day_detail):
     event = Event.objects.mm_event_create(
         users,
-        push_title='Открыта вакансия на {}'.format(BaseConverter.convert_date(worker_day_detail.dttm_from.date())),
+        push_title='Открыта вакансия на {}'.format(Converter.convert_date(worker_day_detail.dttm_from.date())),
 
         text='',
         department_id=worker_day_detail.work_type.shop_id,

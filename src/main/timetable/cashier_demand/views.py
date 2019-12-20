@@ -11,7 +11,7 @@ from src.db.models import (
     WorkerDayCashboxDetails,
 )
 from src.main.timetable.cashier_demand.forms import GetWorkersForm, GetCashiersTimetableForm
-from src.util.models_converter import EmploymentConverter, BaseConverter
+from src.util.models_converter import EmploymentConverter, Converter
 from src.util.utils import api_method, JsonResponse
 from src.util.forms import FormUtil
 from src.conf.djconfig import QOS_DATETIME_FORMAT
@@ -69,8 +69,8 @@ def get_workers(request, form):
     for x in worker_day_cashbox_detail:
         response[x.worker_day.worker_id] = {
             'id': x.id,
-            'from_dttm': BaseConverter.convert_datetime(x.dttm_from),
-            'to_dttm': BaseConverter.convert_datetime(x.dttm_to),
+            'from_dttm': Converter.convert_datetime(x.dttm_from),
+            'to_dttm': Converter.convert_datetime(x.dttm_to),
             'on_cashbox': x.on_cashbox_id,
             'work_type': x.work_type_id,
             'status': x.status,
@@ -152,7 +152,7 @@ def get_timetable_xlsx(request, form):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
     response['Content-Disposition'] = 'attachment; filename="Timetable_{}.xlsx"'.format(
-        BaseConverter.convert_date(dt_from))
+        Converter.convert_date(dt_from))
 
     return response
 

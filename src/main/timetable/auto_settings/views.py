@@ -28,7 +28,7 @@ from src.util.models_converter import (
     WorkTypeConverter,
     EmploymentConverter,
     WorkerDayConverter,
-    BaseConverter,
+    Converter,
     Converter,
 )
 from src.util.utils import api_method, JsonResponse
@@ -484,8 +484,8 @@ def create_timetable(request, form):
         'max_work_coef': max_work_coef,
         'min_work_coef': min_work_coef,
         'period_step': period_step,
-        'tm_start_work': BaseConverter.convert_time(shop.tm_shop_opens),
-        'tm_end_work': BaseConverter.convert_time(shop.tm_shop_closes),
+        'tm_start_work': Converter.convert_time(shop.tm_shop_opens),
+        'tm_end_work': Converter.convert_time(shop.tm_shop_closes),
         'min_work_period': shop.shift_start * 60,
         'max_work_period': shop.shift_end * 60,
         'tm_lock_start': list(map(lambda x: x + ':00', json.loads(shop.restricted_start_times))),
@@ -522,8 +522,8 @@ def create_timetable(request, form):
     slots=Slot.objects.filter(shop_id=shop_id, work_type_id__isnull=False)
     for slot in slots:
         work_types[slot.work_type_id]['slots'].append({
-            'tm_start': BaseConverter.convert_time(slot.tm_start),
-            'tm_end': BaseConverter.convert_time(slot.tm_end),
+            'tm_start': Converter.convert_time(slot.tm_start),
+            'tm_end': Converter.convert_time(slot.tm_end),
         })
 
     # Информация по кассам для каждого сотрудника
@@ -663,7 +663,7 @@ def create_timetable(request, form):
     )
 
     demands = [{
-        'dttm_forecast': BaseConverter.convert_datetime(x[0]),
+        'dttm_forecast': Converter.convert_datetime(x[0]),
         'work_type': x[1],
         'clients': x[2],
     } for x in periods]
@@ -706,8 +706,8 @@ def create_timetable(request, form):
                         'slot': lambda obj: {
                             'id': obj.id,
                             'shop': obj.shop_id,
-                            'tm_start': BaseConverter.convert_time(obj.tm_start),
-                            'tm_end':  BaseConverter.convert_time(obj.tm_end),
+                            'tm_start': Converter.convert_time(obj.tm_start),
+                            'tm_end':  Converter.convert_time(obj.tm_end),
                             'name': obj.name
                         }
                     }
@@ -726,7 +726,7 @@ def create_timetable(request, form):
                 'min_shift_len': e.shift_hours_length_min if e.shift_hours_length_min else 0,
                 'max_shift_len': e.shift_hours_length_max if e.shift_hours_length_max else 24,
                 'min_time_between_slots': e.min_time_btw_shifts if e.min_time_btw_shifts else 0,
-                'dt_new_week_availability_from': BaseConverter.convert_date(e.dt_new_week_availability_from),
+                'dt_new_week_availability_from': Converter.convert_date(e.dt_new_week_availability_from),
             }
             for e in employments
         ],
@@ -912,7 +912,7 @@ def set_timetable(request, form):
                 # todo: actually use a form here is better
                 # todo: too much request to db
 
-                dt = BaseConverter.parse_date(wd['dt'])
+                dt = Converter.parse_date(wd['dt'])
                 wd_obj = WorkerDay(
                     dt=dt,
                     worker_id=uid,
@@ -934,8 +934,8 @@ def set_timetable(request, form):
                     wd_obj.parent_worker_day = parent_wd_obj
 
                 if WorkerDay.is_type_with_tm_range(wd_obj.type):
-                    wd_obj.dttm_work_start = BaseConverter.parse_datetime(wd['dttm_work_start'])
-                    wd_obj.dttm_work_end = BaseConverter.parse_datetime(wd['dttm_work_end'])
+                    wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start'])
+                    wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])
                     wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
                     wd_obj.save()
 
@@ -945,8 +945,8 @@ def set_timetable(request, form):
                     for wdd in wd['details']:
                         wdd_el = WorkerDayCashboxDetails(
                             worker_day=wd_obj,
-                            dttm_from=BaseConverter.parse_datetime(wdd['dttm_from']),
-                            dttm_to=BaseConverter.parse_datetime(wdd['dttm_to']),
+                            dttm_from=Converter.parse_datetime(wdd['dttm_from']),
+                            dttm_to=Converter.parse_datetime(wdd['dttm_to']),
                         )
                         if wdd['type'] > 0:
                             wdd_el.work_type_id = wdd['type']

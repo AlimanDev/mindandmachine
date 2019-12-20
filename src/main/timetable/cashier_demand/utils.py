@@ -15,7 +15,7 @@ from src.db.models import (
     ProductionDay,
     Shop,
 )
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import Converter
 from src.main.urv.utils import wd_stat_count_total, wd_stat_count
 
 
@@ -293,7 +293,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
         predict_cashier_needs = []
         lack_of_cashiers_on_period = []
         for index, dttm in enumerate(dttms):
-            dttm_converted = BaseConverter.convert_datetime(dttm)
+            dttm_converted = Converter.convert_datetime(dttm)
             real_cashiers.append({'dttm': dttm_converted, 'amount': finite_work[index]})
             real_cashiers_initial.append({'dttm': dttm_converted,'amount': init_work[index]})
             fact_cashier_needs.append({'dttm': dttm_converted, 'amount': fact_needs[index]})
@@ -598,7 +598,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
 #                     dttm_ind_initial_end = dttm_combine(wdcds_initial[ind_e_initial].worker_day.dt,
 #                                                         wdcds_initial[ind_e_initial].dttm_to.time())
 #
-#             dttm_converted = BaseConverter.convert_datetime(dttm)
+#             dttm_converted = Converter.convert_datetime(dttm)
 #             real_cashiers.append({
 #                 'dttm': dttm_converted,
 #                 'amount': period_cashiers_current

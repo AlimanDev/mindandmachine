@@ -13,7 +13,7 @@ from src.db.models import (
 )
 from dateutil.relativedelta import relativedelta
 from django.db.models import Sum
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import Converter
 from src.util.utils import api_method, JsonResponse
 from .forms import (
     GetForecastForm,
@@ -170,7 +170,7 @@ def get_forecast(request, form):
             #     queue_wait_length += x.value
 
             forecast_data.append({
-                'dttm': BaseConverter.convert_datetime(dttm),
+                'dttm': Converter.convert_datetime(dttm),
                 'clients': clients,
                 # 'products': products,
                 # 'queue': queue_wait_length
@@ -330,9 +330,9 @@ def get_demand_change_logs(request, form):
     ).order_by('dttm_added')
     return JsonResponse.success([
         {
-            'dttm_added': BaseConverter.convert_datetime(x.dttm_added),
-            'dttm_from': BaseConverter.convert_datetime(x.dttm_from),
-            'dttm_to': BaseConverter.convert_datetime(x.dttm_to),
+            'dttm_added': Converter.convert_datetime(x.dttm_added),
+            'dttm_from': Converter.convert_datetime(x.dttm_from),
+            'dttm_to': Converter.convert_datetime(x.dttm_to),
             'work_type_id': x.operation_type.work_type_id,
             'multiply_coef': x.multiply_coef,
             'set_value': x.set_value,
@@ -399,8 +399,8 @@ def set_pred_bills(request, form):
         return JsonResponse.internal_error('cannot parse json')
 
     shop = Shop.objects.get(id=data['shop_id'])
-    dt_from = BaseConverter.parse_date(data['dt_from'])
-    dt_to = BaseConverter.parse_date(data['dt_to'])
+    dt_from = Converter.parse_date(data['dt_from'])
+    dt_to = Converter.parse_date(data['dt_to'])
     
     PeriodClients.objects.select_related('operation_type__work_type').filter(
         type=PeriodClients.LONG_FORECASE_TYPE,
@@ -417,7 +417,7 @@ def set_pred_bills(request, form):
             models_list,
             PeriodClients(
                 type=PeriodClients.LONG_FORECASE_TYPE,
-                dttm_forecast=BaseConverter.parse_datetime(period_demand_value['dttm']),
+                dttm_forecast=Converter.parse_datetime(period_demand_value['dttm']),
                 operation_type_id=period_demand_value['work_type'],
                 value=clients,
             )

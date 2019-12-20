@@ -1,7 +1,7 @@
 import datetime
 from src.db.models import ProductionDay
 from .colors import *
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import Converter
 from django.db.models import Case, When, Sum, Value, IntegerField
 
 class Xlsx_base:
@@ -154,7 +154,7 @@ class Xlsx_base:
             'fio': (lambda e: '{} {} {}'.format(e.user.last_name, e.user.first_name, e.user.middle_name), text_format,
                     self.worksheet.write_string),
             'position': (lambda e: e.position.title if e.position else 'Не указано', text_format, self.worksheet.write_string),
-            'hired': (lambda e: BaseConverter.convert_date(e.dt_hired), date_format, self.worksheet.write_datetime),
+            'hired': (lambda e: Converter.convert_date(e.dt_hired), date_format, self.worksheet.write_datetime),
         }
 
         for it, employment in enumerate(list(employments)):

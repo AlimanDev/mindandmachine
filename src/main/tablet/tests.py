@@ -3,7 +3,7 @@ import datetime
 from django.utils.timezone import now
 
 from src.db.models import WorkerDayCashboxDetails
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import Converter
 from src.util.test import LocalTestCase
 
 
@@ -27,7 +27,7 @@ class TestTablet(LocalTestCase):
     def test_get_cashiers_info(self):
         self.auth()
         response = self.api_get('/api/tablet/get_cashiers_info?shop_id={}&dttm={}'
-                                .format(self.shop.id, BaseConverter.convert_datetime(now() + datetime.timedelta(hours=3))))
+                                .format(self.shop.id, Converter.convert_datetime(now() + datetime.timedelta(hours=3))))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
         self.assertEqual(response.json()['data']['2']['worker_id'], 2)
@@ -38,7 +38,7 @@ class TestTablet(LocalTestCase):
         def api_cashiers_inf(worker_id, status, shop_id=1):
             response = self.api_get('/api/tablet/get_cashiers_info?shop_id={}&dttm={}'
                                     .format(shop_id,
-                                            BaseConverter.convert_datetime(now() + datetime.timedelta(hours=3))))
+                                            Converter.convert_datetime(now() + datetime.timedelta(hours=3))))
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()['code'], 200)
             self.assertEqual(response.json()['data']['{}'.format(worker_id)]['worker_id'], worker_id)
@@ -71,7 +71,7 @@ class TestTablet(LocalTestCase):
         # self.assertEqual(response.json()['data']['error_message'], 'cashbox already opened')
 
         response = self.api_get('/api/tablet/get_cashiers_info?shop_id={}&dttm={}'
-                                .format(self.shop.id, BaseConverter.convert_datetime(now() + datetime.timedelta(hours=3))))
+                                .format(self.shop.id, Converter.convert_datetime(now() + datetime.timedelta(hours=3))))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
         self.assertEqual(response.json()['data']['2']['worker_id'], 2)

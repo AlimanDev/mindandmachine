@@ -22,7 +22,7 @@ import urllib
 from src.util.utils import JsonResponse
 from django.conf import settings
 
-from src.util.models_converter import BaseConverter, Converter
+from src.util.models_converter import Converter, Converter
 
 
 @api_method('GET', GetIndicatorsForm)
@@ -216,7 +216,7 @@ def process_forecast(request, form):
         for queue_period in queue:
             elem = {
                 'value': queue_period.value,
-                'dttm': BaseConverter.convert_datetime(queue_period.dttm_forecast),
+                'dttm': Converter.convert_datetime(queue_period.dttm_forecast),
                 'work_type': queue_period.work_type_id,
             }
             while needs[it_needs]['dttm'] != elem['dttm']:  # needs and queue are ordered
@@ -246,13 +246,13 @@ def process_forecast(request, form):
             'IP': settings.HOST_IP,
             'algo_params': {
                 'days_info': Converter.convert(day_info, ProductionDay, fields=['id', 'dt', 'type', 'is_celebration']),
-                'dt_from': BaseConverter.convert_date(dt_now),
-                'dt_to': BaseConverter.convert_date(dt_now + timedelta(days=predict2days)),
-                # 'dt_start': BaseConverter.convert_date(dt),
+                'dt_from': Converter.convert_date(dt_now),
+                'dt_to': Converter.convert_date(dt_now + timedelta(days=predict2days)),
+                # 'dt_start': Converter.convert_date(dt),
                 # 'days': predict2days,
-                'period_step': BaseConverter.convert_time(shop.forecast_step_minutes),
-                'tm_start': BaseConverter.convert_time(shop.dt_opened),
-                'tm_end': BaseConverter.convert_time(shop.dt_closed),
+                'period_step': Converter.convert_time(shop.forecast_step_minutes),
+                'tm_start': Converter.convert_time(shop.dt_opened),
+                'tm_end': Converter.convert_time(shop.dt_closed),
             },
             'prediction_data': prediction_data,
             'prev_data': prev_data,
@@ -314,8 +314,8 @@ def set_predict_queue(request, data):
             lst[:] = []
 
     shop = Shop.objects.get(id=data['shop_id'])
-    dt_from = BaseConverter.parse_date(data['dt_from'])
-    dt_to = BaseConverter.parse_date(data['dt_to'])
+    dt_from = Converter.parse_date(data['dt_from'])
+    dt_to = Converter.parse_date(data['dt_to'])
 
     PeriodQueues.objects.filter(
         type=PeriodQueues.LONG_FORECASE_TYPE,
@@ -331,7 +331,7 @@ def set_predict_queue(request, data):
             models_list,
             PeriodQueues(
                 type=PeriodQueues.LONG_FORECASE_TYPE,
-                dttm_forecast=BaseConverter.parse_datetime(period_demand_value['dttm']),
+                dttm_forecast=Converter.parse_datetime(period_demand_value['dttm']),
                 operation_type__work_type_id=period_demand_value['work_type'],
                 value=clients,
             )

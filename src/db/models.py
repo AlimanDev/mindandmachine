@@ -1156,22 +1156,22 @@ class Event(models.Model):
 
     def get_text(self):
         if self.workerday_details:
-            from src.util.models_converter import BaseConverter
+            from src.util.models_converter import Converter
 
             if self.workerday_details.dttm_deleted:
                 return 'Вакансия отмена'
             elif self.workerday_details.worker_day_id:
                 return 'Вакансия на {} в {} уже выбрана.'.format(
-                    BaseConverter.convert_date(self.workerday_details.dttm_from.date()),
+                    Converter.convert_date(self.workerday_details.dttm_from.date()),
                     self.workerday_details.work_type.shop.title,
                 )
             else:
                 return 'Открыта вакансия на {} на {} в {}. Время работы: с {} по {}. Хотите выйти?'.format(
                     self.workerday_details.work_type.name,
-                    BaseConverter.convert_date(self.workerday_details.dttm_from.date()),
+                    Converter.convert_date(self.workerday_details.dttm_from.date()),
                     self.workerday_details.work_type.shop.title,
-                    BaseConverter.convert_time(self.workerday_details.dttm_from.time()),
-                    BaseConverter.convert_time(self.workerday_details.dttm_to.time()),
+                    Converter.convert_time(self.workerday_details.dttm_from.time()),
+                    Converter.convert_time(self.workerday_details.dttm_to.time()),
                 )
 
         else:

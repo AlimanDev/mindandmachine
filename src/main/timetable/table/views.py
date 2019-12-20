@@ -17,7 +17,7 @@ from src.db.models import (
 )
 from src.util.forms import FormUtil
 from src.util.models_converter import (
-    BaseConverter,
+    Converter,
 )
 from src.util.utils import api_method, JsonResponse
 from .forms import GetWorkerStatForm, WorkersToExchange
@@ -329,11 +329,11 @@ def get_table(request, workbook, form):
         output,
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    response['Content-Disposition'] = 'attachment; filename="Tablet_{}.xlsx"'.format(BaseConverter.convert_date(weekday))
+    response['Content-Disposition'] = 'attachment; filename="Tablet_{}.xlsx"'.format(Converter.convert_date(weekday))
     
     return response
     '''
-    return workbook, f'Tablet_{BaseConverter.convert_date(weekday)}.xlsx'
+    return workbook, f'Tablet_{Converter.convert_date(weekday)}.xlsx'
 
 
 @api_method('GET', GetWorkerStatForm)

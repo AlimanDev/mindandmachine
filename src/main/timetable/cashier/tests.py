@@ -12,7 +12,7 @@ from src.db.models import (
     WorkerDay,
     WorkerDayChangeRequest
 )
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import Converter
 from src.util.test import LocalTestCase
 
 def create_stuff(shop_id: int) -> User:
@@ -300,8 +300,8 @@ class TestGetCashierTimetable(LocalTestCase):
             response = self.api_get(self.url, {
                 "worker_ids": json.dumps([self.user2.pk]),
                 "shop_id": self.shop.pk,
-                "from_dt": BaseConverter.convert_date(timezone.now()),
-                "to_dt": BaseConverter.convert_date(timezone.now()),
+                "from_dt": Converter.convert_date(timezone.now()),
+                "to_dt": Converter.convert_date(timezone.now()),
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertResponseDataListCount(response, 1)
@@ -372,7 +372,7 @@ class TestGetWorkerDay(LocalTestCase):
             response = self.api_get(self.url, {
                 "worker_id": self.user2.id,
                 "shop_id": self.shop.id,
-                "dt": BaseConverter.convert_date(timezone.now()),
+                "dt": Converter.convert_date(timezone.now()),
             })
         self.assertResponseCodeEqual(response, 200)
 
@@ -381,7 +381,7 @@ class TestGetWorkerDay(LocalTestCase):
             response = self.api_get(self.url, {
                 "worker_id": self.user2.pk,
                 "shop_id": self.shop.id,
-                "dt": BaseConverter.convert_date(timezone.now() - datetime.timedelta(days=16)),
+                "dt": Converter.convert_date(timezone.now() - datetime.timedelta(days=16)),
             })
         self.assertResponseCodeEqual(response, 400)
         self.assertErrorType(response, 'DoesNotExist')
@@ -398,7 +398,7 @@ class TestSetWorkerDay(LocalTestCase):
             response = self.api_post(self.url, {
                 "worker_id": self.user2.pk,
                 "shop_id": self.shop.id,
-                "dt": BaseConverter.convert_date(timezone.now()),
+                "dt": Converter.convert_date(timezone.now()),
                 "tm_work_start": "11:00:00",
                 "tm_work_end": "12:00:00",
                 "type": WorkerDay.TYPE_BUSINESS_TRIP,
@@ -421,8 +421,8 @@ class TestSetWorkerDay(LocalTestCase):
             response = self.api_post(self.url, {
                 "worker_id": self.user2.pk,
                 "shop_id": self.shop.id,
-                "dt": BaseConverter.convert_date(timezone.now()),
-                "dt_to": BaseConverter.convert_date(timezone.now() + datetime.timedelta(days=2)),
+                "dt": Converter.convert_date(timezone.now()),
+                "dt_to": Converter.convert_date(timezone.now() + datetime.timedelta(days=2)),
                 "tm_work_start": "11:00:00",
                 "tm_work_end": "12:00:00",
                 "type": WorkerDay.TYPE_BUSINESS_TRIP,
@@ -461,8 +461,8 @@ class TestSetWorkerDay(LocalTestCase):
             response = self.api_post(self.url, {
                 "worker_id": user.pk,
                 'shop_id': self.shop.id,
-                "dt": BaseConverter.convert_date(timezone.now()),
-                "dt_to": BaseConverter.convert_date(timezone.now() + datetime.timedelta(days=2)),
+                "dt": Converter.convert_date(timezone.now()),
+                "dt_to": Converter.convert_date(timezone.now() + datetime.timedelta(days=2)),
                 "tm_work_start": "11:00:00",
                 "tm_work_end": "12:00:00",
                 "type": WorkerDay.TYPE_WORKDAY,
@@ -645,7 +645,7 @@ class TestCreateCashier(LocalTestCase):
                 "middle_name": "007",
                 "username": "jb007",
                 "password": "mi7",
-                "dt_hired": BaseConverter.convert_date(now),
+                "dt_hired": Converter.convert_date(now),
                 "shop_id": self.shop.pk,
             })
         self.assertResponseCodeEqual(response, 200)
@@ -687,7 +687,7 @@ class TestCreateCashier(LocalTestCase):
 #         with self.auth_user():
 #             response = self.api_post(self.url, {
 #                 "user_id": self.user.pk,
-#                 "dt_fired": BaseConverter.convert_date(self.now)
+#                 "dt_fired": Converter.convert_date(self.now)
 #             })
 #         self.assertResponseCodeEqual(response, 200)
 #         self.user = self.refresh_model(self.user)
@@ -697,7 +697,7 @@ class TestCreateCashier(LocalTestCase):
 #         with self.auth_user():
 #             response = self.api_post(self.url, {
 #                 "user_id": -1,
-#                 "dt_fired": BaseConverter.convert_date(self.now)
+#                 "dt_fired": Converter.convert_date(self.now)
 #             })
 #         self.assertResponseCodeEqual(response, 400)
 #         self.assertErrorType(response, "DoesNotExist")
@@ -726,7 +726,7 @@ class TestGetChangeRequest(LocalTestCase):
             response = self.api_get(self.url, {
                 'worker_id': self.user.id,
                 "shop_id": self.root_shop.id,
-                'dt': BaseConverter.convert_date(self.now)
+                'dt': Converter.convert_date(self.now)
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertEqual(response.json()['data']['type'],
@@ -736,7 +736,7 @@ class TestGetChangeRequest(LocalTestCase):
         with self.auth_user():
             response = self.api_get(self.url, {
                 'worker_id': self.user.id,
-                'dt': BaseConverter.convert_date(self.now + datetime.timedelta(days=1))
+                'dt': Converter.convert_date(self.now + datetime.timedelta(days=1))
             })
         self.assertResponseCodeEqual(response, 200)
         self.assertEqual(response.json()['data']['type'],
@@ -746,7 +746,7 @@ class TestGetChangeRequest(LocalTestCase):
         with self.auth_user():
             response = self.api_get(self.url, {
                 'worker_id': self.user.id,
-                'dt': BaseConverter.convert_date(self.now - datetime.timedelta(days=1))
+                'dt': Converter.convert_date(self.now - datetime.timedelta(days=1))
             })
         self.assertResponseCodeEqual(response, 200)
 
@@ -764,7 +764,7 @@ class TestRequestWorkerDay(LocalTestCase):
             response = self.api_post(self.url, {
                 "worker_id": self.staff.id,
                 "shop_id": self.shop.id,
-                "dt": BaseConverter.convert_date(timezone.now().date()),
+                "dt": Converter.convert_date(timezone.now().date()),
                 "type": 'V'
             })
         self.assertResponseCodeEqual(response, 200)
@@ -782,10 +782,10 @@ class TestRequestWorkerDay(LocalTestCase):
             response = self.api_post(self.url, {
                 "worker_id": self.staff.id,
                 "shop_id": self.shop.id,
-                "dt": BaseConverter.convert_date(now.date()),
+                "dt": Converter.convert_date(now.date()),
                 "type": 'V',
-                'tm_work_start': BaseConverter.convert_time(now),
-                'tm_work_end': BaseConverter.convert_time(now + datetime.timedelta(hours=2)),
+                'tm_work_start': Converter.convert_time(now),
+                'tm_work_end': Converter.convert_time(now + datetime.timedelta(hours=2)),
                 'wish_text': "lorem ipsum"
             })
         self.assertResponseCodeEqual(response, 200)
