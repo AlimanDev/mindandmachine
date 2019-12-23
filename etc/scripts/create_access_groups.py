@@ -11,7 +11,7 @@
 
 from uuid import uuid4
 from django.utils import timezone
-from src.db.models import Shop, Employment
+from src.base.models import Shop, Employment
 import datetime
 
 def password_generator(len=14):
@@ -29,7 +29,7 @@ def main(hq_accs=2):
     middle_shops = Shop.objects.filter(level=1)
     leaf_shop = Shop.objects.filter(level=2).first()
 
-    from src.db.models import (
+    from src.base.models import (
         User,
         Group,
         FunctionGroup

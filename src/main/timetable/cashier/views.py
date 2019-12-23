@@ -313,7 +313,7 @@ def get_cashier_timetable(request, form):
     def check_wd(wd):
             work_type=wd.work_types.first()
             if work_type and work_type.shop_id != form['shop_id']:
-                wd.other_shop = work_type.shop.title
+                wd.other_shop = work_type.shop.name
     response = {}
     # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_ids']:

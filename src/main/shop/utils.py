@@ -50,7 +50,7 @@ def get_shop_list_stats(form, request, display_format='raw'):
     amount = form['items_per_page']
     sort_type = form['sort_type']
     filter_dict = {
-        'title__icontains': form['title'],
+        'title__icontains': form['name'],
         'dt_opened__gte': form['opened_after_dt'],
         'dt_closed__lte': form['closed_before_dt'],
     }

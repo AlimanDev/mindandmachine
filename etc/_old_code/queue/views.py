@@ -168,7 +168,7 @@ def process_forecast(request, form):
 
     shop = request.shop
     dt_now = datetime.now().date()
-    work_type = WorkType.objects.filter(shop=shop).order_by('id').first()
+    work_type = WorkType.objects.filter(shop=shop).select_related('work_type_name').order_by('id').first()
 
     day_info = ProductionDay.objects.filter(
         dt__gte=dt_now - timedelta(days=366),
@@ -260,7 +260,7 @@ def process_forecast(request, form):
                 work_type.id:  {
                     'id': work_type.id,
                     'predict_demand_params':  json.loads(work_type.period_queue_params),
-                    'name': work_type.name
+                    'name': work_type.work_type_name.name
 
                 }
             },

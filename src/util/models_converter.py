@@ -55,7 +55,7 @@ class EmploymentConverter(BaseConverter):
             'is_fixed_hours': obj.is_fixed_hours,
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
-            'position': obj.position.title if obj.position_id is not None else '',
+            'position': obj.position.name if obj.position_id is not None else '',
             'position_id': obj.position_id if obj.position_id is not None else '',
         })
 
@@ -162,7 +162,7 @@ class WorkerPositionConverter(BaseConverter):
     def convert(cls, obj):
         return {
             'id': obj.id,
-            'title': obj.title,
+            'title': obj.name,
         }
 
 
@@ -171,7 +171,7 @@ class WorkTypeConverter(BaseConverter):
     def convert_operation_type(cls, obj):
         return {
             'id': obj.id,
-            'name': obj.name,
+            'name': obj.operation_type_name.name,
             'speed_coef': obj.speed_coef,
             'do_forecast': obj.do_forecast,
             'work_type_id': obj.work_type.id
@@ -185,7 +185,7 @@ class WorkTypeConverter(BaseConverter):
             'dttm_deleted': cls.convert_datetime(obj.dttm_deleted),
             'shop': obj.shop_id,
             'priority': obj.priority,
-            'name': obj.name,
+            'name': obj.work_type_name.name,
             'prob': obj.probability,
             'prior_weight': obj.prior_weight,
             'min_workers_amount': obj.min_workers_amount,
@@ -204,7 +204,7 @@ class OperationTypeConverter(BaseConverter):
     def convert(cls, obj):
         return {
             'id': obj.id,
-            'name': obj.name,
+            'name': obj.operation_type.name,
             'speed_coef': obj.speed_coef,
             'do_forecast': obj.do_forecast,
             'work_type_id': obj.work_type.id
@@ -235,7 +235,7 @@ class CashboxConverter(BaseConverter):
             'dttm_added': cls.convert_datetime(obj.dttm_added),
             'dttm_deleted': cls.convert_datetime(obj.dttm_deleted),
             'type': obj.type_id,
-            'number': obj.number,
+            'name': obj.name,
             'bio': obj.bio
         }
 
@@ -300,7 +300,7 @@ class ShopConverter(BaseConverter):
         return {
             'id': obj.id,
             'parent': obj.parent_id,
-            'title': obj.title,
+            'name': obj.name,
             'tm_shop_opens': cls.convert_time(obj.tm_shop_opens),
             'tm_shop_closes': cls.convert_time(obj.tm_shop_closes),
             'code': obj.code,

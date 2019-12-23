@@ -591,7 +591,7 @@ class TestSetWorkerRestrictions(LocalTestCase):
                 "worker_id": 1,
                 "shop_id": self.root_shop.id,
                 "worker_sex": "F",
-                "work_type_info": "[{\"work_type_id\":1,\"priority\":0}]",
+                "work_type_info": json.dumps([{"work_type_id":self.work_type1.id,"priority":0}]),
                 "is_ready_for_overworkings" : True,
                 "is_fixed_hours" : True,
                 "norm_work_hours": 50,

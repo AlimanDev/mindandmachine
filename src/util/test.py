@@ -25,12 +25,14 @@ from src.timetable.models import (
     WorkerDayCashboxDetails,
     WorkerCashboxInfo,
     WorkType,
+    WorkTypeName,
     WorkerDay,
     UserWeekdaySlot
 )
 from src.forecast.models import (
     OperationType,
     PeriodClients,
+    OperationTypeName,
 )
 
 
@@ -129,7 +131,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         self.reg_shop1 = Shop.objects.create(
             id=11,
             parent=self.root_shop,
-            title='Region Shop1',
+            name='Region Shop1',
             break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
@@ -138,7 +140,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         self.reg_shop2 = Shop.objects.create(
             id=12,
             parent=self.root_shop,
-            title='Region Shop2',
+            name='Region Shop2',
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
             region=self.region,
@@ -148,7 +150,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         self.shop = Shop.objects.create(
             id=13,
             parent=self.reg_shop1,
-            title='Shop1',
+            name='Shop1',
             break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
@@ -157,7 +159,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         self.shop2 = Shop.objects.create(
             id=2,
             parent=self.reg_shop1,
-            title='Shop2',
+            name='Shop2',
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
             region=self.region,
@@ -166,7 +168,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         self.shop3 = Shop.objects.create(
             id=3,
             parent=self.reg_shop2,
-            title='Shop3',
+            name='Shop3',
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
             region=self.region,
@@ -270,51 +272,69 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         )
 
         # work_types
+        self.work_type_name1 = WorkTypeName.objects.create(
+            name='Кассы',
+            code='',
+        )
+        self.work_type_name2 = WorkTypeName.objects.create(
+            name='Тип_кассы_2',
+            code='',
+        )
+        self.work_type_name3 = WorkTypeName.objects.create(
+            name='Тип_кассы_3',
+            code='',
+        )
+        self.work_type_name4 = WorkTypeName.objects.create(
+            name='тип_кассы_4',
+            code='',
+        )
         self.work_type1 = create_work_type(
             self.shop,
-            'Кассы',
-            id=1,
+            self.work_type_name1,
             dttm_last_update_queue=dttm_now.replace(hour=0,minute=0,second=0,microsecond=0)
         )
         self.work_type2 = create_work_type(
             self.shop,
-            'Тип_кассы_2',
-            id=2,
+            self.work_type_name2,
             dttm_last_update_queue=dttm_now.replace(hour=0,minute=0,second=0,microsecond=0)
         )
         self.work_type3 = create_work_type(
             self.shop,
-            'Тип_кассы_3',
-            id=3,
+            self.work_type_name3,
             dttm_last_update_queue=None,
             dttm_deleted=dttm_now - datetime.timedelta(days=1)
         )
-        self.work_type4 = create_work_type(self.shop2, 'тип_кассы_4', id=4)
+        self.work_type4 = create_work_type(self.shop2, self.work_type_name4)
         WorkType.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 9, 0, 0))
 
-        create_operation_type(OperationType.FORECAST_HARD)
+        self.operation_type_name = OperationTypeName.objects.create(
+            name='',
+            code='',
+        )
+
+        create_operation_type(OperationType.FORECAST_HARD, self.operation_type_name)
 
         # cashboxes
         self.cashbox1 = Cashbox.objects.create(
             type=self.work_type1,
-            number=1,
+            name=1,
             id=1,
         )
         self.cashbox2 = Cashbox.objects.create(
             type=self.work_type2,
-            number=2,
+            name=2,
             id=2,
         )
         self.cashbox3 = Cashbox.objects.create(
             type=self.work_type3,
             dttm_deleted=dttm_now - datetime.timedelta(days=3),
-            number=3,
+            name=3,
             id=3,
         )
         for i in range(4, 10):
             Cashbox.objects.create(
                 type=self.work_type4,
-                number=i,
+                name=i,
                 id=i,
             )
         Cashbox.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0))
@@ -558,21 +578,20 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 #     )
 
 
-def create_work_type(shop, name, dttm_last_update_queue=None, dttm_deleted=None, id=None):
+def create_work_type(shop, name, dttm_last_update_queue=None, dttm_deleted=None):
     work_type = WorkType.objects.create(
-        id=id,
         shop=shop,
-        name=name,
+        work_type_name=name,
         dttm_deleted=dttm_deleted,
         dttm_last_update_queue=dttm_last_update_queue
     )
     return work_type
 
 
-def create_operation_type(do_forecast, dttm_deleted=None):
+def create_operation_type(do_forecast, operation_type_name, dttm_deleted=None):
     for work_type in WorkType.objects.all():
         OperationType.objects.create(
-            name='',
+            operation_type_name=operation_type_name,
             work_type=work_type,
             do_forecast=do_forecast,
             dttm_deleted=dttm_deleted,

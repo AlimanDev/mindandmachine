@@ -59,6 +59,7 @@ def get_outsource_workers(request, form):
         'worker_day__worker',
         'worker_day__shop',
         'work_type',
+        'work_type__work_type_name',
     ).filter(
         dttm_deleted__isnull=True,
         dttm_from__gte=from_dt,
@@ -78,14 +79,14 @@ def get_outsource_workers(request, form):
                 'dttm_work_start': BaseConverter.convert_time(wd.dttm_from.time()),
                 'dttm_work_end': BaseConverter.convert_time(wd.dttm_to.time()),
                 'work_type': wd.work_type_id,  #if wd.type == WorkerDay.TYPE_WORKDAY else None
-                'work_type_name': wd.work_type.name,  #if wd.type == WorkerDay.TYPE_WORKDAY else None
+                'work_type_name': wd.work_type.work_type_name.name,  #if wd.type == WorkerDay.TYPE_WORKDAY else None
                 'id': wd.id,
             }
             if wd.worker_day:
                 data['type'] = wd.worker_day.type
                 data['first_name'] = wd.worker_day.worker.first_name
                 data['last_name'] = wd.worker_day.worker.last_name
-                data['shop'] = wd.worker_day.shop.title if wd.worker_day.shop else None
+                data['shop'] = wd.worker_day.shop.name if wd.worker_day.shop else None
 
             date_response_dict[converted_date]['outsource_workers'].append(data)
             date_response_dict[converted_date]['amount'] += 1

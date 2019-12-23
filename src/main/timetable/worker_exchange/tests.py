@@ -12,6 +12,7 @@ from src.base.models import (
 )
 from src.timetable.models import (
     WorkType,
+    WorkTypeName,
     WorkerDay,
     WorkerDayCashboxDetails,
     ExchangeSettings,
@@ -21,6 +22,7 @@ from src.timetable.models import (
 from src.forecast.models import (
     OperationType,
     PeriodClients,
+    OperationTypeName,
 )
 from etc.scripts import fill_calendar
 from src.util.test import LocalTestCase
@@ -72,8 +74,9 @@ class TestWorkerExchange(LocalTestCase):
         )
 
         response = self.api_get(
-            '/api/timetable/worker_exchange/get_workers_to_exchange?specialization=2&dttm_start=09:00:00 {0}&dttm_end=18:00:00 {0}'.format(
-                self.qos_dt))
+            '/api/timetable/worker_exchange/get_workers_to_exchange?specialization={work_type_id}&dttm_start=09:00:00 {0}&dttm_end=18:00:00 {0}'.format(
+                self.qos_dt,
+                work_type_id=self.work_type2.id))
 
 
         self.assertEqual(response.status_code, 200)
@@ -103,19 +106,19 @@ class TestWorkerExchange(LocalTestCase):
         self.auth()
 
         response = self.api_post('/api/timetable/worker_exchange/notify_workers_about_vacancy',
-                                 {'work_type': 2, 'dttm_start': '09:00:00 {}'.format(self.qos_dt),
+                                 {'work_type': self.work_type2.id, 'dttm_start': '09:00:00 {}'.format(self.qos_dt),
                                   'dttm_end': '15:00:00 {}'.format(self.qos_dt)})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
 
         response = self.api_post('/api/timetable/worker_exchange/notify_workers_about_vacancy',
-                                 {'work_type': 2, 'dttm_start': '15:00:00 {}'.format(self.qos_dt),
+                                 {'work_type': self.work_type2.id, 'dttm_start': '15:00:00 {}'.format(self.qos_dt),
                                   'dttm_end': '21:00:00 {}'.format(self.qos_dt)})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
 
         vacancy = WorkerDayCashboxDetails.objects.filter(is_vacancy=True).order_by('id')
-        wt = WorkType.objects.get(pk=2)
+        wt = self.work_type2
 
         self.assertEqual(vacancy[0].dttm_from, self.dttm.replace(hour=9, minute=0, second=0, microsecond=0))
         self.assertEqual(vacancy[0].dttm_to, self.dttm.replace(hour=15, minute=0, second=0, microsecond=0))
@@ -135,7 +138,7 @@ class TestWorkerExchange(LocalTestCase):
         self.assertEqual(response.json()['data']['vacancies'], [])
 
         wt = WorkType.objects.get(
-            shop=self.shop, name='Тип_кассы_2')
+            shop=self.shop, work_type_name__name='Тип_кассы_2')
         WorkerDayCashboxDetails.objects.create(
             dttm_from='{} 09:00:00'.format(self.dttm.date()),
             dttm_to='{} 15:00:00'.format(self.dttm.date()),
@@ -164,19 +167,19 @@ class TestWorkerExchange(LocalTestCase):
         self.assertEqual(response.json()['data']['vacancies'][0]['dttm_to'], '21:00:00')
         self.assertEqual(response.json()['data']['vacancies'][0]['worker_fio'], '')
         self.assertEqual(response.json()['data']['vacancies'][0]['is_canceled'], False)
-        self.assertEqual(response.json()['data']['vacancies'][0]['work_type'], 2)
+        self.assertEqual(response.json()['data']['vacancies'][0]['work_type'], self.work_type2.id)
         self.assertEqual(response.json()['data']['vacancies'][1]['dt'], self.qos_dt)
         self.assertEqual(response.json()['data']['vacancies'][1]['dttm_from'], '09:00:00')
         self.assertEqual(response.json()['data']['vacancies'][1]['dttm_to'], '15:00:00')
         self.assertEqual(response.json()['data']['vacancies'][1]['worker_fio'], '')
         self.assertEqual(response.json()['data']['vacancies'][1]['is_canceled'], False)
-        self.assertEqual(response.json()['data']['vacancies'][1]['work_type'], 2)
+        self.assertEqual(response.json()['data']['vacancies'][1]['work_type'], self.work_type2.id)
 
     def test_cancel_vacancy(self):
         self.auth()
 
         wt = WorkType.objects.get(
-            shop=self.shop, name='Тип_кассы_2')
+            shop=self.shop, work_type_name__name='Тип_кассы_2')
         worker_day_detail = WorkerDayCashboxDetails.objects.create(
             dttm_from='{} 09:00:00'.format(self.dttm.date()),
             dttm_to='{} 15:00:00'.format(self.dttm.date()),
@@ -217,41 +220,51 @@ class Test_auto_worker_exchange(TestCase):
 
 
         self.root_shop = Shop.objects.create(
-            title='SuperShop1',
+            name='SuperShop1',
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0)
         )
 
         self.shop = Shop.objects.create(
             parent=self.root_shop,
-            title='Shop1',
+            name='Shop1',
             region=self.region,
         )
 
         self.shop2 = Shop.objects.create(
             parent=self.root_shop,
-            title='Shop2',
+            name='Shop2',
             region=self.region,
+        )
+
+        self.work_type_name = WorkTypeName.objects.create(
+            name='Кассы',
+            code='',
         )
 
         self.work_type1 = WorkType.objects.create(
             shop=self.shop,
-            name='Кассы'
+            work_type_name=self.work_type_name,
         )
 
         self.work_type2 = WorkType.objects.create(
             shop=self.shop2,
-            name='Кассы'
+            work_type_name=self.work_type_name,
+        )
+
+        self.operation_type_name = OperationTypeName.objects.create(
+            name='',
+            code='',
         )
 
         self.operation_type = OperationType.objects.create(
-            name='operation type №1',
+            operation_type_name=self.operation_type_name,
             work_type=self.work_type1,
             do_forecast=OperationType.FORECAST_HARD
         )
 
         self.operation_type2 = OperationType.objects.create(
-            name='operation type №1',
+            operation_type_name=self.operation_type_name,
             work_type=self.work_type2,
             do_forecast=OperationType.FORECAST_HARD
         )

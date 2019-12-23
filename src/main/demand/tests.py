@@ -2,12 +2,13 @@ from src.util.test import LocalTestCase
 from src.forecast.models import (
     PeriodClients, 
     OperationType, 
+    OperationTypeName,
     WorkType, 
 )
 from src.timetable.models import (
     Event
 )
-
+import json
 from datetime import datetime, timedelta, time
 from django.apps import apps
 
@@ -15,16 +16,20 @@ class TestDemand(LocalTestCase):
     def setUp(self):
         super().setUp()
         self.date = datetime.now().date()
-        w_type = WorkType.objects.get(pk=1)
-        w_type_2 = WorkType.objects.get(pk=4)
+        op_type_name = OperationTypeName.objects.create(
+            name='',
+            code='',
+        )
+        w_type = self.work_type1
+        w_type_2 = self.work_type4
         def_d = {
                 'work_type' :w_type,
-                'name' : '',
+                'operation_type_name' : op_type_name,
                 'do_forecast' : OperationType.FORECAST_HARD
             }
         def_wf = {
                 'work_type' :w_type,
-                'name' : ''
+                'operation_type_name' : op_type_name,
             }
         o_type_1 = OperationType.objects.update_or_create(
             id=5,
@@ -46,7 +51,7 @@ class TestDemand(LocalTestCase):
             id=9,
             defaults={
                 'work_type' :w_type_2,
-                'name' : ''
+                'operation_type_name' : op_type_name,
             }
             )[0]
         test_data = {
@@ -563,7 +568,7 @@ class TestGetDemangChangeLogs(TestDemand):
         from_dt = self.date.strftime('%d.%m.%Y')
         to_dt = (self.date + timedelta(days=1)).strftime('%d.%m.%Y')
         response = self.api_get(
-            f'/api/demand/get_demand_change_logs?work_type_id=4&from_dt={from_dt}&to_dt={to_dt}&shop_id=2'
+            f'/api/demand/get_demand_change_logs?work_type_id={self.work_type4.id}&from_dt={from_dt}&to_dt={to_dt}&shop_id=2'
         )
         correct_answer = {
             'code': 200,
@@ -572,7 +577,7 @@ class TestGetDemangChangeLogs(TestDemand):
                     'dttm_added': self.dates[0].strftime('%H:%M:%S %d.%m.%Y'), 
                     'dttm_from': datetime.combine(self.date, time(12, 0)).strftime('%H:%M:%S %d.%m.%Y'), 
                     'dttm_to': datetime.combine(self.date, time(13, 0)).strftime('%H:%M:%S %d.%m.%Y'), 
-                    'work_type_id': 4, 
+                    'work_type_id': self.work_type4.id, 
                     'multiply_coef': 0.2, 
                     'set_value': None
                 }, 
@@ -580,7 +585,7 @@ class TestGetDemangChangeLogs(TestDemand):
                     'dttm_added': self.dates[1].strftime('%H:%M:%S %d.%m.%Y'), 
                     'dttm_from': datetime.combine(self.date, time(15, 0)).strftime('%H:%M:%S %d.%m.%Y'), 
                     'dttm_to': datetime.combine(self.date, time(18, 0)).strftime('%H:%M:%S %d.%m.%Y'), 
-                    'work_type_id': 4, 
+                    'work_type_id': self.work_type4.id, 
                     'multiply_coef': None, 
                     'set_value': 10.0
                 }
@@ -643,7 +648,36 @@ class TestSetPredBills(TestDemand):
             "shop_id": self.shop.id,
             "access_token": "a", 
             "key": "a", 
-            "data": "{\"status\": \"R\", \"demand\": [{\"dttm\": \"10:00:00 01.09.2019\", \"value\": 2.1225757598876953, \"work_type\": 5}, {\"dttm\": \"10:30:00 01.09.2019\", \"value\": 2.2346010208129883, \"work_type\": 5}, {\"dttm\": \"11:00:00 01.09.2019\", \"value\": 2.195962905883789, \"work_type\": 5}, {\"dttm\": \"11:30:00 01.09.2019\", \"value\": 2.307988166809082, \"work_type\": 5}], \"dt_from\": \"01.09.2019\", \"dt_to\": \"02.11.2019\", \"shop_id\": 1}"
+            "data": json.dumps(
+                {
+                    "status": "R", 
+                    "demand": [
+                        {
+                            "dttm": "10:00:00 01.09.2019", 
+                            "value": 2.1225757598876953, 
+                            "work_type": self.o_type_5.id
+                        }, 
+                        {
+                            "dttm": "10:30:00 01.09.2019", 
+                            "value": 2.2346010208129883, 
+                            "work_type": self.o_type_5.id
+                        },
+                        {
+                            "dttm": "11:00:00 01.09.2019", 
+                            "value": 2.195962905883789, 
+                            "work_type": self.o_type_5.id
+                        }, 
+                        {
+                            "dttm": "11:30:00 01.09.2019", 
+                            "value": 2.307988166809082, 
+                            "work_type": self.o_type_5.id
+                        }
+                    ], 
+                    "dt_from": "01.09.2019", 
+                    "dt_to": "02.11.2019", 
+                    "shop_id": 1
+                }
+            )
         }
 
         
@@ -652,32 +686,32 @@ class TestSetPredBills(TestDemand):
             {
                 'dttm_forecast': datetime(2019, 9, 1, 10, 0), 
                 'value': 2.1225757598877, 
-                'operation_type_id': 5, 
+                'operation_type_id': self.o_type_5.id, 
                 'type': 'L'
             }, 
             {
                 'dttm_forecast': datetime(2019, 9, 1, 10, 30), 
                 'value': 2.23460102081299, 
-                'operation_type_id': 5, 
+                'operation_type_id': self.o_type_5.id,
                 'type': 'L'
             }, 
             {
                 'dttm_forecast': datetime(2019, 9, 1, 11, 0), 
                 'value': 2.19596290588379, 
-                'operation_type_id': 5, 
+                'operation_type_id': self.o_type_5.id, 
                 'type': 'L'
             }, 
             {
                 'dttm_forecast': datetime(2019, 9, 1, 11, 30), 
                 'value': 2.30798816680908, 
-                'operation_type_id': 5, 
+                'operation_type_id': self.o_type_5.id, 
                 'type': 'L'
             }
         ]
         self.assertEqual(list(PeriodClients.objects.filter(
             dttm_forecast__gte=datetime(2019, 9, 1, 10),
             dttm_forecast__lte=datetime(2019, 9, 1, 11, 30),
-            operation_type_id=5
+            operation_type_id=self.o_type_5.id
         ).values('dttm_forecast', 'value', 'operation_type_id', 'type')), correct_data)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Event.objects.first().text, 'Cоставлен новый спрос на период с 01.09.2019 по 02.11.2019')

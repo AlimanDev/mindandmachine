@@ -114,7 +114,7 @@ def create_predbills_request_function(shop_id, dt=None):
         # todo: aa: нужно qos_filter_active -- но это треш какой-то, как можно запрогнозировать, если там там по середине
         # todo: aa: месяца один тип закрылся, а потом новый открылся... трешшшшшш
         operation_types_dict = {}
-        for operation_type in OperationType.objects.select_related('work_type').filter(
+        for operation_type in OperationType.objects.select_related('work_type', 'operation_type_name').filter(
                 dttm_deleted__isnull=True,
                 work_type__shop_id=shop_id,
                 do_forecast=OperationType.FORECAST_HARD
@@ -123,7 +123,7 @@ def create_predbills_request_function(shop_id, dt=None):
                 operation_types_dict[operation_type.id] = {
                     'id': operation_type.id,
                     'predict_demand_params':  json.loads(operation_type.period_demand_params),
-                    'name': operation_type.name,
+                    'name': operation_type.operation_type_name.name,
                     'work_type': operation_type.work_type.id
                 }
     except ValueError as error_message:

@@ -117,7 +117,7 @@ class Tabel_xlsx(Xlsx_base):
             'align': 'fill',
             'font_color': COLOR_RED,
         })
-        self.worksheet.write_string(2, 1, 'Магазин: {}'.format(self.shop.title), text_top)
+        self.worksheet.write_string(2, 1, 'Магазин: {}'.format(self.shop.name), text_top)
         self.worksheet.write_rich_string(3, 1,
                                          text_top, 'ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ ',
                                          text_top_red, '{}  {}г.'.format(
@@ -126,7 +126,7 @@ class Tabel_xlsx(Xlsx_base):
             )
                                          )
         self.worksheet.write_string(5, 1, 'Отдел: ', text_top_red)
-        self.worksheet.write_string(5, 2, self.shop.title, text_top)
+        self.worksheet.write_string(5, 2, self.shop.name, text_top)
 
         #
         # work month info
