@@ -139,7 +139,8 @@ def get_table(request, workbook, form):
 
         for workerday in workerdays:
             day_detail = WorkerDayCashboxDetails.objects.qos_filter_version(checkpoint).select_related(
-                    'work_type'
+                    'work_type',
+                    'work_type__work_type_name',
                 ).filter(
                     worker_day=workerday
                 ).first()
@@ -177,7 +178,7 @@ def get_table(request, workbook, form):
                     raise WorkerDayCashboxDetails.DoesNotExist
 
                 if workerday_cashbox_details_first.work_type:
-                    worksheet.write(row, 1, workerday_cashbox_details_first.work_type.name, mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
+                    worksheet.write(row, 1, workerday_cashbox_details_first.work_type.work_type_name.name, mix_formats(workbook, bold_left_cell_format, bold_format, bg_color_format, size_format))
                 worksheet.write_blank(row, 2, '', mix_formats(workbook, bold_right_cell_format, bg_color_format, size_format))
             except WorkerDayCashboxDetails.DoesNotExist:
                 pass
