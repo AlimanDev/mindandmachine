@@ -8,8 +8,11 @@ from src.timetable.models import (
     Event
 )
 
+from src.util.models_converter import Converter
+
 from datetime import datetime, timedelta, time
 from django.apps import apps
+import json
 
 class TestDemand(LocalTestCase):
     def setUp(self):
@@ -306,21 +309,21 @@ class TestGetForecast(TestDemand):
     def test_correct_all_operations(self):
         self.auth()
         
-        response = self.api_get('/api/demand/get_forecast?from_dt=07.06.2018&to_dt=07.06.2018&shop_id=13')
+        response = self.api_get(f'/api/demand/get_forecast?from_dt={Converter.convert_date(datetime(2018, 6, 7))}&to_dt={Converter.convert_date(datetime(2018, 6, 7))}&shop_id=13')
         correct_L = {
-            'dttm': '09:00:00 07.06.2018',
+            'dttm': Converter.convert_datetime(datetime(2018, 6, 7, 9)),
             'clients': 55.0, 
             # 'products': 58.0,
             # 'queue': 75.0
         }
         correct_F = {
-            'dttm': '09:00:00 07.06.2018', 
+            'dttm': Converter.convert_datetime(datetime(2018, 6, 7, 9)), 
             'clients': 39.0, 
             # 'products': 46.0,
             # 'queue': 65.0
         }
         correct_S = {
-            'dttm': '09:00:00 07.06.2018', 
+            'dttm': Converter.convert_datetime(datetime(2018, 6, 7, 9)), 
             'clients': 28.0, 
             # 'products': 45.0,
             # 'queue': 65.0
@@ -332,21 +335,21 @@ class TestGetForecast(TestDemand):
     def test_correct_some_operations(self):
         self.auth()
         
-        response = self.api_get('/api/demand/get_forecast?from_dt=07.06.2018&to_dt=07.06.2018&shop_id=13&operation_type_ids=[5,6]')
+        response = self.api_get(f'/api/demand/get_forecast?from_dt={Converter.convert_date(datetime(2018, 6, 7))}&to_dt={Converter.convert_date(datetime(2018, 6, 7))}&shop_id=13&operation_type_ids=[5,6]')
         correct_L = {
-            'dttm': '09:00:00 07.06.2018',
+            'dttm': Converter.convert_datetime(datetime(2018, 6, 7, 9)),
             'clients': 50.0, 
             # 'products': 38.0,
             # 'queue': 54.0
         }
         correct_F = {
-            'dttm': '09:00:00 07.06.2018', 
+            'dttm': Converter.convert_datetime(datetime(2018, 6, 7, 9)), 
             'clients': 34.0, 
             # 'products': 37.0,
             # 'queue': 44.0
         }
         correct_S = {
-            'dttm': '09:00:00 07.06.2018', 
+            'dttm': Converter.convert_datetime(datetime(2018, 6, 7, 9)), 
             'clients': 22.0, 
             # 'products': 38.0,
             # 'queue': 39.0
@@ -374,8 +377,8 @@ class TestSetDemand(TestDemand):
     def setUp(self):
         super().setUp()
         self.data = {
-            'from_dttm' : datetime.combine(self.date, time(12, 0)).strftime('%H:%M:%S %d.%m.%Y'),
-            'to_dttm' : datetime.combine(self.date + timedelta(days=1), time(13, 0)).strftime('%H:%M:%S %d.%m.%Y'),
+            'from_dttm' : Converter.convert_datetime(datetime.combine(self.date, time(12, 0))),
+            'to_dttm' : Converter.convert_datetime(datetime.combine(self.date + timedelta(days=1), time(13, 0))),
             'shop_id' : 13
         }
         for op in self.o_types:
@@ -560,8 +563,8 @@ class TestGetDemangChangeLogs(TestDemand):
 
     def test_correct(self):
         self.auth()
-        from_dt = self.date.strftime('%d.%m.%Y')
-        to_dt = (self.date + timedelta(days=1)).strftime('%d.%m.%Y')
+        from_dt = Converter.convert_date(self.date)
+        to_dt =  Converter.convert_date((self.date + timedelta(days=1)))
         response = self.api_get(
             f'/api/demand/get_demand_change_logs?work_type_id=4&from_dt={from_dt}&to_dt={to_dt}&shop_id=2'
         )
@@ -569,17 +572,17 @@ class TestGetDemangChangeLogs(TestDemand):
             'code': 200,
             'data': [
                 {
-                    'dttm_added': self.dates[0].strftime('%H:%M:%S %d.%m.%Y'), 
-                    'dttm_from': datetime.combine(self.date, time(12, 0)).strftime('%H:%M:%S %d.%m.%Y'), 
-                    'dttm_to': datetime.combine(self.date, time(13, 0)).strftime('%H:%M:%S %d.%m.%Y'), 
+                    'dttm_added': Converter.convert_datetime(self.dates[0]), 
+                    'dttm_from': Converter.convert_datetime(datetime.combine(self.date, time(12, 0))), 
+                    'dttm_to': Converter.convert_datetime(datetime.combine(self.date, time(13, 0))), 
                     'work_type_id': 4, 
                     'multiply_coef': 0.2, 
                     'set_value': None
                 }, 
                 {
-                    'dttm_added': self.dates[1].strftime('%H:%M:%S %d.%m.%Y'), 
-                    'dttm_from': datetime.combine(self.date, time(15, 0)).strftime('%H:%M:%S %d.%m.%Y'), 
-                    'dttm_to': datetime.combine(self.date, time(18, 0)).strftime('%H:%M:%S %d.%m.%Y'), 
+                    'dttm_added': Converter.convert_datetime(self.dates[1]), 
+                    'dttm_from': Converter.convert_datetime(datetime.combine(self.date, time(15, 0))), 
+                    'dttm_to': Converter.convert_datetime(datetime.combine(self.date, time(18, 0))), 
                     'work_type_id': 4, 
                     'multiply_coef': None, 
                     'set_value': 10.0
@@ -611,7 +614,7 @@ class TestCreatePredBillsRequest(TestDemand):
         self.auth()
         data = {
             'shop_id' : 13,
-            'dt' : '07.07.2018'
+            'dt' : Converter.convert_date(datetime(2018, 7, 7))
         }
         response = self.api_post('/api/demand/create_predbills', data)
         res = response.json()
@@ -639,11 +642,39 @@ class TestSetPredBills(TestDemand):
 
     def test_correct(self):
         self.auth()
+        data = {
+            "status": "R",
+            "demand": [
+                {
+                    "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 10)),
+                    "value": 2.1225757598876953,
+                    "work_type": self.o_type_5.id,
+                },
+                {
+                    "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 10, 30)),
+                    "value": 2.2346010208129883,
+                    "work_type": self.o_type_5.id,
+                },
+                {
+                    "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 11)),
+                    "value": 2.195962905883789,
+                    "work_type": self.o_type_5.id,
+                },
+                {
+                    "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 11, 30)),
+                    "value": 2.307988166809082,
+                    "work_type": self.o_type_5.id,
+                },
+            ],
+            "dt_from": Converter.convert_date(datetime(2019, 9, 1)),
+            "dt_to": Converter.convert_date(datetime(2019, 11, 2)),
+            "shop_id": self.shop.id,
+        }
         test_data = {
             "shop_id": self.shop.id,
             "access_token": "a", 
             "key": "a", 
-            "data": "{\"status\": \"R\", \"demand\": [{\"dttm\": \"10:00:00 01.09.2019\", \"value\": 2.1225757598876953, \"work_type\": 5}, {\"dttm\": \"10:30:00 01.09.2019\", \"value\": 2.2346010208129883, \"work_type\": 5}, {\"dttm\": \"11:00:00 01.09.2019\", \"value\": 2.195962905883789, \"work_type\": 5}, {\"dttm\": \"11:30:00 01.09.2019\", \"value\": 2.307988166809082, \"work_type\": 5}], \"dt_from\": \"01.09.2019\", \"dt_to\": \"02.11.2019\", \"shop_id\": 1}"
+            "data": json.dumps(data),
         }
 
         
@@ -652,33 +683,33 @@ class TestSetPredBills(TestDemand):
             {
                 'dttm_forecast': datetime(2019, 9, 1, 10, 0), 
                 'value': 2.1225757598877, 
-                'operation_type_id': 5, 
+                'operation_type_id': self.o_type_5.id, 
                 'type': 'L'
             }, 
             {
                 'dttm_forecast': datetime(2019, 9, 1, 10, 30), 
                 'value': 2.23460102081299, 
-                'operation_type_id': 5, 
+                'operation_type_id': self.o_type_5.id, 
                 'type': 'L'
             }, 
             {
                 'dttm_forecast': datetime(2019, 9, 1, 11, 0), 
                 'value': 2.19596290588379, 
-                'operation_type_id': 5, 
+                'operation_type_id': self.o_type_5.id, 
                 'type': 'L'
             }, 
             {
                 'dttm_forecast': datetime(2019, 9, 1, 11, 30), 
                 'value': 2.30798816680908, 
-                'operation_type_id': 5, 
+                'operation_type_id': self.o_type_5.id, 
                 'type': 'L'
             }
         ]
         self.assertEqual(list(PeriodClients.objects.filter(
             dttm_forecast__gte=datetime(2019, 9, 1, 10),
             dttm_forecast__lte=datetime(2019, 9, 1, 11, 30),
-            operation_type_id=5
+            operation_type_id=self.o_type_5.id
         ).values('dttm_forecast', 'value', 'operation_type_id', 'type')), correct_data)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(Event.objects.first().text, 'Cоставлен новый спрос на период с 01.09.2019 по 02.11.2019')
+        self.assertEqual(Event.objects.first().text, f'Cоставлен новый спрос на период с {Converter.convert_date(datetime(2019, 9, 1))} по {Converter.convert_date(datetime(2019, 11, 2))}')
 

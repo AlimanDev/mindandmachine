@@ -14,7 +14,7 @@ from src.timetable.models import (
     AttendanceRecords,
 )
 from django.db import models
-from django.forms.models import model_to_dict
+from django.db.models.functions import TruncSecond, TruncDate, Cast
 
 
 class Converter:
@@ -42,6 +42,96 @@ class Converter:
     def convert_datetime(obj):
         return obj.strftime(QOS_DATETIME_FORMAT) if obj is not None else None
 
+    @staticmethod
+    def convert_queryset(elements, ModelClass, fields):
+        special_converters = {}
+        fields = [] if not fields else fields
+        spec_fields = []
+        tmp_fields = fields.copy()
+         # Получаем названия особенных полей
+        for field in fields if fields else ModelClass._meta.get_fields():
+            field_name = ''
+            if isinstance(field, str):
+                rel_fields = field.split('__')
+                field_name = field
+                if len(rel_fields) == 1:
+                    field = ModelClass._meta.get_field(field_name)
+                else:
+                    tmp_model = ModelClass
+                    for name in rel_fields[:-1]:
+                        tmp_model = tmp_model._meta.get_field(name).remote_field.model
+                    field = tmp_model._meta.get_field(rel_fields[-1])
+            field_name = field.name if not field_name else field_name
+            if isinstance(field, models.fields.DateTimeField):
+                special_converters[field_name + '_str'] = f"to_char({field_name}, \'HH24:MI:SS DD.MM.YYYY\')"#Cast(TruncSecond(field_name, output_field=models.DateTimeField()), models.CharField())
+                tmp_fields.remove(field_name)
+                spec_fields.append(field_name + '_str')
+            elif isinstance(field, models.fields.DateField):
+                special_converters[field_name + '_str'] = f"to_char({field_name}, \'DD.MM.YYYY\')"#Cast(TruncDate(field_name, output_field=models.DateField()), models.CharField())
+                tmp_fields.remove(field_name)
+                spec_fields.append(field_name + '_str')
+            elif isinstance(field, models.fields.TimeField):
+                special_converters[field_name + '_str'] = f"to_char({field_name}, \'HH24:MI:SS\')"#Cast(TruncSecond(field_name, output_field=models.TimeField()), models.CharField())
+                tmp_fields.remove(field_name)
+                spec_fields.append(field_name + '_str')
+        fields = tmp_fields           
+        fields.extend(spec_fields)
+        if fields:
+            elements = elements.extra(select=special_converters).values(*fields)
+        else:
+            elements = elements.values()
+        return list(elements)
+
+    @classmethod
+    def convert_list(self, elements, ModelClass, fields, custom_converters):
+        special_converters = custom_converters if custom_converters else {}
+        for field in fields if fields else ModelClass._meta.get_fields():
+            field_name = ''
+            if isinstance(field, str):
+                rel_fields = field.split('__')
+                field_name = field
+                if len(rel_fields) == 1:
+                    field = ModelClass._meta.get_field(field_name)
+                else:
+                    tmp_model = ModelClass
+                    for name in rel_fields[:-1]:
+                        tmp_model = tmp_model._meta.get_field(name).remote_field.model
+                    field = tmp_model._meta.get_field(rel_fields[-1])
+            field_name = field.name if not field_name else field_name
+            if field_name in special_converters:
+                continue
+            if isinstance(field, models.fields.DateTimeField):
+                special_converters[field_name] = self.convert_datetime
+            elif isinstance(field, models.fields.DateField):
+                special_converters[field_name] = self.convert_date
+            elif isinstance(field, models.fields.TimeField):
+                special_converters[field_name] = self.convert_time
+            elif isinstance(field, models.ForeignKey):
+                if fields and field_name + '_id' not in fields:
+                    special_converters[field_name] = lambda x: x.id if x and not isinstance(x, int) else x
+            elif isinstance(field, models.ManyToManyField):
+                special_converters[field_name] = lambda x: [el.id for el in x] if x else []
+            
+        result = []
+        for element in elements:
+            el = {}
+            for field in fields:
+                convert_function = special_converters.get(field, lambda x: x)
+                rel_fields = field.split('__')
+                field_name = field
+                if len(rel_fields) == 1:
+                    el[field_name] = convert_function(getattr(element, field_name))
+                else:
+                    try:
+                        tmp_obj = element
+                        for name in rel_fields[:-1]:
+                            tmp_obj = getattr(tmp_obj, name)
+                        el[field_name] = convert_function(getattr(tmp_obj, rel_fields[-1]))
+                    except AttributeError:
+                        el[field_name] = None
+            result.append(el)
+        return result  
+
     @classmethod
     def convert(self, elements, ModelClass=None, fields=None, custom_converters=None, out_array=False):
         '''
@@ -53,18 +143,10 @@ class Converter:
         функция которая применяется к нему
         out_array: bool - на выходе должен быть список даже если элемент один
         '''
-        special_converters = custom_converters if custom_converters else {}
         if not isinstance(elements, (list, tuple, models.QuerySet)):
             elements = [elements]
         if len(elements) == 0:
             return []
-        def apply_special_coverters(elm):
-            '''
-            функция для применения специальных конвертеров
-            '''
-            for key in special_converters.keys():
-                elm[key] = special_converters[key](elm[key])
-            return elm
         # В случае наследования для сложных данных
         if hasattr(self, 'convert_function'):
             elements = [
@@ -73,65 +155,10 @@ class Converter:
             ]
         #Для простого конвертирования
         elif ModelClass:
-            # Получаем названия особенных полей
-            for field in fields if fields else ModelClass._meta.get_fields():
-                field_name = ''
-                if isinstance(field, str):
-                    rel_fields = field.split('__')
-                    field_name = field
-                    if len(rel_fields) == 1:
-                        field = ModelClass._meta.get_field(field_name)
-                    else:
-                        tmp_model = ModelClass
-                        for name in rel_fields[:-1]:
-                            tmp_model = tmp_model._meta.get_field(name).remote_field.model
-                        field = tmp_model._meta.get_field(rel_fields[-1])
-                field_name = field.name if not field_name else field_name
-                if field_name in special_converters:
-                    continue
-                if isinstance(field, models.fields.DateTimeField):
-                    special_converters[field_name] = self.convert_datetime
-                elif isinstance(field, models.fields.DateField):
-                    special_converters[field_name] = self.convert_date
-                elif isinstance(field, models.fields.TimeField):
-                    special_converters[field_name] = self.convert_time
-                elif isinstance(field, models.ForeignKey):
-                    if fields and field_name + '_id' not in fields:
-                        special_converters[field_name] = lambda x: x.id if x and not isinstance(x, int) else x
-                elif isinstance(field, models.ManyToManyField):
-                    special_converters[field_name] = lambda x: [el.id for el in x] if x else []
             if isinstance(elements, models.QuerySet):
-                if fields:
-                    elements = elements.values(*fields)
-                else:
-                    elements = elements.values()
+                elements = self.convert_queryset(elements, ModelClass, fields)
             else:
-                if fields:
-                    result = []
-                    for element in elements:
-                        el = {}
-                        for field in fields:
-                            rel_fields = field.split('__')
-                            field_name = field
-                            if len(rel_fields) == 1:
-                                el[field_name] = getattr(element, field_name)
-                            else:
-                                try:
-                                    tmp_obj = element
-                                    for name in rel_fields[:-1]:
-                                        tmp_obj = getattr(tmp_obj, name)
-                                    el[field_name] = getattr(tmp_obj, rel_fields[-1])
-                                except AttributeError:
-                                    el[field_name] = None
-                        result.append(el)
-                    elements = result
-                else:
-                    elements = [
-                        model_to_dict(element)
-                        for element in elements
-                    ]
-            
-            elements = list(map(apply_special_coverters, elements))
+                elements = self.convert_list(elements, ModelClass, fields, custom_converters)
 
         return elements if len(elements) > 1 or out_array else elements[0]
 
@@ -286,30 +313,6 @@ class NotificationConverter(Converter):
             # 'object_id': obj.object_id,
             # 'content_type': obj._meta.object_name,
         }
-
-
-class AttendanceRecordsConverter(Converter):
-    __TYPES = {
-        AttendanceRecords.TYPE_COMING: 'пришел',
-        AttendanceRecords.TYPE_LEAVING: 'ушел',
-        AttendanceRecords.TYPE_BREAK_START: 'ушел на перерыв',
-        AttendanceRecords.TYPE_BREAK_END: 'вернулся с перерыва',
-    }
-
-    @classmethod
-    def convert_type(cls, obj):
-        return cls.__TYPES.get(obj.type, '')
-
-    @classmethod
-    def convert_function(cls, obj):
-        return {
-            'id': obj.id,
-            'dttm': cls.convert_datetime(obj.dttm),
-            'worker_id': obj.user_id,
-            'type': obj.type,
-            'is_verified': obj.verified,
-        }
-
 
 
 class VacancyConverter(Converter):
