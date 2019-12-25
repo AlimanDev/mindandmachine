@@ -24,7 +24,7 @@ class WorkerPositionAdmin(admin.ModelAdmin):
 @admin.register(User)
 class QsUserAdmin(admin.ModelAdmin):
     list_display = ('first_name', 'last_name', 'shop_title', 'id')
-    search_fields = ('first_name', 'last_name', 'shop_title', 'workercashboxinfo__work_type__name', 'id')
+    search_fields = ('first_name', 'last_name', 'id')
     # list_filter = ('employment__shop', )
 
     # list_display = ('first_name', 'last_name', 'employment__shop__title', 'parent_title', 'work_type_name', 'id')
@@ -65,7 +65,7 @@ class GroupAdmin(admin.ModelAdmin):
 
 @admin.register(FunctionGroup)
 class FunctionGroupAdmin(admin.ModelAdmin):
-    list_display = ('id', 'access_type', 'group', 'func', 'level_down', 'level_up')
+    list_display = ('id', 'access_type', 'group', 'func', 'method', 'level_down', 'level_up')
     list_filter = ('access_type', 'group', 'func')
     search_fields = ('id',)
 
