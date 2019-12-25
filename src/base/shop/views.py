@@ -2,6 +2,7 @@ from src.base.models import Shop, Employment
 from rest_framework import serializers, viewsets
 from django.utils import six
 from timezone_field import TimeZoneField as TimeZoneField_
+from src.base.permissions import Permission
 
 
 class TimeZoneField(serializers.ChoiceField):
@@ -11,26 +12,29 @@ class TimeZoneField(serializers.ChoiceField):
     def to_representation(self, value):
         return six.text_type(super().to_representation(value))
 
+
 # Serializers define the API representation.
 class ShopSerializer(serializers.HyperlinkedModelSerializer):
-    parent_id = serializers.IntegerField()
+    parent_id = serializers.IntegerField(required=False)
     timezone = TimeZoneField()
     class Meta:
         model = Shop
         fields = ['id', 'parent_id', 'title', 'tm_shop_opens', 'tm_shop_closes', 'code',
                   'address', 'type', 'dt_opened', 'dt_closed', 'timezone']
 
- # ViewSets define the view behavior.
+
+
 class ShopViewSet(viewsets.ModelViewSet):
+    permission_classes = [Permission]
     serializer_class = ShopSerializer
     def get_queryset(self):
         user = self.request.user
-        full_list = self.request.query_params.get('full')
+        only_top = self.request.query_params.get('only_top')
 
         employments = Employment.objects \
             .get_active(user=user).values('shop_id')
         shops = Shop.objects.filter(id__in=employments.values('shop_id'))
-        if full_list:
+        if not only_top:
             return Shop.objects.get_queryset_descendants(shops, include_self=True)
         else:
             return shops
