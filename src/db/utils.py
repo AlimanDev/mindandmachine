@@ -57,12 +57,17 @@ class IntegerListField(models.TextField):
 
 def check_func_groups():
     always_allowed_funcs = [
+        # old
         'wrapper',
         'is_signed',
         'update_csrf',
         'signin',
         'get_user_allowed_funcs',
         'rotate_fcm_token',
+
+        #rest
+        'ShopViewSet',
+        'APIRootView'
     ]
 
     def get_all_view_names(all_url_patterns=None, all_views=[]):
@@ -93,4 +98,4 @@ def check_func_groups():
             #     error_group_message += '{}, '.format(view)
     if missing_views:
         raise ValueError('The following views are not mentioned in FUNCS list: ' + ', '.join(missing_views))
-
+#

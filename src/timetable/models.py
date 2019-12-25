@@ -371,6 +371,8 @@ class WorkerDay(models.Model):
         return round(work_hours / 60)
 
     objects = WorkerDayManager()
+    def get_department(self):
+        return self.shop
 
 class WorkerDayCashboxDetailsManager(models.Manager):
     def qos_current_version(self):

@@ -19,9 +19,6 @@ class Region(models.Model):
 
 # на самом деле это отдел
 class Shop(MPTTModel):
-    def __init__(self, *args, **kwargs):
-        super(Shop, self).__init__(*args, **kwargs)
-
     class Meta(object):
         # unique_together = ('parent', 'title')
         verbose_name = 'Отдел'
@@ -51,7 +48,6 @@ class Shop(MPTTModel):
     )
 
 
-    #From supershop
     code = models.CharField(max_length=64, null=True, blank=True)
     address = models.CharField(max_length=256, blank=True, null=True)
     type = models.CharField(max_length=1, choices=DEPARTMENT_TYPES, default=TYPE_SHOP)
@@ -134,7 +130,8 @@ class Shop(MPTTModel):
             return self
         level = self.level - level if self.level > level else 0
         return self.get_ancestors().filter(level=level)[0]
-
+    def get_department(self):
+        return self
 
 class EmploymentManager(models.Manager):
     def get_active(self, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):
@@ -313,11 +310,17 @@ class Employment(models.Model):
 
     objects = EmploymentManager()
 
+    def has_permission(self, permission, method='GET'):
+        return self.function_group.allowed_functions.filter(
+            func=permission,
+            method=method
+        ).first()
+
 
 class FunctionGroup(models.Model):
     class Meta:
         verbose_name = 'Доступ к функциям'
-        unique_together = (('func', 'group'), )
+        unique_together = (('func', 'group', 'method'), )
 
     TYPE_SELF = 'S'
     TYPE_SHOP = 'TS'
@@ -332,6 +335,8 @@ class FunctionGroup(models.Model):
     )
 
     FUNCS = (
+        'Shop',
+
         'signout',
         'password_edit',
 
