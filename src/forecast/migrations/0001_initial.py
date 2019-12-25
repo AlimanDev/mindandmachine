@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 import django.db.models.deletion
-import src.db.utils
+from src.base import models_utils
 
 
 class Migration(migrations.Migration):
@@ -70,7 +70,7 @@ class Migration(migrations.Migration):
                 ('tm_end', models.TimeField()),
                 ('value', models.FloatField()),
                 ('period', models.CharField(choices=[('D', 'Ежедневно'), ('W', 'В неделю'), ('M', 'В месяц')], default='D', max_length=1)),
-                ('days_in_period', src.db.utils.IntegerListField()),
+                ('days_in_period', models_utils.IntegerListField()),
                 ('dt_built_to', models.DateField(blank=True, null=True)),
                 ('operation_type', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='work_type_reversed', to='forecast.OperationType')),
             ],

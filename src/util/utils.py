@@ -132,7 +132,7 @@ class JsonResponse(object):
     @classmethod
     def __base_response(cls, code, data, additional_info=None):
         response_data = {
-            'code': code,
+            'code': code,  # fixme: deprecated -- used normal status code
             'data': data,
             'info': additional_info
         }

@@ -6,28 +6,35 @@ from random import randint
 import numpy as np
 from datetime import time, datetime
 from dateutil.relativedelta import relativedelta
-from src.db.models import (
+from src.base.models import (
+    User,
+    Shop,
+    Group,
+    Region,
+    FunctionGroup,
+)
+from src.forecast.models import (
+    OperationTemplate,
+    OperationType,
+    PeriodClients,
+
+)
+from src.timetable.models import (
     ExchangeSettings,
     Event,
-    Shop,
-    User,
-    PeriodClients,
     WorkerDay,
     WorkerConstraint,
     WorkerDayCashboxDetails,
     WorkerCashboxInfo,
     WorkType,
-    OperationType,
     Cashbox,
     AttendanceRecords,
-    Group,
-    FunctionGroup,
     Timetable,
     Notifications,
     Employment,
-    Region,
 )
-from src.db import fill_calendar
+
+from etc.scripts import fill_calendar
 from src.util.models_converter import (
     WorkerDayConverter,
 )
@@ -233,7 +240,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
 
         for info in worker_d['worker_cashbox_info']:
             add_models(infos, WorkerCashboxInfo, WorkerCashboxInfo(
-                worker=employment,
+                employment=employment,
                 work_type=work_types_dict[info['work_type']],
                 mean_speed=info['mean_speed'],
             ))
@@ -356,7 +363,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         else:
             coef = 2
 
-        WorkerCashboxInfo.objects.filter(worker__shop=shop).update(mean_speed=F('mean_speed') / coef)
+        WorkerCashboxInfo.objects.filter(employment__shop=shop).update(mean_speed=F('mean_speed') / coef)
         #Employment.objects.filter(shop=shop).update(dt_fired=timezone.datetime(2018, 1, 1).date())
 
         for wt_key in work_types_dict.keys():

@@ -1,6 +1,6 @@
 from django.db import models
 
-from src.db import utils
+from src.base import models_utils
 import datetime
 
 from src.timetable.models import WorkType
@@ -108,7 +108,7 @@ class OperationTemplate(models.Model):
     )
 
     # days_in_period = models.TextField()
-    days_in_period = utils.IntegerListField()
+    days_in_period = models_utils.IntegerListField()
     # день до которого заполнен PeriodClients
     dt_built_to = models.DateField(blank=True, null=True)
 
