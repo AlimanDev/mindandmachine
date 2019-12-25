@@ -53,7 +53,7 @@ class Converter:
                 values_dict[field.replace('__', '_')] = models.F(field)
                 tmp_fields.remove(field)
         fields = tmp_fields
-        if fields:
+        if fields or values_dict:
             elements = elements.values(*fields, **values_dict)
         else:
             elements = elements.values()
