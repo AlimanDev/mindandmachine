@@ -4,6 +4,7 @@ import pandas
 from django.utils import timezone
 import datetime
 from src.conf.djconfig import QOS_DATE_FORMAT
+from src.util.models_converter import Converter
 
 class TestDownload(LocalTestCase):
 
@@ -29,9 +30,7 @@ class TestDownload(LocalTestCase):
     def test_get_demand_xlsx(self):
         self.auth()
 
-        response = self.api_get('/api/download/get_demand_xlsx?from_dt=30.05.2019&to_dt=02.06.2019&shop_id={}&demand_model=C'.format(
-            self.shop.id
-        ))
+        response = self.api_get(f'/api/download/get_demand_xlsx?from_dt={Converter.convert_date(datetime.date(2019, 5, 30))}&to_dt={Converter.convert_date(datetime.date(2019, 6, 2))}&shop_id={self.shop.id}&demand_model=C')
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[0]][0], 'Кассы ')
@@ -58,9 +57,7 @@ class TestURVDownload(LocalTestCase):
     def test_get_urv_xlsx(self):
         self.auth()
 
-        response = self.api_get('/api/download/get_urv_xlsx?from_dt=30.05.2019&to_dt=02.06.2019&shop_id={}'.format(
-            self.shop.id
-        ))
+        response = self.api_get(f'/api/download/get_urv_xlsx?from_dt={Converter.convert_date(datetime.date(2019, 5, 30))}&to_dt={Converter.convert_date(datetime.date(2019, 6, 2))}&shop_id={self.shop.id}')
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[0]][0], '01.06.2019')

@@ -20,7 +20,7 @@ class TestAutoSettings(LocalTestCase):
     def test_get_status(self):
         self.auth()
 
-        response = self.api_get('/api/timetable/auto_settings/get_status?dt=01.06.2019&shop_id={}'.format(
+        response = self.api_get('/api/timetable/auto_settings/get_status?dt=2019-06-01&shop_id={}'.format(
             self.shop.id
         ))
         self.assertEqual(response.status_code, 200)

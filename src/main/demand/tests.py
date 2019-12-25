@@ -161,7 +161,7 @@ class TestGetIndicators(TestDemand):
     def test_correct(self):
         self.auth()
 
-        response = self.api_get('/api/demand/get_indicators?from_dt=06.05.2018&to_dt=08.06.2018&shop_id=13')
+        response = self.api_get(f'/api/demand/get_indicators?from_dt={Converter.convert_date(datetime(2018, 5, 6))}&to_dt={Converter.convert_date(datetime(2018, 6, 8))}&shop_id=13')
         
         self.assertEqual(response.status_code, 200)
         correct_res = {

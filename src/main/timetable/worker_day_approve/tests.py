@@ -2,7 +2,7 @@ from src.util.test import LocalTestCase
 from src.timetable.models import WorkerDayApprove
 from dateutil.relativedelta import relativedelta
 from django.utils.timezone import now
-
+from src.util.models_converter import Converter
 
 class TestAutoSettings(LocalTestCase):
 
@@ -22,7 +22,7 @@ class TestAutoSettings(LocalTestCase):
         )
         self.assertEqual(response.status_code, 200)
         id = response.json()['data'].pop('id')
-        dt_approved=self.dt.strftime('%d.%m.%Y')
+        dt_approved = Converter.convert_date(self.dt)
 
         dttm_added = response.json()['data'].pop('dttm_added')
         data = {'code': 200,
@@ -55,8 +55,8 @@ class TestAutoSettings(LocalTestCase):
         self.assertEqual(len(response.json()['data']), 1)
 
         response = self.api_get('/api/timetable/worker_day_approve/get_worker_day_approves?dt_from={}&dt_to={}&shop_id={}'.format(
-            self.dt2.strftime('%d.%m.%Y'),
-            (self.dt + relativedelta(months=1)).strftime('%d.%m.%Y'),
+            Converter.convert_date(self.dt2),
+            Converter.convert_date((self.dt + relativedelta(months=1))),
             self.shop.id
         ))
 

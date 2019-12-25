@@ -332,7 +332,7 @@ class TestGetCashierInfo(LocalTestCase):
         general_info = {'id': 2, 'username': 'user2', 'first_name': 'Иван2',
                         'last_name': 'Иванов', 'middle_name': None,
                         'avatar_url': None, 'sex': 'F', 'phone_number': None, 'email': 'u2@b.b',
-                        'shop_id': 13, 'dt_hired': '01.01.2019', 'dt_fired': None, 'auto_timetable': True,
+                        'shop_id': 13, 'dt_hired': '2019-01-01', 'dt_fired': None, 'auto_timetable': True,
                         'salary': 0.0, 'is_fixed_hours': False, 'is_ready_for_overworkings': False,
                         'tabel_code': None,
                         'position': '',
@@ -565,7 +565,7 @@ class TestSetWorkerRestrictions(LocalTestCase):
                 "worker_id": 1,
                 "shop_id": self.root_shop.id,
                 "week_availability": 4,
-                "dt_new_week_availability_from": date(2019, 2, 10).strftime('%d.%m.%Y'),
+                "dt_new_week_availability_from": Converter.convert_date(date(2019, 2, 10)),
                 "shift_hours_length": '-',
                 'norm_work_hours': 100
             })
