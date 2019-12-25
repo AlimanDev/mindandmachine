@@ -14,8 +14,6 @@ from src.timetable.models import (
     AttendanceRecords,
 )
 from django.db import models
-from django.db.models.functions import TruncSecond, TruncDate, Cast
-import json
 
 class Converter:
     @staticmethod
