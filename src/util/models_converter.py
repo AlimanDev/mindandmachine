@@ -47,7 +47,7 @@ class Converter:
         tmp_fields = fields.copy()
          # Получаем названия особенных полей
         for field in fields:
-            if len(field.split('__')) > 0:
+            if field.find('__') > 0:
                 values_dict[field.replace('__', '_')] = models.F(field)
                 tmp_fields.remove(field)
         fields = tmp_fields
