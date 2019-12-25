@@ -137,10 +137,10 @@ class Shop(MPTTModel):
 
 
 class EmploymentManager(models.Manager):
-    def get_active(self, dt_from, dt_to, *args, **kwargs):
+    def get_active(self, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):
         """
         hired earlier then dt_from, hired later then dt_to
-        :param dt_from:
+        :paramShop dt_from:
         :param dt_to:
         :param args:
         :param kwargs:
