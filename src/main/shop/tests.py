@@ -98,7 +98,7 @@ class TestShop(LocalTestCase):
                   'data': {
                       'shops': [{
                           'id': self.shop.id,
-                          'parent': self.reg_shop1.id,
+                          'parent_id': self.reg_shop1.id,
                           'timezone': 'Europe/Moscow',
                           'title': 'Shop1', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00',
                           'code': None, 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None,
@@ -109,7 +109,7 @@ class TestShop(LocalTestCase):
                           'fot_revenue': {'prev': 5.0, 'curr': 10.0, 'change': 100}}],
                       'super_shop': {
                           'id': self.shop.id,
-                          'parent': self.reg_shop1.id,
+                          'parent_id': self.reg_shop1.id,
                           'timezone': 'Europe/Moscow',
                           'title': 'Shop1', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00',
                           'code': None, 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None}},
@@ -161,7 +161,7 @@ class TestShop(LocalTestCase):
             'pages': 1,
             'shops': [
                 {'id': self.reg_shop2.id,
-                 'parent': self.root_shop.id,
+                 'parent_id': self.root_shop.id,
                  'timezone': 'Europe/Moscow',
                  'title': 'Region Shop2', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00', 'code': None, 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None,
                  'revenue': {'prev': 4, 'curr': 8, 'change': 100},
@@ -171,7 +171,7 @@ class TestShop(LocalTestCase):
                  'workers_amount': {'prev': 4, 'curr': 8, 'change': 100},
                  'fot_revenue': {'prev': 4.0, 'curr': 8.0, 'change': -100}},
                 {'id': self.reg_shop1.id,
-                 'parent': self.root_shop.id,
+                 'parent_id': self.root_shop.id,
                  'timezone': 'Europe/Moscow',
                  'title': 'Region Shop1', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00', 'code': None, 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None,
                  'revenue': {'prev': 10, 'curr': 20, 'change': 100},

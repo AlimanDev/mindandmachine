@@ -13,7 +13,7 @@ from src.timetable.models import (
     Timetable,
 )
 from dateutil.relativedelta import relativedelta
-from src.util.models_converter import ShopConverter
+from src.util.models_converter import Converter
 from math import ceil
 
 
@@ -156,7 +156,12 @@ def get_shop_list_stats(form, request, display_format='raw'):
         return value * (-1) if key in reverse_plus_fields else value
 
     for ss in shops:
-        converted_ss = ShopConverter.convert(ss)
+        converted_ss = Converter.convert(
+            ss, 
+            Shop, 
+            fields=['id', 'parent_id', 'title', 'tm_shop_opens', 'tm_shop_closes', 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone'],
+            custom_converters={'timezone':lambda x: x.zone},
+        )
         #  откидываем лишние данные типа title, tm_start, tm_end, ...
         ss_dynamic_values = {k: v for k, v in ss.__dict__.items() if 'curr' in k or 'prev' in k}
         for key in range_filters:

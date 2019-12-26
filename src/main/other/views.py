@@ -6,7 +6,7 @@ from src.timetable.models import (
     UserWeekdaySlot,
     WorkType,
 )
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import Converter
 from src.util.utils import api_method, JsonResponse
 from .forms import (
     GetSlots,
@@ -62,8 +62,8 @@ def get_all_slots(request, form):
         result.append({
             'id': slot.id,
             'name': slot.name,
-            'tm_start': BaseConverter.convert_time(slot.tm_start),
-            'tm_end': BaseConverter.convert_time(slot.tm_end),
+            'tm_start': Converter.convert_time(slot.tm_start),
+            'tm_end': Converter.convert_time(slot.tm_end),
             'work_type_id': slot.work_type.id if slot.work_type else None,
         })
     return JsonResponse.success(result)
@@ -96,8 +96,8 @@ def get_slots(request, form):
             'slot_id': ws.slot.id,
             'is_suitable': ws.is_suitable,
             'name': ws.slot.name,
-            'tm_start': BaseConverter.convert_time(ws.slot.tm_start),
-            'tm_end': BaseConverter.convert_time(ws.slot.tm_end),
+            'tm_start': Converter.convert_time(ws.slot.tm_start),
+            'tm_end': Converter.convert_time(ws.slot.tm_end),
         })
 
     return JsonResponse.success(slots_by_weekday)

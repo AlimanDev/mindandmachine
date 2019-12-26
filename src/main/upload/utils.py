@@ -30,7 +30,7 @@ from src.timetable.models import (
     WorkerCashboxInfo,
 )
 from src.main.demand.utils import create_predbills_request_function
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import Converter
 from src.conf.djconfig import SFTP_IP, SFTP_PASSWORD, SFTP_USERNAME, SFTP_PATH
 
 WORK_TYPES = {
@@ -208,10 +208,10 @@ def upload_timetable_util(form, timetable_file):
                     times = cell.value.split('-')
                     work_type = WorkerDay.TYPE_WORKDAY
                     dttm_work_start = datetime.datetime.combine(
-                        dt, BaseConverter.parse_time(times[0] + ':00')
+                        dt, Converter.parse_time(times[0] + ':00')
                     )
                     dttm_work_end = datetime.datetime.combine(
-                        dt, BaseConverter.parse_time(times[1] + ':00')
+                        dt, Converter.parse_time(times[1] + ':00')
                     )
                     if dttm_work_end < dttm_work_start:
                         dttm_work_end += datetime.timedelta(days=1)

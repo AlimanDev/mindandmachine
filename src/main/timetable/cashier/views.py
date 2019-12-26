@@ -35,12 +35,9 @@ from src.util.models_converter import (
     EmploymentConverter,
     UserConverter,
     WorkerDayConverter,
-    WorkerConstraintConverter,
-    WorkerCashboxInfoConverter,
-    WorkTypeConverter,
-    BaseConverter,
+    Converter,
     WorkerDayChangeLogConverter,
-    WorkerPositionConverter
+    Converter,
 )
 from src.util.utils import (
     JsonResponse,
@@ -111,11 +108,11 @@ def get_cashiers_list(request, form):
         q &= Q(dt_hired__isnull=True) | Q(dt_hired__lte=form['dt_to'])
         q &= Q(dt_fired__isnull=True) | Q(dt_fired__gt=form['dt_from'])
 
-    employments = Employment.objects.filter(
+    employments = list(Employment.objects.filter(
         shop_id=shop_id,
-    ).filter(q).select_related('user').order_by('id')
+    ).filter(q).select_related('user').order_by('id'))
 
-    return JsonResponse.success([EmploymentConverter.convert(x) for x in employments])
+    return JsonResponse.success(EmploymentConverter.convert(employments, out_array=True))
 
 
 @api_method('GET', GetCashiersListForm)
@@ -257,7 +254,7 @@ def select_cashiers(request, form):
 
         employments = [x for x in employments if x.user_id in set(y.worker_id for y in worker_days)]
 
-    return JsonResponse.success([EmploymentConverter.convert(x) for x in employments])
+    return JsonResponse.success(EmploymentConverter.convert(employments, out_array=True))
 
 
 @api_method('GET', GetCashierTimetableForm)
@@ -314,6 +311,7 @@ def get_cashier_timetable(request, form):
             work_type=wd.work_types.first()
             if work_type and work_type.shop_id != form['shop_id']:
                 wd.other_shop = work_type.shop.title
+            return wd
     response = {}
     # todo: rewrite with 1 request instead 80
     for worker_id in form['worker_ids']:
@@ -389,15 +387,12 @@ def get_cashier_timetable(request, form):
                 'change_amount': len(worker_day_change_log),
                 'hours_count_fact': wd_stat_count_total(worker_days_filter, request.shop)['hours_count_fact']
             }
-        map(check_wd, worker_days)
+        worker_days = list(map(check_wd, worker_days))
         days_response = [
             {
                 'day': WorkerDayConverter.convert(wd),
-                'change_log': [WorkerDayChangeLogConverter.convert(x) for x in
-                               worker_day_change_log.get(wd.id, [])],
-                'change_requests': []
-                # 'change_requests': [WorkerDayChangeRequestConverter.convert(x) for x in
-                #                     worker_day_change_requests.get(obj.id, [])[:10]]
+                'change_log': WorkerDayChangeLogConverter.convert(worker_day_change_log.get(wd.id, [])),
+                'change_requests': [],
             }
             for wd in worker_days
         ]
@@ -486,29 +481,43 @@ def get_cashier_info(request, form):
         worker_cashbox_info = WorkerCashboxInfo.objects.filter(employment=employment, is_active=True)
         work_types = WorkType.objects.filter(shop_id=form['shop_id'])
         response['work_type_info'] = {
-            'worker_cashbox_info': [WorkerCashboxInfoConverter.convert(x) for x in worker_cashbox_info],
-            'work_type': {x.id: WorkTypeConverter.convert(x) for x in work_types}, # todo: delete this -- seems not needed
+            'worker_cashbox_info': Converter.convert(
+                worker_cashbox_info, 
+                WorkerCashboxInfo, 
+                fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration']
+            ),
+            'work_type': {
+                x['id']: x for x in Converter.convert(
+                    work_types, 
+                    WorkType, 
+                    fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+                )
+            }, # todo: delete this -- seems not needed
             'min_time_between_shifts': employment.min_time_btw_shifts,
             'shift_length_min': employment.shift_hours_length_min,
             'shift_length_max': employment.shift_hours_length_max,
             'norm_work_hours': employment.norm_work_hours,
             'week_availability': employment.week_availability,
-            'dt_new_week_availability_from': BaseConverter.convert_date(employment.dt_new_week_availability_from),
+            'dt_new_week_availability_from': Converter.convert_date(employment.dt_new_week_availability_from),
         }
 
     if 'constraints_info' in form['info']:
         constraints = WorkerConstraint.objects.filter(worker_id=worker.id)
-        response['constraints_info'] = [WorkerConstraintConverter.convert(x) for x in constraints]
+        response['constraints_info'] = Converter.convert(
+            constraints, 
+            WorkerConstraint, 
+            fields=['id', 'worker_id', 'eployment__week_availability', 'weekday', 'tm', 'is_lite'],
+        )
         response['shop_times'] = {
-            'tm_start': BaseConverter.convert_time(request.shop.tm_shop_opens),
-            'tm_end': BaseConverter.convert_time(request.shop.tm_shop_closes)
+            'tm_start': Converter.convert_time(request.shop.tm_shop_opens),
+            'tm_end': Converter.convert_time(request.shop.tm_shop_closes)
         }
 
     if 'work_hours' in form['info']:
         def __create_time_obj(__from, __to):
             return {
-                'from': BaseConverter.convert_time(__from.time()),
-                'to': BaseConverter.convert_time(__to.time())
+                'from': Converter.convert_time(__from.time()),
+                'to': Converter.convert_time(__to.time())
             }
 
         constraint_times_all = {i: set() for i in range(7)}
@@ -637,8 +646,8 @@ def get_worker_day(request, form):
 
     def __create_time_obj(__from, __to):
         return {
-            'from': BaseConverter.convert_time(__from.time()),
-            'to': BaseConverter.convert_time(__to.time())
+            'from': Converter.convert_time(__from.time()),
+            'to': Converter.convert_time(__to.time())
         }
 
     if len(times) > 0:
@@ -655,11 +664,15 @@ def get_worker_day(request, form):
             select_related('on_cashbox', 'work_type'). \
             filter(worker_day=wd):
         details.append({
-            'dttm_from': BaseConverter.convert_time(x.dttm_from.time()) if x.dttm_to else None,
-            'dttm_to': BaseConverter.convert_time(x.dttm_to.time()) if x.dttm_to else None,
+            'dttm_from': Converter.convert_time(x.dttm_from.time()) if x.dttm_to else None,
+            'dttm_to': Converter.convert_time(x.dttm_to.time()) if x.dttm_to else None,
             'work_type': x.work_type_id,
         })
-        cashboxes_types[x.work_type_id] = WorkTypeConverter.convert(x.work_type)
+        cashboxes_types[x.work_type_id] = Converter.convert(
+            x.work_type, 
+            WorkType, 
+            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+        )
 
     return JsonResponse.success({
         'day': WorkerDayConverter.convert(wd),
@@ -801,8 +814,8 @@ def set_worker_day(request, form):
         if new_worker_day.type == WorkerDay.TYPE_WORKDAY:
             if len(details):
                 for item in details:
-                    dttm_to = BaseConverter.parse_time(item['dttm_to'])
-                    dttm_from = BaseConverter.parse_time(item['dttm_from'])
+                    dttm_to = Converter.parse_time(item['dttm_to'])
+                    dttm_from = Converter.parse_time(item['dttm_from'])
                     WorkerDayCashboxDetails.objects.create(
                         work_type_id=item['work_type'],
                         worker_day=new_worker_day,
@@ -867,12 +880,12 @@ def get_worker_day_logs(request, form):
 
     def convert_change_log(obj):
         def __work_dttm(__field):
-            return BaseConverter.convert_datetime(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
+            return Converter.convert_datetime(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
 
         res = {
             'id': obj.id,
-            'dttm_added': BaseConverter.convert_datetime(obj.dttm_added),
-            'dt': BaseConverter.convert_date(obj.dt),
+            'dttm_added': Converter.convert_datetime(obj.dttm_added),
+            'dt': Converter.convert_date(obj.dt),
             'worker': obj.worker_id,
             'type': obj.type,
             'dttm_work_start': __work_dttm(obj.dttm_work_start),
@@ -1067,7 +1080,7 @@ def set_worker_restrictions(request, form):
         for constraint in new_constraints:
             constraints_to_create.append(
                 WorkerConstraint(
-                    tm=BaseConverter.parse_time(constraint['tm']),
+                    tm=Converter.parse_time(constraint['tm']),
                     is_lite=constraint['is_lite'],
                     weekday=constraint['weekday'],
                     worker=worker,
@@ -1364,10 +1377,10 @@ def get_change_request(request, form):
     try:
         change_request = WorkerDayChangeRequest.objects.get(dt=form['dt'], worker_id=form['worker_id'])
         return JsonResponse.success({
-            'dt': BaseConverter.convert_date(change_request.dt),
+            'dt': Converter.convert_date(change_request.dt),
             'type': change_request.type,
-            'dttm_work_start': BaseConverter.convert_datetime(change_request.dttm_work_start),
-            'dttm_work_end': BaseConverter.convert_datetime(change_request.dttm_work_end),
+            'dttm_work_start': Converter.convert_datetime(change_request.dttm_work_start),
+            'dttm_work_end': Converter.convert_datetime(change_request.dttm_work_end),
             'wish_text': change_request.wish_text,
             'status_type': change_request.status_type,
         })
@@ -1588,4 +1601,4 @@ def handle_worker_day_request(request, form):
 @api_method('GET', check_permissions=False)
 def get_worker_position_list(request):
     worker_positions = WorkerPosition.objects.all()
-    return JsonResponse.success([WorkerPositionConverter.convert(wp) for wp in worker_positions])
+    return JsonResponse.success(Converter.convert(worker_positions, WorkerPosition))

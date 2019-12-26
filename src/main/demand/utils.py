@@ -15,8 +15,7 @@ from src.forecast.models import (
     PeriodClients,
     OperationType,
 )
-
-from src.util.models_converter import BaseConverter, ProductionDayConverter
+from src.util.models_converter import Converter
 from django.core.exceptions import EmptyResultSet
 
 
@@ -132,20 +131,20 @@ def create_predbills_request_function(shop_id, dt=None):
     aggregation_dict = {
         'IP': settings.HOST_IP,
         'algo_params': {
-            'days_info': [ProductionDayConverter.convert(day) for day in day_info],
-            'dt_from': BaseConverter.convert_date(dt),
-            'dt_to': BaseConverter.convert_date(dt_to),
-            # 'dt_start': BaseConverter.convert_date(dt),
+            'days_info': Converter.convert(day_info, ProductionDay, fields=['id', 'dt', 'type', 'is_celebration']),
+            'dt_from': Converter.convert_date(dt),
+            'dt_to': Converter.convert_date(dt_to),
+            # 'dt_start': Converter.convert_date(dt),
             # 'days': predict2days,
-            'period_step': BaseConverter.convert_time(shop.forecast_step_minutes),
-            'tm_start': BaseConverter.convert_time(shop.tm_shop_opens),
-            'tm_end': BaseConverter.convert_time(shop.tm_shop_closes),
+            'period_step': Converter.convert_time(shop.forecast_step_minutes),
+            'tm_start': Converter.convert_time(shop.tm_shop_opens),
+            'tm_end': Converter.convert_time(shop.tm_shop_closes),
         },
         'work_types': operation_types_dict,
         'period_demands': [
             {
                 'value': period_demand.value,
-                'dttm': BaseConverter.convert_datetime(period_demand.dttm_forecast),
+                'dttm': Converter.convert_datetime(period_demand.dttm_forecast),
                 'work_type': period_demand.operation_type_id,
             } for period_demand in period_clients
         ],
