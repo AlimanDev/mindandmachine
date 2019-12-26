@@ -1,8 +1,17 @@
-from src.base.models import Shop, Employment
-from rest_framework import serializers, viewsets
-from django.utils import six
+import datetime
+from dateutil.relativedelta import relativedelta
 from timezone_field import TimeZoneField as TimeZoneField_
+
+from django.db.models import Q, Sum
+from django.utils import six
+from django_filters.rest_framework import FilterSet
+
+from rest_framework import serializers, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
 from src.base.permissions import Permission
+from src.base.models import  Employment, Shop
 
 
 class TimeZoneField(serializers.ChoiceField):
@@ -14,7 +23,7 @@ class TimeZoneField(serializers.ChoiceField):
 
 
 # Serializers define the API representation.
-class ShopSerializer(serializers.HyperlinkedModelSerializer):
+class ShopSerializer(serializers.ModelSerializer):
     parent_id = serializers.IntegerField(required=False)
     timezone = TimeZoneField()
     class Meta:
@@ -22,11 +31,32 @@ class ShopSerializer(serializers.HyperlinkedModelSerializer):
         fields = ['id', 'parent_id', 'title', 'tm_shop_opens', 'tm_shop_closes', 'code',
                   'address', 'type', 'dt_opened', 'dt_closed', 'timezone']
 
+class ShopStatSerializer(serializers.Serializer):
+    id=serializers.IntegerField()
+    parent_id=serializers.IntegerField()
+    title=serializers.CharField()
+    fot_curr=serializers.FloatField()
+    fot_prev=serializers.FloatField()
+    revenue_prev=serializers.FloatField()
+    revenue_curr=serializers.FloatField()
+    lack_prev=serializers.FloatField()
+    lack_curr=serializers.FloatField()
+
+
+class ShopFilter(FilterSet):
+    class Meta:
+        model = Shop
+        fields = {
+            'id':['exact', 'in'],
+        }
 
 
 class ShopViewSet(viewsets.ModelViewSet):
     permission_classes = [Permission]
     serializer_class = ShopSerializer
+    filterset_class = ShopFilter
+    permission_name = 'department'
+
     def get_queryset(self):
         user = self.request.user
         only_top = self.request.query_params.get('only_top')
@@ -48,4 +78,22 @@ class ShopViewSet(viewsets.ModelViewSet):
         # return shops
         # function_groups = FunctionGroup.objects.all
         # queryset = Shop.objects.
+
+    @action(detail=False, methods=['get']) #, permission_classes=[IsAdminOrIsSelf])
+    def stat(self, request):
+        dt_curr = datetime.datetime.today().replace(day=1)
+        dt_prev = dt_curr - relativedelta(months=1)
+
+        shops = self.filter_queryset(
+            self.get_queryset()
+        ).annotate(
+            fot_prev=Sum('timetable__fot', filter=Q(timetable__dt=dt_prev)),
+            fot_curr=Sum('timetable__fot', filter=Q(timetable__dt=dt_curr)),
+            revenue_prev=Sum('timetable__fot_revenue', filter=Q(timetable__dt=dt_prev)),
+            revenue_curr=Sum('timetable__fot_revenue', filter=Q(timetable__dt=dt_curr)),
+            lack_prev=Sum('timetable__lack', filter=Q(timetable__dt=dt_prev)),
+            lack_curr=Sum('timetable__lack', filter=Q(timetable__dt=dt_curr)),
+        )
+        serializer = ShopStatSerializer(shops, many=True)
+        return Response(serializer.data)
 
