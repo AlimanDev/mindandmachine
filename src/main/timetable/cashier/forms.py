@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from src.base.models import User
 from src.timetable.models import WorkerDay
 from src.util import forms as util_forms
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import Converter
 
 
 class GetCashiersListForm(forms.Form):
@@ -52,7 +52,7 @@ class SelectCashiersForm(forms.Form):
 
         try:
             value = json.loads(value)
-            value = [BaseConverter.parse_date(x) for x in value]
+            value = [Converter.parse_date(x) for x in value]
         except:
             raise ValidationError('invalid')
 
@@ -65,7 +65,7 @@ class SelectCashiersForm(forms.Form):
 
         try:
             value = json.loads(value)
-            value = [BaseConverter.parse_date(x) for x in value]
+            value = [Converter.parse_date(x) for x in value]
         except:
             raise ValidationError('invalid')
 

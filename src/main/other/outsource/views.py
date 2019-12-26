@@ -6,7 +6,7 @@ from .forms import (
 )
 
 from src.util.utils import api_method, JsonResponse
-from src.util.models_converter import BaseConverter
+from src.util.models_converter import Converter
 from datetime import timedelta
 from django.core.exceptions import ObjectDoesNotExist
 
@@ -45,7 +45,7 @@ def get_outsource_workers(request, form):
 
 
     for date in range((to_dt - from_dt).days + 1):
-        converted_date = BaseConverter.convert_date(from_dt + timedelta(days=date))
+        converted_date = Converter.convert_date(from_dt + timedelta(days=date))
         date_response_dict[converted_date] = {
             'outsource_workers': [],
             'amount': 0
@@ -70,13 +70,13 @@ def get_outsource_workers(request, form):
     )
 
     for wd in outsource_workerdays:
-        converted_date = BaseConverter.convert_date(wd.dttm_from.date())
+        converted_date = Converter.convert_date(wd.dttm_from.date())
 
         # first_name = '№{}'.format(str(outsourcer_number + 1))
         try:
             data = {
-                'dttm_work_start': BaseConverter.convert_time(wd.dttm_from.time()),
-                'dttm_work_end': BaseConverter.convert_time(wd.dttm_to.time()),
+                'dttm_work_start': Converter.convert_time(wd.dttm_from.time()),
+                'dttm_work_end': Converter.convert_time(wd.dttm_to.time()),
                 'work_type': wd.work_type_id,  #if wd.type == WorkerDay.TYPE_WORKDAY else None
                 'work_type_name': wd.work_type.name,  #if wd.type == WorkerDay.TYPE_WORKDAY else None
                 'id': wd.id,

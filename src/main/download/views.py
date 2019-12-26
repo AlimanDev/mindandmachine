@@ -20,7 +20,6 @@ from src.main.shop.forms import GetDepartmentListForm
 from src.main.shop.utils import get_shop_list_stats
 from src.main.urv.utils import wd_stat_count
 from src.util.forms import FormUtil
-from src.util.models_converter import AttendanceRecordsConverter
 from src.util.utils import api_method, JsonResponse
 from .utils import xlsx_method
 from .forms import (
@@ -257,7 +256,12 @@ def get_urv_xlsx(request, workbook, form):
 
     prev_date = None
     prev_worker = None
-
+    attendance_record_types = {
+        AttendanceRecords.TYPE_COMING: 'пришел',
+        AttendanceRecords.TYPE_LEAVING: 'ушел',
+        AttendanceRecords.TYPE_BREAK_START: 'ушел на перерыв',
+        AttendanceRecords.TYPE_BREAK_END: 'вернулся с перерыва',
+    }
     for index, record in enumerate(records):
         record_date = record.dttm.date()
         record_worker = record.user
@@ -268,7 +272,7 @@ def get_urv_xlsx(request, workbook, form):
             worksheet.write(index + 1, 1, '{} {}'.format(record_worker.last_name, record_worker.first_name))
             prev_worker = record_worker
         worksheet.write(index + 1, 2, record.dttm.strftime('%H:%M'))
-        worksheet.write(index + 1, 3, AttendanceRecordsConverter.convert_type(record))
+        worksheet.write(index + 1, 3, attendance_record_types.get(record.type, ''))
 
     return workbook, 'URV {}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))
 

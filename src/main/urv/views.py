@@ -9,7 +9,7 @@ from src.timetable.models import (
     WorkerDay
 )
 from src.util.utils import JsonResponse, api_method
-from src.util.models_converter import AttendanceRecordsConverter
+from src.util.models_converter import Converter
 from src.util.forms import FormUtil
 from .forms import GetUserUrvForm
 from .utils import wd_stat_count_total
@@ -78,10 +78,10 @@ def get_user_urv(request, form):
         'pages': paginator.count,
         'amount_per_page': amount_per_page,
     }
-
-    return JsonResponse.success([
-        AttendanceRecordsConverter.convert(record) for record in user_records
-    ], info)
+    return JsonResponse.success(
+        Converter.convert(user_records.object_list, AttendanceRecords, fields=['id', 'dttm', 'user_id', 'type', 'verified']), 
+        info
+    )
 
 
 @api_method('GET', GetUserUrvForm)

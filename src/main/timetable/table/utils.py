@@ -13,7 +13,6 @@ import datetime as dt
 from django.db.models import Sum, Q, Count
 from django.db.models.functions import Coalesce
 
-from src.util.models_converter import WorkerDayConverter
 from src.main.urv.utils import wd_stat_count
 
 def count_work_month_stats(shop, dt_start, dt_end, employments, times_borders=None):

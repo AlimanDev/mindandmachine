@@ -16,7 +16,7 @@ class TestApiMethod(LocalTestCase):
         self.auth(self.USER_USERNAME)
 
         response = self.api_get(
-            '/api/timetable/auto_settings/get_status?dt=01.06.2019&shop_id={}'.format(self.shop.id))
+            '/api/timetable/auto_settings/get_status?dt=2019-06-01&shop_id={}'.format(self.shop.id))
         self.assertEqual(response.status_code, 200)
         self.assertResponseCodeEqual(response, 200)
 
@@ -30,7 +30,7 @@ class TestApiMethod(LocalTestCase):
         self.auth('user5')
 
         response = self.api_get(
-            '/api/timetable/auto_settings/get_status?dt=01.06.2019&shop_id={}'.format(self.shop.id))
+            '/api/timetable/auto_settings/get_status?dt=2019-06-01&shop_id={}'.format(self.shop.id))
         self.assertEqual(response.status_code, 200)
         self.assertResponseCodeEqual(response, 200)
 
@@ -49,7 +49,7 @@ class TestApiMethod(LocalTestCase):
         self.auth('user6')
 
         response = self.api_get(
-            '/api/timetable/auto_settings/get_status?dt=01.06.2019&shop_id={}'.format(self.shop.id))
+            '/api/timetable/auto_settings/get_status?dt=2019-06-01&shop_id={}'.format(self.shop.id))
         self.assertEqual(response.status_code, 200)
         self.assertResponseCodeEqual(response, 200)
 
@@ -86,18 +86,18 @@ class TestApiMethod(LocalTestCase):
         # user7 = employee_group
         self.auth('user7')
 
-        response = self.api_get('/api/timetable/auto_settings/get_status?dt=01.06.2019&shop_id={}'.format(self.shop.id))
+        response = self.api_get('/api/timetable/auto_settings/get_status?dt=2019-06-01&shop_id={}'.format(self.shop.id))
         self.assertEqual(response.status_code, 200)
         self.assertResponseCodeEqual(response, 200)
 
-        response = self.api_get('/api/timetable/auto_settings/get_status?dt=01.06.2019&shop_id={}'.format(self.shop2.id))
+        response = self.api_get('/api/timetable/auto_settings/get_status?dt=2019-06-01&shop_id={}'.format(self.shop2.id))
         self.assertEqual(response.status_code, 403)
         self.assertResponseCodeEqual(response, 403)
         self.assertEqual(response.json()['data']['error_message'],
                          'Вы не можете просматрировать информацию по другим магазинам')
 
     def test_auth_required(self):
-        response = self.api_get('/api/timetable/auto_settings/get_status?dt=01.06.2019&shop_id={}'.format(self.shop.id))
+        response = self.api_get('/api/timetable/auto_settings/get_status?dt=2019-06-01&shop_id={}'.format(self.shop.id))
         self.assertEqual(response.status_code, 401)
         self.assertResponseCodeEqual(response, 401)
         self.assertEqual(response.json()['data']['error_type'], 'AuthRequired')
