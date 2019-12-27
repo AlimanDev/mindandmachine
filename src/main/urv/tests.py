@@ -2,7 +2,7 @@ from src.util.test import LocalTestCase
 from datetime import timedelta, datetime, time
 
 from django.utils.timezone import now
-
+from src.util.models_converter import Converter
 from src.timetable.models import AttendanceRecords
 
 
@@ -69,8 +69,8 @@ class TestURV(LocalTestCase):
         dt = now().date()
         from_dt = dt - timedelta(days=10)
         response = self.api_get('/api/urv/get_indicators?from_dt={}&to_dt={}&shop_id={}'.format(
-            from_dt.strftime("%d.%m.%Y"),
-            dt.strftime("%d.%m.%Y"),
+            Converter.convert_date(from_dt),
+            Converter.convert_date(dt),
             self.shop.id
         ))
 
@@ -90,6 +90,6 @@ class TestURV(LocalTestCase):
 
     def test_get_user_urv(self):
         self.auth()
-        response = self.api_get('/api/urv/get_user_urv?worker_ids=[]&from_dt=01.10.2019&to_dt=08.10.2019&amount_per_page=64&show_outstaff=false&shop_id={}'.format(self.shop.id))
+        response = self.api_get('/api/urv/get_user_urv?worker_ids=[]&from_dt=2019-10-01&to_dt=2019-10-08&amount_per_page=64&show_outstaff=false&shop_id={}'.format(self.shop.id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)

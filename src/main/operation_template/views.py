@@ -12,7 +12,7 @@ from src.forecast.models import (
 )
 from src.util.utils import JsonResponse, api_method
 from src.util.models_converter import (
-    OperationTemplateConverter,
+    Converter,
 )
 from .forms import (
     GetOperationTemplatesForm,
@@ -71,7 +71,11 @@ def get_operation_templates(request, form):
         )
 
     return JsonResponse.success(
-        [OperationTemplateConverter.convert(x) for x in operation_templates]
+        Converter.convert(
+            operation_templates, 
+            OperationTemplate, 
+            fields=['id', 'name', 'tm_start', 'tm_end', 'value', 'period', 'days_in_period', 'operation_type_id', 'dt_built_to']
+        )
     )
 
 
@@ -127,7 +131,11 @@ def create_operation_template(request, form):
     operation_template.save()
 
     return JsonResponse.success(
-        OperationTemplateConverter.convert(operation_template)
+        Converter.convert(
+            operation_template, 
+            OperationTemplate, 
+            fields=['id', 'name', 'tm_start', 'tm_end', 'value', 'period', 'days_in_period', 'operation_type_id', 'dt_built_to']
+        )
     )
 
 
@@ -234,5 +242,9 @@ def update_operation_template(request, form):
     if build_period:
         build_period_clients(operation_template, dt_from=date_rebuild_from)
     return JsonResponse.success(
-        OperationTemplateConverter.convert(operation_template)
+        Converter.convert(
+            operation_template, 
+            OperationTemplate,
+            fields=['id', 'name', 'tm_start', 'tm_end', 'value', 'period', 'days_in_period', 'operation_type_id', 'dt_built_to']
+        )
     )

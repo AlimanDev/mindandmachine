@@ -8,7 +8,7 @@ from src.timetable.models import (
 )
 from src.util.models_converter import (
     WorkerDayConverter,
-    BaseConverter,
+    Converter,
     UserConverter,
     VacancyConverter,
 )
@@ -80,7 +80,7 @@ def get_workers_to_exchange(request, form):
 
     users = {}
     for worker in workers:
-        worker_info = UserConverter.convert_main(worker)
+        worker_info = UserConverter.convert(worker)
         # worker_info['shop_title'] = list(worker.employments.all().values_list('shop__title', flat=True))
         # worker_info['supershop_title'] = worker.parent_title
         users[worker.id] = {'info': worker_info, 'timetable': []}
@@ -97,8 +97,8 @@ def get_workers_to_exchange(request, form):
 
     res_dict = {
         'users': users,
-        'tt_from_dt': BaseConverter.convert_date(change_dt - timezone.timedelta(days=10)),
-        'tt_to_dt': BaseConverter.convert_date(change_dt + timezone.timedelta(days=10)),
+        'tt_from_dt': Converter.convert_date(change_dt - timezone.timedelta(days=10)),
+        'tt_to_dt': Converter.convert_date(change_dt + timezone.timedelta(days=10)),
     }
     return JsonResponse.success(res_dict)
 
@@ -183,7 +183,7 @@ def show_vacancy(request, form):
     ).select_related('worker_day', 'worker_day__worker').order_by('-id')[pointer * count: (pointer + 1) * count]
 
     res_dict = {
-        'vacancies': [VacancyConverter.convert(vac) for vac in vacancies],
+        'vacancies': VacancyConverter.convert(vacancies),
     }
     return JsonResponse.success(res_dict)
 

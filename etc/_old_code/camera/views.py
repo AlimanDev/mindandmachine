@@ -166,7 +166,7 @@ def get_visitors_info(request, form):
     while dttm < dttm_to:
         for model_name, qs in query_sets.items():
             return_dict[model_name].append({
-                'dttm': BaseConverter.convert_datetime(dttm),
+                'dttm': Converter.convert_datetime(dttm),
                 'value': filter_qs(qs, dttm)
             })
         dttm += timedelta(minutes=30)

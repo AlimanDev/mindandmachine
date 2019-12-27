@@ -13,6 +13,7 @@ from django.http import HttpResponse
 from django.views.debug import ExceptionReporter
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
+from django.core.serializers.json import DjangoJSONEncoder
 
 from src.base.models import (
     Employment,
@@ -137,7 +138,12 @@ class JsonResponse(object):
             'info': additional_info
         }
         return HttpResponse(
-            json.dumps(response_data, separators=(',', ':'), ensure_ascii=False),
+            json.dumps(
+                response_data, 
+                separators=(',', ':'), 
+                ensure_ascii=False,
+                cls=DjangoJSONEncoder,
+            ),
             content_type='application/json',
             status=code,
         )

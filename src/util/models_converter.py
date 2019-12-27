@@ -13,37 +13,107 @@ from src.timetable.models import (
     WorkerDay,
     AttendanceRecords,
 )
+from django.db import models
 
-
-class BaseConverter(object):
-    @classmethod
-    def convert_date(cls, obj):
+class Converter:
+    @staticmethod
+    def convert_date(obj):
         return obj.strftime(QOS_DATE_FORMAT) if obj is not None else None
 
-    @classmethod
-    def parse_date(cls, obj):
+    @staticmethod
+    def parse_date(obj):
         return datetime.datetime.strptime(obj, QOS_DATE_FORMAT).date()
 
-    @classmethod
-    def convert_time(cls, obj):
+    @staticmethod
+    def convert_time(obj):
         return obj.strftime(QOS_TIME_FORMAT) if obj is not None else None
 
-    @classmethod
-    def parse_time(cls, obj):
+    @staticmethod
+    def parse_time(obj):
         return datetime.datetime.strptime(obj, QOS_TIME_FORMAT).time()
 
-    @classmethod
-    def parse_datetime(cls, obj):
+    @staticmethod
+    def parse_datetime(obj):
         return datetime.datetime.strptime(obj, QOS_DATETIME_FORMAT)
 
-    @classmethod
-    def convert_datetime(cls, obj):
+    @staticmethod
+    def convert_datetime(obj):
         return obj.strftime(QOS_DATETIME_FORMAT) if obj is not None else None
 
+    @staticmethod
+    def convert_queryset(elements, ModelClass, fields):
+        fields = [] if not fields else fields
+        values_dict = {}
+        tmp_fields = fields.copy()
+         # Получаем названия особенных полей
+        for field in fields:
+            if field.find('__') > 0:
+                values_dict[field.replace('__', '_')] = models.F(field)
+                tmp_fields.remove(field)
+        fields = tmp_fields
+        if fields or values_dict:
+            elements = elements.values(*fields, **values_dict)
+        else:
+            elements = elements.values()
+        return list(elements)
 
-class EmploymentConverter(BaseConverter):
     @classmethod
-    def convert(cls, obj: Employment):
+    def convert_list(self, elements, ModelClass, fields, custom_converters):
+        special_converters = custom_converters if custom_converters else {}            
+        result = []
+        for element in elements:
+            el = {}
+            for field in fields:
+                convert_function = special_converters.get(field, lambda x: x)
+                rel_fields = field.split('__')
+                field_name = field
+                if len(rel_fields) == 1:
+                    el[field_name.replace('__', '_')] = convert_function(getattr(element, field_name))
+                else:
+                    try:
+                        tmp_obj = element
+                        for name in rel_fields[:-1]:
+                            tmp_obj = getattr(tmp_obj, name)
+                        el[field_name.replace('__', '_')] = convert_function(getattr(tmp_obj, rel_fields[-1]))
+                    except AttributeError:
+                        el[field_name.replace('__', '_')] = None
+            result.append(el)
+        return result  
+
+    @classmethod
+    def convert(self, elements, ModelClass=None, fields=None, custom_converters=None, out_array=False):
+        '''
+        Функция для преобразования данных из базы данных в формат json
+        elements:list, tuple, QuerySet - данные
+        ModelClass - класс модели, которую конвертируем
+        fields: list - поля из модели, которые должны быть в результирующем json
+        custom_converters: dict - словарь, где ключом является название поля, а значением
+        функция которая применяется к нему
+        out_array: bool - на выходе должен быть список даже если элемент один
+        '''
+        if not isinstance(elements, (list, tuple, models.QuerySet)):
+            elements = [elements]
+        if len(elements) == 0:
+            return []
+        # В случае наследования для сложных данных
+        if hasattr(self, 'convert_function'):
+            elements = [
+                self.convert_function(element)
+                for element in elements
+            ]
+        #Для простого конвертирования
+        elif ModelClass:
+            if isinstance(elements, models.QuerySet):
+                elements = self.convert_queryset(elements, ModelClass, fields)
+            else:
+                elements = self.convert_list(elements, ModelClass, fields, custom_converters)
+
+        return elements if len(elements) > 1 or out_array else elements[0]
+
+
+class EmploymentConverter(Converter):
+    @classmethod
+    def convert_function(cls, obj: Employment):
         user = obj.user
         res = UserConverter.convert(user)
         res.update({
@@ -62,9 +132,9 @@ class EmploymentConverter(BaseConverter):
         return res
 
 
-class UserConverter(BaseConverter):
+class UserConverter(Converter):
     @classmethod
-    def convert_main(cls, obj: User):
+    def convert_function(cls, obj: User):
         return {
             'id': obj.id,
             'username': obj.username,
@@ -77,15 +147,11 @@ class UserConverter(BaseConverter):
             'email': obj.email,
         }
 
-    @classmethod
-    def convert(cls, obj: User):
-        return cls.convert_main(obj)
 
-
-class WorkerDayConverter(BaseConverter):
+class WorkerDayConverter(Converter):
 
     @classmethod
-    def convert(cls, obj):
+    def convert_function(cls, obj):
         def __work_tm(__field):
             return cls.convert_time(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
 
@@ -109,9 +175,9 @@ class WorkerDayConverter(BaseConverter):
         return data
 
 
-class WorkerDayChangeLogConverter(BaseConverter):
+class WorkerDayChangeLogConverter(Converter):
     @classmethod
-    def convert(cls, obj):
+    def convert_function(cls, obj):
         def __work_tm(__field):
             return cls.convert_time(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
 
@@ -124,7 +190,7 @@ class WorkerDayChangeLogConverter(BaseConverter):
         if parent or obj.created_by_id:
             res = {
                 'worker_day': obj.id,
-                'dttm_changed': BaseConverter.convert_datetime(obj.dttm_added),
+                'dttm_changed': Converter.convert_datetime(obj.dttm_added),
                 'changed_by': obj.created_by_id,
                 'change_by_fio': obj.created_by.last_name + ' ' + obj.created_by.first_name if obj.created_by_id else '',
                 'comment': obj.comment,
@@ -142,31 +208,7 @@ class WorkerDayChangeLogConverter(BaseConverter):
         return res
 
 
-class WorkerDayChangeRequestConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        def __work_tm(__field):
-            return cls.convert_time(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
-
-        return {
-            'id': obj.id,
-            'dttm_added': cls.convert_datetime(obj.dttm_added),
-            'worker_day': obj.worker_day_id,
-            'type': obj.type,
-            'dttm_work_start': __work_tm(obj.dttm_work_start),
-            'dttm_work_end': __work_tm(obj.dttm_work_end),
-        }
-
-class WorkerPositionConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'title': obj.name,
-        }
-
-
-class WorkTypeConverter(BaseConverter):
+class WorkTypeConverter(Converter):
     @classmethod
     def convert_operation_type(cls, obj):
         return {
@@ -185,8 +227,8 @@ class WorkTypeConverter(BaseConverter):
             'dttm_deleted': cls.convert_datetime(obj.dttm_deleted),
             'shop': obj.shop_id,
             'priority': obj.priority,
-            'name': obj.work_type_name.name,
-            'prob': obj.probability,
+            'work_type_name_name': obj.work_type_name.name,
+            'probability': obj.probability, #change front and algo
             'prior_weight': obj.prior_weight,
             'min_workers_amount': obj.min_workers_amount,
             'max_workers_amount': obj.max_workers_amount,
@@ -199,138 +241,16 @@ class WorkTypeConverter(BaseConverter):
         return converted_dict
 
 
-class OperationTypeConverter(BaseConverter):
+
+#TODO change front and algo "week_length" -> "employment__week_availability" constraints_info and availability_info
+
+
+class NotificationConverter(Converter):
     @classmethod
-    def convert(cls, obj):
+    def convert_function(cls, obj):
         return {
             'id': obj.id,
-            'name': obj.operation_type.name,
-            'speed_coef': obj.speed_coef,
-            'do_forecast': obj.do_forecast,
-            'work_type_id': obj.work_type.id
-        }
-
-
-class OperationTemplateConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'name': obj.name,
-            'tm_start': cls.convert_time(obj.tm_start),
-            'tm_end': cls.convert_time(obj.tm_end),
-            'value': obj.value,
-            'period': obj.period,
-            'days_in_period': obj.days_in_period,
-            'operation_type_id': obj.operation_type_id,
-            'dt_built_to': cls.convert_date(obj.dt_built_to)
-        }
-
-
-class CashboxConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'dttm_added': cls.convert_datetime(obj.dttm_added),
-            'dttm_deleted': cls.convert_datetime(obj.dttm_deleted),
-            'type': obj.type_id,
-            'name': obj.name,
-            'bio': obj.bio
-        }
-
-
-class WorkerCashboxInfoConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'worker': obj.employment.user_id,
-            'work_type': obj.work_type_id,
-            'mean_speed': obj.mean_speed,
-            'bills_amount': obj.bills_amount,
-            'period': obj.period,
-            'priority': obj.priority,
-            'duration': obj.duration
-        }
-
-
-class WorkerConstraintConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'worker': obj.worker_id,
-            'week_length': obj.employment.week_availability,
-            'weekday': obj.weekday,
-            'tm': cls.convert_time(obj.tm),
-            'is_lite': obj.is_lite,
-        }
-
-
-class PeriodClientsConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'dttm_forecast': cls.convert_datetime(obj.dttm_forecast),
-            'clients': obj.clients if hasattr(obj, 'clients') else obj.value,
-            'type': obj.type,
-            'work_type': obj.operation_type.work_type.id
-        }
-
-
-class PeriodDemandChangeLogConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'dttm_from': cls.convert_datetime(obj.dttm_from),
-            'dttm_to': cls.convert_datetime(obj.dttm_to),
-            'operation_type': obj.operation_type.id,
-            'work_type': obj.operation_type.work_type.id,
-            'multiply_coef': obj.multiply_coef,
-            'set_value': obj.set_value
-        }
-
-
-class ShopConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'parent': obj.parent_id,
-            'name': obj.name,
-            'tm_shop_opens': cls.convert_time(obj.tm_shop_opens),
-            'tm_shop_closes': cls.convert_time(obj.tm_shop_closes),
-            'code': obj.code,
-            'address': obj.address,
-            'type': obj.type,
-            'dt_opened': cls.convert_date(obj.dt_opened),
-            'dt_closed': cls.convert_date(obj.dt_closed),
-            'timezone': obj.timezone.zone,
-        }
-
-
-class TimetableConverter(BaseConverter):
-    
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'shop': obj.shop_id,
-            'dt': cls.convert_date(obj.dt),
-            'status': obj.status,
-            'dttm_status_change': cls.convert_datetime(obj.dttm_status_change)
-        }
-
-
-class NotificationConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'dttm_added': BaseConverter.convert_datetime(obj.dttm_added),
+            'dttm_added': Converter.convert_datetime(obj.dttm_added),
             'to_worker': obj.to_worker_id,
             'was_read': obj.was_read,
 
@@ -343,68 +263,9 @@ class NotificationConverter(BaseConverter):
         }
 
 
-class SlotConverter(BaseConverter):
+class VacancyConverter(Converter):
     @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'shop': obj.shop_id,
-            'tm_start': cls.convert_time(obj.tm_start),
-            'tm_end':  cls.convert_time(obj.tm_end),
-            'name': obj.name
-        }
-
-
-class UserWeekdaySlotConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'worker': obj.worker_id,
-            'week_length': obj.worker.week_availability,
-            'weekday': obj.weekday,
-            'slot': SlotConverter.convert(obj.slot),
-            'is_suitable': obj.is_suitable,
-        }
-
-
-class AttendanceRecordsConverter(BaseConverter):
-    __TYPES = {
-        AttendanceRecords.TYPE_COMING: 'пришел',
-        AttendanceRecords.TYPE_LEAVING: 'ушел',
-        AttendanceRecords.TYPE_BREAK_START: 'ушел на перерыв',
-        AttendanceRecords.TYPE_BREAK_END: 'вернулся с перерыва',
-    }
-
-    @classmethod
-    def convert_type(cls, obj):
-        return cls.__TYPES.get(obj.type, '')
-
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'dttm': cls.convert_datetime(obj.dttm),
-            'worker_id': obj.user_id,
-            'type': obj.type,
-            'is_verified': obj.verified,
-        }
-
-
-class ProductionDayConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'dt': cls.convert_date(obj.dt),
-            'type': obj.type,
-            'is_celebration': obj.is_celebration,
-        }
-
-
-class VacancyConverter(BaseConverter):
-    @classmethod
-    def convert(self, obj):
+    def convert_function(self, obj):
         return {
             'id': obj.id,
             'dttm_added': self.convert_datetime(obj.dttm_added),
@@ -414,16 +275,4 @@ class VacancyConverter(BaseConverter):
             'worker_fio': obj.worker_day.worker.get_fio() if obj.worker_day_id else '',
             'is_canceled': True if obj.dttm_deleted else False,
             'work_type': obj.work_type_id,
-        }
-
-
-class WorkerDayApproveConverter(BaseConverter):
-    @classmethod
-    def convert(cls, obj):
-        return {
-            'id': obj.id,
-            'shop_id': obj.shop_id,
-            'created_by': obj.created_by_id,
-            'dt_approved': cls.convert_date(obj.dt_approved),
-            'dttm_added': cls.convert_datetime(obj.dttm_added),
         }
