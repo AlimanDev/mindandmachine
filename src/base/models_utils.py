@@ -74,7 +74,7 @@ def check_func_groups():
         if all_url_patterns is None:  # на 0ом уровне рекурсии
             all_url_patterns = list(filter(
                 lambda x: 'api' in x.__str__(),
-                __import__(settings.ROOT_URLCONF).main.urls.urlpatterns
+                __import__(settings.ROOT_URLCONF).urls.urlpatterns
             ))  # интересует только /api
 
         for pattern in all_url_patterns:
