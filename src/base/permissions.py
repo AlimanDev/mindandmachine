@@ -1,6 +1,6 @@
-from src.base.models import Employment
+from src.base.models import Employment, Shop
 from rest_framework import permissions
-
+from rest_framework.exceptions import ValidationError
 
 class Permission(permissions.BasePermission):
     actions ={
@@ -31,6 +31,9 @@ class Permission(permissions.BasePermission):
         method = request.method
         action = view.action
         func = view.basename
+
+        request.employments=employments
+
         if not self.actions.get(action) or method != self.actions[action]:
             func = f"{func}_{action}"
         if method in permissions.SAFE_METHODS:
@@ -40,3 +43,16 @@ class Permission(permissions.BasePermission):
             if employment.has_permission(func, method):
                 return True
         return False
+
+class FilteredListPermission(Permission):
+    def has_permission(self, request, view):
+        shop_id = request.query_params.get('shop_id')# | request.data.get('shop_id')
+        if not shop_id:
+            raise ValidationError("shop_id should be defined")
+        department = Shop.objects.get(id=shop_id)
+
+        employments = Employment.objects.get_active(
+            shop__in=department.get_ancestors(include_self=True, ascending=True),
+            user=request.user)
+
+        return self.check_employment_permission(employments, request, view)

@@ -339,6 +339,7 @@ class FunctionGroup(models.Model):
     FUNCS = (
         'Shop',
         'Shop_stat',
+        'WorkerDay',
 
         'signout',
         'password_edit',

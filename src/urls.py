@@ -17,7 +17,9 @@ from src.main.upload import urls as upload_urls
 from src.main.urv import urls as urv_urls
 
 from src.conf.djconfig import DEBUG
-from src.base import urls as rest_api
+from src.base import urls as base_api
+from src.timetable import urls as timetable_api
+
 
 
 api_urlpatterns = [
@@ -39,7 +41,9 @@ api_urlpatterns = [
 urlpatterns = [
     path('api/', include(api_urlpatterns)),
     path('admin/', admin.site.urls),
-    path('rest_api/', include(rest_api)),
+    path('rest_api/', include(
+        base_api.urlpatterns +
+        timetable_api.urlpatterns)),
 ]
 
 if settings.QOS_DEV_STATIC_ENABLED:

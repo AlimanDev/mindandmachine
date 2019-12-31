@@ -55,7 +55,6 @@ class ShopViewSet(viewsets.ModelViewSet):
     permission_classes = [Permission]
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
-    permission_name = 'department'
 
     def get_queryset(self):
         user = self.request.user

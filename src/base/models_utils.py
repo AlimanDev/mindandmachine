@@ -67,7 +67,8 @@ def check_func_groups():
 
         #rest
         'ShopViewSet',
-        'APIRootView'
+        'WorkerDayViewSet',
+        'APIRootView',
     ]
 
     def get_all_view_names(all_url_patterns=None, all_views=[]):
