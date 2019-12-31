@@ -19,6 +19,9 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
     и расписание для всех трудоустройств
     """
     def filter_queryset(self, request, queryset, view):
+        if view.detail:
+            return super().filter_queryset(request, queryset, view)
+
         shop_id = request.query_params.get('shop_id')
 
         filterset = self.get_filterset(request,queryset,view)
@@ -64,7 +67,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     # parent_id = serializers.IntegerField(required=False)
     class Meta:
         model = WorkerDay
-        fields = ['id', 'worker_id', 'shop_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end', 'comment', 'worker_day_approve_id']
+        fields = ['id', 'worker', 'shop', 'employment', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
+                  'comment', 'worker_day_approve_id']
 
 
 class WorkerDayFilter(FilterSet):
@@ -91,7 +95,6 @@ class WorkerDayFilter(FilterSet):
         }
 
 
-
 class WorkerDayViewSet(viewsets.ModelViewSet):
     authentication_classes = [SessionAuthentication]
     permission_classes = [FilteredListPermission]
@@ -100,6 +103,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
     permission_name = 'department'
     queryset = WorkerDay.objects.all()
     filter_backends = [MultiShopsFilterBackend]
+    # filter_backends = [DjangoFilterBackend]
 
     # def get_queryset(self):
     #     user = self.request.user

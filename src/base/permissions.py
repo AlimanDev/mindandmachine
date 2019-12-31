@@ -2,6 +2,7 @@ from src.base.models import Employment, Shop
 from rest_framework import permissions
 from rest_framework.exceptions import ValidationError
 
+
 class Permission(permissions.BasePermission):
     actions ={
         'list':'GET',
@@ -44,9 +45,17 @@ class Permission(permissions.BasePermission):
                 return True
         return False
 
+
 class FilteredListPermission(Permission):
     def has_permission(self, request, view):
-        shop_id = request.query_params.get('shop_id')# | request.data.get('shop_id')
+        if view.action == 'retrieve':
+            # Права для объекта проверятся в has_object_permission
+            return True
+
+        if request.method == 'GET':
+            shop_id = request.query_params.get('shop_id')
+        else:
+            shop_id = request.data.get('shop_id')
         if not shop_id:
             raise ValidationError("shop_id should be defined")
         department = Shop.objects.get(id=shop_id)
