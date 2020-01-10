@@ -234,7 +234,12 @@ def count_difference_of_normal_days(dt_end, employments, dt_start=None, shop=Non
 
     for u_it in range(len(employments)):
         dt_u_st = employments[u_it].dt_hired if employments[u_it].dt_hired and (employments[u_it].dt_hired > dt_start) else dt_start
-        total_norm_days, total_norm_hours = dts_start_count_dict[dt_u_st]
+
+        if dt_u_st in dts_start_count_dict:
+            total_norm_days, total_norm_hours = dts_start_count_dict[dt_u_st]
+        else:
+            total_norm_days, total_norm_hours = 0, 0
+
         diff_prev_days = prev_info[employments[u_it].id]['count_workdays'] - total_norm_days if prev_info.get(
             employments[u_it].id, None) else 0 - total_norm_days
         diff_prev_hours = prev_info[employments[u_it].id]['count_hours'] - total_norm_hours if prev_info.get(
