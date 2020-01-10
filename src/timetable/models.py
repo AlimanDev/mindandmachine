@@ -176,7 +176,7 @@ class Cashbox(AbstractActiveNamedModel):
     objects = CashboxManager()
 
 
-class WorkerCashboxInfo(models.Model):
+class WorkerCashboxInfo(AbstractModel):
     class Meta(object):
         verbose_name = 'Информация по сотруднику-типу работ'
         unique_together = (('employment', 'work_type'),)
@@ -201,7 +201,7 @@ class WorkerCashboxInfo(models.Model):
     duration = models.FloatField(default=0)
 
 
-class WorkerConstraint(models.Model):
+class WorkerConstraint(AbstractModel):
     class Meta(object):
         verbose_name = 'Ограничения сотрудника'
         unique_together = (('worker', 'weekday', 'tm'),)
@@ -254,7 +254,7 @@ class WorkerDayManager(models.Manager):
         return current_worker_day
 
 
-class WorkerDay(models.Model):
+class WorkerDay(AbstractActiveModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
@@ -334,7 +334,6 @@ class WorkerDay(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
     employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
 
-    dttm_added = models.DateTimeField(auto_now_add=True)
     dt = models.DateField()  # todo: make immutable
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
@@ -384,7 +383,7 @@ class WorkerDayCashboxDetailsManager(models.Manager):
             return self.qos_initial_version()
 
 
-class WorkerDayCashboxDetails(models.Model):
+class WorkerDayCashboxDetails(AbstractActiveModel):
     class Meta:
         verbose_name = 'Детали в течение рабочего дня'
 
@@ -423,9 +422,6 @@ class WorkerDayCashboxDetails(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_deleted = models.DateTimeField(null=True, blank=True)
-
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT, null=True, blank=True)
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, null=True, blank=True)
@@ -452,7 +448,7 @@ class WorkerDayCashboxDetails(models.Model):
     objects = WorkerDayCashboxDetailsManager()
 
 
-class WorkerDayChangeRequest(models.Model):
+class WorkerDayChangeRequest(AbstractActiveModel):
     class Meta(object):
         verbose_name = 'Запрос на изменения рабочего дня'
         unique_together = ('worker', 'dt')
@@ -471,7 +467,6 @@ class WorkerDayChangeRequest(models.Model):
     )
 
     id = models.BigAutoField(primary_key=True)
-    dttm_added = models.DateTimeField(auto_now_add=True)
     status_type = models.CharField(max_length=1, choices=STATUS_CHOICES, default=TYPE_PENDING)
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
@@ -502,7 +497,7 @@ class EventManager(models.Manager):
         return event
 
 
-class Event(models.Model):
+class Event(AbstractModel):
     dttm_added = models.DateTimeField(auto_now_add=True)
 
     text = models.CharField(max_length=256)
@@ -618,7 +613,7 @@ class NotificationManager(models.Manager):
         )
 
 
-class Notifications(models.Model):
+class Notifications(AbstractModel):
     class Meta(object):
         verbose_name = 'Уведомления'
 
@@ -649,7 +644,7 @@ class Notifications(models.Model):
     objects = NotificationManager()
 
 
-class Timetable(models.Model):
+class Timetable(AbstractModel):
     class Meta(object):
         unique_together = (('shop', 'dt'),)
         verbose_name = 'Расписание'
@@ -691,7 +686,7 @@ class Timetable(models.Model):
     task_id = models.CharField(max_length=256, null=True, blank=True)
 
 
-class AttendanceRecords(models.Model):
+class AttendanceRecords(AbstractModel):
     class Meta(object):
         verbose_name = 'Данные УРВ'
 
@@ -718,7 +713,7 @@ class AttendanceRecords(models.Model):
         return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
 
-class ExchangeSettings(models.Model):
+class ExchangeSettings(AbstractModel):
     # Создаем ли автоматически вакансии
     automatic_check_lack = models.BooleanField(default=False)
     # Период, за который проверяем

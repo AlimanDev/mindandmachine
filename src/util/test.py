@@ -73,7 +73,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             code=77,
         )
         if calendar:
-            fill_calendar.main('2018.1.1', '2019.1.1', region_id=1)
+            fill_calendar.main('2018.1.1', (datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y.%m.%d'), region_id=1)
 
         # admin_group
         self.admin_group = Group.objects.create(name='Администратор')
