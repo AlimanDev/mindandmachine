@@ -21,12 +21,9 @@ class EmploymentFilter(FilterSet):
         }
 
 
-
 class UserFilter(FilterSet):
     class Meta:
         model = User
         fields = {
             'id':['exact', 'in'],
-
         }
-

@@ -8,11 +8,11 @@ class Permission(permissions.BasePermission):
     Класс для определения прав доступа к методам апи без привязки к магазину
     """
     actions ={
-        'list':'GET',
-        'create':'POST',
-        'retrieve':'GET',
-        'update':'PUT',
-        'destroy':'DELETE'
+        'list': 'GET',
+        'create': 'POST',
+        'retrieve': 'GET',
+        'update': 'PUT',
+        'destroy': 'DELETE'
     }
 
     def has_permission(self, request, view):
