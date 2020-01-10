@@ -4,6 +4,9 @@ from rest_framework.exceptions import ValidationError
 
 
 class Permission(permissions.BasePermission):
+    """
+    Класс для определения прав доступа к методам апи без привязки к магазину
+    """
     actions ={
         'list':'GET',
         'create':'POST',
@@ -47,6 +50,9 @@ class Permission(permissions.BasePermission):
 
 
 class FilteredListPermission(Permission):
+    """
+    Класс для определения прав доступа к методам апи для конкретного магазина
+    """
     def has_permission(self, request, view):
         if view.action == 'retrieve':
             # Права для объекта проверятся в has_object_permission
@@ -54,10 +60,13 @@ class FilteredListPermission(Permission):
 
         if request.method == 'GET':
             shop_id = request.query_params.get('shop_id')
+            if not shop_id:
+                raise ValidationError("shop_id should be defined")
         else:
             shop_id = request.data.get('shop_id')
-        if not shop_id:
-            raise ValidationError("shop_id should be defined")
+            # shop_id не меняется, права задаются has_object_permission
+            if not shop_id:
+                return True
         department = Shop.objects.get(id=shop_id)
 
         employments = Employment.objects.get_active(

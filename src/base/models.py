@@ -258,7 +258,7 @@ class User(DjangoAbstractUser):
 
 class WorkerPosition(models.Model):
     """
-    Describe employee's department and position
+    Describe employee's position
     """
 
     class Meta:
@@ -318,6 +318,8 @@ class Employment(models.Model):
             method=method
         ).first()
 
+    def get_department(self):
+        return self.shop
 
 class FunctionGroup(models.Model):
     class Meta:
@@ -340,6 +342,8 @@ class FunctionGroup(models.Model):
         'Shop',
         'Shop_stat',
         'WorkerDay',
+        'Employment',
+        'User',
 
         'signout',
         'password_edit',
