@@ -17,9 +17,9 @@ class TestTablet(LocalTestCase):
         response = self.api_get('/api/tablet/get_cashboxes_info?shop_id={}'.format(self.shop.id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
-        self.assertEqual(response.json()['data']['2']['with_queue'], True)
-        self.assertEqual(response.json()['data']['2']['cashbox'][0]['number'], 2)
-        # {'number': 1, 'cashbox_id': 1, 'status': 'C', 'queue': None, 'user_id': None}
+        self.assertEqual(response.json()['data'][str(self.work_type2.id)]['with_queue'], True)
+        self.assertEqual(response.json()['data'][str(self.work_type2.id)]['cashbox'][0]['name'], '2')
+        # {'name': 1, 'cashbox_id': 1, 'status': 'C', 'queue': None, 'user_id': None}
         # self.assertEqual(response.json()['data']['1']['cashbox'][0]['status'], 'O')
         # self.assertEqual(response.json()['data']['1']['cashbox'][0]['queue'], 5.5)
         # self.assertEqual(response.json()['data']['1']['cashbox'][0]['user_id'], '1')
@@ -80,7 +80,7 @@ class TestTablet(LocalTestCase):
         response = self.api_get('/api/tablet/get_cashboxes_info?shop_id={}'.format(self.shop.id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['code'], 200)
-        self.assertEqual(response.json()['data']['2']['cashbox'][0]['status'], 'C')
+        self.assertEqual(response.json()['data'][str(self.work_type2.id)]['cashbox'][0]['status'], 'C')
 
         api_change_cashier_status(worker_id=self.user2.id, status=WorkerDayCashboxDetails.TYPE_WORK,
                                   cashbox_id=self.cashbox2.id)

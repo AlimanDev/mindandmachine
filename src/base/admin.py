@@ -17,8 +17,8 @@ class RegionAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerPosition)
 class WorkerPositionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title')
-    search_fields = ('title',)
+    list_display = ('id', 'name')
+    search_fields = ('name',)
 
 
 @admin.register(User)
@@ -38,7 +38,7 @@ class QsUserAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: User):
-        res = ', '.join(i.shop.title for i in instance.employments.all().select_related('shop'))
+        res = ', '.join(i.shop.name for i in instance.employments.all().select_related('shop'))
         return res
     '''
     @staticmethod
@@ -49,8 +49,8 @@ class QsUserAdmin(admin.ModelAdmin):
 
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
-    list_display = ('title', 'parent_title', 'id')
-    search_fields = ('title', 'parent__title', 'id')
+    list_display = ('name', 'parent_title', 'id')
+    search_fields = ('name', 'parent__title', 'id')
 
     @staticmethod
     def parent_title(instance: Shop):

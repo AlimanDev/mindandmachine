@@ -15,20 +15,20 @@ class GetCashboxesForm(forms.Form):
 
 class CreateCashboxForm(forms.Form):
     work_type_id = forms.IntegerField()
-    number = forms.CharField(max_length=6)
+    name = forms.CharField(max_length=6)
 
 
 class DeleteCashboxForm(forms.Form):
     shop_id = forms.IntegerField()
     work_type_id = forms.IntegerField()
-    number = forms.CharField(max_length=6)
+    name = forms.CharField(max_length=6)
     bio = forms.CharField(max_length=512)
 
 
 class UpdateCashboxForm(forms.Form):
     from_work_type_id = forms.IntegerField()
     to_work_type_id = forms.IntegerField()
-    number = forms.CharField(max_length=6)
+    name = forms.CharField(max_length=6)
 
 
 class CreateWorkTypeForm(forms.Form):

@@ -155,7 +155,11 @@ def get_demand_xlsx(request, workbook, form):
     except LookupError:
         return JsonResponse.internal_error('incorrect demand model'), 'error'
 
-    period_demands = list(model.objects.select_related('operation_type__work_type').filter(
+    period_demands = list(model.objects.select_related(
+        'operation_type__work_type', 
+        'operation_type__operation_type_name',
+        'operation_type__work_type__work_type_name',
+    ).filter(
         operation_type__work_type__shop_id=form['shop_id'],
         dttm_forecast__date__gte=from_dt,
         dttm_forecast__date__lte=to_dt,
@@ -163,7 +167,11 @@ def get_demand_xlsx(request, workbook, form):
     ).order_by('dttm_forecast', 'operation_type_id', 'type'))
 
     work_types = list(WorkType.objects.filter(shop_id=form['shop_id']).order_by('id'))
-    operation_types = list(OperationType.objects.filter(work_type__in=work_types).order_by('id'))
+    operation_types = list(OperationType.objects.filter(work_type__in=work_types).select_related(
+        'operation_type_name',
+        'work_type',
+        'work_type__work_type_name',
+    ).order_by('id'))
     amount_operation_types = len(operation_types)
 
     dttm = datetime.combine(from_dt, time(0, 0))
@@ -185,12 +193,12 @@ def get_demand_xlsx(request, workbook, form):
         if period_demands_len > demand_index:
             demand = period_demands[demand_index]
 
-        worksheet.write(index + 1, 0, work_type.name + ' ' + operation_type.name)
+        worksheet.write(index + 1, 0, work_type.work_type_name.name + ' ' + operation_type.operation_type_name.name)
         worksheet.write(index + 1, 1, dttm.strftime('%d.%m.%Y %H:%M:%S'))
 
         if (demand.dttm_forecast == dttm and
-            demand.operation_type.work_type.name == work_type.name and
-            demand.operation_type.name == operation_type.name):
+            demand.operation_type.work_type.work_type_name.name == work_type.work_type_name.name and
+            demand.operation_type.operation_type_name.name == operation_type.operation_type_name.name):
             if demand.type == PeriodClients.FACT_TYPE:
                 worksheet.write(index + 1, 3, round(demand.value, 1))
                 demand_index += 1
@@ -199,7 +207,7 @@ def get_demand_xlsx(request, workbook, form):
                     next_demand = period_demands[demand_index]
                     if next_demand.type == PeriodClients.LONG_FORECASE_TYPE and \
                             next_demand.dttm_forecast == demand.dttm_forecast and \
-                            next_demand.operation_type.work_type.name == demand.operation_type.work_type.name:
+                            next_demand.operation_type.work_type.work_type_name.name == demand.operation_type.work_type.work_type_name.name:
                         worksheet.write(index + 1, 2, round(next_demand.value, 1))
                         demand_index += 1
             else:
@@ -288,7 +296,7 @@ def get_department_stats_xlsx(request, workbook, form):
         url: /api/download/get_supershops_stats
         pointer(int): указывает с айдишника какого магазина в querysete всех магазов будем инфу отдавать
         items_per_page(int): сколько шопов будем на фронте показывать
-        title(str): required = False, название магазина
+        name(str): required = False, название магазина
         super_shop_type(['H', 'C']): type of supershop
         region(str): title of region
         closed_before_dt(QOS_DATE): closed before this date
@@ -326,7 +334,7 @@ def get_department_stats_xlsx(request, workbook, form):
     worksheet.write(0, 5, 'Сотрудники')
 
     for index, shop_data in enumerate(data, start=1):
-        worksheet.write(index, 0, '{}, {}'.format(shop_data['title'], shop_data['code'] or ''))
+        worksheet.write(index, 0, '{}, {}'.format(shop_data['name'], shop_data['code'] or ''))
         write_stats(index, 1, 'fot_revenue')
         write_stats(index, 2, 'fot')
         write_stats(index, 3, 'idle')

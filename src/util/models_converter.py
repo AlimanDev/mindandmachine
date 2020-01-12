@@ -125,7 +125,7 @@ class EmploymentConverter(Converter):
             'is_fixed_hours': obj.is_fixed_hours,
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
             'tabel_code': obj.tabel_code,
-            'position': obj.position.title if obj.position_id is not None else '',
+            'position': obj.position.name if obj.position_id is not None else '',
             'position_id': obj.position_id if obj.position_id is not None else '',
         })
 
@@ -213,7 +213,7 @@ class WorkTypeConverter(Converter):
     def convert_operation_type(cls, obj):
         return {
             'id': obj.id,
-            'name': obj.name,
+            'name': obj.operation_type_name.name,
             'speed_coef': obj.speed_coef,
             'do_forecast': obj.do_forecast,
             'work_type_id': obj.work_type.id
@@ -227,7 +227,7 @@ class WorkTypeConverter(Converter):
             'dttm_deleted': cls.convert_datetime(obj.dttm_deleted),
             'shop': obj.shop_id,
             'priority': obj.priority,
-            'name': obj.name,
+            'work_type_name_name': obj.work_type_name.name,
             'probability': obj.probability, #change front and algo
             'prior_weight': obj.prior_weight,
             'min_workers_amount': obj.min_workers_amount,

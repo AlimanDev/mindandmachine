@@ -37,7 +37,7 @@ def get_cashboxes_info(request, form):
                 'cashbox' : {
                     [
                         {
-                            | 'number': номер кассы,
+                            | 'name': номер кассы,
                             | 'cashbox_id': id кассы,
                             | 'user_id': id пользователя, который за ней сидит (либо null если касса пустая),
                             | 'queue': число человек в очереди, либо null,
@@ -66,7 +66,7 @@ def get_cashboxes_info(request, form):
         dttm_now,
         dttm_now,
         type__shop_id=shop_id
-    ).order_by('type__priority', 'number').select_related('type')
+    ).order_by('type__priority', 'name').select_related('type', 'type__work_type_name')
 
     for cashbox in list_of_cashbox:
         mean_queue = None
@@ -105,14 +105,14 @@ def get_cashboxes_info(request, form):
 
         if cashbox.type.id not in response:
             response[cashbox.type.id] = {
-                "name": cashbox.type.name,
+                "name": cashbox.type.work_type_name.name,
                 "priority": cashbox.type.priority,
                 "with_queue": with_queue,
                 "cashbox": []
             }
 
         response[cashbox.type.id]["cashbox"] += {
-            "number": cashbox.number,
+            "name": cashbox.name,
             "cashbox_id": cashbox.id,
             "status": status,
 
@@ -260,7 +260,7 @@ def get_cashiers_info(request, form):
         if item.on_cashbox_id:
             cashbox_dttm_added = str(item.on_cashbox.dttm_added)
             cashbox_dttm_deleted = str(item.on_cashbox.dttm_deleted)
-            cashbox_number = item.on_cashbox.number
+            cashbox_number = item.on_cashbox.name
 
         if item.worker_day.worker_id not in response.keys():
             response[item.worker_day.worker_id] = {
