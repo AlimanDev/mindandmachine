@@ -58,7 +58,7 @@ def get_all_slots(request, form):
         )
     else:
         slots = Slot.objects.filter(shop_id=form['shop_id'])
-    for slot in slots.filter(dttm_deleted__isnull=True):
+    for slot in slots.filter(dttm_deleted__isnull=True).order_by('id'):
         result.append({
             'id': slot.id,
             'name': slot.name,

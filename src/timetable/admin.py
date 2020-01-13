@@ -24,7 +24,7 @@ class SlotAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: Slot):
-        return instance.shop.title
+        return instance.shop.name
 
     @staticmethod
     def parent_title(instance: Slot):
@@ -58,7 +58,7 @@ class UserWeekDaySlotAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: UserWeekdaySlot):
-        return instance.worker.shop.title
+        return instance.worker.shop.name
 
     @staticmethod
     def parent_title(instance: UserWeekdaySlot):
@@ -67,7 +67,7 @@ class UserWeekDaySlotAdmin(admin.ModelAdmin):
 
 @admin.register(Cashbox)
 class CashboxAdmin(admin.ModelAdmin):
-    list_display = ('type_name', 'shop_title', 'parent_title', 'id', 'number')
+    list_display = ('type_name', 'shop_title', 'parent_title', 'id', 'name')
     search_fields = ('type__name', 'type__shop__title', 'type__shop__parent__title', 'id')
     list_filter = ('type__shop', )
 
@@ -77,7 +77,7 @@ class CashboxAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: Cashbox):
-        return instance.type.shop.title
+        return instance.type.shop.name
 
     @staticmethod
     def parent_title(instance: Cashbox):
@@ -127,7 +127,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: WorkerDay):
-        return instance.shop.title if instance.shop else ''
+        return instance.shop.name if instance.shop else ''
 
 
     @staticmethod
@@ -152,7 +152,7 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: WorkerDayCashboxDetails):
-        return instance.worker_day.worker.shop.title if instance.worker_day else ''
+        return instance.worker_day.worker.shop.name if instance.worker_day else ''
 
     @staticmethod
     def worker_day_dt(instance: WorkerDayCashboxDetails):
@@ -175,7 +175,7 @@ class NotificationsAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: Timetable):
-        return instance.shop.title
+        return instance.shop.name
 
     @staticmethod
     def parent_title(instance: Timetable):
@@ -195,7 +195,7 @@ class TimetableAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: Timetable):
-        return instance.shop.title
+        return instance.shop.name
 
 
 @admin.register(WorkerDayChangeRequest)

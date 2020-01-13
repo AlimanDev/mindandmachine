@@ -361,6 +361,8 @@ def create_timetable(request, form):
         dt_from=dt_from,
         dt_to=dt_to,
         shop_id=shop_id
+    ).select_related(
+        'work_type_name',
     )
     for work_type in work_types:
         periods_len = PeriodClients.objects.filter(
@@ -372,7 +374,7 @@ def create_timetable(request, form):
         ).count()
 
         if periods_len % period_normal_count:
-            period_difference['work_type_name'].append(work_type.name)
+            period_difference['work_type_name'].append(work_type.work_type_name.name)
             period_difference['difference'].append(abs(period_normal_count - periods_len))
     if period_difference['work_type_name']:
         status_message = 'На типе работ {} не хватает объектов спроса {}.'.format(
@@ -480,7 +482,7 @@ def create_timetable(request, form):
         min_work_coef = 1
 
     shop_dict = {
-        'shop_name': shop.title,
+        'shop_name': shop.name,
         'process_type': shop.process_type,
         'mean_queue_length': shop.mean_queue_length,
         'max_queue_length': shop.max_queue_length,

@@ -28,13 +28,13 @@ class ShopSerializer(serializers.ModelSerializer):
     timezone = TimeZoneField()
     class Meta:
         model = Shop
-        fields = ['id', 'parent_id', 'title', 'tm_shop_opens', 'tm_shop_closes', 'code',
+        fields = ['id', 'parent_id', 'name', 'tm_shop_opens', 'tm_shop_closes', 'code',
                   'address', 'type', 'dt_opened', 'dt_closed', 'timezone']
 
 class ShopStatSerializer(serializers.Serializer):
     id=serializers.IntegerField()
     parent_id=serializers.IntegerField()
-    title=serializers.CharField()
+    name=serializers.CharField()
     fot_curr=serializers.FloatField()
     fot_prev=serializers.FloatField()
     revenue_prev=serializers.FloatField()

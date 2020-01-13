@@ -17,6 +17,7 @@ from src.forecast.models import (
     OperationTemplate,
     OperationType,
     PeriodClients,
+    OperationTypeName,
 
 )
 from src.timetable.models import (
@@ -27,6 +28,7 @@ from src.timetable.models import (
     WorkerDayCashboxDetails,
     WorkerCashboxInfo,
     WorkType,
+    WorkTypeName,
     Cashbox,
     AttendanceRecords,
     Timetable,
@@ -43,7 +45,7 @@ from src.util.models_converter import (
 def create_shop(shop_id, region_id):
     shop = Shop.objects.create(
         parent_id=shop_id,
-        title='department №1',
+        name='department №1',
         forecast_step_minutes=time(minute=30),
         break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]], [900, 1200, [30, 30, 30]]]',
         region_id=region_id,
@@ -66,25 +68,25 @@ def create_timetable(shop_id, dttm):
     )
 
 
-def create_work_types(work_types, shop):
+def create_work_types(work_types, shop, operation_names, work_type_names):
     wt_dict = {}
-    for wt in work_types:
+    for i in range(len(work_types)):
         wt_m = WorkType.objects.create(
             shop=shop,
-            name=wt['name'],
-            probability=wt['probability'],
-            prior_weight=wt['prior_weight']
+            work_type_name=work_type_names[i],
+            probability=work_types[i]['probability'],
+            prior_weight=work_types[i]['prior_weight']
         )
         OperationType.objects.create(
-            name='',
-            speed_coef=wt['speed_coef'],
-            do_forecast=wt['do_forecast'],
+            operation_type_name=operation_names[i],
+            speed_coef=work_types[i]['speed_coef'],
+            do_forecast=work_types[i]['do_forecast'],
             work_type=wt_m
         )
-        wt_dict[wt_m.name] = wt_m
-        Cashbox.objects.create(type=wt_m, number=1)
-        Cashbox.objects.create(type=wt_m, number=2)
-        Cashbox.objects.create(type=wt_m, number=3)
+        wt_dict[wt_m.work_type_name.name] = wt_m
+        Cashbox.objects.create(type=wt_m, name=1)
+        Cashbox.objects.create(type=wt_m, name=2)
+        Cashbox.objects.create(type=wt_m, name=3)
     return wt_dict
 
 
@@ -444,12 +446,27 @@ def main(date=None, shops=None, lang='ru', count_of_month=None):
     )
     fill_calendar.main('2017.1.1', '2020.1.1', region1.id)
     fill_calendar.main('2017.1.1', '2020.1.1', region2.id)
-    root_shop = Shop.objects.create(title=lang_data['root_shop'])
-    parent_shop1 = Shop.objects.create(title=f'{lang_data["super_shop"]} № 1', parent=root_shop, region=region1)
-    parent_shop2 = Shop.objects.create(title=f'{lang_data["super_shop"]} № 2', parent=root_shop, region=region2)
+    root_shop = Shop.objects.create(name=lang_data['root_shop'])
+    parent_shop1 = Shop.objects.create(name=f'{lang_data["super_shop"]} № 1', parent=root_shop, region=region1)
+    parent_shop2 = Shop.objects.create(name=f'{lang_data["super_shop"]} № 2', parent=root_shop, region=region2)
+    operation_type_names = []
+    work_type_names = []
+    for wt in data['work_types']:
+        operation_type_names.append(
+            OperationTypeName.objects.create(
+                name='',
+                code='',
+            )
+        )
+        work_type_names.append(
+            WorkTypeName.objects.create(
+                name=wt['name'],
+                code='',
+            )
+        )
     for shop_ind, shop_size in enumerate(shops, start=1):
         shop = create_shop(parent_shop1.id, parent_shop1.region_id)
-        work_types_dict = create_work_types(data['work_types'], shop)
+        work_types_dict = create_work_types(data['work_types'], shop, operation_type_names, work_type_names)
         create_forecast(data['demand'], work_types_dict, start_date, demand_days)
         create_users_workdays(data['cashiers'], work_types_dict, start_date, worker_days, shop, shop_size, lang=lang)
         dttm_curr = datetime.now().replace(day=1)

@@ -83,7 +83,7 @@ def update_visitors_info():
     # todo: исправить потом. пока делаем такую привязку
     # вообще хорошей идеей наверное будет просто cashbox_type blank=True, null=True сделать в PeriodDemand
     try:
-        work_type = WorkType.objects.get(name='Кассы', shop_id=1)
+        work_type = WorkType.objects.get(work_type_name__name='Кассы', shop_id=1)
     except WorkType.DoesNotExist:
         raise ValueError('Такого типа касс нет в базе данных.')
     create_dict = {

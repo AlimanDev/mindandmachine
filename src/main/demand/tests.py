@@ -2,6 +2,7 @@ from src.util.test import LocalTestCase
 from src.forecast.models import (
     PeriodClients, 
     OperationType, 
+    OperationTypeName,
     WorkType, 
 )
 from src.timetable.models import (
@@ -18,16 +19,20 @@ class TestDemand(LocalTestCase):
     def setUp(self):
         super().setUp()
         self.date = datetime.now().date()
-        w_type = WorkType.objects.get(pk=1)
-        w_type_2 = WorkType.objects.get(pk=4)
+        op_type_name = OperationTypeName.objects.create(
+            name='',
+            code='',
+        )
+        w_type = self.work_type1
+        w_type_2 = self.work_type4
         def_d = {
                 'work_type' :w_type,
-                'name' : '',
+                'operation_type_name' : op_type_name,
                 'do_forecast' : OperationType.FORECAST_HARD
             }
         def_wf = {
                 'work_type' :w_type,
-                'name' : ''
+                'operation_type_name' : op_type_name,
             }
         o_type_1 = OperationType.objects.update_or_create(
             id=5,
@@ -49,7 +54,7 @@ class TestDemand(LocalTestCase):
             id=9,
             defaults={
                 'work_type' :w_type_2,
-                'name' : ''
+                'operation_type_name' : op_type_name,
             }
             )[0]
         test_data = {
@@ -566,7 +571,7 @@ class TestGetDemangChangeLogs(TestDemand):
         from_dt = Converter.convert_date(self.date)
         to_dt =  Converter.convert_date((self.date + timedelta(days=1)))
         response = self.api_get(
-            f'/api/demand/get_demand_change_logs?work_type_id=4&from_dt={from_dt}&to_dt={to_dt}&shop_id=2'
+            f'/api/demand/get_demand_change_logs?work_type_id={self.work_type4.id}&from_dt={from_dt}&to_dt={to_dt}&shop_id=2'
         )
         correct_answer = {
             'code': 200,
@@ -575,7 +580,7 @@ class TestGetDemangChangeLogs(TestDemand):
                     'dttm_added': Converter.convert_datetime(self.dates[0]), 
                     'dttm_from': Converter.convert_datetime(datetime.combine(self.date, time(12, 0))), 
                     'dttm_to': Converter.convert_datetime(datetime.combine(self.date, time(13, 0))), 
-                    'work_type_id': 4, 
+                    'work_type_id': self.work_type4.id,
                     'multiply_coef': 0.2, 
                     'set_value': None
                 }, 
@@ -583,7 +588,7 @@ class TestGetDemangChangeLogs(TestDemand):
                     'dttm_added': Converter.convert_datetime(self.dates[1]), 
                     'dttm_from': Converter.convert_datetime(datetime.combine(self.date, time(15, 0))), 
                     'dttm_to': Converter.convert_datetime(datetime.combine(self.date, time(18, 0))), 
-                    'work_type_id': 4, 
+                    'work_type_id': self.work_type4.id, 
                     'multiply_coef': None, 
                     'set_value': 10.0
                 }

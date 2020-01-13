@@ -6,11 +6,13 @@ from src.base.models import (
 )
 from src.timetable.models import (
     WorkType,
+    WorkTypeName,
     Cashbox,
     Slot,
 )
 from src.forecast.models import (
     OperationType,
+    OperationTypeName,
 )
 
 from src.util.forms import FormUtil
@@ -97,7 +99,7 @@ def get_cashboxes(request, form):
                 {
                     | 'dttm_deleted': ,
                     | 'dttm_added': ,
-                    | 'number'(str): номер кассы,
+                    | 'name'(str): номер кассы,
                     | 'id': id кассы,
                     | 'type': id типа кассы,
                     | 'bio'(str): биография лол?
@@ -123,18 +125,18 @@ def get_cashboxes(request, form):
     cashboxes = Cashbox.objects.filter(
         type__id__in=list(map(lambda x: x.id, work_types)),
         dttm_deleted__isnull=True,
-    ).order_by('number', 'id')
+    ).order_by('name', 'id')
     converted_work_types = Converter.convert(
         work_types, 
         WorkType, 
-        fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+        fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'work_type_name__name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
     )
     return JsonResponse.success({
         'work_types': {x['id']: x for x in converted_work_types},
         'cashboxes': Converter.convert(
             cashboxes, 
             Cashbox, 
-            fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'number', 'bio'],
+            fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'name', 'bio'],
         )
     })
 
@@ -152,7 +154,7 @@ def create_cashbox(request, form):
         method: POST
         url: /api/cashbox/create_cashbox
         work_type_id(int): id типа кассы, к которой будет привязана созданная касса
-        number(str): номер кассы
+        name(str): номер кассы
 
     Returns:
         {
@@ -169,7 +171,7 @@ def create_cashbox(request, form):
                 | 'dttm_added': ,
                 | 'dttm_deleted': null,
                 | 'type': id типа кассы,
-                | 'number'(str): номер,
+                | 'name'(str): номер,
                 | 'bio'(str): лол
             }
         }
@@ -178,7 +180,7 @@ def create_cashbox(request, form):
         Отправляет уведомление о созданной кассе
     """
     work_type_id = form['work_type_id']
-    cashbox_number = form['number']
+    cashbox_number = form['name']
 
     try:
         work_type = WorkType.objects.get(id=work_type_id)
@@ -190,14 +192,14 @@ def create_cashbox(request, form):
     ).filter(
         type__shop_id=work_type.shop_id,
         dttm_deleted=None,
-        number=cashbox_number,
+        name=cashbox_number,
         type_id=work_type_id
     ).count()
 
     if cashboxes_count > 0:
         return JsonResponse.already_exists_error('Касса с таким номером уже существует')
 
-    cashbox = Cashbox.objects.create(type=work_type, number=cashbox_number)
+    cashbox = Cashbox.objects.create(type=work_type, name=cashbox_number)
 
     send_notification('C', cashbox, sender=request.user)
 
@@ -205,12 +207,12 @@ def create_cashbox(request, form):
         'work_type': Converter.convert(
             work_type, 
             WorkType, 
-            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'work_type_name__name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
         ),
         'cashbox': Converter.convert(
             cashbox, 
             Cashbox, 
-            fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'number', 'bio'],
+            fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'name', 'bio'],
         )
     })
 
@@ -229,7 +231,7 @@ def delete_cashbox(request, form):
         url: /api/cashbox/delete_cashbox
         shop_id(int): required = True
         work_type_id(int): required = True
-        number(str): номер кассы которую удаляем
+        name(str): номер кассы которую удаляем
         bio(str): доп инфа
 
     Returns:
@@ -238,7 +240,7 @@ def delete_cashbox(request, form):
             | 'dttm_added': ,
             | 'dttm_deleted': datetime.now(),
             | 'type': id типа кассы,
-            | 'number': номер,
+            | 'name': номер,
             | 'bio': доп инфа
         }
 
@@ -254,7 +256,7 @@ def delete_cashbox(request, form):
             type__id=form['work_type_id'],
             type__shop_id=shop_id,
             dttm_deleted=None,
-            number=form['number']
+            name=form['name']
         )
     except Cashbox.DoesNotExist:
         return JsonResponse.does_not_exists_error()
@@ -271,7 +273,7 @@ def delete_cashbox(request, form):
         Converter.convert(
             cashbox, 
             Cashbox, 
-            fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'number', 'bio']
+            fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'name', 'bio']
         )
     )
 
@@ -290,7 +292,7 @@ def update_cashbox(request, form):
         url: /api/cashbox/update_cashbox
         from_work_type_id(int): с какого типа меняем
         to_work_type_id(int): на какой
-        number(str): номер кассы
+        name(str): номер кассы
 
     Returns:
         {
@@ -298,7 +300,7 @@ def update_cashbox(request, form):
             | 'dttm_added': ,
             | 'dttm_deleted': ,
             | 'type': id типа,
-            | 'number': номер,
+            | 'name': номер,
             | 'bio': доп инфа
         }
 
@@ -308,7 +310,7 @@ def update_cashbox(request, form):
         JsonResponse.multiple_objects_returned: если вернулось несколько объектов в QuerySet'e
 
     """
-    cashbox_number = form['number']
+    cashbox_number = form['name']
 
     try:
         from_work_type = WorkType.objects.get(id=form['from_work_type_id'])
@@ -327,7 +329,7 @@ def update_cashbox(request, form):
             type__id=from_work_type.id,
             type__shop_id=from_work_type.shop_id,
             dttm_deleted=None,
-            number=cashbox_number
+            name=cashbox_number,
         )
     except Cashbox.DoesNotExist:
         return JsonResponse.does_not_exists_error('cashbox')
@@ -337,13 +339,13 @@ def update_cashbox(request, form):
     cashbox.dttm_deleted = datetime.datetime.now()
     cashbox.save()
 
-    cashbox = Cashbox.objects.create(type=to_work_type, number=cashbox_number)
+    cashbox = Cashbox.objects.create(type=to_work_type, name=cashbox_number)
 
     return JsonResponse.success(
         Converter.convert(
             cashbox, 
             Cashbox, 
-            fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'number', 'bio']
+            fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'name', 'bio']
         )
     )
 
@@ -378,11 +380,16 @@ def create_work_type(request, form):
     shop_id = form['shop_id']
     name = form['name']
 
-    if WorkType.objects.filter(name=name, shop_id=shop_id, dttm_deleted__isnull=True).count() > 0:
-        return JsonResponse.already_exists_error('Такой тип работ уже существует')
+    if WorkType.objects.filter(work_type_name__name=name, shop_id=shop_id, dttm_deleted__isnull=True).count() > 0:
+        return JsonResponse.already_exists_error('Такой тип работ в данном магазине уже существует')
+
+    try:
+        work_type_name = WorkTypeName.objects.get(name=name)
+    except:
+        return JsonResponse.does_not_exists_error('Не существует такого названия для типа работ.')
 
     new_work_type = WorkType.objects.create(
-        name=name,
+        work_type_name=work_type_name,
         shop_id=shop_id,
     )
 
@@ -391,7 +398,7 @@ def create_work_type(request, form):
     return JsonResponse.success(Converter.convert(
             new_work_type,
             WorkType,
-            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'work_type_name__name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
         )
     )
 
@@ -440,7 +447,7 @@ def delete_work_type(request, form):
     return JsonResponse.success(Converter.convert(
             work_type,
             WorkType,
-            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'work_type_name__name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
         )
     )
 
@@ -464,7 +471,11 @@ def edit_work_type(request, form):
         work_type.max_workers_amount = worker_amount[1]
 
     if form['new_title']:
-        work_type.name = form['new_title']
+        try:
+            work_type_name = WorkTypeName.objects.get(name=name)
+        except:
+            return JsonResponse.does_not_exists_error('Не существует такого названия для типа работ.')
+        work_type.work_type_name = work_type_name
 
     try:
         work_type.save()
@@ -479,7 +490,6 @@ def edit_work_type(request, form):
 
         if len(front_operations) == 1 and len(existing_operation_types.keys()) == 1:  # была 1 , стала 1 => та же самая
             operation_type = list(existing_operation_types.values())[0]
-            operation_type.name = front_operations[0]['name']
             operation_type.speed_coef = front_operations[0]['speed_coef']
             operation_type.do_forecast = front_operations[0]['do_forecast']
             try:
@@ -493,7 +503,6 @@ def edit_work_type(request, form):
             for oper_dict in front_operations:
                 if 'id' in oper_dict.keys() and oper_dict['id'] in existing_operation_types.keys():
                     ot = existing_operation_types[oper_dict['id']]
-                    ot.name = oper_dict['name']
                     ot.speed_coef = oper_dict['speed_coef']
                     ot.do_forecast = oper_dict['do_forecast']
                     try:
@@ -507,7 +516,7 @@ def edit_work_type(request, form):
                         # todo: aa: add check of params in form
                         OperationType.objects.create(
                             work_type_id=work_type_id,
-                            name=oper_dict['name'],
+                            operation_type_name=OperationTypeName.objects.get(name=oper_dict['name']),
                             speed_coef=oper_dict['speed_coef'],
                             do_forecast=oper_dict['do_forecast'],
                         )
@@ -553,7 +562,7 @@ def edit_work_type(request, form):
                 work_type_id=work_type_id, dttm_deleted__isnull=True
             ), 
             OperationType, 
-            fields=['id', 'name', 'speed_coef', 'do_forecast', 'work_type_id'],
+            fields=['id', 'operation_type_name__name', 'speed_coef', 'do_forecast', 'work_type_id'],
         )
     })
 

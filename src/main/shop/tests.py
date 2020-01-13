@@ -99,9 +99,9 @@ class TestShop(LocalTestCase):
                       'shops': [{
                           'id': self.shop.id,
                           'parent_id': self.reg_shop1.id,
+                          'name': 'Shop1', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00',
+                          'code': '', 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None,
                           'timezone': 'Europe/Moscow',
-                          'title': 'Shop1', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00',
-                          'code': None, 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None,
                           'fot': {'prev': 5, 'curr': 10, 'change': 100},
                           'lack': {'prev': 5.0, 'curr': 10.0, 'change': 100},
                           'idle': {'prev': 5.0, 'curr': 10.0, 'change': 100},
@@ -110,12 +110,11 @@ class TestShop(LocalTestCase):
                       'super_shop': {
                           'id': self.shop.id,
                           'parent_id': self.reg_shop1.id,
-                          'timezone': 'Europe/Moscow',
-                          'title': 'Shop1', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00',
-                          'code': None, 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None}},
+                          'name': 'Shop1', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00',
+                          'code': '', 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None,
+                          'timezone': 'Europe/Moscow',}},
                   'info': None
                   }
-
         self.assertEqual(response.json(), answer)
 
     def test_get_department_stats(self):
@@ -151,7 +150,7 @@ class TestShop(LocalTestCase):
     def test_get_department_list(self):
         self.auth()
         response = self.api_get(
-            '/api/shop/get_department_list?shop_id={}&pointer=0&items_per_page=10&title=&super_shop_type=&region=&closed_before_dt=&opened_after_dt=&fot_revenue=-&revenue=-&lack=-&fot=-&idle=-&workers_amount=-&sort_type=&format=raw&sort_type=fot'.format(
+            '/api/shop/get_department_list?shop_id={}&pointer=0&items_per_page=10&name=&super_shop_type=&region=&closed_before_dt=&opened_after_dt=&fot_revenue=-&revenue=-&lack=-&fot=-&idle=-&workers_amount=-&sort_type=&format=raw&sort_type=fot'.format(
                 self.root_shop.id
             ))
         self.assertEqual(response.status_code, 200)
@@ -163,7 +162,7 @@ class TestShop(LocalTestCase):
                 {'id': self.reg_shop2.id,
                  'parent_id': self.root_shop.id,
                  'timezone': 'Europe/Moscow',
-                 'title': 'Region Shop2', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00', 'code': None, 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None,
+                 'name': 'Region Shop2', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00', 'code': '', 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None,
                  'revenue': {'prev': 4, 'curr': 8, 'change': 100},
                  'lack': {'prev': 4.0, 'curr': 8.0, 'change': -100},
                  'fot': {'prev': 4.0, 'curr': 8.0, 'change': -100},
@@ -173,7 +172,7 @@ class TestShop(LocalTestCase):
                 {'id': self.reg_shop1.id,
                  'parent_id': self.root_shop.id,
                  'timezone': 'Europe/Moscow',
-                 'title': 'Region Shop1', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00', 'code': None, 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None,
+                 'name': 'Region Shop1', 'tm_shop_opens': '07:00:00', 'tm_shop_closes': '00:00:00', 'code': '', 'address': None, 'type': 's', 'dt_opened': None, 'dt_closed': None,
                  'revenue': {'prev': 10, 'curr': 20, 'change': 100},
                  'lack': {'prev': 5.0, 'curr': 10.0, 'change': -100},
                  'fot': {'prev': 10.0, 'curr': 20.0, 'change': -100},
@@ -181,6 +180,7 @@ class TestShop(LocalTestCase):
                  'workers_amount': {'prev': 10, 'curr': 20, 'change': 100},
                  'fot_revenue': {'prev': 5.0, 'curr': 10.0, 'change': -100}}]
         }
+
         self.assertEqual(response.json()['data'], data)
 
     def test_get_parameters(self):

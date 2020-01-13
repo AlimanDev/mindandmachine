@@ -1,5 +1,5 @@
 from src.util.test import LocalTestCase, datetime
-from src.timetable.models import WorkType, Cashbox
+from src.timetable.models import WorkType, Cashbox, WorkTypeName
 
 
 class TestCashbox(LocalTestCase):
@@ -38,8 +38,8 @@ class TestCashbox(LocalTestCase):
     def test_create_cashbox(self):
         self.auth()
         response = self.api_post('/api/cashbox/create_cashbox', {
-            'work_type_id': 1,
-            'number': 1
+            'work_type_id': self.work_type1.id,
+            'name': 1
         })
 
         self.assertEqual(response.status_code, 400)
@@ -54,7 +54,7 @@ class TestCashbox(LocalTestCase):
         data = {
             'shop_id': self.shop.id,
             'work_type_id': self.work_type1.id,
-            'number': self.cashbox1.number,
+            'name': self.cashbox1.name,
             'bio': 'Cashbox crashed',
         }
         response = self.api_post(
@@ -66,8 +66,8 @@ class TestCashbox(LocalTestCase):
         self.assertEqual(res_json['code'], 200)
         self.assertEqual(res_json['data']['id'], 1)
         self.assertEqual(res_json['data']['dttm_added'], "2018-01-01T08:30:00")
-        self.assertEqual(res_json['data']['type_id'], 1)
-        self.assertEqual(res_json['data']['number'], 1)
+        self.assertEqual(res_json['data']['type_id'], self.work_type1.id)
+        self.assertEqual(res_json['data']['name'], '1')
         self.assertEqual(res_json['data']['bio'], 'Cashbox crashed')
 
     def test_update_cashbox(self):
@@ -76,7 +76,7 @@ class TestCashbox(LocalTestCase):
         data = {
             'from_work_type_id': self.work_type2.id,
             'to_work_type_id': self.work_type1.id,
-            'number': self.cashbox2.number,
+            'name': self.cashbox2.name,
         }
         response = self.api_post(
             '/api/cashbox/update_cashbox',
@@ -86,8 +86,8 @@ class TestCashbox(LocalTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(res_json['code'], 200)
         self.assertEqual(res_json['data']['id'], 1)
-        self.assertEqual(res_json['data']['type_id'], 1)
-        self.assertEqual(res_json['data']['number'], '2')
+        self.assertEqual(res_json['data']['type_id'], self.work_type1.id)
+        self.assertEqual(res_json['data']['name'], '2')
         self.assertEqual(res_json['data']['bio'], '')
     
     def test_create_work_type(self):
@@ -95,10 +95,12 @@ class TestCashbox(LocalTestCase):
         Note: Внутри данной функции используется дополнительная функция send_notification
         '''
         self.auth()
-        WorkType.objects.filter(id=1).update(id=200)
+        WorkTypeName.objects.create(
+            name='Уборка',
+        )
         data = {
             'shop_id': self.shop.id,
-            'name': 'Уборка'
+            'name': 'Уборка',
         }
         response = self.api_post(
             '/api/cashbox/create_work_type',
@@ -107,11 +109,10 @@ class TestCashbox(LocalTestCase):
         res_json = response.json()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(res_json['code'], 200)
-        self.assertEqual(res_json['data']['id'], 1)
         self.assertEqual(res_json['data']['dttm_deleted'], None)
         self.assertEqual(res_json['data']['shop_id'], 13)
         self.assertEqual(res_json['data']['priority'], 100)
-        self.assertEqual(res_json['data']['name'], 'Уборка')
+        self.assertEqual(res_json['data']['work_type_name_name'], 'Уборка')
         self.assertEqual(res_json['data']['probability'], 1.0)
         self.assertEqual(res_json['data']['prior_weight'], 1.0)
         self.assertEqual(res_json['data']['min_workers_amount'], 0)
@@ -142,11 +143,11 @@ class TestCashbox(LocalTestCase):
         res_json = response.json()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(res_json['code'], 200)
-        self.assertEqual(res_json['data']['id'], 1)
+        self.assertEqual(res_json['data']['id'], self.work_type1.id)
         self.assertEqual(res_json['data']['dttm_added'], '2018-01-01T00:00:00')
         self.assertEqual(res_json['data']['shop_id'], 13)
         self.assertEqual(res_json['data']['priority'], 100)
-        self.assertEqual(res_json['data']['name'], 'Кассы')
+        self.assertEqual(res_json['data']['work_type_name_name'], 'Кассы')
         self.assertEqual(res_json['data']['probability'], 1.0)
         self.assertEqual(res_json['data']['prior_weight'], 1.0)
         self.assertEqual(res_json['data']['min_workers_amount'], 0)

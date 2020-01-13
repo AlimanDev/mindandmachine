@@ -6,19 +6,19 @@ from timezone_field import TimeZoneField
 
 import datetime
 
+from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
+
 from mptt.models import MPTTModel, TreeForeignKey
 
 
-class Region(models.Model):
+class Region(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Регион'
         verbose_name_plural = 'Регионы'
-    name = models.CharField(max_length=50)
-    code = models.SmallIntegerField()
 
 
 # на самом деле это отдел
-class Shop(MPTTModel):
+class Shop(MPTTModel, AbstractActiveNamedModel):
     class Meta(object):
         # unique_together = ('parent', 'title')
         verbose_name = 'Отдел'
@@ -49,16 +49,12 @@ class Shop(MPTTModel):
 
 
     code = models.CharField(max_length=64, null=True, blank=True)
+    #From supershop
     address = models.CharField(max_length=256, blank=True, null=True)
     type = models.CharField(max_length=1, choices=DEPARTMENT_TYPES, default=TYPE_SHOP)
 
     dt_opened = models.DateField(null=True, blank=True)
     dt_closed = models.DateField(null=True, blank=True)
-
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_deleted = models.DateTimeField(null=True, blank=True)
-
-    title = models.CharField(max_length=64)
 
     mean_queue_length = models.FloatField(default=3)
     max_queue_length = models.FloatField(default=7)
@@ -108,7 +104,7 @@ class Shop(MPTTModel):
     region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
     def __str__(self):
         return '{}, {}, {}'.format(
-            self.title,
+            self.name,
             self.parent_title(),
             self.id)
 
@@ -116,7 +112,7 @@ class Shop(MPTTModel):
         return self.forecast_step_minutes.hour * 60 + self.forecast_step_minutes.minute
 
     def parent_title(self):
-        return self.parent.title if self.parent else '',
+        return self.parent.name if self.parent else '',
 
     def get_level_of(self, shop):
         if self.id == shop.id:
@@ -150,14 +146,12 @@ class EmploymentManager(models.Manager):
         ).filter(*args, **kwargs)
 
 
-class Group(models.Model):
+class Group(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Группа пользователей'
         verbose_name_plural = 'Группы пользователей'
 
-    dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_modified = models.DateTimeField(blank=True, null=True)
-    name = models.CharField(max_length=128)
     subordinates = models.ManyToManyField("self", blank=True)
 
     def __str__(self):
@@ -168,7 +162,7 @@ class Group(models.Model):
         )
 
 
-class ProductionDay(models.Model):
+class ProductionDay(AbstractModel):
     """
     день из производственного календаря короч.
 
@@ -214,7 +208,7 @@ class ProductionDay(models.Model):
         return '(dt {}, type {}, id {})'.format(self.dt, self.type, self.id)
 
 
-class User(DjangoAbstractUser):
+class User(DjangoAbstractUser, AbstractModel):
 
     class Meta:
         verbose_name = 'Пользователь'
@@ -256,7 +250,7 @@ class User(DjangoAbstractUser):
     access_token = models.CharField(max_length=64, blank=True, null=True)
 
 
-class WorkerPosition(models.Model):
+class WorkerPosition(AbstractActiveNamedModel):
     """
     Describe employee's department and position
     """
@@ -267,13 +261,11 @@ class WorkerPosition(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    title = models.CharField(max_length=64) # todo: rename drop (use name)
-
     def __str__(self):
-        return '{}, {}'.format(self.title, self.id)
+        return '{}, {}'.format(self.name, self.id)
 
 
-class Employment(models.Model):
+class Employment(AbstractActiveModel):
 
     class Meta:
         verbose_name = 'Трудоустройство'
@@ -288,9 +280,6 @@ class Employment(models.Model):
     function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
     position = models.ForeignKey(WorkerPosition, null=True, blank=True, on_delete=models.PROTECT)
     is_fixed_hours = models.BooleanField(default=False)
-
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_deleted = models.DateTimeField(null=True, blank=True)
 
     dt_hired = models.DateField(default=datetime.date(2019, 1, 1))
     dt_fired = models.DateField(null=True, blank=True)
@@ -319,7 +308,7 @@ class Employment(models.Model):
         ).first()
 
 
-class FunctionGroup(models.Model):
+class FunctionGroup(AbstractModel):
     class Meta:
         verbose_name = 'Доступ к функциям'
         unique_together = (('func', 'group', 'method'), )
