@@ -35,7 +35,7 @@ class ShopSerializer(serializers.ModelSerializer):
 class ShopStatSerializer(serializers.Serializer):
     id=serializers.IntegerField()
     parent_id=serializers.IntegerField()
-    title=serializers.CharField()
+    name=serializers.CharField()
     fot_curr=serializers.FloatField()
     fot_prev=serializers.FloatField()
     revenue_prev=serializers.FloatField()

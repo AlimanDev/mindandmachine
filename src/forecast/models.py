@@ -3,9 +3,17 @@ from django.db import models
 from src.base import models_utils
 import datetime
 
+from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel
+
 from src.timetable.models import WorkType
 
-class OperationType(models.Model):
+class OperationTypeName(AbstractActiveNamedModel):
+    class Meta:
+        verbose_name = 'Название операции'
+        verbose_name_plural = 'Названия операций'
+
+
+class OperationType(AbstractActiveModel):
     class Meta:
         verbose_name = 'Тип операции'
         verbose_name_plural = 'Типы операций'
@@ -13,8 +21,6 @@ class OperationType(models.Model):
     def __str__(self):
         return 'id: {}, name: {}, work type: {}'.format(self.id, self.name, self.work_type)
 
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_deleted = models.DateTimeField(blank=True, null=True)
 
     FORECAST_HARD = 'H'
     FORECAST_LITE = 'L'
@@ -26,7 +32,7 @@ class OperationType(models.Model):
     )
 
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, related_name='work_type_reversed')
-    name = models.CharField(max_length=128)
+    operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
     speed_coef = models.FloatField(default=1)  # time for do 1 operation
     do_forecast = models.CharField(
         max_length=1,
@@ -40,7 +46,7 @@ class OperationType(models.Model):
     )
 
 
-class OperationTemplate(models.Model):
+class OperationTemplate(AbstractActiveNamedModel):
     """
         Шаблоны операций.
         В соответствии с ними создаются записи в PeriodClients
@@ -91,12 +97,7 @@ class OperationTemplate(models.Model):
         (PERIOD_MONTHLY, 'В месяц',),
     )
 
-
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_deleted = models.DateTimeField(blank=True, null=True)
-
     operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT, related_name='work_type_reversed')
-    name = models.CharField(max_length=128)
     tm_start = models.TimeField()
     tm_end = models.TimeField()
     value = models.FloatField()
@@ -175,7 +176,7 @@ class OperationTemplate(models.Model):
             day = lambda_get_day(dt_from)
 
 
-class PeriodDemand(models.Model):
+class PeriodClients(AbstractModel):
     LONG_FORECASE_TYPE = 'L'
     SHORT_FORECAST_TYPE = 'S'
     FACT_TYPE = 'F'
@@ -185,35 +186,29 @@ class PeriodDemand(models.Model):
         (SHORT_FORECAST_TYPE, 'Short'),
         (FACT_TYPE, 'Fact'),
     )
+    class Meta(object):
+        verbose_name = 'Значение операций'
+    
 
-    class Meta:
-        abstract = True
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
     id = models.BigAutoField(primary_key=True)
     dttm_forecast = models.DateTimeField()
     type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
     operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT)
-
-
-class PeriodClients(PeriodDemand):
-    class Meta(object):
-        verbose_name = 'Значение операций'
-
-    def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
-
     value = models.FloatField(default=0)
 
 
 
-class PeriodDemandChangeLog(models.Model):
+class PeriodDemandChangeLog(AbstractModel):
     class Meta(object):
         verbose_name = 'Лог изменений спроса'
 
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(
             self.operation_type.name,
-            self.operation_type.work_type.shop.title,
+            self.operation_type.work_type.shop.name,
             self.dttm_from,
             self.dttm_to,
             self.id

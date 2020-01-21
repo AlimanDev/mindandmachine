@@ -64,7 +64,7 @@ def get_department(request, form):
         converted = Converter.convert(
             child, 
             Shop, 
-            fields=['id', 'parent_id', 'title', 'tm_shop_opens', 'tm_shop_closes', 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone'],
+            fields=['id', 'parent_id', 'name', 'tm_shop_opens', 'tm_shop_closes', 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone'],
             custom_converters={'timezone':lambda x: x.zone},
         )
         curr_stats = calculate_supershop_stats(dt_now, [child.id])
@@ -87,7 +87,7 @@ def get_department(request, form):
         'super_shop': Converter.convert(
             shop, 
             Shop, 
-            fields=['id', 'parent_id', 'title', 'tm_shop_opens', 'tm_shop_closes', 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone'],
+            fields=['id', 'parent_id', 'name', 'tm_shop_opens', 'tm_shop_closes', 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone'],
             custom_converters={'timezone':lambda x: x.zone},
         )
     })
@@ -142,7 +142,7 @@ def get_department_list(request, form):
 )
 def add_department(request, form):
     created = Shop.objects.create(
-        title=form['title'],
+        name=form['title'],
         tm_shop_opens=form['tm_shop_opens'],
         tm_shop_closes=form['tm_shop_closes'],
         parent_id=form['parent_id'],
@@ -173,7 +173,7 @@ def edit_department(request, form):
     if form['to_delete']:
         shop.dttm_deleted = datetime.datetime.now()
     else:
-        shop.title = form['title']
+        shop.name = form['title']
         shop.timezone = form['timezone']
         shop.tm_shop_opens = form['tm_shop_opens']
         shop.tm_shop_closes = form['tm_shop_closes']

@@ -20,6 +20,7 @@ from src.base.models import (
 )
 from src.forecast.models import (
     OperationType,
+    OperationTypeName,
     PeriodClients,
     WorkType,
 )
@@ -285,7 +286,7 @@ def upload_demand_util(demand_file, form=None):
         try:
             operation_type = OperationType.objects.get(
                 work_type__shop__super_shop__code=shop_code,
-                name=name_operation_type,
+                operation_type_name=OperationTypeName.objects.get(name=name_operation_type),
             )
         except Exception:
             print('Нет такого operation_type: {} - {}'.format(shop_code, name_operation_type))
@@ -353,7 +354,7 @@ def upload_employees_util(vacation_file):
             'last_name': row[last_name_col],
             'first_name': row[first_name_col],
             'middle_name': row[middle_name_col],
-            'position': WorkerPosition.objects.get(title=row[position_col]),
+            'position': WorkerPosition.objects.get(name=row[position_col]),
             'dt_hired': row[hired_col],
             'dt_fired': row[fired_col],
             'shop': Shop.objects.filter(super_shop__code=row[shop_code_col])[0],

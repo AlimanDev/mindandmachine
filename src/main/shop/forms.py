@@ -12,7 +12,7 @@ class GetDepartmentListForm(forms.Form):
     pointer = forms.IntegerField()
     items_per_page = forms.IntegerField()
     shop_id = forms.IntegerField(required=False)
-    title = forms.CharField(required=False, max_length=256)
+    name = forms.CharField(required=False, max_length=256)
     region = forms.CharField(required=False, max_length=256)
     closed_before_dt = util_forms.DateField(required=False)
     opened_after_dt = util_forms.DateField(required=False)
@@ -32,7 +32,7 @@ class GetDepartmentListForm(forms.Form):
 
 
 class AddEditDepartmentForm(forms.Form):
-    title = forms.CharField(max_length=128)
+    name = forms.CharField(max_length=128)
     code = forms.CharField(max_length=64)
     address = forms.CharField(max_length=256, required=False)
     tm_shop_opens = util_forms.TimeField()

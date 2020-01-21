@@ -310,7 +310,7 @@ def get_cashier_timetable(request, form):
     def check_wd(wd):
             work_type=wd.work_types.first()
             if work_type and work_type.shop_id != form['shop_id']:
-                wd.other_shop = work_type.shop.title
+                wd.other_shop = work_type.shop.name
             return wd
     response = {}
     # todo: rewrite with 1 request instead 80
@@ -490,7 +490,7 @@ def get_cashier_info(request, form):
                 x['id']: x for x in Converter.convert(
                     work_types, 
                     WorkType, 
-                    fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+                    fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'work_type_name__name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
                 )
             }, # todo: delete this -- seems not needed
             'min_time_between_shifts': employment.min_time_btw_shifts,
@@ -671,7 +671,7 @@ def get_worker_day(request, form):
         cashboxes_types[x.work_type_id] = Converter.convert(
             x.work_type, 
             WorkType, 
-            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'work_type_name__name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
         )
 
     return JsonResponse.success({

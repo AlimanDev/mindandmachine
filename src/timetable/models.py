@@ -10,13 +10,13 @@ from src.conf.djconfig import IS_PUSH_ACTIVE
 
 from src.base.models import Shop, Employment, User
 
-
+from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel
 
 class WorkerManager(UserManager):
     pass
 
 
-class WorkerDayApprove(models.Model):
+class WorkerDayApprove(AbstractActiveModel):
     """
         Подтверждение расписания на месяц
         Временная отметка, привязанная к магазину, которая
@@ -37,8 +37,6 @@ class WorkerDayApprove(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True)
     dt_approved = models.DateField()
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_deleted = models.DateTimeField(null=True, blank=True)
 
 
 class WorkTypeManager(models.Manager):
@@ -58,23 +56,26 @@ class WorkTypeManager(models.Manager):
             models.Q(dttm_deleted__date__gte=dt_to) | models.Q(dttm_deleted__isnull=True)
         ).filter(*args, **kwargs)
 
+class WorkTypeName(AbstractActiveNamedModel):
+    class Meta:
+        verbose_name = 'Название типа работ'
+        verbose_name_plural = 'Названия типов работ'
 
-class WorkType(models.Model):
+
+class WorkType(AbstractActiveModel):
     class Meta:
         verbose_name = 'Тип работ'
         verbose_name_plural = 'Типы работ'
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.name, self.shop.title, self.shop.parent.title, self.id)
+        return '{}, {}, {}, {}'.format(self.work_type_name.name, self.shop.name, self.shop.parent.name, self.id)
 
     id = models.BigAutoField(primary_key=True)
 
     priority = models.PositiveIntegerField(default=100)  # 1--главная касса, 2--линия, 3--экспресс
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_deleted = models.DateTimeField(null=True, blank=True)
     dttm_last_update_queue = models.DateTimeField(null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
-    name = models.CharField(max_length=128)
+    work_type_name = models.ForeignKey(WorkTypeName, on_delete=models.PROTECT)
     min_workers_amount = models.IntegerField(default=0, blank=True, null=True)
     max_workers_amount = models.IntegerField(default=20, blank=True, null=True)
 
@@ -88,7 +89,7 @@ class WorkType(models.Model):
     )
 
 
-class UserWeekdaySlot(models.Model):
+class UserWeekdaySlot(AbstractModel):
     class Meta(object):
         verbose_name = 'Пользовательский слот'
         verbose_name_plural = 'Пользовательские слоты'
@@ -104,7 +105,7 @@ class UserWeekdaySlot(models.Model):
     is_suitable = models.BooleanField(default=True)
 
 
-class Slot(models.Model):
+class Slot(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Слот'
         verbose_name_plural = 'Слоты'
@@ -118,19 +119,16 @@ class Slot(models.Model):
             work_type_name,
             self.tm_start,
             self.tm_end,
-            self.shop.title,
-            self.shop.parent.title,
+            self.shop.name,
+            self.shop.parent.name,
             self.id
         )
 
     id = models.BigAutoField(primary_key=True)
 
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_deleted = models.DateTimeField(blank=True, null=True)
 
     tm_start = models.TimeField(default=datetime.time(hour=7))
     tm_end = models.TimeField(default=datetime.time(hour=23, minute=59, second=59))
-    name = models.CharField(max_length=32, null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo delete this by cashbox_type
     work_type = models.ForeignKey(WorkType, null=True, blank=True, on_delete=models.PROTECT)
     workers_needed = models.IntegerField(default=1)
@@ -156,7 +154,7 @@ class CashboxManager(models.Manager):
         ).filter(*args, **kwargs)
 
 
-class Cashbox(models.Model):
+class Cashbox(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Рабочее место '
         verbose_name_plural = 'Рабочие места'
@@ -164,25 +162,21 @@ class Cashbox(models.Model):
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(
             self.type.name,
-            self.type.shop.title,
-            self.type.shop.parent.title,
+            self.type.shop.name,
+            self.type.shop.parent.name,
             self.id,
-            self.number
+            self.name
         )
 
     id = models.BigAutoField(primary_key=True)
 
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_deleted = models.DateTimeField(null=True, blank=True)
-
     type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
 
-    number = models.PositiveIntegerField(blank=True, null=True)
     bio = models.CharField(max_length=512, default='', blank=True)
     objects = CashboxManager()
 
 
-class WorkerCashboxInfo(models.Model):
+class WorkerCashboxInfo(AbstractModel):
     class Meta(object):
         verbose_name = 'Информация по сотруднику-типу работ'
         unique_together = (('employment', 'work_type'),)
@@ -207,7 +201,7 @@ class WorkerCashboxInfo(models.Model):
     duration = models.FloatField(default=0)
 
 
-class WorkerConstraint(models.Model):
+class WorkerConstraint(AbstractModel):
     class Meta(object):
         verbose_name = 'Ограничения сотрудника'
         unique_together = (('worker', 'weekday', 'tm'),)
@@ -260,7 +254,7 @@ class WorkerDayManager(models.Manager):
         return current_worker_day
 
 
-class WorkerDay(models.Model):
+class WorkerDay(AbstractActiveModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
@@ -326,8 +320,8 @@ class WorkerDay(models.Model):
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}'.format(
             self.worker.last_name,
-            self.shop.title if self.shop else '',
-            self.shop.parent.title if self.shop and self.shop.parent else '',
+            self.shop.name if self.shop else '',
+            self.shop.parent.name if self.shop and self.shop.parent else '',
             self.dt,
             self.type,
             self.id
@@ -340,7 +334,6 @@ class WorkerDay(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
     employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
 
-    dttm_added = models.DateTimeField(auto_now_add=True)
     dt = models.DateField()  # todo: make immutable
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
@@ -392,7 +385,7 @@ class WorkerDayCashboxDetailsManager(models.Manager):
             return self.qos_initial_version()
 
 
-class WorkerDayCashboxDetails(models.Model):
+class WorkerDayCashboxDetails(AbstractActiveModel):
     class Meta:
         verbose_name = 'Детали в течение рабочего дня'
 
@@ -431,9 +424,6 @@ class WorkerDayCashboxDetails(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_deleted = models.DateTimeField(null=True, blank=True)
-
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT, null=True, blank=True)
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, null=True, blank=True)
@@ -451,7 +441,7 @@ class WorkerDayCashboxDetails(models.Model):
             # self.worker_day.worker.last_name,
             self.dttm_from.date(),
             '', '',
-            self.work_type.name if self.work_type else None,
+            self.work_type.work_type_name.name if self.work_type else None,
             self.dttm_from.replace(microsecond=0).time() if self.dttm_from else self.dttm_from,
             self.dttm_to.replace(microsecond=0).time() if self.dttm_to else self.dttm_to,
             self.id,
@@ -460,7 +450,7 @@ class WorkerDayCashboxDetails(models.Model):
     objects = WorkerDayCashboxDetailsManager()
 
 
-class WorkerDayChangeRequest(models.Model):
+class WorkerDayChangeRequest(AbstractActiveModel):
     class Meta(object):
         verbose_name = 'Запрос на изменения рабочего дня'
         unique_together = ('worker', 'dt')
@@ -479,7 +469,6 @@ class WorkerDayChangeRequest(models.Model):
     )
 
     id = models.BigAutoField(primary_key=True)
-    dttm_added = models.DateTimeField(auto_now_add=True)
     status_type = models.CharField(max_length=1, choices=STATUS_CHOICES, default=TYPE_PENDING)
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
@@ -510,7 +499,7 @@ class EventManager(models.Manager):
         return event
 
 
-class Event(models.Model):
+class Event(AbstractModel):
     dttm_added = models.DateTimeField(auto_now_add=True)
 
     text = models.CharField(max_length=256)
@@ -531,13 +520,13 @@ class Event(models.Model):
             elif self.workerday_details.worker_day_id:
                 return 'Вакансия на {} в {} уже выбрана.'.format(
                     Converter.convert_date(self.workerday_details.dttm_from.date()),
-                    self.workerday_details.work_type.shop.title,
+                    self.workerday_details.work_type.shop.name,
                 )
             else:
                 return 'Открыта вакансия на {} на {} в {}. Время работы: с {} по {}. Хотите выйти?'.format(
-                    self.workerday_details.work_type.name,
+                    self.workerday_details.work_type.work_type_name.name,
                     Converter.convert_date(self.workerday_details.dttm_from.date()),
-                    self.workerday_details.work_type.shop.title,
+                    self.workerday_details.work_type.shop.name,
                     Converter.convert_time(self.workerday_details.dttm_from.time()),
                     Converter.convert_time(self.workerday_details.dttm_to.time()),
                 )
@@ -626,14 +615,14 @@ class NotificationManager(models.Manager):
         )
 
 
-class Notifications(models.Model):
+class Notifications(AbstractModel):
     class Meta(object):
         verbose_name = 'Уведомления'
 
     def __str__(self):
         return '{}, {}, {}, id: {}'.format(
             self.to_worker.last_name,
-            self.shop.title if self.shop else 'no shop',
+            self.shop.name if self.shop else 'no shop',
             self.dttm_added,
             # self.text[:60],
             self.id
@@ -657,7 +646,7 @@ class Notifications(models.Model):
     objects = NotificationManager()
 
 
-class Timetable(models.Model):
+class Timetable(AbstractModel):
     class Meta(object):
         unique_together = (('shop', 'dt'),)
         verbose_name = 'Расписание'
@@ -699,7 +688,7 @@ class Timetable(models.Model):
     task_id = models.CharField(max_length=256, null=True, blank=True)
 
 
-class AttendanceRecords(models.Model):
+class AttendanceRecords(AbstractModel):
     class Meta(object):
         verbose_name = 'Данные УРВ'
 
@@ -726,7 +715,7 @@ class AttendanceRecords(models.Model):
         return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
 
-class ExchangeSettings(models.Model):
+class ExchangeSettings(AbstractModel):
     # Создаем ли автоматически вакансии
     automatic_check_lack = models.BooleanField(default=False)
     # Период, за который проверяем
