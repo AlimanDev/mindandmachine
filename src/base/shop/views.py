@@ -53,11 +53,39 @@ class ShopFilter(FilterSet):
 
 
 class ShopViewSet(viewsets.ModelViewSet):
+    """
+    GET /rest_api/department/?id__in=6,7
+    :return [{"id":6, ...},{"id":7, ...}]
+
+    GET /rest_api/department/
+    :return [   {"id": 1}
+        {"id":6, parent_id: 1},
+        {"id":61, parent_id: 6},
+        {"id":7, parent_id: 1}
+    ]
+
+    GET /rest_api/department/6/
+    :return [   {"id": 6, ...}
+    ]
+
+
+    POST /rest_api/department/, {"title": 'abcd'}
+    :return {"id": 10, ...}
+
+    PUT /rest_api/department/6, {"title": 'abcd'}
+    :return {"id": 6, ...}
+
+    GET /rest_api/department/stat?id=6
+    """
     permission_classes = [Permission]
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
 
     def get_queryset(self):
+        """
+        Возвращает queryset со списком регионов упорядоченных по структуре дерева. Этот queryset
+        определяет права доступа к магазинам.
+        """
         user = self.request.user
         only_top = self.request.query_params.get('only_top')
 
@@ -81,6 +109,20 @@ class ShopViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get']) #, permission_classes=[IsAdminOrIsSelf])
     def stat(self, request):
+        """
+        Статистика для магазина, или списка магазинов, заданных фильтром ShopFilter
+        права доступа - 'Shop_stat' в FunctionGroup
+        :return: [{
+            'id': 12,
+            'parent_id': 1,
+            'title': 'Shop1',
+            'fot_curr': 10.0,
+            'fot_prev': 5.0,
+            'revenue_prev': 5.0,
+            'revenue_curr': 10.0,
+            'lack_prev': 5.0,
+            'lack_curr': 10.0}]
+        """
         dt_curr = datetime.datetime.today().replace(day=1)
         dt_prev = dt_curr - relativedelta(months=1)
 
