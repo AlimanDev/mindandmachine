@@ -188,7 +188,7 @@ class TestDepartment(APITestCase):
         data = [{
             'id': self.shop.id,
             'parent_id': self.reg_shop1.id,
-            'title': 'Shop1',
+            'name': 'Shop1',
             'fot_curr': 10.0,
             'fot_prev': 5.0,
             'revenue_prev': 5.0,

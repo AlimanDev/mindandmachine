@@ -434,7 +434,7 @@ def create_departments_and_users(self):
     self.reg_shop1 = Shop.objects.create(
         # id=11,
         parent=self.root_shop,
-        title='Region Shop1',
+        name='Region Shop1',
         break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
         tm_shop_opens=datetime.time(7, 0, 0),
         tm_shop_closes=datetime.time(0, 0, 0),
@@ -443,7 +443,7 @@ def create_departments_and_users(self):
     self.reg_shop2 = Shop.objects.create(
         # id=12,
         parent=self.root_shop,
-        title='Region Shop2',
+        name='Region Shop2',
         tm_shop_opens=datetime.time(7, 0, 0),
         tm_shop_closes=datetime.time(0, 0, 0),
         region=self.region,
@@ -453,7 +453,7 @@ def create_departments_and_users(self):
     self.shop = Shop.objects.create(
         # id=13,
         parent=self.reg_shop1,
-        title='Shop1',
+        name='Shop1',
         break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
         tm_shop_opens=datetime.time(7, 0, 0),
         tm_shop_closes=datetime.time(0, 0, 0),
@@ -462,7 +462,7 @@ def create_departments_and_users(self):
     self.shop2 = Shop.objects.create(
         # id=2,
         parent=self.reg_shop1,
-        title='Shop2',
+        name='Shop2',
         tm_shop_opens=datetime.time(7, 0, 0),
         tm_shop_closes=datetime.time(0, 0, 0),
         region=self.region,
@@ -471,7 +471,7 @@ def create_departments_and_users(self):
     self.shop3 = Shop.objects.create(
         # id=3,
         parent=self.reg_shop2,
-        title='Shop3',
+        name='Shop3',
         tm_shop_opens=datetime.time(7, 0, 0),
         tm_shop_closes=datetime.time(0, 0, 0),
         region=self.region,
