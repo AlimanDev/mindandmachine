@@ -332,7 +332,7 @@ class TestGetCashierInfo(LocalTestCase):
         general_info = {'id': 2, 'username': 'user2', 'first_name': 'Иван2',
                         'last_name': 'Иванов', 'middle_name': None,
                         'avatar_url': None, 'sex': 'F', 'phone_number': None, 'email': 'u2@b.b',
-                        'shop_id': 13, 'dt_hired': '2019-01-01', 'dt_fired': None, 'auto_timetable': True,
+                        'shop_id': self.shop.id, 'dt_hired': '2019-01-01', 'dt_fired': None, 'auto_timetable': True,
                         'salary': 0.0, 'is_fixed_hours': False, 'is_ready_for_overworkings': False,
                         'tabel_code': None,
                         'position': '',
