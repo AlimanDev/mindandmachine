@@ -4,19 +4,22 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path
 
-from .auth import urls as auth_urls
-from .cashbox import urls as cashbox_urls
-from .download import urls as download_urls
-from .demand import urls as demand_urls
-from .operation_template import urls as operation_template_urls
-from .other import urls as other_urls
-from .timetable import urls as timetable_urls
-from .shop import urls as shop_urls
-from .tablet import urls as tablet_urls
-from .upload import urls as upload_urls
-from .urv import urls as urv_urls
+from src.main.auth import urls as auth_urls
+from src.main.cashbox import urls as cashbox_urls
+from src.main.download import urls as download_urls
+from src.main.demand import urls as demand_urls
+from src.main.operation_template import urls as operation_template_urls
+from src.main.other import urls as other_urls
+from src.main.timetable import urls as timetable_urls
+from src.main.shop import urls as shop_urls
+from src.main.tablet import urls as tablet_urls
+from src.main.upload import urls as upload_urls
+from src.main.urv import urls as urv_urls
 
 from src.conf.djconfig import DEBUG
+from src.base import urls as base_api
+from src.timetable import urls as timetable_api
+
 
 
 api_urlpatterns = [
@@ -37,7 +40,10 @@ api_urlpatterns = [
 
 urlpatterns = [
     path('api/', include(api_urlpatterns)),
-    path('admin/', admin.site.urls)
+    path('admin/', admin.site.urls),
+    path('rest_api/', include(
+        base_api.urlpatterns +
+        timetable_api.urlpatterns)),
 ]
 
 if settings.QOS_DEV_STATIC_ENABLED:

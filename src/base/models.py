@@ -19,9 +19,6 @@ class Region(AbstractActiveNamedModel):
 
 # на самом деле это отдел
 class Shop(MPTTModel, AbstractActiveNamedModel):
-    def __init__(self, *args, **kwargs):
-        super(Shop, self).__init__(*args, **kwargs)
-
     class Meta(object):
         # unique_together = ('parent', 'title')
         verbose_name = 'Отдел'
@@ -51,6 +48,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     )
 
 
+    code = models.CharField(max_length=64, null=True, blank=True)
     #From supershop
     address = models.CharField(max_length=256, blank=True, null=True)
     type = models.CharField(max_length=1, choices=DEPARTMENT_TYPES, default=TYPE_SHOP)
@@ -128,13 +126,14 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             return self
         level = self.level - level if self.level > level else 0
         return self.get_ancestors().filter(level=level)[0]
-
+    def get_department(self):
+        return self
 
 class EmploymentManager(models.Manager):
-    def get_active(self, dt_from, dt_to, *args, **kwargs):
+    def get_active(self, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):
         """
         hired earlier then dt_from, hired later then dt_to
-        :param dt_from:
+        :paramShop dt_from:
         :param dt_to:
         :param args:
         :param kwargs:
@@ -253,7 +252,7 @@ class User(DjangoAbstractUser, AbstractModel):
 
 class WorkerPosition(AbstractActiveNamedModel):
     """
-    Describe employee's department and position
+    Describe employee's position
     """
 
     class Meta:
@@ -302,11 +301,19 @@ class Employment(AbstractActiveModel):
 
     objects = EmploymentManager()
 
+    def has_permission(self, permission, method='GET'):
+        return self.function_group.allowed_functions.filter(
+            func=permission,
+            method=method
+        ).first()
+
+    def get_department(self):
+        return self.shop
 
 class FunctionGroup(AbstractModel):
     class Meta:
         verbose_name = 'Доступ к функциям'
-        unique_together = (('func', 'group'), )
+        unique_together = (('func', 'group', 'method'), )
 
     TYPE_SELF = 'S'
     TYPE_SHOP = 'TS'
@@ -321,6 +328,12 @@ class FunctionGroup(AbstractModel):
     )
 
     FUNCS = (
+        'Shop',
+        'Shop_stat',
+        'WorkerDay',
+        'Employment',
+        'User',
+
         'signout',
         'password_edit',
 

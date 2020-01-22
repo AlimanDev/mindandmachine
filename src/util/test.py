@@ -67,209 +67,10 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
         dttm_now = now()
 
-        self.region = Region.objects.create(
-            id=1,
-            name='Москва',
-            code=77,
-        )
+        create_departments_and_users(self)
+
         if calendar:
             fill_calendar.main('2018.1.1', (datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y.%m.%d'), region_id=1)
-
-        # admin_group
-        self.admin_group = Group.objects.create(name='Администратор')
-        FunctionGroup.objects.bulk_create([
-            FunctionGroup(
-                group=self.admin_group,
-                func=func,
-                level_up=1,
-                level_down=99,
-                # access_type=FunctionGroup.TYPE_ALL
-            ) for func in FunctionGroup.FUNCS
-        ])
-
-        # # central office
-        # self.hq_group = Group.objects.create(name='ЦО')
-        # for func in FunctionGroup.FUNCS:
-        #     if 'get' in func or func == 'signin' or func == 'signout':
-        #         FunctionGroup.objects.create(
-        #             group=self.hq_group,
-        #             func=func,
-        #             level_up=1,
-        #             level_down=99,
-        #             # access_type=FunctionGroup.TYPE_ALL
-        #         )
-
-        # chiefs
-        self.chief_group = Group.objects.create(name='Руководитель')
-        FunctionGroup.objects.bulk_create([
-            FunctionGroup(
-                group=self.chief_group,
-                func=func,
-                level_up=0,
-                level_down=99,
-                # access_type=FunctionGroup.TYPE_SUPERSHOP
-            ) for func in FunctionGroup.FUNCS
-        ])
-
-        # employee
-        self.employee_group = Group.objects.create(name='Сотрудник')
-        FunctionGroup.objects.bulk_create([
-            FunctionGroup(
-                group=self.employee_group,
-                func=func,
-                level_up=0,
-                level_down=0,
-                # access_type=FunctionGroup.TYPE_SELF
-            ) for func in FunctionGroup.FUNCS
-        ])
-
-        Shop._tree_manager.rebuild()
-        # supershop
-        self.root_shop = Shop.objects.first()
-
-        # shops
-        self.reg_shop1 = Shop.objects.create(
-            id=11,
-            parent=self.root_shop,
-            name='Region Shop1',
-            break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
-            tm_shop_opens=datetime.time(7, 0, 0),
-            tm_shop_closes=datetime.time(0, 0, 0),
-            region=self.region,
-        )
-        self.reg_shop2 = Shop.objects.create(
-            id=12,
-            parent=self.root_shop,
-            name='Region Shop2',
-            tm_shop_opens=datetime.time(7, 0, 0),
-            tm_shop_closes=datetime.time(0, 0, 0),
-            region=self.region,
-        )
-
-        # shops
-        self.shop = Shop.objects.create(
-            id=13,
-            parent=self.reg_shop1,
-            name='Shop1',
-            break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
-            tm_shop_opens=datetime.time(7, 0, 0),
-            tm_shop_closes=datetime.time(0, 0, 0),
-            region=self.region,
-        )
-        self.shop2 = Shop.objects.create(
-            id=2,
-            parent=self.reg_shop1,
-            name='Shop2',
-            tm_shop_opens=datetime.time(7, 0, 0),
-            tm_shop_closes=datetime.time(0, 0, 0),
-            region=self.region,
-        )
-
-        self.shop3 = Shop.objects.create(
-            id=3,
-            parent=self.reg_shop2,
-            name='Shop3',
-            tm_shop_opens=datetime.time(7, 0, 0),
-            tm_shop_closes=datetime.time(0, 0, 0),
-            region=self.region,
-        )
-        Shop.objects.rebuild()
-
-        # users
-        self.user1 = User.objects.create_user(
-            self.USER_USERNAME,
-            self.USER_EMAIL,
-            self.USER_PASSWORD,
-            id=1,
-            last_name='Васнецов',
-            first_name='Иван',
-        )
-        self.employment1 = Employment.objects.create(
-            user=self.user1,
-            shop=self.root_shop,
-            function_group = self.admin_group,
-        )
-        self.user2 = User.objects.create_user(
-            'user2',
-            'u2@b.b',
-            '4242',
-            id=2,
-            first_name='Иван2',
-            last_name='Иванов')
-        self.employment2 = Employment.objects.create(
-            user=self.user2,
-            shop=self.shop,
-        )
-        self.user3 = User.objects.create_user(
-            'user3',
-            'u3@b.b',
-            '4242',
-            id=3,
-            first_name='Иван3',
-            last_name='Сидоров',
-        )
-        self.employment3 = Employment.objects.create(
-            user=self.user3,
-            shop=self.shop,
-            auto_timetable=False,
-        )
-
-        self.user4 = User.objects.create_user(
-            'user4',
-            '4b@b.b',
-            '4242',
-            id=4,
-            last_name='Петров',
-            first_name='Иван4',
-        )
-        self.employment4 = Employment.objects.create(
-            user=self.user4,
-            shop=self.shop,
-            function_group=self.admin_group,
-        )
-
-
-        self.user5 = User.objects.create_user(
-            'user5',
-            'm@m.m',
-            '4242',
-            id=5,
-            last_name='Васнецов5',
-            first_name='Иван5',
-        )
-        self.employment5 = Employment.objects.create(
-            user=self.user5,
-            shop=self.reg_shop1,
-            function_group=self.chief_group,
-        )
-
-        self.user6 = User.objects.create_user(
-            'user6',
-            'b@b.b',
-            '4242',
-            id=6,
-            last_name='Васнецов6',
-            first_name='Иван6',
-        )
-        self.employment6 = Employment.objects.create(
-            user=self.user6,
-            shop=self.shop,
-            function_group=self.chief_group,
-        )
-
-        self.user7 = User.objects.create_user(
-            'user7',
-            'k@k.k',
-            '4242',
-            id=7,
-            last_name='Васнецов7',
-            first_name='Иван7',
-        )
-        self.employment7 = Employment.objects.create(
-            user=self.user7,
-            shop=self.shop,
-            function_group=self.employee_group,
-        )
 
         # work_types
         self.work_type_name1 = WorkTypeName.objects.create(
@@ -569,6 +370,211 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         )
         return worker_day
 
+
+def create_departments_and_users(self):
+
+    self.region = Region.objects.create(
+        id=1,
+        name='Москва',
+        code=77,
+    )
+    # admin_group
+    self.admin_group = Group.objects.create(name='Администратор')
+    FunctionGroup.objects.bulk_create([
+        FunctionGroup(
+            group=self.admin_group,
+            func=func,
+            level_up=1,
+            level_down=99,
+            # access_type=FunctionGroup.TYPE_ALL
+        ) for func in FunctionGroup.FUNCS
+    ])
+
+    # # central office
+    # self.hq_group = Group.objects.create(name='ЦО')
+    # for func in FunctionGroup.FUNCS:
+    #     if 'get' in func or func == 'signin' or func == 'signout':
+    #         FunctionGroup.objects.create(
+    #             group=self.hq_group,
+    #             func=func,
+    #             level_up=1,
+    #             level_down=99,
+    #             # access_type =FunctionGroup.TYPE_ALL
+    #         )
+
+    # chiefs
+    self.chief_group = Group.objects.create(name='Руководитель')
+    FunctionGroup.objects.bulk_create([
+        FunctionGroup(
+            group=self.chief_group,
+            func=func,
+            level_up=0,
+            level_down=99,
+            # access_type=FunctionGroup.TYPE_SUPERSHOP
+        ) for func in FunctionGroup.FUNCS
+    ])
+
+    # employee
+    self.employee_group = Group.objects.create(name='Сотрудник')
+    FunctionGroup.objects.bulk_create([
+        FunctionGroup(
+            group=self.employee_group,
+            func=func,
+            level_up=0,
+            level_down=0,
+            # access_type=FunctionGroup.TYPE_SELF
+        ) for func in FunctionGroup.FUNCS
+    ])
+
+    Shop._tree_manager.rebuild()
+    # supershop
+    self.root_shop = Shop.objects.first()
+
+    # shops
+    self.reg_shop1 = Shop.objects.create(
+        # id=11,
+        parent=self.root_shop,
+        name='Region Shop1',
+        break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
+        tm_shop_opens=datetime.time(7, 0, 0),
+        tm_shop_closes=datetime.time(0, 0, 0),
+        region=self.region,
+    )
+    self.reg_shop2 = Shop.objects.create(
+        # id=12,
+        parent=self.root_shop,
+        name='Region Shop2',
+        tm_shop_opens=datetime.time(7, 0, 0),
+        tm_shop_closes=datetime.time(0, 0, 0),
+        region=self.region,
+    )
+
+    # shops
+    self.shop = Shop.objects.create(
+        # id=13,
+        parent=self.reg_shop1,
+        name='Shop1',
+        break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
+        tm_shop_opens=datetime.time(7, 0, 0),
+        tm_shop_closes=datetime.time(0, 0, 0),
+        region=self.region,
+    )
+    self.shop2 = Shop.objects.create(
+        # id=2,
+        parent=self.reg_shop1,
+        name='Shop2',
+        tm_shop_opens=datetime.time(7, 0, 0),
+        tm_shop_closes=datetime.time(0, 0, 0),
+        region=self.region,
+    )
+
+    self.shop3 = Shop.objects.create(
+        # id=3,
+        parent=self.reg_shop2,
+        name='Shop3',
+        tm_shop_opens=datetime.time(7, 0, 0),
+        tm_shop_closes=datetime.time(0, 0, 0),
+        region=self.region,
+    )
+    Shop.objects.rebuild()
+
+    # users
+    self.user1 = User.objects.create_user(
+        self.USER_USERNAME,
+        self.USER_EMAIL,
+        self.USER_PASSWORD,
+        id=1,
+        last_name='Васнецов',
+        first_name='Иван',
+    )
+    self.employment1 = Employment.objects.create(
+        user=self.user1,
+        shop=self.root_shop,
+        function_group=self.admin_group,
+    )
+    self.user2 = User.objects.create_user(
+        'user2',
+        'u2@b.b',
+        '4242',
+        id=2,
+        first_name='Иван2',
+        last_name='Иванов')
+    self.employment2 = Employment.objects.create(
+        user=self.user2,
+        shop=self.shop,
+        function_group=self.employee_group,
+    )
+    self.user3 = User.objects.create_user(
+        'user3',
+        'u3@b.b',
+        '4242',
+        id=3,
+        first_name='Иван3',
+        last_name='Сидоров',
+    )
+    self.employment3 = Employment.objects.create(
+        user=self.user3,
+        shop=self.shop,
+        auto_timetable=False,
+        function_group=self.employee_group,
+
+    )
+
+    self.user4 = User.objects.create_user(
+        'user4',
+        '4b@b.b',
+        '4242',
+        id=4,
+        last_name='Петров',
+        first_name='Иван4',
+    )
+    self.employment4 = Employment.objects.create(
+        user=self.user4,
+        shop=self.shop,
+        function_group=self.admin_group,
+    )
+
+    self.user5 = User.objects.create_user(
+        'user5',
+        'm@m.m',
+        '4242',
+        id=5,
+        last_name='Васнецов5',
+        first_name='Иван5',
+    )
+    self.employment5 = Employment.objects.create(
+        user=self.user5,
+        shop=self.reg_shop1,
+        function_group=self.chief_group,
+    )
+
+    self.user6 = User.objects.create_user(
+        'user6',
+        'b@b.b',
+        '4242',
+        id=6,
+        last_name='Васнецов6',
+        first_name='Иван6',
+    )
+    self.employment6 = Employment.objects.create(
+        user=self.user6,
+        shop=self.shop,
+        function_group=self.chief_group,
+    )
+
+    self.user7 = User.objects.create_user(
+        'user7',
+        'k@k.k',
+        '4242',
+        id=7,
+        last_name='Васнецов7',
+        first_name='Иван7',
+    )
+    self.employment7 = Employment.objects.create(
+        user=self.user7,
+        shop=self.shop,
+        function_group=self.employee_group,
+    )
 
 # def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
 #     CameraCashboxStat.objects.create(

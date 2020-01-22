@@ -1,4 +1,5 @@
 import datetime
+
 from src.conf.djconfig import (
     QOS_DATE_FORMAT,
     QOS_DATETIME_FORMAT,
@@ -11,7 +12,6 @@ from src.base.models import (
 )
 from src.timetable.models import (
     WorkerDay,
-    AttendanceRecords,
 )
 from django.db import models
 

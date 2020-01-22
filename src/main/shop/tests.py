@@ -180,6 +180,7 @@ class TestShop(LocalTestCase):
                  'workers_amount': {'prev': 10, 'curr': 20, 'change': 100},
                  'fot_revenue': {'prev': 5.0, 'curr': 10.0, 'change': -100}}]
         }
+
         self.assertEqual(response.json()['data'], data)
 
     def test_get_parameters(self):

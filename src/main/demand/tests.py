@@ -166,7 +166,7 @@ class TestGetIndicators(TestDemand):
     def test_correct(self):
         self.auth()
 
-        response = self.api_get(f'/api/demand/get_indicators?from_dt={Converter.convert_date(datetime(2018, 5, 6))}&to_dt={Converter.convert_date(datetime(2018, 6, 8))}&shop_id=13')
+        response = self.api_get(f'/api/demand/get_indicators?from_dt={Converter.convert_date(datetime(2018, 5, 6))}&to_dt={Converter.convert_date(datetime(2018, 6, 8))}&shop_id={self.shop.id}')
         
         self.assertEqual(response.status_code, 200)
         correct_res = {
@@ -314,7 +314,7 @@ class TestGetForecast(TestDemand):
     def test_correct_all_operations(self):
         self.auth()
         
-        response = self.api_get(f'/api/demand/get_forecast?from_dt={Converter.convert_date(datetime(2018, 6, 7))}&to_dt={Converter.convert_date(datetime(2018, 6, 7))}&shop_id=13')
+        response = self.api_get(f'/api/demand/get_forecast?from_dt={Converter.convert_date(datetime(2018, 6, 7))}&to_dt={Converter.convert_date(datetime(2018, 6, 7))}&shop_id={self.shop.id}')
         correct_L = {
             'dttm': Converter.convert_datetime(datetime(2018, 6, 7, 9)),
             'clients': 55.0, 
@@ -340,7 +340,7 @@ class TestGetForecast(TestDemand):
     def test_correct_some_operations(self):
         self.auth()
         
-        response = self.api_get(f'/api/demand/get_forecast?from_dt={Converter.convert_date(datetime(2018, 6, 7))}&to_dt={Converter.convert_date(datetime(2018, 6, 7))}&shop_id=13&operation_type_ids=[5,6]')
+        response = self.api_get(f'/api/demand/get_forecast?from_dt={Converter.convert_date(datetime(2018, 6, 7))}&to_dt={Converter.convert_date(datetime(2018, 6, 7))}&shop_id={self.shop.id}&operation_type_ids=[5,6]')
         correct_L = {
             'dttm': Converter.convert_datetime(datetime(2018, 6, 7, 9)),
             'clients': 50.0, 
@@ -384,7 +384,7 @@ class TestSetDemand(TestDemand):
         self.data = {
             'from_dttm' : Converter.convert_datetime(datetime.combine(self.date, time(12, 0))),
             'to_dttm' : Converter.convert_datetime(datetime.combine(self.date + timedelta(days=1), time(13, 0))),
-            'shop_id' : 13
+            'shop_id' : self.shop.id
         }
         for op in self.o_types:
             op.dttm_added = datetime.combine(self.date, time(12, 0))
@@ -395,9 +395,9 @@ class TestSetDemand(TestDemand):
         self.data['multiply_coef'] = 0.2
         response = self.api_post('/api/demand/set_demand', data=self.data) 
         self.assertEqual(response.status_code, 200)
-        operations_count_before = PeriodClients.objects.filter(operation_type__work_type__shop_id=13).count()
+        operations_count_before = PeriodClients.objects.filter(operation_type__work_type__shop_id=self.shop.id).count()
         self.assertEqual(
-            PeriodClients.objects.filter(operation_type__work_type__shop_id=13).count(), 
+            PeriodClients.objects.filter(operation_type__work_type__shop_id=self.shop.id).count(),
             operations_count_before
         )
         self.assertEqual(
@@ -416,7 +416,7 @@ class TestSetDemand(TestDemand):
         correct_data = [20.0, 20.0, 20.0, 10.0, 20.0]
         self.assertEqual(
             list(PeriodClients.objects.filter(
-                operation_type__work_type__shop_id=13,
+                operation_type__work_type__shop_id=self.shop.id,
                 dttm_forecast__lte=datetime.combine(self.date + timedelta(days=1), time(13, 0)),
                 dttm_forecast__gte=datetime.combine(self.date, time(12, 0))
             ).order_by('dttm_forecast').values('dttm_forecast', 'value').distinct()[:5].values_list('value', flat=True)), 
@@ -476,7 +476,7 @@ class TestSetDemand(TestDemand):
         ]
         self.assertEqual(response.status_code, 200)
         self.assertEqual(list(PeriodClients.objects.filter(
-                operation_type__work_type__shop_id=13,
+                operation_type__work_type__shop_id=self.shop.id,
                 operation_type_id=8
             ).values('dttm_forecast', 'type', 'operation_type_id', 'value').order_by('dttm_forecast')),
             correct_data
@@ -521,7 +521,7 @@ class TestSetDemand(TestDemand):
         ]
         self.assertEqual(response.status_code, 200)
         self.assertEqual(list(PeriodClients.objects.filter(
-            operation_type__work_type__shop_id=13,
+            operation_type__work_type__shop_id=self.shop.id,
             operation_type_id=8
             ).values('dttm_forecast', 'type', 'operation_type_id', 'value').order_by('dttm_forecast')),
             correct_data
@@ -571,7 +571,7 @@ class TestGetDemangChangeLogs(TestDemand):
         from_dt = Converter.convert_date(self.date)
         to_dt =  Converter.convert_date((self.date + timedelta(days=1)))
         response = self.api_get(
-            f'/api/demand/get_demand_change_logs?work_type_id={self.work_type4.id}&from_dt={from_dt}&to_dt={to_dt}&shop_id=2'
+            f'/api/demand/get_demand_change_logs?work_type_id={self.work_type4.id}&from_dt={from_dt}&to_dt={to_dt}&shop_id={self.reg_shop1.id}'
         )
         correct_answer = {
             'code': 200,
@@ -618,7 +618,7 @@ class TestCreatePredBillsRequest(TestDemand):
     def test_correct(self):
         self.auth()
         data = {
-            'shop_id' : 13,
+            'shop_id' : self.shop.id,
             'dt' : Converter.convert_date(datetime(2018, 7, 7))
         }
         response = self.api_post('/api/demand/create_predbills', data)
