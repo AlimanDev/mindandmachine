@@ -7,7 +7,7 @@ import django.utils.timezone
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('timetable', '0002_auto_20191223_1019'),
+        ('timetable', '0002_alterfield'),
     ]
 
     operations = [
