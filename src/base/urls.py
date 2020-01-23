@@ -1,5 +1,5 @@
 from django.conf.urls import url, include
-from rest_framework import routers
+from rest_framework import routers, urls
 from src.base.shop.views import ShopViewSet
 from src.base.views import EmploymentViewSet, UserViewSet
 
@@ -24,5 +24,6 @@ router.register(r'user', UserViewSet, basename='User')
 # Additionally, we include login URLs for the browsable API.
 urlpatterns = [
     url(r'^', include(router.urls)),
-    url(r'^auth/', include(rest_auth_urls))
+    url(r'^auth/', include(rest_auth_urls)),
+    url(r'^api-auth/', include(urls))
 ]
