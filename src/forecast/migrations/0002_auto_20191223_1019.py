@@ -26,10 +26,7 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': 'Названия операций',
             },
         ),
-        migrations.RemoveField(
-            model_name='operationtype',
-            name='name',
-        ),
+        migrations.RunSQL('insert into forecast_operationtypename (name, dttm_added, code) select distinct name, now(), 0 from forecast_operationtype'),
         migrations.AddField(
             model_name='operationtemplate',
             name='code',
@@ -44,11 +41,5 @@ class Migration(migrations.Migration):
             model_name='operationtype',
             name='dttm_added',
             field=models.DateTimeField(default=django.utils.timezone.now),
-        ),
-        migrations.AddField(
-            model_name='operationtype',
-            name='operation_type_name',
-            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.PROTECT, to='forecast.OperationTypeName'),
-            preserve_default=False,
         ),
     ]
