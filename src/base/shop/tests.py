@@ -38,10 +38,10 @@ class TestDepartment(APITestCase):
                  'parent_id': None,
                  'break_triplets': '[]',
                  'region_id': None,
-                 'title': 'Корневой магазин',
+                 'name': 'Корневой магазин',
                  'tm_shop_opens': '06:00:00',
                  'tm_shop_closes': '23:00:00',
-                 'code': None,
+                 'code': '',
                  'address': None,
                  'type': 's',
                  'dt_opened': None,
@@ -93,7 +93,7 @@ class TestDepartment(APITestCase):
     def test_create(self):
         data = {        
             "parent_id": self.root_shop.id,
-            "title": 'Region Shop3',
+            "name": 'Region Shop3',
             "break_triplets": "[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]]",
             "tm_shop_opens": '07:00:00',
             "tm_shop_closes": '23:00:00',
@@ -126,7 +126,7 @@ class TestDepartment(APITestCase):
     def test_update(self):
         data = {
             "parent_id": self.root_shop.id,
-            "title": 'Title 2',
+            "name": 'Title 2',
             "break_triplets": "[[0, 360, [30]]]",
             "tm_shop_opens": '07:00:00',
             "tm_shop_closes": '23:00:00',
