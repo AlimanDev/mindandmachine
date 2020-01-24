@@ -12,7 +12,7 @@ from rest_framework.response import Response
 
 from src.base.permissions import Permission
 from src.base.models import  Employment, Shop
-
+import json
 
 class TimeZoneField(serializers.ChoiceField):
     def __init__(self, **kwargs):
@@ -139,3 +139,38 @@ class ShopViewSet(viewsets.ModelViewSet):
         serializer = ShopStatSerializer(shops, many=True)
         return Response(serializer.data)
 
+    def list(self, request):
+        """
+        Дерево магазинов в формате для Quasar
+        :param request:
+        :return:
+        """
+
+        shops = self.filter_queryset(self.get_queryset())
+        tree = []
+        ids = []
+        elems = []
+        for shop in shops:
+            parent_id = shop.parent_id
+            if parent_id in ids:
+                for i, elem in enumerate(elems):
+                    if elem['id'] == parent_id:
+                        ids = ids[0:i+1]
+                        elems = elems[0:i+1]
+                        child_list = elem["children"]
+            else:
+                ids = []
+                elems = []
+                child_list = tree
+
+            child_list.append({
+                "id": shop.id,
+                "level": shop.name,
+                "children": []
+            })
+
+            elems.append(child_list[-1])
+            ids.append(shop.id)
+
+
+        return Response(tree)
