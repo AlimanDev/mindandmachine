@@ -288,7 +288,7 @@ class Test_auto_worker_exchange(TestCase):
         )
 
     def create_period_clients(self, value, operation_type):
-        dttm_from = now().replace(hour=9, minute=0, second=0, microsecond=0)
+        dttm_from = datetime.datetime.combine(self.dt_now, datetime.time(9, 0))
         dttm_to = dttm_from.replace(hour=21, minute=0, second=0, microsecond=0)
         pc_list = []
         while dttm_from < dttm_to:
@@ -437,6 +437,8 @@ class Test_auto_worker_exchange(TestCase):
     # Предикшн в 3 человека -> 4 человека в работе -> 1 перекидывает.
     def test_workers_hard_exchange(self):
         self.create_users(4)
+        if (now().hour >= 20):
+            self.dt_now = self.dt_now + datetime.timedelta(days=1)
         self.create_worker_day()
 
         self.create_period_clients(18, self.operation_type)
