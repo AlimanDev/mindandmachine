@@ -23,7 +23,7 @@ class WorkerPositionAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class QsUserAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'shop_title', 'id')
+    list_display = ('first_name', 'last_name', 'shop_name', 'id')
     search_fields = ('first_name', 'last_name', 'id')
     # list_filter = ('employment__shop', )
 
@@ -37,7 +37,7 @@ class QsUserAdmin(admin.ModelAdmin):
     #     return 'без магазина'
 
     @staticmethod
-    def shop_title(instance: User):
+    def shop_name(instance: User):
         res = ', '.join(i.shop.name for i in instance.employments.all().select_related('shop'))
         return res
     '''
@@ -50,7 +50,7 @@ class QsUserAdmin(admin.ModelAdmin):
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
     list_display = ('name', 'parent_title', 'id')
-    search_fields = ('name', 'parent__title', 'id')
+    search_fields = ('name', 'parent__name', 'id')
 
     @staticmethod
     def parent_title(instance: Shop):
@@ -74,7 +74,7 @@ class FunctionGroupAdmin(admin.ModelAdmin):
 class EmploymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop', 'user')
     list_filter = ('shop', 'user')
-    search_fields = ('user__first_name', 'user__last_name', 'shop__title', 'shop__parent__title')
+    search_fields = ('user__first_name', 'user__last_name', 'shop__name', 'shop__parent__name')
 
 
 @admin.register(ProductionDay)
