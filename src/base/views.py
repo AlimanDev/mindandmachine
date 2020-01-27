@@ -5,6 +5,7 @@ from src.base.serializers import EmploymentSerializer, UserSerializer
 from src.base.filters import EmploymentFilter, UserFilter
 
 from src.base.models import  Employment, User
+from rest_auth.views import UserDetailsView
 
 
 class EmploymentViewSet(viewsets.ModelViewSet):
@@ -21,3 +22,7 @@ class UserViewSet(viewsets.ModelViewSet):
     filterset_class = UserFilter
 
     queryset = User.objects.all()
+
+
+class AuthUserView(UserDetailsView):
+    serializer_class = UserSerializer

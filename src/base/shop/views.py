@@ -172,5 +172,4 @@ class ShopViewSet(viewsets.ModelViewSet):
             elems.append(child_list[-1])
             ids.append(shop.id)
 
-
         return Response(tree)
