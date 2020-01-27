@@ -16,6 +16,9 @@ class Permission(permissions.BasePermission):
     }
 
     def has_permission(self, request, view):
+        if not bool(request.user and request.user.is_authenticated):
+            return False
+
         # if request.method in permissions.SAFE_METHODS:
         #     return True
         employments = Employment.objects.get_active(
@@ -54,6 +57,8 @@ class FilteredListPermission(Permission):
     Класс для определения прав доступа к методам апи для конкретного магазина
     """
     def has_permission(self, request, view):
+        if not bool(request.user and request.user.is_authenticated):
+            return False
         if view.action == 'retrieve':
             # Права для объекта проверятся в has_object_permission
             return True

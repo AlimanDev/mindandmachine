@@ -71,6 +71,9 @@ def check_func_groups():
         'UserViewSet',
         'EmploymentViewSet',
         'APIRootView',
+        'LoginView',
+        'LogoutView',
+        'PasswordChangeView'
     ]
 
     def get_all_view_names(all_url_patterns=None, all_views=[]):

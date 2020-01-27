@@ -33,6 +33,7 @@ django-js-asset==1.2.2
 django-json-field==0.5.7
 django-ltree==0.4
 django-mptt==0.10.0
+django-rest-auth==0.9.5
 django-rest-framework==0.1.0
 django-sekizai==1.0.0
 django-sql-utils==0.4.1
@@ -65,7 +66,7 @@ more-itertools==7.2.0
 numpy==1.17.4
 openpyxl==3.0.1
 packaging==17.1
-pandas==0.25.3
+pandas==0.22.0
 paramiko==2.6.0
 parso==0.5.1
 pexpect==4.7.0

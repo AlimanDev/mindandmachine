@@ -26,13 +26,10 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': 'Названия типов работ',
             },
         ),
+        migrations.RunSQL('insert into timetable_worktypename (name, dttm_added, code) select distinct name, now(), 0  from timetable_worktype'),
         migrations.RemoveField(
             model_name='cashbox',
             name='number',
-        ),
-        migrations.RemoveField(
-            model_name='worktype',
-            name='name',
         ),
         migrations.AddField(
             model_name='cashbox',
@@ -75,11 +72,5 @@ class Migration(migrations.Migration):
             model_name='worktype',
             name='dttm_added',
             field=models.DateTimeField(default=django.utils.timezone.now),
-        ),
-        migrations.AddField(
-            model_name='worktype',
-            name='work_type_name',
-            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.PROTECT, to='timetable.WorkTypeName'),
-            preserve_default=False,
         ),
     ]
