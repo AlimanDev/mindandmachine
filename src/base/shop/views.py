@@ -165,7 +165,7 @@ class ShopViewSet(viewsets.ModelViewSet):
 
             child_list.append({
                 "id": shop.id,
-                "level": shop.name,
+                "label": shop.name,
                 "children": []
             })
 
