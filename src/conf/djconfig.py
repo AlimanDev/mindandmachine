@@ -235,6 +235,7 @@ SESSION_COOKIE_SECURE = True
 
 QOS_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S" #'%H:%M:%S %d.%m.%Y'
 QOS_DATE_FORMAT = '%Y-%m-%d'
+QOS_DATE_FORMAT = '%d.%m.%Y'
 QOS_TIME_FORMAT = '%H:%M:%S'
 QOS_SHORT_TIME_FORMAT = '%H:%M'
 

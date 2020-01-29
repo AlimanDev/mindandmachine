@@ -106,7 +106,7 @@ def get_cashiers_list(request, form):
     q = Q()
     if not form['show_all']:
         q &= Q(dt_hired__isnull=True) | Q(dt_hired__lte=form['dt_to'])
-        q &= Q(dt_fired__isnull=True) | Q(dt_fired__gt=form['dt_from'])
+        q &= Q(dt_fired__isnull=True) | Q(dt_fired__gte=form['dt_from'])
 
     employments = list(Employment.objects.filter(
         shop_id=shop_id,
@@ -159,7 +159,7 @@ def get_not_working_cashiers_list(request, form):
             employment__shop_id=shop_id,
     ).filter(
         (Q(employment__dt_hired__isnull=True) | Q(employment__dt_hired__lte=form['dt_to'])) &
-        (Q(employment__dt_fired__isnull=True) | Q(employment__dt_fired__gt=form['dt_from']))
+        (Q(employment__dt_fired__isnull=True) | Q(employment__dt_fired__gte=form['dt_from']))
     ).exclude(
         type=WorkerDay.TYPE_WORKDAY
     ).order_by(
@@ -321,7 +321,7 @@ def get_cashier_timetable(request, form):
             continue
 
         worker_days_filter = WorkerDay.objects.qos_filter_version(checkpoint).select_related('employment').prefetch_related('work_types').filter(
-            Q(employment__dt_fired__gt=from_dt) &
+            Q(employment__dt_fired__gte=from_dt) &
             Q(dt__lt=F('employment__dt_fired')) |
             Q(employment__dt_fired__isnull=True),
 
