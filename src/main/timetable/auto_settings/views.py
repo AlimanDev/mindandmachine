@@ -371,6 +371,11 @@ def create_timetable(request, form):
             type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lt=dt_to,
+            dttm_forecast__time__gte=shop.tm_shop_opens,
+            dttm_forecast__time__lt=shop.tm_shop_closes,
+
+
+
         ).count()
 
         if periods_len % period_normal_count:
