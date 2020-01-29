@@ -67,14 +67,14 @@ def get_tabel(request, workbook, form):
         dt_from=from_dt,
         dt_to=to_dt,
         shop=shop,
-    ).select_related('position').order_by('position_id', 'user__last_name', 'user__first_name', 'tabel_code')
+    ).select_related('position').order_by('position_id', 'user__last_name', 'user__first_name', 'tabel_code', 'id')
 
     workdays = WorkerDay.objects.qos_filter_version(checkpoint).select_related('worker', 'shop').filter(
         Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True),
         Q(dt__gte=F('employment__dt_hired')) & Q(dt__gte=from_dt),
         employment__in=employments,
         dt__lte=to_dt,
-    ).order_by('employment__position_id', 'worker__last_name', 'worker__first_name', 'employment__tabel_code', 'dt')
+    ).order_by('employment__position_id', 'worker__last_name', 'worker__first_name', 'employment__tabel_code', 'employment__id', 'dt')
 
     wd_stat = wd_stat_count(workdays, shop)
     working_hours = {}
