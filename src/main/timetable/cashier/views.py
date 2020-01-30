@@ -511,7 +511,7 @@ def get_cashier_info(request, form):
         response['constraints_info'] = Converter.convert(
             constraints, 
             WorkerConstraint, 
-            fields=['id', 'worker_id', 'eployment__week_availability', 'weekday', 'tm', 'is_lite'],
+            fields=['id', 'worker_id', 'employment__week_availability', 'weekday', 'tm', 'is_lite'],
             out_array=True,
         )
         response['shop_times'] = {
