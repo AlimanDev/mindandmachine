@@ -129,7 +129,11 @@ def get_cashboxes(request, form):
     converted_work_types = Converter.convert(
         work_types, 
         WorkType, 
-        fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'work_type_name__name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+        fields=[
+            'id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'work_type_name__name',
+            'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'
+        ],
+        out_array=True,
     )
     return JsonResponse.success({
         'work_types': {x['id']: x for x in converted_work_types},
@@ -137,6 +141,7 @@ def get_cashboxes(request, form):
             cashboxes, 
             Cashbox, 
             fields=['id', 'dttm_added', 'dttm_deleted', 'type_id', 'name', 'bio'],
+            out_array=True,
         )
     })
 
@@ -207,7 +212,10 @@ def create_cashbox(request, form):
         'work_type': Converter.convert(
             work_type, 
             WorkType, 
-            fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'work_type_name__name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+            fields=[
+                'id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'work_type_name__name',
+                'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'
+            ],
         ),
         'cashbox': Converter.convert(
             cashbox, 
@@ -563,6 +571,7 @@ def edit_work_type(request, form):
             ), 
             OperationType, 
             fields=['id', 'operation_type_name__name', 'speed_coef', 'do_forecast', 'work_type_id'],
+            out_array=True,
         )
     })
 
