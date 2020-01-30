@@ -18,7 +18,7 @@ class GetCashiersListForm(forms.Form):
 
     def clean(self):
         if not self.cleaned_data['show_all'] \
-            and (not self.cleaned_data['dt_from'] or not self.cleaned_data['dt_to']):
+            and (not self.cleaned_data.get('dt_from') or not self.cleaned_data.get('dt_to')):
             raise ValidationError('dt_from and dt_to or show_all must be set')
 
 class SelectCashiersForm(forms.Form):

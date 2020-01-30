@@ -79,7 +79,12 @@ def get_user_urv(request, form):
         'amount_per_page': amount_per_page,
     }
     return JsonResponse.success(
-        Converter.convert(user_records.object_list, AttendanceRecords, fields=['id', 'dttm', 'user_id', 'type', 'verified']), 
+        Converter.convert(
+            user_records.object_list,
+            AttendanceRecords,
+            fields=['id', 'dttm', 'user_id', 'type', 'verified'],
+            out_array=True
+        ),
         info
     )
 

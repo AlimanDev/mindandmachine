@@ -106,7 +106,7 @@ def get_cashiers_list(request, form):
     q = Q()
     if not form['show_all']:
         q &= Q(dt_hired__isnull=True) | Q(dt_hired__lte=form['dt_to'])
-        q &= Q(dt_fired__isnull=True) | Q(dt_fired__gt=form['dt_from'])
+        q &= Q(dt_fired__isnull=True) | Q(dt_fired__gte=form['dt_from'])
 
     employments = list(Employment.objects.filter(
         shop_id=shop_id,
@@ -159,7 +159,7 @@ def get_not_working_cashiers_list(request, form):
             employment__shop_id=shop_id,
     ).filter(
         (Q(employment__dt_hired__isnull=True) | Q(employment__dt_hired__lte=form['dt_to'])) &
-        (Q(employment__dt_fired__isnull=True) | Q(employment__dt_fired__gt=form['dt_from']))
+        (Q(employment__dt_fired__isnull=True) | Q(employment__dt_fired__gte=form['dt_from']))
     ).exclude(
         type=WorkerDay.TYPE_WORKDAY
     ).order_by(
@@ -321,7 +321,7 @@ def get_cashier_timetable(request, form):
             continue
 
         worker_days_filter = WorkerDay.objects.qos_filter_version(checkpoint).select_related('employment').prefetch_related('work_types').filter(
-            Q(employment__dt_fired__gt=from_dt) &
+            Q(employment__dt_fired__gte=from_dt) &
             Q(dt__lt=F('employment__dt_fired')) |
             Q(employment__dt_fired__isnull=True),
 
@@ -391,7 +391,7 @@ def get_cashier_timetable(request, form):
         days_response = [
             {
                 'day': WorkerDayConverter.convert(wd),
-                'change_log': WorkerDayChangeLogConverter.convert(worker_day_change_log.get(wd.id, [])),
+                'change_log': WorkerDayChangeLogConverter.convert(worker_day_change_log.get(wd.id, []), out_array=True),
                 'change_requests': [],
             }
             for wd in worker_days
@@ -484,13 +484,18 @@ def get_cashier_info(request, form):
             'worker_cashbox_info': Converter.convert(
                 worker_cashbox_info, 
                 WorkerCashboxInfo, 
-                fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration']
+                fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],
+                out_array=True,
             ),
             'work_type': {
                 x['id']: x for x in Converter.convert(
                     work_types, 
                     WorkType, 
-                    fields=['id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'work_type_name__name', 'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'],
+                    fields=[
+                        'id', 'dttm_added', 'dttm_deleted', 'shop_id', 'priority', 'work_type_name__name',
+                        'probability', 'prior_weight', 'min_workers_amount', 'max_workers_amount'
+                    ],
+                    out_array=True,
                 )
             }, # todo: delete this -- seems not needed
             'min_time_between_shifts': employment.min_time_btw_shifts,
@@ -507,6 +512,7 @@ def get_cashier_info(request, form):
             constraints, 
             WorkerConstraint, 
             fields=['id', 'worker_id', 'eployment__week_availability', 'weekday', 'tm', 'is_lite'],
+            out_array=True,
         )
         response['shop_times'] = {
             'tm_start': Converter.convert_time(request.shop.tm_shop_opens),
@@ -1598,7 +1604,8 @@ def handle_worker_day_request(request, form):
 
     return JsonResponse.success()
 
+
 @api_method('GET', check_permissions=False)
 def get_worker_position_list(request):
     worker_positions = WorkerPosition.objects.all()
-    return JsonResponse.success(Converter.convert(worker_positions, WorkerPosition))
+    return JsonResponse.success(Converter.convert(worker_positions, WorkerPosition, out_array=True))

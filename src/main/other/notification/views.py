@@ -45,13 +45,13 @@ def get_notifications(request, form):
     result = dict(
         get_noty_pointer=old_notifications[-1].id if (
                     len(old_notifications) > 0 and len(old_notifications) == count) else None,
-        old_notifications=NotificationConverter.convert(old_notifications)
+        old_notifications=NotificationConverter.convert(old_notifications, out_array=True)
     )
 
     if pointer is None:
         result['get_new_noty_pointer'] = old_notifications[0].id if len(old_notifications) > 0 else -1
         # result['unread_count'] = Notifications.objects.filter(to_worker=user, was_read=False).count()
-    result['new_notifications'] = NotificationConverter.convert(Notifications.objects.mm_filter(to_worker=user, was_read=False))
+    result['new_notifications'] = NotificationConverter.convert(Notifications.objects.mm_filter(to_worker=user, was_read=False), out_array=True)
 
     return JsonResponse.success(result)
 
@@ -125,7 +125,7 @@ def get_notifications2(request, form):
     result = {
         'unread_count': Notifications.objects.filter(to_worker=request.user, was_read=False).count(),
         'next_noty_pointer': pointer + 1 if len(notifies) == count else None,
-        'notifications': NotificationConverter.convert(notifies)
+        'notifications': NotificationConverter.convert(notifies, out_array=True)
     }
     return JsonResponse.success(result)
 
