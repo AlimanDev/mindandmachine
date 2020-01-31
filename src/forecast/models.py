@@ -4,6 +4,7 @@ from src.base import models_utils
 import datetime
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel
+from src.base.models import Shop
 
 from src.timetable.models import WorkType
 
@@ -12,6 +13,8 @@ class OperationTypeName(AbstractActiveNamedModel):
         verbose_name = 'Название операции'
         verbose_name_plural = 'Названия операций'
 
+    def get_department(self):
+        return Shop.objects.filter(level=0).first() #fixme 
 
 class OperationType(AbstractActiveModel):
     class Meta:

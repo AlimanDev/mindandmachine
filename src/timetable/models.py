@@ -60,6 +60,9 @@ class WorkTypeName(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Название типа работ'
         verbose_name_plural = 'Названия типов работ'
+    
+    def get_department(self):
+        return Shop.objects.filter(level=0).first() # fixme permission костыль
 
 
 class WorkType(AbstractActiveModel):
