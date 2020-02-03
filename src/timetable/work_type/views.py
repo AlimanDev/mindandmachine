@@ -4,7 +4,7 @@ from rest_framework import serializers, viewsets
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from src.util.utils import JsonResponse
-from src.base.permissions import FilteredListPermission, Permission
+from src.base.permissions import FilteredListPermission
 from src.timetable.models import WorkType, Cashbox, WorkTypeName
 from django.db.models import Q, F
 from src.main.other.notification.utils import send_notification
@@ -52,7 +52,7 @@ class WorkTypeViewSet(viewsets.ModelViewSet):
     :return {"id": 6, ...}
 
     """
-    permission_classes = [Permission, FilteredListPermission]
+    permission_classes = [FilteredListPermission]
     serializer_class = WorkTypeSerializer
     filterset_class = WorkTypeFilter
     # queryset = self.filter_queryset(WorkType.objects.select_related('work_type_name').all())

@@ -12,7 +12,7 @@ from src.timetable.models import WorkTypeName, WorkType
 from src.base.models import FunctionGroup
 
 
-class TestWorkTypeName(APITestCase):
+class TestOperationTypeName(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
