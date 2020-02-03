@@ -4,7 +4,7 @@ from rest_framework import serializers, viewsets
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from src.util.utils import JsonResponse
-from src.base.permissions import Permission, FilteredListPermission
+from src.base.permissions import FilteredListPermission
 from src.forecast.models import OperationType, OperationTypeName
 from django.db.models import Q, F
 from src.main.other.notification.utils import send_notification
@@ -53,7 +53,7 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
     :return {"id": 6, ...}
 
     """
-    permission_classes = [Permission, FilteredListPermission]
+    permission_classes = [FilteredListPermission]
     serializer_class = OperationTypeSerializer
     filterset_class = OperationTypeFilter
 
