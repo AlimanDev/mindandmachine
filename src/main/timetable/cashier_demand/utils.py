@@ -207,11 +207,11 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
         status_list.append(WorkerDayCashboxDetails.TYPE_VACANCY)
 
     cashbox_details = WorkerDayCashboxDetails.objects.filter(
-        Q(worker_day__employment__dt_fired__gt=from_dt) &
-        Q(dttm_to__lt=F('worker_day__employment__dt_fired')) |
+        Q(worker_day__employment__dt_fired__gte=from_dt) &
+        Q(dttm_to__lte=F('worker_day__employment__dt_fired')) |
         Q(worker_day__employment__dt_fired__isnull=True),
 
-        Q(worker_day__employment__dt_hired__lt=to_dt) &
+        Q(worker_day__employment__dt_hired__lte=to_dt) &
         Q(dttm_from__gte = F('worker_day__employment__dt_hired')) |
         Q(worker_day__employment__dt_hired__isnull=True),
 

@@ -54,12 +54,13 @@ class TestApiMethod(LocalTestCase):
         self.assertResponseCodeEqual(response, 200)
 
         response = self.api_get('/api/shop/get_department?shop_id={}'.format(self.root_shop.id))
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()['code'], 403)
         self.assertResponseCodeEqual(response, 403)
 
         response = self.api_get('/api/shop/get_department?shop_id={}'.format(self.shop3.id))
         self.assertEqual(response.status_code, 403)
         self.assertResponseCodeEqual(response, 403)
+
     @skip("skiop parent level shop")
     def test_access_parent_level_shop_group(self):
         # user4 = shop admin_group - 1 level up

@@ -74,7 +74,11 @@ def get_operation_templates(request, form):
         Converter.convert(
             operation_templates, 
             OperationTemplate, 
-            fields=['id', 'name', 'tm_start', 'tm_end', 'value', 'period', 'days_in_period', 'operation_type_id', 'dt_built_to']
+            fields=[
+                'id', 'name', 'tm_start', 'tm_end', 'value', 'period',
+                'days_in_period', 'operation_type_id', 'dt_built_to'
+            ],
+            out_array=True,
         )
     )
 
