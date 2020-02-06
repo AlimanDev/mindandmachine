@@ -45,11 +45,13 @@ from src.util.models_converter import (
 def create_shop(shop_id, region_id):
     shop = Shop.objects.create(
         parent_id=shop_id,
-        name='department №1',
+        name='department',
         forecast_step_minutes=time(minute=30),
         break_triplets='[[0, 420, [30]], [420, 600, [30, 30]], [600, 900, [30, 30, 15]], [900, 1200, [30, 30, 30]]]',
         region_id=region_id,
     )
+    shop.name = f'department №{shop.id}'
+    shop.save()
     return shop
 
 
@@ -446,7 +448,9 @@ def main(date=None, shops=None, lang='ru', count_of_month=None):
     )
     fill_calendar.main('2017.1.1', '2020.1.1', region1.id)
     fill_calendar.main('2017.1.1', '2020.1.1', region2.id)
-    root_shop = Shop.objects.create(name=lang_data['root_shop'])
+    root_shop = Shop.objects.filter(level=0).first()
+    root_shop.name = lang_data['root_shop']
+    root_shop.save()
     parent_shop1 = Shop.objects.create(name=f'{lang_data["super_shop"]} № 1', parent=root_shop, region=region1)
     parent_shop2 = Shop.objects.create(name=f'{lang_data["super_shop"]} № 2', parent=root_shop, region=region2)
     operation_type_names = []
@@ -454,14 +458,12 @@ def main(date=None, shops=None, lang='ru', count_of_month=None):
     for wt in data['work_types']:
         operation_type_names.append(
             OperationTypeName.objects.create(
-                name='',
-                code='',
+                name=wt['name'],
             )
         )
         work_type_names.append(
             WorkTypeName.objects.create(
                 name=wt['name'],
-                code='',
             )
         )
     for shop_ind, shop_size in enumerate(shops, start=1):

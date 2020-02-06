@@ -23,41 +23,16 @@ class TestWorkTypeName(APITestCase):
         create_departments_and_users(self)
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
-            code='',
         )
-        WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
+        self.wt = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
         self.work_type_name2 = WorkTypeName.objects.create(
             name='Тип_кассы_2',
-            code='',
         )
         self.work_type_name3 = WorkTypeName.objects.create(
             name='Тип_кассы_3',
-            code='',
         )
         self.work_type_name4 = WorkTypeName.objects.create(
             name='тип_кассы_4',
-            code='',
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='WorkTypeName',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='WorkTypeName',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='DELETE',
-            func='WorkTypeName',
-            level_up=1,
-            level_down=99,
         )
 
         self.client.force_authenticate(user=self.user1)
@@ -70,7 +45,7 @@ class TestWorkTypeName(APITestCase):
     def test_get(self):
         response = self.client.get(f'{self.url}{self.work_type_name1.id}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        data = {'name': 'Кассы', 'code': ''}
+        data = {'name': 'Кассы', 'code': None}
         data['id'] = response.json()['id']
         self.assertEqual(response.json(), data)
 
@@ -95,12 +70,29 @@ class TestWorkTypeName(APITestCase):
         data['id'] = self.work_type_name1.id
         self.assertEqual(work_type_name, data)
 
+    def test_update_code(self):
+        data = {
+            'code': '21',
+        }
+        response = self.client.put(f'{self.url}{self.work_type_name1.id}/', data, format='json')
+        work_type_name = response.json()
+        data['id'] = self.work_type_name1.id
+        data['name'] = self.work_type_name1.name
+        self.assertEqual(work_type_name, data)
+    
+    def test_update_name(self):
+        data = {
+            'name': 'Склад',
+        }
+        response = self.client.put(f'{self.url}{self.work_type_name1.id}/', data, format='json')
+        work_type_name = response.json()
+        data['id'] = self.work_type_name1.id
+        data['code'] = self.work_type_name1.code
+        self.assertEqual(work_type_name, data)
+
     def test_delete(self):
         response = self.client.delete(f'{self.url}{self.work_type_name1.id}/')
-        work_type_name = response.json()
-        self.assertEqual(work_type_name['id'], self.work_type_name1.id)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertIsNotNone(WorkTypeName.objects.get(id=self.work_type_name1.id).dttm_deleted)
         self.assertEqual(WorkType.objects.filter(dttm_deleted__isnull=False).count(), 1)
-
-
-    
+        

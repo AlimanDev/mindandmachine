@@ -56,7 +56,6 @@ class TestCashier(LocalTestCase):
             'old_password': self.USER_PASSWORD,
             'new_password': 'new_password',
         })
-        self.assertEqual(response.status_code, 403)
         # {'error_type': 'DoesNotExist', 'error_message': 'error in api_method'}
         self.assertEqual(response.json()['code'], 403)
         # self.assertEqual(response.json()['data']['error_type'], 'AccessForbidden')
@@ -145,7 +144,7 @@ class TestCashier(LocalTestCase):
             'last_name': 'last_name',
             'birthday': date(1990, 2, 3),
         })
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['code'], 400)
         # 'error_message': "[('password', ['This field is required.'])]"
         # self.assertEqual(response.json()['code'], 200)
         # self.assertEqual(response.json()['data']['new_first_name'], 'Viktor')

@@ -1,14 +1,14 @@
 import datetime
 
-from rest_framework import serializers, viewsets
+from rest_framework import serializers, viewsets, permissions
 from rest_framework.response import Response
 from src.util.utils import JsonResponse
-
-from src.base.permissions import Permission
 from src.forecast.models import OperationTypeName, OperationType
 
 # Serializers define the API representation.
 class OperationTypeNameSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(required=False)
+    code = serializers.CharField(required=False)
     class Meta:
         model = OperationTypeName
         fields = ['id', 'name', 'code']
@@ -32,44 +32,11 @@ class OperationTypeNameViewSet(viewsets.ModelViewSet):
     PUT /rest_api/work_type_name/6, {"title": 'abcd'}
     :return {"id": 6, ...}
 
+    Note:
+    Если код не нужен с фронта отправлять code: null
+
     """
-    permission_classes = [Permission]
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = OperationTypeNameSerializer
-    queryset = OperationTypeName.objects.all()
-    
-    def create(self, request):
-        data = OperationTypeNameSerializer(data=request.data)
-        data.is_valid(raise_exception=True)
-        code = data.validated_data.get('code')
-        name = data.validated_data.get('name')
-        if code is not '' and not code:
-            return JsonResponse.value_error('Code should be defined')
-        if (OperationTypeName.objects.filter(code=code).exists() and code is not '') or \
-            OperationTypeName.objects.filter(name=name).exists():
-            return JsonResponse.already_exists_error('Operation type name with such code or name already exists')
-        data.save()
+    queryset = OperationTypeName.objects.filter(dttm_deleted__isnull=True)
 
-        return Response(data.data, status=201)
-
-    def update(self, request, pk=None):
-        operation_type_name = OperationTypeName.objects.get(pk=pk)
-        data = OperationTypeNameSerializer(instance=operation_type_name, data=request.data)
-        data.is_valid(raise_exception=True)
-        code = data.validated_data.get('code')
-        name = data.validated_data.get('name')
-        if (OperationTypeName.objects.filter(code=code).exists() and code is not '') or \
-            OperationTypeName.objects.filter(name=name).exists():
-            return JsonResponse.already_exists_error('Operation type name with such code or name already exists')
-        data.save()
-
-        return Response(data.data)
-
-    def destroy(self, request, pk=None):
-        operation_type_name = OperationTypeName.objects.get(pk=pk)
-        dt_now = datetime.datetime.now()
-        operation_type_name.dttm_deleted = dt_now
-        operation_type_name.save()
-        OperationType.objects.filter(operation_type_name__id=pk).update(
-            dttm_deleted=dt_now
-        )
-        return Response(OperationTypeNameSerializer(operation_type_name).data)

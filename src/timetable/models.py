@@ -10,7 +10,7 @@ from src.conf.djconfig import IS_PUSH_ACTIVE
 
 from src.base.models import Shop, Employment, User
 
-from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel
+from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
 
 class WorkerManager(UserManager):
     pass
@@ -39,7 +39,7 @@ class WorkerDayApprove(AbstractActiveModel):
     dt_approved = models.DateField()
 
 
-class WorkTypeManager(models.Manager):
+class WorkTypeManager(AbstractActiveModelManager):
     def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
         """
         added earlier then dt_from, deleted later then dt_to
@@ -55,20 +55,30 @@ class WorkTypeManager(models.Manager):
         ).filter(
             models.Q(dttm_deleted__date__gte=dt_to) | models.Q(dttm_deleted__isnull=True)
         ).filter(*args, **kwargs)
+    
+    def qos_delete(self, *args, **kwargs):
+        for obj in self.filter(*args, **kwargs):
+            obj.delete()
+
 
 class WorkTypeName(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Название типа работ'
         verbose_name_plural = 'Названия типов работ'
-    
-    def get_department(self):
-        return Shop.objects.filter(level=0).first() # fixme permission костыль
+
+    def delete(self):
+        dt_now = datetime.datetime.now()
+        self.dttm_deleted = dt_now
+        self.save()
+        WorkType.objects.qos_delete(work_type_name__id=self.pk)
+        return self
 
 
 class WorkType(AbstractActiveModel):
     class Meta:
         verbose_name = 'Тип работ'
         verbose_name_plural = 'Типы работ'
+        unique_together = ['shop', 'work_type_name']
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.work_type_name.name, self.shop.name, self.shop.parent.name, self.id)
@@ -90,6 +100,27 @@ class WorkType(AbstractActiveModel):
         max_length=1024,
         default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 1, "reg_lambda": 0.1, "silent": 1, "iterations": 20}'
     )
+
+    def __init__(self, *args, **kwargs):
+        code = kwargs.pop('code', None)
+        super(WorkType, self).__init__(*args, **kwargs)
+        if code:
+            self.work_type_name = WorkTypeName.objects.get(code=code)
+
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'code'):
+            self.work_type_name = WorkTypeName.objects.get(code=self.code)
+        super(WorkType, self).save(*args, **kwargs)
+        
+    def get_department(self):
+        return self.shop
+
+    def delete(self):
+        if Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True).exists():
+            raise models.ProtectedError('There is cashboxes with such work_type', Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True))
+
+        self.dttm_deleted = datetime.datetime.now()
+        self.save()
 
 
 class UserWeekdaySlot(AbstractModel):
@@ -164,7 +195,7 @@ class Cashbox(AbstractActiveNamedModel):
 
     def __str__(self):
         return '{}, {}, {}, {}, {}'.format(
-            self.type.name,
+            self.type.work_type_name.name,
             self.type.shop.name,
             self.type.shop.parent.name,
             self.id,
@@ -174,7 +205,8 @@ class Cashbox(AbstractActiveNamedModel):
     id = models.BigAutoField(primary_key=True)
 
     type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
-
+    name = models.CharField(max_length=128)
+    code = models.CharField(max_length=64, default='', blank=True)
     bio = models.CharField(max_length=512, default='', blank=True)
     objects = CashboxManager()
 

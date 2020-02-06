@@ -24,18 +24,15 @@ class TestOperationType(APITestCase):
         create_departments_and_users(self)
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
-            code='',
         )
         self.work_type1 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
         self.work_type2 = WorkType.objects.create(shop=self.shop2, work_type_name=self.work_type_name1)
 
         self.operation_type_name1 = OperationTypeName.objects.create(
             name='продажа',
-            code='',
         )
         self.operation_type_name2 = OperationTypeName.objects.create(
             name='продажа2',
-            code='',
         )
         self.operation_type_name3 = OperationTypeName.objects.create(
             name='продажа3',
@@ -89,18 +86,21 @@ class TestOperationType(APITestCase):
         response = self.client.get(f'{self.url}{self.operation_type.id}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = {
-            'name': 'продажа',
+            'operation_type_name': {
+                'id': self.operation_type_name1.id,
+                'name': self.operation_type_name1.name,
+                'code': self.operation_type_name1.code,
+            },
             'work_type_id': self.work_type1.id, 
             'do_forecast': OperationType.FORECAST_LITE, 
-            'operation_type_name_id': self.operation_type_name1.id,
             'speed_coef': 1.0,
         }
         data['id'] = response.json()['id']
         self.assertEqual(response.json(), data)
 
-    def test_create(self):
+    def test_create_with_code(self):
         data = {
-            'code': '3',
+            'code': self.operation_type_name3.code,
             'work_type_id': self.work_type1.id, 
             'do_forecast': OperationType.FORECAST_HARD, 
             'speed_coef': 3.0,
@@ -109,15 +109,37 @@ class TestOperationType(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         operation_type = response.json()
         data['id'] = operation_type['id']
-        data['name'] = 'продажа3'
-        data['operation_type_name_id'] = self.operation_type_name3.id
+        data['operation_type_name'] = {
+            'id': self.operation_type_name3.id,
+            'code': self.operation_type_name3.code,
+            'name': self.operation_type_name3.name,
+        }
         data.pop('code')
         self.assertEqual(operation_type, data)
 
-    def test_update(self):
+    def test_create_with_id(self):
+        data = {
+            'operation_type_name_id': self.operation_type_name3.id,
+            'work_type_id': self.work_type1.id, 
+            'do_forecast': OperationType.FORECAST_HARD, 
+            'speed_coef': 3.0,
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        operation_type = response.json()
+        data['id'] = operation_type['id']
+        data['operation_type_name'] = {
+            'id': self.operation_type_name3.id,
+            'code': self.operation_type_name3.code,
+            'name': self.operation_type_name3.name,
+        }
+        data.pop('operation_type_name_id')
+        self.assertEqual(operation_type, data)
+
+    def test_update_by_code(self):
         data = {
             'speed_coef': 2.0,
-            'code': '3',
+            'code': self.operation_type_name3.code,
         }
         response = self.client.put(f'{self.url}{self.operation_type.id}/', data, format='json')
         operation_type = response.json()
@@ -125,16 +147,38 @@ class TestOperationType(APITestCase):
             'id': self.operation_type.id, 
             'work_type_id': self.work_type1.id, 
             'do_forecast': OperationType.FORECAST_LITE,
-            'operation_type_name_id': self.operation_type_name3.id,
+            'operation_type_name': {
+                'id': self.operation_type_name3.id,
+                'name': self.operation_type_name3.name,
+                'code': self.operation_type_name3.code,
+            },
             'speed_coef': 2.0,
-            'name': 'продажа3',
+        }
+        self.assertEqual(operation_type, data)
+
+    def test_update_by_id(self):
+        data = {
+            'speed_coef': 2.0,
+            'operation_type_name_id': self.operation_type_name3.id,
+        }
+        response = self.client.put(f'{self.url}{self.operation_type.id}/', data, format='json')
+        operation_type = response.json()
+        data = {
+            'id': self.operation_type.id, 
+            'work_type_id': self.work_type1.id, 
+            'do_forecast': OperationType.FORECAST_LITE,
+            'operation_type_name': {
+                'id': self.operation_type_name3.id,
+                'name': self.operation_type_name3.name,
+                'code': self.operation_type_name3.code,
+            },
+            'speed_coef': 2.0,
         }
         self.assertEqual(operation_type, data)
 
     def test_delete(self):
         response = self.client.delete(f'{self.url}{self.operation_type.id}/')
-        operation_type = response.json()
-        self.assertEqual(operation_type['id'], self.operation_type.id)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertIsNotNone(OperationType.objects.get(id=self.operation_type.id).dttm_deleted)
 
 
