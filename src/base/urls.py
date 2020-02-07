@@ -1,7 +1,7 @@
 from django.conf.urls import url, include
 from rest_framework import routers, urls
 from src.base.shop.views import ShopViewSet
-from src.base.views import EmploymentViewSet, UserViewSet, AuthUserView
+from src.base.views import EmploymentViewSet, UserViewSet, FunctionGroupView, AuthUserView
 
 from rest_auth.views import (
     LoginView, LogoutView, PasswordChangeView
@@ -12,6 +12,7 @@ rest_auth_urls = [
     url(r'^logout/$', LogoutView.as_view(), name='rest_logout'),
     url(r'^password/change/$', PasswordChangeView.as_view(), name='rest_password_change'),
     url(r'^user/$', AuthUserView.as_view(), name='user'),
+    url(r'^allowed_functions/$', FunctionGroupView.as_view(), name='user'),
 ]
 
 # Routers provide an easy way of automatically determining the URL conf.
@@ -24,7 +25,7 @@ router.register(r'user', UserViewSet, basename='User')
 # Wire up our API using automatic URL routing.
 # Additionally, we include login URLs for the browsable API.
 urlpatterns = [
+    url(r'^auth/', include((rest_auth_urls,'auth'),namespace='auth')),
     url(r'^', include(router.urls)),
-    url(r'^auth/', include(rest_auth_urls)),
-    url(r'^api-auth/', include(urls))
+    url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
 ]

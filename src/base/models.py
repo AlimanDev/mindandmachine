@@ -334,6 +334,7 @@ class FunctionGroup(AbstractModel):
         'Employment',
         'User',
         'AuthUserView',
+        'FunctionGroupView',
 
         'signout',
         'password_edit',

@@ -6,7 +6,7 @@ from django.db.models import Q, Sum
 from django.utils import six
 from django_filters.rest_framework import FilterSet
 
-from rest_framework import serializers, viewsets
+from rest_framework import serializers, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -77,7 +77,7 @@ class ShopViewSet(viewsets.ModelViewSet):
 
     GET /rest_api/department/stat?id=6
     """
-    permission_classes = [Permission]
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
 

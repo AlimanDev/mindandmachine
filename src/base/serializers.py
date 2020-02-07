@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from src.base.models import  Employment, User
+from src.base.models import  Employment, User, FunctionGroup
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -7,6 +7,12 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name',
                   'birthday', 'sex', 'avatar', 'phone_number']
+
+
+class FunctionGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FunctionGroup
+        fields = [ 'id', 'group_id', 'func', 'method']
 
 
 class EmploymentSerializer(serializers.ModelSerializer):
