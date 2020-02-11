@@ -77,7 +77,8 @@ def check_func_groups():
         'WorkTypeNameViewSet',
         'WorkTypeViewSet',
         'OperationTypeNameViewSet',
-        'OperationTypeViewSet'
+        'OperationTypeViewSet',
+        'PeriodClientsViewSet',
 
     ]
 

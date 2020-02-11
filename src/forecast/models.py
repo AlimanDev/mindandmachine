@@ -2,6 +2,7 @@ from django.db import models
 
 from src.base import models_utils
 import datetime
+from django.utils import timezone
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel
 from src.base.models import Shop
@@ -14,11 +15,9 @@ class OperationTypeName(AbstractActiveNamedModel):
         verbose_name_plural = 'Названия операций'
 
     def delete(self):
-        dt_now = datetime.datetime.now()
-        self.dttm_deleted = dt_now
-        self.save()
+        super(OperationTypeName, self).delete()
         OperationType.objects.filter(operation_type_name__id=self.pk).update(
-            dttm_deleted=dt_now
+            dttm_deleted=timezone.now()
         )
         return self
 

@@ -1,6 +1,5 @@
 from django.db import models
 from django.utils import timezone
-import datetime
 
 class AbstractModelManager(models.Manager):
     pass
@@ -52,7 +51,7 @@ class AbstractActiveModel(AbstractModel):
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
     def delete(self):
-        self.dttm_deleted = datetime.datetime.now()
+        self.dttm_deleted = timezone.now()
         self.save()
 
         return self

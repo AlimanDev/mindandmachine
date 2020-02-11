@@ -67,9 +67,7 @@ class WorkTypeName(AbstractActiveNamedModel):
         verbose_name_plural = 'Названия типов работ'
 
     def delete(self):
-        dt_now = datetime.datetime.now()
-        self.dttm_deleted = dt_now
-        self.save()
+        super(WorkTypeName, self).delete()
         WorkType.objects.qos_delete(work_type_name__id=self.pk)
         return self
 
@@ -118,9 +116,10 @@ class WorkType(AbstractActiveModel):
     def delete(self):
         if Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True).exists():
             raise models.ProtectedError('There is cashboxes with such work_type', Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True))
-
-        self.dttm_deleted = datetime.datetime.now()
-        self.save()
+        
+        super(WorkType, self).delete()
+        # self.dttm_deleted = datetime.datetime.now()
+        # self.save()
 
 
 class UserWeekdaySlot(AbstractModel):

@@ -337,6 +337,10 @@ class FunctionGroup(AbstractModel):
         'WorkType',
         'OperationTypeName',
         'OperationType',
+        'PeriodClients',
+        'PeriodClients_indicators',
+        'PeriodClients_put',
+        'PeriodClients_delete',
 
         'signout',
         'password_edit',
