@@ -79,7 +79,7 @@ class TestDemand(APITestCase):
         self.work_type4 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name4)
         self.work_type5 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name5)
         
-        self.date = datetime.now().date()
+        self.date = datetime.now().date() + timedelta(days=1)
         op_type_name = OperationTypeName.objects.create(
             name='O_TYPE',
         )
@@ -286,7 +286,7 @@ class TestDemand(APITestCase):
             dttm_forecast__lte=datetime(2019, 9, 1, 11, 30),
             operation_type_id=self.o_type_5.id
         ).values('dttm_forecast', 'value', 'operation_type_id', 'type')), correct_data)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 201)
         #self.assertEqual(Event.objects.first().text, f'Cоставлен новый спрос на период с {Converter.convert_date(datetime(2019, 9, 1))} по {Converter.convert_date(datetime(2019, 11, 2))}')
 
     def test_create_fact(self):
@@ -329,7 +329,7 @@ class TestDemand(APITestCase):
             dttm_forecast__lte=datetime(2019, 9, 1, 11, 30),
             operation_type_id=self.o_type_5.id
         ).values('dttm_forecast', 'value', 'operation_type_id', 'type')), correct_data)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 201)
 
     def test_update_value(self):
         for op in self.o_types:
@@ -337,7 +337,7 @@ class TestDemand(APITestCase):
             op.save()
         self.data['set_value'] = 20
         response = self.client.put(f'{self.url}put/', data=self.data)
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 200)
         correct_data = [20.0, 20.0, 20.0, 10.0, 20.0]
         self.assertEqual(
             list(PeriodClients.objects.filter(
@@ -400,7 +400,7 @@ class TestDemand(APITestCase):
                 'value': 30.0
             }
         ]
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(list(PeriodClients.objects.filter(
                 operation_type__work_type__shop_id=self.shop.id,
                 operation_type_id=self.o_type_4.id
@@ -415,7 +415,7 @@ class TestDemand(APITestCase):
         
         self.data['multiply_coef'] = 0.2
         response = self.client.put(f'{self.url}put/', data=self.data)
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 200)
         operations_count_before = PeriodClients.objects.filter(operation_type__work_type__shop_id=self.shop.id).count()
         self.assertEqual(
             PeriodClients.objects.filter(operation_type__work_type__shop_id=self.shop.id).count(),
@@ -468,7 +468,7 @@ class TestDemand(APITestCase):
                 'value': 20.0
             }
         ]
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(list(PeriodClients.objects.filter(
             operation_type__work_type__shop_id=self.shop.id,
             operation_type_id=self.o_type_4.id,

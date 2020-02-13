@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, time
-from rest_framework import serializers, viewsets
+from rest_framework import serializers, viewsets, status
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from django_filters import DateFilter, NumberFilter
@@ -24,6 +24,16 @@ class PeriodClientsDeleteSerializer(serializers.Serializer):
 class PeriodClientsUpdateSerializer(PeriodClientsDeleteSerializer):
     multiply_coef = serializers.FloatField(required=False)
     set_value = serializers.FloatField(required=False)
+
+    def is_valid(self, *args, **kwargs):
+        super(PeriodClientsUpdateSerializer, self).is_valid(*args, **kwargs)
+
+        if self.validated_data.get('from_dttm') > self.validated_data.get('to_dttm'):
+            raise serializers.ValidationError('Дата начала не может быть больше даты окончания')
+
+        if self.validated_data.get('from_dttm') < datetime.now() and \
+            (self.validated_data.get('type') is 'L' or self.validated_data.get('type') is 'S'):
+            raise serializers.ValidationError('Нельзя изменить прогноз спроса за прошлый период')
 
 
 class PeriodClientsSerializer(serializers.ModelSerializer):
@@ -54,23 +64,72 @@ class PeriodClientsFilter(FilterSet):
 class PeriodClientsViewSet(viewsets.ModelViewSet):
     """
 
-    GET /rest_api/operation_type/?shop_id=6
-    :return [{"id":2, ...},{"id":3, ...}]
-
-    GET /rest_api/operation_type/
-    :return [   {"id": 1, ...}
-        {"id": 2, ...}, ...
+    GET /rest_api/period_clients/
+    :params
+        shop_id: int, required=True,
+        dt_from: QOS_DATE_FORMAT, required=True,
+        dt_to: QOS_DATE_FORMAT, required=True,
+        type: (L, Q, S), required=True,
+        operation_type_id: int, required=False,
+        operation_type_id__in: int,int,... , required=False,
+    :return [
+        {
+            "dttm_forecast":2020-01-01T00:00:00, 
+            "value": 2.0,
+            
+        },
+        ...
+        {
+            "dttm_forecast":2020-01-03T23:00:00, 
+            "value": 2.0,
+            
+        },
     ]
 
-    GET /rest_api/operation_type/6/
-    :return {"id": 6, ...}
+
+    GET /rest_api/period_clients/indicators/
+    :params
+        shop_id: int, required=True,
+        dt_from: QOS_DATE_FORMAT, required=True,
+        dt_to: QOS_DATE_FORMAT, required=True,
+        type: (L, F, S), required=True,
+        operation_type_id: int, required=False,
+        operation_type_id__in: int,int,... , required=False,
+        work_type_id: int, requred=False,
+    :return {
+        "overall_operations": 255.3, 
+        "fact_overall_operations": 240.8,
+    }
 
 
-    POST /rest_api/operation_type/, {"name": 'abcd'}
-    :return {"id": 10, ...}
+    POST /rest_api/period_clietns/
+    :params
+        data: JSON, required=True,
+    :return 
+        code=201
 
-    PUT /rest_api/operation_type/6, {"name": 'abcd'}
-    :return {"id": 6, ...}
+    PUT /rest_api/period_clietns/put/
+    :params
+        operation_type_id: list(int), requeired=False,
+        from_dttm: QOS_DATETIME_FORMAT, required=True,
+        to_dttm: QOS_DATETIME_FORMAT, required=True,
+        shop_id: int, required=True,
+        type: (L, F, S), required=True,
+        multiply_coef: float, required=False,
+        set_value: float, required=False
+    :return
+        code=200
+
+
+    DELETE /rest_api/period_Clients/delete/
+    :params
+        operation_type_id: list(int), requeired=False,
+        from_dttm: QOS_DATETIME_FORMAT, required=True,
+        to_dttm: QOS_DATETIME_FORMAT, required=True,
+        shop_id: int, required=True,
+        type: (L, F, S), required=True
+    :return
+        code=204
 
     """
     permission_classes = [FilteredListPermission]
@@ -126,7 +185,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         #     department=shop,
         # )
 
-        return JsonResponse.success()
+        return Response(status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['put'])
     def put(self, request, pk=None):
@@ -209,7 +268,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
                 set_value=set_value
             )
 
-        return Response(status=201)
+        return Response(status=200)
 
     @action(detail=False, methods=['delete'])
     def delete(self, request, pk=None):
