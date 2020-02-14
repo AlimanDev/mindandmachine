@@ -52,9 +52,9 @@ class OperationTemplateViewSet(viewsets.ModelViewSet):
 
     GET /rest_api/operation_template/
     :params
-        shop_id: int, required=False,
-        operation_type_id: int, required=False,
-        operation_type_id__in: int,int,... , required=False,
+        shop_id: int, required=False
+        operation_type_id: int, required=False
+        operation_type_id__in: int,int,... , required=False
     :return [
         {
             'id': 1, 
