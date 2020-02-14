@@ -175,6 +175,9 @@ class OperationTemplate(AbstractActiveNamedModel):
             dt_from += datetime.timedelta(days=1)
             day = lambda_get_day(dt_from)
 
+    def get_department(self):
+        return self.operation_type.work_type.shop
+
 
 class PeriodClients(AbstractModel):
     LONG_FORECASE_TYPE = 'L'

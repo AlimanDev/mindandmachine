@@ -51,6 +51,12 @@ class AbstractActiveModel(AbstractModel):
     dttm_added = models.DateTimeField(default=timezone.now)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
+    def delete(self):
+        self.dttm_deleted = timezone.now()
+        self.save()
+
+        return self
+
     # dttm_modified = models.DateTimeField(null=True, blank=True)
     # changed_by = models.IntegerField(null=True, blank=True)  # вообще на User ссылка
 
