@@ -32,23 +32,106 @@ class WorkTypeFilter(FilterSet):
 class WorkTypeViewSet(viewsets.ModelViewSet):
     """
 
-    GET /rest_api/work_type/?shop_id=6
-    :return [{"id":2, ...},{"id":3, ...}]
-
     GET /rest_api/work_type/
-    :return [   {"id": 1, ...}
-        {"id": 2, ...}, ...
+    :params
+        shop_id: int, required=False
+    :return [
+        {
+            "id": 2,
+            "priority": 23,
+            "dttm_last_update_queue": None,
+            "min_workers_amount": 2,
+            "max_workers_amount": 10,
+            "probability": 2.0,
+            "prior_weigth": 1.0,
+            "shop_id": 1,
+            "work_type_name":{
+                "id": 1,
+                "name": "Work type",
+                "code": "1",
+            }
+        },
+        ...
     ]
 
+
     GET /rest_api/work_type/6/
-    :return {"id": 6, ...}
+    :return {
+        "id": 6,
+        "priority": 23,
+        "dttm_last_update_queue": None,
+        "min_workers_amount": 2,
+        "max_workers_amount": 10,
+        "probability": 2.0,
+        "prior_weigth": 1.0,
+        "shop_id": 1,
+        "work_type_name":{
+            "id": 1,
+            "name": "Work type",
+            "code": "1",
+        }
+    }
 
 
-    POST /rest_api/work_type/, {"title": 'abcd'}
-    :return {"id": 10, ...}
+    POST /rest_api/work_type/
+    :params
+        priority: int, required=False
+        min_workers_amount: int, required=False
+        max_workers_amount: int, required=False
+        probability: float, required=Fasle
+        prior_weigth: float, required=False
+        shop_id: int, required=True
+        code: str, required=False
+        work_type_name_id: int, required=False
+    :return 
+        code 201
+        {
+            "id": 6,
+            "priority": 23,
+            "dttm_last_update_queue": None,
+            "min_workers_amount": 2,
+            "max_workers_amount": 10,
+            "probability": 2.0,
+            "prior_weigth": 1.0,
+            "shop_id": 1,
+            "work_type_name":{
+                "id": 1,
+                "name": "Work type",
+                "code": "1",
+            }
+        }
 
-    PUT /rest_api/work_type/6, {"title": 'abcd'}
-    :return {"id": 6, ...}
+
+    PUT /rest_api/work_type/6/
+    :params
+        priority: int, required=False
+        min_workers_amount: int, required=False
+        max_workers_amount: int, required=False
+        probability: float, required=Fasle
+        prior_weigth: float, required=False
+        shop_id: int, required=True
+        code: str, required=False
+        work_type_name_id: int, required=False
+    :return {
+        "id": 6,
+        "priority": 23,
+        "dttm_last_update_queue": None,
+        "min_workers_amount": 2,
+        "max_workers_amount": 10,
+        "probability": 2.0,
+        "prior_weigth": 1.0,
+        "shop_id": 1,
+        "work_type_name":{
+            "id": 1,
+            "name": "Work type",
+            "code": "1",
+        }
+    }
+
+
+    DELETE /rest_api/work_type/6/
+    :return
+        code 204
 
     """
     permission_classes = [FilteredListPermission]

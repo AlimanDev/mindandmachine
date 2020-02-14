@@ -79,7 +79,7 @@ class TestOperationType(APITestCase):
     def test_get_list(self):
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&work_type_id={self.work_type1.id}')
         self.assertEqual(len(response.json()), 2)
-        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&work_type__shop_id={self.shop.id}')
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}')
         self.assertEqual(len(response.json()), 2)
 
     def test_get(self):

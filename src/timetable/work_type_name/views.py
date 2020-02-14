@@ -20,19 +20,51 @@ class WorkTypeNameViewSet(viewsets.ModelViewSet):
     """
 
     GET /rest_api/work_type_name/
-    :return [   {"id": 1, "title": Abcd, "code": "1"}
-        {"id": 2, "title": Aaaa, "code": "2"}, ...
+    :return [   
+        {
+            "id": 1, 
+            "name": "Abcd", 
+            "code": "1"
+        },
+        ...
     ]
 
+
     GET /rest_api/work_type_name/6/
-    :return {"id": 6, ...}
+    :return {
+        "id": 6,
+        "name": "Abcde", 
+        "code": "6"
+    }
 
 
-    POST /rest_api/work_type_name/, {"title": 'abcd'}
-    :return {"id": 10, ...}
+    POST /rest_api/work_type_name/
+    :params
+        name: str, required=True
+        code: str, required=False
+    :return 
+        code 201
+        {
+            "id": 6,
+            "name": "Abcde", 
+            "code": "6"
+        }
 
-    PUT /rest_api/work_type_name/6, {"title": 'abcd'}
-    :return {"id": 6, ...}
+
+    PUT /rest_api/work_type_name/6/
+    :params
+        name: str, required=False
+        code: str, required=False
+    :return {
+        "id": 6,
+        "name": "Abcde", 
+        "code": "6"
+    }
+
+
+    DELETE /rest_api/work_type_name/6/
+    :return
+        code 204
 
     """
     permission_classes = [permissions.IsAuthenticated]
