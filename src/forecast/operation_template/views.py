@@ -71,7 +71,7 @@ class OperationTemplateViewSet(viewsets.ModelViewSet):
     ]
 
 
-    GET /rest_api/operation_template/1
+    GET /rest_api/operation_template/1/
     :return {
             'id': 1, 
             'operation_type_id': 1, 
@@ -98,7 +98,7 @@ class OperationTemplateViewSet(viewsets.ModelViewSet):
         operation_type_id: int, required=True,
         dt_built_to: QOS_DATE_FORMAT, required=False
     :return 
-        :code=201
+        code 201
         {
             'id': 1, 
             'operation_type_id': 1, 
@@ -113,7 +113,7 @@ class OperationTemplateViewSet(viewsets.ModelViewSet):
         }
 
 
-    PUT /rest_api/operation_template/
+    PUT /rest_api/operation_template/1/
     :params
         value: float, required=True
         name: str, required=True
@@ -140,9 +140,9 @@ class OperationTemplateViewSet(viewsets.ModelViewSet):
         }
 
 
-    DELETE /rest_api/operation_template/1
+    DELETE /rest_api/operation_template/1/
     :return
-        code=204
+        code 204
 
     """
     permission_classes = [FilteredListPermission]
