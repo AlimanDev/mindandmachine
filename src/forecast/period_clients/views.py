@@ -69,7 +69,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         shop_id: int, required=True,
         dt_from: QOS_DATE_FORMAT, required=True,
         dt_to: QOS_DATE_FORMAT, required=True,
-        type: (L, Q, S), required=True,
+        type: (L, F, S), required=True,
         operation_type_id: int, required=False,
         operation_type_id__in: int,int,... , required=False,
     :return [
@@ -134,6 +134,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
     """
     permission_classes = [FilteredListPermission]
     filterset_class = PeriodClientsFilter
+    serializer_class = PeriodClientsSerializer
 
     def get_queryset(self):
         return self.filter_queryset(PeriodClients.objects.all())
