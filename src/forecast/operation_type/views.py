@@ -10,12 +10,14 @@ from src.forecast.models import OperationType, OperationTypeName
 from django.db.models import Q, F
 from src.forecast.operation_type_name.views import OperationTypeNameSerializer
 
+
 # Serializers define the API representation.
 class OperationTypeSerializer(serializers.ModelSerializer):
     operation_type_name = OperationTypeNameSerializer(required=False)
     work_type_id = serializers.IntegerField(required=False)
     code = serializers.CharField(required=False, write_only=True)
     operation_type_name_id = serializers.IntegerField(write_only=True, required=False)
+
     class Meta:
         model = OperationType
         fields = ['id', 'work_type_id', 'speed_coef', 'do_forecast', 'operation_type_name', 'code', 'operation_type_name_id']
