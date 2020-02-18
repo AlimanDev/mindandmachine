@@ -101,12 +101,13 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
     permission_name = 'department'
-    queryset = WorkerDay.objects.all()
+    queryset = WorkerDay.objects.qos_filter_version(1)
     filter_backends = [MultiShopsFilterBackend]
     # filter_backends = [DjangoFilterBackend]
 
     def list(self, request,  *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
+        queryset = self.get_queryset()#.qos_filter_version(1)
+        queryset = self.filter_queryset(queryset)
 
         page = self.paginate_queryset(queryset)
         if page is not None:
