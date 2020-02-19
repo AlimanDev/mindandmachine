@@ -227,7 +227,7 @@ class WorkTypeConverter(Converter):
             'dttm_deleted': cls.convert_datetime(obj.dttm_deleted),
             'shop': obj.shop_id,
             'priority': obj.priority,
-            'work_type_name_name': obj.work_type_name.name,
+            'name': obj.work_type_name.name,
             'probability': obj.probability, #change front and algo
             'prior_weight': obj.prior_weight,
             'min_workers_amount': obj.min_workers_amount,

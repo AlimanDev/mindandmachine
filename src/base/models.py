@@ -335,6 +335,15 @@ class FunctionGroup(AbstractModel):
         'User',
         'AuthUserView',
         'FunctionGroupView',
+        'WorkTypeName',
+        'WorkType',
+        'OperationTypeName',
+        'OperationType',
+        'PeriodClients',
+        'PeriodClients_indicators',
+        'PeriodClients_put',
+        'PeriodClients_delete',
+>>>>>>> master
 
         'signout',
         'password_edit',

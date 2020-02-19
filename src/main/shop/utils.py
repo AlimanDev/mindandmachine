@@ -159,7 +159,10 @@ def get_shop_list_stats(form, request, display_format='raw'):
         converted_ss = Converter.convert(
             ss, 
             Shop, 
-            fields=['id', 'parent_id', 'name', 'tm_shop_opens', 'tm_shop_closes', 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone'],
+            fields=[
+                'id', 'parent_id', 'name', 'tm_shop_opens', 'tm_shop_closes', 'code',
+                'address', 'type', 'dt_opened', 'dt_closed', 'timezone'
+            ],
             custom_converters={'timezone':lambda x: x.zone},
         )
         #  откидываем лишние данные типа title, tm_start, tm_end, ...

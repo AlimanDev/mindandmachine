@@ -144,7 +144,7 @@ class JsonResponse(object):
                 cls=DjangoJSONEncoder,
             ),
             content_type='application/json',
-            status=code,
+            #status=code,
         )
 
 

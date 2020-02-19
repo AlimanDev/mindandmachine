@@ -19,7 +19,7 @@ from src.main.urv import urls as urv_urls
 from src.conf.djconfig import DEBUG
 from src.base import urls as base_api
 from src.timetable import urls as timetable_api
-
+from src.forecast import urls as forecast_api
 
 
 api_urlpatterns = [
@@ -43,7 +43,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('rest_api/', include(
         base_api.urlpatterns +
-        timetable_api.urlpatterns)),
+        timetable_api.urlpatterns +
+        forecast_api.urlpatterns)),
 ]
 
 if settings.QOS_DEV_STATIC_ENABLED:
