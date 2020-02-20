@@ -22,7 +22,6 @@ from src.timetable import urls as timetable_api
 from src.forecast import urls as forecast_api
 
 
-
 api_urlpatterns = [
     path('auth/', include(auth_urls)),
     # path('camera/', include(camera_urls)),

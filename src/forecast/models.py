@@ -2,8 +2,10 @@ from django.db import models
 
 from src.base import models_utils
 import datetime
+from django.utils import timezone
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel
+from src.base.models import Shop
 
 from src.timetable.models import WorkType
 
@@ -12,14 +14,22 @@ class OperationTypeName(AbstractActiveNamedModel):
         verbose_name = 'Название операции'
         verbose_name_plural = 'Названия операций'
 
+    def delete(self):
+        super(OperationTypeName, self).delete()
+        OperationType.objects.filter(operation_type_name__id=self.pk).update(
+            dttm_deleted=timezone.now()
+        )
+        return self
+
 
 class OperationType(AbstractActiveModel):
     class Meta:
         verbose_name = 'Тип операции'
         verbose_name_plural = 'Типы операций'
+        unique_together = ['work_type', 'operation_type_name']
 
     def __str__(self):
-        return 'id: {}, name: {}, work type: {}'.format(self.id, self.name, self.work_type)
+        return 'id: {}, name: {}, work type: {}'.format(self.id, self.operation_type_name.name, self.work_type)
 
 
     FORECAST_HARD = 'H'
@@ -44,6 +54,20 @@ class OperationType(AbstractActiveModel):
         max_length=1024,
         default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 200, "reg_lambda": 2, "silent": 1, "iterations": 20}'
     )
+
+    def __init__(self, *args, **kwargs):
+        code = kwargs.pop('code', None)
+        super(OperationType, self).__init__(*args, **kwargs)
+        if code:
+            self.operation_type_name = OperationTypeName.objects.get(code=code)
+
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'code'):
+            self.operation_type_name = OperationTypeName.objects.get(code=self.code)
+        super(OperationType, self).save(*args, **kwargs)
+
+    def get_department(self):
+        return self.work_type.shop
 
 
 class OperationTemplate(AbstractActiveNamedModel):
@@ -101,6 +125,8 @@ class OperationTemplate(AbstractActiveNamedModel):
     tm_start = models.TimeField()
     tm_end = models.TimeField()
     value = models.FloatField()
+    name = models.CharField(max_length=128)
+    code = models.CharField(max_length=64, default='', blank=True)
 
     period = models.CharField(
         max_length=1,

@@ -1,7 +1,6 @@
 from django.db import models
 from django.utils import timezone
 
-
 class AbstractModelManager(models.Manager):
     pass
 
@@ -75,8 +74,8 @@ class AbstractActiveNamedModel(AbstractActiveModel):
     class Meta:
         abstract = True
 
-    name = models.CharField(max_length=128)
-    code = models.CharField(max_length=64, default='')
+    name = models.CharField(max_length=128, unique=True)
+    code = models.CharField(max_length=64, unique=True, null=True, blank=True)
 
     objects = AbstractActiveNamedModelManager()
 
