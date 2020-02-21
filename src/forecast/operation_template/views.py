@@ -1,16 +1,12 @@
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta
 from rest_framework import serializers, viewsets, status
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from django_filters import DateFilter, NumberFilter
 from src.base.permissions import FilteredListPermission
-from src.forecast.models import OperationType, OperationTemplate
-from django.db.models import Q, F, Sum
+from src.forecast.models import OperationTemplate
 from src.conf.djconfig import QOS_DATE_FORMAT, QOS_TIME_FORMAT
-from rest_framework.decorators import action
-from src.base.models import Shop, Employment, FunctionGroup
-from src.util.models_converter import Converter
-from src.main.operation_template.utils import build_period_clients
+from src.forecast.operation_template.utils import build_period_clients
 
 
 # Serializers define the API representation.
@@ -27,14 +23,12 @@ class OperationTemplateSerializer(serializers.ModelSerializer):
 
     def is_valid(self, *args, **kwargs):
         super(OperationTemplateSerializer, self).is_valid(*args, **kwargs)
-        if self.validated_data.get('period') == OperationTemplate.PERIOD_WEEKLY:
-            for d in self.validated_data.get('days_in_period'):
-                if d < 1 or d > 7:
-                    raise serializers.ValidationError('Перечисленные дни не соответствуют периоду')
-        elif self.validated_data.get('period') == OperationTemplate.PERIOD_MONTHLY:
-            for d in self.validated_data.get('days_in_period'):
-                if d < 1 or d > 31:
-                    raise serializers.ValidationError('Перечисленные дни не соответствуют периоду')
+        ot = OperationTemplate(
+            period=self.validated_data.get('period'),
+            days_in_period=self.validated_data.get('days_in_period'),
+        )
+        if not ot.check_days_in_period():
+            raise serializers.ValidationError('Перечисленные дни не соответствуют периоду')
 
 
 class OperationTemplateFilter(FilterSet):
@@ -185,3 +179,10 @@ class OperationTemplateViewSet(viewsets.ModelViewSet):
         dt_from = datetime.now().date() + timedelta(days=2)
         build_period_clients(operation_template, dt_from=dt_from, operation='delete')
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def create(self, request):
+        operation_template = OperationTemplateSerializer(data=request.data)
+        operation_template.is_valid(raise_exception=True)
+        operation_template.save()
+        build_period_clients(operation_template.instance, dt_from=datetime.now().date())
+        return Response(status=status.HTTP_201_CREATED, data=operation_template.data)

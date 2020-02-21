@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta, time
 from rest_framework import status
 from rest_framework.test import APITestCase
-
+from dateutil.relativedelta import relativedelta
 from src.util.test import create_departments_and_users
-
+from src.util.models_converter import Converter
 from src.forecast.models import OperationTypeName, OperationType, OperationTemplate
 from src.timetable.models import WorkTypeName, WorkType
 from src.base.models import FunctionGroup
@@ -145,7 +145,7 @@ class TestOperationTemplate(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         operation_template = response.json()
         data['id'] = operation_template['id']
-        data['dt_built_to'] = None
+        data['dt_built_to'] = Converter.convert_date(datetime.now().date() + relativedelta(months=2) + timedelta(days=4))
         data['code'] = ''
         self.assertEqual(operation_template, data)
 
