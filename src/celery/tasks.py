@@ -31,7 +31,7 @@ from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
     WorkerCashboxInfo,
-    Timetable,
+    ShopMonthStat,
     ExchangeSettings,
 )
 from src.base.models import (
@@ -308,7 +308,7 @@ def update_shop_stats(dt=None):
     if not dt:
         dt = date.today().replace(day=1)
     shops = Shop.objects.filter(dttm_deleted__isnull=True)
-    tts = Timetable.objects.filter(shop__in=shops, dt__gte=dt, status=Timetable.READY)
+    tts = ShopMonthStat.objects.filter(shop__in=shops, dt__gte=dt, status=ShopMonthStat.READY)
     for timetable in tts:
         stats = get_shop_stats(
             shop_id=timetable.shop_id,

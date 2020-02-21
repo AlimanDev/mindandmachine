@@ -31,7 +31,7 @@ from src.timetable.models import (
     WorkTypeName,
     Cashbox,
     AttendanceRecords,
-    Timetable,
+    ShopMonthStat,
     Notifications,
     Employment,
 )
@@ -54,8 +54,8 @@ def create_shop(shop_id, region_id):
     shop.save()
     return shop
 
-
-def create_timetable(shop_id, dttm):
+ShopMonthStat
+def create_timeShopMonthStatp_id, dttm):
     tt = Timetable.objects.create(
         status=Timetable.READY,
         shop_id=shop_id,

@@ -680,20 +680,22 @@ class Notifications(AbstractModel):
     objects = NotificationManager()
 
 
-class Timetable(AbstractModel):
+class ShopMonthStat(AbstractModel):
     class Meta(object):
         unique_together = (('shop', 'dt'),)
-        verbose_name = 'Расписание'
-        verbose_name_plural = 'Расписания'
+        verbose_name = 'Статистика по мгазину за месяц'
+        verbose_name_plural = 'Статистики по мгазинам за месяц'
 
     READY = 'R'
     PROCESSING = 'P'
     ERROR = 'E'
+    NOT_DONE = 'N'
 
     STATUS = [
         (READY, 'Готово'),
         (PROCESSING, 'В процессе'),
-        (ERROR, 'Ошибка')
+        (ERROR, 'Ошибка'),
+        (NOT_DONE, 'Не составлялось'),
     ]
 
     def __str__(self):
@@ -708,7 +710,7 @@ class Timetable(AbstractModel):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='timetable')
     status_message = models.CharField(max_length=256, null=True, blank=True)
     dt = models.DateField()
-    status = models.CharField(choices=STATUS, default=PROCESSING, max_length=1)
+    status = models.CharField(choices=STATUS, default=NOT_DONE, max_length=1)
     dttm_status_change = models.DateTimeField()
 
     # statistics
