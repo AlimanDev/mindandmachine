@@ -307,9 +307,22 @@ def create_pred_bills():
 def update_shop_stats(dt=None):
     if not dt:
         dt = date.today().replace(day=1)
-    shops = Shop.objects.filter(dttm_deleted__isnull=True)
-    tts = ShopMonthStat.objects.filter(shop__in=shops, dt__gte=dt, status=ShopMonthStat.READY)
-    for timetable in tts:
+    shops = list(Shop.objects.filter(dttm_deleted__isnull=True))
+    month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, dt__gte=dt, status__in=[ShopMonthStat.READY, ShopMonthStat.NOT_DONE]))
+    if len(shops) != len(month_stats):
+        shops_with_stats = list(ShopMonthStat.objects.filter(
+            shop__in=shops, 
+            dt__gte=dt, 
+            status=ShopMonthStat.READY
+        ).values_list('shop', flat=True))
+        for shop in shops:
+            if shop not in shops_with_stats:
+                ShopMonthStat.objects.create(
+                    shop=shop,
+                    dt=date.today().replace(day=1),
+                )
+        month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, dt__gte=dt, status__in=[ShopMonthStat.READY, ShopMonthStat.NOT_DONE]))
+    for month_stat in month_stats:
         stats = get_shop_stats(
             shop_id=timetable.shop_id,
             form=dict(
@@ -319,13 +332,13 @@ def update_shop_stats(dt=None):
             ),
             indicators_only=True
         )['indicators']
-        timetable.idle = stats['deadtime_part']
-        timetable.fot = stats['FOT']
-        timetable.workers_amount = stats['cashier_amount']
-        timetable.revenue = stats['revenue']
-        timetable.lack = stats['covering_part']
-        timetable.fot_revenue = stats['fot_revenue']
-        timetable.save()
+        month_stat.idle = stats['deadtime_part']
+        month_stat.fot = stats['FOT']
+        month_stat.workers_amount = stats['cashier_amount']
+        month_stat.revenue = stats['revenue']
+        month_stat.lack = stats['covering_part']
+        month_stat.fot_revenue = stats['fot_revenue']
+        month_stat.save()
 
 
 @app.task
