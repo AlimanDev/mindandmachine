@@ -324,10 +324,10 @@ def update_shop_stats(dt=None):
         month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, dt__gte=dt, status__in=[ShopMonthStat.READY, ShopMonthStat.NOT_DONE]))
     for month_stat in month_stats:
         stats = get_shop_stats(
-            shop_id=timetable.shop_id,
+            shop_id=month_stat.shop_id,
             form=dict(
-                from_dt=timetable.dt,
-                to_dt=timetable.dt + relativedelta(months=1, days=-1),
+                from_dt=month_stat.dt,
+                to_dt=month_stat.dt + relativedelta(months=1, days=-1),
                 work_type_ids=[]
             ),
             indicators_only=True

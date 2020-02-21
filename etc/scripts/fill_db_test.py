@@ -54,8 +54,8 @@ def create_shop(shop_id, region_id):
     shop.save()
     return shop
 
-ShopMonthStat
-def create_timeShopMonthStatp_id, dttm):
+
+def create_timetable(shop_id, dttm):
     tt = Timetable.objects.create(
         status=Timetable.READY,
         shop_id=shop_id,
