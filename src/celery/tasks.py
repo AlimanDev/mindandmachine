@@ -328,13 +328,6 @@ def update_shop_stats(dt=None):
                 if shop.id not in shops_with_stats
             ]
         )
-        # for shop in shops:
-        #     if shop.id not in shops_with_stats:
-        #         ShopMonthStat.objects.create(
-        #             shop=shop,
-        #             dt=dt,
-        #             dttm_status_change=datetime.now(),
-        #         )
         month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt, status__in=[ShopMonthStat.READY, ShopMonthStat.NOT_DONE]))
     for month_stat in month_stats:
         stats = get_shop_stats(

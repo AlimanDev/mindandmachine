@@ -308,7 +308,7 @@ def create_timetable(request, form):
     tt, _ = ShopMonthStat.objects.get_or_create(shop_id=shop_id, dt=dt_first, defaults={'dttm_status_change': timezone.now()})
     if tt.status is ShopMonthStat.NOT_DONE:
         tt.status = ShopMonthStat.PROCESSING
-        tt.dttm_status_change = datetime.now()
+        tt.dttm_status_change = timezone.now()
         tt.save()
     else:
         return JsonResponse.already_exists_error()
