@@ -279,7 +279,7 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name='ShopMonthStat',
+            name='Timetable',
             fields=[
                 ('id', models.BigAutoField(primary_key=True, serialize=False)),
                 ('status_message', models.CharField(blank=True, max_length=256, null=True)),

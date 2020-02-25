@@ -79,6 +79,7 @@ def check_func_groups():
         'OperationTypeNameViewSet',
         'OperationTypeViewSet',
         'PeriodClientsViewSet',
+        'ShopMonthStatViewSet',
 
     ]
 

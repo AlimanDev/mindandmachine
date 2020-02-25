@@ -305,7 +305,7 @@ def create_timetable(request, form):
     dt_first = dt_from.replace(day=1)
     dt_to = (dt_first + relativedelta(months=1))
 
-    tt = ShopMonthStat.objects.get(shop_id=shop_id, dt=dt_first)
+    tt, _ = ShopMonthStat.objects.get_or_create(shop_id=shop_id, dt=dt_first, defaults={'dttm_status_change': timezone.now()})
     if tt.status is ShopMonthStat.NOT_DONE:
         tt.status = ShopMonthStat.PROCESSING
         tt.dttm_status_change = datetime.now()

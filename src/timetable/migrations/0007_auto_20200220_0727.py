@@ -10,6 +10,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RenameModel('Timetable', 'ShopMonthStat'),
         migrations.AlterModelOptions(
             name='shopmonthstat',
             options={'verbose_name': 'Статистика по мгазину за месяц', 'verbose_name_plural': 'Статистики по мгазинам за месяц'},

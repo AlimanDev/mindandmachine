@@ -1,5 +1,4 @@
 import datetime
-
 from rest_framework import serializers, viewsets
 from src.base.permissions import FilteredListPermission
 from rest_framework.response import Response
@@ -9,7 +8,7 @@ from src.timetable.models import ShopMonthStat
 
 # Serializers define the API representation.
 class ShopMonthStatSerializer(serializers.ModelSerializer):
-    dt = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt = serializers.DateField(format=QOS_DATE_FORMAT, read_only=True)
     class Meta:
         model = ShopMonthStat
         fields = ['id', 'shop_id', 'status_message', 'dt', 'status', 'fot', 'lack', 'idle', 'workers_amount', 'revenue', 'fot_revenue']

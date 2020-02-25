@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import os
 
 from django.db.models import Avg, Q
@@ -307,21 +307,35 @@ def create_pred_bills():
 def update_shop_stats(dt=None):
     if not dt:
         dt = date.today().replace(day=1)
-    shops = list(Shop.objects.filter(dttm_deleted__isnull=True))
-    month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, dt__gte=dt, status__in=[ShopMonthStat.READY, ShopMonthStat.NOT_DONE]))
+    else:
+        dt = dt.replace(day=1)
+    shops = list(Shop.objects.filter(dttm_deleted__isnull=True, child__isnull=True))
+    month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt, status__in=[ShopMonthStat.READY, ShopMonthStat.NOT_DONE]))
     if len(shops) != len(month_stats):
         shops_with_stats = list(ShopMonthStat.objects.filter(
+            shop__child__isnull=True,
             shop__in=shops, 
-            dt__gte=dt, 
-            status=ShopMonthStat.READY
-        ).values_list('shop', flat=True))
-        for shop in shops:
-            if shop not in shops_with_stats:
-                ShopMonthStat.objects.create(
+            dt=dt,
+        ).values_list('shop_id', flat=True))
+        ShopMonthStat.objects.bulk_create(
+            [
+                ShopMonthStat(
                     shop=shop,
-                    dt=date.today().replace(day=1),
+                    dt=dt,
+                    dttm_status_change=datetime.now(),
                 )
-        month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, dt__gte=dt, status__in=[ShopMonthStat.READY, ShopMonthStat.NOT_DONE]))
+                for shop in shops
+                if shop.id not in shops_with_stats
+            ]
+        )
+        # for shop in shops:
+        #     if shop.id not in shops_with_stats:
+        #         ShopMonthStat.objects.create(
+        #             shop=shop,
+        #             dt=dt,
+        #             dttm_status_change=datetime.now(),
+        #         )
+        month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt, status__in=[ShopMonthStat.READY, ShopMonthStat.NOT_DONE]))
     for month_stat in month_stats:
         stats = get_shop_stats(
             shop_id=month_stat.shop_id,
@@ -339,6 +353,13 @@ def update_shop_stats(dt=None):
         month_stat.lack = stats['covering_part']
         month_stat.fot_revenue = stats['fot_revenue']
         month_stat.save()
+
+
+@app.task
+def update_shop_stats_2_months():
+    dt = date.today().replace(day=1)
+    update_shop_stats(dt=dt)
+    update_shop_stats(dt=dt + relativedelta(months=1))
 
 
 @app.task

@@ -178,7 +178,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             dt_to = dt_from + relativedelta(months=1)
             while dt_from < dt_to:
                 for employment in Employment.objects.all():
-              ShopMonthStatf.create_worker_day(
+                    self.create_worker_day(
                         employment=employment,
                         dt=dt_from,
                         dttm_work_start=datetime.datetime.combine(dt_from, datetime.time(9, 0)),
@@ -187,13 +187,12 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
                 dt_from += datetime.timedelta(days=1)
 
         # Timetable create
-        self.timetable1 = Timetable.objects.create(
+        self.timetable1 = ShopMonthStat.objects.create(
             shop = self.shop,
             dt = datetime.date(2019, 6, 1),
-            status = Timetable.READY,
-          ShopMonthStatatus_change = datetime.datetime(2019, 6, 1, 9, 30, 0)
-        )ShopMonthStat
-
+            status = ShopMonthStat.READY,
+            dttm_status_change=datetime.datetime(2019, 6, 1, 9, 30, 0)
+        )
         # AttendanceRecords
         self.attendanShopMonthStat = AttendanceRecords.objects.create(
             dttm=datetime.datetime(2019, 6, 1, 9, 0, 0),

@@ -723,6 +723,9 @@ class ShopMonthStat(AbstractModel):
 
     task_id = models.CharField(max_length=256, null=True, blank=True)
 
+    def get_department(self):
+        return self.shop
+
 
 class AttendanceRecords(AbstractModel):
     class Meta(object):
