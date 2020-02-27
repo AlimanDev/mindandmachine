@@ -2,7 +2,7 @@ from django.conf.urls import url, include
 from rest_framework import routers, urls
 from src.base.shop.views import ShopViewSet
 from src.base.views import EmploymentViewSet, UserViewSet, FunctionGroupView, AuthUserView
-
+from src.base.worker_position.views import WorkerPositionViewSet
 from rest_auth.views import (
     LoginView, LogoutView, PasswordChangeView
 )
@@ -20,6 +20,7 @@ router = routers.DefaultRouter()
 router.register(r'department', ShopViewSet, basename='Shop')
 router.register(r'employment', EmploymentViewSet, basename='Employment')
 router.register(r'user', UserViewSet, basename='User')
+router.register(r'worker_position', WorkerPositionViewSet, basename='WorkerPosition')
 
 
 # Wire up our API using automatic URL routing.

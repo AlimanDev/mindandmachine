@@ -343,7 +343,6 @@ class FunctionGroup(AbstractModel):
         'PeriodClients_indicators',
         'PeriodClients_put',
         'PeriodClients_delete',
->>>>>>> master
 
         'signout',
         'password_edit',
