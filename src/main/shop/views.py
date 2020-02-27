@@ -142,7 +142,7 @@ def get_department_list(request, form):
 )
 def add_department(request, form):
     created = Shop.objects.create(
-        name=form['title'],
+        name=form['name'],
         tm_shop_opens=form['tm_shop_opens'],
         tm_shop_closes=form['tm_shop_closes'],
         parent_id=form['parent_id'],
@@ -154,7 +154,7 @@ def add_department(request, form):
     return JsonResponse.success(Converter.convert(
             created, 
             Shop,
-            fields=['id', 'parent_id', 'title', 'tm_shop_opens', 'tm_shop_closes', 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone'],
+            fields=['id', 'parent_id', 'name', 'tm_shop_opens', 'tm_shop_closes', 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone'],
             custom_converters={'timezone':lambda x: x.zone},
         )
     )

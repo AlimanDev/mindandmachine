@@ -302,7 +302,7 @@ def cancel_vacancies(shop_id, work_type_id):
         return
 
     from_dt = now().replace(minute=0, second=0, microsecond=0)
-    to_dt = from_dt + exchange_settings.automatic_check_lack_timegap
+    to_dt = from_dt + exchange_settings.automatic_check_lack_timegap + timedelta(days=1)
     min_dttm = from_dt + exchange_settings.automatic_worker_select_timegap
 
     from_dt = from_dt.date()

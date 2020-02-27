@@ -371,6 +371,11 @@ def create_timetable(request, form):
             type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lt=dt_to,
+            dttm_forecast__time__gte=shop.tm_shop_opens,
+            dttm_forecast__time__lt=shop.tm_shop_closes,
+
+
+
         ).count()
 
         if periods_len % period_normal_count:
@@ -702,7 +707,8 @@ def create_timetable(request, form):
                 'constraints_info': Converter.convert(
                     constraints.get(e.user_id, []), 
                     WorkerConstraint, 
-                    fields=['id', 'worker_id', 'employment__week_availability', 'weekday', 'tm', 'is_lite'],#change algo worker -> worker_id
+                    fields=['id', 'worker_id', 'employment__week_availability', 'weekday', 'tm', 'is_lite'], #change algo worker -> worker_id
+                    out_array=True,
                 ),
                 'availability_info': Converter.convert(
                     availabilities.get(e.user_id, []), 
@@ -716,15 +722,17 @@ def create_timetable(request, form):
                             'tm_end':  Converter.convert_time(obj.tm_end),
                             'name': obj.name
                         }
-                    }
+                    },
+                    out_array=True,
                 ),
                 'worker_cashbox_info': Converter.convert(
                     worker_cashbox_info.get(e.user_id, []), 
                     WorkerCashboxInfo, 
-                    fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],#change algo worker -> employment__user_id work_type -> work_type_id
+                    fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],  # change algo worker -> employment__user_id work_type -> work_type_id
+                    out_array=True,
                 ),
-                'workdays': WorkerDayConverter.convert(worker_day.get(e.user_id, [])),
-                'prev_data': WorkerDayConverter.convert(prev_data.get(e.user_id, [])),
+                'workdays': WorkerDayConverter.convert(worker_day.get(e.user_id, []), out_array=True),
+                'prev_data': WorkerDayConverter.convert(prev_data.get(e.user_id, []), out_array=True),
                 'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),
                 'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),
                 'norm_work_amount': work_hours * e.norm_work_hours / 100,

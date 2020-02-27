@@ -75,19 +75,15 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         # work_types
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
-            code='',
         )
         self.work_type_name2 = WorkTypeName.objects.create(
             name='Тип_кассы_2',
-            code='',
         )
         self.work_type_name3 = WorkTypeName.objects.create(
             name='Тип_кассы_3',
-            code='',
         )
         self.work_type_name4 = WorkTypeName.objects.create(
             name='тип_кассы_4',
-            code='',
         )
         self.work_type1 = create_work_type(
             self.shop,
@@ -110,7 +106,6 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
         self.operation_type_name = OperationTypeName.objects.create(
             name='',
-            code='',
         )
 
         create_operation_type(OperationType.FORECAST_HARD, self.operation_type_name)

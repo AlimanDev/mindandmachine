@@ -20,139 +20,130 @@ class TestDemand(LocalTestCase):
         super().setUp()
         self.date = datetime.now().date()
         op_type_name = OperationTypeName.objects.create(
-            name='',
-            code='',
+            name='O_TYPE',
         )
-        w_type = self.work_type1
-        w_type_2 = self.work_type4
-        def_d = {
-                'work_type' :w_type,
-                'operation_type_name' : op_type_name,
-                'do_forecast' : OperationType.FORECAST_HARD
-            }
-        def_wf = {
-                'work_type' :w_type,
-                'operation_type_name' : op_type_name,
-            }
-        o_type_1 = OperationType.objects.update_or_create(
-            id=5,
-            defaults=def_d
-            )[0]
-        o_type_2 = OperationType.objects.update_or_create(
-            id=6,
-            defaults=def_wf
-            )[0]
-        o_type_3 = OperationType.objects.update_or_create(
-            id=7,
-            defaults=def_d
-            )[0]
-        o_type_4 = OperationType.objects.update_or_create(
-            id=8,
-            defaults=def_wf
-            )[0]
-        self.o_type_5 = OperationType.objects.update_or_create(
-            id=9,
-            defaults={
-                'work_type' :w_type_2,
-                'operation_type_name' : op_type_name,
-            }
-            )[0]
+        op_type_name2 = OperationTypeName.objects.create(
+            name='O_TYPE2',
+        )
+        self.work_type5 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name4)
+        self.o_type_1 = OperationType.objects.create(
+            work_type=self.work_type1,
+            operation_type_name=op_type_name,
+            do_forecast=OperationType.FORECAST_HARD,
+            )
+        self.o_type_2 = OperationType.objects.create(
+            work_type=self.work_type2,
+            operation_type_name=op_type_name,
+            )
+        self.o_type_3 = OperationType.objects.create(
+            work_type=self.work_type3,
+            operation_type_name=op_type_name,
+            do_forecast=OperationType.FORECAST_HARD,
+            )
+        self.o_type_4 = OperationType.objects.create(
+            work_type=self.work_type5,
+            operation_type_name=op_type_name2,
+            )
+        self.o_type_5 = OperationType.objects.create(
+            work_type=self.work_type4,
+            operation_type_name=op_type_name,
+            )
         test_data = {
             'PeriodClients': [
                 {
                     'dttm_forecast':datetime(2018, 5, 7, 0, 0),
-                    'operation_type':o_type_1,
+                    'operation_type':self.o_type_1,
                     'value':20
                 },
                 {
                     'dttm_forecast':datetime(2018, 5, 7, 0, 0),
-                    'operation_type':o_type_2,
+                    'operation_type':self.o_type_2,
                     'value':10
                 },
                 {
                     'dttm_forecast':datetime(2018, 5, 7, 0, 0),
-                    'operation_type':o_type_3,
+                    'operation_type':self.o_type_3,
                     'value':30
                 },
                 {
                     'dttm_forecast':datetime(2018, 6, 7, 9, 0),
-                    'operation_type':o_type_1,
+                    'operation_type':self.o_type_1,
                     'value':30
                 },
                 {
                     'dttm_forecast':datetime(2018, 6, 7, 9, 0),
-                    'operation_type':o_type_2,
+                    'operation_type':self.o_type_2,
                     'value':20
                 },
                 {
                     'dttm_forecast':datetime(2018, 6, 7, 9, 0),
-                    'operation_type':o_type_3,
+                    'operation_type':self.o_type_3,
                     'value':5
                 },
                 {
                     'dttm_forecast':datetime(2018, 6, 7, 9, 0),
-                    'operation_type':o_type_1,
+                    'operation_type':self.o_type_1,
                     'value':15,
                     'type':PeriodClients.FACT_TYPE
                 },
                 {
                     'dttm_forecast':datetime(2018, 6, 7, 9, 0),
-                    'operation_type':o_type_2,
+                    'operation_type':self.o_type_2,
                     'value':19,
                     'type':PeriodClients.FACT_TYPE
                 },
                 {
                     'dttm_forecast':datetime(2018, 6, 7, 9, 0),
-                    'operation_type':o_type_3,
+                    'operation_type':self.o_type_3,
                     'value':5,
                     'type':PeriodClients.FACT_TYPE
                 },
                 {
                     'dttm_forecast':datetime(2018, 6, 7, 9, 0),
-                    'operation_type':o_type_1,
+                    'operation_type':self.o_type_1,
                     'value':12,
                     'type':PeriodClients.SHORT_FORECAST_TYPE
                 },
                 {
                     'dttm_forecast':datetime(2018, 6, 7, 9, 0),
-                    'operation_type':o_type_2,
+                    'operation_type':self.o_type_2,
                     'value':10,
                     'type':PeriodClients.SHORT_FORECAST_TYPE
                 },
                 {
                     'dttm_forecast':datetime(2018, 6, 7, 9, 0),
-                    'operation_type':o_type_3,
+                    'operation_type':self.o_type_3,
                     'value':6,
                     'type':PeriodClients.SHORT_FORECAST_TYPE
                 },
                 {
                     'dttm_forecast' : datetime.combine(self.date, time(12, 0)),
-                    'operation_type' : o_type_4,
+                    'operation_type' : self.o_type_4,
                     'value' : 10
                 },
                 {
                     'dttm_forecast' : datetime.combine(self.date, time(12, 30)),
-                    'operation_type' : o_type_4,
+                    'operation_type' : self.o_type_4,
                     'value' : 20
                 },
                 {
                     'dttm_forecast' : datetime.combine(self.date, time(13, 0)),
-                    'operation_type' : o_type_4,
+                    'operation_type' : self.o_type_4,
                     'value' : 15
                 },
                 {
                     'dttm_forecast' : datetime.combine(self.date, time(13, 30)),
-                    'operation_type' : o_type_4,
+                    'operation_type' : self.o_type_4,
                     'value' : 10
                 },
                 {
                     'dttm_forecast' : datetime.combine(self.date + timedelta(days=1), time(13, 0)),
-                    'operation_type' : o_type_4,
+                    'operation_type' : self.o_type_4,
                     'value' : 10
                 }
             ]
         }
-        self.o_types = [o_type_1, o_type_2, o_type_3, o_type_4, self.o_type_5]
+        self.o_types = [self.o_type_1, self.o_type_2, self.o_type_3, self.o_type_4, self.o_type_5]
         for model in test_data.keys():
             for data in test_data[model]:
                 apps.get_model('forecast', model).objects.create(**data)
@@ -340,7 +331,11 @@ class TestGetForecast(TestDemand):
     def test_correct_some_operations(self):
         self.auth()
         
-        response = self.api_get(f'/api/demand/get_forecast?from_dt={Converter.convert_date(datetime(2018, 6, 7))}&to_dt={Converter.convert_date(datetime(2018, 6, 7))}&shop_id={self.shop.id}&operation_type_ids=[5,6]')
+        response = self.api_get(
+            f'/api/demand/get_forecast?from_dt={Converter.convert_date(datetime(2018, 6, 7))}'
+            f'&to_dt={Converter.convert_date(datetime(2018, 6, 7))}&shop_id={self.shop.id}'
+            f'&operation_type_ids=[{self.o_type_1.id},{self.o_type_2.id}]'
+        )
         correct_L = {
             'dttm': Converter.convert_datetime(datetime(2018, 6, 7, 9)),
             'clients': 50.0, 
@@ -427,57 +422,57 @@ class TestSetDemand(TestDemand):
     def test_correct_val_operation(self):
         self.auth()
         self.data['set_value'] = 30
-        self.data['operation_type_id'] = '[8]'
+        self.data['operation_type_id'] = f'[{self.o_type_4.id}]'
         response = self.api_post('/api/demand/set_demand', data=self.data)
         date = self.date + timedelta(days=1)
         correct_data = [
             {
                 'dttm_forecast': datetime.combine(self.date, time(12, 0)), 
                 'type': 'L', 
-                'operation_type_id': 8, 
+                'operation_type_id': self.o_type_4.id, 
                 'value': 30.0
             }, 
             {
                 'dttm_forecast': datetime.combine(self.date, time(12, 30)), 
                 'type': 'L', 
-                'operation_type_id': 8, 
+                'operation_type_id': self.o_type_4.id, 
                 'value': 30.0
             }, 
             {
                 'dttm_forecast': datetime.combine(self.date, time(13, 0)), 
                 'type': 'L', 
-                'operation_type_id': 8, 
+                'operation_type_id': self.o_type_4.id, 
                 'value': 30.0
             }, 
             {
                 'dttm_forecast': datetime.combine(self.date, time(13, 30)), 
                 'type': 'L', 
-                'operation_type_id': 8, 
+                'operation_type_id': self.o_type_4.id, 
                 'value': 10.0
             }, 
             {
                 'dttm_forecast': datetime.combine(date, time(12, 0)), 
                 'type': 'L', 
-                'operation_type_id': 8, 
+                'operation_type_id': self.o_type_4.id, 
                 'value': 30.0
             }, 
             {
                 'dttm_forecast': datetime.combine(date, time(12, 30)), 
                 'type': 'L', 
-                'operation_type_id': 8, 
+                'operation_type_id': self.o_type_4.id, 
                 'value': 30.0
             }, 
             {
                 'dttm_forecast': datetime.combine(date, time(13, 0)), 
                 'type': 'L', 
-                'operation_type_id': 8, 
+                'operation_type_id': self.o_type_4.id, 
                 'value': 30.0
             }
         ]
         self.assertEqual(response.status_code, 200)
         self.assertEqual(list(PeriodClients.objects.filter(
                 operation_type__work_type__shop_id=self.shop.id,
-                operation_type_id=8
+                operation_type_id=self.o_type_4.id
             ).values('dttm_forecast', 'type', 'operation_type_id', 'value').order_by('dttm_forecast')),
             correct_data
         )
@@ -485,44 +480,44 @@ class TestSetDemand(TestDemand):
     def test_correct_mul_operation(self):
         self.auth()
         self.data['multiply_coef'] = 2
-        self.data['operation_type_id'] = '[8]'
+        self.data['operation_type_id'] = f'[{self.o_type_4.id}]'
         response = self.api_post('/api/demand/set_demand', data=self.data)
         date = self.date + timedelta(days=1)
         correct_data = [
             {
                 'dttm_forecast': datetime.combine(self.date, time(12, 0)), 
                 'type': 'L', 
-                'operation_type_id': 8, 
+                'operation_type_id': self.o_type_4.id, 
                 'value': 20.0
             }, 
             {
                 'dttm_forecast': datetime.combine(self.date, time(12, 30)), 
                 'type': 'L', 
-                'operation_type_id': 8, 
+                'operation_type_id': self.o_type_4.id, 
                 'value': 40.0
             }, 
             {
                 'dttm_forecast': datetime.combine(self.date, time(13, 0)), 
                 'type': 'L', 
-                'operation_type_id': 8, 
+                'operation_type_id': self.o_type_4.id, 
                 'value': 30.0
             }, 
             {
                 'dttm_forecast': datetime.combine(self.date, time(13, 30)), 
-                'type': 'L', 'operation_type_id': 8, 
+                'type': 'L', 'operation_type_id': self.o_type_4.id, 
                 'value': 10.0
             }, 
             {
                 'dttm_forecast': datetime.combine(date, time(13, 0)), 
                 'type': 'L', 
-                'operation_type_id': 8, 
+                'operation_type_id': self.o_type_4.id, 
                 'value': 20.0
             }
         ]
         self.assertEqual(response.status_code, 200)
         self.assertEqual(list(PeriodClients.objects.filter(
             operation_type__work_type__shop_id=self.shop.id,
-            operation_type_id=8
+            operation_type_id=self.o_type_4.id,
             ).values('dttm_forecast', 'type', 'operation_type_id', 'value').order_by('dttm_forecast')),
             correct_data
         )
