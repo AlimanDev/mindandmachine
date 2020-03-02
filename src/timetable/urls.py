@@ -1,6 +1,6 @@
 from django.conf.urls import url, include
 from rest_framework import routers
-from src.timetable.worker_day.views import WorkerDayViewSet
+from src.timetable.views import WorkerDayViewSet
 from src.timetable.work_type_name.views import WorkTypeNameViewSet
 from src.timetable.work_type.views import WorkTypeViewSet
 

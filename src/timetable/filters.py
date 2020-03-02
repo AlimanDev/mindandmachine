@@ -2,13 +2,9 @@ import datetime
 
 from django_filters.rest_framework import FilterSet, BooleanFilter, DjangoFilterBackend
 from django_filters import utils
-from rest_framework import serializers, viewsets
-from rest_framework.response import Response
-from rest_framework.authentication import SessionAuthentication
 
-from src.base.permissions import FilteredListPermission
 from src.base.models import Employment
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
+from src.timetable.models import WorkerDay
 
 
 class MultiShopsFilterBackend(DjangoFilterBackend):
@@ -61,18 +57,6 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
             employment__in=all_employments_for_users)\
         .order_by('worker_id','dt','dttm_work_start')
 
-# Serializers define the API representation.
-class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = WorkerDayCashboxDetails
-        fields = ['id', 'work_type_id', 'dttm_from', 'dttm_to', 'status']
-
-class WorkerDaySerializer(serializers.ModelSerializer):
-    worker_day_details = WorkerDayCashboxDetailsSerializer(many=True)
-    class Meta:
-        model = WorkerDay
-        fields = ['id', 'worker', 'shop', 'employment', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
-                  'comment', 'worker_day_approve_id', 'worker_day_details']
 
 
 class WorkerDayFilter(FilterSet):
@@ -97,28 +81,4 @@ class WorkerDayFilter(FilterSet):
             'dt': ['gte','lte','exact', 'range'],
             'is_approved': ['exact']
         }
-
-
-class WorkerDayViewSet(viewsets.ModelViewSet):
-    authentication_classes = [SessionAuthentication]
-    permission_classes = [FilteredListPermission]
-    serializer_class = WorkerDaySerializer
-    filterset_class = WorkerDayFilter
-    permission_name = 'department'
-    queryset = WorkerDay.objects.qos_filter_version(1)
-    filter_backends = [MultiShopsFilterBackend]
-    # filter_backends = [DjangoFilterBackend]
-
-    def list(self, request,  *args, **kwargs):
-        queryset = self.get_queryset()#.qos_filter_version(1)
-        queryset = self.filter_queryset(queryset)
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
 
