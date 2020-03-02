@@ -1,16 +1,15 @@
 import datetime
 
-from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter, DjangoFilterBackend
+from django_filters.rest_framework import FilterSet, BooleanFilter, DjangoFilterBackend
 from django_filters import utils
-from rest_framework import filters
-from rest_framework import serializers, viewsets, status, exceptions
-from rest_framework.decorators import action
+from rest_framework import serializers, viewsets
 from rest_framework.response import Response
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from rest_framework.authentication import SessionAuthentication
 
-from src.base.permissions import FilteredListPermission, Permission
-from src.base.models import Employment, Shop
-from src.timetable.models import WorkerDay
+from src.base.permissions import FilteredListPermission
+from src.base.models import Employment
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
+
 
 class MultiShopsFilterBackend(DjangoFilterBackend):
     """
@@ -63,12 +62,17 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
         .order_by('worker_id','dt','dttm_work_start')
 
 # Serializers define the API representation.
+class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkerDayCashboxDetails
+        fields = ['id', 'work_type_id', 'dttm_from', 'dttm_to', 'status']
+
 class WorkerDaySerializer(serializers.ModelSerializer):
-    # parent_id = serializers.IntegerField(required=False)
+    worker_day_details = WorkerDayCashboxDetailsSerializer(many=True)
     class Meta:
         model = WorkerDay
         fields = ['id', 'worker', 'shop', 'employment', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
-                  'comment', 'worker_day_approve_id']
+                  'comment', 'worker_day_approve_id', 'worker_day_details']
 
 
 class WorkerDayFilter(FilterSet):
