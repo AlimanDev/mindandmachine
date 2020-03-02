@@ -145,7 +145,7 @@ class TestOperationTemplate(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         operation_template = response.json()
         data['id'] = operation_template['id']
-        data['dt_built_to'] = Converter.convert_date(datetime.now().date() + relativedelta(months=2) + timedelta(days=4))
+        data['dt_built_to'] = Converter.convert_date(datetime.now().date() + timedelta(days=64))
         data['code'] = ''
         self.assertEqual(operation_template, data)
 
