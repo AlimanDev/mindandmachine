@@ -333,6 +333,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay',
         'Employment',
         'User',
+        'OperationTemplate',
         'WorkTypeName',
         'WorkType',
         'OperationTypeName',
