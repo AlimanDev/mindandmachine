@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='shopmonthstat',
             name='status',
-            field=models.CharField(choices=[('R', 'Готово'), ('P', 'В процессе'), ('E', 'Ошибка'), ('N', 'Не составлялось')], default='N', max_length=1),
+            field=models.CharField(choices=[('R', 'Готово'), ('P', 'В процессе'), ('E', 'Ошибка'), ('N', 'График не составлен')], default='N', max_length=1),
         ),
     ]

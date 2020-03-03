@@ -1,5 +1,5 @@
 import datetime
-from rest_framework import serializers, viewsets
+from rest_framework import serializers, viewsets, mixins
 from src.base.permissions import FilteredListPermission
 from rest_framework.response import Response
 from src.conf.djconfig import QOS_DATE_FORMAT
@@ -14,7 +14,10 @@ class ShopMonthStatSerializer(serializers.ModelSerializer):
         fields = ['id', 'shop_id', 'status_message', 'dt', 'status', 'fot', 'lack', 'idle', 'workers_amount', 'revenue', 'fot_revenue']
 
 
-class ShopMonthStatViewSet(viewsets.ModelViewSet):
+class ShopMonthStatViewSet(mixins.UpdateModelMixin,
+                                mixins.ListModelMixin,
+                                mixins.RetrieveModelMixin,
+                                viewsets.GenericViewSet):
     """
 
     GET /rest_api/shop_month_stat/

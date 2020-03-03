@@ -695,7 +695,7 @@ class ShopMonthStat(AbstractModel):
         (READY, 'Готово'),
         (PROCESSING, 'В процессе'),
         (ERROR, 'Ошибка'),
-        (NOT_DONE, 'Не составлялось'),
+        (NOT_DONE, 'График не составлен'),
     ]
 
     def __str__(self):

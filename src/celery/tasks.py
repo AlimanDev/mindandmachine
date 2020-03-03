@@ -310,7 +310,7 @@ def update_shop_stats(dt=None):
     else:
         dt = dt.replace(day=1)
     shops = list(Shop.objects.filter(dttm_deleted__isnull=True, child__isnull=True))
-    month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt, status__in=[ShopMonthStat.READY, ShopMonthStat.NOT_DONE]))
+    month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt))
     if len(shops) != len(month_stats):
         shops_with_stats = list(ShopMonthStat.objects.filter(
             shop__child__isnull=True,
@@ -328,8 +328,10 @@ def update_shop_stats(dt=None):
                 if shop.id not in shops_with_stats
             ]
         )
-        month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt, status__in=[ShopMonthStat.READY, ShopMonthStat.NOT_DONE]))
+        month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt))
     for month_stat in month_stats:
+        if month_stat.status not in [ShopMonthStat.READY, ShopMonthStat.NOT_DONE]:
+            continue
         stats = get_shop_stats(
             shop_id=month_stat.shop_id,
             form=dict(
