@@ -1,10 +1,10 @@
 import datetime
 
-from django_filters.rest_framework import FilterSet, BooleanFilter, DjangoFilterBackend
+from django_filters.rest_framework import FilterSet, BooleanFilter, DjangoFilterBackend, NumberFilter
 from django_filters import utils
 
 from src.base.models import Employment
-from src.timetable.models import WorkerDay
+from src.timetable.models import WorkerDay, WorkerDayApprove
 
 
 class MultiShopsFilterBackend(DjangoFilterBackend):
@@ -58,19 +58,26 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
         .order_by('worker_id','dt','dttm_work_start')
 
 
+class WorkerDayApproveFilter(FilterSet):
+    class Meta:
+        model = WorkerDayApprove
+        fields = {
+            'shop_id':['exact'],
+            'created_by':['exact'],
+            'dt_approved': ['gte','lte'],
+            'dttm_added': ['gte','lte'],
+        }
+
 
 class WorkerDayFilter(FilterSet):
     is_approved = BooleanFilter(field_name='worker_day_approve_id', method='filter_approved')
-
 
     def filter_approved(self, queryset, name, value):
         notnull = True
         if value:
             notnull = False
 
-        # alternatively, it may not be necessary to construct the lookup.
         return queryset.filter(worker_day_approve_id__isnull=notnull)
-    # shop_id = NumberFilter(required=True)
 
 
     class Meta:

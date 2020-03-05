@@ -1,16 +1,42 @@
-import datetime
-
-from django_filters.rest_framework import FilterSet, BooleanFilter, DjangoFilterBackend
-from django_filters import utils
-from rest_framework import serializers, viewsets
+from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.authentication import SessionAuthentication
 
 from src.base.permissions import FilteredListPermission
 
-from src.timetable.models import WorkerDay
-from src.timetable.serializers import WorkerDaySerializer, WorkerDayCashboxDetailsSerializer
-from src.timetable.filters import MultiShopsFilterBackend, WorkerDayFilter
+from src.timetable.models import WorkerDay, WorkerDayApprove
+from src.timetable.serializers import WorkerDaySerializer, WorkerDayReadSerializer, WorkerDayApproveSerializer
+from src.timetable.filters import MultiShopsFilterBackend, WorkerDayFilter, WorkerDayApproveFilter
+
+from dateutil.relativedelta import relativedelta
+
+class WorkerDayApproveViewSet(viewsets.ModelViewSet):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [FilteredListPermission]
+    serializer_class = WorkerDayApproveSerializer
+    filterset_class = WorkerDayApproveFilter
+    queryset = WorkerDayApprove.objects.all()
+
+    def perform_create(self, serializer):
+        #TODO: dt.day=1
+        worker_day_approve=serializer.save()
+        dt = worker_day_approve.dt_approved
+        dt_to = dt + relativedelta(months=1)
+
+        WorkerDay.objects.filter(
+            dttm_deleted__isnull=True,
+            worker_day_approve_id__isnull=True,
+            shop_id=worker_day_approve.shop_id,
+            dt__lt=dt_to,
+            dt__gte=dt,
+        ).update(worker_day_approve_id=worker_day_approve.id)
+        return worker_day_approve
+
+    def perform_destroy(self, instance):
+        WorkerDay.objects.\
+            filter(worker_day_approve=instance).\
+            update(worker_day_approve=None)
+        instance.delete()
 
 
 class WorkerDayViewSet(viewsets.ModelViewSet):

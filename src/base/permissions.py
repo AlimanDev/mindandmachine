@@ -19,8 +19,6 @@ class Permission(permissions.BasePermission):
         if not bool(request.user and request.user.is_authenticated):
             return False
 
-        # if request.method in permissions.SAFE_METHODS:
-        #     return True
         employments = Employment.objects.get_active(
             user=request.user)
         return self.check_employment_permission(employments, request, view)

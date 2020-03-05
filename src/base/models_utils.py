@@ -68,6 +68,7 @@ def check_func_groups():
         #rest
         'ShopViewSet',
         'WorkerDayViewSet',
+        'WorkerDayApproveViewSet',
         'UserViewSet',
         'EmploymentViewSet',
         'APIRootView',
