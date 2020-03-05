@@ -7,14 +7,14 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('base', '0008_auto_20200205_0924'),
-        ('timetable', '0004_auto_20200205_0751'),
+        ('timetable', '0004_fix'),
     ]
 
     operations = [
         migrations.AlterField(
             model_name='cashbox',
             name='code',
-            field=models.CharField(blank=True, max_length=64, null=True, unique=True),
+            field=models.CharField(blank=True, max_length=64, null=True),
         ),
         migrations.AlterField(
             model_name='cashbox',
@@ -24,12 +24,12 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='slot',
             name='code',
-            field=models.CharField(blank=True, max_length=64, null=True, unique=True),
+            field=models.CharField(blank=True, max_length=64, null=True),
         ),
         migrations.AlterField(
             model_name='slot',
             name='name',
-            field=models.CharField(max_length=128, unique=True),
+            field=models.CharField(max_length=128)#, unique=True),
         ),
         migrations.AlterUniqueTogether(
             name='worktype',
