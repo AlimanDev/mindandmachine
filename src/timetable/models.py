@@ -36,7 +36,9 @@ class WorkerDayApprove(AbstractActiveModel):
     id = models.BigAutoField(primary_key=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True)
-    dt_approved = models.DateField()
+    dt_approved = models.DateField() # 1 день месяца
+    def get_department(self):
+        return self.shop
 
 
 class WorkTypeManager(AbstractActiveModelManager):
@@ -384,6 +386,8 @@ class WorkerDay(AbstractActiveModel):
     parent_worker_day = models.OneToOneField('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child')
     work_hours = models.SmallIntegerField(default=0)
 
+    objects = WorkerDayManager()
+
     @classmethod
     def is_type_with_tm_range(cls, t):
         return t in (cls.TYPE_WORKDAY, cls.TYPE_BUSINESS_TRIP, cls.TYPE_QUALIFICATION)
@@ -397,9 +401,9 @@ class WorkerDay(AbstractActiveModel):
                 break
         return round(work_hours / 60)
 
-    objects = WorkerDayManager()
     def get_department(self):
         return self.shop
+
 
 class WorkerDayCashboxDetailsManager(models.Manager):
     def qos_current_version(self):
@@ -458,7 +462,7 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
 
     id = models.BigAutoField(primary_key=True)
 
-    worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT, null=True, blank=True, related_name='worker_day_details')
+    worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT, null=True, blank=True)
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, null=True, blank=True)
 
