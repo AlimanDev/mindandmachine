@@ -336,6 +336,7 @@ class FunctionGroup(AbstractModel):
         'User',
         'AuthUserView',
         'FunctionGroupView',
+        'OperationTemplate',
         'WorkTypeName',
         'WorkType',
         'OperationTypeName',

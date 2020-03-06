@@ -13,11 +13,15 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='operationtypename',
             name='code',
-            field=models.CharField(blank=True, max_length=64, null=True, unique=True),
+            field=models.CharField(blank=True, max_length=64, null=True),# unique=True),
         ),
         migrations.AlterField(
             model_name='operationtypename',
             name='name',
             field=models.CharField(max_length=128, unique=True),
+        ),
+        migrations.AlterUniqueTogether(
+            name='operationtype',
+            unique_together={('work_type', 'operation_type_name')},
         ),
     ]
