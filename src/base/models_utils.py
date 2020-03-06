@@ -77,6 +77,7 @@ def check_func_groups():
         'PasswordChangeView',
         'WorkTypeNameViewSet',
         'WorkTypeViewSet',
+        'OperationTemplateViewSet',
         'OperationTypeNameViewSet',
         'OperationTypeViewSet',
         'PeriodClientsViewSet',
