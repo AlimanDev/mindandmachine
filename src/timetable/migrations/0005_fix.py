@@ -7,22 +7,20 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('timetable', '0005_auto_20200205_0924'),
-        ('forecast', '0006_auto_20200205_0739'),
     ]
 
     operations = [
+
+        migrations.RunSQL("update timetable_cashbox set code=null where code=''"),
+        migrations.RunSQL("update timetable_slot set code=null where code=''"),
         migrations.AlterField(
-            model_name='operationtemplate',
+            model_name='cashbox',
             name='code',
             field=models.CharField(blank=True, max_length=64, null=True, unique=True),
         ),
         migrations.AlterField(
-            model_name='operationtemplate',
-            name='name',
-            field=models.CharField(max_length=128, unique=True),
-        ),
-        migrations.AlterUniqueTogether(
-            name='operationtype',
-            unique_together={('work_type', 'operation_type_name')},
+            model_name='slot',
+            name='code',
+            field=models.CharField(blank=True, max_length=64, null=True, unique=True),
         ),
     ]

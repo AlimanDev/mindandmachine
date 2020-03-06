@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='group',
             name='code',
-            field=models.CharField(blank=True, max_length=64, null=True, unique=True),
+            field=models.CharField(blank=True, max_length=64, null=True),
         ),
         migrations.AlterField(
             model_name='group',
@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='region',
             name='code',
-            field=models.CharField(blank=True, max_length=64, null=True, unique=True),
+            field=models.CharField(blank=True, max_length=64, null=True),
         ),
         migrations.AlterField(
             model_name='region',
@@ -38,7 +38,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='workerposition',
             name='code',
-            field=models.CharField(blank=True, max_length=64, null=True, unique=True),
+            field=models.CharField(blank=True, max_length=64, null=True),
         ),
         migrations.AlterField(
             model_name='workerposition',
