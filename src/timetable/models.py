@@ -159,6 +159,7 @@ class Slot(AbstractActiveNamedModel):
 
     id = models.BigAutoField(primary_key=True)
 
+    name = models.CharField(max_length=128)
 
     tm_start = models.TimeField(default=datetime.time(hour=7))
     tm_end = models.TimeField(default=datetime.time(hour=23, minute=59, second=59))
