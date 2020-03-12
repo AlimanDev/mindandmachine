@@ -1,5 +1,7 @@
 import datetime
 
+from django.db.models import Q
+
 from django_filters.rest_framework import FilterSet, BooleanFilter, DjangoFilterBackend, NumberFilter
 from django_filters import utils
 
@@ -73,12 +75,13 @@ class WorkerDayFilter(FilterSet):
     is_approved = BooleanFilter(field_name='worker_day_approve_id', method='filter_approved')
 
     def filter_approved(self, queryset, name, value):
-        notnull = True
         if value:
-            notnull = False
-
-        return queryset.filter(worker_day_approve_id__isnull=notnull)
-
+            return queryset.filter(worker_day_approve_id__isnull=False)
+        else:
+            # Подтвержденная версия, это на самом деле последняя версия
+            return queryset.filter(
+                child__id__isnull=True
+            )
 
     class Meta:
         model = WorkerDay
