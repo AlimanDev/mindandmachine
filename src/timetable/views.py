@@ -1,4 +1,4 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, mixins
 from rest_framework.response import Response
 from rest_framework.authentication import SessionAuthentication
 
@@ -11,7 +11,14 @@ from src.timetable.filters import MultiShopsFilterBackend, WorkerDayFilter, Work
 from dateutil.relativedelta import relativedelta
 
 
-class WorkerDayApproveViewSet(viewsets.ModelViewSet):
+class WorkerDayApproveViewSet(
+    viewsets.GenericViewSet,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+):
+
     authentication_classes = [SessionAuthentication]
     permission_classes = [FilteredListPermission]
     serializer_class = WorkerDayApproveSerializer
@@ -30,7 +37,12 @@ class WorkerDayApproveViewSet(viewsets.ModelViewSet):
             shop_id=worker_day_approve.shop_id,
             dt__lt=dt_to,
             dt__gte=dt,
-        ).update(worker_day_approve_id=worker_day_approve.id)
+        ).update(
+            worker_day_approve_id=worker_day_approve.id
+        )
+        WorkerDay.objects.filter(
+            child__worker_day_approve_id=worker_day_approve.id
+        ).delete()
         return worker_day_approve
 
     def perform_destroy(self, instance):
@@ -49,14 +61,21 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
     queryset = WorkerDay.objects.qos_filter_version(1)
     filter_backends = [MultiShopsFilterBackend]
 
-    def list(self, request,  *args, **kwargs):
-        queryset = self.get_queryset()#.qos_filter_version(1)
-        queryset = self.filter_queryset(queryset)
+    def perform_update(self, serializer):
+        #TODO: псевдокод
 
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+        # Если подтвержденная версия, создаем новую, сославшись на старую
+        if serializer.instance.worker_day_approve_id:
+            data = serializer.validated_data
+            data.parent_worker_day_id=data.pop('id')
+            serializer = WorkerDaySerializer(data)
 
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        serializer.save()
+
+"""
+TODO: 
+
+фактический план и такой
+подтержденный и нет
+подтверждение диапазона дат. 
+"""
