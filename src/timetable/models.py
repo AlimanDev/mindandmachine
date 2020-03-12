@@ -463,7 +463,7 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
 
     id = models.BigAutoField(primary_key=True)
 
-    worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT, null=True, blank=True, related_name='worker_day_details')
+    worker_day = models.ForeignKey(WorkerDay, on_delete=models.CASCADE, null=True, blank=True, related_name='worker_day_details')
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, null=True, blank=True)
 
