@@ -36,7 +36,11 @@ class WorkerDayApprove(AbstractActiveModel):
     id = models.BigAutoField(primary_key=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True)
-    dt_approved = models.DateField() # 1 день месяца
+    # dt_approved = models.DateField() # 1 день месяца
+    dt_from = models.DateField() # начало периода
+    dt_to = models.DateField() # конец периода
+    is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
+
     def get_department(self):
         return self.shop
 
@@ -384,8 +388,10 @@ class WorkerDay(AbstractActiveModel):
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
 
     comment = models.TextField(null=True, blank=True)
-    parent_worker_day = models.OneToOneField('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child')
-    work_hours = models.SmallIntegerField(default=0)
+    parent_worker_day = models.ForeignKey('self', on_delete=models.PROTECT, blank=True, null=True, related_name='child')
+    work_hours = models.DurationField(default=datetime.timedelta(days=0))
+
+    is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
 
     objects = WorkerDayManager()
 
@@ -404,6 +410,13 @@ class WorkerDay(AbstractActiveModel):
 
     def get_department(self):
         return self.shop
+
+    def save(self, *args, **kwargs):
+        if self.dttm_work_end and self.dttm_work_start:
+            self.work_hours = self.dttm_work_end - self.dttm_work_start
+        else:
+            self.work_hours = datetime.timedelta(0)
+        super().save(*args, **kwargs)
 
 
 class WorkerDayCashboxDetailsManager(models.Manager):

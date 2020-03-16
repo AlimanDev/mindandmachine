@@ -66,7 +66,7 @@ class WorkerDayApproveFilter(FilterSet):
         fields = {
             'shop_id':['exact'],
             'created_by':['exact'],
-            'dt_approved': ['gte','lte'],
+            # 'dt_approved': ['gte','lte'],
             'dttm_added': ['gte','lte'],
         }
 
@@ -89,6 +89,7 @@ class WorkerDayFilter(FilterSet):
             # 'shop_id':['exact'],
             'worker_id':['in','exact'],
             'dt': ['gte','lte','exact', 'range'],
-            'is_approved': ['exact']
+            'is_approved': ['exact'],
+            'is_fact': ['exact']
         }
 
