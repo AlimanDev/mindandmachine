@@ -21,7 +21,7 @@ class EmploymentViewSet(ModelViewSet):
 
 
 class UserViewSet(ModelViewSet):
-    permission_classes = [Permission]
+    permission_classes = [IsAuthenticated]
     serializer_class = UserSerializer
     filterset_class = UserFilter
 
