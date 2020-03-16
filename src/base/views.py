@@ -9,6 +9,8 @@ from src.base.filters import EmploymentFilter, UserFilter
 
 from src.base.models import  Employment, User, FunctionGroup
 
+from django.utils.timezone import now
+
 
 class EmploymentViewSet(ModelViewSet):
     permission_classes = [FilteredListPermission]
@@ -24,6 +26,11 @@ class UserViewSet(ModelViewSet):
     filterset_class = UserFilter
 
     queryset = User.objects.all()
+    def perform_create(self, serializer):
+        serializer.username=now()
+        instance=serializer.save()
+        instance.username='user_'+ str(instance.id)
+        instance.save()
 
 
 class AuthUserView(UserDetailsView):
