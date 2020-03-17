@@ -16,7 +16,7 @@ class FunctionGroupSerializer(serializers.ModelSerializer):
 
 
 class EmploymentSerializer(serializers.ModelSerializer):
-    user = UserSerializer()
+    user = UserSerializer(read_only=True)
     position_id = serializers.IntegerField(required=False)
     shop_id = serializers.IntegerField(required=False)
     user_id = serializers.IntegerField(required=False)
@@ -26,7 +26,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
         fields = ['id', 'user_id', 'shop_id', 'position_id', 'is_fixed_hours', 'dt_hired', 'dt_fired',
                   'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
                   'shift_hours_length_min', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
-                  'dt_new_week_availability_from', 'user'
+                  'dt_new_week_availability_from', 'user', 'is_visible'
         ]
         create_only_fields = ['user_id', 'shop_id']
         read_only_fields=['user']

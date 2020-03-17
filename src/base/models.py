@@ -299,6 +299,7 @@ class Employment(AbstractActiveModel):
     is_ready_for_overworkings = models.BooleanField(default=False)
 
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
+    is_visible = models.BooleanField(default=True)
 
     objects = EmploymentManager()
 
