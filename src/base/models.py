@@ -248,7 +248,7 @@ class User(DjangoAbstractUser, AbstractModel):
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     access_token = models.CharField(max_length=64, blank=True, null=True)
-    tabel_code = models.CharField(max_length=15, null=True, blank=True, unique=True)
+    tabel_code = models.CharField(max_length=15, null=True, unique=True)
 
 
 class WorkerPosition(AbstractActiveNamedModel):
