@@ -6,7 +6,6 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('base', '0013_auto_20200318_1410'),
         ('timetable', '0010_auto_20200316_1412'),
     ]
 

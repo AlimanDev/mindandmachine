@@ -312,6 +312,7 @@ class Employment(AbstractActiveModel):
     def get_department(self):
         return self.shop
 
+
 class FunctionGroup(AbstractModel):
     class Meta:
         verbose_name = 'Доступ к функциям'
@@ -339,8 +340,9 @@ class FunctionGroup(AbstractModel):
         'AuthUserView',
         'FunctionGroupView',
         'OperationTemplate',
-        'WorkTypeName',
+        'WorkerWorkType',
         'WorkType',
+        'WorkTypeName',
         'OperationTypeName',
         'OperationType',
         'PeriodClients',

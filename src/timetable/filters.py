@@ -1,12 +1,10 @@
 import datetime
 
-from django.db.models import Q
-
 from django_filters.rest_framework import FilterSet, BooleanFilter, DjangoFilterBackend, NumberFilter
 from django_filters import utils
 
 from src.base.models import Employment
-from src.timetable.models import WorkerDay, WorkerDayApprove
+from src.timetable.models import WorkerDay, WorkerDayApprove, WorkerWorkType
 
 
 class MultiShopsFilterBackend(DjangoFilterBackend):
@@ -93,3 +91,11 @@ class WorkerDayFilter(FilterSet):
             'is_fact': ['exact']
         }
 
+class WorkerWorkTypeFilter(FilterSet):
+    shop_id=NumberFilter(field_name='work_type__shop_id')
+    class Meta:
+        model = WorkerWorkType
+        fields = {
+            'shop_id':['exact'],
+            'employment_id':['exact'],
+        }

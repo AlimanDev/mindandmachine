@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayApprove
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayApprove, WorkerWorkType
 
 from rest_framework.exceptions import ValidationError
 
@@ -102,3 +102,12 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                     raise ValidationError({"error":f"Рабочий день пересекается с существующим рабочим днем. {wd.shop.name} {wd.dttm_work_start} {wd.dttm_work_end}"})
             else:
                 raise ValidationError({"error": f"У сотрудника уже существует рабочий день: {wd} "})
+
+
+class WorkerWorkTypeSerializer(serializers.ModelSerializer):
+    employment_id = serializers.IntegerField(required=False)
+    work_type_id = serializers.IntegerField(required=False)
+
+    class Meta:
+        model = WorkerWorkType
+        fields = ['id', 'work_type_id', 'employment_id', 'period', 'bills_amount', 'priority', 'duration']

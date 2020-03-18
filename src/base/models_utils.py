@@ -75,6 +75,7 @@ def check_func_groups():
         'LoginView',
         'LogoutView',
         'PasswordChangeView',
+        'WorkerWorkTypeViewSet',
         'WorkTypeNameViewSet',
         'WorkTypeViewSet',
         'OperationTemplateViewSet',

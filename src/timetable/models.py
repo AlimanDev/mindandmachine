@@ -241,6 +241,9 @@ class WorkerWorkType(AbstractModel):
     # how many hours did he work
     duration = models.FloatField(default=0)
 
+    def get_department(self):
+        return self.employment.shop
+
 
 class WorkerConstraint(AbstractModel):
     class Meta(object):
