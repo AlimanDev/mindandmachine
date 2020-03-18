@@ -1,5 +1,5 @@
 from django.db.models import Q
-from django_filters.rest_framework import FilterSet, DateFilter
+from django_filters.rest_framework import FilterSet, DateFilter, NumberFilter
 
 from src.base.models import  Employment, User
 
@@ -22,9 +22,10 @@ class EmploymentFilter(FilterSet):
 
 
 class UserFilter(FilterSet):
+    shop_id=NumberFilter(field_name='employments__shop_id')
     class Meta:
         model = User
         fields = {
             'id':['exact', 'in'],
-            'employments__shop_id': ['exact'],
+            'shop_id': ['exact'],
         }
