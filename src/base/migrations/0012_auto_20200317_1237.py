@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='user',
             name='tabel_code',
-            field=models.CharField(blank=True, max_length=15, null=True, unique=True),
+            field=models.CharField(max_length=15, null=True, unique=True),
         ),
     ]
