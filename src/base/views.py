@@ -1,14 +1,14 @@
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_auth.views import UserDetailsView
 
-from src.base.permissions import FilteredListPermission, Permission
-from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer
+from src.base.permissions import FilteredListPermission
+from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer
 from src.base.filters import EmploymentFilter, UserFilter
 
-from src.base.models import  Employment, User, FunctionGroup
+from src.base.models import  Employment, User, FunctionGroup, WorkerPosition
 
 from django.utils.timezone import now
 
@@ -51,3 +51,113 @@ class FunctionGroupView(ListAPIView):
         groups = Employment.objects \
             .get_active(user=user).values_list("function_group_id", flat=True)
         return FunctionGroup.objects.filter(group__in=groups).distinct('func')
+
+
+class WorkerPositionViewSet(ReadOnlyModelViewSet):
+    """
+
+    GET /rest_api/work_type/
+    :params
+        shop_id: int, required=False
+    :return [
+        {
+            "id": 2,
+            "priority": 23,
+            "dttm_last_update_queue": None,
+            "min_workers_amount": 2,
+            "max_workers_amount": 10,
+            "probability": 2.0,
+            "prior_weigth": 1.0,
+            "shop_id": 1,
+            "work_type_name":{
+                "id": 1,
+                "name": "Work type",
+                "code": "1",
+            }
+        },
+        ...
+    ]
+
+
+    GET /rest_api/work_type/6/
+    :return {
+        "id": 6,
+        "priority": 23,
+        "dttm_last_update_queue": None,
+        "min_workers_amount": 2,
+        "max_workers_amount": 10,
+        "probability": 2.0,
+        "prior_weigth": 1.0,
+        "shop_id": 1,
+        "work_type_name":{
+            "id": 1,
+            "name": "Work type",
+            "code": "1",
+        }
+    }
+
+
+    POST /rest_api/work_type/
+    :params
+        priority: int, required=False
+        min_workers_amount: int, required=False
+        max_workers_amount: int, required=False
+        probability: float, required=Fasle
+        prior_weigth: float, required=False
+        shop_id: int, required=True
+        code: str, required=False
+        work_type_name_id: int, required=False
+    :return
+        code 201
+        {
+            "id": 6,
+            "priority": 23,
+            "dttm_last_update_queue": None,
+            "min_workers_amount": 2,
+            "max_workers_amount": 10,
+            "probability": 2.0,
+            "prior_weigth": 1.0,
+            "shop_id": 1,
+            "work_type_name":{
+                "id": 1,
+                "name": "Work type",
+                "code": "1",
+            }
+        }
+
+
+    PUT /rest_api/work_type/6/
+    :params
+        priority: int, required=False
+        min_workers_amount: int, required=False
+        max_workers_amount: int, required=False
+        probability: float, required=Fasle
+        prior_weigth: float, required=False
+        shop_id: int, required=True
+        code: str, required=False
+        work_type_name_id: int, required=False
+    :return {
+        "id": 6,
+        "priority": 23,
+        "dttm_last_update_queue": None,
+        "min_workers_amount": 2,
+        "max_workers_amount": 10,
+        "probability": 2.0,
+        "prior_weigth": 1.0,
+        "shop_id": 1,
+        "work_type_name":{
+            "id": 1,
+            "name": "Work type",
+            "code": "1",
+        }
+    }
+
+
+    DELETE /rest_api/work_type/6/
+    :return
+        code 204
+
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = WorkerPositionSerializer
+    queryset = WorkerPosition.objects.filter(dttm_deleted__isnull=True)

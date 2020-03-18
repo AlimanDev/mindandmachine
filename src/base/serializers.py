@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from src.base.models import  Employment, User, FunctionGroup
+from src.base.models import  Employment, User, FunctionGroup, WorkerPosition
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -44,3 +44,9 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 if field not in data:
                     raise serializers.ValidationError({field:"This field is required"})
         return data
+
+
+class WorkerPositionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkerPosition
+        fields = ['id', 'name',]

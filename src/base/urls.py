@@ -1,8 +1,7 @@
 from django.conf.urls import url, include
 from rest_framework import routers, urls
 from src.base.shop.views import ShopViewSet
-from src.base.views import EmploymentViewSet, UserViewSet, FunctionGroupView, AuthUserView
-from src.base.worker_position.views import WorkerPositionViewSet
+from src.base.views import EmploymentViewSet, UserViewSet, FunctionGroupView, AuthUserView, WorkerPositionViewSet
 from rest_auth.views import (
     LoginView, LogoutView, PasswordChangeView
 )
