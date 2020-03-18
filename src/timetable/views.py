@@ -8,7 +8,6 @@ from src.timetable.models import WorkerDay, WorkerDayApprove
 from src.timetable.serializers import WorkerDaySerializer, WorkerDayApproveSerializer
 from src.timetable.filters import MultiShopsFilterBackend, WorkerDayFilter, WorkerDayApproveFilter
 
-from dateutil.relativedelta import relativedelta
 
 
 class WorkerDayApproveViewSet(
@@ -57,7 +56,6 @@ class WorkerDayApproveViewSet(
             new_plans = WorkerDay.objects.filter(
                 dttm_deleted__isnull=True,
                 worker_day_approve_id=worker_day_approve.id,
-                # is_fact=True
             )
             for new_plan in new_plans:
                 parent = new_plan.parent_worker_day
@@ -112,8 +110,4 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.data)
 
-"""
-TODO: 
-создание неподтвержденной копии расписания 
-занесение отметок в WorkerDay
-"""
+

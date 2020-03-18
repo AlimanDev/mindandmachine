@@ -20,7 +20,7 @@ from src.base.models import (
 from src.timetable.models import (
     WorkerDay,
     WorkerDayChangeRequest,
-    WorkerCashboxInfo,
+    WorkerWorkType,
     WorkerConstraint,
     WorkerDayCashboxDetails,
     WorkType,
@@ -203,7 +203,7 @@ def select_cashiers(request, form):
 
     work_types = set(form.get('work_types', []))
     if len(work_types) > 0:
-        employments_ids = WorkerCashboxInfo.objects.select_related('work_type').filter(
+        employments_ids = WorkerWorkType.objects.select_related('work_type').filter(
             work_type__shop_id=shop_id,
             is_active=True,
             work_type_id__in=work_types
@@ -478,12 +478,12 @@ def get_cashier_info(request, form):
         response['general_info'] = EmploymentConverter.convert(employment)
 
     if 'work_type_info' in form['info']:
-        worker_cashbox_info = WorkerCashboxInfo.objects.filter(employment=employment, is_active=True)
+        worker_work_type = WorkerWorkType.objects.filter(employment=employment, is_active=True)
         work_types = WorkType.objects.filter(shop_id=form['shop_id'])
         response['work_type_info'] = {
             'worker_cashbox_info': Converter.convert(
-                worker_cashbox_info, 
-                WorkerCashboxInfo, 
+                worker_work_type,
+                WorkerWorkType,
                 fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],
                 out_array=True,
             ),
@@ -1057,7 +1057,7 @@ def set_worker_restrictions(request, form):
 
     # WorkTypes
     work_type_info = form.get('work_type_info', [])
-    curr_work_types = {wci.work_type_id: wci for wci in WorkerCashboxInfo.objects.filter(employment=employment,)}
+    curr_work_types = {wci.work_type_id: wci for wci in WorkerWorkType.objects.filter(employment=employment, )}
     
     for work_type in work_type_info:
         wci = curr_work_types.pop(work_type['work_type_id'], None)
@@ -1067,7 +1067,7 @@ def set_worker_restrictions(request, form):
             wci.save()
         else:
             try:
-                WorkerCashboxInfo.objects.create(
+                WorkerWorkType.objects.create(
                     employment=employment,
                     work_type_id=work_type['work_type_id'],
                     priority=work_type['priority'],
@@ -1076,7 +1076,7 @@ def set_worker_restrictions(request, form):
                 pass
     
     del_old_wcis_ids = [wci.id for wci in curr_work_types.values()]
-    WorkerCashboxInfo.objects.filter(id__in=del_old_wcis_ids).delete()
+    WorkerWorkType.objects.filter(id__in=del_old_wcis_ids).delete()
     
     if type(form.get('constraints')) == list:
         new_constraints = form['constraints']

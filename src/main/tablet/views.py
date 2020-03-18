@@ -9,7 +9,7 @@ from src.base.models import (
 from src.timetable.models import (
     Cashbox,
     WorkerDayCashboxDetails,
-    WorkerCashboxInfo,
+    WorkerWorkType,
     WorkerDay,
     WorkType,
 )
@@ -297,21 +297,21 @@ def get_cashiers_info(request, form):
             })
 
     user_ids = response.keys()
-    worker_cashboxes_types = WorkerCashboxInfo.objects.select_related('work_type', 'employment').filter(
+    worker_work_type_list = WorkerWorkType.objects.select_related('work_type', 'employment').filter(
         employment__user_id__in=user_ids, is_active=True)
     result = {}
-    for worker_cashboxes_type in list(worker_cashboxes_types):
-        key = worker_cashboxes_type.employment.user_id
+    for worker_work_type in list(worker_work_type_list):
+        key = worker_work_type.employment.user_id
         if key not in result:
             result[key] = []
-        result[key].append(worker_cashboxes_type)
-    worker_cashboxes_types = result
+        result[key].append(worker_work_type)
+    worker_work_type_list = result
     #group_by(list(worker_cashboxes_types), group_key=lambda _: _.worker_id,)
     for user_id in response.keys():
-        if user_id in worker_cashboxes_types.keys():
+        if user_id in worker_work_type_list.keys():
             response[user_id]['work_types'] = Converter.convert(
-                worker_cashboxes_types.get(user_id),
-                WorkerCashboxInfo,
+                worker_work_type_list.get(user_id),
+                WorkerWorkType,
                 fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],
             )
 

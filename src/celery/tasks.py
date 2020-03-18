@@ -30,7 +30,7 @@ from src.main.operation_template.utils import build_period_clients
 from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
-    WorkerCashboxInfo,
+    WorkerWorkType,
     Timetable,
     ExchangeSettings,
 )
@@ -238,7 +238,7 @@ def allocation_of_time_for_work_on_cashbox():
     """
 
     def update_duration(last_user, last_work_type, duration):
-        WorkerCashboxInfo.objects.filter(
+        WorkerWorkType.objects.filter(
             worker=last_user,
             work_type=last_work_type,
         ).update(duration=round(duration, 3))

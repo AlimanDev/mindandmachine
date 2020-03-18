@@ -217,7 +217,7 @@ class Cashbox(AbstractActiveNamedModel):
     objects = CashboxManager()
 
 
-class WorkerCashboxInfo(AbstractModel):
+class WorkerWorkType(AbstractModel):
     class Meta(object):
         verbose_name = 'Информация по сотруднику-типу работ'
         unique_together = (('employment', 'work_type'),)
@@ -789,3 +789,4 @@ class ExchangeSettings(AbstractModel):
 
     # Расстояние до родителя, в поддереве которого ищем сотрудников для автоназначения
     automatic_worker_select_tree_level = models.IntegerField(default=1)
+
