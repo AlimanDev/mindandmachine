@@ -1,6 +1,7 @@
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import LimitOffsetPagination
 from rest_auth.views import UserDetailsView
 
 from src.base.permissions import FilteredListPermission, Permission
@@ -21,11 +22,14 @@ class EmploymentViewSet(ModelViewSet):
 
 
 class UserViewSet(ModelViewSet):
+    page_size = 10
+    pagination_class = LimitOffsetPagination
     permission_classes = [IsAuthenticated]
     serializer_class = UserSerializer
     filterset_class = UserFilter
 
     queryset = User.objects.all()
+
     def perform_create(self, serializer):
         serializer.username=now()
         instance=serializer.save()

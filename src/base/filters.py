@@ -26,4 +26,5 @@ class UserFilter(FilterSet):
         model = User
         fields = {
             'id':['exact', 'in'],
+            'employments__shop_id': ['exact'],
         }
