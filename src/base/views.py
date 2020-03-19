@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_auth.views import UserDetailsView
 
-from src.base.permissions import FilteredListPermission
+from src.base.permissions import Permission
 from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer
 from src.base.filters import EmploymentFilter, UserFilter
 
@@ -14,7 +14,7 @@ from django.utils.timezone import now
 
 
 class EmploymentViewSet(ModelViewSet):
-    permission_classes = [FilteredListPermission]
+    permission_classes = [Permission]
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
 
