@@ -227,7 +227,7 @@ class WorkerWorkType(AbstractModel):
 
     id = models.BigAutoField(primary_key=True)
 
-    employment = models.ForeignKey(Employment, on_delete=models.PROTECT)
+    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, related_name="work_types")
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
 
     is_active = models.BooleanField(default=True)

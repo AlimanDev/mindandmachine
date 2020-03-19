@@ -18,6 +18,7 @@ class EmploymentFilter(FilterSet):
             'id':['in'],
             'shop_id': ['exact'],
             'user_id': ['exact', 'in'],
+
         }
 
 
