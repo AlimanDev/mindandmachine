@@ -1,14 +1,15 @@
-from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
+from rest_framework import mixins
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet, GenericViewSet
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_auth.views import UserDetailsView
 
 from src.base.permissions import Permission
-from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer
-from src.base.filters import EmploymentFilter, UserFilter
+from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer
+from src.base.filters import EmploymentFilter, UserFilter, NotificationFilter, SubscribeFilter
 
-from src.base.models import  Employment, User, FunctionGroup, WorkerPosition
+from src.base.models import  Employment, User, FunctionGroup, WorkerPosition, Subscribe, Notification
 
 from django.utils.timezone import now
 
@@ -161,3 +162,22 @@ class WorkerPositionViewSet(ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = WorkerPositionSerializer
     queryset = WorkerPosition.objects.filter(dttm_deleted__isnull=True)
+
+
+class SubscribeViewSet(ModelViewSet):
+    permission_classes = [Permission]
+    serializer_class = SubscribeSerializer
+    filterset_class = SubscribeFilter
+    queryset = Subscribe.objects.all()
+
+
+class NotificationViewSet(
+                   mixins.RetrieveModelMixin,
+                   mixins.UpdateModelMixin,
+                   mixins.ListModelMixin,
+                   GenericViewSet
+):
+    permission_classes = [IsAuthenticated]
+    serializer_class = NotificationSerializer
+    filterset_class = NotificationFilter
+    queryset = Notification.objects.all()
