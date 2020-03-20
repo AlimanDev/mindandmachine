@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from src.base.models import  Employment, User, FunctionGroup, WorkerPosition
+from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event
 from src.timetable.serializers import WorkerWorkTypeSerializer
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -51,3 +52,23 @@ class WorkerPositionSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkerPosition
         fields = ['id', 'name',]
+
+
+class EventSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Event
+        fields = ['params']
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    event = EventSerializer(read_only=True)
+    class Meta:
+        model = Notification
+        fields = ['worker_id', 'is_read', 'event_id', 'event']
+        read_only_fields = ['worker_id', 'event_id']
+
+
+class SubscribeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Subscribe
+        fields = [ 'user_id', 'shop_id', 'type_id'],

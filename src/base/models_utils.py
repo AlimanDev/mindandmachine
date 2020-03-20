@@ -83,6 +83,8 @@ def check_func_groups():
         'OperationTypeViewSet',
         'PeriodClientsViewSet',
         'WorkerPositionViewSet',
+        'SubscribeViewSet',
+        'NotificationViewSet',
 
     ]
 

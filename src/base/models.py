@@ -331,6 +331,8 @@ class FunctionGroup(AbstractModel):
     )
 
     FUNCS = (
+        'Notification',
+        'Subscribe',
         'Shop',
         'Shop_stat',
         'WorkerDay',
@@ -488,3 +490,40 @@ class FunctionGroup(AbstractModel):
             self.access_type,
             self.func,
         )
+
+EVENT_TYPES = [('V','Вакансия'),('T','Изменения в расписании')]
+
+
+class Event(AbstractModel):
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    type = models.CharField(choices=EVENT_TYPES, max_length=1)
+    shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT, related_name="events")
+    params = models.CharField(default='{}', max_length=64)
+
+
+class Subscribe(AbstractModel):
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    type = models.CharField(choices=EVENT_TYPES, max_length=1)
+    user = models.ForeignKey(User, blank=False, null=False, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, blank=False, null=False, on_delete=models.PROTECT)
+
+
+class Notification(AbstractModel):
+    class Meta(object):
+        verbose_name = 'Уведомления'
+
+    def __str__(self):
+        return '{}, {}, {}, id: {}'.format(
+            self.to_worker.last_name,
+            self.shop.name if self.shop else 'no shop',
+            self.dttm_added,
+            # self.text[:60],
+            self.id
+        )
+
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
+
+    is_read = models.BooleanField(default=False)
+    event = models.ForeignKey(Event, on_delete=models.PROTECT, null=True)
+
