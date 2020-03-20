@@ -4,7 +4,7 @@ from rest_framework.authentication import SessionAuthentication
 
 from src.base.permissions import FilteredListPermission
 
-from src.timetable.models import WorkerDay, WorkerDayApprove, WorkerWorkType
+from src.timetable.models import WorkerDay, WorkerDayApprove, EmploymentWorkType
 from src.timetable.serializers import WorkerDaySerializer, WorkerDayApproveSerializer, WorkerWorkTypeSerializer
 from src.timetable.filters import MultiShopsFilterBackend, WorkerDayFilter, WorkerDayApproveFilter, WorkerWorkTypeFilter
 
@@ -113,4 +113,6 @@ class WorkerWorkTypeViewSet(viewsets.ModelViewSet):
     permission_classes = [FilteredListPermission]
     serializer_class = WorkerWorkTypeSerializer
     filterset_class = WorkerWorkTypeFilter
-    queryset = WorkerWorkType.objects.all()
+    queryset = EmploymentWorkType.objects.all()
+
+

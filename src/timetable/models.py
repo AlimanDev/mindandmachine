@@ -5,10 +5,7 @@ from django.contrib.auth.models import (
 
 import datetime
 
-from fcm_django.models import FCMDevice
-from src.conf.djconfig import IS_PUSH_ACTIVE
-
-from src.base.models import Shop, Employment, User
+from src.base.models import Shop, Employment, User, Event
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
 
@@ -217,7 +214,7 @@ class Cashbox(AbstractActiveNamedModel):
     objects = CashboxManager()
 
 
-class WorkerWorkType(AbstractModel):
+class EmploymentWorkType(AbstractModel):
     class Meta(object):
         verbose_name = 'Информация по сотруднику-типу работ'
         unique_together = (('employment', 'work_type'),)
@@ -490,6 +487,7 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
 
     dttm_from = models.DateTimeField()
     dttm_to = models.DateTimeField(null=True, blank=True)
+    event = models.OneToOneField(Event, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return '{}, {}, {}, {}, {}-{}, id: {}'.format(

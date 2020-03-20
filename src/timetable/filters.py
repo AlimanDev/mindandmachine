@@ -4,7 +4,7 @@ from django_filters.rest_framework import FilterSet, BooleanFilter, DjangoFilter
 from django_filters import utils
 
 from src.base.models import Employment
-from src.timetable.models import WorkerDay, WorkerDayApprove, WorkerWorkType
+from src.timetable.models import WorkerDay, WorkerDayApprove, EmploymentWorkType
 
 
 class MultiShopsFilterBackend(DjangoFilterBackend):
@@ -94,7 +94,7 @@ class WorkerDayFilter(FilterSet):
 class WorkerWorkTypeFilter(FilterSet):
     shop_id=NumberFilter(field_name='work_type__shop_id')
     class Meta:
-        model = WorkerWorkType
+        model = EmploymentWorkType
         fields = {
             'shop_id':['exact'],
             'employment_id':['exact'],

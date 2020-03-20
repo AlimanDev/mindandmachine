@@ -28,7 +28,7 @@ from src.timetable.models import (
     AttendanceRecords,
     WorkerDay,
     WorkerDayCashboxDetails,
-    WorkerWorkType,
+    EmploymentWorkType,
 )
 from src.main.demand.utils import create_predbills_request_function
 from src.util.models_converter import Converter
@@ -195,7 +195,7 @@ def upload_timetable_util(form, timetable_file):
             elif column_index == work_type_column:
                 user_work_type = shop_work_types.get(cell.value, None)
                 if user_work_type:
-                    WorkerWorkType.objects.get_or_create(
+                    EmploymentWorkType.objects.get_or_create(
                         employment=employment,
                         work_type=user_work_type,
                     )
