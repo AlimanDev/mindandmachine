@@ -24,7 +24,6 @@ from src.main.demand.utils import create_predbills_request_function
 from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
 
 
-from src.main.timetable.worker_exchange.utils import search_candidates, send_noti2candidates
 from src.main.operation_template.utils import build_period_clients
 
 from src.timetable.models import (
@@ -52,7 +51,7 @@ from src.conf.djconfig import EMAIL_HOST_USER
 import time as time_in_secs
 
 @app.task
-def create_notifications(event):
+def create_notifications_for_event(event):
     subscribes = Subscribe.objects.filter(type=event.type, shop=event.shop)
     notification_list = []
     for subscribe in subscribes:
@@ -65,6 +64,30 @@ def create_notifications(event):
         print(f"Create notification for {subscribe.user}, {event}")
         Notification.objects.bulk_create(notification_list)
 
+@app.task
+def create_notifications_for_subscribe(subscribe):
+    events = Event.objects.filter(shop=subscribe.shop, type=subscribe.type, dttm_valid_to__gte=now())
+    notification_list = []
+    for event in events:
+        notification_list.append(
+            Notification(
+                worker=subscribe.user,
+                event=event
+            )
+        )
+        print(f"Create notification for {subscribe.user}, {event}")
+        Notification.objects.bulk_create(notification_list)
+
+@app.task
+def delete_notifications():
+    dt=now().date() - timedelta(days=3)
+    Notification.objects.filter(
+        event__dttm_valid_to__lte=dt
+    ).delete()
+
+    Event.objects.filter(
+        dttm_valid_to__lte=dt
+    ).delete()
 
 @app.task
 def op_type_build_period_clients():
