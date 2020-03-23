@@ -514,8 +514,8 @@ class Notification(AbstractModel):
 
     def __str__(self):
         return '{}, {}, {}, id: {}'.format(
-            self.to_worker.last_name,
-            self.shop.name if self.shop else 'no shop',
+            self.worker,
+            self.event ,
             self.dttm_added,
             # self.text[:60],
             self.id

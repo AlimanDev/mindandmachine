@@ -37,6 +37,10 @@ from src.timetable.models import (
 from src.base.models import (
     Shop,
     User,
+    Notification,
+    Subscribe,
+    Event
+
 )
 from src.forecast.models import (
     OperationTemplate
@@ -46,6 +50,20 @@ from django.core.mail import EmailMultiAlternatives
 from src.conf.djconfig import EMAIL_HOST_USER
 
 import time as time_in_secs
+
+@app.task
+def create_notifications(event):
+    subscribes = Subscribe.objects.filter(type=event.type, shop=event.shop)
+    notification_list = []
+    for subscribe in subscribes:
+        notification_list.append(
+            Notification(
+                worker=subscribe.user,
+                event=event
+            )
+        )
+        print(f"Create notification for {subscribe.user}, {event}")
+        Notification.objects.bulk_create(notification_list)
 
 
 @app.task
@@ -162,8 +180,7 @@ def release_all_workers():
 @app.task
 def vacancies_create_and_cancel():
     """
-    Создает уведомления на неделю вперед, если в магазине будет нехватка кассиров
-
+    Создание вакансий для всех магазинов
     """
 
     exchange_settings = ExchangeSettings.objects.first()
@@ -179,8 +196,7 @@ def vacancies_create_and_cancel():
 @app.task
 def create_shop_vacancies_and_notify(shop_id, work_type_id):
     """
-    Создает уведомления на неделю вперед, если в магазине будет нехватка кассиров
-
+    Создание вакансий для магазина
     """
 
     create_vacancies_and_notify(shop_id, work_type_id)
@@ -198,7 +214,6 @@ def cancel_shop_vacancies(shop_id, work_type_id):
 @app.task
 def workers_hard_exchange():
     """
-
     Автоматически перекидываем сотрудников из других магазинов, если
     в том магазине потребность в сотруднике < 20%.
 
