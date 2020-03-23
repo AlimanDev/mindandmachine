@@ -57,18 +57,19 @@ class WorkerPositionSerializer(serializers.ModelSerializer):
 class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
-        fields = ['params']
+        fields = ['params', 'type', 'shop']
 
 
 class NotificationSerializer(serializers.ModelSerializer):
     event = EventSerializer(read_only=True)
     class Meta:
         model = Notification
-        fields = ['worker_id', 'is_read', 'event_id', 'event']
+        fields = ['id','worker_id', 'is_read', 'event_id', 'event']
         read_only_fields = ['worker_id', 'event_id']
 
 
 class SubscribeSerializer(serializers.ModelSerializer):
+    shop_id = serializers.IntegerField(required=True)
     class Meta:
         model = Subscribe
-        fields = [ 'user_id', 'shop_id', 'type_id'],
+        fields = ['id','shop_id', 'type']

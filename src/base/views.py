@@ -165,11 +165,15 @@ class WorkerPositionViewSet(ReadOnlyModelViewSet):
 
 
 class SubscribeViewSet(ModelViewSet):
-    permission_classes = [Permission]
+    permission_classes = [IsAuthenticated]
     serializer_class = SubscribeSerializer
     filterset_class = SubscribeFilter
-    queryset = Subscribe.objects.all()
 
+    def get_queryset(self):
+        user = self.request.user
+        return Subscribe.objects.filter(user=user)
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 class NotificationViewSet(
                    mixins.RetrieveModelMixin,
@@ -180,4 +184,7 @@ class NotificationViewSet(
     permission_classes = [IsAuthenticated]
     serializer_class = NotificationSerializer
     filterset_class = NotificationFilter
-    queryset = Notification.objects.all()
+
+    def get_queryset(self):
+        user = self.request.user
+        return Notification.objects.filter(worker=user)
