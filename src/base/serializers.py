@@ -6,7 +6,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name',
-                  'birthday', 'sex', 'avatar', 'phone_number','tabel_code']
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number','tabel_code']
 
 
 class FunctionGroupSerializer(serializers.ModelSerializer):
