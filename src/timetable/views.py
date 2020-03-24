@@ -1,9 +1,7 @@
 from rest_framework import viewsets, mixins
 from rest_framework.response import Response
-from rest_framework.authentication import SessionAuthentication
-from rest_framework.permissions import IsAuthenticated
 
-from src.base.permissions import FilteredListPermission
+from src.base.permissions import FilteredListPermission, EmploymentFilteredListPermission
 
 from src.timetable.models import WorkerDay, WorkerDayApprove, WorkerWorkType, WorkerConstraint
 from src.timetable.serializers import WorkerDaySerializer, WorkerDayApproveSerializer, WorkerWorkTypeSerializer, WorkerConstraintSerializer
@@ -17,7 +15,6 @@ class WorkerDayApproveViewSet(
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
 ):
-    authentication_classes = [SessionAuthentication]
     permission_classes = [FilteredListPermission]
     serializer_class = WorkerDayApproveSerializer
     filterset_class = WorkerDayApproveFilter
@@ -77,7 +74,6 @@ class WorkerDayApproveViewSet(
 
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
-    authentication_classes = [SessionAuthentication]
     permission_classes = [FilteredListPermission]
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
@@ -110,7 +106,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
 
 class WorkerWorkTypeViewSet(viewsets.ModelViewSet):
-    authentication_classes = [SessionAuthentication]
     permission_classes = [FilteredListPermission]
     serializer_class = WorkerWorkTypeSerializer
     filterset_class = WorkerWorkTypeFilter
@@ -118,8 +113,13 @@ class WorkerWorkTypeViewSet(viewsets.ModelViewSet):
 
 
 class WorkerConstraintViewSet(viewsets.ModelViewSet):
-    authentication_classes = [SessionAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [EmploymentFilteredListPermission]
     serializer_class = WorkerConstraintSerializer
     filterset_class = WorkerConstraintFilter
     queryset = WorkerConstraint.objects.all()
+
+    def filter_queryset(self, queryset):
+        if self.action == 'list':
+            return super().filter_queryset(queryset)
+        return queryset
+

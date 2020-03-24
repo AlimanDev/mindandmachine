@@ -77,3 +77,33 @@ class FilteredListPermission(Permission):
             user=request.user)
 
         return self.check_employment_permission(employments, request, view)
+
+class EmploymentFilteredListPermission(Permission):
+    """
+    Класс для определения прав доступа к методам апи по employment
+    """
+    def has_permission(self, request, view):
+        if not bool(request.user and request.user.is_authenticated):
+            return False
+        if view.action == 'retrieve':
+            # Права для объекта проверятся в has_object_permission
+            return True
+
+        if request.method == 'GET':
+            employment_id = request.query_params.get('employment_id')
+            if not employment_id:
+                raise ValidationError("employment_id should be defined")
+        else:
+            employment_id = request.data.get('employment_id')
+            # shop_id не меняется, права задаются has_object_permission
+            if not employment_id:
+                return True
+
+        employment = Employment.objects.get(id=employment_id)
+        department = employment.shop
+
+        employments = Employment.objects.get_active(
+            shop__in=department.get_ancestors(include_self=True, ascending=True),
+            user=request.user)
+
+        return self.check_employment_permission(employments, request, view)

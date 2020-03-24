@@ -102,9 +102,10 @@ class WorkerWorkTypeFilter(FilterSet):
 
 
 class WorkerConstraintFilter(FilterSet):
-    employment_id=NumberFilter(field_name='employment_id',required=True)
+    employment_id = NumberFilter(field_name='employment_id')
     class Meta:
         model = WorkerConstraint
         fields = {
-            'employment_id':['exact'],
+            'employment_id': ['exact'],
         }
+
