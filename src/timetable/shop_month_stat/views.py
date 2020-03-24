@@ -4,7 +4,7 @@ from src.base.permissions import FilteredListPermission
 from rest_framework.response import Response
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import ShopMonthStat
-
+from django_filters.rest_framework import FilterSet
 
 # Serializers define the API representation.
 class ShopMonthStatSerializer(serializers.ModelSerializer):
@@ -12,6 +12,15 @@ class ShopMonthStatSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShopMonthStat
         fields = ['id', 'shop_id', 'status_message', 'dt', 'status', 'fot', 'lack', 'idle', 'workers_amount', 'revenue', 'fot_revenue']
+
+
+class ShopMonthStatFilter(FilterSet):
+    class Meta:
+        model = ShopMonthStat
+        fields = {
+            'shop_id':['exact', 'in'],
+            'dt':['exact',],
+        }
 
 
 class ShopMonthStatViewSet(mixins.UpdateModelMixin,

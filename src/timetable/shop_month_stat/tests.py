@@ -42,6 +42,13 @@ class TestShopMonthStat(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.json()), 1)
 
+    
+    def test_get_by_dt_and_shop(self):
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&dt={Converter.convert_date(date.today().replace(day=1))}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()), 1)
+
+
     def test_get(self):
         response = self.client.get(f'{self.url}{self.month_stat.id}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
