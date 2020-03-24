@@ -1,12 +1,13 @@
 from rest_framework import viewsets, mixins
 from rest_framework.response import Response
 from rest_framework.authentication import SessionAuthentication
+from rest_framework.permissions import IsAuthenticated
 
 from src.base.permissions import FilteredListPermission
 
-from src.timetable.models import WorkerDay, WorkerDayApprove, WorkerWorkType
-from src.timetable.serializers import WorkerDaySerializer, WorkerDayApproveSerializer, WorkerWorkTypeSerializer
-from src.timetable.filters import MultiShopsFilterBackend, WorkerDayFilter, WorkerDayApproveFilter, WorkerWorkTypeFilter
+from src.timetable.models import WorkerDay, WorkerDayApprove, WorkerWorkType, WorkerConstraint
+from src.timetable.serializers import WorkerDaySerializer, WorkerDayApproveSerializer, WorkerWorkTypeSerializer, WorkerConstraintSerializer
+from src.timetable.filters import MultiShopsFilterBackend, WorkerDayFilter, WorkerDayApproveFilter, WorkerWorkTypeFilter, WorkerConstraintFilter
 
 
 class WorkerDayApproveViewSet(
@@ -114,3 +115,11 @@ class WorkerWorkTypeViewSet(viewsets.ModelViewSet):
     serializer_class = WorkerWorkTypeSerializer
     filterset_class = WorkerWorkTypeFilter
     queryset = WorkerWorkType.objects.all()
+
+
+class WorkerConstraintViewSet(viewsets.ModelViewSet):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = WorkerConstraintSerializer
+    filterset_class = WorkerConstraintFilter
+    queryset = WorkerConstraint.objects.all()

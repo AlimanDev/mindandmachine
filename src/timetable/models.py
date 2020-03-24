@@ -12,6 +12,7 @@ from src.base.models import Shop, Employment, User
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
 
+
 class WorkerManager(UserManager):
     pass
 

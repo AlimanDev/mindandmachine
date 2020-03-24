@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayApprove, WorkerWorkType
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayApprove, WorkerWorkType, WorkerConstraint
 
 from rest_framework.exceptions import ValidationError
 
@@ -111,3 +111,13 @@ class WorkerWorkTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkerWorkType
         fields = ['id', 'work_type_id', 'employment_id', 'period', 'bills_amount', 'priority', 'duration']
+
+
+class WorkerConstraintSerializer(serializers.ModelSerializer):
+    employment_id = serializers.IntegerField(required=False)
+    worker_id = serializers.IntegerField(required=False)
+    shop_id = serializers.IntegerField(required=False)
+
+    class Meta:
+        model = WorkerConstraint
+        fields = ['id', 'shop_id', 'employment_id', 'worker_id', 'weekday', 'is_lite', 'tm']
