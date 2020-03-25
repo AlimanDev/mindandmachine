@@ -6,6 +6,7 @@ from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import ShopMonthStat
 from django_filters.rest_framework import FilterSet
 
+
 # Serializers define the API representation.
 class ShopMonthStatSerializer(serializers.ModelSerializer):
     dt = serializers.DateField(format=QOS_DATE_FORMAT, read_only=True)
@@ -18,8 +19,8 @@ class ShopMonthStatFilter(FilterSet):
     class Meta:
         model = ShopMonthStat
         fields = {
-            'shop_id':['exact', 'in'],
-            'dt':['exact',],
+            'shop_id': ['exact', 'in'],
+            'dt': ['exact', 'in'],
         }
 
 
