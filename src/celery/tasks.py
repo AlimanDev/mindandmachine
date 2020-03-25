@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import os
 
 from django.db.models import Avg, Q
@@ -31,7 +31,7 @@ from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
     WorkerCashboxInfo,
-    Timetable,
+    ShopMonthStat,
     ExchangeSettings,
 )
 from src.base.models import (
@@ -307,25 +307,54 @@ def create_pred_bills():
 def update_shop_stats(dt=None):
     if not dt:
         dt = date.today().replace(day=1)
-    shops = Shop.objects.filter(dttm_deleted__isnull=True)
-    tts = Timetable.objects.filter(shop__in=shops, dt__gte=dt, status=Timetable.READY)
-    for timetable in tts:
+    else:
+        dt = dt.replace(day=1)
+    shops = list(Shop.objects.filter(dttm_deleted__isnull=True, child__isnull=True))
+    month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt))
+    if len(shops) != len(month_stats):
+        shops_with_stats = list(ShopMonthStat.objects.filter(
+            shop__child__isnull=True,
+            shop__in=shops, 
+            dt=dt,
+        ).values_list('shop_id', flat=True))
+        ShopMonthStat.objects.bulk_create(
+            [
+                ShopMonthStat(
+                    shop=shop,
+                    dt=dt,
+                    dttm_status_change=datetime.now(),
+                )
+                for shop in shops
+                if shop.id not in shops_with_stats
+            ]
+        )
+        month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt))
+    for month_stat in month_stats:
+        if month_stat.status not in [ShopMonthStat.READY, ShopMonthStat.NOT_DONE]:
+            continue
         stats = get_shop_stats(
-            shop_id=timetable.shop_id,
+            shop_id=month_stat.shop_id,
             form=dict(
-                from_dt=timetable.dt,
-                to_dt=timetable.dt + relativedelta(months=1, days=-1),
+                from_dt=month_stat.dt,
+                to_dt=month_stat.dt + relativedelta(months=1, days=-1),
                 work_type_ids=[]
             ),
             indicators_only=True
         )['indicators']
-        timetable.idle = stats['deadtime_part']
-        timetable.fot = stats['FOT']
-        timetable.workers_amount = stats['cashier_amount']
-        timetable.revenue = stats['revenue']
-        timetable.lack = stats['covering_part']
-        timetable.fot_revenue = stats['fot_revenue']
-        timetable.save()
+        month_stat.idle = stats['deadtime_part']
+        month_stat.fot = stats['FOT']
+        month_stat.workers_amount = stats['cashier_amount']
+        month_stat.revenue = stats['revenue']
+        month_stat.lack = stats['covering_part']
+        month_stat.fot_revenue = stats['fot_revenue']
+        month_stat.save()
+
+
+@app.task
+def update_shop_stats_2_months():
+    dt = date.today().replace(day=1)
+    update_shop_stats(dt=dt)
+    update_shop_stats(dt=dt + relativedelta(months=1))
 
 
 @app.task

@@ -342,6 +342,7 @@ class FunctionGroup(AbstractModel):
         'PeriodClients_indicators',
         'PeriodClients_put',
         'PeriodClients_delete',
+        'ShopMonthStat',
 
         'signout',
         'password_edit',
