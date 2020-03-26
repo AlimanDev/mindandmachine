@@ -5,7 +5,8 @@ from src.base.permissions import FilteredListPermission, EmploymentFilteredListP
 
 from src.timetable.models import WorkerDay, WorkerDayApprove, WorkerWorkType, WorkerConstraint
 from src.timetable.serializers import WorkerDaySerializer, WorkerDayApproveSerializer, WorkerWorkTypeSerializer, WorkerConstraintSerializer
-from src.timetable.filters import MultiShopsFilterBackend, WorkerDayFilter, WorkerDayApproveFilter, WorkerWorkTypeFilter, WorkerConstraintFilter
+from src.timetable.filters import WorkerDayFilter, WorkerDayApproveFilter, WorkerWorkTypeFilter, WorkerConstraintFilter
+from src.timetable.backends import MultiShopsFilterBackend
 
 
 class WorkerDayApproveViewSet(
