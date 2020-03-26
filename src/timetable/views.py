@@ -78,7 +78,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
     permission_classes = [FilteredListPermission]
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
-    queryset = WorkerDay.objects.qos_filter_version(1)
+    queryset = WorkerDay.objects.all()
     filter_backends = [MultiShopsFilterBackend]
 
     # тут переопределяется update потому что надо в Response вернуть
