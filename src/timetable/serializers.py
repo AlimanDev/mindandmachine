@@ -76,18 +76,21 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
         return super().update(instance, validated_data)
 
-    def check_other_worker_days(self, instance, validated_data):
-        is_fact =  instance.is_fact if instance else validated_data.get('is_fact')
+    def check_other_worker_days(self, worker_day, validated_data):
+        """
+        При сохранении рабочего дня проверяет, что нет пересечений с другими рабочими днями в тот же день
+        """
+        is_fact = worker_day.is_fact if worker_day else validated_data.get('is_fact')
         worker_days = WorkerDay.objects.filter(
             worker_id=validated_data.get('worker_id'),
             dt=validated_data.get('dt'),
-            is_fact = is_fact,
+            is_fact=is_fact,
             dttm_deleted__isnull=True,
         )
 
-        if instance:
-            parent_worker_day_id = instance.parent_worker_day_id
-            worker_days=worker_days.exclude(id=instance.id)
+        if worker_day:
+            parent_worker_day_id = worker_day.parent_worker_day_id
+            worker_days = worker_days.exclude(id=worker_day.id)
         else:
             parent_worker_day_id = validated_data.get('parent_worker_day_id', None)
 
