@@ -88,7 +88,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
 
         if serializer.instance.worker_day_approve_id:
             data = serializer.validated_data
@@ -104,6 +103,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             instance._prefetched_objects_cache = {}
 
         return Response(serializer.data)
+
 
 
 class WorkerWorkTypeViewSet(viewsets.ModelViewSet):
