@@ -97,7 +97,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def perform_destroy(self, worker_day):
-        if worker_day.worker_day_approved_id:
+        if worker_day.worker_day_approve_id:
             raise ValidationError({"error": f"Нельзя удалить подтвержденную версию"})
         super().perform_destroy(worker_day)
 
