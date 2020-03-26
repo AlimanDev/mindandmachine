@@ -32,8 +32,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         model = WorkerDay
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'worker_day_approve_id', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id']
-        read_only_fields =['worker_day_approve_id','work_hours' ]
-        create_only_fields = ['is_fact','parent_worker_day_id']
+        read_only_fields =['worker_day_approve_id', 'work_hours' ]
+        create_only_fields = ['is_fact', 'parent_worker_day_id']
 
     def create(self, validated_data):
         self.check_other_worker_days(None, validated_data)

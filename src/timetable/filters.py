@@ -31,7 +31,7 @@ class WorkerDayFilter(FilterSet):
         fields = {
             # 'shop_id':['exact'],
             'worker_id':['in','exact'],
-            'dt': ['gte','lte','exact', 'range'],
+            'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
             'is_fact': ['exact']
         }
@@ -42,8 +42,8 @@ class WorkerWorkTypeFilter(FilterSet):
     class Meta:
         model = WorkerWorkType
         fields = {
-            'shop_id':['exact'],
-            'employment_id':['exact'],
+            'shop_id': ['exact'],
+            'employment_id': ['exact'],
         }
 
 

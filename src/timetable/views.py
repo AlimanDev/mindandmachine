@@ -1,5 +1,6 @@
 from rest_framework import viewsets, mixins
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 
 from src.base.permissions import FilteredListPermission, EmploymentFilteredListPermission
 
@@ -95,6 +96,10 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.data)
 
+    def perform_destroy(self, worker_day):
+        if worker_day.worker_day_approved_id:
+            raise ValidationError({"error": f"Нельзя удалить подтвержденную версию"})
+        super().perform_destroy(worker_day)
 
 
 class WorkerWorkTypeViewSet(viewsets.ModelViewSet):
