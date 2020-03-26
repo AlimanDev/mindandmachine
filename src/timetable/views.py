@@ -13,7 +13,6 @@ class WorkerDayApproveViewSet(
     viewsets.GenericViewSet,
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
-    mixins.DestroyModelMixin,
     mixins.ListModelMixin,
 ):
     permission_classes = [FilteredListPermission]
@@ -63,15 +62,7 @@ class WorkerDayApproveViewSet(
                     )
                     parent.delete()
 
-
         return worker_day_approve
-
-    def perform_destroy(self, instance):
-        WorkerDay.objects.filter(
-            dttm_deleted__isnull=True,
-            worker_day_approve=instance
-        ).update(worker_day_approve=None)
-        instance.delete()
 
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
