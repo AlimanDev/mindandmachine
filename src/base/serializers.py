@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event
-from src.timetable.serializers import WorkerWorkTypeSerializer, WorkerConstraintSerializer
+from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -22,7 +22,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
     position_id = serializers.IntegerField(required=False)
     shop_id = serializers.IntegerField(required=False)
     user_id = serializers.IntegerField(required=False)
-    work_types = WorkerWorkTypeSerializer(many=True)
+    work_types = EmploymentWorkTypeSerializer(many=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
 
     class Meta:

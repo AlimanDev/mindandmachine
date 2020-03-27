@@ -342,7 +342,7 @@ class FunctionGroup(AbstractModel):
         'AuthUserView',
         'FunctionGroupView',
         'OperationTemplate',
-        'WorkerWorkType',
+        'EmploymentWorkType',
         'WorkerConstraint',
         'WorkType',
         'WorkTypeName',

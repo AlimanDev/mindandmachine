@@ -107,7 +107,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 raise ValidationError({"error": f"У сотрудника уже существует рабочий день: {wd} "})
 
 
-class WorkerWorkTypeSerializer(serializers.ModelSerializer):
+class EmploymentWorkTypeSerializer(serializers.ModelSerializer):
     employment_id = serializers.IntegerField(required=False)
     work_type_id = serializers.IntegerField(required=False)
 

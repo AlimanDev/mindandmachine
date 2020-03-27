@@ -5,8 +5,8 @@ from rest_framework.exceptions import ValidationError
 from src.base.permissions import FilteredListPermission, EmploymentFilteredListPermission
 
 from src.timetable.models import WorkerDay, WorkerDayApprove, EmploymentWorkType, WorkerConstraint
-from src.timetable.serializers import WorkerDaySerializer, WorkerDayApproveSerializer, WorkerWorkTypeSerializer, WorkerConstraintSerializer
-from src.timetable.filters import WorkerDayFilter, WorkerDayApproveFilter, WorkerWorkTypeFilter, WorkerConstraintFilter
+from src.timetable.serializers import WorkerDaySerializer, WorkerDayApproveSerializer, EmploymentWorkTypeSerializer, WorkerConstraintSerializer
+from src.timetable.filters import WorkerDayFilter, WorkerDayApproveFilter, EmploymentWorkTypeFilter, WorkerConstraintFilter
 from src.timetable.backends import MultiShopsFilterBackend
 
 
@@ -103,10 +103,10 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         super().perform_destroy(worker_day)
 
 
-class WorkerWorkTypeViewSet(viewsets.ModelViewSet):
+class EmploymentWorkTypeViewSet(viewsets.ModelViewSet):
     permission_classes = [FilteredListPermission]
-    serializer_class = WorkerWorkTypeSerializer
-    filterset_class = WorkerWorkTypeFilter
+    serializer_class = EmploymentWorkTypeSerializer
+    filterset_class = EmploymentWorkTypeFilter
     queryset = EmploymentWorkType.objects.all()
 
 

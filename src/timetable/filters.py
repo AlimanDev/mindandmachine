@@ -39,7 +39,7 @@ class WorkerDayFilter(FilterSet):
         }
 
 
-class WorkerWorkTypeFilter(FilterSet):
+class EmploymentWorkTypeFilter(FilterSet):
     shop_id=NumberFilter(field_name='work_type__shop_id')
     class Meta:
         model = EmploymentWorkType
