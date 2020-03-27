@@ -48,7 +48,7 @@ class WorkerDayApproveViewSet(
                 wd.child.filter(
                     dttm_deleted__isnull=True
                 ).update(parent_worker_day = parent)
-                parent.delete()
+                wd.delete()
         else:
             new_plans = WorkerDay.objects.filter(
                 dttm_deleted__isnull=True,
@@ -60,6 +60,8 @@ class WorkerDayApproveViewSet(
                     parent.child.filter(is_fact=True).update(
                         parent_worker_day_id=new_plan.id
                     )
+                    new_plan.parent_worker_day=None
+                    new_plan.save()
                     parent.delete()
 
         return worker_day_approve
