@@ -20,7 +20,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
     position_id = serializers.IntegerField(required=False)
     shop_id = serializers.IntegerField(required=False)
     user_id = serializers.IntegerField(required=False)
-    work_types = WorkerWorkTypeSerializer(many=True)
+    work_types = WorkerWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
 
     class Meta:
