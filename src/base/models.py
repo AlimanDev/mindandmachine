@@ -506,8 +506,8 @@ class Event(AbstractModel):
 class Subscribe(AbstractModel):
     dttm_added = models.DateTimeField(auto_now_add=True)
     type = models.CharField(choices=EVENT_TYPES, max_length=1)
-    user = models.ForeignKey(User, blank=False, null=False, on_delete=models.PROTECT)
-    shop = models.ForeignKey(Shop, blank=False, null=False, on_delete=models.PROTECT)
+    user = models.ForeignKey(User, null=False, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, null=False, on_delete=models.PROTECT)
 
 
 class Notification(AbstractModel):
@@ -527,5 +527,5 @@ class Notification(AbstractModel):
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
 
     is_read = models.BooleanField(default=False)
-    event = models.ForeignKey(Event, on_delete=models.PROTECT, null=True)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE(), null=True)
 

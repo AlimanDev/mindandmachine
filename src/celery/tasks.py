@@ -51,7 +51,8 @@ from src.conf.djconfig import EMAIL_HOST_USER
 import time as time_in_secs
 
 @app.task
-def create_notifications_for_event(event):
+def create_notifications_for_event(event_id):
+    event = Event.objects.get(id=event_id)
     subscribes = Subscribe.objects.filter(type=event.type, shop=event.shop)
     notification_list = []
     for subscribe in subscribes:
@@ -65,7 +66,8 @@ def create_notifications_for_event(event):
         Notification.objects.bulk_create(notification_list)
 
 @app.task
-def create_notifications_for_subscribe(subscribe):
+def create_notifications_for_subscribe(subscribe_id):
+    subscribe = Subscribe.objects.get(id=subscribe_id)
     events = Event.objects.filter(shop=subscribe.shop, type=subscribe.type, dttm_valid_to__gte=now())
     notification_list = []
     for event in events:
@@ -80,7 +82,7 @@ def create_notifications_for_subscribe(subscribe):
 
 @app.task
 def delete_notifications():
-    dt=now().date() - timedelta(days=3)
+    dt=now()
     Notification.objects.filter(
         event__dttm_valid_to__lte=dt
     ).delete()

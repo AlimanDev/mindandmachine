@@ -487,7 +487,7 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
 
     dttm_from = models.DateTimeField()
     dttm_to = models.DateTimeField(null=True, blank=True)
-    event = models.OneToOneField(Event, on_delete=models.PROTECT, null=True, blank=True,related_name='worker_day_details')
+    event = models.OneToOneField(Event, on_delete=models.CASCADE(), null=True, blank=True,related_name='worker_day_details')
 
     def __str__(self):
         return '{}, {}, {}, {}, {}-{}, id: {}'.format(
