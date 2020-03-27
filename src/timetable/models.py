@@ -9,6 +9,7 @@ from src.base.models import Shop, Employment, User, Event
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
 
+
 class WorkerManager(UserManager):
     pass
 
@@ -252,12 +253,14 @@ class WorkerConstraint(AbstractModel):
 
     id = models.BigAutoField(primary_key=True)
     shop = models.ForeignKey(Shop, blank=True, null=True, on_delete=models.PROTECT, related_name='worker_constraints')
-    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
+    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True, related_name='worker_constraints')
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
     is_lite = models.BooleanField(default=False)  # True -- если сам сотрудник выставил, False -- если менеджер
     tm = models.TimeField()
+    def get_department(self):
+        return self.employment.shop
 
 
 class WorkerDayManager(models.Manager):

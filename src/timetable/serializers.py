@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayApprove, EmploymentWorkType
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayApprove, EmploymentWorkType, WorkerConstraint
 
 from rest_framework.exceptions import ValidationError
 
@@ -32,8 +32,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         model = WorkerDay
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'worker_day_approve_id', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id']
-        read_only_fields =['worker_day_approve_id','work_hours' ]
-        create_only_fields = ['is_fact','parent_worker_day_id']
+        read_only_fields =['worker_day_approve_id', 'work_hours' ]
+        create_only_fields = ['is_fact', 'parent_worker_day_id']
 
     def create(self, validated_data):
         self.check_other_worker_days(None, validated_data)
@@ -76,18 +76,21 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
         return super().update(instance, validated_data)
 
-    def check_other_worker_days(self, instance, validated_data):
-        is_fact =  instance.is_fact if instance else validated_data.get('is_fact')
+    def check_other_worker_days(self, worker_day, validated_data):
+        """
+        При сохранении рабочего дня проверяет, что нет пересечений с другими рабочими днями в тот же день
+        """
+        is_fact = worker_day.is_fact if worker_day else validated_data.get('is_fact')
         worker_days = WorkerDay.objects.filter(
             worker_id=validated_data.get('worker_id'),
             dt=validated_data.get('dt'),
-            is_fact = is_fact,
+            is_fact=is_fact,
             dttm_deleted__isnull=True,
         )
 
-        if instance:
-            parent_worker_day_id = instance.parent_worker_day_id
-            worker_days=worker_days.exclude(id=instance.id)
+        if worker_day:
+            parent_worker_day_id = worker_day.parent_worker_day_id
+            worker_days = worker_days.exclude(id=worker_day.id)
         else:
             parent_worker_day_id = validated_data.get('parent_worker_day_id', None)
 
@@ -111,3 +114,13 @@ class WorkerWorkTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmploymentWorkType
         fields = ['id', 'work_type_id', 'employment_id', 'period', 'bills_amount', 'priority', 'duration']
+
+
+class WorkerConstraintSerializer(serializers.ModelSerializer):
+    employment_id = serializers.IntegerField(required=False)
+    worker_id = serializers.IntegerField(required=False)
+    shop_id = serializers.IntegerField(required=False)
+
+    class Meta:
+        model = WorkerConstraint
+        fields = ['id', 'shop_id', 'employment_id', 'worker_id', 'weekday', 'is_lite', 'tm']

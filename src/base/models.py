@@ -343,6 +343,7 @@ class FunctionGroup(AbstractModel):
         'FunctionGroupView',
         'OperationTemplate',
         'WorkerWorkType',
+        'WorkerConstraint',
         'WorkType',
         'WorkTypeName',
         'OperationTypeName',

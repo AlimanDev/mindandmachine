@@ -1,22 +1,21 @@
 from rest_framework import viewsets, mixins
 from rest_framework.response import Response
-from rest_framework.authentication import SessionAuthentication
+from rest_framework.exceptions import ValidationError
 
-from src.base.permissions import FilteredListPermission
+from src.base.permissions import FilteredListPermission, EmploymentFilteredListPermission
 
-from src.timetable.models import WorkerDay, WorkerDayApprove, EmploymentWorkType
-from src.timetable.serializers import WorkerDaySerializer, WorkerDayApproveSerializer, WorkerWorkTypeSerializer
-from src.timetable.filters import MultiShopsFilterBackend, WorkerDayFilter, WorkerDayApproveFilter, WorkerWorkTypeFilter
+from src.timetable.models import WorkerDay, WorkerDayApprove, EmploymentWorkType, WorkerConstraint
+from src.timetable.serializers import WorkerDaySerializer, WorkerDayApproveSerializer, WorkerWorkTypeSerializer, WorkerConstraintSerializer
+from src.timetable.filters import WorkerDayFilter, WorkerDayApproveFilter, WorkerWorkTypeFilter, WorkerConstraintFilter
+from src.timetable.backends import MultiShopsFilterBackend
 
 
 class WorkerDayApproveViewSet(
     viewsets.GenericViewSet,
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
-    mixins.DestroyModelMixin,
     mixins.ListModelMixin,
 ):
-    authentication_classes = [SessionAuthentication]
     permission_classes = [FilteredListPermission]
     serializer_class = WorkerDayApproveSerializer
     filterset_class = WorkerDayApproveFilter
@@ -49,7 +48,7 @@ class WorkerDayApproveViewSet(
                 wd.child.filter(
                     dttm_deleted__isnull=True
                 ).update(parent_worker_day = parent)
-                parent.delete()
+                wd.delete()
         else:
             new_plans = WorkerDay.objects.filter(
                 dttm_deleted__isnull=True,
@@ -59,28 +58,20 @@ class WorkerDayApproveViewSet(
                 parent = new_plan.parent_worker_day
                 if parent:
                     parent.child.filter(is_fact=True).update(
-                        dttm_deleted__isnull=True,
                         parent_worker_day_id=new_plan.id
                     )
+                    new_plan.parent_worker_day=None
+                    new_plan.save()
                     parent.delete()
-
 
         return worker_day_approve
 
-    def perform_destroy(self, instance):
-        WorkerDay.objects.filter(
-            dttm_deleted__isnull=True,
-            worker_day_approve=instance
-        ).update(worker_day_approve=None)
-        instance.delete()
-
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
-    authentication_classes = [SessionAuthentication]
     permission_classes = [FilteredListPermission]
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
-    queryset = WorkerDay.objects.qos_filter_version(1)
+    queryset = WorkerDay.objects.all()
     filter_backends = [MultiShopsFilterBackend]
 
     # тут переопределяется update потому что надо в Response вернуть
@@ -90,7 +81,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
 
         if serializer.instance.worker_day_approve_id:
             data = serializer.validated_data
@@ -107,12 +97,27 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.data)
 
+    def perform_destroy(self, worker_day):
+        if worker_day.worker_day_approve_id:
+            raise ValidationError({"error": f"Нельзя удалить подтвержденную версию"})
+        super().perform_destroy(worker_day)
+
 
 class WorkerWorkTypeViewSet(viewsets.ModelViewSet):
-    authentication_classes = [SessionAuthentication]
     permission_classes = [FilteredListPermission]
     serializer_class = WorkerWorkTypeSerializer
     filterset_class = WorkerWorkTypeFilter
     queryset = EmploymentWorkType.objects.all()
 
+
+class WorkerConstraintViewSet(viewsets.ModelViewSet):
+    permission_classes = [EmploymentFilteredListPermission]
+    serializer_class = WorkerConstraintSerializer
+    filterset_class = WorkerConstraintFilter
+    queryset = WorkerConstraint.objects.all()
+
+    def filter_queryset(self, queryset):
+        if self.action == 'list':
+            return super().filter_queryset(queryset)
+        return queryset
 
