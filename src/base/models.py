@@ -527,5 +527,5 @@ class Notification(AbstractModel):
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
 
     is_read = models.BooleanField(default=False)
-    event = models.ForeignKey(Event, on_delete=models.CASCADE(), null=True)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True)
 
