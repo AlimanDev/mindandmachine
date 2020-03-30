@@ -95,7 +95,6 @@ class EmploymentFilteredListPermission(Permission):
                 raise ValidationError("employment_id should be defined")
         else:
             employment_id = request.data.get('employment_id')
-            # shop_id не меняется, права задаются has_object_permission
             if not employment_id:
                 return True
 

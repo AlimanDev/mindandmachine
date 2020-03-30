@@ -1,70 +1,14 @@
 from rest_framework import viewsets, mixins
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
+from rest_framework.decorators import action
 
 from src.base.permissions import FilteredListPermission, EmploymentFilteredListPermission
 
-from src.timetable.models import WorkerDay, WorkerDayApprove, WorkerWorkType, WorkerConstraint
-from src.timetable.serializers import WorkerDaySerializer, WorkerDayApproveSerializer, WorkerWorkTypeSerializer, WorkerConstraintSerializer
-from src.timetable.filters import WorkerDayFilter, WorkerDayApproveFilter, WorkerWorkTypeFilter, WorkerConstraintFilter
+from src.timetable.models import WorkerDay, WorkerWorkType, WorkerConstraint
+from src.timetable.serializers import WorkerDaySerializer, WorkerWorkTypeSerializer, WorkerConstraintSerializer, WorkerDayApproveSerializer
+from src.timetable.filters import WorkerDayFilter, WorkerWorkTypeFilter, WorkerConstraintFilter
 from src.timetable.backends import MultiShopsFilterBackend
-
-
-class WorkerDayApproveViewSet(
-    viewsets.GenericViewSet,
-    mixins.CreateModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.ListModelMixin,
-):
-    permission_classes = [FilteredListPermission]
-    serializer_class = WorkerDayApproveSerializer
-    filterset_class = WorkerDayApproveFilter
-    queryset = WorkerDayApprove.objects.all()
-
-    def perform_create(self, serializer):
-        worker_day_approve=serializer.save()
-        dt_from = worker_day_approve.dt_from
-        dt_to = worker_day_approve.dt_to
-
-        WorkerDay.objects.filter(
-            dttm_deleted__isnull=True,
-            worker_day_approve_id__isnull=True,
-            shop_id=worker_day_approve.shop_id,
-            dt__lte=dt_to,
-            dt__gte=dt_from,
-            is_fact=worker_day_approve.is_fact,
-        ).update(
-            worker_day_approve_id=worker_day_approve.id
-        )
-
-        if worker_day_approve.is_fact:
-            worker_days = WorkerDay.objects.filter(
-                dttm_deleted__isnull=True,
-                child__worker_day_approve_id=worker_day_approve.id,
-                is_fact=True
-            )
-            for wd in worker_days:
-                parent = wd.parent_worker_day
-                wd.child.filter(
-                    dttm_deleted__isnull=True
-                ).update(parent_worker_day = parent)
-                wd.delete()
-        else:
-            new_plans = WorkerDay.objects.filter(
-                dttm_deleted__isnull=True,
-                worker_day_approve_id=worker_day_approve.id,
-            )
-            for new_plan in new_plans:
-                parent = new_plan.parent_worker_day
-                if parent:
-                    parent.child.filter(is_fact=True).update(
-                        parent_worker_day_id=new_plan.id
-                    )
-                    new_plan.parent_worker_day=None
-                    new_plan.save()
-                    parent.delete()
-
-        return worker_day_approve
 
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
@@ -98,9 +42,58 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def perform_destroy(self, worker_day):
-        if worker_day.worker_day_approve_id:
+        if worker_day.is_approved:
             raise ValidationError({"error": f"Нельзя удалить подтвержденную версию"})
         super().perform_destroy(worker_day)
+
+
+    @action(detail=False, methods=['post'])
+    def approve(self, request):
+        kwargs = {'context' : self.get_serializer_context()}
+        serializer = WorkerDayApproveSerializer(data=request.data, **kwargs)
+        serializer.is_valid(raise_exception=True)
+
+
+        wdays_to_approve = WorkerDay.objects.filter(
+            dttm_deleted__isnull=True,
+            shop_id=serializer.data['shop_id'],
+            dt__lte=serializer.data['dt_to'],
+            dt__gte=serializer.data['dt_from'],
+            is_fact=serializer.data['is_fact'],
+            is_approved=False,
+        )
+
+        if serializer.data['is_fact']:
+            worker_days = WorkerDay.objects.filter(
+                dttm_deleted__isnull=True,
+                child__in=wdays_to_approve,
+                is_fact=serializer.data['is_fact']
+            )
+            for wd in worker_days:
+                parent = wd.parent_worker_day
+                wd.child.filter(
+                    dttm_deleted__isnull=True
+                ).update(parent_worker_day = parent,
+                         is_approved=True)
+                wd.delete()
+        else:
+            for wd in wdays_to_approve:
+                parent = wd.parent_worker_day
+                if parent:
+                    parent.child.filter(is_fact=True).update(
+                        parent_worker_day_id=wd.id
+                    )
+                    wd.parent_worker_day=None
+                    wd.is_approved=True
+                    wd.save()
+                    parent.delete()
+
+        wdays_to_approve.update(
+            is_approved=True
+        )
+
+        return Response()
+
 
 
 class WorkerWorkTypeViewSet(viewsets.ModelViewSet):

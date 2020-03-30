@@ -1,15 +1,14 @@
 from rest_framework import serializers
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayApprove, WorkerWorkType, WorkerConstraint
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerWorkType, WorkerConstraint
 
 from rest_framework.exceptions import ValidationError
 
 
-class WorkerDayApproveSerializer(serializers.ModelSerializer):
+class WorkerDayApproveSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField(required=True)
-    created_by = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
-    class Meta:
-        model = WorkerDayApprove
-        fields = ['id', 'shop_id', 'is_fact', 'created_by', 'dt_from', 'dt_to']
+    is_fact = serializers.BooleanField()
+    dt_from = serializers.DateField()
+    dt_to = serializers.DateField()
 
 
 class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
@@ -25,14 +24,14 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField()
     parent_worker_day_id = serializers.IntegerField(required=False)
     is_fact = serializers.BooleanField(required=True)
-    dttm_work_start=serializers.DateTimeField(default=None)
-    dttm_work_end=serializers.DateTimeField(default=None)
+    dttm_work_start = serializers.DateTimeField(default=None)
+    dttm_work_end = serializers.DateTimeField(default=None)
 
     class Meta:
         model = WorkerDay
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
-                  'comment', 'worker_day_approve_id', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id']
-        read_only_fields =['worker_day_approve_id', 'work_hours' ]
+                  'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id']
+        read_only_fields =['is_approved', 'work_hours' ]
         create_only_fields = ['is_fact', 'parent_worker_day_id']
 
     def create(self, validated_data):

@@ -334,7 +334,7 @@ class FunctionGroup(AbstractModel):
         'Shop',
         'Shop_stat',
         'WorkerDay',
-        'WorkerDayApprove',
+        'WorkerDay_approve',
         'Employment',
         'User',
         'AuthUserView',
