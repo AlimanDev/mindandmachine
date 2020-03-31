@@ -116,11 +116,45 @@ class WorkerWorkTypeSerializer(serializers.ModelSerializer):
         fields = ['id', 'work_type_id', 'employment_id', 'period', 'bills_amount', 'priority', 'duration']
 
 
+class WorkerConstraintListSerializer(serializers.ListSerializer):
+    def create(self, validated_data):
+        employment_id = None
+        to_create = []
+        to_update = []
+        ids = []
+
+        # constraint_mapping = {constraint.id: constraint for constraint in instance}
+        # data_mapping = {item['id']: item for item in validated_data}
+
+
+        for item in validated_data:
+            constraint = WorkerConstraint(**item)
+            employment_id = constraint.employment_id
+            if not employment_id:
+                employment_id = constraint.employment_id
+            elif constraint.employment_id != employment_id:
+                raise ValidationError({"error": f"employment_id must be same for all constraints"})
+            if constraint.id:
+                ids.append(constraint.id)
+                constraint.save()
+            else:
+                to_create.append(constraint)
+        WorkerConstraint.objects.filter(
+            employment_id=employment_id
+        ).exclude(
+            id__in=ids
+        ).delete()
+        # WorkerConstraint.objects.bulk_update(to_update)
+        WorkerConstraint.objects.bulk_create(to_create)
+        return WorkerConstraint.objects.filter(employment_id=employment_id)
+
 class WorkerConstraintSerializer(serializers.ModelSerializer):
-    employment_id = serializers.IntegerField(required=False)
-    worker_id = serializers.IntegerField(required=False)
-    shop_id = serializers.IntegerField(required=False)
+    id = serializers.IntegerField(required=False)
+    employment_id = serializers.IntegerField(required=True)
+    worker_id = serializers.IntegerField(required=True)
+    shop_id = serializers.IntegerField(required=True)
 
     class Meta:
         model = WorkerConstraint
         fields = ['id', 'shop_id', 'employment_id', 'worker_id', 'weekday', 'is_lite', 'tm']
+        list_serializer_class = WorkerConstraintListSerializer
