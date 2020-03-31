@@ -94,7 +94,13 @@ class EmploymentFilteredListPermission(Permission):
             if not employment_id:
                 raise ValidationError("employment_id should be defined")
         else:
-            employment_id = request.data.get('employment_id')
+            if isinstance(request.data, list):
+                employment_id = request.data[0].get('employment_id')
+                for item in request.data:
+                    if item['employment_id'] != employment_id:
+                        raise ValidationError({"error": f"employment_id must be same for all constraints"})
+            else:
+                employment_id = request.data.get('employment_id')
             # shop_id не меняется, права задаются has_object_permission
             if not employment_id:
                 return True

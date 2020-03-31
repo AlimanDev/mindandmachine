@@ -111,8 +111,7 @@ class WorkerWorkTypeViewSet(viewsets.ModelViewSet):
 
 
 class WorkerConstraintViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
-    # permission_classes = [EmploymentFilteredListPermission]
+    permission_classes = [EmploymentFilteredListPermission]
     serializer_class = WorkerConstraintSerializer
     filterset_class = WorkerConstraintFilter
     queryset = WorkerConstraint.objects.all()
