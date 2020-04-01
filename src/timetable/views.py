@@ -18,7 +18,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
     queryset = WorkerDay.objects.all()
     filter_backends = [MultiShopsFilterBackend]
 
-    # тут переопределяется update потому что надо в Response вернуть
+    # тут переопределяется update а не perform_update потому что надо в Response вернуть
     # не тот объект, который был изначально
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
@@ -26,9 +26,13 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
 
-        if serializer.instance.worker_day_approve_id:
+        if instance.is_approved:
+            if instance.child.filter(is_fact=instance.is_fact):
+                raise ValidationError({"error": "У расписания уже есть неподтвержденная версия."})
+
             data = serializer.validated_data
-            data['parent_worker_day_id']=serializer.instance.id
+            data['parent_worker_day_id']=instance.id
+            data['is_fact']=instance.is_fact
             serializer = WorkerDaySerializer(data=data)
             serializer.is_valid(raise_exception=True)
 

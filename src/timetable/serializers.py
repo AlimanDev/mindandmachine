@@ -23,7 +23,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     employment_id = serializers.IntegerField()
     shop_id = serializers.IntegerField()
     parent_worker_day_id = serializers.IntegerField(required=False)
-    is_fact = serializers.BooleanField(required=True)
+    is_fact = serializers.BooleanField(required=False)
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
 
@@ -88,8 +88,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         )
 
         if worker_day:
-            parent_worker_day_id = worker_day.parent_worker_day_id
             worker_days = worker_days.exclude(id=worker_day.id)
+            parent_worker_day_id = worker_day.parent_worker_day_id
         else:
             parent_worker_day_id = validated_data.get('parent_worker_day_id', None)
 
@@ -104,6 +104,19 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                     raise ValidationError({"error":f"Рабочий день пересекается с существующим рабочим днем. {wd.shop.name} {wd.dttm_work_start} {wd.dttm_work_end}"})
             else:
                 raise ValidationError({"error": f"У сотрудника уже существует рабочий день: {wd} "})
+    def to_internal_value(self, data):
+        data = super(WorkerDaySerializer, self).to_internal_value(data)
+        if self.instance:
+            # update
+            for field in self.Meta.create_only_fields:
+                if field in data:
+                    data.pop(field)
+        else:
+            # shop_id is required for create
+            for field in self.Meta.create_only_fields:
+                if field not in data:
+                    raise serializers.ValidationError({field:"This field is required"})
+        return data
 
 
 class WorkerWorkTypeSerializer(serializers.ModelSerializer):
