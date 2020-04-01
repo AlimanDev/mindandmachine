@@ -151,11 +151,10 @@ class WorkerConstraintListSerializer(serializers.ListSerializer):
         WorkerConstraint.objects.bulk_create(to_create)
         return WorkerConstraint.objects.filter(employment_id=employment_id)
 
+
 class WorkerConstraintSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(required=False)
     employment_id = serializers.IntegerField(required=True)
-    # worker_id = serializers.IntegerField(required=True)
-    # shop_id = serializers.IntegerField(required=True)
 
     class Meta:
         model = WorkerConstraint
