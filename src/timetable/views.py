@@ -2,7 +2,7 @@ from rest_framework import viewsets, mixins
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action
-
+from rest_framework.permissions import IsAuthenticated
 from src.base.permissions import FilteredListPermission, EmploymentFilteredListPermission
 
 from src.timetable.models import WorkerDay, WorkerWorkType, WorkerConstraint
@@ -118,3 +118,8 @@ class WorkerConstraintViewSet(viewsets.ModelViewSet):
             return super().filter_queryset(queryset)
         return queryset
 
+    def get_serializer(self, *args, **kwargs):
+        """ if an array is passed, set serializer to many """
+        if isinstance(kwargs.get('data', {}), list):
+            kwargs['many'] = True
+        return super(WorkerConstraintViewSet, self).get_serializer(*args, **kwargs)

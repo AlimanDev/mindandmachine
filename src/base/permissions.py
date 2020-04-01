@@ -1,7 +1,7 @@
 from src.base.models import Employment, Shop
 from rest_framework import permissions
-from rest_framework.exceptions import ValidationError
-
+from rest_framework.exceptions import ValidationError, NotFound
+from django.db.models import ObjectDoesNotExist
 
 class Permission(permissions.BasePermission):
     """
@@ -94,11 +94,22 @@ class EmploymentFilteredListPermission(Permission):
             if not employment_id:
                 raise ValidationError("employment_id should be defined")
         else:
-            employment_id = request.data.get('employment_id')
+            if isinstance(request.data, list):
+                employment_id = request.data[0].get('employment_id')
+                for item in request.data:
+                    if item['employment_id'] != employment_id:
+                        raise ValidationError("employment_id must be same for all constraints")
+            else:
+                employment_id = request.data.get('employment_id')
+            # shop_id не меняется, права задаются has_object_permission
             if not employment_id:
                 return True
 
-        employment = Employment.objects.get(id=employment_id)
+        try:
+            employment = Employment.objects.get(id=employment_id)
+        except ObjectDoesNotExist:
+            raise NotFound( "Employment does not exist")
+
         department = employment.shop
 
         employments = Employment.objects.get_active(
