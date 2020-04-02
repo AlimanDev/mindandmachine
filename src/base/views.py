@@ -2,16 +2,19 @@ from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.response import Response
+from rest_framework.status import HTTP_400_BAD_REQUEST
+from rest_framework.decorators import action
+
 from rest_auth.views import UserDetailsView
 
 from src.base.permissions import Permission
-from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer
+from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, PasswordSerializer
 from src.base.filters import EmploymentFilter, UserFilter
 
 from src.base.models import  Employment, User, FunctionGroup, WorkerPosition
 
 from django.utils.timezone import now
-
 
 class EmploymentViewSet(ModelViewSet):
     permission_classes = [Permission]
@@ -35,6 +38,17 @@ class UserViewSet(ModelViewSet):
         instance=serializer.save()
         instance.username='user_'+ str(instance.id)
         instance.save()
+
+    @action(detail=True, methods=['post'])
+    def change_password(self, request, pk=None):
+        user = self.get_object()
+        serializer = PasswordSerializer(data=request.data, instance=user, context={'request':request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'status': 'Пароль сохранен'})
+        else:
+            return Response(serializer.errors,
+                            status=HTTP_400_BAD_REQUEST)
 
 
 class AuthUserView(UserDetailsView):

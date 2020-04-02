@@ -10,7 +10,6 @@ from rest_framework import serializers, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from src.base.permissions import Permission
 from src.base.models import  Employment, Shop
 import json
 
