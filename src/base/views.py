@@ -35,10 +35,12 @@ class UserViewSet(ModelViewSet):
     queryset = User.objects.all()
 
     def perform_create(self, serializer):
-        serializer.username=now()
-        instance=serializer.save()
-        instance.username='user_'+ str(instance.id)
-        instance.save()
+        if 'username' not in serializer.validated_data:
+            instance = serializer.save(username = now())
+            instance.username = 'user_' + str(instance.id)
+            instance.save()
+        else:
+            serializer.save()
 
     @action(detail=True, methods=['post'])
     def change_password(self, request, pk=None):

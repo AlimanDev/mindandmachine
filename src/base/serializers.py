@@ -2,10 +2,10 @@ from rest_framework import serializers
 from src.base.models import  Employment, User, FunctionGroup, WorkerPosition
 from src.timetable.serializers import WorkerWorkTypeSerializer, WorkerConstraintSerializer
 from django.contrib.auth.forms import SetPasswordForm
-
+from rest_framework.validators import UniqueValidator
 
 class UserSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(required=False)
+    username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name',
@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class PasswordSerializer(serializers.Serializer):
-    confirmation_password  = serializers.CharField(required=True, max_length=30)
+    confirmation_password = serializers.CharField(required=True, max_length=30)
     new_password1 = serializers.CharField(required=True, max_length=30)
     new_password2 = serializers.CharField(required=True, max_length=30)
 
