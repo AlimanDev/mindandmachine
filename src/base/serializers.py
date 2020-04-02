@@ -5,10 +5,11 @@ from django.contrib.auth.forms import SetPasswordForm
 
 
 class UserSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(required=False)
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number','tabel_code', 'username' ]
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
 
 
 class PasswordSerializer(serializers.Serializer):
