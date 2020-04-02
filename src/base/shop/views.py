@@ -154,8 +154,9 @@ class ShopViewSet(viewsets.ModelViewSet):
             child_list.append({
                 "id": shop.id,
                 "label": shop.name,
-                "open":shop.tm_shop_opens,
-                "close":shop.tm_shop_closes,
+                "tm_shop_opens":shop.tm_shop_opens,
+                "tm_shop_closes":shop.tm_shop_closes,
+                "forecast_step_minutes":shop.forecast_step_minutes,
                 "children": []
             })
 
