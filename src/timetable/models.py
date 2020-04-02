@@ -249,7 +249,7 @@ class WorkerWorkType(AbstractModel):
 class WorkerConstraint(AbstractModel):
     class Meta(object):
         verbose_name = 'Ограничения сотрудника'
-        unique_together = (('worker', 'weekday', 'tm'),)
+        unique_together = (('employment', 'weekday', 'tm'),)
 
     def __str__(self):
         return '{} {}, {}, {}, {}'.format(self.worker.last_name, self.worker.id, self.weekday, self.tm, self.id)
