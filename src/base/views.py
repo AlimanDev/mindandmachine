@@ -12,9 +12,10 @@ from src.base.permissions import Permission
 from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, PasswordSerializer
 from src.base.filters import EmploymentFilter, UserFilter
 
-from src.base.models import  Employment, User, FunctionGroup, WorkerPosition
+from src.base.models import Employment, User, FunctionGroup, WorkerPosition
 
 from django.utils.timezone import now
+
 
 class EmploymentViewSet(ModelViewSet):
     permission_classes = [Permission]

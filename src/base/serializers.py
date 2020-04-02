@@ -12,12 +12,12 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class PasswordSerializer(serializers.Serializer):
-    old_password  = serializers.CharField(required=True, max_length=30)
+    confirmation_password  = serializers.CharField(required=True, max_length=30)
     new_password1 = serializers.CharField(required=True, max_length=30)
     new_password2 = serializers.CharField(required=True, max_length=30)
 
     def validate(self, data):
-        if not self.context['request'].user.check_password(data.get('old_password')):
+        if not self.context['request'].user.check_password(data.get('confirmation_password')):
             raise serializers.ValidationError({'error': 'Неверный пароль'})
 
         if data.get('new_password1') != data.get('new_password2'):
