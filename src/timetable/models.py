@@ -743,6 +743,45 @@ class AttendanceRecords(AbstractModel):
     def __str__(self):
         return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
+    def save(self, *args, **kwargs):
+        map_fields = {
+            self.TYPE_COMING: 'dttm_work_start',
+            self.TYPE_LEAVING:'dttm_work_end'
+        }
+
+        worker_days = WorkerDay.objects.filter(
+            shop=self.shop,
+            worker=self.user,
+            dttm=self.dttm.date(),
+            is_fact=True
+        )
+        if len(worker_days):
+            if len(worker_days) > 2:
+                raise ValueError( f"Worker {self.user} has too many worker days on {dt}")
+            for wd in worker_days:
+                if wd.is_approved:
+                    wd_approved = wd
+                else:
+                    wd_not_approved = wd
+
+        if not wd_approved:
+            wd_approved = WorkerDay(
+                shop=self.shop,
+                worker=self.user,
+                dttm=self.dttm.date(),
+                is_fact=True,
+                is_approved=True
+            )
+
+        wd[map_fields[self.type]] = self.dttm
+        wd.save()
+
+        # Привязываем неподтвержденную версию
+        if wd_not_approved:
+            wd_not_approved.parent_worker_day = wd
+            wd_not_approved.save()
+        super().save(self, *args, **kwargs)
+
 
 class ExchangeSettings(AbstractModel):
     # Создаем ли автоматически вакансии
