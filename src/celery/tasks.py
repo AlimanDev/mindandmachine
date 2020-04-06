@@ -82,13 +82,8 @@ def create_notifications_for_subscribe(subscribe_id):
 
 @app.task
 def delete_notifications():
-    dt=now()
-    Notification.objects.filter(
-        event__dttm_valid_to__lte=dt
-    ).delete()
-
     Event.objects.filter(
-        dttm_valid_to__lte=dt
+        dttm_valid_to__lte=now()
     ).delete()
 
 @app.task
