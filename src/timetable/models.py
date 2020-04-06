@@ -11,6 +11,7 @@ from src.conf.djconfig import IS_PUSH_ACTIVE
 from src.base.models import Shop, Employment, User
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
+from django.utils import timezone
 
 
 class WorkerManager(UserManager):
@@ -272,7 +273,7 @@ class WorkerDayManager(models.Manager):
         return current_worker_day
 
 
-class WorkerDay(AbstractActiveModel):
+class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
@@ -369,6 +370,7 @@ class WorkerDay(AbstractActiveModel):
     work_hours = models.DurationField(default=datetime.timedelta(days=0))
 
     is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
+    dttm_added = models.DateTimeField(default=timezone.now)
 
     objects = WorkerDayManager()
 

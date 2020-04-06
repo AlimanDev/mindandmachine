@@ -130,7 +130,7 @@ class TestWorkerDay(APITestCase):
         # id = response.json()['id']
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).is_approved, True)
         self.assertIsNone(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).parent_worker_day_id)
-        self.assertEqual(len(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id)),0)
+        self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).exists())
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).parent_worker_day_id, self.worker_day_plan_not_approved.id)
 
         # Approve fact
@@ -141,8 +141,8 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # id = response.json()['id']
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).is_approved, True)
-        self.assertEqual(len(WorkerDay.objects.filter(id=self.worker_day_fact_approved.id)), 0)
-        self.assertIsNone(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).dttm_deleted)
+        self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).exists())
+        self.assertTrue(WorkerDay.objects.filter(id=self.worker_day_plan_not_approved.id).exists())
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).parent_worker_day_id, self.worker_day_plan_not_approved.id)
 
     def test_create_and_approve(self):
@@ -269,7 +269,7 @@ class TestWorkerDay(APITestCase):
         # План неподтвержденный
         response = self.client.delete(f'{self.url}{self.worker_day_plan_not_approved.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertIsNotNone(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).dttm_deleted)
+        self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_plan_not_approved.id).exists())
 
         # Факт подтвержденный
         response = self.client.delete(f'{self.url}{self.worker_day_fact_approved.id}/')
@@ -279,4 +279,4 @@ class TestWorkerDay(APITestCase):
         # Факт неподтвержденный
         response = self.client.delete(f'{self.url}{self.worker_day_fact_not_approved.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertIsNotNone(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).dttm_deleted)
+        self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_not_approved.id).exists())

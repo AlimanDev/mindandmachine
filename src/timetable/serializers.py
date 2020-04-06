@@ -49,7 +49,6 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 is_fact=False,
                 dt=validated_data.get('dt'),
                 shop_id=validated_data.get('shop_id'),
-                dttm_deleted__isnull=True
             ).first()
             if not worker_day:
                 raise ValidationError({"error": f"Нельзя занести фактическое время в отсутствие планового графика"})
@@ -87,7 +86,6 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             worker_id=validated_data.get('worker_id'),
             dt=validated_data.get('dt'),
             is_fact=is_fact,
-            dttm_deleted__isnull=True,
         )
 
         if worker_day:
