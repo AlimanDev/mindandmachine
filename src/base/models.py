@@ -504,8 +504,7 @@ class Event(AbstractModel):
     params = models.CharField(default='{}', max_length=64)
 
 
-class Subscribe(AbstractModel):
-    dttm_added = models.DateTimeField(auto_now_add=True)
+class Subscribe(AbstractActiveModel):
     type = models.CharField(choices=EVENT_TYPES, max_length=1)
     user = models.ForeignKey(User, null=False, on_delete=models.PROTECT)
     shop = models.ForeignKey(Shop, null=False, on_delete=models.PROTECT)
