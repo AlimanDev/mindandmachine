@@ -1,12 +1,41 @@
 from rest_framework import serializers
 from src.base.models import  Employment, User, FunctionGroup, WorkerPosition
 from src.timetable.serializers import WorkerWorkTypeSerializer, WorkerConstraintSerializer
+from django.contrib.auth.forms import SetPasswordForm
+from rest_framework.validators import UniqueValidator
 
 class UserSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number','tabel_code']
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
+
+
+class PasswordSerializer(serializers.Serializer):
+    confirmation_password = serializers.CharField(required=True, max_length=30)
+    new_password1 = serializers.CharField(required=True, max_length=30)
+    new_password2 = serializers.CharField(required=True, max_length=30)
+
+    def validate(self, data):
+        if not self.context['request'].user.check_password(data.get('confirmation_password')):
+            raise serializers.ValidationError({'confirmation_password': 'Неверный пароль'})
+
+        if data.get('new_password1') != data.get('new_password2'):
+            raise serializers.ValidationError({'new_password2': 'Пароли не совпадают'})
+        form = SetPasswordForm(user=self.instance, data=data )
+        if not form.is_valid():
+            raise serializers.ValidationError(form.errors)
+
+        return data
+
+    def update(self, instance, validated_data):
+        instance.set_password(validated_data['new_password1'])
+        instance.save()
+        return instance
+
+    def create(self, validated_data):
+        pass
 
 
 class FunctionGroupSerializer(serializers.ModelSerializer):
