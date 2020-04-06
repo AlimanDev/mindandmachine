@@ -107,6 +107,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                     raise ValidationError({"error":f"Рабочий день пересекается с существующим рабочим днем. {wd.shop.name} {wd.dttm_work_start} {wd.dttm_work_end}"})
             else:
                 raise ValidationError({"error": f"У сотрудника уже существует рабочий день: {wd} "})
+
     def to_internal_value(self, data):
         data = super(WorkerDaySerializer, self).to_internal_value(data)
         if self.instance:
