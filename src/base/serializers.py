@@ -74,7 +74,7 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
         fields = ['id','worker_id', 'is_read', 'event_id', 'event']
-        read_only_fields = ['worker_id', 'event_id']
+        read_only_fields = ['worker_id', 'event_id', 'event']
 
 
 class SubscribeSerializer(serializers.ModelSerializer):
