@@ -744,43 +744,51 @@ class AttendanceRecords(AbstractModel):
         return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
     def save(self, *args, **kwargs):
-        map_fields = {
+        super(AttendanceRecords, self).save(*args, **kwargs)
+
+        type2dtfield = {
             self.TYPE_COMING: 'dttm_work_start',
-            self.TYPE_LEAVING:'dttm_work_end'
+            self.TYPE_LEAVING: 'dttm_work_end'
         }
 
         worker_days = WorkerDay.objects.filter(
             shop=self.shop,
             worker=self.user,
-            dttm=self.dttm.date(),
-            is_fact=True
+            dt=self.dttm.date(),
         )
-        if len(worker_days):
-            if len(worker_days) > 2:
-                raise ValueError( f"Worker {self.user} has too many worker days on {dt}")
-            for wd in worker_days:
-                if wd.is_approved:
-                    wd_approved = wd
-                else:
-                    wd_not_approved = wd
+        wdays = {}
+        if len(worker_days) > 4:
+            raise ValueError( f"Worker {self.user} has too many worker days on {dt}")
 
-        if not wd_approved:
-            wd_approved = WorkerDay(
+        for wd in worker_days:
+            key_fact = 'fact' if wd.is_fact else 'plan'
+            key_approved = 'approved' if wd.is_approved else 'not_approved'
+            if not key_fact in wdays:
+                wdays[key_fact] = {}
+            wdays[key_fact][key_approved] = wd
+
+        if 'fact' in wdays and 'approved' in wdays['fact']:
+            setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
+            wdays['fact']['approved'].save()
+        else:
+            wd = WorkerDay(
                 shop=self.shop,
                 worker=self.user,
-                dttm=self.dttm.date(),
+                dt=self.dttm.date(),
                 is_fact=True,
                 is_approved=True
             )
 
-        wd[map_fields[self.type]] = self.dttm
-        wd.save()
+            if 'plan' in wdays:
+                wd.parent_worker_day = wdays['plan']['approved'] \
+                    if 'approved' in wdays['plan']\
+                    else wdays['plan']['not_approved']
 
-        # Привязываем неподтвержденную версию
-        if wd_not_approved:
-            wd_not_approved.parent_worker_day = wd
-            wd_not_approved.save()
-        super().save(self, *args, **kwargs)
+            wd.save()
+
+            if 'fact' in wdays and 'not_approved' in wdays['fact']:
+                wdays['fact']['not_approved'].parent_worker_day = wd
+                wdays['fact']['not_approved'].save()
 
 
 class ExchangeSettings(AbstractModel):
