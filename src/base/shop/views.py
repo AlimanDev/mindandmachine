@@ -67,11 +67,10 @@ class ShopViewSet(viewsets.ModelViewSet):
     :return [   {"id": 6, ...}
     ]
 
-
     POST /rest_api/department/, {"title": 'abcd'}
     :return {"id": 10, ...}
 
-    PUT /rest_api/department/6, {"title": 'abcd'}
+    PUT /rest_api/department/6/, {"title": 'abcd'}
     :return {"id": 6, ...}
 
     GET /rest_api/department/stat?id=6
@@ -95,16 +94,6 @@ class ShopViewSet(viewsets.ModelViewSet):
             return Shop.objects.get_queryset_descendants(shops, include_self=True)
         else:
             return shops
-
-        # funcs = FunctionGroup.objects.filter(func='department', group__employment__in=employments)
-        #
-        # for employment in employments:
-        #     # res=employment.shop.get_ancestor_by_level_distance(employment.function_group.level_up).get_descendants(employment.function_group.level_up)
-        #     res=employment.shop.get_descendants(include_self=True)
-        #     shops.append(list(res))
-        # return shops
-        # function_groups = FunctionGroup.objects.all
-        # queryset = Shop.objects.
 
     @action(detail=False, methods=['get']) #, permission_classes=[IsAdminOrIsSelf])
     def stat(self, request):
@@ -165,6 +154,9 @@ class ShopViewSet(viewsets.ModelViewSet):
             child_list.append({
                 "id": shop.id,
                 "label": shop.name,
+                "tm_shop_opens":shop.tm_shop_opens,
+                "tm_shop_closes":shop.tm_shop_closes,
+                "forecast_step_minutes":shop.forecast_step_minutes,
                 "children": []
             })
 
