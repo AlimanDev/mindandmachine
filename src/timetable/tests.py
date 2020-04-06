@@ -130,7 +130,7 @@ class TestWorkerDay(APITestCase):
         # id = response.json()['id']
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).is_approved, True)
         self.assertIsNone(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).parent_worker_day_id)
-        self.assertIsNotNone(WorkerDay.objects.get(id=self.worker_day_plan_approved.id).dttm_deleted)
+        self.assertEqual(len(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id)),0)
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).parent_worker_day_id, self.worker_day_plan_not_approved.id)
 
         # Approve fact
@@ -141,7 +141,7 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # id = response.json()['id']
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).is_approved, True)
-        self.assertIsNotNone(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_deleted)
+        self.assertEqual(len(WorkerDay.objects.filter(id=self.worker_day_fact_approved.id)), 0)
         self.assertIsNone(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).dttm_deleted)
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).parent_worker_day_id, self.worker_day_plan_not_approved.id)
 
