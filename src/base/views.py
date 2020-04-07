@@ -1,17 +1,21 @@
+from django.utils.timezone import now
+from rest_auth.views import UserDetailsView
+
 from rest_framework import mixins
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet, GenericViewSet
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
-from rest_auth.views import UserDetailsView
+from rest_framework.response import Response
+from rest_framework.status import HTTP_400_BAD_REQUEST
+from rest_framework.decorators import action
+
 
 from src.base.permissions import Permission
-from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer
-from src.base.filters import EmploymentFilter, UserFilter, NotificationFilter, SubscribeFilter
-
-from src.base.models import  Employment, User, FunctionGroup, WorkerPosition, Subscribe, Notification
-
-from django.utils.timezone import now
+from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer
+from src.base.filters import NotificationFilter, SubscribeFilter
+from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Subscribe, Notification
+from src.base.filters import EmploymentFilter, UserFilter
 
 
 class EmploymentViewSet(ModelViewSet):
@@ -32,10 +36,23 @@ class UserViewSet(ModelViewSet):
     queryset = User.objects.all()
 
     def perform_create(self, serializer):
-        serializer.username=now()
-        instance=serializer.save()
-        instance.username='user_'+ str(instance.id)
-        instance.save()
+        if 'username' not in serializer.validated_data:
+            instance = serializer.save(username = now())
+            instance.username = 'user_' + str(instance.id)
+            instance.save()
+        else:
+            serializer.save()
+
+    @action(detail=True, methods=['post'])
+    def change_password(self, request, pk=None):
+        user = self.get_object()
+        serializer = PasswordSerializer(data=request.data, instance=user, context={'request':request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'status': 'Пароль сохранен'})
+        else:
+            return Response(serializer.errors,
+                            status=HTTP_400_BAD_REQUEST)
 
 
 class AuthUserView(UserDetailsView):

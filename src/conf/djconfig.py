@@ -63,6 +63,7 @@ REST_FRAMEWORK = {
         'src.base.authentication.SessionAuthentication',
     ]
 }
+OLD_PASSWORD_FIELD_ENABLED=True
 
 FCM_DJANGO_SETTINGS = {
     "FCM_SERVER_KEY": "AAAAoJJLEXM:APA91bHcdiVZxmJE26xjLgYHmmVF03BgEt5r05uJN0kITq_buvZKI26jxGQP-qNAA2FjJdYNI21n_ECtBiisVlIZnCxaF8csG3AW5AXB1BoQiBsn4PlXLFOr1XcxA0cMD3pbwCifWGb0",

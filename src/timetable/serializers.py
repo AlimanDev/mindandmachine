@@ -2,8 +2,8 @@ from rest_framework import serializers
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayApprove, EmploymentWorkType, WorkerConstraint
 
 from rest_framework.exceptions import ValidationError
-
-
+from  django.db import DatabaseError
+from src.base.models import Employment
 class WorkerDayApproveSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField(required=True)
     created_by = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
@@ -116,11 +116,47 @@ class EmploymentWorkTypeSerializer(serializers.ModelSerializer):
         fields = ['id', 'work_type_id', 'employment_id', 'period', 'bills_amount', 'priority', 'duration']
 
 
+class WorkerConstraintListSerializer(serializers.ListSerializer):
+    def create(self, validated_data):
+        employment_id = validated_data[0].get('employment_id')
+        employment = Employment.objects.get(id=employment_id)
+        to_create = []
+        ids = []
+
+        constraints = WorkerConstraint.objects.filter(
+            employment_id=employment_id,
+        )
+        constraint_mapping = {constraint.id: constraint for constraint in constraints}
+
+        for item in validated_data:
+            if item.get('id'):
+                if not constraint_mapping.get(item['id']):
+                    raise ValidationError({"error": f"object with id {item['id']} does not exist"})
+                self.child.update(constraint_mapping[item['id']], item)
+                ids.append(item['id'])
+            else:
+                constraint = WorkerConstraint(
+                    **item,
+                    worker_id=employment.user_id,
+                    shop_id=employment.shop_id,
+                )
+                to_create.append(constraint)
+
+        WorkerConstraint.objects.filter(
+            employment_id=employment_id
+        ).exclude(
+            id__in=ids
+        ).delete()
+
+        WorkerConstraint.objects.bulk_create(to_create)
+        return WorkerConstraint.objects.filter(employment_id=employment_id)
+
+
 class WorkerConstraintSerializer(serializers.ModelSerializer):
-    employment_id = serializers.IntegerField(required=False)
-    worker_id = serializers.IntegerField(required=False)
-    shop_id = serializers.IntegerField(required=False)
+    id = serializers.IntegerField(required=False)
+    employment_id = serializers.IntegerField(required=True)
 
     class Meta:
         model = WorkerConstraint
-        fields = ['id', 'shop_id', 'employment_id', 'worker_id', 'weekday', 'is_lite', 'tm']
+        fields = ['id', 'employment_id', 'weekday', 'is_lite', 'tm']
+        list_serializer_class = WorkerConstraintListSerializer
