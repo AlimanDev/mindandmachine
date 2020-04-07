@@ -1,15 +1,16 @@
 from rest_framework import serializers
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayApprove, WorkerWorkType, WorkerConstraint
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerWorkType, WorkerConstraint
 
 from rest_framework.exceptions import ValidationError
 from  django.db import DatabaseError
 from src.base.models import Employment
-class WorkerDayApproveSerializer(serializers.ModelSerializer):
+
+
+class WorkerDayApproveSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField(required=True)
-    created_by = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
-    class Meta:
-        model = WorkerDayApprove
-        fields = ['id', 'shop_id', 'is_fact', 'created_by', 'dt_from', 'dt_to']
+    is_fact = serializers.BooleanField()
+    dt_from = serializers.DateField()
+    dt_to = serializers.DateField()
 
 
 class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
@@ -18,22 +19,23 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
         model = WorkerDayCashboxDetails
         fields = ['id', 'work_type_id', 'dttm_from', 'dttm_to', 'status']
 
+
 class WorkerDaySerializer(serializers.ModelSerializer):
     worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
     worker_id = serializers.IntegerField()
     employment_id = serializers.IntegerField()
     shop_id = serializers.IntegerField()
     parent_worker_day_id = serializers.IntegerField(required=False)
-    is_fact = serializers.BooleanField(required=True)
-    dttm_work_start=serializers.DateTimeField(default=None)
-    dttm_work_end=serializers.DateTimeField(default=None)
+    is_fact = serializers.BooleanField(required=False)
+    dttm_work_start = serializers.DateTimeField(default=None)
+    dttm_work_end = serializers.DateTimeField(default=None)
 
     class Meta:
         model = WorkerDay
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
-                  'comment', 'worker_day_approve_id', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id']
-        read_only_fields =['worker_day_approve_id', 'work_hours' ]
-        create_only_fields = ['is_fact', 'parent_worker_day_id']
+                  'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id']
+        read_only_fields =['is_approved', 'work_hours', 'parent_worker_day_id']
+        create_only_fields = ['is_fact']
 
     def create(self, validated_data):
         self.check_other_worker_days(None, validated_data)
@@ -47,7 +49,6 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 is_fact=False,
                 dt=validated_data.get('dt'),
                 shop_id=validated_data.get('shop_id'),
-                dttm_deleted__isnull=True
             ).first()
             if not worker_day:
                 raise ValidationError({"error": f"Нельзя занести фактическое время в отсутствие планового графика"})
@@ -85,12 +86,11 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             worker_id=validated_data.get('worker_id'),
             dt=validated_data.get('dt'),
             is_fact=is_fact,
-            dttm_deleted__isnull=True,
         )
 
         if worker_day:
-            parent_worker_day_id = worker_day.parent_worker_day_id
             worker_days = worker_days.exclude(id=worker_day.id)
+            parent_worker_day_id = worker_day.parent_worker_day_id
         else:
             parent_worker_day_id = validated_data.get('parent_worker_day_id', None)
 
@@ -105,6 +105,20 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                     raise ValidationError({"error":f"Рабочий день пересекается с существующим рабочим днем. {wd.shop.name} {wd.dttm_work_start} {wd.dttm_work_end}"})
             else:
                 raise ValidationError({"error": f"У сотрудника уже существует рабочий день: {wd} "})
+
+    def to_internal_value(self, data):
+        data = super(WorkerDaySerializer, self).to_internal_value(data)
+        if self.instance:
+            # update
+            for field in self.Meta.create_only_fields:
+                if field in data:
+                    data.pop(field)
+        else:
+            # shop_id is required for create
+            for field in self.Meta.create_only_fields:
+                if field not in data:
+                    raise serializers.ValidationError({field:"This field is required"})
+        return data
 
 
 class WorkerWorkTypeSerializer(serializers.ModelSerializer):
