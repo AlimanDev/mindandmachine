@@ -1,19 +1,7 @@
 from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter
 from django_filters import utils
 
-from src.base.models import Employment
-from src.timetable.models import WorkerDay, WorkerDayApprove, EmploymentWorkType, WorkerConstraint
-
-
-class WorkerDayApproveFilter(FilterSet):
-    class Meta:
-        model = WorkerDayApprove
-        fields = {
-            'shop_id':['exact'],
-            'created_by':['exact'],
-            # 'dt_approved': ['gte','lte'],
-            'dttm_added': ['gte','lte'],
-        }
+from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 
 
 class WorkerDayFilter(FilterSet):

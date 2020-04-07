@@ -8,39 +8,11 @@ import datetime
 from src.base.models import Shop, Employment, User, Event
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
+from django.utils import timezone
 
 
 class WorkerManager(UserManager):
     pass
-
-
-class WorkerDayApprove(AbstractActiveModel):
-    """
-        Подтверждение расписания на месяц
-        Временная отметка, привязанная к магазину, которая
-            подтверждает все workerday за указанный месяц
-    """
-    class Meta:
-        verbose_name = 'Подверждение расписания'
-        verbose_name_plural = 'Подтверждения расписания'
-
-    def __str__(self):
-        return '{},  {},  {}'.format(
-            self.id,
-            self.shop,
-            self.dt_approved,
-        )
-
-    id = models.BigAutoField(primary_key=True)
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True)
-    # dt_approved = models.DateField() # 1 день месяца
-    dt_from = models.DateField() # начало периода
-    dt_to = models.DateField() # конец периода
-    is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
-
-    def get_department(self):
-        return self.shop
 
 
 class WorkTypeManager(AbstractActiveModelManager):
@@ -267,8 +239,8 @@ class WorkerDayManager(models.Manager):
     def qos_current_version(self, approved_only=False):
         if approved_only:
             return super().get_queryset().filter(
-                models.Q(child__id__isnull=True) | models.Q(child__worker_day_approve_id__isnull=True),
-                worker_day_approve_id__isnull=False,
+                models.Q(child__id__isnull=True) | models.Q(child__worker_day_approve=False),
+                worker_day_approve=True,
             )
         else:
             return super().get_queryset().filter(child__id__isnull=True)
@@ -298,7 +270,7 @@ class WorkerDayManager(models.Manager):
         return current_worker_day
 
 
-class WorkerDay(AbstractActiveModel):
+class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
@@ -387,7 +359,7 @@ class WorkerDay(AbstractActiveModel):
 
     work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')
 
-    worker_day_approve = models.ForeignKey(WorkerDayApprove, on_delete=models.PROTECT, blank=True, null=True)
+    is_approved = models.BooleanField(default=False)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
 
     comment = models.TextField(null=True, blank=True)
@@ -395,6 +367,7 @@ class WorkerDay(AbstractActiveModel):
     work_hours = models.DurationField(default=datetime.timedelta(days=0))
 
     is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
+    dttm_added = models.DateTimeField(default=timezone.now)
 
     objects = WorkerDayManager()
 

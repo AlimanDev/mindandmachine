@@ -10,8 +10,8 @@ from rest_framework import serializers, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from src.base.models import  Employment, Shop
-import json
+from src.base.models import Employment, Shop
+
 
 class TimeZoneField(serializers.ChoiceField):
     def __init__(self, **kwargs):

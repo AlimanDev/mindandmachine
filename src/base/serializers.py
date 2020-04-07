@@ -61,7 +61,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
                   'dt_new_week_availability_from', 'user', 'is_visible',  'worker_constraints', 'work_types'
         ]
         create_only_fields = ['user_id', 'shop_id']
-        read_only_fields=['user']
+        read_only_fields = ['user']
 
     def __init__(self, *args, **kwargs):
         super(EmploymentSerializer, self).__init__(*args, **kwargs)
