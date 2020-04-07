@@ -46,6 +46,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             attrs['worker_day_details'] = []
         elif not ( attrs['dttm_work_start'] and attrs['dttm_work_end'] and attrs['worker_day_details']):
             raise ValidationError({"error": f"dttm_work_start, dttm_work_end, and worker_day_details required for type {type}"})
+        return attrs
 
 
 
