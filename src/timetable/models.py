@@ -746,6 +746,10 @@ class AttendanceRecords(AbstractModel):
         return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
     def save(self, *args, **kwargs):
+        """
+        Создание WorkerDay при занесении отметок.
+
+        """
         super(AttendanceRecords, self).save(*args, **kwargs)
 
         type2dtfield = {
@@ -760,7 +764,7 @@ class AttendanceRecords(AbstractModel):
         )
         wdays = {}
         if len(worker_days) > 4:
-            raise ValueError( f"Worker {self.user} has too many worker days on {dt}")
+            raise ValueError( f"Worker {self.user} has too many worker days on {self.dttm.date()}")
 
         for wd in worker_days:
             key_fact = 'fact' if wd.is_fact else 'plan'
@@ -780,6 +784,7 @@ class AttendanceRecords(AbstractModel):
                 is_fact=True,
                 is_approved=True
             )
+            setattr(wd, type2dtfield[self.type], self.dttm)
 
             if 'plan' in wdays:
                 wd.parent_worker_day = wdays['plan']['approved'] \
