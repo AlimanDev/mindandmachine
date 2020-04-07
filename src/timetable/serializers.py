@@ -25,10 +25,11 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     worker_id = serializers.IntegerField()
     employment_id = serializers.IntegerField()
     shop_id = serializers.IntegerField()
-    parent_worker_day_id = serializers.IntegerField(required=False)
+    parent_worker_day_id = serializers.IntegerField(required=False, read_only=True)
     is_fact = serializers.BooleanField(required=False)
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
+    type = serializers.CharField(required=True)
 
     class Meta:
         model = WorkerDay
@@ -36,6 +37,17 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id']
         read_only_fields =['is_approved', 'work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
+    def validate(self, attrs):
+        type = attrs['type']
+
+        if not WorkerDay.is_type_with_tm_range(type):
+            attrs['dttm_work_start'] = None
+            attrs['dttm_work_end'] = None
+            attrs['worker_day_details'] = []
+        elif not ( attrs['dttm_work_start'] and attrs['dttm_work_end'] and attrs['worker_day_details']):
+            raise ValidationError({"error": f"dttm_work_start, dttm_work_end, and worker_day_details required for type {type}"})
+
+
 
     def create(self, validated_data):
         self.check_other_worker_days(None, validated_data)
