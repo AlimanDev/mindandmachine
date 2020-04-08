@@ -337,12 +337,14 @@ class WorkerDay(AbstractModel):
     ]
 
     def __str__(self):
-        return '{}, {}, {}, {}, {}, {}'.format(
+        return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
             self.worker.last_name,
             self.shop.name if self.shop else '',
             self.shop.parent.name if self.shop and self.shop.parent else '',
             self.dt,
             self.type,
+            'Fact' if self.is_fact else 'Plan',
+            'Approved' if self.is_approved else 'Not approved',
             self.id
         )
 
