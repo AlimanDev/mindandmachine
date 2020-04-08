@@ -492,20 +492,20 @@ class FunctionGroup(AbstractModel):
             self.func,
         )
 
-EVENT_TYPES = [('V','Вакансия'),('T','Изменения в расписании')]
+EVENT_TYPES = [('vacancy','Вакансия'),('timetable','Изменения в расписании')]
 
 
 class Event(AbstractModel):
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_valid_to = models.DateTimeField(auto_now_add=True)
 
-    type = models.CharField(choices=EVENT_TYPES, max_length=1)
+    type = models.CharField(choices=EVENT_TYPES, max_length=20)
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT, related_name="events")
     params = models.CharField(default='{}', max_length=512)
 
 
 class Subscribe(AbstractActiveModel):
-    type = models.CharField(choices=EVENT_TYPES, max_length=1)
+    type = models.CharField(choices=EVENT_TYPES, max_length=20)
     user = models.ForeignKey(User, null=False, on_delete=models.PROTECT)
     shop = models.ForeignKey(Shop, null=False, on_delete=models.PROTECT)
 
