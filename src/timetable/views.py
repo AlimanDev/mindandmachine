@@ -5,9 +5,16 @@ from rest_framework.decorators import action
 
 from src.base.permissions import FilteredListPermission, EmploymentFilteredListPermission
 
-from src.timetable.models import WorkerDay, WorkerWorkType, WorkerConstraint
-from src.timetable.serializers import WorkerDaySerializer, WorkerDayWithParentSerializer, WorkerWorkTypeSerializer, WorkerConstraintSerializer, WorkerDayApproveSerializer
-from src.timetable.filters import WorkerDayFilter, WorkerWorkTypeFilter, WorkerConstraintFilter
+from src.timetable.serializers import (
+    WorkerDaySerializer,
+    WorkerDayApproveSerializer,
+    WorkerDayWithParentSerializer,
+    EmploymentWorkTypeSerializer,
+    WorkerConstraintSerializer
+)
+from src.timetable.filters import WorkerDayFilter, EmploymentWorkTypeFilter, WorkerConstraintFilter
+from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
+
 from src.timetable.backends import MultiShopsFilterBackend
 from django.db.models import OuterRef, Subquery
 
@@ -50,7 +57,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         if worker_day.is_approved:
             raise ValidationError({"error": f"Нельзя удалить подтвержденную версию"})
         super().perform_destroy(worker_day)
-
 
     @action(detail=False, methods=['post'])
     def approve(self, request):
@@ -107,11 +113,11 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         return Response()
 
 
-class WorkerWorkTypeViewSet(viewsets.ModelViewSet):
+class EmploymentWorkTypeViewSet(viewsets.ModelViewSet):
     permission_classes = [FilteredListPermission]
-    serializer_class = WorkerWorkTypeSerializer
-    filterset_class = WorkerWorkTypeFilter
-    queryset = WorkerWorkType.objects.all()
+    serializer_class = EmploymentWorkTypeSerializer
+    filterset_class = EmploymentWorkTypeFilter
+    queryset = EmploymentWorkType.objects.all()
 
 
 class WorkerConstraintViewSet(viewsets.ModelViewSet):

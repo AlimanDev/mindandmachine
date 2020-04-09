@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerWorkType, WorkerConstraint
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
 
 from rest_framework.exceptions import ValidationError
 from  django.db import DatabaseError
@@ -148,12 +148,12 @@ class WorkerDayWithParentSerializer(WorkerDaySerializer):
     parent_worker_day_id = serializers.IntegerField()
 
 
-class WorkerWorkTypeSerializer(serializers.ModelSerializer):
+class EmploymentWorkTypeSerializer(serializers.ModelSerializer):
     employment_id = serializers.IntegerField(required=False)
     work_type_id = serializers.IntegerField(required=False)
 
     class Meta:
-        model = WorkerWorkType
+        model = EmploymentWorkType
         fields = ['id', 'work_type_id', 'employment_id', 'period', 'bills_amount', 'priority', 'duration']
 
 

@@ -9,7 +9,7 @@ from src.base.models import (
 from src.timetable.models import (
     Cashbox,
     WorkerDayCashboxDetails,
-    WorkerWorkType,
+    EmploymentWorkType,
     WorkerDay,
     WorkType,
 )
@@ -297,7 +297,7 @@ def get_cashiers_info(request, form):
             })
 
     user_ids = response.keys()
-    worker_work_type_list = WorkerWorkType.objects.select_related('work_type', 'employment').filter(
+    worker_work_type_list = EmploymentWorkType.objects.select_related('work_type', 'employment').filter(
         employment__user_id__in=user_ids, is_active=True)
     result = {}
     for worker_work_type in list(worker_work_type_list):
@@ -311,7 +311,7 @@ def get_cashiers_info(request, form):
         if user_id in worker_work_type_list.keys():
             response[user_id]['work_types'] = Converter.convert(
                 worker_work_type_list.get(user_id),
-                WorkerWorkType,
+                EmploymentWorkType,
                 fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],
             )
 
