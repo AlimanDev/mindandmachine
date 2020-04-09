@@ -5,10 +5,7 @@ from django.contrib.auth.models import (
 
 import datetime
 
-from fcm_django.models import FCMDevice
-from src.conf.djconfig import IS_PUSH_ACTIVE
-
-from src.base.models import Shop, Employment, User
+from src.base.models import Shop, Employment, User, Event
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
 from django.utils import timezone
@@ -190,7 +187,7 @@ class Cashbox(AbstractActiveNamedModel):
     objects = CashboxManager()
 
 
-class WorkerWorkType(AbstractModel):
+class EmploymentWorkType(AbstractModel):
     class Meta(object):
         verbose_name = 'Информация по сотруднику-типу работ'
         unique_together = (('employment', 'work_type'),)
@@ -466,6 +463,7 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
 
     dttm_from = models.DateTimeField()
     dttm_to = models.DateTimeField(null=True, blank=True)
+    event = models.OneToOneField(Event, on_delete=models.SET_NULL, null=True, blank=True,related_name='worker_day_details')
 
     def __str__(self):
         return '{}, {}, {}, {}, {}-{}, id: {}'.format(
@@ -538,7 +536,7 @@ class Event(AbstractModel):
 
     department = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT) # todo: should be department model?
 
-    workerday_details = models.ForeignKey(WorkerDayCashboxDetails, null=True, blank=True, on_delete=models.PROTECT)
+    workerday_details = models.ForeignKey(WorkerDayCashboxDetails, null=True, blank=True, on_delete=models.PROTECT, related_name='events')
 
     objects = EventManager()
 

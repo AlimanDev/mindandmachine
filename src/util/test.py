@@ -23,7 +23,7 @@ from src.timetable.models import (
     Slot,
     Timetable,
     WorkerDayCashboxDetails,
-    WorkerWorkType,
+    EmploymentWorkType,
     WorkType,
     WorkTypeName,
     WorkerDay,
@@ -236,31 +236,31 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         )
 
         # WorkerCashboxInfo
-        WorkerWorkType.objects.create(
+        EmploymentWorkType.objects.create(
             employment=self.employment1,
             work_type=self.work_type1,
         )
-        WorkerWorkType.objects.create(
+        EmploymentWorkType.objects.create(
             employment=self.employment2,
             work_type=self.work_type3,
         )
-        WorkerWorkType.objects.create(
+        EmploymentWorkType.objects.create(
             employment=self.employment3,
             work_type=self.work_type2,
         )
-        WorkerWorkType.objects.create(
+        EmploymentWorkType.objects.create(
             employment=self.employment4,
             work_type=self.work_type1,
         )
-        WorkerWorkType.objects.create(
+        EmploymentWorkType.objects.create(
             employment=self.employment5,
             work_type=self.work_type3,
         )
-        WorkerWorkType.objects.create(
+        EmploymentWorkType.objects.create(
             employment=self.employment6,
             work_type=self.work_type1,
         )
-        WorkerWorkType.objects.create(
+        EmploymentWorkType.objects.create(
             employment=self.employment7,
             work_type=self.work_type1,
         )

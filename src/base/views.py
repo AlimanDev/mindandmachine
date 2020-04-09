@@ -1,4 +1,8 @@
-from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
+from django.utils.timezone import now
+from rest_auth.views import UserDetailsView
+
+from rest_framework import mixins
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet, GenericViewSet
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
@@ -6,15 +10,11 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_400_BAD_REQUEST
 from rest_framework.decorators import action
 
-from rest_auth.views import UserDetailsView
-
 from src.base.permissions import Permission
-from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, PasswordSerializer
+from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer
+from src.base.filters import NotificationFilter, SubscribeFilter
+from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Subscribe, Notification
 from src.base.filters import EmploymentFilter, UserFilter
-
-from src.base.models import Employment, User, FunctionGroup, WorkerPosition
-
-from django.utils.timezone import now
 
 
 class EmploymentViewSet(ModelViewSet):
@@ -190,3 +190,31 @@ class WorkerPositionViewSet(ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = WorkerPositionSerializer
     queryset = WorkerPosition.objects.filter(dttm_deleted__isnull=True)
+
+
+class SubscribeViewSet(ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SubscribeSerializer
+    filterset_class = SubscribeFilter
+
+    def get_queryset(self):
+        user = self.request.user
+        return Subscribe.objects.filter(user=user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class NotificationViewSet(
+                   mixins.RetrieveModelMixin,
+                   mixins.UpdateModelMixin,
+                   mixins.ListModelMixin,
+                   GenericViewSet
+):
+    permission_classes = [IsAuthenticated]
+    serializer_class = NotificationSerializer
+    filterset_class = NotificationFilter
+
+    def get_queryset(self):
+        user = self.request.user
+        return Notification.objects.filter(worker=user)

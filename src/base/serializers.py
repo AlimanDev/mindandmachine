@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from src.base.models import  Employment, User, FunctionGroup, WorkerPosition
-from src.timetable.serializers import WorkerWorkTypeSerializer, WorkerConstraintSerializer
+
+from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event
+from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
 from django.contrib.auth.forms import SetPasswordForm
 from rest_framework.validators import UniqueValidator
 from rest_framework.exceptions import ValidationError
@@ -52,7 +53,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
     position_id = serializers.IntegerField()
     shop_id = serializers.IntegerField(required=False)
     user_id = serializers.IntegerField(required=False)
-    work_types = WorkerWorkTypeSerializer(many=True, read_only=True)
+    work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
 
     class Meta:
@@ -111,3 +112,24 @@ class WorkerPositionSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkerPosition
         fields = ['id', 'name',]
+
+
+class EventSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Event
+        fields = ['params', 'type', 'shop']
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    event = EventSerializer(read_only=True)
+    class Meta:
+        model = Notification
+        fields = ['id','worker_id', 'is_read', 'event_id', 'event']
+        read_only_fields = ['worker_id', 'event_id', 'event']
+
+
+class SubscribeSerializer(serializers.ModelSerializer):
+    shop_id = serializers.IntegerField(required=True)
+    class Meta:
+        model = Subscribe
+        fields = ['id','shop_id', 'type']
