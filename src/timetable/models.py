@@ -757,13 +757,6 @@ class AttendanceRecords(AbstractModel):
             self.TYPE_LEAVING: 'dttm_work_end'
         }
 
-        # Достаем сразу все планы и факты за день
-        worker_days = WorkerDay.objects.filter(
-            shop=self.shop,
-            worker=self.user,
-            dt=self.dttm.date(),
-        )
-
         wdays = {
             'fact': {
                 'approved': None,
@@ -774,6 +767,13 @@ class AttendanceRecords(AbstractModel):
                 'not_approved': None,
             }
         }
+
+        # Достаем сразу все планы и факты за день
+        worker_days = WorkerDay.objects.filter(
+            shop=self.shop,
+            worker=self.user,
+            dt=self.dttm.date(),
+        )
 
         if len(worker_days) > 4:
             raise ValueError( f"Worker {self.user} has too many worker days on {self.dttm.date()}")
