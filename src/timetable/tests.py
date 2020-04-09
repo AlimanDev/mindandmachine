@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 
 from src.util.test import create_departments_and_users
 
-from src.timetable.models import WorkerDay, WorkType, WorkTypeName
+from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName
 from src.base.models import FunctionGroup
 from src.util.models_converter import Converter
 
@@ -332,7 +332,6 @@ class TestWorkerDay(APITestCase):
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_not_approved.id).exists())
 
 
-
 class TestWorkerDayCreateFact(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -393,3 +392,177 @@ class TestWorkerDayCreateFact(APITestCase):
 
         self.assertEqual(WorkerDay.objects.get(id=fact_id).parent_worker_day_id, plan_id)
 
+
+class TestAttendanceRecords(APITestCase):
+    USER_USERNAME = "user1"
+    USER_EMAIL = "q@q.q"
+    USER_PASSWORD = "4242"
+
+    def setUp(self):
+        super().setUp()
+
+        self.url = '/rest_api/worker_day/'
+        self.url_approve = '/rest_api/worker_day/approve/'
+        self.dt = now().date()
+
+        create_departments_and_users(self)
+
+        self.worker_day_plan_approved = WorkerDay.objects.create(
+            shop=self.shop,
+            worker=self.user2,
+            employment=self.employment2,
+            dt=self.dt,
+            is_fact=False,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
+            is_approved=True,
+        )
+        self.worker_day_plan_not_approved = WorkerDay.objects.create(
+            shop=self.shop,
+            worker=self.user2,
+            employment=self.employment2,
+            dt=self.dt,
+            is_fact=False,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
+            parent_worker_day=self.worker_day_plan_approved
+        )
+        self.worker_day_fact_approved = WorkerDay.objects.create(
+            shop=self.shop,
+            worker=self.user2,
+            employment=self.employment2,
+            dt=self.dt,
+            is_fact=True,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(8, 12, 23)),
+            dttm_work_end=datetime.combine(self.dt, time(20, 2, 1)),
+            is_approved=True,
+            parent_worker_day=self.worker_day_plan_approved,
+        )
+        self.worker_day_fact_not_approved = WorkerDay.objects.create(
+            shop=self.shop,
+            worker=self.user2,
+            employment=self.employment2,
+            dt=self.dt,
+            is_fact=True,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(7, 58, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
+            parent_worker_day=self.worker_day_fact_approved
+        )
+
+
+    def test_attendancerecords_update(self):
+        tm_start=datetime.combine(self.dt, time(6,0,0))
+        tm_end=datetime.combine(self.dt, time(21,0,0))
+        AttendanceRecords.objects.create(
+            dttm=tm_start,
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop,
+            user=self.user2
+        )
+
+        # wd = WorkerDay.objects.get(
+        #     dt=self.dt,
+        #     is_fact=True,
+        #     is_approved=True,
+        #     dttm_work_start = datetime.combine(self.dt, time(6,0,0)),
+        #     # dttm_work_end = None
+        # )
+        # # self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_start, datetime.combine(self.dt, time(6,0,0)))
+
+
+        AttendanceRecords.objects.create(
+            dttm=tm_end,
+            type=AttendanceRecords.TYPE_LEAVING,
+            shop=self.shop,
+            user=self.user2
+        )
+        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_end, tm_end)
+
+    def test_attendancerecords_create(self):
+        wd = WorkerDay.objects.filter(
+            dt=self.dt,
+            worker=self.user3
+        )
+        self.assertFalse(wd.exists())
+        AttendanceRecords.objects.create(
+            dttm=datetime.combine(self.dt, time(6,0,0)),
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop,
+            user=self.user3
+        )
+
+        wd = WorkerDay.objects.filter(
+            dt=self.dt,
+            is_fact=True,
+            is_approved=True,
+            dttm_work_start = datetime.combine(self.dt, time(6,0,0)),
+            dttm_work_end = None,
+            worker=self.user3
+        )
+
+        self.assertTrue(wd.exists())
+        wd=wd.first()
+
+        AttendanceRecords.objects.create(
+            dttm=datetime.combine(self.dt, time(21,0,0)),
+            type=AttendanceRecords.TYPE_LEAVING,
+            shop=self.shop,
+            user=self.user3
+        )
+        self.assertEqual(WorkerDay.objects.get(id=wd.id).dttm_work_end, datetime.combine(self.dt, time(21,0,0)))
+
+    def test_attendancerecords_not_approved_fact_create(self):
+        self.worker_day_fact_not_approved.parent_worker_day_id=self.worker_day_fact_approved.parent_worker_day_id
+        self.worker_day_fact_not_approved.save()
+
+        self.worker_day_fact_approved.delete()
+
+        AttendanceRecords.objects.create(
+            dttm=datetime.combine(self.dt, time(6,0,0)),
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop,
+            user=self.user2
+        )
+
+        wd = WorkerDay.objects.filter(
+            dt=self.dt,
+            is_fact=True,
+            is_approved=True,
+            dttm_work_start = datetime.combine(self.dt, time(6,0,0)),
+            dttm_work_end = None,
+            worker=self.user2
+        )
+
+        self.assertTrue(wd.exists())
+        wd=wd.first()
+        self.assertEqual(wd.parent_worker_day_id,self.worker_day_plan_approved.id)
+        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).parent_worker_day_id,wd.id)
+
+    def test_attendancerecords_no_fact_create(self):
+        self.worker_day_fact_not_approved.delete()
+        self.worker_day_fact_approved.delete()
+
+        AttendanceRecords.objects.create(
+            dttm=datetime.combine(self.dt, time(6, 0, 0)),
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop,
+            user=self.user2
+        )
+        #
+        wd = WorkerDay.objects.filter(
+            dt=self.dt,
+            is_fact=True,
+            is_approved=True,
+            dttm_work_start=datetime.combine(self.dt, time(6, 0, 0)),
+            dttm_work_end=None,
+            worker=self.user2
+        )
+
+        self.assertTrue(wd.exists())
+        wd = wd.first()
+        self.assertEqual(wd.parent_worker_day_id, self.worker_day_plan_approved.id)

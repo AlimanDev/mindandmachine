@@ -745,6 +745,71 @@ class AttendanceRecords(AbstractModel):
     def __str__(self):
         return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
+    def save(self, *args, **kwargs):
+        """
+        Создание WorkerDay при занесении отметок.
+
+        При создании отметки время о приходе или уходе заносится в фактический подтвержденный график WorkerDay.
+        Если подтвержденного факта нет - создаем новый подтвержденный факт. Неподтвержденный факт привязываем к нему.
+        Новый подтвержденный факт привязываем к плану - подтвержденному, если есть, либо неподтвержденному.
+        """
+        super(AttendanceRecords, self).save(*args, **kwargs)
+
+
+        # Достаем сразу все планы и факты за день
+        worker_days = WorkerDay.objects.filter(
+            shop=self.shop,
+            worker=self.user,
+            dt=self.dttm.date(),
+        )
+
+        if len(worker_days) > 4:
+            raise ValueError( f"Worker {self.user} has too many worker days on {self.dttm.date()}")
+
+        wdays = {
+            'fact': {
+                'approved': None,
+                'not_approved': None,
+            },
+            'plan': {
+                'approved': None,
+                'not_approved': None,
+            }
+        }
+
+        for wd in worker_days:
+            key_fact = 'fact' if wd.is_fact else 'plan'
+            key_approved = 'approved' if wd.is_approved else 'not_approved'
+            wdays[key_fact][key_approved] = wd
+
+        type2dtfield = {
+            self.TYPE_COMING: 'dttm_work_start',
+            self.TYPE_LEAVING: 'dttm_work_end'
+        }
+
+        if wdays['fact']['approved']:
+            setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
+            wdays['fact']['approved'].save()
+        else:
+            wd = WorkerDay(
+                shop=self.shop,
+                worker=self.user,
+                dt=self.dttm.date(),
+                is_fact=True,
+                is_approved=True
+            )
+            setattr(wd, type2dtfield[self.type], self.dttm)
+
+            wd.parent_worker_day = wdays['plan']['approved'] \
+                if   wdays['plan']['approved']\
+                else wdays['plan']['not_approved']
+
+            wd.save()
+
+            if wdays['fact']['not_approved']:
+                wdays['fact']['not_approved'].parent_worker_day = wd
+                wdays['fact']['not_approved'].save()
+
 
 class ExchangeSettings(AbstractModel):
     # Создаем ли автоматически вакансии
