@@ -749,13 +749,22 @@ class AttendanceRecords(AbstractModel):
         """
         Создание WorkerDay при занесении отметок.
 
+        При создании отметки время о приходе или уходе заносится в фактический подтвержденный график WorkerDay.
+        Если подтвержденного факта нет - создаем новый подтвержденный факт. Неподтвержденный факт привязываем к нему.
+        Новый подтвержденный факт привязываем к плану - подтвержденному, если есть, либо неподтвержденному.
         """
         super(AttendanceRecords, self).save(*args, **kwargs)
 
-        type2dtfield = {
-            self.TYPE_COMING: 'dttm_work_start',
-            self.TYPE_LEAVING: 'dttm_work_end'
-        }
+
+        # Достаем сразу все планы и факты за день
+        worker_days = WorkerDay.objects.filter(
+            shop=self.shop,
+            worker=self.user,
+            dt=self.dttm.date(),
+        )
+
+        if len(worker_days) > 4:
+            raise ValueError( f"Worker {self.user} has too many worker days on {self.dttm.date()}")
 
         wdays = {
             'fact': {
@@ -768,20 +777,15 @@ class AttendanceRecords(AbstractModel):
             }
         }
 
-        # Достаем сразу все планы и факты за день
-        worker_days = WorkerDay.objects.filter(
-            shop=self.shop,
-            worker=self.user,
-            dt=self.dttm.date(),
-        )
-
-        if len(worker_days) > 4:
-            raise ValueError( f"Worker {self.user} has too many worker days on {self.dttm.date()}")
-
         for wd in worker_days:
             key_fact = 'fact' if wd.is_fact else 'plan'
             key_approved = 'approved' if wd.is_approved else 'not_approved'
             wdays[key_fact][key_approved] = wd
+
+        type2dtfield = {
+            self.TYPE_COMING: 'dttm_work_start',
+            self.TYPE_LEAVING: 'dttm_work_end'
+        }
 
         if wdays['fact']['approved']:
             setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
