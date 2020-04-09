@@ -12,6 +12,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RenameModel(
             old_name='WorkerCashboxInfo',
-            new_name='WorkerWorkType',
+            new_name='EmploymentWorkType',
         ),
     ]

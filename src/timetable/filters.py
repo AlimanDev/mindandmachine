@@ -1,6 +1,7 @@
 from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter
+from django_filters import utils
 
-from src.timetable.models import WorkerDay, WorkerWorkType, WorkerConstraint
+from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 
 
 class WorkerDayFilter(FilterSet):
@@ -26,10 +27,10 @@ class WorkerDayFilter(FilterSet):
         }
 
 
-class WorkerWorkTypeFilter(FilterSet):
+class EmploymentWorkTypeFilter(FilterSet):
     shop_id=NumberFilter(field_name='work_type__shop_id')
     class Meta:
-        model = WorkerWorkType
+        model = EmploymentWorkType
         fields = {
             'shop_id': ['exact'],
             'employment_id': ['exact'],

@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, related_name='worker_constraints', to='base.Employment'),
         ),
         migrations.AlterField(
-            model_name='workerworktype',
+            model_name='employmentworktype',
             name='employment',
             field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='work_types', to='base.Employment'),
         ),

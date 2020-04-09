@@ -2,7 +2,7 @@ from src.util.test import LocalTestCase
 
 
 from src.timetable.models import (
-    WorkerWorkType,
+    EmploymentWorkType,
     WorkerDayCashboxDetails,
 )
 
@@ -72,7 +72,7 @@ class TestCelery(LocalTestCase):
 
     def test_allocation_of_time_for_work_on_cashbox(self):
         allocation_of_time_for_work_on_cashbox()
-        x = WorkerWorkType.objects.all()
+        x = EmploymentWorkType.objects.all()
         self.assertEqual(x[0].duration, 0)
         # x[1].duration = 81.0
         # self.assertEqual(x[1].duration, 0)

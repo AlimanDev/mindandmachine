@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 
 from src.util.test import create_departments_and_users
 
-from src.timetable.models import WorkerDay, AttendanceRecords
+from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName
 from src.base.models import FunctionGroup
 from src.util.models_converter import Converter
 
@@ -19,12 +19,15 @@ class TestWorkerDay(APITestCase):
     def setUp(self):
         super().setUp()
 
-
         self.url = '/rest_api/worker_day/'
         self.url_approve = '/rest_api/worker_day/approve/'
         self.dt = now().date()
 
         create_departments_and_users(self)
+        self.work_type_name = WorkTypeName.objects.create(name='Магазин')
+        self.work_type = WorkType.objects.create(
+            work_type_name=self.work_type_name,
+            shop=self.shop)
 
         self.worker_day_plan_approved = WorkerDay.objects.create(
             shop=self.shop,
@@ -145,6 +148,7 @@ class TestWorkerDay(APITestCase):
         self.assertTrue(WorkerDay.objects.filter(id=self.worker_day_plan_not_approved.id).exists())
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).parent_worker_day_id, self.worker_day_plan_not_approved.id)
 
+    # Последовательное создание и подтверждение P1 -> A1 -> P2 -> F1 -> A2 -> F2
     def test_create_and_approve(self):
         dt = self.dt + timedelta(days=1)
 
@@ -157,6 +161,11 @@ class TestWorkerDay(APITestCase):
             "type": WorkerDay.TYPE_WORKDAY,
             "dttm_work_start": datetime.combine(dt, time(8,0,0)),
             "dttm_work_end":  datetime.combine(dt, time(20,0,0)),
+            "worker_day_details": [{
+                "dttm_from":datetime.combine(self.dt, time(8,0,0)),
+                "dttm_to":datetime.combine(self.dt, time(20,0,0)),
+                 "work_type_id":self.work_type.id}
+            ]
         }
 
         #create not approved plan
@@ -218,7 +227,7 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(WorkerDay.objects.get(id=fact_id).is_approved, True)
 
         # edit approved plan
-        data['is_fact'] = False
+        # data['is_fact'] = False
         response = self.client.put(f"{self.url}{plan_id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         new_plan_id=response.json()['id']
@@ -240,6 +249,42 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(res['dttm_work_start'], data['dttm_work_start'])
         self.assertEqual(res['dttm_work_end'], data['dttm_work_end'])
 
+    def test_empty_params(self):
+        data = {
+            "shop_id": self.shop.id,
+            "worker_id": self.user2.id,
+            "employment_id": self.employment2.id,
+            "dt": self.dt,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(8,0,0)),
+            "dttm_work_end":  datetime.combine(self.dt, time(20,0,0)),
+            "worker_day_details":[]
+        }
+
+        response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {
+            'error': ['dttm_work_start, dttm_work_end, and worker_day_details required for type W']})
+
+        data = {
+            "shop_id": self.shop.id,
+            "worker_id": self.user2.id,
+            "employment_id": self.employment2.id,
+            "dt": self.dt,
+            "type": WorkerDay.TYPE_WORKDAY,
+            # "dttm_work_start": None,
+            "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "dttm_from":datetime.combine(self.dt, time(8,0,0)),
+                "dttm_to":datetime.combine(self.dt, time(20,0,0)),
+                 "work_type_id":self.work_type.id}]
+        }
+
+        response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {
+            'error': ['dttm_work_start, dttm_work_end, and worker_day_details required for type W']})
+
     def test_edit_approved_wd_secondly(self):
         data = {
             "shop_id": self.shop.id,
@@ -249,6 +294,11 @@ class TestWorkerDay(APITestCase):
             "type": WorkerDay.TYPE_WORKDAY,
             "dttm_work_start": datetime.combine(self.dt, time(8,0,0)),
             "dttm_work_end":  datetime.combine(self.dt, time(20,0,0)),
+            "worker_day_details": [{
+                "dttm_from":datetime.combine(self.dt, time(8,0,0)),
+                "dttm_to":datetime.combine(self.dt, time(20,0,0)),
+                 "work_type_id":1}
+            ]
         }
 
         response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
@@ -280,6 +330,67 @@ class TestWorkerDay(APITestCase):
         response = self.client.delete(f'{self.url}{self.worker_day_fact_not_approved.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_not_approved.id).exists())
+
+
+class TestWorkerDayCreateFact(APITestCase):
+    USER_USERNAME = "user1"
+    USER_EMAIL = "q@q.q"
+    USER_PASSWORD = "4242"
+
+    def setUp(self):
+        super().setUp()
+
+        create_departments_and_users(self)
+
+        self.url = '/rest_api/worker_day/'
+        self.url_approve = '/rest_api/worker_day/approve/'
+        self.dt = now().date()
+        self.work_type_name = WorkTypeName.objects.create(name='Магазин')
+        self.work_type = WorkType.objects.create(
+            work_type_name=self.work_type_name,
+            shop=self.shop)
+
+        FunctionGroup.objects.bulk_create([
+            FunctionGroup(group=self.admin_group,
+                          method=method,
+                          func=func,
+                          level_up=1,
+                          level_down=99,
+                          ) for method in ['POST', 'PUT', 'DELETE'] for func in ['WorkerDay', 'WorkerDayApprove']
+        ])
+        self.client.force_authenticate(user=self.user1)
+
+    def test_create_fact(self):
+        data = {
+            "shop_id": self.shop.id,
+            "worker_id": self.user2.id,
+            "employment_id": self.employment2.id,
+            "dt": self.dt,
+            "is_fact": True,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(8,0,0)),
+            "dttm_work_end": datetime.combine(self.dt, time(20,0,0)),
+            "worker_day_details": [{
+                "dttm_from": datetime.combine(self.dt, time(8, 0, 0)),
+                "dttm_to": datetime.combine(self.dt, time(20, 0, 0)),
+                "work_type_id": self.work_type.id}
+            ]
+        }
+
+        #create not approved fact
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        fact_id = response.json()['id']
+
+        #create not approved plan
+        data['is_fact'] = False
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        plan_id = response.json()['id']
+        parent_id = response.json()['parent_worker_day_id']
+        self.assertEqual(parent_id, None)
+
+        self.assertEqual(WorkerDay.objects.get(id=fact_id).parent_worker_day_id, plan_id)
 
 
 class TestAttendanceRecords(APITestCase):
@@ -411,18 +522,13 @@ class TestAttendanceRecords(APITestCase):
 
         self.worker_day_fact_approved.delete()
 
-        # wd = WorkerDay.objects.filter(
-        #     dt=self.dt,
-        #     worker=self.user3
-        # )
-        # self.assertFalse(wd.exists())
         AttendanceRecords.objects.create(
             dttm=datetime.combine(self.dt, time(6,0,0)),
             type=AttendanceRecords.TYPE_COMING,
             shop=self.shop,
             user=self.user2
         )
-        #
+
         wd = WorkerDay.objects.filter(
             dt=self.dt,
             is_fact=True,
@@ -441,11 +547,6 @@ class TestAttendanceRecords(APITestCase):
         self.worker_day_fact_not_approved.delete()
         self.worker_day_fact_approved.delete()
 
-        # wd = WorkerDay.objects.filter(
-        #     dt=self.dt,
-        #     worker=self.user3
-        # )
-        # self.assertFalse(wd.exists())
         AttendanceRecords.objects.create(
             dttm=datetime.combine(self.dt, time(6, 0, 0)),
             type=AttendanceRecords.TYPE_COMING,
