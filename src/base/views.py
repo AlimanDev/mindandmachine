@@ -18,6 +18,18 @@ from django.utils.timezone import now
 
 
 class EmploymentViewSet(ModelViewSet):
+    """
+        обязательные поля при редактировании PUT:
+            position_id
+            dt_hired
+            dt_fired
+        при создании POST дополнительно еще:
+            shop_id
+            user_id
+        Если дата увольнения не задана, надо передать пустое поле.
+
+
+    """
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter

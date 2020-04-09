@@ -3,6 +3,9 @@ from src.base.models import  Employment, User, FunctionGroup, WorkerPosition
 from src.timetable.serializers import WorkerWorkTypeSerializer, WorkerConstraintSerializer
 from django.contrib.auth.forms import SetPasswordForm
 from rest_framework.validators import UniqueValidator
+from rest_framework.exceptions import ValidationError
+from django.db.models import Q
+
 
 class UserSerializer(serializers.ModelSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
@@ -46,7 +49,7 @@ class FunctionGroupSerializer(serializers.ModelSerializer):
 
 class EmploymentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
-    position_id = serializers.IntegerField(required=False)
+    position_id = serializers.IntegerField()
     shop_id = serializers.IntegerField(required=False)
     user_id = serializers.IntegerField(required=False)
     work_types = WorkerWorkTypeSerializer(many=True, read_only=True)
@@ -61,6 +64,26 @@ class EmploymentSerializer(serializers.ModelSerializer):
         ]
         create_only_fields = ['user_id', 'shop_id']
         read_only_fields = ['user']
+
+    def validate(self, attrs):
+        if self.instance:
+            user_id = self.instance.user_id
+            shop_id = self.instance.shop_id
+        else:
+            user_id = attrs['user_id']
+            shop_id = attrs['shop_id']
+        employments = Employment.objects.filter(
+            Q(dt_fired__isnull=True)|Q(dt_fired__gte=attrs['dt_hired']),
+            user_id=user_id,
+            shop_id=shop_id,
+        )
+        if attrs['dt_fired']:
+            employments=employments.filter( dt_hired__lte=attrs['dt_fired'])
+        if self.instance:
+            employments = employments.exclude(id=self.instance.id)
+        if employments:
+            raise ValidationError({"error": f"employment already exists from {employments[0].dt_hired} to {employments[0].dt_fired}"})
+        return attrs
 
     def __init__(self, *args, **kwargs):
         super(EmploymentSerializer, self).__init__(*args, **kwargs)
