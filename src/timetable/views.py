@@ -5,9 +5,15 @@ from rest_framework.decorators import action
 
 from src.base.permissions import FilteredListPermission, EmploymentFilteredListPermission
 
-from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
-from src.timetable.serializers import WorkerDaySerializer, WorkerDayApproveSerializer, EmploymentWorkTypeSerializer, WorkerConstraintSerializer
+from src.timetable.serializers import (
+    WorkerDaySerializer,
+    WorkerDayApproveSerializer,
+    WorkerDayWithParentSerializer,
+    EmploymentWorkTypeSerializer,
+    WorkerConstraintSerializer
+)
 from src.timetable.filters import WorkerDayFilter, EmploymentWorkTypeFilter, WorkerConstraintFilter
+from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 
 from src.timetable.backends import MultiShopsFilterBackend
 from django.db.models import OuterRef, Subquery
@@ -35,7 +41,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             data = serializer.validated_data
             data['parent_worker_day_id']=instance.id
             data['is_fact']=instance.is_fact
-            serializer = WorkerDaySerializer(data=data)
+            serializer = WorkerDayWithParentSerializer(data=data)
             serializer.is_valid(raise_exception=True)
 
         serializer.save()
