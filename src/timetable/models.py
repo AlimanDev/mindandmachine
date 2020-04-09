@@ -757,23 +757,33 @@ class AttendanceRecords(AbstractModel):
             self.TYPE_LEAVING: 'dttm_work_end'
         }
 
+        # Достаем сразу все планы и факты за день
         worker_days = WorkerDay.objects.filter(
             shop=self.shop,
             worker=self.user,
             dt=self.dttm.date(),
         )
-        wdays = {}
+
+        wdays = {
+            'fact': {
+                'approved': None,
+                'not_approved': None,
+            },
+            'plan': {
+                'approved': None,
+                'not_approved': None,
+            }
+        }
+
         if len(worker_days) > 4:
             raise ValueError( f"Worker {self.user} has too many worker days on {self.dttm.date()}")
 
         for wd in worker_days:
             key_fact = 'fact' if wd.is_fact else 'plan'
             key_approved = 'approved' if wd.is_approved else 'not_approved'
-            if not key_fact in wdays:
-                wdays[key_fact] = {}
             wdays[key_fact][key_approved] = wd
 
-        if 'fact' in wdays and 'approved' in wdays['fact']:
+        if wdays['fact']['approved']:
             setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
             wdays['fact']['approved'].save()
         else:
@@ -786,14 +796,13 @@ class AttendanceRecords(AbstractModel):
             )
             setattr(wd, type2dtfield[self.type], self.dttm)
 
-            if 'plan' in wdays:
-                wd.parent_worker_day = wdays['plan']['approved'] \
-                    if 'approved' in wdays['plan']\
-                    else wdays['plan']['not_approved']
+            wd.parent_worker_day = wdays['plan']['approved'] \
+                if   wdays['plan']['approved']\
+                else wdays['plan']['not_approved']
 
             wd.save()
 
-            if 'fact' in wdays and 'not_approved' in wdays['fact']:
+            if wdays['fact']['not_approved']:
                 wdays['fact']['not_approved'].parent_worker_day = wd
                 wdays['fact']['not_approved'].save()
 
