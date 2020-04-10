@@ -25,10 +25,10 @@ class PasswordSerializer(serializers.Serializer):
 
     def validate(self, data):
         if not self.context['request'].user.check_password(data.get('confirmation_password')):
-            raise serializers.ValidationError({'confirmation_password': 'Неверный пароль'})
+            raise MessageError(code='wrong_password', lang=self.context['request'].user.lang)
 
         if data.get('new_password1') != data.get('new_password2'):
-            raise serializers.ValidationError({'new_password2': 'Пароли не совпадают'})
+            raise MessageError(code='mismatch_password', lang=self.context['request'].user.lang)
         form = SetPasswordForm(user=self.instance, data=data )
         if not form.is_valid():
             raise serializers.ValidationError(form.errors)
