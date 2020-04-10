@@ -7,6 +7,7 @@ from rest_framework.validators import UniqueValidator
 from rest_framework.exceptions import ValidationError
 from django.db.models import Q
 
+from django.conf import settings
 from src.base.message import Message
 from src.base.exceptions import MessageError
 class UserSerializer(serializers.ModelSerializer):
@@ -135,7 +136,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         message = Message(lang=lang)
         if event.type=='vacancy':
             details = event.worker_day_details
-            params = {'details': details, 'dt': details.dttm_from.date(), 'shop': event.shop, 'domain': 'domain'}
+            params = {'details': details, 'dt': details.dttm_from.date(), 'shop': event.shop, 'domain': settings.DOMAIN}
         return message.get_message(event.type, params)
 
 class SubscribeSerializer(serializers.ModelSerializer):
