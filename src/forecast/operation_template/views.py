@@ -32,7 +32,7 @@ class OperationTemplateSerializer(serializers.ModelSerializer):
 
 
 class OperationTemplateFilter(FilterSet):
-    shop_id = NumberFilter(field_name='operation_type__work_type__shop_id')
+    shop_id = NumberFilter(field_name='operation_type__shop_id')
 
     class Meta:
         model = OperationTemplate

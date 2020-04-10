@@ -655,7 +655,7 @@ def create_timetable(request, form):
     # Спрос
     periods = PeriodClients.objects.filter(
         operation_type__dttm_deleted__isnull=True,
-        operation_type__work_type__shop_id=shop_id,
+        operation_type__shop_id=shop_id,
         operation_type__work_type__dttm_deleted__isnull=True,
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
@@ -664,7 +664,7 @@ def create_timetable(request, form):
         'dttm_forecast',
         'operation_type__work_type_id',
     ).annotate(
-        clients=Sum(F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + (shop.absenteeism / 100)))
+        clients=Sum(F('value'))
     ).values_list(
         'dttm_forecast',
         'operation_type__work_type_id',

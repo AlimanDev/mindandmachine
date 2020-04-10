@@ -7,7 +7,7 @@ from django.utils import timezone
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel
 from src.base.models import Shop
 
-from src.timetable.models import WorkType
+from src.timetable.models import WorkType, WorkTypeName
 
 class OperationTypeName(AbstractActiveNamedModel):
     class Meta:
@@ -22,6 +22,28 @@ class OperationTypeName(AbstractActiveNamedModel):
         return self
 
 
+class LoadTemplate(AbstractModel):
+    class Meta:
+        verbose_name = 'Шаблон нагрузки'
+        verbose_name_plural = 'Шаблоны нагрузки'
+
+    READY = 'R'
+    UPDATED = 'U'
+    NEW = 'N'
+    ERROR = 'E'
+
+    STATUSES = [
+        (READY, 'Применён'),
+        (UPDATED, 'Обновлён'),
+        (NEW, 'Новый'),
+        (ERROR, 'Ошибка'),
+    ]
+    
+    name = models.CharField(max_length=64, unique=True)
+    status = models.CharField(max_length=1, choices=STATUSES, default=NEW)
+    error_message = models.CharField(max_length=256, null=True)
+
+
 class OperationType(AbstractActiveModel):
     class Meta:
         verbose_name = 'Тип операции'
@@ -32,28 +54,43 @@ class OperationType(AbstractActiveModel):
         return 'id: {}, name: {}, work type: {}'.format(self.id, self.operation_type_name.name, self.work_type)
 
 
-    FORECAST_HARD = 'H'
-    FORECAST_LITE = 'L'
+    FORECAST = 'H'
     FORECAST_NONE = 'N'
+    FORECAST_TEMPLATE = 'T'
+    FORECAST_FORMULA = 'F'
     FORECAST_CHOICES = (
-        (FORECAST_HARD, 'Hard',),
-        (FORECAST_LITE, 'Lite',),
+        (FORECAST, 'Forecast',),
         (FORECAST_NONE, 'None',),
+        (FORECAST_TEMPLATE, 'Template'),
+        (FORECAST_FORMULA, 'Formula'),
     )
 
-    work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, related_name='work_type_reversed')
+    READY = 'R'
+    UPDATED = 'U'
+
+    STATUSES = [
+        (READY, 'Применён'),
+        (UPDATED, 'Обновлён'),
+    ]
+
+    work_type = models.OneToOneField(WorkType, on_delete=models.PROTECT, related_name='operation_type', null=True)
     operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
-    speed_coef = models.FloatField(default=1)  # time for do 1 operation
     do_forecast = models.CharField(
         max_length=1,
-        default=FORECAST_LITE,
+        default=FORECAST,
         choices=FORECAST_CHOICES,
+    )
+    status = models.CharField(
+        max_length=1,
+        default=UPDATED,
+        choices=STATUSES,
     )
 
     period_demand_params = models.CharField(
         max_length=1024,
         default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 200, "reg_lambda": 2, "silent": 1, "iterations": 20}'
     )
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
 
     def __init__(self, *args, **kwargs):
         code = kwargs.pop('code', None)
@@ -67,7 +104,26 @@ class OperationType(AbstractActiveModel):
         super(OperationType, self).save(*args, **kwargs)
 
     def get_department(self):
-        return self.work_type.shop
+        return self.shop
+
+
+class OperationTypeTemplate(AbstractModel):
+    class Meta:
+        verbose_name = 'Шаблон типа операции'
+        verbose_name_plural = 'Шаблоны типов операций'
+        unique_together = ('load_template', 'operation_type_name')
+
+    load_template = models.ForeignKey(LoadTemplate, on_delete=models.PROTECT, related_name='operation_type_templates')
+    operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
+    work_type_name = models.ForeignKey(WorkTypeName, on_delete=models.PROTECT, null=True, blank=True)
+    do_forecast = models.CharField(max_length=1, choices=OperationType.FORECAST_CHOICES, default=OperationType.FORECAST)
+
+
+class OperationTypeRelation(AbstractModel):
+
+    base = models.ForeignKey(OperationTypeTemplate, on_delete=models.PROTECT, related_name='depends')
+    depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.PROTECT, related_name='bases')
+    formula = models.CharField(max_length=256)
 
 
 class OperationTemplate(AbstractActiveNamedModel):
@@ -121,7 +177,7 @@ class OperationTemplate(AbstractActiveNamedModel):
         (PERIOD_MONTHLY, 'В месяц',),
     )
 
-    operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT, related_name='work_type_reversed')
+    operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT, related_name='opeartion_templates')
     tm_start = models.TimeField()
     tm_end = models.TimeField()
     value = models.FloatField()

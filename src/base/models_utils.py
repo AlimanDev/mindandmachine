@@ -80,6 +80,10 @@ def check_func_groups():
         'OperationTypeViewSet',
         'PeriodClientsViewSet',
         'ShopMonthStatViewSet',
+        'OperationTemplateViewSet',
+        'OperationTypeTemplateViewSet',
+        'OperationTypeRelationViewSet',
+        'LoadTemplateViewSet',
 
     ]
 

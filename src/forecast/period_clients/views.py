@@ -48,8 +48,8 @@ class PeriodClientsCreateSerializer(serializers.Serializer):
 
 
 class PeriodClientsFilter(FilterSet):
-    shop_id = NumberFilter(field_name='operation_type__work_type__shop_id')
-    work_type_id = NumberFilter(field_name='operation_type__work_type_id', lookup_expr='in')
+    shop_id = NumberFilter(field_name='operation_type__shop_id')
+    work_type_id = NumberFilter(field_name='operation_type__work_type_id')
     dt_from = DateFilter(field_name='dttm_forecast', lookup_expr='date__gte')
     dt_to = DateFilter(field_name='dttm_forecast', lookup_expr='date__lte')
 
@@ -154,8 +154,8 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
             type=type,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lte=dt_to,
-            operation_type__work_type__shop_id=shop.id,
-            operation_type__do_forecast=OperationType.FORECAST_HARD,
+            operation_type__shop_id=shop.id,
+            operation_type__do_forecast=OperationType.FORECAST,
         ).delete()
         
         for period_demand_value in data['demand']:
@@ -216,7 +216,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         period_clients = PeriodClients.objects.select_related(
             'operation_type__work_type'
         ).filter(
-            operation_type__work_type__shop_id=shop_id,
+            operation_type__shop_id=shop_id,
             type=type,
             dttm_forecast__time__gte=dttm_from.time(),
             dttm_forecast__time__lte=dttm_to.time(),
@@ -283,7 +283,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         shop_id = data.validated_data.get('shop_id')
         type = data.validated_data.get('type')
         PeriodClients.objects.filter(
-            operation_type__work_type__shop_id=shop_id,
+            operation_type__shop_id=shop_id,
             type=type,
             dttm_forecast__date__gte=dttm_from.date(),
             dttm_forecast__date__lte=dttm_to.date(),

@@ -27,6 +27,7 @@ class TestOperationType(APITestCase):
         )
         self.work_type1 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
         self.work_type2 = WorkType.objects.create(shop=self.shop2, work_type_name=self.work_type_name1)
+        self.work_type3 = WorkType.objects.create(shop=self.shop3, work_type_name=self.work_type_name1)
 
         self.operation_type_name1 = OperationTypeName.objects.create(
             name='продажа',
@@ -42,14 +43,12 @@ class TestOperationType(APITestCase):
         self.operation_type = OperationType.objects.create(
             operation_type_name=self.operation_type_name1,
             work_type=self.work_type1,
+            shop=self.work_type1.shop,
         )
         self.operation_type2 = OperationType.objects.create(
             operation_type_name=self.operation_type_name2,
-            work_type=self.work_type1,
-        )
-        self.operation_type3 = OperationType.objects.create(
-            operation_type_name=self.operation_type_name2,
             work_type=self.work_type2,
+            shop=self.work_type2.shop,
         )
         
         FunctionGroup.objects.create(
@@ -78,9 +77,9 @@ class TestOperationType(APITestCase):
 
     def test_get_list(self):
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&work_type_id={self.work_type1.id}')
-        self.assertEqual(len(response.json()), 2)
+        self.assertEqual(len(response.json()), 1)
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}')
-        self.assertEqual(len(response.json()), 2)
+        self.assertEqual(len(response.json()), 1)
 
     def test_get(self):
         response = self.client.get(f'{self.url}{self.operation_type.id}/')
@@ -91,9 +90,9 @@ class TestOperationType(APITestCase):
                 'name': self.operation_type_name1.name,
                 'code': self.operation_type_name1.code,
             },
+            'shop_id': self.operation_type.shop_id,
             'work_type_id': self.work_type1.id, 
-            'do_forecast': OperationType.FORECAST_LITE, 
-            'speed_coef': 1.0,
+            'do_forecast': OperationType.FORECAST, 
         }
         data['id'] = response.json()['id']
         self.assertEqual(response.json(), data)
@@ -101,9 +100,8 @@ class TestOperationType(APITestCase):
     def test_create_with_code(self):
         data = {
             'code': self.operation_type_name3.code,
-            'work_type_id': self.work_type1.id, 
-            'do_forecast': OperationType.FORECAST_HARD, 
-            'speed_coef': 3.0,
+            'work_type_id': self.work_type3.id, 
+            'do_forecast': OperationType.FORECAST, 
         }
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -115,14 +113,14 @@ class TestOperationType(APITestCase):
             'name': self.operation_type_name3.name,
         }
         data.pop('code')
+        data['shop_id'] = None
         self.assertEqual(operation_type, data)
 
     def test_create_with_id(self):
         data = {
             'operation_type_name_id': self.operation_type_name3.id,
-            'work_type_id': self.work_type1.id, 
-            'do_forecast': OperationType.FORECAST_HARD, 
-            'speed_coef': 3.0,
+            'work_type_id': self.work_type3.id, 
+            'do_forecast': OperationType.FORECAST, 
         }
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -133,12 +131,12 @@ class TestOperationType(APITestCase):
             'code': self.operation_type_name3.code,
             'name': self.operation_type_name3.name,
         }
+        data['shop_id'] = None
         data.pop('operation_type_name_id')
         self.assertEqual(operation_type, data)
 
     def test_update_by_code(self):
         data = {
-            'speed_coef': 2.0,
             'code': self.operation_type_name3.code,
         }
         response = self.client.put(f'{self.url}{self.operation_type.id}/', data, format='json')
@@ -146,19 +144,18 @@ class TestOperationType(APITestCase):
         data = {
             'id': self.operation_type.id, 
             'work_type_id': self.work_type1.id, 
-            'do_forecast': OperationType.FORECAST_LITE,
+            'do_forecast': OperationType.FORECAST,
+            'shop_id': self.operation_type.shop_id,
             'operation_type_name': {
                 'id': self.operation_type_name3.id,
                 'name': self.operation_type_name3.name,
                 'code': self.operation_type_name3.code,
             },
-            'speed_coef': 2.0,
         }
         self.assertEqual(operation_type, data)
 
     def test_update_by_id(self):
         data = {
-            'speed_coef': 2.0,
             'operation_type_name_id': self.operation_type_name3.id,
         }
         response = self.client.put(f'{self.url}{self.operation_type.id}/', data, format='json')
@@ -166,13 +163,13 @@ class TestOperationType(APITestCase):
         data = {
             'id': self.operation_type.id, 
             'work_type_id': self.work_type1.id, 
-            'do_forecast': OperationType.FORECAST_LITE,
+            'do_forecast': OperationType.FORECAST,
+            'shop_id': self.operation_type.shop_id,
             'operation_type_name': {
                 'id': self.operation_type_name3.id,
                 'name': self.operation_type_name3.name,
                 'code': self.operation_type_name3.code,
             },
-            'speed_coef': 2.0,
         }
         self.assertEqual(operation_type, data)
 

@@ -97,6 +97,8 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     # added on 16.05.2019
     queue_length = models.FloatField(default=3.0)
 
+    load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops')
+
     max_work_hours_7days = models.SmallIntegerField(default=48)
 
     staff_number = models.SmallIntegerField(default=0)

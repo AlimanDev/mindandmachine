@@ -108,7 +108,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             name='',
         )
 
-        create_operation_type(OperationType.FORECAST_HARD, self.operation_type_name)
+        create_operation_type(OperationType.FORECAST, self.operation_type_name)
 
         # cashboxes
         self.cashbox1 = Cashbox.objects.create(
@@ -595,6 +595,7 @@ def create_operation_type(do_forecast, operation_type_name, dttm_deleted=None):
             work_type=work_type,
             do_forecast=do_forecast,
             dttm_deleted=dttm_deleted,
+            shop=work_type.shop,
         )
 
 

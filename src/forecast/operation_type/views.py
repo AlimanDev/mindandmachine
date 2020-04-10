@@ -20,11 +20,11 @@ class OperationTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OperationType
-        fields = ['id', 'work_type_id', 'speed_coef', 'do_forecast', 'operation_type_name', 'code', 'operation_type_name_id']
+        fields = ['id', 'work_type_id', 'do_forecast', 'operation_type_name', 'code', 'operation_type_name_id', 'shop_id']
 
 
 class OperationTypeFilter(FilterSet):
-    shop_id = NumberFilter(field_name='work_type__shop_id')
+    shop_id = NumberFilter(field_name='shop_id')
     class Meta:
         model = OperationType
         fields = {
@@ -52,7 +52,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
                 "code": '2',
             },
             "work_type_id": 1,
-            "speed_coef": 3.0,
             "do_forecast": "H"
         },
         ...
@@ -68,7 +67,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
             "code": '4',
         },
         "work_type_id": 1,
-        "speed_coef": 3.0,
         "do_forecast": "H"
     }
 
@@ -78,7 +76,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
         work_type_id: int, required=True
         operation_type_name_id: int, required=False
         code: str, required=False
-        speed_coef: float, required=True
         do_forecast: OperationType do_forecast, required=False
     :return 
         code 201
@@ -90,7 +87,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
                 "code": '4',
             },
             "work_type_id": 1,
-            "speed_coef": 3.0,
             "do_forecast": "H"
         }
 
@@ -100,7 +96,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
         work_type_id: int, required=False
         operation_type_name_id: int, required=False
         code: str, required=False
-        speed_coef: float, required=False
         do_forecast: OperationType do_forecast, required=False
     :return {
         "id":6,
@@ -110,7 +105,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
             "code": '4',
         },
         "work_type_id": 1,
-        "speed_coef": 3.0,
         "do_forecast": "H"
     }
 
