@@ -10,7 +10,6 @@ from src.base.models_abstract import AbstractActiveModel, AbstractModel, Abstrac
 
 from mptt.models import MPTTModel, TreeForeignKey
 
-
 class Region(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Регион'
@@ -249,13 +248,13 @@ class User(DjangoAbstractUser, AbstractModel):
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     access_token = models.CharField(max_length=64, blank=True, null=True)
     tabel_code = models.CharField(blank=True, max_length=15, null=True, unique=True)
+    lang = models.CharField(max_length=2, default='ru')
 
 
 class WorkerPosition(AbstractActiveNamedModel):
     """
     Describe employee's position
     """
-
     class Meta:
         verbose_name = 'Должность сотрудника'
         verbose_name_plural = 'Должности сотрудников'
