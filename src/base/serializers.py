@@ -117,9 +117,10 @@ class WorkerPositionSerializer(serializers.ModelSerializer):
 
 
 class EventSerializer(serializers.ModelSerializer):
+    shop_id = serializers.IntegerField()
     class Meta:
         model = Event
-        fields = ['params', 'type', 'shop']
+        fields = ['type', 'shop_id']
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -127,8 +128,8 @@ class NotificationSerializer(serializers.ModelSerializer):
     message = serializers.SerializerMethodField()
     class Meta:
         model = Notification
-        fields = ['id','worker_id', 'is_read', 'event_id', 'event', 'message']
-        read_only_fields = ['worker_id', 'event_id', 'event']
+        fields = ['id','worker_id', 'is_read', 'event', 'message']
+        read_only_fields = ['worker_id', 'event']
     def get_message(self, instance):
         lang = self.context['request'].user.lang
 
