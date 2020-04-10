@@ -7,7 +7,8 @@ from rest_framework.validators import UniqueValidator
 from rest_framework.exceptions import ValidationError
 from django.db.models import Q
 
-
+from src.base.message import Message
+from src.base.exceptions import MessageError
 class UserSerializer(serializers.ModelSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
     class Meta:
@@ -83,7 +84,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
         if self.instance:
             employments = employments.exclude(id=self.instance.id)
         if employments:
-            raise ValidationError({"error": f"employment already exists from {employments[0].dt_hired} to {employments[0].dt_fired}"})
+            raise MessageError(code='emp_check_dates', params={'employment': employments.first()}, lang=self.context['request'].user.lang)
         return attrs
 
     def __init__(self, *args, **kwargs):
@@ -122,11 +123,20 @@ class EventSerializer(serializers.ModelSerializer):
 
 class NotificationSerializer(serializers.ModelSerializer):
     event = EventSerializer(read_only=True)
+    message = serializers.SerializerMethodField()
     class Meta:
         model = Notification
-        fields = ['id','worker_id', 'is_read', 'event_id', 'event']
+        fields = ['id','worker_id', 'is_read', 'event_id', 'event', 'message']
         read_only_fields = ['worker_id', 'event_id', 'event']
+    def get_message(self, instance):
+        lang = self.context['request'].user.lang
 
+        event = instance.event
+        message = Message(lang=lang)
+        if event.type=='vacancy':
+            details = event.worker_day_details
+            params = {'details': details, 'dt': details.dttm_from.date(), 'shop': event.shop, 'domain': 'domain'}
+        return message.get_message(event.type, params)
 
 class SubscribeSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField(required=True)

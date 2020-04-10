@@ -217,4 +217,5 @@ class NotificationViewSet(
 
     def get_queryset(self):
         user = self.request.user
-        return Notification.objects.filter(worker=user)
+        return Notification.objects.filter(worker=user).select_related('event','event__worker_day_details')
+
