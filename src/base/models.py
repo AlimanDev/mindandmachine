@@ -500,7 +500,6 @@ class Event(AbstractModel):
 
     type = models.CharField(choices=EVENT_TYPES, max_length=20)
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT, related_name="events")
-    params = models.CharField(default='{}', max_length=512)
 
 
 class Subscribe(AbstractActiveModel):
