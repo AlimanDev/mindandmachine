@@ -9,7 +9,7 @@ class Message(object):
         file = open(f"data/lang/{lang}.json")
         self.message_dict = json.load(file)
 
-    def get_message(self, key, params):
+    def get_message(self, key, params={}):
         message = self.message_dict.get(key, '')
         message = message.format(**params)
         return message
