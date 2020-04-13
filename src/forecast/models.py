@@ -121,8 +121,8 @@ class OperationTypeTemplate(AbstractModel):
 
 class OperationTypeRelation(AbstractModel):
 
-    base = models.ForeignKey(OperationTypeTemplate, on_delete=models.PROTECT, related_name='depends')
-    depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.PROTECT, related_name='bases')
+    base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends')
+    depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases')
     formula = models.CharField(max_length=256)
 
 

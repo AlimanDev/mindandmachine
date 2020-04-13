@@ -188,7 +188,7 @@ class TestOperationTypeName(APITestCase):
         operation_type = OperationType.objects.get(shop=self.shop, operation_type_name=self.operation_type_name1)
         period_clients = PeriodClients.objects.filter(operation_type=operation_type).first()
         self.assertEqual(period_clients.value, 6.0)
-        self.assertEqual(PeriodClients.objects.filter(operation_type=operation_type).count(), 48)
+        self.assertEqual(PeriodClients.objects.filter(operation_type=operation_type).count(), 34)
         self.assertEqual(operation_type.status, OperationType.READY)
         
     def test_create_from_shop(self):
@@ -244,11 +244,8 @@ class TestOperationTypeName(APITestCase):
         self.assertEqual(load_template, data)
     
 
-    # def test_delete(self):
-    #     response = self.client.delete(f'{self.url}{self.operation_type_name1.id}/')
-    #     self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-    #     self.assertIsNotNone(OperationTypeName.objects.get(id=self.operation_type_name1.id).dttm_deleted)
-    #     self.assertEqual(OperationType.objects.filter(dttm_deleted__isnull=False).count(), 1)
-
+    def test_delete(self):
+        response = self.client.delete(f'{self.url}{self.load_template.id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     

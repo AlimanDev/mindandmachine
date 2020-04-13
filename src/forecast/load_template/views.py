@@ -100,4 +100,11 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
 
 
     def destroy(self, request, pk=None):
-        pass #подумать что делать
+        load_template = LoadTemplate.objects.get(pk=pk)
+        if load_template.shops.exists():
+            return Response(['There is an attached shops'], status=400)
+
+        load_template.operation_type_templates.all().delete()
+        load_template.delete()
+
+        return Response(status=204)
