@@ -8,6 +8,10 @@ from src.base.permissions import FilteredListPermission
 from src.timetable.models import WorkType, WorkTypeName
 from django.db.models import Q, F
 from src.timetable.work_type_name.views import WorkTypeNameSerializer
+from rest_framework.decorators import action
+from src.main.timetable.cashier_demand.forms import GetCashiersTimetableForm
+from src.timetable.work_type.utils import get_efficiency
+from src.conf.djconfig import QOS_DATE_FORMAT
 
 # Serializers define the API representation.
 class WorkTypeSerializer(serializers.ModelSerializer):
@@ -19,6 +23,19 @@ class WorkTypeSerializer(serializers.ModelSerializer):
         model = WorkType
         fields = ['id', 'priority', 'dttm_last_update_queue', 'min_workers_amount', 'max_workers_amount',\
              'probability', 'prior_weight', 'shop_id', 'code', 'work_type_name_id', 'work_type_name']
+
+
+class EfficiencySerializer(serializers.Serializer):
+    from_dt = serializers.DateField(format=QOS_DATE_FORMAT)
+    to_dt = serializers.DateField(format=QOS_DATE_FORMAT)
+    work_type_ids = serializers.ListField(allow_empty=True, child=serializers.IntegerField(), required=False, default=[])
+    shop_id = serializers.IntegerField()
+
+    def is_valid(self, *args, **kwargs):
+        super(EfficiencySerializer, self).is_valid(*args, **kwargs)
+
+        if self.validated_data['from_dt'] > self.validated_data['to_dt']:
+            raise serializers.ValidationError('dt_from have to be less or equal than dt_to')
 
 
 class WorkTypeFilter(FilterSet):
@@ -143,3 +160,10 @@ class WorkTypeViewSet(viewsets.ModelViewSet):
             WorkType.objects.select_related('work_type_name').filter(dttm_deleted__isnull=True)
         )
 
+    @action(detail=False, methods=['get'])
+    def efficiency(self, request):
+        data = EfficiencySerializer(data=request.query_params)
+
+        data.is_valid(raise_exception=True)
+
+        return Response(get_efficiency(data.validated_data.get('shop_id'), data.validated_data), status=200)
