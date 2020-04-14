@@ -12,6 +12,7 @@ from src.base.message import Message
 from src.base.exceptions import MessageError
 class UserSerializer(serializers.ModelSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
+
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name',
@@ -118,6 +119,7 @@ class WorkerPositionSerializer(serializers.ModelSerializer):
 
 class EventSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField()
+
     class Meta:
         model = Event
         fields = ['type', 'shop_id']
@@ -126,10 +128,12 @@ class EventSerializer(serializers.ModelSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
     event = EventSerializer(read_only=True)
     message = serializers.SerializerMethodField()
+
     class Meta:
         model = Notification
         fields = ['id','worker_id', 'is_read', 'event', 'message']
         read_only_fields = ['worker_id', 'event']
+
     def get_message(self, instance):
         lang = self.context['request'].user.lang
 
@@ -142,6 +146,7 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 class SubscribeSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField(required=True)
+
     class Meta:
         model = Subscribe
         fields = ['id','shop_id', 'type']
