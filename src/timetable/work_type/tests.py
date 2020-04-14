@@ -217,5 +217,6 @@ class TestWorkType(APITestCase):
         url = f'{self.url}efficiency/?shop_id={self.shop.id}&from_dt={dt_now}&to_dt={dt_now + timedelta(days=2)}'
 
         response = self.client.get(url)
-
-        print(len(response.json()))
+        data = response.json()
+        self.assertEqual(len(data['tt_periods']['real_cashiers']), 144)
+        self.assertEqual(len(data['tt_periods']['predict_cashier_needs']), 144)
