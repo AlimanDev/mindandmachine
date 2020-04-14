@@ -63,7 +63,7 @@ class UserViewSet(ModelViewSet):
 
         if serializer.is_valid():
             serializer.save()
-            return Response({'message': message.get_message('password_saved')})
+            return Response()
         else:
             return Response(serializer.errors,
                             status=HTTP_400_BAD_REQUEST)
