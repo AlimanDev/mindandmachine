@@ -15,6 +15,7 @@ from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionG
 from src.base.filters import NotificationFilter, SubscribeFilter
 from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Subscribe, Notification
 from src.base.filters import EmploymentFilter, UserFilter
+from src.base.message import Message
 
 
 class EmploymentViewSet(ModelViewSet):
@@ -57,10 +58,12 @@ class UserViewSet(ModelViewSet):
     @action(detail=True, methods=['post'])
     def change_password(self, request, pk=None):
         user = self.get_object()
+        message = Message(lang=user.lang)
         serializer = PasswordSerializer(data=request.data, instance=user, context={'request':request})
+
         if serializer.is_valid():
             serializer.save()
-            return Response({'status': 'Пароль сохранен'})
+            return Response()
         else:
             return Response(serializer.errors,
                             status=HTTP_400_BAD_REQUEST)
@@ -217,4 +220,5 @@ class NotificationViewSet(
 
     def get_queryset(self):
         user = self.request.user
-        return Notification.objects.filter(worker=user)
+        return Notification.objects.filter(worker=user).select_related('event', 'event__worker_day_details', 'event__shop')
+
