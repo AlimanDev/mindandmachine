@@ -142,6 +142,8 @@ class NotificationSerializer(serializers.ModelSerializer):
         if event.type=='vacancy':
             details = event.worker_day_details
             params = {'details': details, 'dt': details.dttm_from.date(), 'shop': event.shop, 'domain': settings.DOMAIN}
+        else:
+            params = event.params
         return message.get_message(event.type, params)
 
 class SubscribeSerializer(serializers.ModelSerializer):
