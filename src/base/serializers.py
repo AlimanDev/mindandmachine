@@ -7,9 +7,12 @@ from rest_framework.validators import UniqueValidator
 from rest_framework.exceptions import ValidationError
 from django.db.models import Q
 
-
+from django.conf import settings
+from src.base.message import Message
+from src.base.exceptions import MessageError
 class UserSerializer(serializers.ModelSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
+
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name',
@@ -23,10 +26,10 @@ class PasswordSerializer(serializers.Serializer):
 
     def validate(self, data):
         if not self.context['request'].user.check_password(data.get('confirmation_password')):
-            raise serializers.ValidationError({'confirmation_password': 'Неверный пароль'})
+            raise MessageError(code='password_wrong', lang=self.context['request'].user.lang)
 
         if data.get('new_password1') != data.get('new_password2'):
-            raise serializers.ValidationError({'new_password2': 'Пароли не совпадают'})
+            raise MessageError(code='password_mismatch', lang=self.context['request'].user.lang)
         form = SetPasswordForm(user=self.instance, data=data )
         if not form.is_valid():
             raise serializers.ValidationError(form.errors)
@@ -83,7 +86,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
         if self.instance:
             employments = employments.exclude(id=self.instance.id)
         if employments:
-            raise ValidationError({"error": f"employment already exists from {employments[0].dt_hired} to {employments[0].dt_fired}"})
+            raise MessageError(code='emp_check_dates', params={'employment': employments.first()}, lang=self.context['request'].user.lang)
         return attrs
 
     def __init__(self, *args, **kwargs):
@@ -115,21 +118,37 @@ class WorkerPositionSerializer(serializers.ModelSerializer):
 
 
 class EventSerializer(serializers.ModelSerializer):
+    shop_id = serializers.IntegerField()
+
     class Meta:
         model = Event
-        fields = ['params', 'type', 'shop']
+        fields = ['type', 'shop_id']
 
 
 class NotificationSerializer(serializers.ModelSerializer):
     event = EventSerializer(read_only=True)
+    message = serializers.SerializerMethodField()
+
     class Meta:
         model = Notification
-        fields = ['id','worker_id', 'is_read', 'event_id', 'event']
-        read_only_fields = ['worker_id', 'event_id', 'event']
+        fields = ['id','worker_id', 'is_read', 'event', 'message']
+        read_only_fields = ['worker_id', 'event']
 
+    def get_message(self, instance):
+        lang = self.context['request'].user.lang
+
+        event = instance.event
+        message = Message(lang=lang)
+        if event.type=='vacancy':
+            details = event.worker_day_details
+            params = {'details': details, 'dt': details.dttm_from.date(), 'shop': event.shop, 'domain': settings.DOMAIN}
+        else:
+            params = event.params
+        return message.get_message(event.type, params)
 
 class SubscribeSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField(required=True)
+
     class Meta:
         model = Subscribe
         fields = ['id','shop_id', 'type']
