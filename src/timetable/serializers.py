@@ -201,3 +201,22 @@ class WorkerConstraintSerializer(serializers.ModelSerializer):
         model = WorkerConstraint
         fields = ['id', 'employment_id', 'weekday', 'is_lite', 'tm']
         list_serializer_class = WorkerConstraintListSerializer
+
+
+class ListChangeSrializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    workers = serializers.JSONField()
+    type = serializers.CharField()
+    tm_work_start = serializers.TimeField(required=False)
+    tm_work_end = serializers.TimeField(required=False)
+    work_type_id = serializers.IntegerField(required=False)
+    comment = serializers.CharField(max_length=128, required=False)
+
+
+    def is_valid(self):
+        super().is_valid()
+        if WorkerDay.is_type_with_tm_range(self.validated_data['type']):
+            if self.validated_data.get('tm_work_start') is None:
+                raise serializers.ValidationError('tm_work_start is required')
+            if self.validated_data.get('tm_work_end') is None:
+                raise serializers.ValidationError('tm_work_end is required')

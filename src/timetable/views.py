@@ -10,7 +10,8 @@ from src.timetable.serializers import (
     WorkerDayApproveSerializer,
     WorkerDayWithParentSerializer,
     EmploymentWorkTypeSerializer,
-    WorkerConstraintSerializer
+    WorkerConstraintSerializer,
+    ListChangeSrializer,
 )
 from src.timetable.filters import WorkerDayFilter, EmploymentWorkTypeFilter, WorkerConstraintFilter
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
@@ -111,6 +112,141 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             WorkerDay.objects.filter(id__in=parent_ids).delete()
 
         return Response()
+
+
+    @action(detail=False, methods=['post'])
+    def change_list(self, request):
+        data = ListChangeSrializer(data=request.data)
+        details = []
+        if form['details']:
+            details = json.loads(form['details'])
+
+        dt_from = form['dt']
+        dt_to = form['dt_to']
+        if (not dt_to):
+            dt_to = dt_from
+
+        is_type_with_tm_range = WorkerDay.is_type_with_tm_range(form['type'])
+
+        response = []
+        old_wds = []
+
+        worker = User.objects.get(id=form['worker_id'])
+        shop = request.shop
+        employment = Employment.objects.get(
+            user=worker,
+            shop=shop)
+
+
+        work_type = WorkType.objects.get(id=form['work_type']) if form['work_type'] else None
+
+        for dt in range(int(dt_from.toordinal()), int(dt_to.toordinal()) + 1, 1):
+            dt = date.fromordinal(dt)
+            try:
+                old_wd = WorkerDay.objects.qos_current_version().get(
+                    worker_id=worker.id,
+                    dt=dt,
+                    shop=shop
+                )
+                action = 'update'
+            except WorkerDay.DoesNotExist:
+                old_wd = None
+                action = 'create'
+            except WorkerDay.MultipleObjectsReturned:
+                if (not form['dt_to']):
+                    return JsonResponse.multiple_objects_returned()
+                response.append({
+                    'action': 'MultypleObjectsReturnedError',
+                    'dt': dt,
+                })
+                continue
+
+            if old_wd:
+                # Не пересохраняем, если тип не изменился
+                if old_wd.type == form['type'] and not is_type_with_tm_range:
+                    if (not form['dt_to']):
+                        return JsonResponse.success()
+                    response.append({
+                        'action': 'TypeNotChanged',
+                        'dt': dt
+                    })
+                    continue
+
+            res = {
+                'action': action
+            }
+
+
+            wd_args = {
+                'dt': dt,
+                'type': form['type'],
+                'worker_id': worker.id,
+                'shop': shop,
+                'employment': employment,
+                'parent_worker_day': old_wd,
+                'created_by': request.user,
+                'comment': form['comment'],
+            }
+
+            if is_type_with_tm_range:
+                dttm_work_start = datetime.combine(dt, form[
+                    'tm_work_start'])  # на самом деле с фронта приходят время а не дата-время
+                tm_work_end = form['tm_work_end']
+                dttm_work_end = datetime.combine(dt, tm_work_end) if tm_work_end > form['tm_work_start'] else \
+                    datetime.combine(dt + timedelta(days=1), tm_work_end)
+                break_triplets = json.loads(shop.break_triplets)
+                work_hours = WorkerDay.count_work_hours(break_triplets, dttm_work_start, dttm_work_end)
+                wd_args.update({
+                    'dttm_work_start': dttm_work_start,
+                    'dttm_work_end': dttm_work_end,
+                    'work_hours': work_hours,
+                })
+
+            new_worker_day = WorkerDay.objects.create(
+                **wd_args
+            )
+            if new_worker_day.type == WorkerDay.TYPE_WORKDAY:
+                if len(details):
+                    for item in details:
+                        dttm_to = Converter.parse_time(item['dttm_to'])
+                        dttm_from = Converter.parse_time(item['dttm_from'])
+                        WorkerDayCashboxDetails.objects.create(
+                            work_type_id=item['work_type'],
+                            worker_day=new_worker_day,
+                            dttm_from=datetime.combine(dt, dttm_from),
+                            dttm_to=datetime.combine(dt, dttm_to) if dttm_to > dttm_from\
+                                else datetime.combine(dt + timedelta(days=1), dttm_to)
+                        )
+
+                else:
+                    WorkerDayCashboxDetails.objects.create(
+                        work_type=work_type,
+                        worker_day=new_worker_day,
+                        dttm_from=new_worker_day.dttm_work_start,
+                        dttm_to=new_worker_day.dttm_work_end
+                    )
+
+
+            res['day'] = WorkerDayConverter.convert(new_worker_day)
+
+            response.append(res)
+            if old_wd:
+                old_wds.append(old_wd)
+
+        old_cashboxdetails = WorkerDayCashboxDetails.objects.filter(
+            worker_day__in=old_wds,
+            dttm_deleted__isnull=True
+        ).first()
+
+        if work_type and form['type'] == WorkerDay.TYPE_WORKDAY:
+            cancel_vacancies(work_type.shop_id, work_type.id)
+        if old_cashboxdetails:
+            create_vacancies_and_notify(old_cashboxdetails.work_type.shop_id, old_cashboxdetails.work_type_id)
+
+        if (not form['dt_to']):
+            response = response[0]
+
+        return JsonResponse.success(response)
 
 
 class EmploymentWorkTypeViewSet(viewsets.ModelViewSet):
