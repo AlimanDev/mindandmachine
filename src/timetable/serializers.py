@@ -43,7 +43,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         type = attrs['type']
         if is_fact:
             attrs.pop('worker_day_details',None)
-        elif not WorkerDay.is_type_with_tm_range(type):
+        elif type != WorkerDay.TYPE_WORKDAY:
             attrs['dttm_work_start'] = None
             attrs['dttm_work_end'] = None
             attrs['worker_day_details'] = []
