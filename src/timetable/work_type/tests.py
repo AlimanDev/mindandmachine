@@ -60,13 +60,6 @@ class TestWorkType(APITestCase):
             level_up=1,
             level_down=99,
         )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='GET',
-            func='WorkType_efficiency',
-            level_up=1,
-            level_down=99,
-        )
 
         self.client.force_authenticate(user=self.user1)
 

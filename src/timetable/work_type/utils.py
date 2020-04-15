@@ -72,9 +72,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
     #work_types = group_by(work_types, group_key=lambda x: x.id)
 
     # query selecting PeriodClients
-    need_workers = PeriodClients.objects.annotate(
-        need_workers=F('value') * F('operation_type__speed_coef') / period_lengths_minutes,
-    ).select_related('operation_type').filter(
+    need_workers = PeriodClients.objects.select_related('operation_type').filter(
         dttm_forecast__gte=from_dt,
         dttm_forecast__lte=to_dt,
         operation_type__work_type_id__in=work_types.keys(),
@@ -82,7 +80,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
     )
 
     lambda_index_periodclients = lambda x: [dttm2index(from_dt, x.dttm_forecast, period_in_day, period_lengths_minutes)]
-    lambda_add_periodclients = lambda x: x.need_workers
+    lambda_add_periodclients = lambda x: x.value
 
     fill_array(
         predict_needs,
