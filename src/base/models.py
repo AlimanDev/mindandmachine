@@ -336,6 +336,7 @@ class FunctionGroup(AbstractModel):
         'OperationTemplate',
         'WorkTypeName',
         'WorkType',
+        'WorkType_efficiency',
         'OperationTypeName',
         'OperationType',
         'PeriodClients',
