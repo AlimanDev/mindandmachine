@@ -398,8 +398,8 @@ class WorkerDay(AbstractActiveModel):
                 break
         return round(work_hours / 60)
 
-    def delete(self):
-        super(AbstractActiveModel, self).delete()
+    def delete(self, *args, **kwargs):
+        super(AbstractActiveModel, self).delete(*args, **kwargs)
 
     objects = WorkerDayManager()
     def get_department(self):

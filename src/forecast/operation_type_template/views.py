@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from src.forecast.models import OperationTypeTemplate, LoadTemplate
 from src.forecast.operation_type_name.views import OperationTypeNameSerializer
+
+
 # Serializers define the API representation.
 class OperationTypeTemplateSerializer(serializers.ModelSerializer):
     operation_type_name = OperationTypeNameSerializer(read_only=True)
@@ -36,3 +38,11 @@ class OperationTypeTemplateViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return self.filter_queryset(OperationTypeTemplate.objects.all())
+
+    def update(self, request, pk=None):
+        data = OperationTypeTemplateSerializer(data=request.data, instance=OperationTypeTemplate.objects.get(pk=pk))
+        data.is_valid(raise_exception=True)
+        data.validated_data.pop('load_template_id', None)
+        data.save()
+
+        return Response(data.data, status=200)
