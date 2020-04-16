@@ -4,7 +4,7 @@ from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentW
 from rest_framework.exceptions import ValidationError
 from  django.db import DatabaseError
 from src.base.models import Employment
-
+from src.util.models_converter import Converter
 
 class WorkerDayApproveSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField(required=True)
@@ -220,3 +220,9 @@ class ListChangeSrializer(serializers.Serializer):
                 raise serializers.ValidationError('tm_work_start is required')
             if self.validated_data.get('tm_work_end') is None:
                 raise serializers.ValidationError('tm_work_end is required')
+            workers = self.validated_data.get('workers')
+            for key, value in workers:
+                try:
+                    workers[key] = list(map(lambda x: Converter.parse_date(x), value))
+                except:
+                    raise serializers.ValidationError('Error in workers dict')
