@@ -14,9 +14,9 @@ from src.base.permissions import Permission
 from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer
 from src.base.filters import NotificationFilter, SubscribeFilter
 from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Subscribe, Notification
-from src.base.filters import EmploymentFilter, UserFilter
-from src.base.message import Message
-
+from src.base.filters import UserFilter
+from src.base.backends import EmploymentFilterBackend
+from src.timetable.worker_day.stat import count_month_stat
 
 class EmploymentViewSet(ModelViewSet):
     """
@@ -28,14 +28,22 @@ class EmploymentViewSet(ModelViewSet):
             shop_id
             user_id
         Если дата увольнения не задана, надо передать пустое поле.
-
-
     """
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
-    filterset_class = EmploymentFilter
+    filter_backends = (EmploymentFilterBackend,)
 
     queryset = Employment.objects.all()
+
+
+    @action(detail=False, methods=['get'], )
+    def month_stat(self, request):
+        filterset = self.filter_backends[0]().get_filterset(request, self.get_queryset(), self)
+        employments = self.filter_queryset(
+            self.get_queryset()
+        )
+        month_stat = count_month_stat(filterset, employments)
+        return Response(month_stat)
 
 
 class UserViewSet(ModelViewSet):
@@ -58,7 +66,6 @@ class UserViewSet(ModelViewSet):
     @action(detail=True, methods=['post'])
     def change_password(self, request, pk=None):
         user = self.get_object()
-        message = Message(lang=user.lang)
         serializer = PasswordSerializer(data=request.data, instance=user, context={'request':request})
 
         if serializer.is_valid():

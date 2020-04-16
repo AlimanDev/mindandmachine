@@ -22,6 +22,23 @@ class EmploymentFilter(FilterSet):
         }
 
 
+class EmploymentRequiredFilter(FilterSet):
+    dt_from = DateFilter(method='gte_or_null', required=True)
+    dt_to = DateFilter(field_name='dt_hired', lookup_expr='lte', label='Окончание периода', required=True)
+    shop_id = NumberFilter(required=True)
+
+    def gte_or_null(self, queryset, name, value):
+        return queryset.filter(
+            Q(dt_fired__gte=value) | Q(dt_fired__isnull=True)
+        )
+    class Meta:
+        model = Employment
+        fields = {
+            'shop_id': ['exact'],
+            'user_id': ['exact', 'in'],
+        }
+
+
 class UserFilter(FilterSet):
     shop_id=NumberFilter(field_name='employments__shop_id')
     class Meta:
