@@ -24,29 +24,43 @@ def count_month_stat(filterset, employments):
 
     cal = CalendarPaidDays(dt_year_start, dt_end, shop.region_id)
     employment_dict = {e.id: e for e in employments}
+    worker_ids = [e.user_id for e in employments]
 
     worker_days = WorkerDay.objects.filter(
         dt__gte=dt_year_start,
         dt__lte=dt_end,
-        employment_id__in=employments,
+        worker_id__in=worker_ids,
     ).order_by(
         'worker_id',
         'dt',
+        'is_fact',
         'is_approved',
-        'is_fact'
     )
 
     month_info = {}
     worker_stat = {}
     worker_id = 0
+    wdays = {
+        'plan': {'approved':None,'not_approved':None},
+        'fact': {'approved': None, 'not_approved': None}
+    }
+    dt = worker_days[0].dt
 
-    for worker_day in worker_days:
+    for i, worker_day in enumerate(worker_days):
+        if worker_day.dt < dt_start and worker_day.is_fact:
+            continue
+        if worker_id != worker_day.worker_id or dt != worker_day.dt:
+            dt = worker_day.dt
+            wdays = {
+                'plan': {'approved': None, 'not_approved': None},
+                'fact': {'approved': None, 'not_approved': None}
+            }
         if worker_id != worker_day.worker_id:
             if worker_id:
                 for app in ['approved', 'not_approved']:
-                    for period in ['days', 'hours']:
-                        worker_stat['plan'][app]['overtime'][period] += worker_stat['plan'][app][period]['total']
-                        worker_stat['plan'][app]['overtime_prev'][period] += worker_stat['plan'][app]['prev'][period]['total']
+                    # for period in ['days', 'hours']:
+                    #     worker_stat['plan'][app]['overtime'][period] += worker_stat['plan'][app][period]['total']
+                    #     worker_stat['plan'][app]['overtime_prev'][period] += worker_stat['plan'][app]['prev'][period]['total']
                     worker_stat['plan'][app].pop('prev')
 
                 month_info[worker_id] = worker_stat
@@ -54,33 +68,48 @@ def count_month_stat(filterset, employments):
 
             employment = employment_dict[worker_day.employment_id]
             paid_days_n_hours = cal.paid_days(dt_start, dt_end, employment)
-            paid_days_n_hours_prev = cal.paid_days(dt_year_start, dt_start, employment)
+            paid_days_n_hours_prev = cal.paid_days(dt_year_start, dt_start-timedelta(days=1), employment)
 
             worker_stat = init_values()
             worker_stat['plan']['approved']['overtime'] = paid_days_n_hours
-            worker_stat['plan']['not_approved']['overtime'] = paid_days_n_hours
+            worker_stat['plan']['not_approved']['overtime'] = paid_days_n_hours.copy()
             worker_stat['plan']['approved']['overtime_prev'] = paid_days_n_hours_prev
-            worker_stat['plan']['not_approved']['overtime_prev'] = paid_days_n_hours_prev
+            worker_stat['plan']['not_approved']['overtime_prev'] = paid_days_n_hours_prev.copy()
+
 
         plan_or_fact = 'fact' if worker_day.is_fact else 'plan'
-        approved = 'approved' if worker_day.is_approved else 'not_approved'
-        cur_stat = worker_stat[plan_or_fact][approved]
-        #previous period
-        if worker_day.dt < dt_start:
-            if worker_day.is_fact:
-                continue
-            cur_stat = cur_stat['prev']
-        else:
-            cur_stat['day_type'][worker_day.type] += 1
+        approved = ['approved'] if worker_day.is_approved else ['not_approved']
 
-        if worker_day.type in WorkerDay.TYPES_PAID:
-            field = 'shop' if worker_day.shop_id == shop.id else 'other'
-            for f in [field, 'total']:
-                cur_stat['days'][f] += 1
-                cur_stat['hours'][f] += ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK]
+        wdays[plan_or_fact][approved[0]] = worker_day
 
+        # approved must come later then not approved
+        if worker_day.is_approved and not wdays[plan_or_fact]['not_approved']:
+            approved.append('not_approved')
 
-    month_info[worker_id] = worker_stat
+        for app in approved:
+            cur_stat = worker_stat[plan_or_fact][app]
+
+            #previous period
+            if worker_day.dt < dt_start:
+                cur_stat = cur_stat['prev']
+            elif not worker_day.is_fact:
+                cur_stat['day_type'][worker_day.type] += 1
+
+            if worker_day.type in WorkerDay.TYPES_PAID:
+                field = 'shop' if worker_day.shop_id == shop.id else 'other'
+                for f in [field, 'total']:
+                    cur_stat['days'][f] += 1
+                    cur_stat['hours'][f] += count_fact(worker_day, wdays)
+
+    if worker_id:
+        for app in ['approved', 'not_approved']:
+            for period in ['days', 'hours']:
+                stat = worker_stat['plan'][app]
+                stat['overtime'][period] += stat[period]['total']
+                stat['overtime_prev'][period] += stat['prev'][period]['total']
+            # worker_stat['plan'][app].pop('prev')
+
+        month_info[worker_id] = worker_stat
 
 
     # stat_prev_month = count_difference_of_normal_days(dt_end=dt_start, employments=employments, shop=shop)
@@ -98,6 +127,22 @@ def count_month_stat(filterset, employments):
     #         'diff_total_paid_hours': emp_prev_stat['diff_prev_paid_hours'] + emp_month_info['diff_norm_hours'],
     #     })
     return month_info
+
+
+def count_fact(fact, wdays):
+    if not fact.is_fact:
+        return fact.work_hours.seconds/3600
+
+    plan = wdays['plan']['approved'] if wdays['plan']['approved'] else wdays['plan']['not_approved']
+
+    if not plan.type == WorkerDay.TYPE_WORKDAY:
+        return 0
+    start = fact.dttm_work_start if fact.dttm_work_start > plan.dttm_work_start else plan.dttm_work_start
+    end = fact.dttm_work_end if fact.dttm_work_end < plan.dttm_work_end else plan.dttm_work_end
+    if end < start:
+        return 0
+
+    return round((end-start).seconds / 3600)
 
 
 def init_values():
@@ -154,10 +199,11 @@ class CalendarPaidDays:
         self.calendar_days = df
 
     def paid_days(self, dt_start, dt_end, employment = None):
-        if employment.dt_hired and employment.dt_hired >= dt_start:
-            dt_start = employment.dt_hired
-        if employment.dt_fired and employment.dt_fired <= dt_end:
-            dt_end = employment.dt_fired
+        if employment:
+            if employment.dt_hired and employment.dt_hired >= dt_start:
+                dt_start = employment.dt_hired
+            if employment.dt_fired and employment.dt_fired <= dt_end:
+                dt_end = employment.dt_fired
 
         day_hours = self.calendar_days.loc[(
             (self.calendar_days.index >= dt_start)
