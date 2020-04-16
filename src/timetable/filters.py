@@ -1,6 +1,4 @@
 from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter
-from django_filters import utils
-
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 
 
