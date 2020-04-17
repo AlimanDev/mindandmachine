@@ -23,13 +23,12 @@ def count_month_stat(filterset, employments):
     shop = Shop.objects.get(id=shop_id)
 
     cal = CalendarPaidDays(dt_year_start, dt_end, shop.region_id)
-    employment_dict = {e.id: e for e in employments}
-    worker_ids = [e.user_id for e in employments]
+    worker_dict = {e.user_id: e for e in employments}
 
     worker_days = WorkerDay.objects.filter(
         dt__gte=dt_year_start,
         dt__lte=dt_end,
-        worker_id__in=worker_ids,
+        worker_id__in=worker_dict.keys(),
     ).order_by(
         'worker_id',
         'dt',
@@ -66,7 +65,7 @@ def count_month_stat(filterset, employments):
                 month_info[worker_id] = worker_stat
             worker_id = worker_day.worker_id
 
-            employment = employment_dict[worker_day.employment_id]
+            employment = worker_dict[worker_day.worker_id]
             paid_days_n_hours = cal.paid_days(dt_start, dt_end, employment)
             paid_days_n_hours_prev = cal.paid_days(dt_year_start, dt_start-timedelta(days=1), employment)
 
