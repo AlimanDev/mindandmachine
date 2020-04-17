@@ -1,8 +1,10 @@
-from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter
+from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter, DateFilter
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
-
+from django.db.models import Q
 
 class WorkerDayFilter(FilterSet):
+    dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода")
+    dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода')
     is_approved = BooleanFilter(field_name='worker_day_approve_id', method='filter_approved')
 
     def filter_approved(self, queryset, name, value):
@@ -11,6 +13,7 @@ class WorkerDayFilter(FilterSet):
         else:
             # Подтвержденная версия, это на самом деле последняя версия
             return queryset.filter(
+                is_fact=False,
                 child__id__isnull=True
             )
 
@@ -24,6 +27,20 @@ class WorkerDayFilter(FilterSet):
             'is_fact': ['exact']
         }
 
+
+class WorkerDayMonthStatFilter(FilterSet):
+    dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода", required=True)
+    dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода', required=True)
+
+    #shop_id определен в
+    # shop_id = NumberFilter(required=True)
+
+    class Meta:
+        model = WorkerDay
+        fields = {
+            # 'shop_id': ['exact'],
+            'worker_id': ['exact', 'in'],
+        }
 
 class EmploymentWorkTypeFilter(FilterSet):
     shop_id=NumberFilter(field_name='work_type__shop_id')

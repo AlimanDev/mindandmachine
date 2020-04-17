@@ -5,6 +5,7 @@ from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
 
 from datetime import time, timedelta
 import datetime
+from src.base.models import Employment
 from django.db.models import Sum, Q, Count
 from django.db.models.functions import Coalesce
 
@@ -12,30 +13,29 @@ from src.main.urv.utils import wd_stat_count
 from django.db.models.functions import Extract, Coalesce, Cast, Ceil
 import pandas
 
-def count_month_stat(filterset, employments):
-    if filterset.form.is_valid():
-        data = filterset.form.cleaned_data
+def count_month_stat(shop_id, data, worker_days):
 
-    shop_id =data['shop_id']
+    # employments = self.filter_queryset(
+    #     self.get_queryset()
+    # )
+    # shop_id =data['shop_id']
     dt_start = data['dt_from']
     dt_end = data['dt_to']
     dt_year_start = datetime.date(data['dt_from'].year,1,1)
     shop = Shop.objects.get(id=shop_id)
 
     cal = CalendarPaidDays(dt_year_start, dt_end, shop.region_id)
+
+    employments=Employment.objects.get_active(dt_year_start,dt_end, shop_id=shop_id)
     worker_dict = {e.user_id: e for e in employments}
 
-    worker_days = WorkerDay.objects.filter(
-        dt__gte=dt_year_start,
-        dt__lte=dt_end,
-        worker_id__in=worker_dict.keys(),
-    ).order_by(
+
+    worker_days = worker_days.order_by(
         'worker_id',
         'dt',
         'is_fact',
         'is_approved',
     )
-
     month_info = {}
     worker_stat = {}
     worker_id = 0
@@ -56,12 +56,6 @@ def count_month_stat(filterset, employments):
             }
         if worker_id != worker_day.worker_id:
             if worker_id:
-                for app in ['approved', 'not_approved']:
-                    # for period in ['days', 'hours']:
-                    #     worker_stat['plan'][app]['overtime'][period] += worker_stat['plan'][app][period]['total']
-                    #     worker_stat['plan'][app]['overtime_prev'][period] += worker_stat['plan'][app]['prev'][period]['total']
-                    worker_stat['plan'][app].pop('prev')
-
                 month_info[worker_id] = worker_stat
             worker_id = worker_day.worker_id
 
@@ -69,12 +63,7 @@ def count_month_stat(filterset, employments):
             paid_days_n_hours = cal.paid_days(dt_start, dt_end, employment)
             paid_days_n_hours_prev = cal.paid_days(dt_year_start, dt_start-timedelta(days=1), employment)
 
-            worker_stat = init_values()
-            worker_stat['plan']['approved']['overtime'] = paid_days_n_hours
-            worker_stat['plan']['not_approved']['overtime'] = paid_days_n_hours.copy()
-            worker_stat['plan']['approved']['overtime_prev'] = paid_days_n_hours_prev
-            worker_stat['plan']['not_approved']['overtime_prev'] = paid_days_n_hours_prev.copy()
-
+            worker_stat = init_values(paid_days_n_hours,paid_days_n_hours_prev)
 
         plan_or_fact = 'fact' if worker_day.is_fact else 'plan'
         approved = ['approved'] if worker_day.is_approved else ['not_approved']
@@ -88,43 +77,23 @@ def count_month_stat(filterset, employments):
         for app in approved:
             cur_stat = worker_stat[plan_or_fact][app]
 
-            #previous period
-            if worker_day.dt < dt_start:
-                cur_stat = cur_stat['prev']
-            elif not worker_day.is_fact:
+            if worker_day.dt > dt_start and not worker_day.is_fact:
                 cur_stat['day_type'][worker_day.type] += 1
 
             if worker_day.type in WorkerDay.TYPES_PAID:
                 field = 'shop' if worker_day.shop_id == shop.id else 'other'
-                for f in [field, 'total']:
-                    cur_stat['days'][f] += 1
-                    cur_stat['hours'][f] += count_fact(worker_day, wdays)
+                fields = [field,'total']
+                if not worker_day.is_fact:
+                    fields.append(
+                         'overtime_prev' if worker_day.dt < dt_start else 'overtime'
+                    )
+                for f in fields:
+                    cur_stat['paid_days'][f] += 1
+                    cur_stat['paid_hours'][f] += count_fact(worker_day, wdays)
 
     if worker_id:
-        for app in ['approved', 'not_approved']:
-            for period in ['days', 'hours']:
-                stat = worker_stat['plan'][app]
-                stat['overtime'][period] += stat[period]['total']
-                stat['overtime_prev'][period] += stat['prev'][period]['total']
-            # worker_stat['plan'][app].pop('prev')
-
         month_info[worker_id] = worker_stat
 
-
-    # stat_prev_month = count_difference_of_normal_days(dt_end=dt_start, employments=employments, shop=shop)
-    #
-    # for employment in employments:
-    #     if employment.user_id not in month_info:
-    #         continue
-    #     emp_prev_stat = stat_prev_month[employment.id]
-    #     emp_month_info = month_info[employment.user_id]
-    #
-    #     emp_month_info.update({
-    #         'overtime_days_prev': emp_prev_stat['diff_prev_paid_days'],
-    #         'overtime_hours_prev': emp_prev_stat['diff_prev_paid_hours'],
-    #         'diff_total_paid_days': emp_prev_stat['diff_prev_paid_days'] + emp_month_info['diff_norm_days'],
-    #         'diff_total_paid_hours': emp_prev_stat['diff_prev_paid_hours'] + emp_month_info['diff_norm_hours'],
-    #     })
     return month_info
 
 
@@ -144,38 +113,38 @@ def count_fact(fact, wdays):
     return round((end-start).seconds / 3600)
 
 
-def init_values():
+def init_values(overtime,overtime_prev):
     dict = {
         'plan': {
             'approved': {
-                'days': {'total': 0, 'shop': 0, 'other': 0},
-                'hours': {'total': 0, 'shop': 0, 'other': 0},
-                'overtime': {'days': 0, 'hours': 0},
-                'day_type': {i[0]: 0 for i in WorkerDay.TYPES},
-                'prev': {
-                    'days': {'total': 0, 'shop': 0, 'other': 0},
-                    'hours': {'total': 0, 'shop': 0, 'other': 0},
-                },
+                'paid_days': {'total': 0, 'shop': 0, 'other': 0, 'overtime':overtime['days'],'overtime_prev':overtime_prev['days']},
+                'paid_hours': {'total': 0, 'shop': 0, 'other': 0, 'overtime':overtime['hours'],'overtime_prev':overtime_prev['hours']},
+                # 'overtime': {'days': 0, 'hours': 0},
+                'day_type': {i: 0 for i in WorkerDay.TYPES_USED},
+                # 'prev': {
+                #     'days': {'total': 0, 'shop': 0, 'other': 0},
+                #     'hours': {'total': 0, 'shop': 0, 'other': 0},
+                # },
             },
             'not_approved': {
-                'days': {'total': 0, 'shop': 0, 'other': 0},
-                'hours': {'total': 0, 'shop': 0, 'other': 0},
-                'overtime': {'days': 0, 'hours': 0},
-                'day_type': {i[0]: 0 for i in WorkerDay.TYPES},
-                'prev': {
-                    'days': {'total': 0, 'shop': 0, 'other': 0},
-                    'hours': {'total': 0, 'shop': 0, 'other': 0},
-                },
+                'paid_days': {'total': 0, 'shop': 0, 'other': 0, 'overtime':overtime['days'],'overtime_prev':overtime_prev['days']},
+                'paid_hours': {'total': 0, 'shop': 0, 'other': 0, 'overtime':overtime['days'],'overtime_prev':overtime_prev['days']},
+                # 'overtime': {'days': 0, 'hours': 0},
+                'day_type': {i: 0 for i in WorkerDay.TYPES_USED},
+                # 'prev': {
+                #     'days': {'total': 0, 'shop': 0, 'other': 0},
+                #     'hours': {'total': 0, 'shop': 0, 'other': 0},
+                # },
             }
         },
         'fact': {
             'approved': {
-                'hours': {'total': 0, 'shop': 0, 'other': 0},
-                'days': {'total': 0, 'shop': 0, 'other': 0},
+                'paid_days': {'total': 0, 'shop': 0, 'other': 0},
+                'paid_hours': {'total': 0, 'shop': 0, 'other': 0},
             },
             'not_approved': {
-                'hours': {'total': 0, 'shop': 0, 'other': 0},
-                'days': {'total': 0, 'shop': 0, 'other': 0},
+                'paid_hours': {'total': 0, 'shop': 0, 'other': 0},
+                'paid_days': {'total': 0, 'shop': 0, 'other': 0},
             },
         },
         # 'day_type':{i[0]: 0 for i in WorkerDay.TYPES}

@@ -332,7 +332,6 @@ class FunctionGroup(AbstractModel):
     FUNCS = (
         'AuthUserView',
         'Employment',
-        'Employment_month_stat',
         'EmploymentWorkType',
         'FunctionGroupView',
         'Notification',
@@ -350,6 +349,7 @@ class FunctionGroup(AbstractModel):
         'WorkerConstraint',
         'WorkerDay',
         'WorkerDay_approve',
+        'WorkerDay_month_stat',
         'WorkType',
         'WorkTypeName',
 

@@ -15,8 +15,7 @@ from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionG
 from src.base.filters import NotificationFilter, SubscribeFilter
 from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Subscribe, Notification
 from src.base.filters import UserFilter
-from src.base.backends import EmploymentFilterBackend
-from src.timetable.worker_day.stat import count_month_stat
+
 
 class EmploymentViewSet(ModelViewSet):
     """
@@ -31,19 +30,8 @@ class EmploymentViewSet(ModelViewSet):
     """
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
-    filter_backends = (EmploymentFilterBackend,)
 
     queryset = Employment.objects.all()
-
-
-    @action(detail=False, methods=['get'], )
-    def month_stat(self, request):
-        filterset = self.filter_backends[0]().get_filterset(request, self.get_queryset(), self)
-        employments = self.filter_queryset(
-            self.get_queryset()
-        )
-        month_stat = count_month_stat(filterset, employments)
-        return Response(month_stat)
 
 
 class UserViewSet(ModelViewSet):
