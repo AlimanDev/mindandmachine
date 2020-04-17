@@ -1,7 +1,7 @@
 from django.db.models import Q
-from django_filters.rest_framework import FilterSet, DateFilter
+from django_filters.rest_framework import FilterSet, DateFilter, NumberFilter
 
-from src.base.models import  Employment, User
+from src.base.models import  Employment, User, Notification, Subscribe
 
 
 class EmploymentFilter(FilterSet):
@@ -18,12 +18,28 @@ class EmploymentFilter(FilterSet):
             'id':['in'],
             'shop_id': ['exact'],
             'user_id': ['exact', 'in'],
+
         }
 
 
 class UserFilter(FilterSet):
+    shop_id=NumberFilter(field_name='employments__shop_id')
     class Meta:
         model = User
         fields = {
             'id':['exact', 'in'],
+            'shop_id': ['exact'],
         }
+
+
+class NotificationFilter(FilterSet):
+    class Meta:
+        model = Notification
+        fields = ['worker_id', 'is_read']
+
+
+class SubscribeFilter(FilterSet):
+    shop_id=NumberFilter(field_name='employments__shop_id')
+    class Meta:
+        model = Subscribe
+        fields = [ 'user_id', 'shop_id']

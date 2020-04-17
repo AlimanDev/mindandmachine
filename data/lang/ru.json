@@ -1,0 +1,6 @@
+{
+  "vacancy": "Создана вакансия на {dt} с {details.dttm_from} по {details.dttm_to} в магазине {shop.address} http://{domain}/vacancy/{details.id}",
+  "emp_check_dates": "В этом магазине уже заведено трудоустройство с {employment.dt_hired} по {employment.dt_fired}",
+  "password_wrong": "Неверный пароль",
+  "password_mismatch": "Пароли не совпадают"
+}

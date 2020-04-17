@@ -10,7 +10,6 @@ from src.base.models_abstract import AbstractActiveModel, AbstractModel, Abstrac
 
 from mptt.models import MPTTModel, TreeForeignKey
 
-
 class Region(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Регион'
@@ -248,13 +247,14 @@ class User(DjangoAbstractUser, AbstractModel):
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     access_token = models.CharField(max_length=64, blank=True, null=True)
+    tabel_code = models.CharField(blank=True, max_length=15, null=True, unique=True)
+    lang = models.CharField(max_length=2, default='ru')
 
 
 class WorkerPosition(AbstractActiveNamedModel):
     """
     Describe employee's position
     """
-
     class Meta:
         verbose_name = 'Должность сотрудника'
         verbose_name_plural = 'Должности сотрудников'
@@ -298,6 +298,7 @@ class Employment(AbstractActiveModel):
     is_ready_for_overworkings = models.BooleanField(default=False)
 
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
+    is_visible = models.BooleanField(default=True)
 
     objects = EmploymentManager()
 
@@ -309,6 +310,7 @@ class Employment(AbstractActiveModel):
 
     def get_department(self):
         return self.shop
+
 
 class FunctionGroup(AbstractModel):
     class Meta:
@@ -328,14 +330,21 @@ class FunctionGroup(AbstractModel):
     )
 
     FUNCS = (
+        'Notification',
+        'Subscribe',
         'Shop',
         'Shop_stat',
         'WorkerDay',
+        'WorkerDay_approve',
         'Employment',
         'User',
+        'AuthUserView',
+        'FunctionGroupView',
         'OperationTemplate',
-        'WorkTypeName',
+        'EmploymentWorkType',
+        'WorkerConstraint',
         'WorkType',
+        'WorkTypeName',
         'OperationTypeName',
         'OperationType',
         'PeriodClients',
@@ -482,3 +491,41 @@ class FunctionGroup(AbstractModel):
             self.access_type,
             self.func,
         )
+
+EVENT_TYPES = [('vacancy', 'Вакансия'),('timetable', 'Изменения в расписании')]
+
+
+class Event(AbstractModel):
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    dttm_valid_to = models.DateTimeField(auto_now_add=True)
+
+    type = models.CharField(choices=EVENT_TYPES, max_length=20)
+    shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT, related_name="events")
+    params = models.CharField(default='{}', max_length=512)
+
+
+class Subscribe(AbstractActiveModel):
+    type = models.CharField(choices=EVENT_TYPES, max_length=20)
+    user = models.ForeignKey(User, null=False, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, null=False, on_delete=models.PROTECT)
+
+
+class Notification(AbstractModel):
+    class Meta(object):
+        verbose_name = 'Уведомления'
+
+    def __str__(self):
+        return '{}, {}, {}, id: {}'.format(
+            self.worker,
+            self.event ,
+            self.dttm_added,
+            # self.text[:60],
+            self.id
+        )
+
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    worker = models.ForeignKey(User, on_delete=models.PROTECT)
+
+    is_read = models.BooleanField(default=False)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True)
+

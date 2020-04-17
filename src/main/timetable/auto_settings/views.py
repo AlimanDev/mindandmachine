@@ -19,7 +19,7 @@ from src.timetable.models import (
     ShopMonthStat,
     WorkType,
     WorkerConstraint,
-    WorkerCashboxInfo,
+    EmploymentWorkType,
     WorkerDay,
     WorkerDayCashboxDetails,
     Slot,
@@ -334,7 +334,7 @@ def create_timetable(request, form):
     # проверка что у всех юзеров указаны специализации
     users_without_spec = []
     for employment in employments:
-        worker_cashbox_info = WorkerCashboxInfo.objects.filter(
+        worker_cashbox_info = EmploymentWorkType.objects.filter(
             employment=employment,
             is_active='True'
         )
@@ -538,7 +538,7 @@ def create_timetable(request, form):
     # Информация по кассам для каждого сотрудника
     need_work_types = WorkType.objects.filter(shop_id=shop_id).values_list('id', flat=True)
     worker_cashbox_info = {}
-    for worker_cashbox_inf in list(WorkerCashboxInfo.objects.select_related('employment').filter(work_type_id__in=need_work_types, is_active=True)):
+    for worker_cashbox_inf in list(EmploymentWorkType.objects.select_related('employment').filter(work_type_id__in=need_work_types, is_active=True)):
         key = worker_cashbox_inf.employment.user_id
         if key not in worker_cashbox_info:
             worker_cashbox_info[key] = []
@@ -725,7 +725,7 @@ def create_timetable(request, form):
                 ),
                 'worker_cashbox_info': Converter.convert(
                     worker_cashbox_info.get(e.user_id, []), 
-                    WorkerCashboxInfo, 
+                    EmploymentWorkType,
                     fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority', 'duration'],  # change algo worker -> employment__user_id work_type -> work_type_id
                     out_array=True,
                 ),

@@ -1,12 +1,8 @@
-import datetime
 
 from rest_framework import serializers, viewsets
-from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
-from src.util.utils import JsonResponse
 from src.base.permissions import FilteredListPermission
-from src.timetable.models import WorkType, WorkTypeName
-from django.db.models import Q, F
+from src.timetable.models import WorkType
 from src.timetable.work_type_name.views import WorkTypeNameSerializer
 
 # Serializers define the API representation.

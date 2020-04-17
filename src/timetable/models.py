@@ -5,38 +5,14 @@ from django.contrib.auth.models import (
 
 import datetime
 
-from fcm_django.models import FCMDevice
-from src.conf.djconfig import IS_PUSH_ACTIVE
-
-from src.base.models import Shop, Employment, User
+from src.base.models import Shop, Employment, User, Event
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
+from django.utils import timezone
+
 
 class WorkerManager(UserManager):
     pass
-
-
-class WorkerDayApprove(AbstractActiveModel):
-    """
-        Подтверждение расписания на месяц
-        Временная отметка, привязанная к магазину, которая
-            подтверждает все workerday за указанный месяц
-    """
-    class Meta:
-        verbose_name = 'Подверждение расписания'
-        verbose_name_plural = 'Подтверждения расписания'
-
-    def __str__(self):
-        return '{},  {},  {}'.format(
-            self.id,
-            self.shop,
-            self.dt_approved,
-        )
-
-    id = models.BigAutoField(primary_key=True)
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True)
-    dt_approved = models.DateField()
 
 
 class WorkTypeManager(AbstractActiveModelManager):
@@ -211,7 +187,7 @@ class Cashbox(AbstractActiveNamedModel):
     objects = CashboxManager()
 
 
-class WorkerCashboxInfo(AbstractModel):
+class EmploymentWorkType(AbstractModel):
     class Meta(object):
         verbose_name = 'Информация по сотруднику-типу работ'
         unique_together = (('employment', 'work_type'),)
@@ -221,7 +197,7 @@ class WorkerCashboxInfo(AbstractModel):
 
     id = models.BigAutoField(primary_key=True)
 
-    employment = models.ForeignKey(Employment, on_delete=models.PROTECT)
+    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, related_name="work_types")
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
 
     is_active = models.BooleanField(default=True)
@@ -235,31 +211,36 @@ class WorkerCashboxInfo(AbstractModel):
     # how many hours did he work
     duration = models.FloatField(default=0)
 
+    def get_department(self):
+        return self.employment.shop
+
 
 class WorkerConstraint(AbstractModel):
     class Meta(object):
         verbose_name = 'Ограничения сотрудника'
-        unique_together = (('worker', 'weekday', 'tm'),)
+        unique_together = (('employment', 'weekday', 'tm'),)
 
     def __str__(self):
         return '{} {}, {}, {}, {}'.format(self.worker.last_name, self.worker.id, self.weekday, self.tm, self.id)
 
     id = models.BigAutoField(primary_key=True)
     shop = models.ForeignKey(Shop, blank=True, null=True, on_delete=models.PROTECT, related_name='worker_constraints')
-    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
+    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True, related_name='worker_constraints')
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
     is_lite = models.BooleanField(default=False)  # True -- если сам сотрудник выставил, False -- если менеджер
     tm = models.TimeField()
+    def get_department(self):
+        return self.employment.shop
 
 
 class WorkerDayManager(models.Manager):
     def qos_current_version(self, approved_only=False):
         if approved_only:
             return super().get_queryset().filter(
-                models.Q(child__id__isnull=True) | models.Q(child__worker_day_approve_id__isnull=True),
-                worker_day_approve_id__isnull=False,
+                models.Q(child__id__isnull=True) | models.Q(child__worker_day_approve=False),
+                worker_day_approve=True,
             )
         else:
             return super().get_queryset().filter(child__id__isnull=True)
@@ -289,7 +270,7 @@ class WorkerDayManager(models.Manager):
         return current_worker_day
 
 
-class WorkerDay(AbstractActiveModel):
+class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
@@ -353,12 +334,14 @@ class WorkerDay(AbstractActiveModel):
     ]
 
     def __str__(self):
-        return '{}, {}, {}, {}, {}, {}'.format(
+        return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
             self.worker.last_name,
             self.shop.name if self.shop else '',
             self.shop.parent.name if self.shop and self.shop.parent else '',
             self.dt,
             self.type,
+            'Fact' if self.is_fact else 'Plan',
+            'Approved' if self.is_approved else 'Not approved',
             self.id
         )
 
@@ -378,12 +361,17 @@ class WorkerDay(AbstractActiveModel):
 
     work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')
 
-    worker_day_approve = models.ForeignKey(WorkerDayApprove, on_delete=models.PROTECT, blank=True, null=True)
+    is_approved = models.BooleanField(default=False)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
 
     comment = models.TextField(null=True, blank=True)
-    parent_worker_day = models.OneToOneField('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child')
-    work_hours = models.SmallIntegerField(default=0)
+    parent_worker_day = models.ForeignKey('self', on_delete=models.PROTECT, blank=True, null=True, related_name='child')
+    work_hours = models.DurationField(default=datetime.timedelta(days=0))
+
+    is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
+    dttm_added = models.DateTimeField(default=timezone.now)
+
+    objects = WorkerDayManager()
 
     @classmethod
     def is_type_with_tm_range(cls, t):
@@ -398,9 +386,16 @@ class WorkerDay(AbstractActiveModel):
                 break
         return round(work_hours / 60)
 
-    objects = WorkerDayManager()
     def get_department(self):
         return self.shop
+
+    def save(self, *args, **kwargs):
+        if self.dttm_work_end and self.dttm_work_start:
+            self.work_hours = self.dttm_work_end - self.dttm_work_start
+        else:
+            self.work_hours = datetime.timedelta(0)
+        super().save(*args, **kwargs)
+
 
 class WorkerDayCashboxDetailsManager(models.Manager):
     def qos_current_version(self):
@@ -459,7 +454,7 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
 
     id = models.BigAutoField(primary_key=True)
 
-    worker_day = models.ForeignKey(WorkerDay, on_delete=models.PROTECT, null=True, blank=True)
+    worker_day = models.ForeignKey(WorkerDay, on_delete=models.CASCADE, null=True, blank=True, related_name='worker_day_details')
     on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, null=True, blank=True)
 
@@ -470,6 +465,7 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
 
     dttm_from = models.DateTimeField()
     dttm_to = models.DateTimeField(null=True, blank=True)
+    event = models.OneToOneField(Event, on_delete=models.SET_NULL, null=True, blank=True, related_name='worker_day_details', related_query_name='worker_day_details')
 
     def __str__(self):
         return '{}, {}, {}, {}, {}-{}, id: {}'.format(
@@ -542,7 +538,7 @@ class Event(AbstractModel):
 
     department = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT) # todo: should be department model?
 
-    workerday_details = models.ForeignKey(WorkerDayCashboxDetails, null=True, blank=True, on_delete=models.PROTECT)
+    workerday_details = models.ForeignKey(WorkerDayCashboxDetails, null=True, blank=True, on_delete=models.PROTECT, related_name='events')
 
     objects = EventManager()
 
@@ -754,6 +750,71 @@ class AttendanceRecords(AbstractModel):
     def __str__(self):
         return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
+    def save(self, *args, **kwargs):
+        """
+        Создание WorkerDay при занесении отметок.
+
+        При создании отметки время о приходе или уходе заносится в фактический подтвержденный график WorkerDay.
+        Если подтвержденного факта нет - создаем новый подтвержденный факт. Неподтвержденный факт привязываем к нему.
+        Новый подтвержденный факт привязываем к плану - подтвержденному, если есть, либо неподтвержденному.
+        """
+        super(AttendanceRecords, self).save(*args, **kwargs)
+
+
+        # Достаем сразу все планы и факты за день
+        worker_days = WorkerDay.objects.filter(
+            shop=self.shop,
+            worker=self.user,
+            dt=self.dttm.date(),
+        )
+
+        if len(worker_days) > 4:
+            raise ValueError( f"Worker {self.user} has too many worker days on {self.dttm.date()}")
+
+        wdays = {
+            'fact': {
+                'approved': None,
+                'not_approved': None,
+            },
+            'plan': {
+                'approved': None,
+                'not_approved': None,
+            }
+        }
+
+        for wd in worker_days:
+            key_fact = 'fact' if wd.is_fact else 'plan'
+            key_approved = 'approved' if wd.is_approved else 'not_approved'
+            wdays[key_fact][key_approved] = wd
+
+        type2dtfield = {
+            self.TYPE_COMING: 'dttm_work_start',
+            self.TYPE_LEAVING: 'dttm_work_end'
+        }
+
+        if wdays['fact']['approved']:
+            setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
+            wdays['fact']['approved'].save()
+        else:
+            wd = WorkerDay(
+                shop=self.shop,
+                worker=self.user,
+                dt=self.dttm.date(),
+                is_fact=True,
+                is_approved=True
+            )
+            setattr(wd, type2dtfield[self.type], self.dttm)
+
+            wd.parent_worker_day = wdays['plan']['approved'] \
+                if   wdays['plan']['approved']\
+                else wdays['plan']['not_approved']
+
+            wd.save()
+
+            if wdays['fact']['not_approved']:
+                wdays['fact']['not_approved'].parent_worker_day = wd
+                wdays['fact']['not_approved'].save()
+
 
 class ExchangeSettings(AbstractModel):
     # Создаем ли автоматически вакансии
@@ -777,3 +838,4 @@ class ExchangeSettings(AbstractModel):
 
     # Расстояние до родителя, в поддереве которого ищем сотрудников для автоназначения
     automatic_worker_select_tree_level = models.IntegerField(default=1)
+
