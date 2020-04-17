@@ -14,6 +14,8 @@ from django.db.models.functions import Extract, Coalesce, Cast, Ceil
 import pandas
 
 def count_month_stat(shop_id, data, worker_days):
+    if not len(worker_days):
+        return init_values({'days':0,'hours':0}, {'days':0,'hours':0})
 
     # employments = self.filter_queryset(
     #     self.get_queryset()
@@ -113,7 +115,7 @@ def count_fact(fact, wdays):
     return round((end-start).seconds / 3600)
 
 
-def init_values(overtime,overtime_prev):
+def init_values(overtime, overtime_prev):
     dict = {
         'plan': {
             'approved': {
