@@ -21,7 +21,7 @@ from src.timetable.models import (
     AttendanceRecords,
     Cashbox,
     Slot,
-    Timetable,
+    ShopMonthStat,
     WorkerDayCashboxDetails,
     EmploymentWorkType,
     WorkType,
@@ -187,15 +187,14 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
                 dt_from += datetime.timedelta(days=1)
 
         # Timetable create
-        self.timetable1 = Timetable.objects.create(
+        self.timetable1 = ShopMonthStat.objects.create(
             shop = self.shop,
             dt = datetime.date(2019, 6, 1),
-            status = Timetable.READY,
-            dttm_status_change = datetime.datetime(2019, 6, 1, 9, 30, 0)
+            status = ShopMonthStat.READY,
+            dttm_status_change=datetime.datetime(2019, 6, 1, 9, 30, 0)
         )
-
         # AttendanceRecords
-        self.attendancerecords = AttendanceRecords.objects.create(
+        self.attendanShopMonthStat = AttendanceRecords.objects.create(
             dttm=datetime.datetime(2019, 6, 1, 9, 0, 0),
             type='C',
             user=self.user1,
