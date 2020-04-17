@@ -12,7 +12,7 @@ from rest_framework.decorators import action
 
 from src.base.permissions import Permission
 from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer
-from src.base.filters import NotificationFilter, SubscribeFilter
+from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter
 from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Subscribe, Notification
 from src.base.filters import UserFilter
 
@@ -30,6 +30,7 @@ class EmploymentViewSet(ModelViewSet):
     """
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
+    filterset_class = EmploymentFilter
 
     queryset = Employment.objects.all()
 
