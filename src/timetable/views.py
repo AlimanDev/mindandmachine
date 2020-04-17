@@ -1,4 +1,5 @@
 from django.db.models import OuterRef, Subquery
+from django_filters import utils
 
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -118,11 +119,11 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         filterset = self.filter_backends[0]().get_filterset(request, self.get_queryset(), self)
         if filterset.form.is_valid():
             data = filterset.form.cleaned_data
-        worker_days = self.filter_queryset(
-            self.get_queryset()
-        )
+        else:
+            raise utils.translate_validation(filterset.errors)
+
         shop_id = request.query_params.get('shop_id')
-        month_stat = count_month_stat(shop_id, data, worker_days)
+        month_stat = count_month_stat(shop_id, data)
         return Response(month_stat)
 
 

@@ -15,9 +15,7 @@ from django.db.models.functions import Extract, Coalesce, Cast, Ceil
 import pandas
 
 
-def count_month_stat(shop_id, data, worker_days):
-    if not len(worker_days):
-        return init_values({'days':0,'hours':0}, {'days':0,'hours':0})
+def count_month_stat(shop_id, data):
 
     # employments = self.filter_queryset(
     #     self.get_queryset()
@@ -25,6 +23,7 @@ def count_month_stat(shop_id, data, worker_days):
     # shop_id =data['shop_id']
     dt_start = data['dt_from']
     dt_end = data['dt_to']
+    worker_ids = data['worker_id__in']
     dt_year_start = datetime.date(data['dt_from'].year,1,1)
     shop = Shop.objects.get(id=shop_id)
 
@@ -33,13 +32,23 @@ def count_month_stat(shop_id, data, worker_days):
     employments=Employment.objects.get_active(dt_year_start,dt_end, shop_id=shop_id)
     worker_dict = {e.user_id: e for e in employments}
 
-
+    worker_days = WorkerDay.objects.filter(
+        dt__gte=dt_year_start,
+        dt__lte=dt_end,
+        shop_id=shop_id,
+    )
+    if worker_ids:
+        worker_days = worker_days.filter(
+            worker_id__in=worker_ids)
     worker_days = worker_days.order_by(
         'worker_id',
         'dt',
         'is_fact',
         'is_approved',
     )
+    if not len(worker_days):
+        return {}
+
     month_info = {}
     worker_stat = {}
     worker_id = 0
@@ -79,14 +88,14 @@ def count_month_stat(shop_id, data, worker_days):
         for app in approved:
             cur_stat = worker_stat[plan_or_fact][app]
 
-            if worker_day.dt > dt_start and not worker_day.is_fact:
+            if worker_day.dt >= dt_start and not worker_day.is_fact:
                 cur_stat['day_type'][worker_day.type] += 1
 
             if worker_day.type in WorkerDay.TYPES_PAID:
-                field = 'shop' if worker_day.shop_id == shop.id else 'other'
-                fields = [field, 'total', 'overtime']
-                if worker_day.dt < dt_start:
-                    fields = ['overtime_prev']
+                fields = ['overtime_prev']
+                if worker_day.dt >= dt_start:
+                    field = 'shop' if worker_day.shop_id == shop.id else 'other'
+                    fields = [field, 'total', 'overtime']
                 for f in fields:
                     cur_stat['paid_days'][f] += 1
                     cur_stat['paid_hours'][f] += count_fact(worker_day, wdays)
