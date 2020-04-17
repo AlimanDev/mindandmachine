@@ -1,3 +1,4 @@
+from copy import deepcopy
 from src.base.models import Shop, ProductionDay
 from src.main.timetable.table.utils import  count_difference_of_normal_days
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
@@ -12,6 +13,7 @@ from django.db.models.functions import Coalesce
 from src.main.urv.utils import wd_stat_count
 from django.db.models.functions import Extract, Coalesce, Cast, Ceil
 import pandas
+
 
 def count_month_stat(shop_id, data, worker_days):
     if not len(worker_days):
@@ -48,8 +50,6 @@ def count_month_stat(shop_id, data, worker_days):
     dt = worker_days[0].dt
 
     for i, worker_day in enumerate(worker_days):
-        if worker_day.dt < dt_start and worker_day.is_fact:
-            continue
         if worker_id != worker_day.worker_id or dt != worker_day.dt:
             dt = worker_day.dt
             wdays = {
@@ -84,11 +84,9 @@ def count_month_stat(shop_id, data, worker_days):
 
             if worker_day.type in WorkerDay.TYPES_PAID:
                 field = 'shop' if worker_day.shop_id == shop.id else 'other'
-                fields = [field,'total']
-                if not worker_day.is_fact:
-                    fields.append(
-                         'overtime_prev' if worker_day.dt < dt_start else 'overtime'
-                    )
+                fields = [field, 'total', 'overtime']
+                if worker_day.dt < dt_start:
+                    fields = ['overtime_prev']
                 for f in fields:
                     cur_stat['paid_days'][f] += 1
                     cur_stat['paid_hours'][f] += count_fact(worker_day, wdays)
@@ -116,40 +114,25 @@ def count_fact(fact, wdays):
 
 
 def init_values(overtime, overtime_prev):
+    days = {'total': 0, 'shop': 0, 'other': 0, 'overtime': overtime['days'],
+            'overtime_prev': overtime_prev['days']}
+    hours = {'total': 0, 'shop': 0, 'other': 0, 'overtime': overtime['hours'],
+            'overtime_prev': overtime_prev['hours']}
+    approved = {
+        'paid_days': days.copy(),
+        'paid_hours': hours.copy(),
+    }
+
     dict = {
-        'plan': {
-            'approved': {
-                'paid_days': {'total': 0, 'shop': 0, 'other': 0, 'overtime':overtime['days'],'overtime_prev':overtime_prev['days']},
-                'paid_hours': {'total': 0, 'shop': 0, 'other': 0, 'overtime':overtime['hours'],'overtime_prev':overtime_prev['hours']},
-                # 'overtime': {'days': 0, 'hours': 0},
-                'day_type': {i: 0 for i in WorkerDay.TYPES_USED},
-                # 'prev': {
-                #     'days': {'total': 0, 'shop': 0, 'other': 0},
-                #     'hours': {'total': 0, 'shop': 0, 'other': 0},
-                # },
-            },
-            'not_approved': {
-                'paid_days': {'total': 0, 'shop': 0, 'other': 0, 'overtime':overtime['days'],'overtime_prev':overtime_prev['days']},
-                'paid_hours': {'total': 0, 'shop': 0, 'other': 0, 'overtime':overtime['days'],'overtime_prev':overtime_prev['days']},
-                # 'overtime': {'days': 0, 'hours': 0},
-                'day_type': {i: 0 for i in WorkerDay.TYPES_USED},
-                # 'prev': {
-                #     'days': {'total': 0, 'shop': 0, 'other': 0},
-                #     'hours': {'total': 0, 'shop': 0, 'other': 0},
-                # },
-            }
-        },
         'fact': {
-            'approved': {
-                'paid_days': {'total': 0, 'shop': 0, 'other': 0},
-                'paid_hours': {'total': 0, 'shop': 0, 'other': 0},
-            },
-            'not_approved': {
-                'paid_hours': {'total': 0, 'shop': 0, 'other': 0},
-                'paid_days': {'total': 0, 'shop': 0, 'other': 0},
-            },
-        },
-        # 'day_type':{i[0]: 0 for i in WorkerDay.TYPES}
+            'approved': deepcopy(approved),
+            'not_approved': deepcopy(approved)
+        }}
+    approved['day_type'] = {i: 0 for i in WorkerDay.TYPES_USED}
+
+    dict['plan'] = {
+        'approved': deepcopy(approved),
+        'not_approved': deepcopy(approved)
     }
     return dict
 
