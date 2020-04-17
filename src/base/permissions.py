@@ -1,7 +1,7 @@
 from src.base.models import Employment, Shop
 from rest_framework import permissions
-from rest_framework.exceptions import ValidationError
-
+from rest_framework.exceptions import ValidationError, NotFound
+from django.db.models import ObjectDoesNotExist
 
 class Permission(permissions.BasePermission):
     """
@@ -19,8 +19,6 @@ class Permission(permissions.BasePermission):
         if not bool(request.user and request.user.is_authenticated):
             return False
 
-        # if request.method in permissions.SAFE_METHODS:
-        #     return True
         employments = Employment.objects.get_active(
             user=request.user)
         return self.check_employment_permission(employments, request, view)
@@ -73,6 +71,46 @@ class FilteredListPermission(Permission):
             if not shop_id:
                 return True
         department = Shop.objects.get(id=shop_id)
+
+        employments = Employment.objects.get_active(
+            shop__in=department.get_ancestors(include_self=True, ascending=True),
+            user=request.user)
+
+        return self.check_employment_permission(employments, request, view)
+
+class EmploymentFilteredListPermission(Permission):
+    """
+    Класс для определения прав доступа к методам апи по employment
+    """
+    def has_permission(self, request, view):
+        if not bool(request.user and request.user.is_authenticated):
+            return False
+        if view.action == 'retrieve':
+            # Права для объекта проверятся в has_object_permission
+            return True
+
+        if request.method == 'GET':
+            employment_id = request.query_params.get('employment_id')
+            if not employment_id:
+                raise ValidationError("employment_id should be defined")
+        else:
+            if isinstance(request.data, list):
+                employment_id = request.data[0].get('employment_id')
+                for item in request.data:
+                    if item['employment_id'] != employment_id:
+                        raise ValidationError("employment_id must be same for all constraints")
+            else:
+                employment_id = request.data.get('employment_id')
+            # shop_id не меняется, права задаются has_object_permission
+            if not employment_id:
+                return True
+
+        try:
+            employment = Employment.objects.get(id=employment_id)
+        except ObjectDoesNotExist:
+            raise NotFound( "Employment does not exist")
+
+        department = employment.shop
 
         employments = Employment.objects.get_active(
             shop__in=department.get_ancestors(include_self=True, ascending=True),

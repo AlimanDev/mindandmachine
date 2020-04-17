@@ -24,19 +24,22 @@ from src.main.demand.utils import create_predbills_request_function
 from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
 
 
-from src.main.timetable.worker_exchange.utils import search_candidates, send_noti2candidates
 from src.main.operation_template.utils import build_period_clients
 
 from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
-    WorkerCashboxInfo,
     ShopMonthStat,
+    EmploymentWorkType,
     ExchangeSettings,
 )
 from src.base.models import (
     Shop,
     User,
+    Notification,
+    Subscribe,
+    Event
+
 )
 from src.forecast.models import (
     OperationTemplate
@@ -47,6 +50,41 @@ from src.conf.djconfig import EMAIL_HOST_USER
 
 import time as time_in_secs
 
+@app.task
+def create_notifications_for_event(event_id):
+    event = Event.objects.get(id=event_id)
+    subscribes = Subscribe.objects.filter(type=event.type, shop=event.shop)
+    notification_list = []
+    for subscribe in subscribes:
+        notification_list.append(
+            Notification(
+                worker=subscribe.user,
+                event=event
+            )
+        )
+        print(f"Create notification for {subscribe.user}, {event}")
+        Notification.objects.bulk_create(notification_list)
+
+@app.task
+def create_notifications_for_subscribe(subscribe_id):
+    subscribe = Subscribe.objects.get(id=subscribe_id)
+    events = Event.objects.filter(shop=subscribe.shop, type=subscribe.type, dttm_valid_to__gte=now())
+    notification_list = []
+    for event in events:
+        notification_list.append(
+            Notification(
+                worker=subscribe.user,
+                event=event
+            )
+        )
+        print(f"Create notification for {subscribe.user}, {event}")
+        Notification.objects.bulk_create(notification_list)
+
+@app.task
+def delete_notifications():
+    Event.objects.filter(
+        dttm_valid_to__lte=now()
+    ).delete()
 
 @app.task
 def op_type_build_period_clients():
@@ -162,8 +200,7 @@ def release_all_workers():
 @app.task
 def vacancies_create_and_cancel():
     """
-    Создает уведомления на неделю вперед, если в магазине будет нехватка кассиров
-
+    Создание вакансий для всех магазинов
     """
 
     exchange_settings = ExchangeSettings.objects.first()
@@ -179,8 +216,7 @@ def vacancies_create_and_cancel():
 @app.task
 def create_shop_vacancies_and_notify(shop_id, work_type_id):
     """
-    Создает уведомления на неделю вперед, если в магазине будет нехватка кассиров
-
+    Создание вакансий для магазина
     """
 
     create_vacancies_and_notify(shop_id, work_type_id)
@@ -198,7 +234,6 @@ def cancel_shop_vacancies(shop_id, work_type_id):
 @app.task
 def workers_hard_exchange():
     """
-
     Автоматически перекидываем сотрудников из других магазинов, если
     в том магазине потребность в сотруднике < 20%.
 
@@ -238,7 +273,7 @@ def allocation_of_time_for_work_on_cashbox():
     """
 
     def update_duration(last_user, last_work_type, duration):
-        WorkerCashboxInfo.objects.filter(
+        EmploymentWorkType.objects.filter(
             worker=last_user,
             work_type=last_work_type,
         ).update(duration=round(duration, 3))

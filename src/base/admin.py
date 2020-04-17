@@ -80,3 +80,4 @@ class EmploymentAdmin(admin.ModelAdmin):
 @admin.register(ProductionDay)
 class ProductionDayAdmin(admin.ModelAdmin):
     list_display = ('dt', 'type')
+
