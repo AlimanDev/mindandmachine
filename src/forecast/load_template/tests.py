@@ -220,22 +220,22 @@ class TestOperationTypeName(APITestCase):
                 {
                     'id': load_template['operation_type_templates'][0]['id'], 
                     'load_template_id': load_template['id'], 
-                    'work_type_name_id': None, 
-                    'do_forecast': 'N', 
+                    'work_type_name_id': self.work_type_name1.id, 
+                    'do_forecast': 'F', 
                     'operation_type_name': {
-                        'id': self.operation_type_name2.id, 
-                        'name': 'Строительные работы', 
+                        'id': self.operation_type_name1.id, 
+                        'name': 'Кассы', 
                         'code': None
                     }
                 }, 
                 {
                     'id': load_template['operation_type_templates'][1]['id'], 
                     'load_template_id': load_template['id'], 
-                    'work_type_name_id': self.work_type_name1.id, 
-                    'do_forecast': 'F', 
+                    'work_type_name_id': None, 
+                    'do_forecast': 'N', 
                     'operation_type_name': {
-                        'id': self.operation_type_name1.id, 
-                        'name': 'Кассы', 
+                        'id': self.operation_type_name2.id, 
+                        'name': 'Строительные работы', 
                         'code': None
                     }
                 }

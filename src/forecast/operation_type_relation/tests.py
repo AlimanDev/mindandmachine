@@ -139,7 +139,7 @@ class TestOperationTypeName(APITestCase):
         data = {
             'base_id': op_temp1.id,
             'depended_id': op_temp2.id,
-            'formula': 'lambda a: a + a * 2'
+            'formula': 'a + a * 2'
         }
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -174,7 +174,7 @@ class TestOperationTypeName(APITestCase):
 
     def test_update(self):
         data = {
-            'formula': 'lambda a: a * 3',
+            'formula': 'a * 3',
             'base_id': self.operation_type_template1.id,
             'depended_id': self.operation_type_template2.id,
         }

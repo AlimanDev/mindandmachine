@@ -48,7 +48,7 @@ class OperationType(AbstractActiveModel):
     class Meta:
         verbose_name = 'Тип операции'
         verbose_name_plural = 'Типы операций'
-        unique_together = ['work_type', 'operation_type_name']
+        unique_together = ['shop', 'operation_type_name']
 
     def __str__(self):
         return 'id: {}, name: {}, work type: {}'.format(self.id, self.operation_type_name.name, self.work_type)
@@ -120,10 +120,13 @@ class OperationTypeTemplate(AbstractModel):
 
 
 class OperationTypeRelation(AbstractModel):
+    class Meta:
+        unique_together = ('base', 'depended')
 
     base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends')
     depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases')
     formula = models.CharField(max_length=256)
+    convert_min_to_real = models.BooleanField(default=False)
 
 
 class OperationTemplate(AbstractActiveNamedModel):

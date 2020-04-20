@@ -101,7 +101,8 @@ class TestOperationType(APITestCase):
         data = {
             'code': self.operation_type_name3.code,
             'work_type_id': self.work_type3.id, 
-            'do_forecast': OperationType.FORECAST, 
+            'do_forecast': OperationType.FORECAST,
+            'shop_id': self.shop3.id,
         }
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -113,14 +114,14 @@ class TestOperationType(APITestCase):
             'name': self.operation_type_name3.name,
         }
         data.pop('code')
-        data['shop_id'] = None
         self.assertEqual(operation_type, data)
 
     def test_create_with_id(self):
         data = {
             'operation_type_name_id': self.operation_type_name3.id,
             'work_type_id': self.work_type3.id, 
-            'do_forecast': OperationType.FORECAST, 
+            'do_forecast': OperationType.FORECAST,
+            'shop_id': self.shop3.id, 
         }
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -131,7 +132,6 @@ class TestOperationType(APITestCase):
             'code': self.operation_type_name3.code,
             'name': self.operation_type_name3.name,
         }
-        data['shop_id'] = None
         data.pop('operation_type_name_id')
         self.assertEqual(operation_type, data)
 

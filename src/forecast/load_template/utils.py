@@ -61,11 +61,12 @@ def apply_formula(operation_type, operation_type_template, dt_from, dt_to, tm_fr
             type=PeriodClients.LONG_FORECASE_TYPE,
         ).order_by('dttm_forecast'))
         formula = eval(template_relation.formula)
+        division_val = period_lengths_minutes if template_relation.convert_min_to_real else 1
         try:
-            return (result + formula(temp_values), True)
+            return (result + formula(temp_values)/division_val, True)
         except:
             try:
-                return (result + list(map(formula, temp_values)), True)
+                return (result + np.array(list(map(formula, temp_values)))/division_val, True)
             except:
                 error_mes = f'There is an error in formula in relation between {template_relation.base.operation_type_name.name} ' + \
                     f'and {template_relation.depended.operation_type_name.name}'

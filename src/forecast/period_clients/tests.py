@@ -86,6 +86,15 @@ class TestDemand(APITestCase):
         op_type_name2 = OperationTypeName.objects.create(
             name='O_TYPE2',
         )
+        op_type_name3 = OperationTypeName.objects.create(
+            name='O_TYPE3',
+        )
+        op_type_name4 = OperationTypeName.objects.create(
+            name='O_TYPE4',
+        )
+        op_type_name5 = OperationTypeName.objects.create(
+            name='O_TYPE5',
+        )
         self.o_type_1 = OperationType.objects.create(
             work_type=self.work_type1,
             operation_type_name=op_type_name,
@@ -94,12 +103,12 @@ class TestDemand(APITestCase):
             )
         self.o_type_2 = OperationType.objects.create(
             work_type=self.work_type2,
-            operation_type_name=op_type_name,
+            operation_type_name=op_type_name4,
             shop=self.work_type2.shop,
             )
         self.o_type_3 = OperationType.objects.create(
             work_type=self.work_type3,
-            operation_type_name=op_type_name,
+            operation_type_name=op_type_name3,
             do_forecast=OperationType.FORECAST,
             shop=self.work_type3.shop,
             )
@@ -110,7 +119,7 @@ class TestDemand(APITestCase):
             )
         self.o_type_5 = OperationType.objects.create(
             work_type=self.work_type4,
-            operation_type_name=op_type_name,
+            operation_type_name=op_type_name5,
             shop=self.work_type4.shop,
             )
         test_data = {

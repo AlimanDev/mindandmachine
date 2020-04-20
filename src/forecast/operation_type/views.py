@@ -9,6 +9,7 @@ from src.base.permissions import FilteredListPermission
 from src.forecast.models import OperationType, OperationTypeName
 from django.db.models import Q, F
 from src.forecast.operation_type_name.views import OperationTypeNameSerializer
+from rest_framework.validators import UniqueTogetherValidator
 
 
 # Serializers define the API representation.
@@ -17,10 +18,22 @@ class OperationTypeSerializer(serializers.ModelSerializer):
     work_type_id = serializers.IntegerField(required=False)
     code = serializers.CharField(required=False, write_only=True)
     operation_type_name_id = serializers.IntegerField(write_only=True, required=False)
+    shop_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = OperationType
         fields = ['id', 'work_type_id', 'do_forecast', 'operation_type_name', 'code', 'operation_type_name_id', 'shop_id']
+        validators = [
+            UniqueTogetherValidator(
+                queryset=OperationType.objects.all(),
+                fields=['operation_type_name_id', 'shop_id'],
+            ),
+        ]
+
+    def is_valid(self, *args, **kwargs):
+        if self.initial_data.get('code', False):
+            self.initial_data['operation_type_name_id'] = OperationTypeName.objects.get(code=self.initial_data.get('code')).id
+        super().is_valid(*args, **kwargs)
 
 
 class OperationTypeFilter(FilterSet):

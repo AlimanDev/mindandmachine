@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from src.forecast.models import OperationTypeTemplate, LoadTemplate
 from src.forecast.operation_type_name.views import OperationTypeNameSerializer
-
+from rest_framework.validators import UniqueTogetherValidator
 
 # Serializers define the API representation.
 class OperationTypeTemplateSerializer(serializers.ModelSerializer):
@@ -14,6 +14,12 @@ class OperationTypeTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = OperationTypeTemplate
         fields = ['id', 'load_template_id', 'operation_type_name_id', 'work_type_name_id', 'do_forecast', 'operation_type_name']
+        validators = [
+            UniqueTogetherValidator(
+                queryset=OperationTypeTemplate.objects.all(),
+                fields=['load_template_id', 'operation_type_name_id'],
+            ),
+        ]
 
 
 class OperationTypeTemplateFilter(FilterSet):

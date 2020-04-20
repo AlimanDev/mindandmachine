@@ -7,6 +7,9 @@ from src.forecast.load_template.utils import create_load_template_for_shop, appl
 from rest_framework.decorators import action
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
+from src.base.exceptions import MessageError
+
+
 # Serializers define the API representation.
 class LoadTemplateSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField(write_only=True, required=False)
@@ -102,7 +105,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     def destroy(self, request, pk=None):
         load_template = LoadTemplate.objects.get(pk=pk)
         if load_template.shops.exists():
-            return Response(['There is an attached shops'], status=400)
+            raise MessageError(code="load_template_attached_shops", lang=requset.user.lang)
 
         load_template.operation_type_templates.all().delete()
         load_template.delete()
