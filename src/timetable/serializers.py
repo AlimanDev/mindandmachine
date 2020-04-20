@@ -40,15 +40,27 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         is_fact = attrs.get('is_fact')
-        type = attrs['type']
         if is_fact:
-            attrs.pop('worker_day_details',None)
-        elif not WorkerDay.is_type_with_tm_range(type):
+            attrs['type'] = WorkerDay.TYPE_WORKDAY
+
+        type = attrs['type']
+
+
+        if not WorkerDay.is_type_with_tm_range(type):
             attrs['dttm_work_start'] = None
             attrs['dttm_work_end'] = None
-            attrs['worker_day_details'] = []
-        elif not ( attrs.get('dttm_work_start') and attrs.get('dttm_work_end') and attrs.get('worker_day_details')):
-            raise ValidationError({"error": f"dttm_work_start, dttm_work_end, and worker_day_details required for type {type}"})
+        elif not ( attrs.get('dttm_work_start') and attrs.get('dttm_work_end')):
+            raise ValidationError({"error": f"dttm_work_start, dttm_work_end are required for type {type}"})
+        elif attrs['dttm_work_start'] > attrs['dttm_work_end'] or attrs['dt'] != attrs['dttm_work_start'].date() or attrs['dt'] != attrs['dttm_work_end'].date():
+            raise ValidationError({"error": f"dttm_work_start must be less then dttm_work_end and has the same date as dt"})
+
+
+
+
+        if not type == WorkerDay.TYPE_WORKDAY or is_fact:
+            attrs.pop('worker_day_details', None)
+        elif not ( attrs.get('worker_day_details')):
+            raise ValidationError({"error": f" worker_day_details is required for type {type}"})
         return attrs
 
     def create(self, validated_data):
