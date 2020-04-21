@@ -12,14 +12,20 @@ from src.timetable.serializers import (
     EmploymentWorkTypeSerializer,
     WorkerConstraintSerializer,
     ListChangeSrializer,
+    DuplicateSrializer,
+    DeleteTimetableSerializer,
+    ExchangeSerializer,
 )
 from src.timetable.filters import WorkerDayFilter, EmploymentWorkTypeFilter, WorkerConstraintFilter
-from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
-from src.base.models import Employment, Shop
+from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint, WorkerDayCashboxDetails
+from src.base.models import Employment, Shop, User
 from src.timetable.backends import MultiShopsFilterBackend
-from django.db.models import OuterRef, Subquery
+from django.db.models import OuterRef, Subquery, Q
 from django.utils import timezone
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy
+from src.base.exceptions import MessageError
+from src.main.timetable.auto_settings.utils import set_timetable_date_from
+from src.main.other.notification.utils import send_notification
 
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
@@ -118,7 +124,8 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def change_list(self, request):
-        data = ListChangeSrializer(data=request.data)
+        data = ListChangeSrializer(data=request.data, context={'request': request})
+        data.is_valid(raise_exception=True)
 
         is_type_with_tm_range = WorkerDay.is_type_with_tm_range(data['type'])
 
@@ -179,6 +186,14 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 else:
                     pass
                     # worker_day.canceled = False
+                if created:
+                    wd.parent_worker_day = WorkerDay.objects.filter(
+                        worker_id=user_id,
+                        dt=dt,
+                        shop_id=shop_id,
+                        is_approved=True,
+                    ).first()
+                    wd.save()
                 if wd.type == WorkerDay.TYPE_WORKDAY:      
                     WorkerDayCashboxDetails.objects.create(
                         work_type=work_type,
@@ -198,6 +213,213 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 create_vacancies_and_notify(wt.shop_id, wt.id)
 
         return Response(response, status=200)
+
+
+    @action(detail=False, methods=['post'])
+    def duplicate(request):
+        data = DuplicateSrializer(data=request.data, context={'request': request})
+        data.is_valid(raise_exception=True)
+        from_worker_id = data['from_worker_id']
+        to_worker_id = data['to_worker_id']
+        from_dt = data['from_dt']
+        to_dt = data['to_dt']
+
+        main_worker_days = list(WorkerDay.objects.qos_current_version().filter(
+            worker_id=from_worker_id,
+            dt__gte=from_dt,
+            dt__lte=to_dt,
+            is_approved=data['is_approved'],
+        ))
+        main_worker_days_details = WorkerDayCashboxDetails.objects.qos_current_version().filter(
+            worker_day__in=main_worker_days,
+        )
+        # todo: add several details, not last
+        main_worker_days_details = {wdds.worker_day_id: wdds for wdds in main_worker_days_details}
+
+        trainee_worker_days = WorkerDay.objects.qos_current_version().filter(
+            worker_id=to_worker_id,
+            dt__gte=from_dt,
+            dt__lte=to_dt,
+            is_approved=False,
+        )
+        WorkerDayCashboxDetails.objects.filter(worker_day__in=trainee_worker_days).delete()
+        trainee_worker_days.delete()
+
+        created_wds = []
+        wdcds_list_to_create = []
+        for blank_day in main_worker_days:
+            new_wd = WorkerDay.objects.create(
+                worker_id=to_worker_id,
+                dt=blank_day.dt,
+                shop_id=blank_day.shop_id,
+                work_hours=blank_day.work_hours,
+                type=blank_day.type,
+                dttm_work_start=blank_day.dttm_work_start,
+                dttm_work_end=blank_day.dttm_work_end,
+                is_approved=False,
+            )
+            created_wds.append(new_wd)
+            new_wdcds = main_worker_days_details.get(blank_day.id)
+            if new_wdcds:
+                wdcds_list_to_create.append(
+                    WorkerDayCashboxDetails(
+                        worker_day=new_wd,
+                        on_cashbox=new_wdcds.on_cashbox,
+                        work_type=new_wdcds.work_type,
+                        dttm_from=new_wdcds.dttm_from,
+                        dttm_to=new_wdcds.dttm_to
+                    )
+                )
+
+        WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
+        return Response(WorkerDaySerializer(created_wds, many=True).data)
+
+
+    @action(detail=False, methods=['post'])
+    def delete_timetable(self, request):
+        data = DeleteTimetableSerializer(data=request.data, context={'request': request})
+        data.is_valid(raise_exception=True)
+        shop_id = data['shop_id']
+        if data.validated_data.get('delete_all'):
+
+            dt_from = set_timetable_date_from(data['dt_from'].year, data['dt_from'].month)
+            if not dt_from:
+                raise MessageError(code="cant_delete_past_period", lang=request.user.lang)
+            dt_first = dt_from.replace(day=1)
+            dt_to = (dt_first + relativedelta(months=1))
+
+            employments = Employment.objects.get_active(dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
+            workers = User.objects.filter(id__in=employments.values_list('user_id'))
+            tts = ShopMonthStat.objects.filter(shop_id=shop_id, dt=dt_first)
+            for tt in tts:
+                if (tt.status == ShopMonthStat.PROCESSING) and (not tt.task_id is None):
+                    try:
+                        requests.post(
+                            'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
+                        )
+                    except (requests.ConnectionError, requests.ConnectTimeout):
+                        pass
+                    send_notification('D', tt, sender=request.user)
+            tts.update(status=ShopMonthStat.NOT_DONE)
+
+
+            WorkerDayCashboxDetails.objects.filter(
+                Q(work_type__shop_id=shop_id)|Q(work_type__shop_id__isnull=True),
+                worker_day__worker__in=workers,
+                worker_day__dt__gte=dt_from,
+                worker_day__dt__lt=dt_to,
+                worker_day__is_approved=False,
+                is_vacancy=False,
+                worker_day__created_by__isnull=True,
+            ).delete()
+
+            WorkerDayCashboxDetails.objects.filter(
+                worker_day__worker__in=workers,
+                worker_day__dt__gte=dt_from,
+                worker_day__dt__lt=dt_to,
+                worker_day__is_approved=False,
+                is_vacancy=True,
+                worker_day__created_by__isnull=True,
+            ).update(
+                worker_day=None
+            )
+
+            WorkerDay.objects.filter(
+                Q(shop_id=shop_id)|Q(shop_id__isnull=True),
+                worker__in=workers,
+                dt__gte=dt_from,
+                dt__lt=dt_to,
+                created_by__isnull=True,
+                is_approved=False,
+            ).delete()
+
+            # cancel vacancy
+            # todo: add deleting workerdays
+            work_type_ids = [w.id for w in WorkType.objects.filter(shop_id=shop_id)]
+            wd_details= WorkerDayCashboxDetails.objects.select_related(
+                'worker_day', 
+                'worker_day__worker', 
+                'worker_day__shop',
+            ).filter(
+                dttm_from__date__gte=dt_from,
+                dttm_from__date__lt=dt_to,
+                is_vacancy=True,
+                work_type_id__in=work_type_ids,
+            )
+            ids = list(wd_details.values_list('worker_day_id',flat=True))
+            # for worker_day_cashbox_detail in wd_details:
+            #     notify_about_canceled_vacancy(worker_day_cashbox_detail)
+            wd_details.update(
+                worker_day=None,
+                dttm_deleted=timezone.now(),
+                status=WorkerDayCashboxDetails.TYPE_DELETED,
+            )
+            
+
+
+            WorkerDay.objects.filter(id__in=ids).delete()
+
+        else:
+            pass
+
+
+    @action(detail=False, methods=['post'])
+    def exchange(self, request):
+        def create_worker_day(wd_parent, wd_swap):
+            wd_new = WorkerDay(
+                type=wd_swap.type,
+                dttm_work_start=wd_swap.dttm_work_start,
+                dttm_work_end=wd_swap.dttm_work_end,
+                worker_id=wd_parent.worker_id,
+                dt=wd_parent.dt,
+                parent_worker_day=wd_parent.parent_worker_day,
+                created_by=request.user,
+                is_approved=False,
+            )
+            wd_new.save()
+
+            wd_cashbox_details_new = []
+            for wd_cashbox_details_parent in wd_swap.workerdaycashboxdetails_set.all():
+                wd_cashbox_details_new.append(WorkerDayCashboxDetails(
+                    worker_day_id=wd_new.id,
+                    on_cashbox_id=wd_cashbox_details_parent.on_cashbox_id,
+                    work_type_id=wd_cashbox_details_parent.work_type_id,
+                    status=wd_cashbox_details_parent.status,
+                    is_tablet=wd_cashbox_details_parent.is_tablet,
+                    dttm_from=wd_cashbox_details_parent.dttm_from,
+                    dttm_to=wd_cashbox_details_parent.dttm_to,
+                ))
+            WorkerDayCashboxDetails.objects.bulk_create(wd_cashbox_details_new)
+
+        data = ExchangeSerializer(data=request.data, context={'request': request})
+        data.is_valid(raise_exception=True)
+        days = (data['to_dt'] - data['from_dt']).days + 1
+
+        wd_parent_list = list(WorkerDay.objects.qos_current_version().filter(
+            worker_id__in=(data['worker1_id'], data['worker2_id']),
+            dt__gte=data['from_dt'],
+            dt__lte=data['to_dt'],
+            is_approved=False,
+        ).order_by('dt'))
+        id_to_delete = [wd.id for wd in wd_parent_list]
+
+        if len(wd_parent_list) != days * 2:
+            raise MessageError(code="no_timetable", lang=request.user.lang)
+
+        day_pairs = []
+        for day_ind in range(days):
+            day_pair = [wd_parent_list[day_ind * 2], wd_parent_list[day_ind * 2 + 1]]
+            if day_pair[0].dt != day_pair[1].dt:
+                raise MessageError(code="worker_days_mismatch", lang=request.user.lang)
+            day_pairs.append(day_pair)
+
+        for day_pair in day_pairs:
+            create_worker_day(day_pair[0], day_pair[1])
+            create_worker_day(day_pair[1], day_pair[0])
+
+        WorkerDay.objects.filter(id__in=id_to_delete).delete()
+
+        return JsonResponse.success()
 
 
 class EmploymentWorkTypeViewSet(viewsets.ModelViewSet):

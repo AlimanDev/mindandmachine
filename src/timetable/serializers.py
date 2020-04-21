@@ -3,8 +3,11 @@ from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentW
 
 from rest_framework.exceptions import ValidationError
 from  django.db import DatabaseError
-from src.base.models import Employment
+from src.base.models import Employment, User
 from src.util.models_converter import Converter
+from src.conf.djconfig import QOS_DATE_FORMAT
+from src.base.exceptions import MessageError
+
 
 class WorkerDayApproveSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField(required=True)
@@ -225,16 +228,75 @@ class ListChangeSrializer(serializers.Serializer):
     comment = serializers.CharField(max_length=128, required=False)
 
 
-    def is_valid(self):
-        super().is_valid()
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
         if WorkerDay.is_type_with_tm_range(self.validated_data['type']):
             if self.validated_data.get('tm_work_start') is None:
-                raise serializers.ValidationError('tm_work_start is required')
+                raise MessageError(code="tm_work_start_req", lang=self.context['request'].user.lang)
             if self.validated_data.get('tm_work_end') is None:
-                raise serializers.ValidationError('tm_work_end is required')
+                raise MessageError(code="tm_work_end_req", lang=self.context['request'].user.lang)
             workers = self.validated_data.get('workers')
             for key, value in workers:
                 try:
                     workers[key] = list(map(lambda x: Converter.parse_date(x), value))
                 except:
-                    raise serializers.ValidationError('Error in workers dict')
+                    raise MessageError(code="invalid_dt_change_list", lang=self.context['request'].user.lang)
+
+
+class DuplicateSrializer(serializers.Serializer):
+    from_worker_id = serializers.IntegerField()
+    to_worker_id = serializers.IntegerField()
+    from_dt = serializers.DateField(format=QOS_DATE_FORMAT)
+    to_dt = serializers.DateField(format=QOS_DATE_FORMAT)
+    is_approved = serializers.BooleanField(default=False)
+
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+        if not User.objects.filter(id=self.validated_data['from_worker_id']).exists():
+            raise MessageError(code="duplicate_wd_main_user", lang=self.context['request'].user.lang)
+        if not User.objects.filter(id=self.validated_data['to_worker_id']).exists():
+            raise MessageError(code="duplicate_wd_trainer_user", lang=self.context['request'].user.lang)
+        if self.validated_data['from_dt'] > self.validated_data['to_dt']:
+            raise MessageError(code="dt_from_gt_dt_to", lang=self.context['request'].user.lang)
+
+
+class DeleteTimetableSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT, required=False)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT, required=False)
+    users = serializers.ListField(child=serializers.IntegerField(), required=False)
+    types = serializers.ListField(child=serializers.CharField(), required=False)
+    delete_all = serializers.BooleanField(default=False)
+    
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+        dt_from = self.validated_data.get('dt_from')
+        dt_to = self.validated_data.get('dt_to')
+        users = self.validated_data.get('users')
+        types = self.validated_data.get('types')
+
+        if not dt_from:
+            raise MessageError(code="dt_from_required", lang=self.context['request'].user.lang)
+        
+        if users:
+            if not dt_to:
+                raise MessageError(code="dt_to_required", lang=self.context['request'].user.lang)
+
+        if dt_to and dt_from > dt_to:
+            raise MessageError(code="dt_from_gt_dt_to", lang=self.context['request'].user.lang)
+
+
+class ExchangeSerializer(serializers.Serializer):
+    worker1_id = serializers.IntegerField()
+    worker2_id = serializers.IntegerField()
+    from_dt = serializers.DateField(format=QOS_DATE_FORMAT)
+    to_dt = serializers.DateField(format=QOS_DATE_FORMAT)
+
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+        if not User.objects.filter(id=self.validated_data['from_worker_id']).exists():
+            raise MessageError(code="exchange_user", lang=self.context['request'].user.lang)
+        if not User.objects.filter(id=self.validated_data['to_worker_id']).exists():
+            raise MessageError(code="exchange_user", lang=self.context['request'].user.lang)
+        if self.validated_data['from_dt'] > self.validated_data['to_dt']:
+            raise MessageError(code="dt_from_gt_dt_to", lang=self.context['request'].user.lang)
