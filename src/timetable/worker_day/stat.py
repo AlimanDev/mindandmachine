@@ -15,7 +15,7 @@ from django.db.models.functions import Extract, Coalesce, Cast, Ceil
 import pandas
 
 
-def count_month_stat(shop_id, data):
+def count_worker_stat(shop_id, data):
 
     # employments = self.filter_queryset(
     #     self.get_queryset()
