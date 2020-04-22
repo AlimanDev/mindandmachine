@@ -21,6 +21,8 @@ class OperationTypeName(AbstractActiveNamedModel):
         )
         return self
 
+    is_special = models.BooleanField(default=False)
+
 
 class OperationType(AbstractActiveModel):
     class Meta:
