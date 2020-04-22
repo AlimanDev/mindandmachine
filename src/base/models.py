@@ -350,7 +350,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay',
         'WorkerDay_approve',
         'WorkerDay_daily_stat',
-        'WorkerDay_month_stat',
+        'WorkerDay_worker_stat',
         'WorkType',
         'WorkTypeName',
 

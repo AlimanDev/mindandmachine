@@ -19,7 +19,7 @@ from src.timetable.serializers import (
 from src.timetable.filters import WorkerDayFilter, EmploymentWorkTypeFilter, WorkerConstraintFilter
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 from src.timetable.backends import MultiShopsFilterBackend
-from src.timetable.worker_day.stat import count_month_stat, count_daily_stat
+from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
     permission_classes = [FilteredListPermission]
@@ -114,9 +114,8 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response()
 
-
     @action(detail=False, methods=['get'], )
-    def month_stat(self, request):
+    def worker_stat(self, request):
         filterset = self.filter_backends[0]().get_filterset(request, self.get_queryset(), self)
         if filterset.form.is_valid():
             data = filterset.form.cleaned_data
@@ -124,8 +123,8 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             raise utils.translate_validation(filterset.errors)
 
         shop_id = request.query_params.get('shop_id')
-        month_stat = count_month_stat(shop_id, data)
-        return Response(month_stat)
+        stat = count_worker_stat(shop_id, data)
+        return Response(stat)
 
     @action(detail=False, methods=['get'], )
     def daily_stat(self, request):

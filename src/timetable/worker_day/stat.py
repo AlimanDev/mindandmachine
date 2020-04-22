@@ -114,7 +114,7 @@ def count_daily_stat(shop_id, data):
     return stat
 
 
-def count_month_stat(shop_id, data):
+def count_worker_stat(shop_id, data):
 
     # employments = self.filter_queryset(
     #     self.get_queryset()
@@ -176,13 +176,13 @@ def count_month_stat(shop_id, data):
             worker_stat = init_values(paid_days_n_hours,paid_days_n_hours_prev)
 
         plan_or_fact = 'fact' if worker_day.is_fact else 'plan'
-        approved = ['approved'] if worker_day.is_approved else ['not_approved']
+        approved = ['approved'] if worker_day.is_approved else ['not_approved', 'combined']
 
         wdays[plan_or_fact][approved[0]] = worker_day
 
         # approved must come later then not approved
         if worker_day.is_approved and not wdays[plan_or_fact]['not_approved']:
-            approved.append('not_approved')
+            approved.append('combined')
 
         for app in approved:
             cur_stat = worker_stat[plan_or_fact][app]
@@ -234,13 +234,15 @@ def init_values(overtime, overtime_prev):
     dict = {
         'fact': {
             'approved': deepcopy(approved),
-            'not_approved': deepcopy(approved)
+            'not_approved': deepcopy(approved),
+            'combined': deepcopy(approved)
         }}
     approved['day_type'] = {i: 0 for i in WorkerDay.TYPES_USED}
 
     dict['plan'] = {
         'approved': deepcopy(approved),
-        'not_approved': deepcopy(approved)
+        'not_approved': deepcopy(approved),
+        'combined': deepcopy(approved)
     }
     return dict
 
