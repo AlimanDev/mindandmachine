@@ -44,8 +44,8 @@ def count_daily_stat(shop_id, data):
         'dt', 'is_fact', 'is_approved', 'is_shop'
     ).annotate(
         shifts=Count('dt'),
-        paid_hours = Sum('work_hours'),
-        fot = Sum(Cast(Extract(F('work_hours'), 'epoch') / 3600 * F('salary'), FloatField())))
+        paid_hours=Sum(Extract(F('work_hours'), 'epoch') / 3600),
+        fot=Sum(Cast(Extract(F('work_hours'), 'epoch') / 3600 * F('salary'), FloatField())))
 
     stat = {}
     for day in worker_days:
