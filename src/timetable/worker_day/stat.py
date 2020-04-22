@@ -28,7 +28,7 @@ def count_daily_stat(shop_id, data):
     ).exclude(shop_id=shop_id)
 
     cond = Q()
-    if 'worker_id__in' in data:
+    if 'worker_id__in' in data and data['worker_id__in'] is not None:
         cond = Q(worker_id__in=data['worker_id__in'])
 
     worker_days = WorkerDay.objects.filter(
@@ -49,7 +49,7 @@ def count_daily_stat(shop_id, data):
 
     stat = {}
     for day in worker_days:
-        dt = day.pop('dt')
+        dt = str(day.pop('dt'))
         if dt not in stat:
             stat[dt] = {
                 'plan':{'approved': {}, 'not_approved': {}},
@@ -78,7 +78,7 @@ def count_daily_stat(shop_id, data):
     )
 
     for day in worker_days:
-        dt = day.pop('dt')
+        dt = str(day.pop('dt'))
         if dt not in stat:
             stat[dt] = {
                 'plan': {'approved': {}, 'not_approved': {}},
@@ -86,28 +86,31 @@ def count_daily_stat(shop_id, data):
             }
         stat[dt]['vacancies'] = day
 
-    q = {
-        'work_types': Q(operation_type__work_type__shop_id=shop_id),
-        'operation_types': Q(operation_type__operation_type_name__is_special=True),
-    }
+    q = [
+        ('work_types', 'operation_type__work_type_id', Q(operation_type__work_type__shop_id=shop_id)),
+        ('operation_types', 'operation_type_id', Q(operation_type__operation_type_name__is_special=True)),
+    ]
 
-    for name, cond in q.items():
+    for item in q:
+        (name, field, cond) = item
         period_clients = PeriodClients.objects.filter(
             cond,
             dttm_forecast__gte=dt_start,
             dttm_forecast__lte=dt_end,
         ).annotate(
-            dt=TruncDate('dttm_forecast')
-        ).values('dt','operation_type_id'
-        ).annotate(val=Sum('value'))
+            dt=TruncDate('dttm_forecast'),
+            field=F(field)
+        ).values('dt','field'
+        ).annotate(value=Sum('value'))
 
         for day in period_clients:
-            dt = day.pop('dt')
+            dt = str(day.pop('dt'))
             if dt not in stat:
                 stat[dt] = {}
             if name not in stat[dt]:
-                stat[dt][name] = []
-            stat[dt][name].append(day)
+                stat[dt][name] = {
+                }
+            stat[dt][name][day['field']]=day['value']
     return stat
 
 
