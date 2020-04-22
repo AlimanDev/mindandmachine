@@ -1,18 +1,114 @@
-from copy import deepcopy
-from src.base.models import Shop, ProductionDay
-from src.main.timetable.table.utils import  count_difference_of_normal_days
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
-
-
-from datetime import time, timedelta
-import datetime
-from src.base.models import Employment
-from django.db.models import Sum, Q, Count
-from django.db.models.functions import Coalesce
-
-from src.main.urv.utils import wd_stat_count
-from django.db.models.functions import Extract, Coalesce, Cast, Ceil
 import pandas
+from datetime import timedelta
+import datetime
+from copy import deepcopy
+
+from django.db.models import Count, Sum,OuterRef, Subquery, F, Q, FloatField, Exists
+from django.db.models.functions import Extract, Cast, Coalesce, TruncDate
+
+from src.base.models import Shop, ProductionDay, Employment
+from src.timetable.models import WorkerDay
+from src.forecast.models import PeriodClients
+
+
+def count_daily_stat(shop_id, data):
+    dt_start = data['dt_from']
+    dt_end = data['dt_to']
+
+    emp_subq_shop = Employment.objects.filter(
+        Q(dt_fired__gte=OuterRef('dt')) | Q(dt_fired__isnull=True),
+        user_id = OuterRef('worker_id'),
+        shop_id=shop_id,
+        dt_hired__lte = OuterRef('dt'))
+
+    emp_subq = Employment.objects.filter(
+        Q(dt_fired__gte=OuterRef('dt')) | Q(dt_fired__isnull=True),
+        user_id = OuterRef('worker_id'),
+        dt_hired__lte = OuterRef('dt')
+    ).exclude(shop_id=shop_id)
+
+    cond = Q()
+    if 'worker_id__in' in data:
+        cond = Q(worker_id__in=data['worker_id__in'])
+
+    worker_days = WorkerDay.objects.filter(
+        cond,
+        dt__gte=dt_start,
+        dt__lte=dt_end,
+        shop_id=shop_id,
+        type=WorkerDay.TYPE_WORKDAY
+    ).annotate(
+        salary=Coalesce(Subquery(emp_subq_shop.values('salary')[:1]), Subquery(emp_subq.values('salary')[:1])),
+        is_shop=Exists(emp_subq_shop)
+    ).values(
+        'dt', 'is_fact', 'is_approved', 'is_shop'
+    ).annotate(
+        shifts=Count('dt'),
+        paid_hours = Sum('work_hours'),
+        fot = Sum(Cast(Extract(F('work_hours'), 'epoch') / 3600 * F('salary'), FloatField())))
+
+    stat = {}
+    for day in worker_days:
+        dt = day.pop('dt')
+        if dt not in stat:
+            stat[dt] = {
+                'plan':{'approved': {}, 'not_approved': {}},
+                'fact': {'approved': {}, 'not_approved': {}}
+            }
+        plan_or_fact = 'fact' if day.pop('is_fact') else 'plan'
+        approved = 'approved' if day.pop('is_approved') else 'not_approved'
+        shop = 'self' if day.pop('is_shop') else 'outsource'
+
+        stat[dt][plan_or_fact][approved][shop] = day
+
+
+    #Открытые вакансии
+    worker_days = WorkerDay.objects.filter(
+        dt__gte=dt_start,
+        dt__lte=dt_end,
+        shop_id=shop_id,
+        type=WorkerDay.TYPE_WORKDAY,
+        is_vacancy=True,
+        worker_id__isnull=True,
+    ).values(
+        'dt'
+    ).annotate(
+        shifts=Count('dt'),
+        paid_hours = Sum('work_hours'),
+    )
+
+    for day in worker_days:
+        dt = day.pop('dt')
+        if dt not in stat:
+            stat[dt] = {
+                'plan': {'approved': {}, 'not_approved': {}},
+                'fact': {'approved': {}, 'not_approved': {}}
+            }
+        stat[dt]['vacancies'] = day
+
+    q = {
+        'work_types': Q(operation_type__work_type__shop_id=shop_id),
+        'operation_types': Q(operation_type__operation_type_name__is_special=True),
+    }
+
+    for name, cond in q.items():
+        period_clients = PeriodClients.objects.filter(
+            cond,
+            dttm_forecast__gte=dt_start,
+            dttm_forecast__lte=dt_end,
+        ).annotate(
+            dt=TruncDate('dttm_forecast')
+        ).values('dt','operation_type_id'
+        ).annotate(val=Sum('value'))
+
+        for day in period_clients:
+            dt = day.pop('dt')
+            if dt not in stat:
+                stat[dt] = {}
+            if name not in stat[dt]:
+                stat[dt][name] = []
+            stat[dt][name].append(day)
+    return stat
 
 
 def count_month_stat(shop_id, data):
@@ -176,5 +272,3 @@ class CalendarPaidDays:
             'days': -day_hours.count(),
             'hours': -day_hours.sum(),
         }
-
-
