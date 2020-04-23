@@ -30,16 +30,16 @@ def count_worker_stat(shop_id, data):
     cal = CalendarPaidDays(dt_year_start, dt_end, shop.region_id)
 
     employments=Employment.objects.get_active(dt_year_start,dt_end, shop_id=shop_id)
+    if worker_ids:
+        employments=employments.filter(user_id__in=worker_ids)
     worker_dict = {e.user_id: e for e in employments}
 
     worker_days = WorkerDay.objects.filter(
+        Q(shop_id=shop_id)|Q(shop_id__isnull=True),
         dt__gte=dt_year_start,
         dt__lte=dt_end,
-        shop_id=shop_id,
+        worker_id__in=worker_dict.keys()
     )
-    if worker_ids:
-        worker_days = worker_days.filter(
-            worker_id__in=worker_ids)
     worker_days = worker_days.order_by(
         'worker_id',
         'dt',
