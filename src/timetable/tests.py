@@ -227,27 +227,41 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(WorkerDay.objects.get(id=fact_id).is_approved, True)
 
         # edit approved plan
-        # data['is_fact'] = False
-        response = self.client.put(f"{self.url}{plan_id}/", data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data['is_fact'] = False
+        response = self.client.post(f"{self.url}", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         new_plan_id=response.json()['id']
+        new_plan = WorkerDay.objects.get(id=new_plan_id)
         self.assertNotEqual(new_plan_id, plan_id)
         self.assertEqual(response.json()['parent_worker_day_id'], plan_id)
         self.assertEqual(response.json()['type'], data['type'])
+
+        # edit approved plan again
+        response = self.client.post(f"{self.url}", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день: {new_plan}"})
 
         # edit approved fact
         data['dttm_work_start'] = Converter.convert_datetime(datetime.combine(dt, time(8, 8, 0)))
         data['dttm_work_end'] = Converter.convert_datetime(datetime.combine(dt, time(21, 2, 0)))
 
-        response = self.client.put(f"{self.url}{fact_id}/", data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data['is_fact'] = True
+        response = self.client.post(f"{self.url}", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         res = response.json()
         new_fact_id = res['id']
+        new_fact = WorkerDay.objects.get(id=new_fact_id)
         self.assertNotEqual(new_fact_id, fact_id)
         self.assertEqual(WorkerDay.objects.get(id=new_fact_id).parent_worker_day_id, fact_id)
         self.assertEqual(res['dttm_work_start'], data['dttm_work_start'])
         self.assertEqual(res['dttm_work_end'], data['dttm_work_end'])
+
+        #edit approved fact again
+        response = self.client.post(f"{self.url}", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день: {new_fact}"})
 
     def test_empty_params(self):
         data = {
@@ -261,17 +275,17 @@ class TestWorkerDay(APITestCase):
             "worker_day_details":[]
         }
 
-        response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
+        response = self.client.put(f"{self.url}{self.worker_day_plan_not_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(), {
-            'error': ['dttm_work_start, dttm_work_end, and worker_day_details required for type W']})
+            'error': ['worker_day_details is required for type W']})
 
         data = {
             "shop_id": self.shop.id,
             "worker_id": self.user2.id,
             "employment_id": self.employment2.id,
             "dt": self.dt,
-            "type": WorkerDay.TYPE_WORKDAY,
+            "type": WorkerDay.TYPE_BUSINESS_TRIP,
             # "dttm_work_start": None,
             "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
             "worker_day_details": [{
@@ -280,10 +294,10 @@ class TestWorkerDay(APITestCase):
                  "work_type_id":self.work_type.id}]
         }
 
-        response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
+        response = self.client.put(f"{self.url}{self.worker_day_plan_not_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(), {
-            'error': ['dttm_work_start, dttm_work_end, and worker_day_details required for type W']})
+            'error': ['dttm_work_start, dttm_work_end are required for type T']})
 
     def test_edit_approved_wd_secondly(self):
         data = {
@@ -303,11 +317,11 @@ class TestWorkerDay(APITestCase):
 
         response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': 'У расписания уже есть неподтвержденная версия.'})
+        self.assertEqual(response.json(), {'error': ['Нельзя менять подтвержденную версию.']})
 
         response = self.client.put(f"{self.url}{self.worker_day_fact_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': 'У расписания уже есть неподтвержденная версия.'})
+        self.assertEqual(response.json(), {'error': ['Нельзя менять подтвержденную версию.']})
 
 
     def test_delete(self):

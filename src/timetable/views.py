@@ -28,33 +28,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
     queryset = WorkerDay.objects.all()
     filter_backends = [MultiShopsFilterBackend]
 
-    # тут переопределяется update а не perform_update потому что надо в Response вернуть
-    # не тот объект, который был изначально
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-
-        if instance.is_approved:
-            if instance.child.filter(is_fact=instance.is_fact):
-                raise ValidationError({"error": "У расписания уже есть неподтвержденная версия."})
-
-            data = serializer.validated_data
-            data['parent_worker_day_id']=instance.id
-            data['is_fact']=instance.is_fact
-            serializer = WorkerDayWithParentSerializer(data=data)
-            serializer.is_valid(raise_exception=True)
-
-        serializer.save()
-
-        if getattr(instance, '_prefetched_objects_cache', None):
-            # If 'prefetch_related' has been applied to a queryset, we need to
-            # forcibly invalidate the prefetch cache on the instance.
-            instance._prefetched_objects_cache = {}
-
-        return Response(serializer.data)
-
     def perform_destroy(self, worker_day):
         if worker_day.is_approved:
             raise ValidationError({"error": f"Нельзя удалить подтвержденную версию"})

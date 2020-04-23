@@ -39,6 +39,9 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         create_only_fields = ['is_fact']
 
     def validate(self, attrs):
+        if self.instance and self.instance.is_approved:
+            raise ValidationError({"error": "Нельзя менять подтвержденную версию."})
+
         is_fact = attrs.get('is_fact')
         if is_fact:
             attrs['type'] = WorkerDay.TYPE_WORKDAY
@@ -56,41 +59,48 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         if not type == WorkerDay.TYPE_WORKDAY or is_fact:
             attrs.pop('worker_day_details', None)
         elif not ( attrs.get('worker_day_details')):
-            raise ValidationError({"error": f" worker_day_details is required for type {type}"})
+            raise ValidationError({"error": f"worker_day_details is required for type {type}"})
         return attrs
 
     def create(self, validated_data):
         self.check_other_worker_days(None, validated_data)
 
         is_fact = validated_data.get('is_fact')
-        parent_worker_day_id = validated_data.get('parent_worker_day_id', None)
 
-        # Если создаем факт то делаем его потомком плана. Если создаем план - делаем родителем факта
-        worker_day_to_bind = None
-        if not parent_worker_day_id:
-            worker_days = WorkerDay.objects.filter(
-                worker_id=validated_data.get('worker_id'),
-                is_fact=not is_fact,
-                dt=validated_data.get('dt'),
-                shop_id=validated_data.get('shop_id'),
-            )
-            wd = {True: None, False: None}
+        # Если создаем факт то делаем его потомком подтвержденного факта или плана. Если создаем план - делаем родителем факта и потомком подтвержденного плана
+        worker_days = WorkerDay.objects.filter(
+            worker_id=validated_data.get('worker_id'),
+            dt=validated_data.get('dt'),
+            shop_id=validated_data.get('shop_id'),
+        )
+        wd = {
+            'plan': {'approved': None, 'not_approved': None},
+            'fact': {'approved': None, 'not_approved': None},
+        }
 
-            for w in worker_days:
-                wd[w.is_approved] = w
+        for w in worker_days:
+            plan_or_fact = 'fact' if w.is_fact else 'plan'
+            approved = 'approved' if w.is_approved else 'not_approved'
+            wd[plan_or_fact][approved] = w
 
-            worker_day_to_bind = wd[True] if wd[True] else wd[False]
-            if is_fact and worker_day_to_bind:
-                validated_data['parent_worker_day_id'] = worker_day_to_bind.id
+        plan_to_bind = wd['plan']['approved'] if wd['plan']['approved'] else wd['plan']['not_approved'] if is_fact else None
+        fact_to_bind = wd['fact']['approved'] if wd['fact']['approved'] else wd['fact']['not_approved'] if not is_fact else None
+
+        # Привязываем факт к подтвержденному факту или любому плану, план к подтвержденному плану
+        if is_fact and fact_to_bind:
+            validated_data['parent_worker_day_id'] = fact_to_bind.id
+        elif plan_to_bind:
+            validated_data['parent_worker_day_id'] = plan_to_bind.id
 
         details = validated_data.pop('worker_day_details', None)
 
         worker_day = WorkerDay.objects.create(**validated_data)
 
+        # К созданному плану привязываем факт
         if not is_fact:
-            if worker_day_to_bind:
-                worker_day_to_bind.parent_worker_day = worker_day
-                worker_day_to_bind.save()
+            if fact_to_bind and fact_to_bind.parent_worker_day_id == None:
+                fact_to_bind.parent_worker_day = worker_day
+                fact_to_bind.save()
             if details:
                 for wd_detail in details:
                     WorkerDayCashboxDetails.objects.create(worker_day=worker_day, **wd_detail)
@@ -118,25 +128,28 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             worker_id=validated_data.get('worker_id'),
             dt=validated_data.get('dt'),
             is_fact=is_fact,
+            is_approved=False
         )
 
+        parent_worker_day_id = None
         if worker_day:
             worker_days = worker_days.exclude(id=worker_day.id)
             parent_worker_day_id = worker_day.parent_worker_day_id
-        else:
-            parent_worker_day_id = validated_data.get('parent_worker_day_id', None)
 
         if parent_worker_day_id:
             worker_days = worker_days.exclude(id=parent_worker_day_id)
 
-        for wd in worker_days:
-            # может быть смена в другое время в тот же день, других workerday быть не должно
-            if wd.type == WorkerDay.TYPE_WORKDAY and validated_data.get('type') == WorkerDay.TYPE_WORKDAY:
-                if wd.dttm_work_start <=validated_data.get('dttm_work_end') and \
-                   wd.dttm_work_end >= validated_data.get('dttm_work_start'):
-                    raise ValidationError({"error":f"Рабочий день пересекается с существующим рабочим днем. {wd.shop.name} {wd.dttm_work_start} {wd.dttm_work_end}"})
-            else:
-                raise ValidationError({"error": f"У сотрудника уже существует рабочий день: {wd} "})
+        if worker_days:
+            raise ValidationError({"error": f"У сотрудника уже существует рабочий день: {worker_days[0]}"})
+
+        # for wd in worker_days:
+        #     # может быть смена в другое время в тот же день, других workerday быть не должно
+        #     if wd.type == WorkerDay.TYPE_WORKDAY and validated_data.get('type') == WorkerDay.TYPE_WORKDAY:
+        #         if wd.dttm_work_start <=validated_data.get('dttm_work_end') and \
+        #            wd.dttm_work_end >= validated_data.get('dttm_work_start'):
+        #             raise ValidationError({"error":f"Рабочий день пересекается с существующим рабочим днем. {wd.shop.name} {wd.dttm_work_start} {wd.dttm_work_end}"})
+        #     else:
+        #         raise ValidationError({"error": f"У сотрудника уже существует рабочий день: {wd} "})
 
     def to_internal_value(self, data):
         data = super(WorkerDaySerializer, self).to_internal_value(data)
@@ -151,6 +164,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 if field not in data:
                     raise serializers.ValidationError({field:"This field is required"})
         return data
+
 
 class WorkerDayWithParentSerializer(WorkerDaySerializer):
     parent_worker_day_id = serializers.IntegerField()
