@@ -15,6 +15,9 @@ router.register(r'shop_month_stat', ShopMonthStatViewSet, basename='ShopMonthSta
 router.register(r'employment_work_type', EmploymentWorkTypeViewSet, basename='EmploymentWorkType')
 router.register(r'worker_constraint', WorkerConstraintViewSet, basename='WorkerConstraint')
 
+router.register(r'employment_work_type', EmploymentWorkTypeViewSet, basename='EmploymentWorkType')
+router.register(r'worker_constraint', WorkerConstraintViewSet, basename='WorkerConstraint')
+router.register(r'shop_month_stat', ShopMonthStatViewSet, basename='ShopMonthStat')
 
 urlpatterns = [
     url(r'^', include(router.urls)),

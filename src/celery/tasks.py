@@ -31,6 +31,10 @@ from src.timetable.models import (
     WorkerDayCashboxDetails,
     ShopMonthStat,
     EmploymentWorkType,
+    EmploymentWorkType,
+    Timetable,
+    WorkerCashboxInfo,
+    ShopMonthStat,
     ExchangeSettings,
 )
 from src.base.models import (
