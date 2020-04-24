@@ -262,25 +262,20 @@ class DuplicateSrializer(serializers.Serializer):
 
 class DeleteTimetableSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField()
-    dt_from = serializers.DateField(format=QOS_DATE_FORMAT, required=False)
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT, required=False)
     users = serializers.ListField(child=serializers.IntegerField(), required=False)
     types = serializers.ListField(child=serializers.CharField(), required=False)
     delete_all = serializers.BooleanField(default=False)
+    except_created_by = serializers.BooleanField(default=True)
     
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
         dt_from = self.validated_data.get('dt_from')
         dt_to = self.validated_data.get('dt_to')
-        users = self.validated_data.get('users')
-        types = self.validated_data.get('types')
-
-        if not dt_from:
-            raise MessageError(code="dt_from_required", lang=self.context['request'].user.lang)
         
-        if users:
-            if not dt_to:
-                raise MessageError(code="dt_to_required", lang=self.context['request'].user.lang)
+        if not self.validated_data.get('delete all') and not dt_to:
+            raise MessageError(code="dt_to_required", lang=self.context['request'].user.lang)
 
         if dt_to and dt_from > dt_to:
             raise MessageError(code="dt_from_gt_dt_to", lang=self.context['request'].user.lang)
@@ -291,6 +286,7 @@ class ExchangeSerializer(serializers.Serializer):
     worker2_id = serializers.IntegerField()
     from_dt = serializers.DateField(format=QOS_DATE_FORMAT)
     to_dt = serializers.DateField(format=QOS_DATE_FORMAT)
+    is_approved = serializers.BooleanField(default=False)
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)

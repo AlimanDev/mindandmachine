@@ -280,63 +280,79 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         data = DeleteTimetableSerializer(data=request.data, context={'request': request})
         data.is_valid(raise_exception=True)
         shop_id = data['shop_id']
+        worker_day_filter = {}
+        worker_day_cashbox_details_filter = {}
         if data.validated_data.get('delete_all'):
-
             dt_from = set_timetable_date_from(data['dt_from'].year, data['dt_from'].month)
-            if not dt_from:
-                raise MessageError(code="cant_delete_past_period", lang=request.user.lang)
-            dt_first = dt_from.replace(day=1)
-            dt_to = (dt_first + relativedelta(months=1))
+            if dt_from:
+                dt_first = dt_from.replace(day=1)
+                dt_to = (dt_first + relativedelta(months=1))
+                tts = ShopMonthStat.objects.filter(shop_id=shop_id, dt=dt_first)
+                for tt in tts:
+                    if (tt.status == ShopMonthStat.PROCESSING) and (not tt.task_id is None):
+                        try:
+                            requests.post(
+                                'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
+                            )
+                        except (requests.ConnectionError, requests.ConnectTimeout):
+                            pass
+                        send_notification('D', tt, sender=request.user)
+                tts.update(status=ShopMonthStat.NOT_DONE)
+            else:
+                dt_from = data['dt_from']
+                dt_to = data['dt_to'] if data['dt_to'] else (dt_from.replace(day=1) + relativedelta(months=1))
 
             employments = Employment.objects.get_active(dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
             workers = User.objects.filter(id__in=employments.values_list('user_id'))
-            tts = ShopMonthStat.objects.filter(shop_id=shop_id, dt=dt_first)
-            for tt in tts:
-                if (tt.status == ShopMonthStat.PROCESSING) and (not tt.task_id is None):
-                    try:
-                        requests.post(
-                            'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
-                        )
-                    except (requests.ConnectionError, requests.ConnectTimeout):
-                        pass
-                    send_notification('D', tt, sender=request.user)
-            tts.update(status=ShopMonthStat.NOT_DONE)
+        else:
+            dt_from = data['dt_from']
+            dt_to = data['dt_to']
+            if not len(data['users']):
+                employments = Employment.objects.get_active(dt_from, dt_to, shop_id=shop_id)
+                workers = User.objects.filter(id__in=employments.values_list('user_id'))
+            else:
+                workers = User.objects.filter(id__in=data['users'])
+        if len(data['types']) and not data['delete_all']:
+            worker_day_filter['type__in'] = data['types']
+            worker_day_cashbox_details_filter['worker_day__type__in'] = data['types']
 
+        if data['except_created_by']:
+            worker_day_filter['created_by__isnull'] = True
+            worker_day_cashbox_details_filter['worker_day__created_by__isnull'] = True
+        
+        WorkerDayCashboxDetails.objects.filter(
+            Q(work_type__shop_id=shop_id)|Q(work_type__shop_id__isnull=True),
+            worker_day__worker__in=workers,
+            worker_day__dt__gte=dt_from,
+            worker_day__dt__lt=dt_to,
+            worker_day__is_approved=False,
+            is_vacancy=False,
+            **worker_day_cashbox_details_filter,
+        ).delete()
 
-            WorkerDayCashboxDetails.objects.filter(
-                Q(work_type__shop_id=shop_id)|Q(work_type__shop_id__isnull=True),
-                worker_day__worker__in=workers,
-                worker_day__dt__gte=dt_from,
-                worker_day__dt__lt=dt_to,
-                worker_day__is_approved=False,
-                is_vacancy=False,
-                worker_day__created_by__isnull=True,
-            ).delete()
-
-            WorkerDayCashboxDetails.objects.filter(
-                worker_day__worker__in=workers,
-                worker_day__dt__gte=dt_from,
-                worker_day__dt__lt=dt_to,
-                worker_day__is_approved=False,
-                is_vacancy=True,
-                worker_day__created_by__isnull=True,
-            ).update(
-                worker_day=None
-            )
-
-            WorkerDay.objects.filter(
-                Q(shop_id=shop_id)|Q(shop_id__isnull=True),
-                worker__in=workers,
-                dt__gte=dt_from,
-                dt__lt=dt_to,
-                created_by__isnull=True,
-                is_approved=False,
-            ).delete()
-
+        WorkerDayCashboxDetails.objects.filter(
+            worker_day__worker__in=workers,
+            worker_day__dt__gte=dt_from,
+            worker_day__dt__lt=dt_to,
+            worker_day__is_approved=False,
+            is_vacancy=True,
+            **worker_day_cashbox_details_filter,
+        ).update(
+            worker_day=None
+        )
+        WorkerDay.objects.filter(
+            Q(shop_id=shop_id)|Q(shop_id__isnull=True),
+            worker__in=workers,
+            dt__gte=dt_from,
+            dt__lt=dt_to,
+            is_approved=False,
+            **worker_day_filter,
+        ).delete()
+        if data['delete_all']:
             # cancel vacancy
             # todo: add deleting workerdays
             work_type_ids = [w.id for w in WorkType.objects.filter(shop_id=shop_id)]
-            wd_details= WorkerDayCashboxDetails.objects.select_related(
+            wd_details = WorkerDayCashboxDetails.objects.select_related(
                 'worker_day', 
                 'worker_day__worker', 
                 'worker_day__shop',
@@ -355,24 +371,21 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 status=WorkerDayCashboxDetails.TYPE_DELETED,
             )
             
-
-
             WorkerDay.objects.filter(id__in=ids).delete()
-
-        else:
-            pass
+        return Response()
 
 
     @action(detail=False, methods=['post'])
     def exchange(self, request):
-        def create_worker_day(wd_parent, wd_swap):
+        def create_worker_day(wd_parent, wd_swap, is_approved):
+            parent_worker_day_id = wd_swap.id if is_approved else wd_parent.parent_worker_day_id
             wd_new = WorkerDay(
                 type=wd_swap.type,
                 dttm_work_start=wd_swap.dttm_work_start,
                 dttm_work_end=wd_swap.dttm_work_end,
                 worker_id=wd_parent.worker_id,
                 dt=wd_parent.dt,
-                parent_worker_day=wd_parent.parent_worker_day,
+                parent_worker_day_id=parent_worker_day_id,
                 created_by=request.user,
                 is_approved=False,
             )
@@ -395,13 +408,16 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         data.is_valid(raise_exception=True)
         days = (data['to_dt'] - data['from_dt']).days + 1
 
-        wd_parent_list = list(WorkerDay.objects.qos_current_version().filter(
+        wd_parent_list = list(WorkerDay.objects.qos_current_version().prefetch_related('child').filter(
             worker_id__in=(data['worker1_id'], data['worker2_id']),
             dt__gte=data['from_dt'],
             dt__lte=data['to_dt'],
-            is_approved=False,
+            is_approved=data['is_approved'],
         ).order_by('dt'))
-        id_to_delete = [wd.id for wd in wd_parent_list]
+        if data['is_approved']:
+            id_to_delete = [wd.child.first().id for wd in wd_parent_list]
+        else:
+            id_to_delete = [wd.id for wd in wd_parent_list]
 
         if len(wd_parent_list) != days * 2:
             raise MessageError(code="no_timetable", lang=request.user.lang)
@@ -414,12 +430,12 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             day_pairs.append(day_pair)
 
         for day_pair in day_pairs:
-            create_worker_day(day_pair[0], day_pair[1])
-            create_worker_day(day_pair[1], day_pair[0])
+            create_worker_day(day_pair[0], day_pair[1], data['is_approved'])
+            create_worker_day(day_pair[1], day_pair[0], data['is_approved'])
 
         WorkerDay.objects.filter(id__in=id_to_delete).delete()
 
-        return JsonResponse.success()
+        return Response()
 
 
 class EmploymentWorkTypeViewSet(viewsets.ModelViewSet):

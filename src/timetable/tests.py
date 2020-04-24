@@ -566,3 +566,24 @@ class TestAttendanceRecords(APITestCase):
         self.assertTrue(wd.exists())
         wd = wd.first()
         self.assertEqual(wd.parent_worker_day_id, self.worker_day_plan_approved.id)
+
+
+class TestAditionalFunctions(APITestCase):
+    def setUp(self):
+        super().setUp()
+
+        self.url = '/rest_api/worker_day/'
+        create_departments_and_users(self)
+        self.client.force_authenticate(user=self.user1)
+
+    def test_delete(self):
+        pass
+
+    def test_exchange(self):
+        pass
+
+    def test_duplicate(self):
+        pass
+
+    def test_change_list(self):
+        pass
