@@ -324,6 +324,17 @@ class WorkerDay(AbstractModel):
         (TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE, 'Выходные дни по уходу'),
     ]
 
+    TYPES_USED = [
+        TYPE_HOLIDAY,
+        TYPE_WORKDAY,
+        TYPE_VACATION,
+        TYPE_SICK,
+        TYPE_QUALIFICATION,
+        TYPE_ABSENSE,
+        TYPE_MATERNITY,
+        TYPE_BUSINESS_TRIP,
+        TYPE_ETC,
+    ]
     TYPES_PAID = [
         TYPE_WORKDAY,
         TYPE_QUALIFICATION,

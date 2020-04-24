@@ -12,10 +12,9 @@ from rest_framework.decorators import action
 
 from src.base.permissions import Permission
 from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer
-from src.base.filters import NotificationFilter, SubscribeFilter
+from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter
 from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Subscribe, Notification
-from src.base.filters import EmploymentFilter, UserFilter
-from src.base.message import Message
+from src.base.filters import UserFilter
 
 
 class EmploymentViewSet(ModelViewSet):
@@ -28,8 +27,6 @@ class EmploymentViewSet(ModelViewSet):
             shop_id
             user_id
         Если дата увольнения не задана, надо передать пустое поле.
-
-
     """
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
@@ -58,7 +55,6 @@ class UserViewSet(ModelViewSet):
     @action(detail=True, methods=['post'])
     def change_password(self, request, pk=None):
         user = self.get_object()
-        message = Message(lang=user.lang)
         serializer = PasswordSerializer(data=request.data, instance=user, context={'request':request})
 
         if serializer.is_valid():

@@ -1,3 +1,6 @@
+from django.db.models import OuterRef, Subquery
+from django_filters import utils
+
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
@@ -14,10 +17,8 @@ from src.timetable.serializers import (
 )
 from src.timetable.filters import WorkerDayFilter, EmploymentWorkTypeFilter, WorkerConstraintFilter
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
-
 from src.timetable.backends import MultiShopsFilterBackend
-from django.db.models import OuterRef, Subquery
-
+from src.timetable.worker_day.stat import count_worker_stat
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
     permission_classes = [FilteredListPermission]
@@ -111,6 +112,19 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             WorkerDay.objects.filter(id__in=parent_ids).delete()
 
         return Response()
+
+    @action(detail=False, methods=['get'], )
+    def worker_stat(self, request):
+        filterset = self.filter_backends[0]().get_filterset(request, self.get_queryset(), self)
+        if filterset.form.is_valid():
+            data = filterset.form.cleaned_data
+        else:
+            raise utils.translate_validation(filterset.errors)
+
+        shop_id = int(request.query_params.get('shop_id'))
+        stat = count_worker_stat(shop_id, data)
+        return Response(stat)
+
 
 
 class EmploymentWorkTypeViewSet(viewsets.ModelViewSet):
