@@ -122,7 +122,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         else:
             raise utils.translate_validation(filterset.errors)
 
-        shop_id = request.query_params.get('shop_id')
+        shop_id = int(request.query_params.get('shop_id'))
         stat = count_worker_stat(shop_id, data)
         return Response(stat)
 

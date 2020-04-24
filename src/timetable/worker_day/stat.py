@@ -1,14 +1,13 @@
-import pandas
-from datetime import timedelta
-import datetime
+from datetime import timedelta, date
 from copy import deepcopy
+import pandas
 
 from django.db.models import Count, Sum,OuterRef, Subquery, F, Q, FloatField, Exists
 from django.db.models.functions import Extract, Cast, Coalesce, TruncDate
 
-from src.base.models import Shop, ProductionDay, Employment
-from src.timetable.models import WorkerDay
+from src.base.models import Employment, Shop, ProductionDay
 from src.forecast.models import PeriodClients
+from src.timetable.models import WorkerDay
 
 
 def count_daily_stat(shop_id, data):
@@ -115,15 +114,10 @@ def count_daily_stat(shop_id, data):
 
 
 def count_worker_stat(shop_id, data):
-
-    # employments = self.filter_queryset(
-    #     self.get_queryset()
-    # )
-    # shop_id =data['shop_id']
     dt_start = data['dt_from']
     dt_end = data['dt_to']
     worker_ids = data['worker_id__in']
-    dt_year_start = datetime.date(data['dt_from'].year,1,1)
+    dt_year_start = date(data['dt_from'].year,1,1)
     shop = Shop.objects.get(id=shop_id)
 
     cal = CalendarPaidDays(dt_year_start, dt_end, shop.region_id)
@@ -131,6 +125,9 @@ def count_worker_stat(shop_id, data):
     employments=Employment.objects.get_active(dt_year_start,dt_end, shop_id=shop_id)
     if worker_ids:
         employments=employments.filter(user_id__in=worker_ids)
+    employments = Employment.objects.get_active(dt_year_start,dt_end, shop_id=shop_id)
+    if worker_ids:
+        employments = employments.filter(user_id__in=worker_ids)
     worker_dict = {e.user_id: e for e in employments}
 
     worker_days = WorkerDay.objects.filter(
@@ -152,18 +149,19 @@ def count_worker_stat(shop_id, data):
     worker_stat = {}
     worker_id = 0
     wdays = {
-        'plan': {'approved':None,'not_approved':None},
+        'plan': {'approved': None, 'not_approved': None},
         'fact': {'approved': None, 'not_approved': None}
     }
     dt = worker_days[0].dt
 
-    for i, worker_day in enumerate(worker_days):
+    for worker_day in worker_days:
         if worker_id != worker_day.worker_id or dt != worker_day.dt:
             dt = worker_day.dt
             wdays = {
                 'plan': {'approved': None, 'not_approved': None},
                 'fact': {'approved': None, 'not_approved': None}
             }
+
         if worker_id != worker_day.worker_id:
             if worker_id:
                 month_info[worker_id] = worker_stat
@@ -186,18 +184,21 @@ def count_worker_stat(shop_id, data):
 
         for app in approved:
             cur_stat = worker_stat[plan_or_fact][app]
-
-            if worker_day.dt >= dt_start and not worker_day.is_fact:
+            if worker_day.dt >= dt_start and not worker_day.is_fact and (worker_day.shop_id is None or worker_day.shop_id == shop_id):
                 cur_stat['day_type'][worker_day.type] += 1
 
             if worker_day.type in WorkerDay.TYPES_PAID:
                 fields = ['overtime_prev']
                 if worker_day.dt >= dt_start:
-                    field = 'shop' if worker_day.shop_id == shop.id else 'other'
+                    if worker_day.shop_id == shop.id or worker_day.type == WorkerDay.TYPE_BUSINESS_TRIP:
+                        field = 'shop'
+                    else:
+                        field = 'other'
                     fields = [field, 'total', 'overtime']
+                days, hours = count_fact(worker_day, wdays)
                 for f in fields:
-                    cur_stat['paid_days'][f] += 1
-                    cur_stat['paid_hours'][f] += count_fact(worker_day, wdays)
+                    cur_stat['paid_days'][f] += days
+                    cur_stat['paid_hours'][f] += hours
 
     if worker_id:
         month_info[worker_id] = worker_stat
@@ -207,18 +208,18 @@ def count_worker_stat(shop_id, data):
 
 def count_fact(fact, wdays):
     if not fact.is_fact:
-        return fact.work_hours.seconds/3600
+        return (1, fact.work_hours.seconds/3600)
 
-    plan = wdays['plan']['approved'] if wdays['plan']['approved'] else wdays['plan']['not_approved']
+    plan = wdays['plan']['approved'] if wdays['plan']['approved'] else None
 
-    if not plan.type == WorkerDay.TYPE_WORKDAY:
-        return 0
+    if not plan or plan.type != WorkerDay.TYPE_WORKDAY:
+        return (0, 0)
     start = fact.dttm_work_start if fact.dttm_work_start > plan.dttm_work_start else plan.dttm_work_start
     end = fact.dttm_work_end if fact.dttm_work_end < plan.dttm_work_end else plan.dttm_work_end
     if end < start:
-        return 0
+        return (0, 0)
 
-    return round((end-start).seconds / 3600)
+    return (1, round((end-start).seconds / 3600))
 
 
 def init_values(overtime, overtime_prev):
