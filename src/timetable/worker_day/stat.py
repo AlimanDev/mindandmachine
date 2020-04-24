@@ -35,7 +35,7 @@ def count_worker_stat(shop_id, data):
     worker_dict = {e.user_id: e for e in employments}
 
     worker_days = WorkerDay.objects.filter(
-        Q(shop_id=shop_id)|Q(shop_id__isnull=True),
+        # Q(shop_id=shop_id)|Q(shop_id__isnull=True),
         dt__gte=dt_year_start,
         dt__lte=dt_end,
         worker_id__in=worker_dict.keys()
@@ -110,9 +110,9 @@ def count_fact(fact, wdays):
     if not fact.is_fact:
         return fact.work_hours.seconds/3600
 
-    plan = wdays['plan']['approved'] if wdays['plan']['approved'] else wdays['plan']['not_approved']
+    plan = wdays['plan']['approved'] if wdays['plan']['approved'] else None
 
-    if not plan.type == WorkerDay.TYPE_WORKDAY:
+    if not plan or plan.type != WorkerDay.TYPE_WORKDAY:
         return 0
     start = fact.dttm_work_start if fact.dttm_work_start > plan.dttm_work_start else plan.dttm_work_start
     end = fact.dttm_work_end if fact.dttm_work_end < plan.dttm_work_end else plan.dttm_work_end
