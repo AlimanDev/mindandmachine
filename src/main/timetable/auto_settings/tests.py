@@ -1,7 +1,7 @@
 import json
 import datetime
 from src.base.models import Employment
-from src.timetable.models import  Timetable, WorkerDay, WorkerDayCashboxDetails
+from src.timetable.models import  ShopMonthStat, WorkerDay, WorkerDayCashboxDetails
 from src.util.test import LocalTestCase
 from django.utils.timezone import now
 
@@ -59,10 +59,10 @@ class TestAutoSettings(LocalTestCase):
 
         self.auth()
 
-        timetable = Timetable.objects.create(
+        timetable = ShopMonthStat.objects.create(
             shop = self.shop,
             dt = now().date().replace(day=1),
-            status = Timetable.PROCESSING,
+            status = ShopMonthStat.PROCESSING,
             dttm_status_change = now()
         )
         dt = now().date()
@@ -186,5 +186,5 @@ class TestAutoSettings(LocalTestCase):
             'shop_id': self.shop.id,
             'status': 3,
         }
-        self.assertEqual(Timetable.objects.all().values('shop_id', 'status').last(), correct_tt)
+        self.assertEqual(ShopMonthStat.objects.all().values('shop_id', 'status').last(), correct_tt)
         '''

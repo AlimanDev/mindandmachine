@@ -3,7 +3,7 @@ from datetime import datetime, time
 from dateutil.relativedelta import relativedelta
 
 from src.base.models import Shop
-from src.timetable.models import Timetable
+from src.timetable.models import ShopMonthStat
 from src.util.test import LocalTestCase
 
 class TestShop(LocalTestCase):
@@ -12,7 +12,7 @@ class TestShop(LocalTestCase):
         super().setUp()
 
         # print(self.shop.__dict__)
-        self.timetable1_1 = Timetable.objects.create(
+        self.timetable1_1 = ShopMonthStat.objects.create(
             shop = self.shop,
             dt = datetime.now().date().replace(day=1),
             status = 1,
@@ -24,7 +24,7 @@ class TestShop(LocalTestCase):
             revenue=10,
             fot_revenue=10,
         )
-        self.timetable1_2 = Timetable.objects.create(
+        self.timetable1_2 = ShopMonthStat.objects.create(
             shop = self.shop,
             dt = datetime.now().date().replace(day=1) - relativedelta(months=1),
             status = 1,
@@ -37,7 +37,7 @@ class TestShop(LocalTestCase):
             fot_revenue=5,
         )
 
-        self.timetable2_1 = Timetable.objects.create(
+        self.timetable2_1 = ShopMonthStat.objects.create(
             shop = self.shop2,
             dt = datetime.now().date().replace(day=1),
             status = 1,
@@ -49,7 +49,7 @@ class TestShop(LocalTestCase):
             revenue=10,
             fot_revenue=10,
         )
-        self.timetable2_2 = Timetable.objects.create(
+        self.timetable2_2 = ShopMonthStat.objects.create(
             shop = self.shop2,
             dt = datetime.now().date().replace(day=1) - relativedelta(months=1),
             status = 1,
@@ -62,7 +62,7 @@ class TestShop(LocalTestCase):
             fot_revenue=5,
         )
 
-        self.timetable3_1 = Timetable.objects.create(
+        self.timetable3_1 = ShopMonthStat.objects.create(
             shop = self.shop3,
             dt = datetime.now().date().replace(day=1),
             status = 1,
@@ -74,7 +74,7 @@ class TestShop(LocalTestCase):
             revenue=8,
             fot_revenue=8,
         )
-        self.timetable3_2 = Timetable.objects.create(
+        self.timetable3_2 = ShopMonthStat.objects.create(
             shop = self.shop3,
             dt = datetime.now().date().replace(day=1) - relativedelta(months=1),
             status = 1,

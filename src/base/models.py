@@ -352,6 +352,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_worker_stat',
         'WorkType',
         'WorkTypeName',
+        'ShopMonthStat',
 
         'signout',
         'password_edit',
