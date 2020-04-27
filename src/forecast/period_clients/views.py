@@ -260,6 +260,15 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         PeriodClients.objects.bulk_create(models)
         period_clients.update(value=set_value if set_value else F('value')*multiply_coef)
         changed_operation_type_ids = set(period_clients.values_list('operation_type_id', flat=True))
+        for o_type in OperationType.objects.select_related('shop').filter(id__in=operation_type_ids):
+            apply_reverse_formula(
+                o_type, 
+                dt_from=dttm_from.date(), 
+                dt_to=dttm_to.date(), 
+                tm_from=dttm_from.time(), 
+                tm_to=dttm_to.time(),
+                lang=request.user.lang,
+            )
         for x in changed_operation_type_ids:
             PeriodDemandChangeLog.objects.create(
                 dttm_from=dttm_from,

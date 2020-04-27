@@ -465,7 +465,7 @@ def set_pred_bills(request, form):
         status=OperationType.READY,
     )
     if (shop.load_template_id):
-        calculate_shop_load(shop, shop.load_template, dt_from, dt_to)
+        calculate_shop_load(shop, shop.load_template, dt_from, dt_to, lang=request.user.lang)
 
     employments = Employment.objects.filter(
         function_group__allowed_functions__func='set_demand',

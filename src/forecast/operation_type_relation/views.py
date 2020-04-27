@@ -7,6 +7,7 @@ from src.forecast.operation_type_template.views import OperationTypeTemplateSeri
 from django_filters import NumberFilter
 from rest_framework.validators import UniqueTogetherValidator
 from src.base.exceptions import MessageError
+from src.forecast.load_template.utils import create_operation_type_relations_dict
 
 
 # Serializers define the API representation.
@@ -51,23 +52,25 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         
         if OperationTypeRelation.objects.filter(base=depended, depended=base).exists():
             raise MessageError(code="reversed_relation", lang=self.context['request'].user.lang,)
+        
+        self.relations = create_operation_type_relations_dict(base.load_template_id)
 
         self.check_relations(base.id, depended.id)
 
     def check_relations(self, base_id, depended_id):
-        relations = list(OperationTypeRelation.objects.filter(base_id=depended_id))
-        if not len(relations):
-            return True
+        relations = self.relations.get(depended_id)
+        if not relations:
+            return
         else:
             for relation in relations:
-                if relation.depended_id == base_id:
+                if relation.id == base_id:
                     raise MessageError(code="cycle_relation", lang=self.context['request'].user.lang,)
                 else:
-                    self.check_relations(self, base_id, relation.depended_id)
+                    self.check_relations(self, base_id, relation.id)
 
 
 class OperationTypeRelationFilter(FilterSet):
-    load_teplate = NumberFilter(field_name='base__load_template_id')
+    load_template = NumberFilter(field_name='base__load_template_id')
     class Meta:
         model = OperationTypeRelation
         fields = {

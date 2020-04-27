@@ -12,31 +12,102 @@ from src.main.operation_template.utils import build_period_clients
 import numpy as np
 from django.utils import timezone
 import datetime
+from src.base.message import Message
 
-def create_load_template_for_shop(shop_id):
-    shop = Shop.objects.get(pk=shop_id)
 
-    load_template = LoadTemplate.objects.create(
-        name=f'Шаблон нагрузки для магазина {shop.name}'
-    )
-    operation_types = OperationType.objects.select_related('work_type').filter(
-        shop_id=shop_id, dttm_deleted__isnull=True
-    )
+########################## Вспомогательные функции ##########################
+def create_operation_type_relations_dict(load_template_id, reverse=False):
+    '''
+    Создаёт словарь зависимых операций.
+    reverse: показывает какая операция будет ключем:
+    False - базовая операция
+    True - операция от которой есть зависимость
+    '''
+    type_of_relation = 'depended'
+    if reverse:
+        type_of_relation = 'base'
+    operation_type_relations = OperationTypeRelation.objects.select_related(type_of_relation).filter(base__load_template_id=load_template_id)
+    result_dict = {}
 
-    for operation_type in operation_types:
-        OperationTypeTemplate.objects.create(
-            load_template=load_template,
-            operation_type_name_id=operation_type.operation_type_name_id,
-            work_type_name_id=operation_type.work_type.work_type_name_id if operation_type.work_type else None,
-            do_forecast=operation_type.do_forecast,
+    for operation_type_relation in operation_type_relations:
+        key = operation_type_relation.base_id
+        if key not in result_dict:
+            result_dict[key] = []
+        result_dict[key].append(
+            {
+                type_of_relation: getattr(operation_type_relation, type_of_relation),
+                'formula': operation_type_relation.formula,
+                'convert_min_to_real': operation_type_relation.convert_min_to_real,
+            }
         )
-    shop.load_template = load_template
-    return load_template
+
+    return result_dict
 
 
-def apply_formula(operation_type, operation_type_template, dt_from, dt_to, tm_from=None, tm_to=None):
+def check_forecasts(shop):
+    '''
+    Проверяет, что все типы операций спрогнозировались.
+    Данную функцию следует вызывать перед apply_formeula.
+    '''
+    forecast_templates = list(OperationTypeRelation.objects.filter(
+        depended__do_forecast=OperationType.FORECAST,
+        depended__load_template_id=shop.load_template_id,
+    ).values_list('depended__operation_type_name_id', flat=True))
+
+    if OperationType.objects.filter(
+        operation_type_name_id__in=forecast_templates,
+        shop=shop, 
+        status=OperationType.UPDATED,
+    ).exists():
+        return prepare_answer(True, code="not_ready_forecasts")
+    
+    return prepare_answer(False)
+
+
+def write_error(code, load_template_id, lang='ru', params={}):
+    '''
+    Записывает сообщение об ошибке на нужном языке.
+    '''
+    message = Message(lang=lang)
+    LoadTemplate.objects.filter(id=load_template_id).update(
+        error_message=message.get_message(code, params=params),
+        status=LoadTemplate.ERROR,
+    )
+
+
+def prepare_answer(error, code="", result=None, params={}):
+    return {
+        'error': error,
+        'code': code,
+        'params':params,
+        'result': result,
+    }
+
+##############################################################################
+
+def apply_formula(operation_type, operation_type_template, operation_type_relations, shop, dt_from, dt_to, tm_from=None, tm_to=None):
+    '''
+    Применяет формулу для типа операций.
+    Логика частично взята из функции расчета эффективности.
+    params:
+        operation_type: тип операции для которой делаем расчёт
+        operation_type_template: шаблон операции, из которой был создан данный тип опирации
+        operation_type_relations: словарь с отношениями типов операций, создается при помощи
+            функции create_operation_type_relations_dict
+        operation_types_dict: словарь с типами операций в данном магазине, где ключ это id OperationTypeName
+        dt_from: дата с которой применяем
+        dt_to: дата до которой применяем
+        tm_from: время с которого применяем
+        tm_to: время до которого применяем
+
+    перед вызовом данной функции необходимо вызвать функцию check_forecasts
+
+    подсчёт ведётся рекурсивно, начиная от конечного типа операций (к которому привязан тип работ)
+    пока не будут посчитаны все зависимые операции, результат записан не будет
+    порядок расчета зависимых операций не имеет значения, так как невозможны циклические отношения
+    '''
     MINUTES_IN_DAY = 24 * 60
-    shop = operation_type.shop
+    # shop = operation_type.shop
     period_lengths_minutes = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
     period_in_day = MINUTES_IN_DAY // period_lengths_minutes
     tm_from = tm_from if tm_from else shop.tm_shop_opens
@@ -50,7 +121,7 @@ def apply_formula(operation_type, operation_type_template, dt_from, dt_to, tm_fr
             index = dttm2index(dt_from, model.dttm_forecast)
             array[index] = model.value
     
-    def count_res(op_type, template_relation, result):
+    def count_res(op_type, template_relation):
         temp_values = np.zeros(((dt_to - dt_from).days + 1)  * period_in_day)
         fill_array(temp_values, PeriodClients.objects.filter(
             operation_type=op_type,
@@ -60,56 +131,44 @@ def apply_formula(operation_type, operation_type_template, dt_from, dt_to, tm_fr
             dttm_forecast__time__lte=tm_to,
             type=PeriodClients.LONG_FORECASE_TYPE,
         ).order_by('dttm_forecast'))
-        formula = eval(template_relation.formula)
-        division_val = period_lengths_minutes if template_relation.convert_min_to_real else 1
+        formula = eval(template_relation.get('formula'))
+        division_val = period_lengths_minutes if template_relation.get('convert_min_to_real') else 1
         try:
-            return (result + formula(temp_values)/division_val, True)
-        except:
-            try:
-                return (result + np.array(list(map(formula, temp_values)))/division_val, True)
-            except:
-                error_mes = f'There is an error in formula in relation between {template_relation.base.operation_type_name.name} ' + \
-                    f'and {template_relation.depended.operation_type_name.name}'
-                return (error_mes, False)
-
-    forecast_templates = list(OperationTypeRelation.objects.filter(
-        base=operation_type_template, depended__do_forecast=OperationType.FORECAST
-    ).values_list('depended__operation_type_name_id', flat=True))
-
-    if OperationType.objects.filter(
-        operation_type_name_id__in=forecast_templates,
-        shop=shop, 
-        status=OperationType.UPDATED,
-    ).exists():
-        return ('There is not ready forecasts!', False)
+            return prepare_answer(False, result=np.array(list(map(formula, temp_values)))/division_val)
+        except (NameError, ValueError) as e:
+            return prepare_answer(True, code="error_in_formula_rel", params={
+                    'formula': template_relation.get('formula'),
+                    'base': operation_type.operation_type_name.name,
+                    'depended': template_relation.get("depended").operation_type_name.name,
+                    'error': e,
+                })
     
-    operation_types_dict = {
-        op.operation_type_name_id: op
-        for op in OperationType.objects.filter(shop=shop)
-    }
-
-    related_templates = list(OperationTypeRelation.objects.select_related('depended').filter(
-        base=operation_type_template
-    ))
-    if not len(related_templates):
-        return (
-            f'Do_forecast of operation type {operation_type.operation_type_name.name} is formula but there is not any relations',
-            False,
-        )
+    related_templates = operation_type_relations.get(operation_type_template.id, None)
+    
+    if not related_templates:
+        return prepare_answer(True, code="no_relations", params={'operation_type': operation_type})
     result = np.zeros(((dt_to - dt_from).days + 1)  * period_in_day)
     for template_relation in related_templates:
-        op_type = operation_types_dict.get(template_relation.depended.operation_type_name_id)
+        op_type = OperationType.objects.filter(shop=shop, operation_type_name_id=template_relation.get('depended').operation_type_name_id).first()
+        #operation_types_dict.get(template_relation.get('depended').operation_type_name_id)
         if not op_type:
-            return (f'Load template is not applied in shop {operation_type.shop.name}', False)
+            return prepare_answer(True, code="load_template_not_applied", params={"shop": shop})
         if op_type.status == OperationType.UPDATED:
-            res = apply_formula(op_type, template_relation.depended, dt_from, dt_to)
-            if not res[1]:
+            res = apply_formula(
+                op_type, 
+                template_relation.get('depended'), 
+                operation_type_relations,
+                shop,
+                dt_from, 
+                dt_to, 
+            )
+            if res['error']:
                 return res     
-        res = count_res(op_type, template_relation, result)
-        if res[1]:
-            result = res[0]
-        else:
+        res = count_res(op_type, template_relation)
+        if res['error']:
             return res
+        else:
+            result += res['result']        
     
     PeriodClients.objects.filter(
         operation_type=operation_type,
@@ -145,90 +204,84 @@ def apply_formula(operation_type, operation_type_template, dt_from, dt_to, tm_fr
     operation_type.status = OperationType.READY
     operation_type.save()
 
-    return ('Created', True)
+    return prepare_answer(False)
 
 
-def apply_reverse_formula(operation_type, dt_from, dt_to, tm_from=None, tm_to=None):
-    operation_types = set(search_related_operation_types(operation_type))
-    for operation_type in operation_types:
-        res = apply_formula(operation_type[0], operation_type[1], dt_from, dt_to, tm_from=tm_from, tm_to=tm_to)
-        if not res[1]:
-            return res
-    return ('Updated', True)
+def create_load_template_for_shop(shop_id):
+    '''
+    Создаёт шаблон нагрузки относительно типов операций и типов работ
+    определнного магазина.
+    '''
+    shop = Shop.objects.get(pk=shop_id)
 
-
-def search_related_operation_types(operation_type, operation_type_template=None, operation_types=None):
-    if not operation_type_template:
-        operation_type_template = operation_type.shop.load_template.operation_type_templates.get(
-            operation_type_name_id=operation_type.operation_type_name_id,
-        )
-    
-    if not operation_types:
-        operation_types = {
-            x.operation_type_name_id:x
-            for x in OperationType.objects.filter(shop_id=operation_type.shop_id)
-        }
-
-    related_templates = OperationTypeRelation.objects.select_related('base').filter(
-        depended=operation_type_template,
+    load_template = LoadTemplate.objects.create(
+        name=f'Шаблон нагрузки для магазина {shop.name}'
     )
-    result = []
-    if not related_templates.exists():
-        return result + [(operation_type, operation_type_template), ]
-    else:
-        for template in related_templates:
-            result += search_related_operation_types(
-                operation_types.get(template.base.operation_type_name_id), 
-                operation_type_template=template.base, 
-                operation_types=operation_types
-            )
-        return result
+    operation_types = OperationType.objects.select_related('work_type').filter(
+        shop_id=shop_id, dttm_deleted__isnull=True
+    )
+
+    operation_type_templates = [
+        OperationTypeTemplate(
+            load_template=load_template,
+            operation_type_name_id=operation_type.operation_type_name_id,
+            work_type_name_id=operation_type.work_type.work_type_name_id if operation_type.work_type else None,
+            do_forecast=operation_type.do_forecast,
+        )
+        for operation_type in operation_types
+    ]
+
+    OperationTypeTemplate.objects.bulk_create(operation_type_templates)
+    shop.load_template = load_template
+    return load_template
 
 
 def apply_load_template(load_template_id, shop_id, dt_from):
+    '''
+    Применяет шаблон нагрузки к магазину. 
+    Создает типы операций, типы работ.
+    "Удаляет" ненужные типы работ и типы операций.
+    Запускает составление прогноза нагрузки.
+    '''
     operation_type_templates = LoadTemplate.objects.get(
         pk=load_template_id
-    ).operation_type_templates.all()
-    op_type_names = operation_type_templates.values_list('operation_type_name_id', flat=True)
+    ).operation_type_templates.all() # Получаем шаблоны типов операций
+    op_type_names = operation_type_templates.values_list(
+        'operation_type_name_id', 
+        flat=True
+    ) # Названия типов операций которые есть в шаблонах
 
     for operation_type_template in operation_type_templates:
         work_type = None
-        if operation_type_template.work_type_name:
-            try:
-                work_type = WorkType.objects.get(
-                    shop_id=shop_id,
-                    work_type_name=operation_type_template.work_type_name,
-                )
-            except:
-                work_type = WorkType.objects.create(
-                    shop_id=shop_id,
-                    work_type_name=operation_type_template.work_type_name,
-                )
-
-        try:
-            operation_type = OperationType.objects.get(
+        '''
+        Если в шаблоне есть тип работ, проверяем
+        есть ли он в магазине, и создаём в случае
+        необходимости.
+        '''
+        if operation_type_template.work_type_name_id:
+            work_type, _ = WorkType.objects.get_or_create(
                 shop_id=shop_id,
-                operation_type_name=operation_type_template.operation_type_name,
+                work_type_name_id=operation_type_template.work_type_name_id,
             )
-
-            operation_type.status = OperationType.UPDATED \
-                if operation_type_template.do_forecast != OperationType.FORECAST_NONE\
-                else OperationType.READY
-            operation_type.work_type = work_type
-            operation_type.do_forecast = operation_type_template.do_forecast
-            operation_type.dttm_deleted = None
-            operation_type.save()
-        except:
-            operation_type = OperationType.objects.create(
-                shop_id=shop_id,
-                operation_type_name=operation_type_template.operation_type_name,
-                do_forecast=operation_type_template.do_forecast,
-                status=OperationType.UPDATED \
+        '''
+        Создаём или обновляем тип операций в соответсвии с шаблоном.
+        '''
+        OperationType.objects.update_or_create(
+            shop_id=shop_id,
+            operation_type_name_id=operation_type_template.operation_type_name_id,
+            defaults={
+                'status': OperationType.UPDATED \
                 if operation_type_template.do_forecast != OperationType.FORECAST_NONE\
                 else OperationType.READY,
-                work_type=work_type,
-            )
+                'work_type': work_type,
+                'do_forecast': operation_type_template.do_forecast,
+                'dttm_deleted': None,
+            },
+        )
     operation_types = OperationType.objects.filter(shop_id=shop_id).exclude(operation_type_name_id__in=op_type_names)
+    '''
+    "Удаляем" типы работ и типы операций, которые отсутсвуют в шаблоне.
+    '''
     WorkType.objects.filter(operation_type__in=operation_types).update(
         dttm_deleted=timezone.now(),
     )
@@ -240,7 +293,15 @@ def apply_load_template(load_template_id, shop_id, dt_from):
         create_predbills_request_function(shop_id, dt=dt_from)
 
 
-def calculate_shop_load(shop, load_template, dt_from, dt_to):
+def calculate_shop_load(shop, load_template, dt_from, dt_to, lang='ru'):
+    '''
+    Расчитывает нагрузку магазина по формулам на определенные даты.
+    
+    '''
+    res = check_forecasts(shop)
+    if res['error']:
+        return res
+    # Словарь с конечными типами операций которые расчитываются по формуле
     operation_types_dict = {
         op.operation_type_name_id: op
         for op in OperationType.objects.filter(
@@ -249,7 +310,7 @@ def calculate_shop_load(shop, load_template, dt_from, dt_to):
             work_type__isnull=False,
         )
     }
-
+    operation_type_relations = create_operation_type_relations_dict(shop.load_template_id)
     operation_type_templates = load_template.operation_type_templates.filter(
         do_forecast=OperationType.FORECAST_FORMULA,
         work_type_name_id__isnull=False,
@@ -258,10 +319,70 @@ def calculate_shop_load(shop, load_template, dt_from, dt_to):
     for operation_type_template in operation_type_templates:
         operation_type = operation_types_dict.get(operation_type_template.operation_type_name_id)
         if not operation_type:
-            return (f'Load template is not applied in shop {shop.name}', False)
+            write_error("load_template_not_applied", load_template.id, lang=lang, params={"shop": shop})
+            return prepare_answer(True)
         
-        res = apply_formula(operation_type, operation_type_template, dt_from, dt_to)
-        if not res[1]:
+        res = apply_formula(
+            operation_type, 
+            operation_type_template, 
+            operation_type_relations, 
+            shop,
+            dt_from, 
+            dt_to, 
+        )
+        if res['error']:
+            write_error(res['code'], load_template.id, lang=lang, params=res['params'])
             return res
+    return prepare_answer(False)
 
-    return ('Calculated', True)
+
+'''
+Блок кода отвечающий за перерасчёт операций при ручных изменениях
+'''
+def apply_reverse_formula(operation_type, dt_from, dt_to, tm_from=None, tm_to=None, lang='ru'):
+    load_template_id = operation_type.shop.load_template_id
+    res = check_forecasts(operation_type.shop)
+    if res['error']:
+        return res
+    operation_type_relations = create_operation_type_relations_dict(load_template_id, reverse=True)
+    operation_types = {
+        x.operation_type_name_id:x
+        for x in OperationType.objects.filter(shop_id=operation_type.shop_id)
+    }
+    operation_type_template = OperationTypeTemplate.objects.get(
+        load_template_id=load_template_id,
+        operation_type_name_id=operation_type.operation_type_name_id
+    )
+    operation_types = set(search_related_operation_types(operation_type, operation_type_relations, operation_type_template, operation_types))
+    operation_type_relations = create_operation_type_relations_dict(load_template_id)
+    for operation_type in operation_types:
+        res = apply_formula(
+            operation_type[0], 
+            operation_type[1], 
+            operation_type_relations, 
+            operation_type.shop, 
+            dt_from, 
+            dt_to, 
+            tm_from=tm_from, 
+            tm_to=tm_to,
+        )
+        if res['error']:
+            return res
+    return prepare_answer(False)
+
+
+def search_related_operation_types(operation_type, operation_type_relations, operation_type_template, operation_types=None):
+
+    related_templates = operation_type_relations.get(operation_type_template.id)
+    result = []
+    if not related_templates:
+        return result + [(operation_type, operation_type_template), ]
+    else:
+        for template in related_templates:
+            result += search_related_operation_types(
+                operation_types.get(template.get('base').operation_type_name_id),
+                operation_type_relations, 
+                template.get('base'), 
+                operation_types,
+            )
+        return result

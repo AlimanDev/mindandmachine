@@ -3,11 +3,13 @@ from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from django_filters import CharFilter
 from src.forecast.models import LoadTemplate
-from src.forecast.load_template.utils import create_load_template_for_shop, apply_load_template, calculate_shop_load
+from src.forecast.load_template.utils import create_load_template_for_shop, apply_load_template
+from src.celery.tasks import calculate_shops_load
 from rest_framework.decorators import action
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
 from src.base.exceptions import MessageError
+from celery import exceptions
 
 
 # Serializers define the API representation.
@@ -87,19 +89,15 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
         data = LoadTemplateSpecSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         shop_id = data.validated_data.get('shop_id')
-        load_template = LoadTemplate.objects.get(pk=data.validated_data.get('id'))
+        load_template_id = data.validated_data.get('id')
         dt_from = data.validated_data.get('dt_from')
         dt_to = data.validated_data.get('dt_to')
-        if shop_id:
-            res = calculate_shop_load(load_template.shops.get(pk=shop_id), load_template, dt_from, dt_to)
-        else:
-            for shop in load_template.shops.all():
-                res = calculate_shop_load(shop, load_template, dt_from, dt_to)
-                if not res[1]:
-                    break
-        status_code = 200 if res[1] else 400
+        try:
+            calculate_shops_load.delay(request.user, load_template_id, dt_from, dt_to, shop_id=shop_id)
+        except exceptions.OperationalError:
+            calculate_shops_load(request.user, load_template_id, dt_from, dt_to, shop_id=shop_id)
 
-        return Response([res[0]],status=status_code)
+        return Response(200)
 
 
     def destroy(self, request, pk=None):
