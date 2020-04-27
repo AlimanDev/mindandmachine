@@ -30,8 +30,8 @@ from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
     EmploymentWorkType,
-    Timetable,
-    WorkerCashboxInfo,
+    # Timetable,
+    # WorkerCashboxInfo,
     ShopMonthStat,
     ExchangeSettings,
 )
@@ -41,7 +41,6 @@ from src.base.models import (
     Notification,
     Subscribe,
     Event
-
 )
 from src.forecast.models import (
     OperationTemplate
