@@ -5,6 +5,11 @@ from django_filters import utils
 
 from src.base.models import Employment
 
+from django_filters.rest_framework import DjangoFilterBackend
+
+from src.timetable.filters import WorkerDayFilter, WorkerDayMonthStatFilter
+
+
 class MultiShopsFilterBackend(DjangoFilterBackend):
     """
     Чтобы составить расписание для магазина, надо получить расписание его сотрудников по всем другим магазинам
@@ -46,12 +51,17 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
             user_id__in=worker_id__in
             )
 
-        all_employments_for_users = Employment.objects.get_active(dt_from, dt_to).filter(user_id__in=ids)
-
+        # all_employments_for_users = Employment.objects.get_active(dt_from, dt_to).filter(user_id__in=ids)
 
         return super().filter_queryset(
-            request, queryset, view
-        ).filter(
-            employment__in=all_employments_for_users)\
-        .order_by('worker_id','dt','dttm_work_start')
+                request, queryset, view
+            ).filter(
+                worker_id__in=ids,
+                # employment__in=all_employments_for_users\
+            ).order_by('worker_id','dt','dttm_work_start')
 
+    def get_filterset_class(self, view, queryset=None):
+        if view.action == 'month_stat':
+            return WorkerDayMonthStatFilter
+        else:
+            return WorkerDayFilter

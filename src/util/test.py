@@ -381,6 +381,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
 
 def create_departments_and_users(self):
+    dt = now().date() - relativedelta(months=1)
 
     self.region = Region.objects.create(
         id=1,
@@ -512,6 +513,7 @@ def create_departments_and_users(self):
         user=self.user2,
         shop=self.shop,
         function_group=self.employee_group,
+        dt_hired=dt
     )
     self.user3 = User.objects.create_user(
         'user3',
