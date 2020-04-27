@@ -30,8 +30,10 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
 
 
     def is_valid(self, *args, **kwargs):
-        super().is_valid(*args, **kwargs)
-        lambda_check = r'^(if|else|\+|-|\*|/|\s|a|[0-9]|=|>|<)*'
+        
+        if not super().is_valid(*args, **kwargs):
+            return False
+        lambda_check = r'^(if|else|\+|-|\*|/|\s|a|[0-9]|=|>|<|\.)*'
         if not re.fullmatch(lambda_check, self.validated_data['formula']):
             raise MessageError(code="error_in_formula", lang=self.context['request'].user.lang, params={'formula': self.validated_data['formula']})
 
@@ -58,15 +60,18 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         self.check_relations(base.id, depended.id)
 
     def check_relations(self, base_id, depended_id):
+        '''
+        Функция проверяет отсутсвие цикличных связей
+        '''
         relations = self.relations.get(depended_id)
         if not relations:
             return
         else:
             for relation in relations:
-                if relation.id == base_id:
+                if relation['depended'].id == base_id:
                     raise MessageError(code="cycle_relation", lang=self.context['request'].user.lang,)
                 else:
-                    self.check_relations(self, base_id, relation.id)
+                    self.check_relations(base_id, relation['depended'].id)
 
 
 class OperationTypeRelationFilter(FilterSet):

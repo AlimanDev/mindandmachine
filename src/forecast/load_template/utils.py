@@ -8,11 +8,9 @@ from src.forecast.models import (
 from src.base.models import Shop
 from src.timetable.models import WorkType
 from src.main.demand.utils import create_predbills_request_function
-from src.main.operation_template.utils import build_period_clients
 import numpy as np
 from django.utils import timezone
 import datetime
-from src.base.message import Message
 
 
 ########################## Вспомогательные функции ##########################
@@ -62,17 +60,6 @@ def check_forecasts(shop):
         return prepare_answer(True, code="not_ready_forecasts")
     
     return prepare_answer(False)
-
-
-def write_error(code, load_template_id, lang='ru', params={}):
-    '''
-    Записывает сообщение об ошибке на нужном языке.
-    '''
-    message = Message(lang=lang)
-    LoadTemplate.objects.filter(id=load_template_id).update(
-        error_message=message.get_message(code, params=params),
-        status=LoadTemplate.ERROR,
-    )
 
 
 def prepare_answer(error, code="", result=None, params={}):
@@ -296,7 +283,19 @@ def apply_load_template(load_template_id, shop_id, dt_from):
 def calculate_shop_load(shop, load_template, dt_from, dt_to, lang='ru'):
     '''
     Расчитывает нагрузку магазина по формулам на определенные даты.
-    
+    :params
+        shop: Shop obj
+        load_template: LoadTemplate obj
+        dt_from: datetime.date
+        dt_to: datetime.date
+        lang: str
+    :return
+        {
+            "error": True | False,
+            "code": "code" | "",
+            "result": None,
+            "params": {},
+        }
     '''
     res = check_forecasts(shop)
     if res['error']:
@@ -319,8 +318,7 @@ def calculate_shop_load(shop, load_template, dt_from, dt_to, lang='ru'):
     for operation_type_template in operation_type_templates:
         operation_type = operation_types_dict.get(operation_type_template.operation_type_name_id)
         if not operation_type:
-            write_error("load_template_not_applied", load_template.id, lang=lang, params={"shop": shop})
-            return prepare_answer(True)
+            return prepare_answer(True, code="load_template_not_applied", params={'shop':shop})
         
         res = apply_formula(
             operation_type, 
@@ -331,7 +329,6 @@ def calculate_shop_load(shop, load_template, dt_from, dt_to, lang='ru'):
             dt_to, 
         )
         if res['error']:
-            write_error(res['code'], load_template.id, lang=lang, params=res['params'])
             return res
     return prepare_answer(False)
 

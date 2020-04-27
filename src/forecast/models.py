@@ -27,21 +27,7 @@ class LoadTemplate(AbstractModel):
         verbose_name = 'Шаблон нагрузки'
         verbose_name_plural = 'Шаблоны нагрузки'
 
-    READY = 'R'
-    UPDATED = 'U'
-    NEW = 'N'
-    ERROR = 'E'
-
-    STATUSES = [
-        (READY, 'Применён'),
-        (UPDATED, 'Обновлён'),
-        (NEW, 'Новый'),
-        (ERROR, 'Ошибка'),
-    ]
-    
     name = models.CharField(max_length=64, unique=True)
-    status = models.CharField(max_length=1, choices=STATUSES, default=NEW)
-    error_message = models.CharField(max_length=256, null=True)
 
 
 class OperationType(AbstractActiveModel):
@@ -113,7 +99,7 @@ class OperationTypeTemplate(AbstractModel):
         verbose_name_plural = 'Шаблоны типов операций'
         unique_together = ('load_template', 'operation_type_name')
 
-    load_template = models.ForeignKey(LoadTemplate, on_delete=models.PROTECT, related_name='operation_type_templates')
+    load_template = models.ForeignKey(LoadTemplate, on_delete=models.CASCADE, related_name='operation_type_templates')
     operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
     work_type_name = models.ForeignKey(WorkTypeName, on_delete=models.PROTECT, null=True, blank=True)
     do_forecast = models.CharField(max_length=1, choices=OperationType.FORECAST_CHOICES, default=OperationType.FORECAST)

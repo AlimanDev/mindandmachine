@@ -495,7 +495,12 @@ class FunctionGroup(AbstractModel):
             self.func,
         )
 
-EVENT_TYPES = [('vacancy', 'Вакансия'),('timetable', 'Изменения в расписании')]
+EVENT_TYPES = [
+    ('vacancy', 'Вакансия'),
+    ('timetable', 'Изменения в расписании'),
+    ('load_template_err', 'Ошибка применения шаблона нагрузки'),
+    ('load_template_apply', 'Шаблон нагрузки применён'),
+]
 
 
 class Event(AbstractModel):
