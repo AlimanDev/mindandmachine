@@ -4,7 +4,7 @@ from rest_framework.test import APITestCase
 
 from src.util.test import create_departments_and_users
 from src.timetable.models import WorkerDay, WorkType, WorkTypeName
-
+from src.forecast.models import PeriodClients, OperationType, OperationTypeName
 
 class TestWorkerDayStat(APITestCase):
     USER_USERNAME = "user1"
@@ -165,6 +165,34 @@ class TestWorkerDayStat(APITestCase):
         fnawd4=self.create_worker_day(is_approved=False, is_fact=True, dt=dt4, parent_worker_day=pawd4)
 
 
+        otn1=OperationTypeName.objects.create(
+            is_special=True,
+            name='special'
+        )
+        ot1=OperationType.objects.create(
+            operation_type_name=otn1,
+            shop=self.shop,
+        )
+        otn2=OperationTypeName.objects.create(
+            is_special=False,
+            name='not special'
+        )
+        ot2=OperationType.objects.create(
+            operation_type_name=otn2,
+            shop=self.shop,
+            work_type = self.work_type,
+        )
+
+        for dt in [dt1]:
+            for ot in [ot1,ot2]:
+                for tm in range(8, 21):
+                    PeriodClients.objects.create(
+                        operation_type=ot,
+                        value=1,
+                        dttm_forecast=datetime.combine(dt, time(tm,0,0)),
+                        type='L',
+                    )
+
         dt_to = self.dt+timedelta(days=4)
         self.maxDiff=None
         response = self.client.get(f"{self.daily_stat_url}?shop_id={self.shop.id}&dt_from={dt1}&dt_to={dt_to}", format='json')
@@ -176,7 +204,10 @@ class TestWorkerDayStat(APITestCase):
                     'not_approved': {}},
                 'fact': {
                     'approved': {'shop': {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}},
-                    'not_approved': {'shop': {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}}}},
+                    'not_approved': {'shop': {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}}
+                },
+                'operation_types': {str(ot1.id): 13.0},
+                'work_types': {str(ot2.work_type.id): 13.0}},
             dt2_str: {
                 'plan': {
                     'approved': {},

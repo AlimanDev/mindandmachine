@@ -44,7 +44,7 @@ class OperationType(AbstractActiveModel):
     )
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True, related_name='operation_types')
-    work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, related_name='work_type_reversed')
+    work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, related_name='work_type_reversed', null=True)
     operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
     speed_coef = models.FloatField(default=1)  # time for do 1 operation
     do_forecast = models.CharField(

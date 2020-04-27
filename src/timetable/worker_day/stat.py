@@ -58,7 +58,8 @@ def count_daily_stat(shop_id, data):
     ).annotate(
         shifts=Count('dt'),
         paid_hours=Sum(Extract(F('work_hours'), 'epoch') / 3600),
-        fot=Sum(Cast(Extract(F('work_hours'), 'epoch') / 3600 * F('salary'), FloatField())))
+        fot=Sum(Cast(Extract(F('work_hours'), 'epoch') / 3600 * F('salary'), FloatField()))
+    )
 
     stat = {}
     for day in worker_days:
@@ -89,7 +90,6 @@ def count_daily_stat(shop_id, data):
         shifts=Count('dt'),
         paid_hours = Sum(Extract(F('work_hours'), 'epoch') / 3600),
     )
-    print(worker_days)
 
     for day in worker_days:
         approved = 'approved' if day.pop('is_approved') else 'not_approved'
@@ -261,6 +261,7 @@ def init_values(overtime, overtime_prev):
     return dict
 
 
+
 class CalendarPaidDays:
     def __init__(self,dt_start, dt_end, region_id):
         prod_days_list = list(ProductionDay.objects.filter(
@@ -291,3 +292,4 @@ class CalendarPaidDays:
             'days': -day_hours.count(),
             'hours': -day_hours.sum(),
         }
+
