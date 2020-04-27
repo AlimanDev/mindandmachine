@@ -29,6 +29,11 @@ from src.main.operation_template.utils import build_period_clients
 from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
+<<<<<<< HEAD
+=======
+    ShopMonthStat,
+    EmploymentWorkType,
+>>>>>>> a31ca69fbeca072737707ee7ee15ec81c1612f14
     EmploymentWorkType,
     Timetable,
     WorkerCashboxInfo,
