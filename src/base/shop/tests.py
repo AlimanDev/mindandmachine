@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 from src.util.test import create_departments_and_users
 
 from src.base.models import Shop, FunctionGroup
-from src.timetable.models import Timetable
+from src.timetable.models import ShopMonthStat
 
 class TestDepartment(APITestCase):
     USER_USERNAME = "user1"
@@ -157,7 +157,7 @@ class TestDepartment(APITestCase):
 
     def test_stat(self):
         # print(self.shop.__dict__)
-        self.timetable1_1 = Timetable.objects.create(
+        self.timetable1_1 = ShopMonthStat.objects.create(
             shop = self.shop,
             dt = datetime.now().date().replace(day=1),
             status = 1,
@@ -169,7 +169,7 @@ class TestDepartment(APITestCase):
             revenue=10,
             fot_revenue=10,
         )
-        self.timetable1_2 = Timetable.objects.create(
+        self.timetable1_2 = ShopMonthStat.objects.create(
             shop = self.shop,
             dt = datetime.now().date().replace(day=1) - relativedelta(months=1),
             status = 1,

@@ -57,13 +57,13 @@ def create_notification(action, instance, requester=None):
     #                                                                                   instance.number)
     #     elif isinstance(instance, WorkType):
     #         notification_text = 'Был добавлен тип работ {}.'.format(instance.name)
-    #     elif isinstance(instance, Timetable):
-    #         if instance.status == Timetable.PROCESSING:
+    #     elif isinstance(instance, ShopMonthStat):
+    #         if instance.status == ShopMonthStat.PROCESSING:
     #             notification_text = 'Расписание на ' + get_month_name(instance.dt) + ' начало составляться.'
-    #         elif instance.status == Timetable.READY:
+    #         elif instance.status == ShopMonthStat.READY:
     #             notification_text = 'Расписание на ' + get_month_name(instance.dt) + ' составлено.'
     #             notification_type = Notifications.TYPE_SUCCESS
-    #         elif instance.status == Timetable.ERROR:
+    #         elif instance.status == ShopMonthStat.ERROR:
     #             notification_text = 'Ошибка при составлении расписания на ' + get_month_name(instance.dt) + '.'
     #             notification_type = Notifications.TYPE_ERROR
     #
@@ -90,7 +90,7 @@ def create_notification(action, instance, requester=None):
     #         notification_text = 'Касса с номером {} была удалена с типа {}.'.format(instance.number, instance.type.name)
     #     elif isinstance(instance, WorkType) and instance.dttm_deleted:
     #         notification_text = 'Тип работ {} был удален.'.format(instance.name)
-    #     elif isinstance(instance, Timetable):
+    #     elif isinstance(instance, ShopMonthStat):
     #         notification_text = 'Расписание на ' + get_month_name(instance.dt) + ' было успешно удалено.'
     #
     # return notification_text, notification_type

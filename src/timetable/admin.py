@@ -7,7 +7,7 @@ from src.timetable.models import (
     Slot,
     UserWeekdaySlot,
     WorkerConstraint,
-    Timetable,
+    ShopMonthStat,
     WorkerDayChangeRequest,
     AttendanceRecords,
     ExchangeSettings,
@@ -131,7 +131,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
 
 
     @staticmethod
-    def parent_title(instance: Timetable):
+    def parent_title(instance: ShopMonthStat):
         return instance.shop.parent_title() if instance.shop else ''
 
 
@@ -170,19 +170,19 @@ class NotificationsAdmin(admin.ModelAdmin):
     list_filter = ('shop',)
 
     @staticmethod
-    def worker_last_name(instance: Timetable):
+    def worker_last_name(instance: ShopMonthStat):
         return instance.to_worker.last_name
 
     @staticmethod
-    def shop_title(instance: Timetable):
+    def shop_title(instance: ShopMonthStat):
         return instance.shop.name
 
     @staticmethod
-    def parent_title(instance: Timetable):
+    def parent_title(instance: ShopMonthStat):
         return instance.shop.parent_title()
 
 
-@admin.register(Timetable)
+@admin.register(ShopMonthStat)
 class TimetableAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop_title', 'parent_title', 'dt', 'status', 'dttm_status_change',
                     'fot', 'idle', 'lack', 'workers_amount', 'revenue', 'fot_revenue',)
@@ -190,11 +190,11 @@ class TimetableAdmin(admin.ModelAdmin):
     list_filter = ('shop',)
 
     @staticmethod
-    def parent_title(instance: Timetable):
+    def parent_title(instance: ShopMonthStat):
         return instance.shop.parent_title()
 
     @staticmethod
-    def shop_title(instance: Timetable):
+    def shop_title(instance: ShopMonthStat):
         return instance.shop.name
 
 
