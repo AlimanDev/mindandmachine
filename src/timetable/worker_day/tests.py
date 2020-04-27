@@ -1,15 +1,9 @@
 from datetime import timedelta, time, datetime
-
 from django.utils.timezone import now
-
-from rest_framework import status
 from rest_framework.test import APITestCase
 
 from src.util.test import create_departments_and_users
-
 from src.timetable.models import WorkerDay, WorkType, WorkTypeName
-from src.base.models import FunctionGroup
-from src.util.models_converter import Converter
 
 
 class TestWorkerDayStat(APITestCase):
@@ -32,7 +26,7 @@ class TestWorkerDayStat(APITestCase):
 
         self.client.force_authenticate(user=self.user1)
 
-    def create_worker_day(self, type='W', shop = None, dt=None, user=None, employment=None,is_fact=False,is_approved=False,parent_worker_day=None):
+    def create_worker_day(self, type='W', shop = None, dt=None, user=None, employment=None,is_fact=False,is_approved=False,parent_worker_day=None, is_vacancy=False):
         shop = shop if shop else self.shop
         if type =='W':
             employment = employment if employment else self.employment2
@@ -53,9 +47,24 @@ class TestWorkerDayStat(APITestCase):
             dttm_work_start=datetime.combine(dt, time(8,0,0)),
             dttm_work_end=datetime.combine(dt, time(20,0,0)),
             parent_worker_day=parent_worker_day,
-            work_hours=datetime.combine(dt, time(20,0,0)) - datetime.combine(dt, time(8,0,0))
+            work_hours=datetime.combine(dt, time(20,0,0)) - datetime.combine(dt, time(8,0,0)),
+            is_vacancy=is_vacancy
         )
+    def create_vacancy(self, shop=None, dt=None, is_approved=False, parent_worker_day=None):
+        dt = dt if dt else self.dt
+        shop = shop if shop else self.shop
 
+        return WorkerDay.objects.create(
+            shop=shop,
+            dt=dt,
+            is_approved=is_approved,
+            type='W',
+            dttm_work_start=datetime.combine(dt, time(8,0,0)),
+            dttm_work_end=datetime.combine(dt, time(20,0,0)),
+            parent_worker_day=parent_worker_day,
+            work_hours=datetime.combine(dt, time(20,0,0)) - datetime.combine(dt, time(8,0,0)),
+            is_vacancy=True
+        )
     def test_worker_stat(self):
 
         pawd1=self.create_worker_day(is_approved=True)
@@ -107,4 +116,92 @@ class TestWorkerDayStat(APITestCase):
                     'paid_days': {'total': 2, 'shop': 1, 'other': 1, 'overtime': 2, 'overtime_prev': 0},
                     'paid_hours': {'total': 24, 'shop': 12, 'other': 12, 'overtime': 24, 'overtime_prev': 0}},
         }}}
+        self.maxDiff=None
+        self.assertEqual(response.json(), stat)
+
+
+    def test_daily_stat(self):
+        self.employment3.shop=self.shop2
+        self.employment3.save()
+
+        dt1=self.dt
+        dt2=self.dt+timedelta(days=1)
+        dt3=self.dt+timedelta(days=2)
+        dt4=self.dt+timedelta(days=3)
+
+        format = '%Y-%m-%d'
+
+        dt1_str = dt1.strftime(format)
+        dt2_str = dt2.strftime(format)
+        dt3_str = dt3.strftime(format)
+        dt4_str = dt4.strftime(format)
+        pawd1=self.create_worker_day(is_approved=True)
+        pnawd1=self.create_worker_day(type=WorkerDay.TYPE_HOLIDAY, parent_worker_day=pawd1)
+        fawd1=self.create_worker_day(is_approved=True, is_fact=True, parent_worker_day=pawd1)
+        fnawd1=self.create_worker_day(is_approved=False, is_fact=True, parent_worker_day=fawd1)
+
+        pawd2=self.create_worker_day(is_approved=True, dt=dt2,type=WorkerDay.TYPE_BUSINESS_TRIP)
+        pnawd2=self.create_worker_day(dt=dt2,type=WorkerDay.TYPE_WORKDAY, parent_worker_day=pawd2)
+        # fawd2=self.create_worker_day(is_approved=True, is_fact=True, dt=dt2,parent_worker_day=pawd2)
+        fnawd2=self.create_worker_day(is_approved=False, is_fact=True, dt=dt2, parent_worker_day=pawd2)
+
+
+        vnawd3=self.create_vacancy(dt=dt3)
+        vna1wd3=self.create_vacancy(dt=dt3)
+        vawd3=self.create_vacancy(is_approved=True, dt=dt3)
+        va2wd3=self.create_vacancy(is_approved=True, dt=dt3)
+
+        pnawd3=self.create_worker_day(
+            user=self.user3,
+            employment=self.employment3,
+            is_vacancy=True,
+            dt=self.dt+timedelta(days=2))
+        fawd3=self.create_worker_day(
+            user=self.user3,
+            employment=self.employment3,
+            is_approved=True, is_fact=True, dt=self.dt+timedelta(days=2),parent_worker_day=pnawd3)
+
+        pawd4=self.create_worker_day(is_approved=True, dt=dt4)
+        fnawd4=self.create_worker_day(is_approved=False, is_fact=True, dt=dt4, parent_worker_day=pawd4)
+
+
+        dt_to = self.dt+timedelta(days=4)
+        self.maxDiff=None
+        response = self.client.get(f"{self.daily_stat_url}?shop_id={self.shop.id}&dt_from={dt1}&dt_to={dt_to}", format='json')
+
+        stat = {
+            dt1_str: {
+                'plan': {
+                    'approved': {'shop': {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}},
+                    'not_approved': {}},
+                'fact': {
+                    'approved': {'shop': {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}},
+                    'not_approved': {'shop': {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}}}},
+            dt2_str: {
+                'plan': {
+                    'approved': {},
+                    'not_approved': {'shop': {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}}},
+                'fact': {
+                    'approved': {},
+                    'not_approved': {}}},
+            dt3_str: {
+                'plan': {
+                    'approved': {'vacancies': {'shifts': 2, 'paid_hours': 24}},
+                    'not_approved': {
+                        'outsource': {'shifts': 1, 'paid_hours': 12, 'fot': 1800.0},
+                        'vacancies': {'shifts': 2, 'paid_hours': 24}},
+                },
+                'fact': {
+                    'approved': {},
+                    'not_approved': {}}},
+            dt4_str: {
+                'plan': {
+                    'approved': {'shop': {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}},
+                    'not_approved': {},
+                },
+                'fact': {
+                    'approved': {},
+                    'not_approved': {'shop': {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}}}}
+        }
+
         self.assertEqual(response.json(), stat)

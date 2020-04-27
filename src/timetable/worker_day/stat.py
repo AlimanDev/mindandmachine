@@ -24,7 +24,17 @@ def count_daily_stat(shop_id, data):
         Q(dt_fired__gte=OuterRef('dt')) | Q(dt_fired__isnull=True),
         user_id = OuterRef('worker_id'),
         dt_hired__lte = OuterRef('dt')
-    ).exclude(shop_id=shop_id)
+    ).exclude(
+        shop_id=shop_id
+    )
+
+    plan_approved_subq = WorkerDay.objects.filter(
+        dt=OuterRef('dt'),
+        is_fact=False,
+        is_approved=True,
+        worker_id = OuterRef('worker_id'),
+        type=WorkerDay.TYPE_WORKDAY,
+    )
 
     cond = Q()
     if 'worker_id__in' in data and data['worker_id__in'] is not None:
@@ -35,10 +45,14 @@ def count_daily_stat(shop_id, data):
         dt__gte=dt_start,
         dt__lte=dt_end,
         shop_id=shop_id,
-        type=WorkerDay.TYPE_WORKDAY
+        type=WorkerDay.TYPE_WORKDAY,
+        worker_id__isnull=False,
     ).annotate(
-        salary=Coalesce(Subquery(emp_subq_shop.values('salary')[:1]), Subquery(emp_subq.values('salary')[:1])),
-        is_shop=Exists(emp_subq_shop)
+        salary=Coalesce(Subquery(emp_subq_shop.values('salary')[:1]), Subquery(emp_subq.values('salary')[:1]), 0),
+        is_shop=Exists(emp_subq_shop),
+        has_plan=Exists(plan_approved_subq)
+    ).filter(
+        Q(is_fact=False)|Q(has_plan=True)
     ).values(
         'dt', 'is_fact', 'is_approved', 'is_shop'
     ).annotate(
@@ -56,10 +70,9 @@ def count_daily_stat(shop_id, data):
             }
         plan_or_fact = 'fact' if day.pop('is_fact') else 'plan'
         approved = 'approved' if day.pop('is_approved') else 'not_approved'
-        shop = 'self' if day.pop('is_shop') else 'outsource'
+        shop = 'shop' if day.pop('is_shop') else 'outsource'
 
         stat[dt][plan_or_fact][approved][shop] = day
-
 
     #Открытые вакансии
     worker_days = WorkerDay.objects.filter(
@@ -70,20 +83,23 @@ def count_daily_stat(shop_id, data):
         is_vacancy=True,
         worker_id__isnull=True,
     ).values(
-        'dt'
+        'dt',
+        'is_approved'
     ).annotate(
         shifts=Count('dt'),
-        paid_hours = Sum('work_hours'),
+        paid_hours = Sum(Extract(F('work_hours'), 'epoch') / 3600),
     )
+    print(worker_days)
 
     for day in worker_days:
+        approved = 'approved' if day.pop('is_approved') else 'not_approved'
         dt = str(day.pop('dt'))
         if dt not in stat:
             stat[dt] = {
                 'plan': {'approved': {}, 'not_approved': {}},
                 'fact': {'approved': {}, 'not_approved': {}}
             }
-        stat[dt]['vacancies'] = day
+        stat[dt]['plan'][approved]['vacancies'] = day
 
     q = [
         ('work_types', 'operation_type__work_type_id', Q(operation_type__work_type__shop_id=shop_id)),
@@ -122,16 +138,13 @@ def count_worker_stat(shop_id, data):
 
     cal = CalendarPaidDays(dt_year_start, dt_end, shop.region_id)
 
-    employments=Employment.objects.get_active(dt_year_start,dt_end, shop_id=shop_id)
-    if worker_ids:
-        employments=employments.filter(user_id__in=worker_ids)
     employments = Employment.objects.get_active(dt_year_start,dt_end, shop_id=shop_id)
     if worker_ids:
         employments = employments.filter(user_id__in=worker_ids)
+
     worker_dict = {e.user_id: e for e in employments}
 
     worker_days = WorkerDay.objects.filter(
-        Q(shop_id=shop_id)|Q(shop_id__isnull=True),
         dt__gte=dt_year_start,
         dt__lte=dt_end,
         worker_id__in=worker_dict.keys()
