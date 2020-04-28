@@ -202,7 +202,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     def destroy(self, request, pk=None):
         load_template = LoadTemplate.objects.get(pk=pk)
         if load_template.shops.exists():
-            raise MessageError(code="load_template_attached_shops", lang=requset.user.lang)
+            raise MessageError(code="load_template_attached_shops", lang=request.user.lang)
         load_template.delete()
 
         return Response(status=204)

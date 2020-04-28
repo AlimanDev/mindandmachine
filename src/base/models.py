@@ -495,6 +495,7 @@ class FunctionGroup(AbstractModel):
             self.func,
         )
 
+
 EVENT_TYPES = [
     ('vacancy', 'Вакансия'),
     ('timetable', 'Изменения в расписании'),
