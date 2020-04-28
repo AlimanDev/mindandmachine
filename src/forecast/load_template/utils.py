@@ -51,13 +51,13 @@ def check_forecasts(shop):
         depended__do_forecast=OperationType.FORECAST,
         depended__load_template_id=shop.load_template_id,
     ).values_list('depended__operation_type_name_id', flat=True))
-
-    if OperationType.objects.filter(
+    operation_types = list(OperationType.objects.filter(
         operation_type_name_id__in=forecast_templates,
         shop=shop, 
         status=OperationType.UPDATED,
-    ).exists():
-        return prepare_answer(True, code="not_ready_forecasts")
+    ).values_list('operation_type_name__name', flat=True))
+    if len(operation_types):
+        return prepare_answer(True, code="not_ready_forecasts", params={'operation_types': operation_types})
     
     return prepare_answer(False)
 

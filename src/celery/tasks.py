@@ -460,7 +460,7 @@ def upload_vacation_task():
 @app.task
 def calculate_shops_load(user, load_template_id, dt_from, dt_to, shop_id=None):
     load_template = LoadTemplate.objects.get(pk=load_template_id)
-
+    root_shop = Shop.objects.filter(level=0).first()
     shops = [load_template.shops.get(pk=shop_id)] if shop_id else load_template.shops.all()
     for shop in shops:
         res = calculate_shop_load(shop, load_template, dt_from, dt_to, lang=user.lang)
@@ -472,15 +472,13 @@ def calculate_shops_load(user, load_template_id, dt_from, dt_to, shop_id=None):
                     'message': Message(lang=user.lang).get_message(res['code'], params=res.get('params', {})),
                 },
                 dttm_valid_to=datetime.now() + timedelta(days=2),
+                shop=root_shop,
             )
-            Notification.objects.create(
-                worker=user,
-                event=event,
-            )
+            create_notifications_for_event(event.id)
 
 
 @app.task
-def apply_load_template_to_shops(user, load_template_id, dt_from, shop_id=None):
+def apply_load_template_to_shops(load_template_id, dt_from, shop_id=None):
     load_template = LoadTemplate.objects.get(pk=load_template_id)
     shops = [Shop.objects.get(pk=shop_id)] if shop_id else load_template.shops.all()
     for shop in shops:
@@ -491,8 +489,6 @@ def apply_load_template_to_shops(user, load_template_id, dt_from, shop_id=None):
             'name': load_template.name,
         },
         dttm_valid_to=datetime.now() + timedelta(days=2),
+        shop=Shop.objects.filter(level=0).first(),
     )
-    Notification.objects.create(
-        worker=user,
-        event=event,
-    )
+    create_notifications_for_event(event.id)
