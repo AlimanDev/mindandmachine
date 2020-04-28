@@ -396,7 +396,7 @@ class WorkerDay(AbstractModel):
                 work_hours = work_hours - sum(break_triplet[2])
                 break
         return round(work_hours / 60)
-
+    
     def get_department(self):
         return self.shop
 
@@ -488,6 +488,9 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
             self.dttm_to.replace(microsecond=0).time() if self.dttm_to else self.dttm_to,
             self.id,
         )
+
+    def delete(self, *args, **kwargs):
+        super(AbstractActiveModel, self).delete(*args, **kwargs)
 
     objects = WorkerDayCashboxDetailsManager()
 

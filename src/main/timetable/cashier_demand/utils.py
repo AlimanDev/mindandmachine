@@ -175,7 +175,7 @@ def get_worker_timetable2(shop_id, form, indicators_only=False, consider_vacanci
 
     # query selecting PeriodClients
     need_workers = PeriodClients.objects.annotate(
-        need_workers=F('value') * F('operation_type__speed_coef') / period_lengths_minutes,
+        need_workers=F('value'),
     ).select_related('operation_type').filter(
         dttm_forecast__gte=from_dt,
         dttm_forecast__lte=to_dt,

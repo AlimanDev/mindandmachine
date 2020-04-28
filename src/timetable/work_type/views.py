@@ -2,8 +2,10 @@
 from rest_framework import serializers, viewsets
 from django_filters.rest_framework import FilterSet
 from src.base.permissions import FilteredListPermission
-from src.timetable.models import WorkType
+from src.timetable.models import WorkType,WorkTypeName
 from src.timetable.work_type_name.views import WorkTypeNameSerializer
+from rest_framework.validators import UniqueTogetherValidator
+
 
 # Serializers define the API representation.
 class WorkTypeSerializer(serializers.ModelSerializer):
@@ -15,7 +17,16 @@ class WorkTypeSerializer(serializers.ModelSerializer):
         model = WorkType
         fields = ['id', 'priority', 'dttm_last_update_queue', 'min_workers_amount', 'max_workers_amount',\
              'probability', 'prior_weight', 'shop_id', 'code', 'work_type_name_id', 'work_type_name']
-
+        validators = [
+            UniqueTogetherValidator(
+                queryset=WorkType.objects.filter(dttm_deleted__isnull=True),
+                fields=['shop_id', 'work_type_name_id'],
+            ),
+        ]
+    def is_valid(self, *args, **kwargs):
+        if self.initial_data.get('code', False):
+            self.initial_data['work_type_name_id'] = WorkTypeName.objects.get(code=self.initial_data.get('code')).id
+        super().is_valid(*args, **kwargs)
 
 class WorkTypeFilter(FilterSet):
     class Meta:
