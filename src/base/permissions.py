@@ -1,7 +1,7 @@
 from src.base.models import Employment, Shop
 from rest_framework import permissions
 from rest_framework.exceptions import ValidationError, NotFound
-from django.db.models import ObjectDoesNotExist
+from django.db.models import ObjectDoesNotExist, Q
 
 class Permission(permissions.BasePermission):
     """
@@ -26,8 +26,12 @@ class Permission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         department = obj.get_department()
 
+        q = Q()
+        if department:
+            q=Q(shop__in=department.get_ancestors(include_self=True, ascending=True))
+
         employments = Employment.objects.get_active(
-            shop__in=department.get_ancestors(include_self=True, ascending=True),
+            q,
             user=request.user)
 
         return self.check_employment_permission(employments, request, view)
