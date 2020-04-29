@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, date
 
 from django.conf import settings
 from django.db.models import F, Max, Count, Sum, Q, Subquery, OuterRef
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Extract
 from django.utils import timezone
 
 from rest_framework import viewsets
@@ -15,7 +15,7 @@ from src.base.permissions import Permission
 
 from src.forecast.models import PeriodClients
 
-from src.base.models import Shop, Employment, User, ProductionDay
+from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings
 from src.base.exceptions import MessageError
 from src.timetable.models import (
     ShopMonthStat,
@@ -47,6 +47,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get', 'post'])
     def create_timetable(self, request):
+        """
+
+        :params: shop_id, dt_from, dt_to, is_remarking
+        """
         """
         Формат данных -- v1.3
         (last updated 16.05.2019):
@@ -257,11 +261,11 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 tt.dttm_status_change = datetime.now()
                 tt.save()
             else:
-                return JsonResponse.already_exists_error()
+                raise MessageError("tt_exists")
 
         employments = Employment.objects.get_active(
-            dt_from,
-            dt_to,
+            dt_from=dt_from,
+            dt_to=dt_to,
             shop_id=shop_id,
             # auto_timetable=True, чтобы все сотрудники были, так как пересоставляем иногда для 1
         ).select_related('user', 'position')
@@ -292,21 +296,21 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             raise MessageError("tt_users_without_spec", params={'users': ', '.join(users_without_spec)})
 
         # проверка что есть спрос на период
-        period_difference = {'work_type_name': [], 'difference': []}
+        # period_difference = {'work_type_name': [], 'difference': []}
 
-        hours_opened = round((datetime.combine(date.today(), shop.tm_shop_closes) -
-                              datetime.combine(date.today(), shop.tm_shop_opens)).seconds / 3600)
-        if hours_opened == 0:
+        # hours_opened = round((datetime.combine(date.today(), shop.tm_shop_closes) -
+        #                       datetime.combine(date.today(), shop.tm_shop_opens)).seconds / 3600)
+        # if hours_opened == 0:
             hours_opened = 24
-        period_normal_count = int(hours_opened * ((dt_to - dt_from).days) * (60 / period_step))
+        # period_normal_count = int(hours_opened * ((dt_to - dt_from).days) * (60 / period_step))
 
-        work_types = WorkType.objects.qos_filter_active(
-            dt_from=dt_from,
-            dt_to=dt_to,
-            shop_id=shop_id
-        ).select_related(
-            'work_type_name',
-        )
+        # work_types = WorkType.objects.qos_filter_active(
+        #     dt_from=dt_from,
+        #     dt_to=dt_to,
+        #     shop_id=shop_id
+        # ).select_related(
+        #     'work_type_name',
+        # )
 
         # fixme: плохая проверка на наличие всех полей -- могут быть 0 и из-за этого постоянно не проходит проверка
         # лучше сделать проверку по дням
@@ -386,7 +390,6 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         new_worker_days = []
         worker_days_db = WorkerDay.objects.get_last_plan(
-
             worker_id__in=user_ids,
             dt__gte=dt_from,
             dt__lt=dt_to,
@@ -425,16 +428,15 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         )
         fill_wd_array(worker_days_db, prev_worker_days, prev_data=True)
 
-        if shop.process_type == Shop.YEAR_NORM:
-            max_work_coef = (1 + shop.more_norm / 100)
-            min_work_coef = (1 - shop.less_norm / 100)
-        else:
-            max_work_coef = 1
-            min_work_coef = 1
+        max_work_coef = 1
+        min_work_coef = 1
+        if shop.settings.process_type == ShopSettings.YEAR_NORM:
+            max_work_coef += shop.settings.more_norm / 100
+            min_work_coef -= shop.settings.less_norm / 100
 
         shop_dict = {
             'shop_name': shop.name,
-            'process_type': shop.process_type,
+            'process_type': shop.settings.process_type,
             'mean_queue_length': shop.mean_queue_length,
             'max_queue_length': shop.max_queue_length,
             'dead_time_part': shop.dead_time_part,
@@ -512,13 +514,13 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             prev_data[key].append(worker_d)
 
         employment_stat_dict = count_prev_paid_days(dt_from - timedelta(days=1), employments, shop.region_id)
-        month_stat = count_work_month_stats(shop, dt_first, dt_from, Employment.objects.filter(user_id__in=user_ids))
+        # month_stat = count_work_month_stats(shop, dt_first, dt_from, Employment.objects.filter(user_id__in=user_ids))
 
         ##################################################################
 
         # если стоит флаг shop.paired_weekday, смотрим по юзерам, нужны ли им в этом месяце выходные в выходные
         resting_states_list = [WorkerDay.TYPE_HOLIDAY]
-        if shop.paired_weekday:
+        if shop.settings.paired_weekday:
             for employment in employments:
                 coupled_weekdays = 0
                 month_info = prev_data.get(employment.user_id, [])
@@ -617,7 +619,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'dttm_forecast',
             'operation_type__work_type_id',
         ).annotate(
-            clients=Sum(F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + (shop.absenteeism / 100)))
+            clients=Sum(F('value') / period_step * (1.0 + (shop.settings.absenteeism / 100)))
         ).values_list(
             'dttm_forecast',
             'operation_type__work_type_id',
@@ -631,7 +633,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         } for x in periods]
 
         # Параметры инициализации
-        init_params = json.loads(shop.init_params)
+        init_params = json.loads(shop.settings.init_params)
         work_days = list(ProductionDay.objects.filter(
             dt__gte=dt_first,
             dt__lt=dt_to,
@@ -644,7 +646,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 for wd in work_days
             ]
         )  # норма рабочего времени за оставшийся период период (за месяц)
-        work_hours = shop.fot if shop.fot else work_hours  # fixme: tmp, special for 585
+        work_hours = shop.settings.fot if shop.settings.fot else work_hours  # fixme: tmp, special for 585
         init_params['n_working_days_optimal'] = len(work_days)
 
         ##################################################################
@@ -710,9 +712,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     'prev_data': WorkerDayConverter.convert(prev_data.get(e.user_id, []), out_array=True),
                     'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),
                     'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),
-                    'norm_work_amount': (work_hours - month_stat.get(e.user_id, {'paid_hours': 0})['paid_hours'] -
-                                         month_stat.get(e.user_id, {WorkerDay.TYPE_VACATION: 0})[
-                                             WorkerDay.TYPE_VACATION] * ProductionDay.WORK_NORM_HOURS[
+                    'norm_work_amount': (work_hours - employment_stat_dict[e.id]['paid_hours'] -
+                                         employment_stat_dict[e.id]['vacations'] * ProductionDay.WORK_NORM_HOURS[
                                              ProductionDay.TYPE_WORK]
                                          ) * e.norm_work_hours / 100,
                     'required_coupled_hol_in_hol': employment_stat_dict[e.id].get('required_coupled_hol_in_hol', 0),
@@ -726,9 +727,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             ],
             'algo_params': {
                 'min_add_coef': shop.mean_queue_length,
-                'cost_weights': json.loads(shop.cost_weights),
-                'method_params': json.loads(shop.method_params),
-                'breaks_triplets': json.loads(shop.break_triplets),
+                'cost_weights': json.loads(shop.settings.cost_weights),
+                'method_params': json.loads(shop.settings.method_params),
+                'breaks_triplets': json.loads(shop.settings.break_triplets),
                 'init_params': init_params,
             },
         }
@@ -775,17 +776,21 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None):
     ids = [e.id for e in employments]
 
     prev_info = list(Employment.objects.filter(
-        Q(workerday__dt__gte=dt_start,
-          workerday__dt__lt=dt_end,
-          workerday__is_fact=False,
-          worker_day__is_approved=True) |
-        Q(workerday=None),  # for doing left join
+        Q(
+          Q(user__worker_day__type__in=WorkerDay.TYPES_PAID)|
+          Q(user__worker_day__type=WorkerDay.TYPE_VACATION),
+          user__worker_day__dt__gte=dt_start,
+          user__worker_day__dt__lt=dt_end,
+          user__worker_day__is_fact=False,
+          user__worker_day__is_approved=True) |
+        Q(user__worker_day=None),  # for doing left join
         id__in=ids,
     ).values('id').annotate(
-        count_workdays=Coalesce(Count('workerday', filter=Q(workerday__type__in=WorkerDay.TYPES_PAID)), 0),
-        count_hours=Coalesce(Sum('workerday__work_hours', filter=Q(workerday__type__in=WorkerDay.TYPES_PAID)), 0),
+        paid_days=Coalesce(Count('user__worker_day', filter=Q(user__worker_day__type__in=WorkerDay.TYPES_PAID)), 0),
+        paid_hours=Coalesce(Sum(Extract(F('user__worker_day__work_hours'),'epoch') / 3600, filter=Q(user__worker_day__type__in=WorkerDay.TYPES_PAID)), 0),
+        vacations=Coalesce(Count('user__worker_day', filter=Q(user__worker_day__type=WorkerDay.TYPE_SELF_VACATION)), 0),
     ).order_by('id'))
-    prev_info = {user['id']: user for user in prev_info}
+    prev_info = {e['id']: e for e in prev_info}
     employment_stat_dict = {}
 
     for employment in employments:
@@ -793,13 +798,20 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None):
 
         paid_days_n_hours_prev = prod_cal.paid_days(dt_u_st, dt_end, employment)
 
-        if prev_info.get(employment.id, None):
-            paid_days_n_hours_prev['days'] += prev_info[employment.id]['count_workdays']
-            paid_days_n_hours_prev['hours'] += prev_info[employment.id]['count_hours']
-
         employment_stat_dict[employment.id] = {
-            'diff_prev_paid_days': paid_days_n_hours_prev['days'],
-            'diff_prev_paid_hours': paid_days_n_hours_prev['hours']
+            'overworking_days': paid_days_n_hours_prev['days'],
+            'overworking_hours': paid_days_n_hours_prev['hours'],
+            'paid_days': 0,
+            'paid_hours': 0,
+            'vacations': 0,
         }
+
+        if prev_info.get(employment.id, None):
+            employment_stat_dict[employment.id]['overworking_days'] += prev_info[employment.id]['paid_days']
+            employment_stat_dict[employment.id]['overworking_hours'] += prev_info[employment.id]['paid_hours']
+            employment_stat_dict[employment.id]['paid_days'] = prev_info[employment.id]['paid_days']
+            employment_stat_dict[employment.id]['paid_hours'] = prev_info[employment.id]['paid_hours']
+            employment_stat_dict[employment.id]['vacations'] = prev_info[employment.id]['vacations']
+
 
     return employment_stat_dict

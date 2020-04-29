@@ -7,8 +7,8 @@
   "tt_exists": "Расписание уже существует",
   "tt_users_without_spec": "Не проставлены типы работ у пользователей: {users}.",
   "tt_period_empty": "На типе работ {work_type} не хватает объектов спроса {period}.",
-   "tt_user_extra_shifts": "Ошибка! Работник {user.id} {user.last_name} {user.first_name} с фиксированными часами, но на один день выбрано больше одной смены!",
-  "tt_server_error": "Ошибка отправки данных на сервер"
+  "tt_user_extra_shifts": "Ошибка! Работник {user.id} {user.last_name} {user.first_name} с фиксированными часами, но на один день выбрано больше одной смены!",
+  "tt_server_error": "Ошибка отправки данных на сервер",
   "error_in_formula": "Ошибка в формуле: {formula}",
   "cycle_relation": "Циклическая зависимость: операция зависит сама от себя",
   "reversed_relation": "Уже существует обратная зависимость",

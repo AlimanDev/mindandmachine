@@ -214,7 +214,7 @@ class AutoSettingsSerializer(serializers.Serializer):
     shop_id=serializers.IntegerField()
     dt_from=serializers.DateField()
     dt_to=serializers.DateField()
-    worker_ids=serializers.ListField(child=serializers.IntegerField(), required=False)
+    is_remaking=serializers.BooleanField(default=False)
 
 
 

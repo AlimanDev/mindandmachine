@@ -109,8 +109,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops')
 
-    max_work_hours_7days = models.SmallIntegerField(default=48)
-
     staff_number = models.SmallIntegerField(default=0)
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)

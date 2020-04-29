@@ -100,7 +100,7 @@ def count_worker_stat(shop_id, data):
 
 def count_fact(fact, wdays):
     if not fact.is_fact:
-        return (1, fact.work_hours.seconds/3600)
+        return (1, fact.work_hours.seconds / 3600)
 
     plan = wdays['plan']['approved'] if wdays['plan']['approved'] else None
 
