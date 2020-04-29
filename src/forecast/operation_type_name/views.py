@@ -3,7 +3,7 @@ import datetime
 from rest_framework import serializers, viewsets, permissions
 from rest_framework.response import Response
 from src.util.utils import JsonResponse
-from src.forecast.models import OperationTypeName, OperationType
+from src.forecast.models import OperationTypeName
 
 # Serializers define the API representation.
 class OperationTypeNameSerializer(serializers.ModelSerializer):

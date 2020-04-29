@@ -105,10 +105,25 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         WorkType.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 9, 0, 0))
 
         self.operation_type_name = OperationTypeName.objects.create(
-            name='',
+            name='Test',
+        )
+        self.operation_type_name2 = OperationTypeName.objects.create(
+            name='Test2',
+        )
+        self.operation_type_name3 = OperationTypeName.objects.create(
+            name='Test3',
+        )
+        self.operation_type_name4 = OperationTypeName.objects.create(
+            name='Test4',
         )
 
-        create_operation_type(OperationType.FORECAST_HARD, self.operation_type_name)
+        create_operation_type(OperationType.FORECAST, [
+            self.operation_type_name,
+            self.operation_type_name2,
+            self.operation_type_name3,
+            self.operation_type_name4,
+            ]
+        )
 
         # cashboxes
         self.cashbox1 = Cashbox.objects.create(
@@ -366,6 +381,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
 
 def create_departments_and_users(self):
+    dt = now().date() - relativedelta(months=1)
 
     self.region = Region.objects.create(
         id=1,
@@ -497,6 +513,7 @@ def create_departments_and_users(self):
         user=self.user2,
         shop=self.shop,
         function_group=self.employee_group,
+        dt_hired=dt
     )
     self.user3 = User.objects.create_user(
         'user3',
@@ -588,13 +605,14 @@ def create_work_type(shop, name, dttm_last_update_queue=None, dttm_deleted=None)
     return work_type
 
 
-def create_operation_type(do_forecast, operation_type_name, dttm_deleted=None):
-    for work_type in WorkType.objects.all():
+def create_operation_type(do_forecast, operation_type_names, dttm_deleted=None):
+    for i, work_type in enumerate(WorkType.objects.all()):
         OperationType.objects.create(
-            operation_type_name=operation_type_name,
+            operation_type_name=operation_type_names[i],
             work_type=work_type,
             do_forecast=do_forecast,
             dttm_deleted=dttm_deleted,
+            shop=work_type.shop,
         )
 
 

@@ -10,9 +10,9 @@ from src.forecast.models import (
 
 @admin.register(OperationType)
 class OperationTypeAdmin(admin.ModelAdmin):
-    list_display = ('id', 'work_type_name', 'operation_type_name', 'speed_coef', 'do_forecast', 'period_demand_params')
-    list_filter = ('work_type__shop',)
-    search_fields = ('work_type__shop', 'name')
+    list_display = ('id', 'work_type_name', 'operation_type_name', 'do_forecast', 'period_demand_params', 'shop')
+    list_filter = ('shop',)
+    search_fields = ('shop', 'name')
 
     @staticmethod
     def work_type_name(instance: OperationType):
@@ -48,8 +48,8 @@ class PeriodClientsAdmin(admin.ModelAdmin):
 @admin.register(PeriodDemandChangeLog)
 class PeriodDemandChangeLogAdmin(admin.ModelAdmin):
     list_display = ('operation_type_name', 'dttm_from', 'dttm_to')
-    search_fields = ('operation_type_name', 'operation_type__work_type__shop__title', 'id')
-    list_filter = ('operation_type__work_type__shop', )
+    search_fields = ('operation_type_name', 'operation_type__shop__title', 'id')
+    list_filter = ('operation_type__shop', )
 
     @staticmethod
     def operation_type_name(instance: PeriodDemandChangeLog):
