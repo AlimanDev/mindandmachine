@@ -1,9 +1,8 @@
 from rest_framework import serializers
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
-
 from rest_framework.exceptions import ValidationError
-from  django.db import DatabaseError
+
 from src.base.models import Employment
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
 
 
 class WorkerDayApproveSerializer(serializers.Serializer):
@@ -209,3 +208,13 @@ class WorkerConstraintSerializer(serializers.ModelSerializer):
         model = WorkerConstraint
         fields = ['id', 'employment_id', 'weekday', 'is_lite', 'tm']
         list_serializer_class = WorkerConstraintListSerializer
+
+
+class AutoSettingsSerializer(serializers.Serializer):
+    shop_id=serializers.IntegerField()
+    dt_from=serializers.DateField()
+    dt_to=serializers.DateField()
+    worker_ids=serializers.ListField(child=serializers.IntegerField(), required=False)
+
+
+

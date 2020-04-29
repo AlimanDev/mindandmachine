@@ -150,3 +150,4 @@ class WorkerConstraintViewSet(viewsets.ModelViewSet):
         if isinstance(kwargs.get('data', {}), list):
             kwargs['many'] = True
         return super(WorkerConstraintViewSet, self).get_serializer(*args, **kwargs)
+
