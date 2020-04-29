@@ -1,17 +1,15 @@
-import datetime
 
 from rest_framework import serializers, viewsets
-from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
-from src.util.utils import JsonResponse
 from src.base.permissions import FilteredListPermission
-from src.timetable.models import WorkType, WorkTypeName
-from django.db.models import Q, F
+from src.timetable.models import WorkType,WorkTypeName
 from src.timetable.work_type_name.views import WorkTypeNameSerializer
 from rest_framework.decorators import action
 from src.main.timetable.cashier_demand.forms import GetCashiersTimetableForm
 from src.timetable.work_type.utils import get_efficiency
 from src.conf.djconfig import QOS_DATE_FORMAT
+from rest_framework.validators import UniqueTogetherValidator
+
 
 # Serializers define the API representation.
 class WorkTypeSerializer(serializers.ModelSerializer):
@@ -23,7 +21,16 @@ class WorkTypeSerializer(serializers.ModelSerializer):
         model = WorkType
         fields = ['id', 'priority', 'dttm_last_update_queue', 'min_workers_amount', 'max_workers_amount',\
              'probability', 'prior_weight', 'shop_id', 'code', 'work_type_name_id', 'work_type_name']
-
+        validators = [
+            UniqueTogetherValidator(
+                queryset=WorkType.objects.filter(dttm_deleted__isnull=True),
+                fields=['shop_id', 'work_type_name_id'],
+            ),
+        ]
+    def is_valid(self, *args, **kwargs):
+        if self.initial_data.get('code', False):
+            self.initial_data['work_type_name_id'] = WorkTypeName.objects.get(code=self.initial_data.get('code')).id
+        super().is_valid(*args, **kwargs)
 
 class EfficiencySerializer(serializers.Serializer):
     from_dt = serializers.DateField(format=QOS_DATE_FORMAT)

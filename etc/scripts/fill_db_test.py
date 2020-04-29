@@ -26,7 +26,7 @@ from src.timetable.models import (
     WorkerDay,
     WorkerConstraint,
     WorkerDayCashboxDetails,
-    WorkerCashboxInfo,
+    EmploymentWorkType,
     WorkType,
     WorkTypeName,
     Cashbox,
@@ -81,7 +81,6 @@ def create_work_types(work_types, shop, operation_names, work_type_names):
         )
         OperationType.objects.create(
             operation_type_name=operation_names[i],
-            speed_coef=work_types[i]['speed_coef'],
             do_forecast=work_types[i]['do_forecast'],
             work_type=wt_m
         )
@@ -142,7 +141,7 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt: timezone.date
                 value=item['clients'] * (1 + (np.random.rand() - 0.5) / 10),
                 dttm_forecast=item['dttm_forecast'] + dt_diff,
                 type=PeriodClients.LONG_FORECASE_TYPE,
-                operation_type=wt.work_type_reversed.all()[0],
+                operation_type=wt.opearion_type,
             ))
             wt_df_index = (wt_df_index + 1) % wt_df.shape[0]
             if prev_dt != item['dttm_forecast'].date():
@@ -243,7 +242,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         ])
 
         for info in worker_d['worker_cashbox_info']:
-            add_models(infos, WorkerCashboxInfo, WorkerCashboxInfo(
+            add_models(infos, EmploymentWorkType, EmploymentWorkType(
                 employment=employment,
                 work_type=work_types_dict[info['work_type']],
                 mean_speed=info['mean_speed'],
@@ -358,7 +357,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
 
     add_models(details, WorkerDayCashboxDetails, None)
     add_models(models, WorkerDay, None)
-    add_models(infos, WorkerCashboxInfo, None)
+    add_models(infos, EmploymentWorkType, None)
     add_models(models_attendance, AttendanceRecords, None)
 
     if shop_size in ['small', 'normal']:
@@ -367,7 +366,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
         else:
             coef = 2
 
-        WorkerCashboxInfo.objects.filter(employment__shop=shop).update(mean_speed=F('mean_speed') / coef)
+        EmploymentWorkType.objects.filter(employment__shop=shop).update(mean_speed=F('mean_speed') / coef)
         #Employment.objects.filter(shop=shop).update(dt_fired=timezone.datetime(2018, 1, 1).date())
 
         for wt_key in work_types_dict.keys():
@@ -380,7 +379,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
             Employment.objects.filter(id__in=wt_users_id).update(dt_fired=None)
 
     #  че то как-то не отнормированно получилось все
-    WorkerCashboxInfo.objects.all().update(mean_speed=F('mean_speed'))
+    EmploymentWorkType.objects.all().update(mean_speed=F('mean_speed'))
 
 
 def create_notifications():

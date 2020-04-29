@@ -6,12 +6,11 @@ from django.db.models import Q, Sum
 from django.utils import six
 from django_filters.rest_framework import FilterSet
 
-from rest_framework import serializers, viewsets
+from rest_framework import serializers, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from src.base.permissions import Permission
-from src.base.models import  Employment, Shop
+from src.base.models import Employment, Shop
 
 
 class TimeZoneField(serializers.ChoiceField):
@@ -68,16 +67,15 @@ class ShopViewSet(viewsets.ModelViewSet):
     :return [   {"id": 6, ...}
     ]
 
-
     POST /rest_api/department/, {"title": 'abcd'}
     :return {"id": 10, ...}
 
-    PUT /rest_api/department/6, {"title": 'abcd'}
+    PUT /rest_api/department/6/, {"title": 'abcd'}
     :return {"id": 6, ...}
 
     GET /rest_api/department/stat?id=6
     """
-    permission_classes = [Permission]
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
 
@@ -96,16 +94,6 @@ class ShopViewSet(viewsets.ModelViewSet):
             return Shop.objects.get_queryset_descendants(shops, include_self=True)
         else:
             return shops
-
-        # funcs = FunctionGroup.objects.filter(func='department', group__employment__in=employments)
-        #
-        # for employment in employments:
-        #     # res=employment.shop.get_ancestor_by_level_distance(employment.function_group.level_up).get_descendants(employment.function_group.level_up)
-        #     res=employment.shop.get_descendants(include_self=True)
-        #     shops.append(list(res))
-        # return shops
-        # function_groups = FunctionGroup.objects.all
-        # queryset = Shop.objects.
 
     @action(detail=False, methods=['get']) #, permission_classes=[IsAdminOrIsSelf])
     def stat(self, request):
@@ -139,3 +127,40 @@ class ShopViewSet(viewsets.ModelViewSet):
         serializer = ShopStatSerializer(shops, many=True)
         return Response(serializer.data)
 
+    def list(self, request):
+        """
+        Дерево магазинов в формате для Quasar
+        :param request:
+        :return:
+        """
+
+        shops = self.filter_queryset(self.get_queryset())
+        tree = []
+        ids = []
+        elems = []
+        for shop in shops:
+            parent_id = shop.parent_id
+            if parent_id in ids:
+                for i, elem in enumerate(elems):
+                    if elem['id'] == parent_id:
+                        ids = ids[0:i+1]
+                        elems = elems[0:i+1]
+                        child_list = elem["children"]
+            else:
+                ids = []
+                elems = []
+                child_list = tree
+
+            child_list.append({
+                "id": shop.id,
+                "label": shop.name,
+                "tm_shop_opens":shop.tm_shop_opens,
+                "tm_shop_closes":shop.tm_shop_closes,
+                "forecast_step_minutes":shop.forecast_step_minutes,
+                "children": []
+            })
+
+            elems.append(child_list[-1])
+            ids.append(shop.id)
+
+        return Response(tree)

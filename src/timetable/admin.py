@@ -1,7 +1,7 @@
 from django.contrib import admin
 from src.timetable.models import (
     Cashbox,
-    WorkerCashboxInfo,
+    EmploymentWorkType,
     WorkerDayCashboxDetails,
     Notifications,
     Slot,
@@ -85,19 +85,19 @@ class CashboxAdmin(admin.ModelAdmin):
 
 
 
-@admin.register(WorkerCashboxInfo)
+@admin.register(EmploymentWorkType)
 class WorkerCashboxInfoAdmin(admin.ModelAdmin):
     list_display = ('worker', 'work_type_name', 'id')
     search_fields = ('employment__user__last_name', 'work_type__name', 'id')
     list_filter = ('work_type__shop',)
 
     @staticmethod
-    def worker(instance: WorkerCashboxInfo):
+    def worker(instance: EmploymentWorkType):
         user = instance.employment.user
         return f"({user.id}) {user.last_name} {user.first_name}"
 
     @staticmethod
-    def work_type_name(instance: WorkerCashboxInfo):
+    def work_type_name(instance: EmploymentWorkType):
         return instance.work_type.name
 
 

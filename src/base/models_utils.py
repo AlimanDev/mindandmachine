@@ -6,6 +6,7 @@ from django.conf import settings
 import json
 from src.util.forms import IntegersList
 from django.core.exceptions import ValidationError
+import re
 
 
 class IntegerListField(models.TextField):
@@ -64,7 +65,6 @@ def check_func_groups():
         'signin',
         'get_user_allowed_funcs',
         'rotate_fcm_token',
-
         #rest
         'ShopViewSet',
         'WorkerDayViewSet',
@@ -80,13 +80,12 @@ def check_func_groups():
         'OperationTypeViewSet',
         'PeriodClientsViewSet',
         'ShopMonthStatViewSet',
-
     ]
 
     def get_all_view_names(all_url_patterns=None, all_views=[]):
         if all_url_patterns is None:  # на 0ом уровне рекурсии
             all_url_patterns = list(filter(
-                lambda x: 'api' in x.__str__(),
+                lambda x: re.match('^api', x.__str__()),
                 __import__(settings.ROOT_URLCONF).urls.urlpatterns
             ))  # интересует только /api
 
