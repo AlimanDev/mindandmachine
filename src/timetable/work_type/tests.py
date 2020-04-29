@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, time
 from dateutil.relativedelta import relativedelta
 
 from rest_framework import status
@@ -8,6 +8,8 @@ from src.util.test import create_departments_and_users
 
 from src.timetable.models import WorkTypeName, WorkType
 from src.base.models import FunctionGroup
+from src.forecast.models import OperationType, PeriodClients, OperationTypeName
+from etc.scripts.fill_calendar import main
 
 
 class TestWorkType(APITestCase):
@@ -184,3 +186,30 @@ class TestWorkType(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertIsNotNone(WorkType.objects.get(id=self.work_type1.id).dttm_deleted)
     
+
+    def test_get_efficiency(self):
+        dt_now = datetime.now().date()
+        main('2019.1.1', (datetime.now() + timedelta(days=365)).strftime('%Y.%m.%d'), region_id=1)
+        op_name = OperationTypeName.objects.create(
+            name='Test',
+        )
+        op_type = OperationType.objects.create(
+            work_type=self.work_type1,
+            operation_type_name=op_name,
+        )
+
+        for i in range(3):
+            dt = dt_now + timedelta(days=i)
+            for j in range(24):
+                PeriodClients.objects.create(
+                    value=2,
+                    operation_type=op_type,
+                    dttm_forecast=datetime.combine(dt, time(j)),
+                )
+
+        url = f'{self.url}efficiency/?shop_id={self.shop.id}&from_dt={dt_now}&to_dt={dt_now + timedelta(days=2)}'
+
+        response = self.client.get(url)
+        data = response.json()
+        self.assertEqual(len(data['tt_periods']['real_cashiers']), 144)
+        self.assertEqual(len(data['tt_periods']['predict_cashier_needs']), 144)
