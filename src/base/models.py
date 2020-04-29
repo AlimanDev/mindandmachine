@@ -1,14 +1,14 @@
+import datetime
+from timezone_field import TimeZoneField
+
 from django.db import models
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
-from timezone_field import TimeZoneField
-
-import datetime
+from mptt.models import MPTTModel, TreeForeignKey
 
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
 
-from mptt.models import MPTTModel, TreeForeignKey
 
 class Region(AbstractActiveNamedModel):
     class Meta:
@@ -53,8 +53,8 @@ class ShopSettings(AbstractActiveNamedModel):
     # added on 16.05.2019
     queue_length = models.FloatField(default=3.0)
 
+    max_work_hours_7days = models.SmallIntegerField(default=48)
 
-max_work_hours_7days = models.SmallIntegerField(default=48)
     def get_department(self):
         return None
 
