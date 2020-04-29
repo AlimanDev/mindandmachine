@@ -45,10 +45,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
     permission_classes = [Permission]
     basename = 'AutoSettings'
 
-    @action(detail=False, methods=['get', 'post'])
+    @action(detail=False, methods=['post'])
     def create_timetable(self, request):
         """
-
         :params: shop_id, dt_from, dt_to, is_remarking
         """
         """
