@@ -355,8 +355,6 @@ class FunctionGroup(AbstractModel):
         'WorkerDay',
         'WorkerDay_approve',
         'WorkerDay_worker_stat',
-        'WorkType',
-        'WorkTypeName',
         'ShopMonthStat',
 
         'signout',

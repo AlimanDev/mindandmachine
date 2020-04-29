@@ -192,9 +192,9 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
         if not dt_to:
             raise MessageError(code="dt_to_required", lang=request.user.lang)
         try:
-            calculate_shops_load.delay(request.user, load_template_id, dt_from, dt_to, shop_id=shop_id)
+            calculate_shops_load.delay(request.user.lang, load_template_id, dt_from, dt_to, shop_id=shop_id)
         except celery_exceptions.OperationalError:
-            calculate_shops_load(request.user, load_template_id, dt_from, dt_to, shop_id=shop_id)
+            calculate_shops_load(request.user.lang, load_template_id, dt_from, dt_to, shop_id=shop_id)
 
         return Response(200)
 

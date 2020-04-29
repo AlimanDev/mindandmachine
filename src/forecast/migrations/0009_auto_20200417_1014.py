@@ -19,9 +19,4 @@ class Migration(migrations.Migration):
             name='operationtyperelation',
             unique_together={('base', 'depended')},
         ),
-        migrations.AddField(
-            model_name='operationtyperelation',
-            name='convert_min_to_real',
-            field=models.BooleanField(default=False),
-        ),
     ]

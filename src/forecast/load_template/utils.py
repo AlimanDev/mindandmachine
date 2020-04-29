@@ -35,7 +35,6 @@ def create_operation_type_relations_dict(load_template_id, reverse=False):
             {
                 type_of_relation: getattr(operation_type_relation, type_of_relation),
                 'formula': operation_type_relation.formula,
-                'convert_min_to_real': operation_type_relation.convert_min_to_real,
             }
         )
 
@@ -119,9 +118,8 @@ def apply_formula(operation_type, operation_type_template, operation_type_relati
             type=PeriodClients.LONG_FORECASE_TYPE,
         ).order_by('dttm_forecast'))
         formula = eval(template_relation.get('formula'))
-        division_val = period_lengths_minutes if template_relation.get('convert_min_to_real') else 1
         try:
-            return prepare_answer(False, result=np.array(list(map(formula, temp_values)))/division_val)
+            return prepare_answer(False, result=np.array(list(map(formula, temp_values))))
         except (NameError, ValueError) as e:
             return prepare_answer(True, code="error_in_formula_rel", params={
                     'formula': template_relation.get('formula'),
