@@ -212,6 +212,22 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         :param request:
         :return:
         """
+
+        ####################################################
+        #  specially for 585 gold!!!
+        def get_position_status(employment):
+            pos_status = 0
+            if employment.position:
+                if employment.position.code == '1':
+                    pos_status = 1
+                elif employment.position.code == '2':
+                    pos_status = 2
+                else:
+                    pos_status = 0
+            return pos_status
+
+        ####################################################
+
         serializer = AutoSettingsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         form = serializer.validated_data
@@ -227,25 +243,32 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         dt_first = dt_from.replace(day=1)
 
-        tt, _ = ShopMonthStat.objects.get_or_create(shop_id=shop_id, dt=dt_first,
-                                                    defaults={'dttm_status_change': timezone.now()})
-        if tt.status is ShopMonthStat.NOT_DONE:
-            tt.status = ShopMonthStat.PROCESSING
-            tt.dttm_status_change = timezone.now()
-            tt.save()
-        else:
-            raise MessageError("tt_exists")
+        try:
+            tt = ShopMonthStat.objects.create(
+                shop_id=shop_id,
+                dt=dt_first,
+                status=ShopMonthStat.PROCESSING,
+                dttm_status_change=datetime.now()
+            )
+        except:
+            if (form['is_remaking']):
+                tt = ShopMonthStat.objects.get(shop_id=shop_id, dt=dt_first)
+                tt.status = ShopMonthStat.PROCESSING
+                tt.dttm_status_change = datetime.now()
+                tt.save()
+            else:
+                return JsonResponse.already_exists_error()
 
         employments = Employment.objects.get_active(
             dt_from,
             dt_to,
             shop_id=shop_id,
-            auto_timetable=True,
-        )
+            # auto_timetable=True, чтобы все сотрудники были, так как пересоставляем иногда для 1
+        ).select_related('user', 'position')
 
-        employment_ids = employments.values_list('user_id', flat=True)
+        user_ids = employments.values_list('user_id', flat=True)
 
-        users = User.objects.filter(id__in=employment_ids)
+        users = User.objects.filter(id__in=user_ids)
         user_dict = {u.id: u for u in users}
 
         shop = Shop.objects.get(id=shop_id)
@@ -284,31 +307,38 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         ).select_related(
             'work_type_name',
         )
-        for work_type in work_types:
-            periods_len = PeriodClients.objects.filter(
-                operation_type__dttm_deleted__isnull=True,
-                operation_type__work_type=work_type,
-                type=PeriodClients.LONG_FORECASE_TYPE,
-                dttm_forecast__date__gte=dt_from,
-                dttm_forecast__date__lt=dt_to,
-                dttm_forecast__time__gte=shop.tm_shop_opens,
-                dttm_forecast__time__lt=shop.tm_shop_closes,
-            ).count()
 
-            if periods_len % period_normal_count:
-                period_difference['work_type_name'].append(work_type.work_type_name.name)
-                period_difference['difference'].append(abs(period_normal_count - periods_len))
-        if period_difference['work_type_name']:
-            tt.delete()
-            raise MessageError(
-                'tt_period_empty',
-                {'work_type':', '.join(period_difference['work_type_name']),
-                'period': ', '.join(str(x) for x in period_difference['difference'])})
+        # fixme: плохая проверка на наличие всех полей -- могут быть 0 и из-за этого постоянно не проходит проверка
+        # лучше сделать проверку по дням
+        # for work_type in work_types:
+        #     periods_len = PeriodClients.objects.filter(
+        #         operation_type__dttm_deleted__isnull=True,
+        #         operation_type__work_type=work_type,
+        #         type=PeriodClients.LONG_FORECASE_TYPE,
+        #         dttm_forecast__date__gte=dt_from,
+        #         dttm_forecast__date__lt=dt_to,
+        #         dttm_forecast__time__gte=shop.tm_shop_opens,
+        #         dttm_forecast__time__lt=shop.tm_shop_closes,
+        #
+        #
+        #
+        #     ).count()
+        #
+        #     if periods_len % period_normal_count:
+        #         period_difference['work_type_name'].append(work_type.work_type_name.name)
+        #         period_difference['difference'].append(abs(period_normal_count - periods_len))
+        # if period_difference['work_type_name']:
+        #     status_message = 'На типе работ {} не хватает объектов спроса {}.'.format(
+        #         ', '.join(period_difference['work_type_name']),
+        #         ', '.join(str(x) for x in period_difference['difference'])
+        #     )
+        #     tt.delete()
+        #     return JsonResponse.value_error(status_message)
 
         # проверки для фиксированных чуваков
         # Возможности сотрудников
         availabilities = {}
-        for user_weekday_slot in list(UserWeekdaySlot.objects.select_related('worker').filter(
+        for user_weekday_slot in list(UserWeekdaySlot.objects.select_related('worker', 'employment').filter(
                 employment__shop_id=shop_id)):
             key = user_weekday_slot.worker_id
             if key not in availabilities:
@@ -332,10 +362,12 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         ##################################################################
 
         # Функция для заполнения расписания
-        def fill_wd_array(worker_days_db, array):
+        def fill_wd_array(worker_days_db, array, prev_data=False):
             worker_days_mask = {}
             for wd in worker_days_db:
-                if (wd['id'] in worker_days_mask) and wd['work_types__id']:
+                if ((wd['id'] in worker_days_mask) and wd['work_types__id']) or \
+                        ((prev_data == False) and (wd['type'] == WorkerDay.TYPE_HOLIDAY) and (
+                                wd['created_by_id'] is None)):
                     continue
 
                 worker_days_mask[wd['id']] = len(array)
@@ -347,14 +379,15 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     worker_id=wd['worker_id'],
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
-
+                    created_by_id=wd['created_by_id'],
                 )
                 wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
                 array.append(wd_mod)
 
         new_worker_days = []
         worker_days_db = WorkerDay.objects.get_last_plan(
-            shop_id=shop_id,
+
+            worker_id__in=user_ids,
             dt__gte=dt_from,
             dt__lt=dt_to,
         ).order_by(
@@ -368,12 +401,13 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'dttm_work_start',
             'dttm_work_end',
             'work_types__id',
+            'created_by_id',
         )
-        fill_wd_array(worker_days_db, new_worker_days)
+        fill_wd_array(worker_days_db, new_worker_days, prev_data=form.get('is_remaking', False))
 
         prev_worker_days = []
         worker_days_db = WorkerDay.objects.get_last_plan(
-            shop_id=shop_id,
+            worker_id__in=user_ids,
             dt__gte=dt_from - timedelta(days=7),
             dt__lt=dt_from,
         ).order_by(
@@ -387,8 +421,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'dttm_work_start',
             'dttm_work_end',
             'work_types__id',
+            'created_by_id',
         )
-        fill_wd_array(worker_days_db, prev_worker_days)
+        fill_wd_array(worker_days_db, prev_worker_days, prev_data=True)
 
         if shop.process_type == Shop.YEAR_NORM:
             max_work_coef = (1 + shop.more_norm / 100)
@@ -399,6 +434,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         shop_dict = {
             'shop_name': shop.name,
+            'process_type': shop.process_type,
             'mean_queue_length': shop.mean_queue_length,
             'max_queue_length': shop.max_queue_length,
             'dead_time_part': shop.dead_time_part,
@@ -418,17 +454,17 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             '1day_holiday': int(shop.settings.exit1day),
             'max_outsourcing_day': 3,
             'max_work_hours_7days': int(shop.settings.max_work_hours_7days),
-            'process_type': shop.settings.process_type,
             'slider': shop.settings.queue_length,
-            'fot': shop.settings.fot,
+            'fot': 0,  # fixme: tmp, special for 585
             'idle': shop.settings.idle,
+            'is_remaking': form['is_remaking'],
         }
 
         ########### Группируем ###########
 
         # Ограничения сотрудников
         constraints = {}
-        for worker_constraint in list(WorkerConstraint.objects.select_related('worker').filter(
+        for worker_constraint in list(WorkerConstraint.objects.select_related('employment').filter(
                 employment__shop_id=shop_id)):
             key = worker_constraint.worker_id
             if key not in constraints:
@@ -476,6 +512,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             prev_data[key].append(worker_d)
 
         employment_stat_dict = count_prev_paid_days(dt_from - timedelta(days=1), employments, shop.region_id)
+        month_stat = count_work_month_stats(shop, dt_first, dt_from, Employment.objects.filter(user_id__in=user_ids))
 
         ##################################################################
 
@@ -506,8 +543,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 wd_index = 0
                 for dt in dates:
                     if (workers_month_days[wd_index].dt if \
-                            wd_index < len
-                                (
+                            wd_index < len(
                                 workers_month_days) else None) and dt < employment.dt_fired:  # Если вернется пустой список, нужно исключать ошибку out of range
                         workers_month_days_new.append(workers_month_days[wd_index])
                         wd_index += 1
@@ -532,8 +568,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 wd_index = 0
                 for dt in dates:
                     if (workers_month_days[wd_index].dt if \
-                            wd_index < len
-                                (
+                            wd_index < len(
                                 workers_month_days) else None) == dt:  # Если вернется пустой список, нужно исключать ошибку out of range
                         workers_month_days_new.append(workers_month_days[wd_index])
                         wd_index += 1
@@ -550,7 +585,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 workers_month_days_new = []
                 wd_index = 0
                 user_dt = dt_from
-                while user_dt != user.dt_hired:
+                while user_dt != employment.dt_hired:
                     workers_month_days_new.append(WorkerDay(
                         type=WorkerDay.TYPE_HOLIDAY,
                         dt=user_dt,
@@ -598,15 +633,18 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         # Параметры инициализации
         init_params = json.loads(shop.init_params)
         work_days = list(ProductionDay.objects.filter(
-            dt__gte=dt_from,
+            dt__gte=dt_first,
             dt__lt=dt_to,
             type__in=ProductionDay.WORK_TYPES,
             region_id=shop.region_id,
         ))
-        work_hours = sum \
-            ([ProductionDay.WORK_NORM_HOURS[wd.type] for wd in
-              work_days])  # норма рабочего времени за период (за месяц)
-
+        work_hours = sum(
+            [
+                ProductionDay.WORK_NORM_HOURS[wd.type]
+                for wd in work_days
+            ]
+        )  # норма рабочего времени за оставшийся период период (за месяц)
+        work_hours = shop.fot if shop.fot else work_hours  # fixme: tmp, special for 585
         init_params['n_working_days_optimal'] = len(work_days)
 
         ##################################################################
@@ -621,13 +659,20 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'cashiers': [
                 {
                     'general_info': EmploymentConverter.convert(e),
-                    'constraints_info': Converter.convert(
-                        constraints.get(e.user_id, []),
-                        WorkerConstraint,
-                        fields=['id', 'worker_id', 'employment__week_availability', 'weekday', 'tm', 'is_lite'],
-                        # change algo worker -> worker_id
-                        out_array=True,
-                    ),
+                    'constraints_info': [{
+                        'id': obj.id,
+                        'worker': obj.worker_id,
+                        'week_length': obj.employment.week_availability,
+                        'weekday': obj.weekday,
+                        'tm': Converter.convert_time(obj.tm),
+                        'is_lite': obj.is_lite,
+                    } for obj in constraints.get(e.user_id, [])],
+                    #     Converter.convert(
+                    #     constraints.get(e.user_id, []),
+                    #     WorkerConstraint,
+                    #     fields=['id', 'worker_id', 'employment__week_availability', 'weekday', 'tm', 'is_lite'], #change algo worker -> worker_id
+                    #     out_array=True,
+                    # ),
                     'availability_info': Converter.convert(
                         availabilities.get(e.user_id, []),
                         UserWeekdaySlot,
@@ -644,22 +689,37 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         },
                         out_array=True,
                     ),
-                    'worker_cashbox_info': Converter.convert(
-                        worker_cashbox_info.get(e.user_id, []),
-                        EmploymentWorkType,
-                        fields=['id', 'employment__user_id', 'work_type_id', 'mean_speed', 'bills_amount', 'priority',
-                                'duration'],  # change algo worker -> employment__user_id work_type -> work_type_id
-                        out_array=True,
-                    ),
+                    'worker_cashbox_info': [{
+                        'id': obj.id,
+                        'worker': obj.employment.user_id,
+                        'work_type': obj.work_type_id,
+                        'mean_speed': obj.mean_speed,
+                        'bills_amount': obj.bills_amount,
+                        'period': obj.period,
+                        'priority': obj.priority,
+                        'duration': obj.duration
+                    } for obj in worker_cashbox_info.get(e.user_id, [])
+                    ],
+                    # Converter.convert(
+                    #     worker_cashbox_info.get(e.user_id, []),
+                    #     WorkerCashboxInfo,
+                    #     fields=['id', 'employment__user_id', 'work_type', 'mean_speed', 'bills_amount', 'priority', 'duration'],  # change algo worker -> employment__user_id work_type -> work_type_id
+                    #     out_array=True,
+                    # ),
                     'workdays': WorkerDayConverter.convert(worker_day.get(e.user_id, []), out_array=True),
                     'prev_data': WorkerDayConverter.convert(prev_data.get(e.user_id, []), out_array=True),
                     'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),
                     'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),
-                    'norm_work_amount': work_hours * e.norm_work_hours / 100,
+                    'norm_work_amount': (work_hours - month_stat.get(e.user_id, {'paid_hours': 0})['paid_hours'] -
+                                         month_stat.get(e.user_id, {WorkerDay.TYPE_VACATION: 0})[
+                                             WorkerDay.TYPE_VACATION] * ProductionDay.WORK_NORM_HOURS[
+                                             ProductionDay.TYPE_WORK]
+                                         ) * e.norm_work_hours / 100,
                     'required_coupled_hol_in_hol': employment_stat_dict[e.id].get('required_coupled_hol_in_hol', 0),
                     'min_shift_len': e.shift_hours_length_min if e.shift_hours_length_min else 0,
                     'max_shift_len': e.shift_hours_length_max if e.shift_hours_length_max else 24,
                     'min_time_between_slots': e.min_time_btw_shifts if e.min_time_btw_shifts else 0,
+                    'is_dm': get_position_status(e),
                     'dt_new_week_availability_from': Converter.convert_date(e.dt_new_week_availability_from),
                 }
                 for e in employments
