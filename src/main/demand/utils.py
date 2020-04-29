@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from src.util.utils import JsonResponse
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
-
+from django.core.serializers.json import DjangoJSONEncoder
 from src.base.models import (
     Shop,
     ProductionDay,
@@ -98,8 +98,8 @@ def create_predbills_request_function(shop_id, dt=None):
     shop = Shop.objects.filter(id=shop_id).first()
 
     period_clients = PeriodClients.objects.select_related('operation_type__work_type__shop').filter(
-        operation_type__work_type__shop_id=shop_id,
-        operation_type__do_forecast=OperationType.FORECAST_HARD,
+        operation_type__shop_id=shop_id,
+        operation_type__do_forecast=OperationType.FORECAST,
         operation_type__dttm_deleted__isnull=True,
         type=PeriodClients.FACT_TYPE,
         dttm_forecast__date__gt=dt - relativedelta(years=YEARS_TO_COLLECT),
@@ -115,15 +115,15 @@ def create_predbills_request_function(shop_id, dt=None):
         operation_types_dict = {}
         for operation_type in OperationType.objects.select_related('work_type', 'operation_type_name').filter(
                 dttm_deleted__isnull=True,
-                work_type__shop_id=shop_id,
-                do_forecast=OperationType.FORECAST_HARD
+                shop_id=shop_id,
+                do_forecast=OperationType.FORECAST
         ):
             if any(map(lambda x: x.operation_type_id == operation_type.id, period_clients)):
                 operation_types_dict[operation_type.id] = {
                     'id': operation_type.id,
                     'predict_demand_params':  json.loads(operation_type.period_demand_params),
                     'name': operation_type.operation_type_name.name,
-                    'work_type': operation_type.work_type.id
+                    'work_type': operation_type.work_type_id
                 }
     except ValueError as error_message:
         return JsonResponse.internal_error(error_message)
@@ -151,7 +151,7 @@ def create_predbills_request_function(shop_id, dt=None):
         'shop_id': shop.id,
     }
 
-    data = json.dumps(aggregation_dict).encode('ascii')
+    data = json.dumps(aggregation_dict, cls=DjangoJSONEncoder).encode('ascii')
     req = request.Request('http://{}/create_pred_bills'.format(settings.TIMETABLE_IP), data=data, headers={'content-type': 'application/json'})
     try:
         response = request.urlopen(req)

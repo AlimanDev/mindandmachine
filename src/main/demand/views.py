@@ -30,7 +30,7 @@ from .forms import (
 )
 from .utils import create_predbills_request_function
 import json
-
+from src.forecast.load_template.utils import calculate_shop_load, apply_reverse_formula
 
 @api_method('GET', GetIndicatorsForm)
 def get_indicators(request, form):
@@ -66,7 +66,7 @@ def get_indicators(request, form):
     #     return JsonResponse.internal_error('Нет активных касс в данный период')
 
     period_filter_dict = {
-        'operation_type__work_type__shop_id': shop_id,
+        'operation_type__shop_id': shop_id,
         'operation_type__work_type_id__in': work_type_filter_list,
         'dttm_forecast__gte': datetime.combine(dt_from, time()),
         'dttm_forecast__lt': datetime.combine(dt_to, time()) + timedelta(days=1)
@@ -81,7 +81,7 @@ def get_indicators(request, form):
     prev_clients = PeriodClients.objects.select_related(
         'operation_type__work_type'
     ).filter(
-        operation_type__work_type__shop_id=shop_id,
+        operation_type__shop_id=shop_id,
         operation_type__work_type_id__in=work_type_filter_list,
         dttm_forecast__gte=datetime.combine(dt_from, time()) - relativedelta(months=1),
         dttm_forecast__lt=datetime.combine(dt_to, time()) - relativedelta(months=1),
@@ -134,7 +134,7 @@ def get_forecast(request, form):
 
     shop = request.shop
     period_clients = PeriodClients.objects.select_related('operation_type__work_type').filter(
-        operation_type__work_type__shop_id=shop.id
+        operation_type__shop_id=shop.id
     )
     # period_products = PeriodProducts.objects.select_related('operation_type__work_type').filter(
     #     operation_type__work_type__shop_id=shop.id
@@ -235,7 +235,7 @@ def set_demand(request, form):
     period_clients = PeriodClients.objects.select_related(
         'operation_type__work_type'
     ).filter(
-        operation_type__work_type__shop_id=shop_id,
+        operation_type__shop_id=shop_id,
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__time__gte=dttm_from.time(),
         dttm_forecast__time__lte=dttm_to.time(),
@@ -291,7 +291,14 @@ def set_demand(request, form):
 
         if x.operation_type_id not in changed_operation_type_ids:
             changed_operation_type_ids.append(x.operation_type_id)
-    
+    for o_type in OperationType.objects.select_related('shop').filter(id__in=operation_type_ids):
+        apply_reverse_formula(
+            o_type, 
+            dt_from=dttm_from.date(), 
+            dt_to=dttm_to.date(), 
+            tm_from=dttm_from.time(), 
+            tm_to=dttm_to.time()
+        )
     for x in changed_operation_type_ids:
         PeriodDemandChangeLog.objects.create(
             dttm_from=dttm_from,
@@ -406,13 +413,14 @@ def set_pred_bills(request, form):
     shop = Shop.objects.get(id=data['shop_id'])
     dt_from = Converter.parse_date(data['dt_from'])
     dt_to = Converter.parse_date(data['dt_to'])
+    operation_types = []
     
     PeriodClients.objects.select_related('operation_type__work_type').filter(
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to,
-        operation_type__work_type__shop_id=shop.id,
-        operation_type__do_forecast__in=[OperationType.FORECAST_HARD, OperationType.FORECAST_LITE],
+        operation_type__shop_id=shop.id,
+        operation_type__do_forecast=OperationType.FORECAST,
     ).delete()
     
     for period_demand_value in data['demand']:
@@ -427,6 +435,8 @@ def set_pred_bills(request, form):
                 value=clients,
             )
         )
+        if period_demand_value['work_type'] not in operation_types:
+            operation_types.append(period_demand_value['work_type'])
 
     # блок для составления спроса на слотовые типы касс (никак не зависит от data с qos_algo) -- всегда 1
     work_time_seconds = (shop.tm_shop_closes.hour - shop.tm_shop_opens.hour) * 3600 +\
@@ -436,21 +446,26 @@ def set_pred_bills(request, form):
 
     time_step = shop.forecast_step_minutes.hour * 3600 + shop.forecast_step_minutes.minute * 60
 
-    for operation in OperationType.objects.filter(work_type__shop_id=shop.id, do_forecast=OperationType.FORECAST_LITE):
-        for dt_offset in range((dt_to - dt_from).days + 1):
-            dttm_start = datetime.combine(dt_from + timedelta(days=dt_offset), shop.tm_shop_opens)
-            for tm_offset in range(0, work_time_seconds, time_step):
-                save_models(
-                    models_list,
-                    PeriodClients(
-                        type=PeriodClients.LONG_FORECASE_TYPE,
-                        dttm_forecast=dttm_start + timedelta(seconds=tm_offset),
-                        operation_type=operation,
-                        value=1,
-                    )
-                )
+    # for operation in OperationType.objects.filter(work_type__shop_id=shop.id, do_forecast=OperationType.FORECAST_LITE):
+    #     for dt_offset in range((dt_to - dt_from).days + 1):
+    #         dttm_start = datetime.combine(dt_from + timedelta(days=dt_offset), shop.tm_shop_opens)
+    #         for tm_offset in range(0, work_time_seconds, time_step):
+    #             save_models(
+    #                 models_list,
+    #                 PeriodClients(
+    #                     type=PeriodClients.LONG_FORECASE_TYPE,
+    #                     dttm_forecast=dttm_start + timedelta(seconds=tm_offset),
+    #                     operation_type=operation,
+    #                     value=1,
+    #                 )
+    #             )
 
     save_models(models_list, None)
+    OperationType.objects.filter(id__in=operation_types).update(
+        status=OperationType.READY,
+    )
+    if (shop.load_template_id):
+        calculate_shop_load(shop, shop.load_template, dt_from, dt_to, lang=request.user.lang)
 
     employments = Employment.objects.filter(
         function_group__allowed_functions__func='set_demand',

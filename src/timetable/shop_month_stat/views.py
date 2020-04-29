@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import ShopMonthStat
 from django_filters.rest_framework import FilterSet
+from rest_framework.validators import UniqueTogetherValidator
 
 
 # Serializers define the API representation.
@@ -13,7 +14,12 @@ class ShopMonthStatSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShopMonthStat
         fields = ['id', 'shop_id', 'status_message', 'dt', 'status', 'fot', 'lack', 'idle', 'workers_amount', 'revenue', 'fot_revenue']
-
+        validators = [
+            UniqueTogetherValidator(
+                queryset=ShopMonthStat.objects.all(),
+                fields=['shop_id', 'dt'],
+            ),
+        ]
 
 class ShopMonthStatFilter(FilterSet):
     class Meta:

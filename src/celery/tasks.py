@@ -1,6 +1,6 @@
 from datetime import date, timedelta, datetime
 import os
-
+from src.base.message import Message
 from django.db.models import Avg, Q
 from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
@@ -22,7 +22,7 @@ from src.main.timetable.worker_exchange.utils import (
 
 from src.main.demand.utils import create_predbills_request_function
 from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
-
+from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
 
 from src.main.operation_template.utils import build_period_clients
 
@@ -30,8 +30,7 @@ from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
     EmploymentWorkType,
-    Timetable,
-    WorkerCashboxInfo,
+    # WorkerCashboxInfo,
     ShopMonthStat,
     ExchangeSettings,
 )
@@ -44,7 +43,8 @@ from src.base.models import (
 
 )
 from src.forecast.models import (
-    OperationTemplate
+    OperationTemplate,
+    LoadTemplate,
 )
 from src.celery.celery import app
 from django.core.mail import EmailMultiAlternatives
@@ -455,3 +455,40 @@ def upload_vacation_task():
     upload_vacation_util(file)
     file.close()
     os.remove(localpath)
+
+
+@app.task
+def calculate_shops_load(user, load_template_id, dt_from, dt_to, shop_id=None):
+    load_template = LoadTemplate.objects.get(pk=load_template_id)
+    root_shop = Shop.objects.filter(level=0).first()
+    shops = [load_template.shops.get(pk=shop_id)] if shop_id else load_template.shops.all()
+    for shop in shops:
+        res = calculate_shop_load(shop, load_template, dt_from, dt_to, lang=user.lang)
+        if res['error']:
+            event = Event.objects.create(
+                type="load_template_err",
+                params={
+                    'shop': shop,
+                    'message': Message(lang=user.lang).get_message(res['code'], params=res.get('params', {})),
+                },
+                dttm_valid_to=datetime.now() + timedelta(days=2),
+                shop=root_shop,
+            )
+            create_notifications_for_event(event.id)
+
+
+@app.task
+def apply_load_template_to_shops(load_template_id, dt_from, shop_id=None):
+    load_template = LoadTemplate.objects.get(pk=load_template_id)
+    shops = [Shop.objects.get(pk=shop_id)] if shop_id else load_template.shops.all()
+    for shop in shops:
+        apply_load_template(load_template_id, shop.id, dt_from)
+    event = Event.objects.create(
+        type="load_template_apply",
+        params={
+            'name': load_template.name,
+        },
+        dttm_valid_to=datetime.now() + timedelta(days=2),
+        shop=Shop.objects.filter(level=0).first(),
+    )
+    create_notifications_for_event(event.id)

@@ -221,8 +221,8 @@ def get_table(request, workbook, form):
                 datetime.datetime.combine(weekday, datetime.time()),
                 datetime.datetime.combine(weekday, datetime.time(hour=23, minute=59))
             ),
-            operation_type__work_type__shop_id=shop_id,
-            operation_type__do_forecast=OperationType.FORECAST_HARD,
+            operation_type__shop_id=shop_id,
+            operation_type__do_forecast=OperationType.FORECAST,
         )
 
         inds = list(stats)
@@ -230,7 +230,7 @@ def get_table(request, workbook, form):
 
         ct_add = WorkType.objects.filter(
             shop_id=shop_id,
-            work_type_reversed__do_forecast=OperationType.FORECAST_LITE
+            opeariotion_type__do_forecast=OperationType.FORECAST
         ).count()
 
         for tm in inds:
