@@ -42,7 +42,7 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
         if not dt_to:
             dt_to = dt if dt else datetime.date.today()
         ids = Employment.objects.get_active(
-            dt_from, dt_to,
+            dt_from=dt_from, dt_to=dt_to,
             shop_id=shop_id,
         ).values('user_id')
 

@@ -39,7 +39,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
     shop = Shop.objects.get(id=shop_id)
     period_lengths_minutes = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
     period_in_day = MINUTES_IN_DAY // period_lengths_minutes
-    absenteeism_coef = 1 + shop.absenteeism / 100
+    absenteeism_coef = 1 + shop.settings.absenteeism / 100
 
     from_dt = form['from_dt']
     # To include last day in "x < to_dt" conds

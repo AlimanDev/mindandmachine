@@ -55,7 +55,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         if not type == WorkerDay.TYPE_WORKDAY or is_fact:
             attrs.pop('worker_day_details', None)
         elif not ( attrs.get('worker_day_details')):
-            raise ValidationError({"error": f" worker_day_details is required for type {type}"})
+            raise ValidationError({"error": f"worker_day_details is required for type {type}"})
         return attrs
 
     def create(self, validated_data):
