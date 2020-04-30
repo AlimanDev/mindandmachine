@@ -1,28 +1,28 @@
 import json
 import requests
 from datetime import datetime, timedelta, date
-
 from django.conf import settings
-from django.db.models import F, Max, Count, Sum, Q, Subquery, OuterRef
+from django.db.models import F, Count, Sum, Q
 from django.db.models.functions import Coalesce, Extract
-from django.utils import timezone
+from dateutil.relativedelta import relativedelta
 
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
+from src.celery.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
 from src.base.permissions import Permission
+from src.base.exceptions import MessageError
 
 from src.forecast.models import PeriodClients
-
 from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings
-from src.base.exceptions import MessageError
 from src.timetable.models import (
     ShopMonthStat,
     WorkType,
     WorkerConstraint,
     EmploymentWorkType,
     WorkerDay,
+    WorkerDayCashboxDetails,
     Slot,
     UserWeekdaySlot,
 )
@@ -36,6 +36,7 @@ from src.util.models_converter import (
 )
 
 from src.timetable.worker_day.stat import CalendarPaidDays
+from rest_framework.exceptions import ValidationError
 
 REBUILD_TIMETABLE_MIN_DELTA = 2
 
@@ -751,6 +752,106 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             tt.status_message = str(e)
             tt.save()
             raise MessageError('tt_server_error')
+
+        return Response()
+
+
+    @action(detail=False, methods=['post'])
+    def set_timetable(self, request):
+        """
+        Ждет request'a от qos_algo. Когда получает, записывает данные по расписанию в бд
+
+        Args:
+            method: POST
+            url: /api/timetable/auto_settings/set_timetable
+            data(str): json data с данными от qos_algo
+
+        Raises:
+            JsonResponse.does_not_exists_error: если расписания нет в бд
+
+        Note:
+            Отправляет уведомление о том, что расписание успешно было создано
+        """
+        form = request.post
+
+        try:
+            data = json.loads(form['data'])
+        except:
+            raise ValidationError('cannot parse json')
+
+        timetable = ShopMonthStat.objects.get(id=form['timetable_id'])
+
+        shop = timetable.shop
+        break_triplets = json.loads(shop.settings.break_triplets)
+
+        timetable.status = data['timetable_status']
+        timetable.status_message = data.get('status_message', False)
+        timetable.save()
+        if timetable.status != ShopMonthStat.READY and timetable.status_message:
+            return Response(timetable.status_message)
+
+        if data['users']:
+            for uid, v in data['users'].items():
+                uid = int(uid)
+                for wd in v['workdays']:
+                    # todo: actually use a form here is better
+                    # todo: too much request to db
+
+                    dt = Converter.parse_date(wd['dt'])
+                    wd_obj = WorkerDay(
+                        is_approved=False,
+                        is_fact=False,
+                        dt=dt,
+                        worker_id=uid,
+                        type=wd['type']
+                    )
+                    if wd['type'] == WorkerDay.TYPE_WORKDAY:
+                        wd_obj.shop=shop
+
+                    wdays = {w.is_approved: w for w in WorkerDay.objects.filter(
+                        is_fact=False,
+                        worker_id=uid,
+                        shop=shop,
+                        dt=dt,
+                    )}
+
+                    #неподтвержденная версия
+                    if wdays[False]:
+                        wd_obj=wd['False']
+                        wd_obj.type=wd['type']
+                    elif wdays[True]:
+                        wd_obj.parent_worker_day=wdays[True]
+
+                    if WorkerDay.is_type_with_tm_range(wd_obj.type):
+                        wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start'])
+                        wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])
+                        wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
+                        wd_obj.save()
+
+                        WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
+                        wdd_list = []
+
+                        for wdd in wd['details']:
+                            wdd_el = WorkerDayCashboxDetails(
+                                worker_day=wd_obj,
+                                dttm_from=Converter.parse_datetime(wdd['dttm_from']),
+                                dttm_to=Converter.parse_datetime(wdd['dttm_to']),
+                            )
+                            if wdd['type'] > 0:
+                                wdd_el.work_type_id = wdd['type']
+                            else:
+                                wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
+
+                            wdd_list.append(wdd_el)
+                        WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
+
+                    else:
+                        wd_obj.save()
+
+
+            for work_type in shop.worktype_set.all():
+                cancel_shop_vacancies.apply_async((shop.id, work_type.id))
+                create_shop_vacancies_and_notify.apply_async((shop.id, work_type.id))
 
         return Response()
 
