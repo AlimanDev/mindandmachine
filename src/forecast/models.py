@@ -112,7 +112,6 @@ class OperationTypeRelation(AbstractModel):
     base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends')
     depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases')
     formula = models.CharField(max_length=256)
-    convert_min_to_real = models.BooleanField(default=False)
 
 
 class OperationTemplate(AbstractActiveNamedModel):

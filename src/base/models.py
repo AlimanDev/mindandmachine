@@ -352,6 +352,9 @@ class FunctionGroup(AbstractModel):
         'FunctionGroupView',
         'Notification',
         'OperationTemplate',
+        'WorkTypeName',
+        'WorkType',
+        'WorkType_efficiency',
         'OperationTypeName',
         'OperationType',
         'PeriodClients',
@@ -366,8 +369,6 @@ class FunctionGroup(AbstractModel):
         'WorkerDay',
         'WorkerDay_approve',
         'WorkerDay_worker_stat',
-        'WorkType',
-        'WorkTypeName',
         'ShopMonthStat',
         'ShopSettings',
 

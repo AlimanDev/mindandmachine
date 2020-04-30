@@ -458,18 +458,18 @@ def upload_vacation_task():
 
 
 @app.task
-def calculate_shops_load(user, load_template_id, dt_from, dt_to, shop_id=None):
+def calculate_shops_load(lang, load_template_id, dt_from, dt_to, shop_id=None):
     load_template = LoadTemplate.objects.get(pk=load_template_id)
     root_shop = Shop.objects.filter(level=0).first()
     shops = [load_template.shops.get(pk=shop_id)] if shop_id else load_template.shops.all()
     for shop in shops:
-        res = calculate_shop_load(shop, load_template, dt_from, dt_to, lang=user.lang)
+        res = calculate_shop_load(shop, load_template, dt_from, dt_to, lang=lang)
         if res['error']:
             event = Event.objects.create(
                 type="load_template_err",
                 params={
                     'shop': shop,
-                    'message': Message(lang=user.lang).get_message(res['code'], params=res.get('params', {})),
+                    'message': Message(lang=lang).get_message(res['code'], params=res.get('params', {})),
                 },
                 dttm_valid_to=datetime.now() + timedelta(days=2),
                 shop=root_shop,
