@@ -10,15 +10,16 @@ from rest_framework import serializers, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from src.base.models import Employment, Shop
 
+from src.base.models import Employment, Shop
+import pytz
 
 class TimeZoneField(serializers.ChoiceField):
     def __init__(self, **kwargs):
-        super().__init__(TimeZoneField_.CHOICES + [(None, "")], **kwargs)
+        super().__init__(pytz.common_timezones + [(None, "")], **kwargs)
 
     def to_representation(self, value):
-        return six.text_type(super().to_representation(value))
+        return str(six.text_type(super().to_representation(value)))
 
 
 # Serializers define the API representation.
@@ -29,7 +30,8 @@ class ShopSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shop
         fields = ['id', 'parent_id', 'name', 'tm_shop_opens', 'tm_shop_closes', 'code',
-                  'address', 'type', 'dt_opened', 'dt_closed', 'timezone','break_triplets', 'region_id']
+                  'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id']
+
 
 class ShopStatSerializer(serializers.Serializer):
     id=serializers.IntegerField()
@@ -95,7 +97,7 @@ class ShopViewSet(viewsets.ModelViewSet):
         else:
             return shops
 
-    @action(detail=False, methods=['get']) #, permission_classes=[IsAdminOrIsSelf])
+    @action(detail=False, methods=['get'], serializer_class=ShopStatSerializer)#, permission_classes=[IsAdminOrIsSelf])
     def stat(self, request):
         """
         Статистика для магазина, или списка магазинов, заданных фильтром ShopFilter
