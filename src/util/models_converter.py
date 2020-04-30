@@ -214,7 +214,6 @@ class WorkTypeConverter(Converter):
         return {
             'id': obj.id,
             'name': obj.operation_type_name.name,
-            'speed_coef': obj.speed_coef,
             'do_forecast': obj.do_forecast,
             'work_type_id': obj.work_type.id
         }
@@ -232,11 +231,12 @@ class WorkTypeConverter(Converter):
             'prior_weight': obj.prior_weight,
             'min_workers_amount': obj.min_workers_amount,
             'max_workers_amount': obj.max_workers_amount,
+            'operation_types': [cls.convert_operation_type(obj.operation_type)],
         }
-        if convert_operations:
-            converted_dict['operation_types'] = [
-                cls.convert_operation_type(x) for x in obj.work_type_reversed.filter(dttm_deleted__isnull=True)
-            ]
+        # if convert_operations:
+        #     converted_dict['operation_types'] = [
+        #         cls.convert_operation_type(x) for x in obj.work_type_reversed.filter(dttm_deleted__isnull=True)
+        #     ]
 
         return converted_dict
 

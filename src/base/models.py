@@ -96,6 +96,8 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     # added on 16.05.2019
     queue_length = models.FloatField(default=3.0)
 
+    load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops')
+
     max_work_hours_7days = models.SmallIntegerField(default=48)
 
     staff_number = models.SmallIntegerField(default=0)
@@ -336,6 +338,9 @@ class FunctionGroup(AbstractModel):
         'FunctionGroupView',
         'Notification',
         'OperationTemplate',
+        'WorkTypeName',
+        'WorkType',
+        'WorkType_efficiency',
         'OperationTypeName',
         'OperationType',
         'PeriodClients',
@@ -351,8 +356,6 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_approve',
         'WorkerDay_daily_stat',
         'WorkerDay_worker_stat',
-        'WorkType',
-        'WorkTypeName',
         'ShopMonthStat',
 
         'signout',
@@ -494,7 +497,13 @@ class FunctionGroup(AbstractModel):
             self.func,
         )
 
-EVENT_TYPES = [('vacancy', 'Вакансия'),('timetable', 'Изменения в расписании')]
+
+EVENT_TYPES = [
+    ('vacancy', 'Вакансия'),
+    ('timetable', 'Изменения в расписании'),
+    ('load_template_err', 'Ошибка применения шаблона нагрузки'),
+    ('load_template_apply', 'Шаблон нагрузки применён'),
+]
 
 
 class Event(AbstractModel):

@@ -498,7 +498,6 @@ def edit_work_type(request, form):
 
         if len(front_operations) == 1 and len(existing_operation_types.keys()) == 1:  # была 1 , стала 1 => та же самая
             operation_type = list(existing_operation_types.values())[0]
-            operation_type.speed_coef = front_operations[0]['speed_coef']
             operation_type.do_forecast = front_operations[0]['do_forecast']
             try:
                 # todo: aa: add check of params in form
@@ -511,7 +510,6 @@ def edit_work_type(request, form):
             for oper_dict in front_operations:
                 if 'id' in oper_dict.keys() and oper_dict['id'] in existing_operation_types.keys():
                     ot = existing_operation_types[oper_dict['id']]
-                    ot.speed_coef = oper_dict['speed_coef']
                     ot.do_forecast = oper_dict['do_forecast']
                     try:
                         # todo: aa: add check of params in form
@@ -525,7 +523,6 @@ def edit_work_type(request, form):
                         OperationType.objects.create(
                             work_type_id=work_type_id,
                             operation_type_name=OperationTypeName.objects.get(name=oper_dict['name']),
-                            speed_coef=oper_dict['speed_coef'],
                             do_forecast=oper_dict['do_forecast'],
                         )
                     except (TypeError, IntegrityError) as e:
@@ -570,7 +567,7 @@ def edit_work_type(request, form):
                 work_type_id=work_type_id, dttm_deleted__isnull=True
             ), 
             OperationType, 
-            fields=['id', 'operation_type_name__name', 'speed_coef', 'do_forecast', 'work_type_id'],
+            fields=['id', 'operation_type_name__name', 'do_forecast', 'work_type_id'],
             out_array=True,
         )
     })

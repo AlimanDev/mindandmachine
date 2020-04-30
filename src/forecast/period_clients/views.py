@@ -11,6 +11,7 @@ from src.conf.djconfig import QOS_DATETIME_FORMAT
 from rest_framework.decorators import action
 from src.base.models import Shop, Employment, FunctionGroup
 from src.util.models_converter import Converter
+from src.forecast.load_template.utils import apply_reverse_formula # чтобы тесты не падали
 
 # Serializers define the API representation.
 class PeriodClientsDeleteSerializer(serializers.Serializer):
@@ -48,8 +49,8 @@ class PeriodClientsCreateSerializer(serializers.Serializer):
 
 
 class PeriodClientsFilter(FilterSet):
-    shop_id = NumberFilter(field_name='operation_type__work_type__shop_id')
-    work_type_id = NumberFilter(field_name='operation_type__work_type_id', lookup_expr='in')
+    shop_id = NumberFilter(field_name='operation_type__shop_id')
+    work_type_id = NumberFilter(field_name='operation_type__work_type_id')
     dt_from = DateFilter(field_name='dttm_forecast', lookup_expr='date__gte')
     dt_to = DateFilter(field_name='dttm_forecast', lookup_expr='date__lte')
 
@@ -154,8 +155,8 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
             type=type,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lte=dt_to,
-            operation_type__work_type__shop_id=shop.id,
-            operation_type__do_forecast=OperationType.FORECAST_HARD,
+            operation_type__shop_id=shop.id,
+            operation_type__do_forecast=OperationType.FORECAST,
         ).delete()
         
         for period_demand_value in data['demand']:
@@ -216,7 +217,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         period_clients = PeriodClients.objects.select_related(
             'operation_type__work_type'
         ).filter(
-            operation_type__work_type__shop_id=shop_id,
+            operation_type__shop_id=shop_id,
             type=type,
             dttm_forecast__time__gte=dttm_from.time(),
             dttm_forecast__time__lte=dttm_to.time(),
@@ -260,6 +261,16 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         PeriodClients.objects.bulk_create(models)
         period_clients.update(value=set_value if set_value else F('value')*multiply_coef)
         changed_operation_type_ids = set(period_clients.values_list('operation_type_id', flat=True))
+        if Shop.objects.filter(pk=shop_id, load_template__isnull=False).exists():
+            for o_type in OperationType.objects.select_related('shop').filter(id__in=operation_type_ids):
+                apply_reverse_formula(
+                    o_type, 
+                    dt_from=dttm_from.date(), 
+                    dt_to=dttm_to.date(), 
+                    tm_from=dttm_from.time(), 
+                    tm_to=dttm_to.time(),
+                    lang=request.user.lang,
+                )
         for x in changed_operation_type_ids:
             PeriodDemandChangeLog.objects.create(
                 dttm_from=dttm_from,
@@ -283,7 +294,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         shop_id = data.validated_data.get('shop_id')
         type = data.validated_data.get('type')
         PeriodClients.objects.filter(
-            operation_type__work_type__shop_id=shop_id,
+            operation_type__shop_id=shop_id,
             type=type,
             dttm_forecast__date__gte=dttm_from.date(),
             dttm_forecast__date__lte=dttm_to.date(),

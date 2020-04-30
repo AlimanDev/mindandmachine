@@ -260,13 +260,13 @@ class Test_auto_worker_exchange(TestCase):
         self.operation_type = OperationType.objects.create(
             operation_type_name=self.operation_type_name,
             work_type=self.work_type1,
-            do_forecast=OperationType.FORECAST_HARD
+            do_forecast=OperationType.FORECAST
         )
 
         self.operation_type2 = OperationType.objects.create(
             operation_type_name=self.operation_type_name,
             work_type=self.work_type2,
-            do_forecast=OperationType.FORECAST_HARD
+            do_forecast=OperationType.FORECAST
         )
 
         self.exchange_settings = ExchangeSettings.objects.create(
@@ -323,8 +323,8 @@ class Test_auto_worker_exchange(TestCase):
                 shop=employment.shop,
                 dt=self.dt_now,
                 type=WorkerDay.TYPE_WORKDAY,
-                dttm_work_start='{} 09:00:00'.format(self.dt_now),
-                dttm_work_end='{} 21:00:00'.format(self.dt_now),
+                dttm_work_start=datetime.datetime.combine(self.dt_now, datetime.time(9)),
+                dttm_work_end=datetime.datetime.combine(self.dt_now, datetime.time(21)),
             )
 
             WorkerDayCashboxDetails.objects.create(
@@ -341,7 +341,7 @@ class Test_auto_worker_exchange(TestCase):
         self.create_vacancy('09:00:00', '20:00:00')
         self.create_vacancy('09:00:00', '20:00:00')
 
-        self.create_period_clients(40, self.operation_type)
+        self.create_period_clients(1.0, self.operation_type)
 
         wdcd = WorkerDayCashboxDetails.objects.all()
         self.assertEqual(len(wdcd.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY)), 2)
@@ -354,7 +354,7 @@ class Test_auto_worker_exchange(TestCase):
 
     # Нужны 3 вакансии -> у нас 0 -> создаём 3
     def test_create_vacancies_and_notify(self):
-        self.create_period_clients(72, self.operation_type)
+        self.create_period_clients(3, self.operation_type)
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 0)
@@ -373,7 +373,7 @@ class Test_auto_worker_exchange(TestCase):
         self.create_vacancy('09:00:00', '20:00:00')
         self.create_vacancy('09:00:00', '20:00:00')
 
-        self.create_period_clients(72, self.operation_type)
+        self.create_period_clients(3, self.operation_type)
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 2)
@@ -390,7 +390,7 @@ class Test_auto_worker_exchange(TestCase):
     def test_create_vacancies_and_notify3(self):
         self.create_vacancy('12:00:00', '17:00:00')
 
-        self.create_period_clients(18, self.operation_type)
+        self.create_period_clients(1.0, self.operation_type)
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 1)
@@ -408,7 +408,7 @@ class Test_auto_worker_exchange(TestCase):
         self.create_vacancy('09:00:00', '14:00:00')
         self.create_vacancy('16:00:00', '21:00:00')
 
-        self.create_period_clients(18, self.operation_type)
+        self.create_period_clients(1.0, self.operation_type)
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 2)
@@ -426,7 +426,7 @@ class Test_auto_worker_exchange(TestCase):
         self.create_vacancy('09:00:00', '15:00:00')
         self.create_vacancy('16:00:00', '21:00:00')
 
-        self.create_period_clients(18, self.operation_type)
+        self.create_period_clients(1.0, self.operation_type)
 
         len_wdcd = len(WorkerDayCashboxDetails.objects.filter(status=WorkerDayCashboxDetails.TYPE_VACANCY))
         self.assertEqual(len_wdcd, 2)
@@ -441,8 +441,8 @@ class Test_auto_worker_exchange(TestCase):
             self.dt_now = self.dt_now + datetime.timedelta(days=1)
         self.create_worker_day()
 
-        self.create_period_clients(18, self.operation_type)
-        self.create_period_clients(72, self.operation_type2)
+        self.create_period_clients(1, self.operation_type)
+        self.create_period_clients(3, self.operation_type2)
 
         vacancy=self.create_vacancy('09:00:00', '21:00:00')
         Event.objects.create(
@@ -467,8 +467,8 @@ class Test_auto_worker_exchange(TestCase):
         self.create_users(4)
         self.create_worker_day()
 
-        self.create_period_clients(18, self.operation_type)
-        self.create_period_clients(150, self.operation_type2)
+        self.create_period_clients(0, self.operation_type)
+        self.create_period_clients(4, self.operation_type2)
 
         vacancy=self.create_vacancy('09:00:00', '21:00:00')
         Event.objects.create(
