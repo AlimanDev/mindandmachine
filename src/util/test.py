@@ -513,7 +513,8 @@ def create_departments_and_users(self):
         user=self.user2,
         shop=self.shop,
         function_group=self.employee_group,
-        dt_hired=dt
+        dt_hired=dt,
+        salary=100,
     )
     self.user3 = User.objects.create_user(
         'user3',
@@ -528,7 +529,8 @@ def create_departments_and_users(self):
         shop=self.shop,
         auto_timetable=False,
         function_group=self.employee_group,
-
+        dt_hired=dt,
+        salary=150
     )
 
     self.user4 = User.objects.create_user(

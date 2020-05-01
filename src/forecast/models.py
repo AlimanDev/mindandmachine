@@ -21,6 +21,8 @@ class OperationTypeName(AbstractActiveNamedModel):
         )
         return self
 
+    is_special = models.BooleanField(default=False)
+
 
 class LoadTemplate(AbstractModel):
     class Meta:
@@ -59,6 +61,7 @@ class OperationType(AbstractActiveModel):
         (UPDATED, 'Обновлён'),
     ]
 
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True, related_name='operation_types')
     work_type = models.OneToOneField(WorkType, on_delete=models.PROTECT, related_name='operation_type', null=True)
     operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
     do_forecast = models.CharField(
@@ -112,7 +115,6 @@ class OperationTypeRelation(AbstractModel):
     base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends')
     depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases')
     formula = models.CharField(max_length=256)
-    convert_min_to_real = models.BooleanField(default=False)
 
 
 class OperationTemplate(AbstractActiveNamedModel):

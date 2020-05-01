@@ -1,10 +1,14 @@
-
 from rest_framework import serializers, viewsets
 from django_filters.rest_framework import FilterSet
 from src.base.permissions import FilteredListPermission
 from src.timetable.models import WorkType,WorkTypeName
 from src.timetable.work_type_name.views import WorkTypeNameSerializer
+from rest_framework.decorators import action
+from src.main.timetable.cashier_demand.forms import GetCashiersTimetableForm
+from src.timetable.work_type.utils import get_efficiency
+from src.conf.djconfig import QOS_DATE_FORMAT
 from rest_framework.validators import UniqueTogetherValidator
+from rest_framework.response import Response
 
 
 # Serializers define the API representation.
@@ -27,6 +31,19 @@ class WorkTypeSerializer(serializers.ModelSerializer):
         if self.initial_data.get('code', False):
             self.initial_data['work_type_name_id'] = WorkTypeName.objects.get(code=self.initial_data.get('code')).id
         super().is_valid(*args, **kwargs)
+
+class EfficiencySerializer(serializers.Serializer):
+    from_dt = serializers.DateField(format=QOS_DATE_FORMAT)
+    to_dt = serializers.DateField(format=QOS_DATE_FORMAT)
+    work_type_ids = serializers.ListField(allow_empty=True, child=serializers.IntegerField(), required=False, default=[])
+    shop_id = serializers.IntegerField()
+
+    def is_valid(self, *args, **kwargs):
+        super(EfficiencySerializer, self).is_valid(*args, **kwargs)
+
+        if self.validated_data['from_dt'] > self.validated_data['to_dt']:
+            raise serializers.ValidationError('dt_from have to be less or equal than dt_to')
+
 
 class WorkTypeFilter(FilterSet):
     class Meta:
@@ -150,3 +167,10 @@ class WorkTypeViewSet(viewsets.ModelViewSet):
             WorkType.objects.select_related('work_type_name').filter(dttm_deleted__isnull=True)
         )
 
+    @action(detail=False, methods=['get'])
+    def efficiency(self, request):
+        data = EfficiencySerializer(data=request.query_params)
+
+        data.is_valid(raise_exception=True)
+
+        return Response(get_efficiency(data.validated_data.get('shop_id'), data.validated_data), status=200)

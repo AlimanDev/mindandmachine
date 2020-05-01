@@ -323,8 +323,8 @@ class Test_auto_worker_exchange(TestCase):
                 shop=employment.shop,
                 dt=self.dt_now,
                 type=WorkerDay.TYPE_WORKDAY,
-                dttm_work_start='{} 09:00:00'.format(self.dt_now),
-                dttm_work_end='{} 21:00:00'.format(self.dt_now),
+                dttm_work_start=datetime.datetime.combine(self.dt_now, datetime.time(9)),
+                dttm_work_end=datetime.datetime.combine(self.dt_now, datetime.time(21)),
             )
 
             WorkerDayCashboxDetails.objects.create(
