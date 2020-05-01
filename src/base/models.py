@@ -354,6 +354,7 @@ class FunctionGroup(AbstractModel):
         'WorkerConstraint',
         'WorkerDay',
         'WorkerDay_approve',
+        'WorkerDay_daily_stat',
         'WorkerDay_worker_stat',
         'ShopMonthStat',
 
