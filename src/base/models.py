@@ -346,6 +346,7 @@ class FunctionGroup(AbstractModel):
 
     FUNCS = (
         'AutoSettings_create_timetable',
+        'AutoSettings_set_timetable',
         'AuthUserView',
         'Employment',
         'EmploymentWorkType',
