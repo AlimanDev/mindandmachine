@@ -756,7 +756,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         return Response()
 
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post', 'get'])
     def set_timetable(self, request):
         """
         Ждет request'a от qos_algo. Когда получает, записывает данные по расписанию в бд
@@ -772,7 +772,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         Note:
             Отправляет уведомление о том, что расписание успешно было создано
         """
-        form = request.post
+        form = request.data
 
         try:
             data = json.loads(form['data'])
@@ -805,22 +805,24 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         worker_id=uid,
                         type=wd['type']
                     )
-                    if wd['type'] == WorkerDay.TYPE_WORKDAY:
-                        wd_obj.shop=shop
 
                     wdays = {w.is_approved: w for w in WorkerDay.objects.filter(
+                        Q(shop=shop) | Q(shop__isnull=True),
                         is_fact=False,
                         worker_id=uid,
-                        shop=shop,
                         dt=dt,
                     )}
 
                     #неподтвержденная версия
-                    if wdays[False]:
-                        wd_obj=wd['False']
+                    if False in wdays:
+                        wd_obj=wdays[False]
                         wd_obj.type=wd['type']
-                    elif wdays[True]:
+                        WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
+                    elif True in wdays:
                         wd_obj.parent_worker_day=wdays[True]
+
+                    if wd['type'] == WorkerDay.TYPE_WORKDAY:
+                        wd_obj.shop=shop
 
                     if WorkerDay.is_type_with_tm_range(wd_obj.type):
                         wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start'])
@@ -828,7 +830,6 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
                         wd_obj.save()
 
-                        WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
                         wdd_list = []
 
                         for wdd in wd['details']:
@@ -846,6 +847,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
 
                     else:
+                        wd_obj.dttm_work_start = None
+                        wd_obj.dttm_work_end = None
+                        wd_obj.work_hours = timedelta(hours=0)
+                        wd_obj.shop=None
                         wd_obj.save()
 
 
@@ -853,7 +858,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 cancel_shop_vacancies.apply_async((shop.id, work_type.id))
                 create_shop_vacancies_and_notify.apply_async((shop.id, work_type.id))
 
-        return Response()
+        return Response({})
 
 
 def count_prev_paid_days(dt_end, employments, region_id, dt_start=None):
