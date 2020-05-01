@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, date
 from django.conf import settings
 from django.db.models import F, Count, Sum, Q
 from django.db.models.functions import Coalesce, Extract
+from django.utils import timezone
 from dateutil.relativedelta import relativedelta
 
 from rest_framework import viewsets
@@ -860,6 +861,115 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         return Response({})
 
+    @action(detail=False, methods=['post', 'get'])
+    def delete_timetable(self, request):
+        """
+        Удаляет расписание на заданный месяц. Также отправляет request на qos_algo на остановку задачи в селери
+
+        Args:
+            method: POST
+            url: /api/timetable/auto_settings/delete_timetable
+            shop_id(int): required = True
+            dt(QOS_DATE): required = True
+
+        Note:
+            Отправляет уведомление о том, что расписание было удалено
+        """
+        serializer = AutoSettingsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        form = serializer.validated_data
+
+        shop_id = form['shop_id']
+
+        dt_from = form['dt_from']
+        dt_to = form['dt_to']
+
+        dt_min = datetime.now().date() + timedelta(days=REBUILD_TIMETABLE_MIN_DELTA)
+
+        if dt_from < dt_min:
+            raise MessageError("tt_delete_past")
+
+        dt_first = dt_from.replace(day=1)
+
+        tts = ShopMonthStat.objects.filter(shop_id=shop_id, dt=dt_first)
+        for tt in tts:
+            if (tt.status == ShopMonthStat.PROCESSING) and (not tt.task_id is None):
+                try:
+                    requests.post(
+                        'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
+                    )
+                except (requests.ConnectionError, requests.ConnectTimeout):
+                    pass
+                # send_notification('D', tt, sender=request.user)
+        tts.update(status=ShopMonthStat.NOT_DONE)
+
+        user_ids=Employment.objects.get_active(
+            dt_from=dt_from,dt_to=dt_to,
+            shop_id=shop_id,
+            auto_timetable=True
+        ).values('user_id')
+
+        # Not approved
+        wdays = WorkerDay.objects.filter(
+            Q(shop_id=shop_id) | Q(shop_id__isnull=True),
+            dt__gte=dt_from,
+            dt__lt=dt_to,
+            worker_id__in=user_ids,
+            is_approved=False,
+            # is_vacancy=False,
+            created_by__isnull=True,
+        )
+
+        WorkerDayCashboxDetails.objects.filter(
+            worker_day__in=wdays,
+        ).delete()
+
+        wdays.filter(
+            parent_worker_day__isnull=True
+        ).delete()
+
+        wdays.update(
+            dttm_work_start=None,
+            dttm_work_end=None,
+            #worker_id=None, TODO: ???
+            type=WorkerDay.TYPE_EMPTY
+
+        )
+
+        # approved
+        wdays = WorkerDay.objects.filter(
+            Q(shop_id=shop_id) | Q(shop_id__isnull=True),
+            dt__gte=dt_from,
+            dt__lt=dt_to,
+            worker_id__in=user_ids,
+            is_approved=True,
+            # is_vacancy=False,
+            created_by__isnull=True,
+            child__isnull=True
+        )
+        WorkerDay.objects.bulk_create(
+            [WorkerDay(
+                # worker_id=w.worker_id, TODO: ???
+                type=WorkerDay.TYPE_EMPTY,
+                dt=w.dt,
+                parent_worker_day=w
+            ) for w in wdays]
+        )
+
+        # # cancel vacancy
+        # # todo: add deleting workerdays
+        # work_type_ids = [w.id for w in WorkType.objects.filter(shop_id=shop_id)]
+        # WorkerDayCashboxDetails.objects.filter(
+        #     dttm_from__date__gte=dt_from,
+        #     dttm_from__date__lt=dt_to,
+        #     is_vacancy=True,
+        #     work_type_id__in=work_type_ids,
+        # ).update(
+        #     dttm_deleted=timezone.now(),
+        #     status=WorkerDayCashboxDetails.TYPE_DELETED,
+        # )
+
+        return Response()
 
 def count_prev_paid_days(dt_end, employments, region_id, dt_start=None):
     """
