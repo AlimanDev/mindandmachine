@@ -248,9 +248,9 @@ class DuplicateSrializer(serializers.Serializer):
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
         if not User.objects.filter(id=self.validated_data['from_worker_id']).exists():
-            raise MessageError(code="duplicate_wd_main_user", lang=self.context['request'].user.lang)
+            raise MessageError(code="user_does_not_exist", lang=self.context['request'].user.lang)
         if not User.objects.filter(id=self.validated_data['to_worker_id']).exists():
-            raise MessageError(code="duplicate_wd_trainer_user", lang=self.context['request'].user.lang)
+            raise MessageError(code="user_does_not_exist", lang=self.context['request'].user.lang)
 
 
 class DeleteTimetableSerializer(serializers.Serializer):

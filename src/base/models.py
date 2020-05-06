@@ -360,8 +360,6 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_duplicate',
         'WorkerDay_delete_timetable',
         'WorkerDay_exchange',
-        'WorkType',
-        'WorkTypeName',
         'ShopMonthStat',
 
         'signout',

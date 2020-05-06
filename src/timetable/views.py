@@ -36,7 +36,6 @@ from django.utils import timezone
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy
 from src.base.exceptions import MessageError
 from src.main.timetable.auto_settings.utils import set_timetable_date_from
-from src.main.other.notification.utils import send_notification
 from src.timetable.worker_day.stat import count_worker_stat
 from dateutil.relativedelta import relativedelta
 
@@ -259,19 +258,19 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         from_worker_id = data['from_worker_id']
         to_worker_id = data['to_worker_id']
 
-        main_worker_days = list(WorkerDay.objects.qos_current_version().filter(
+        main_worker_days = list(WorkerDay.objects.filter(
             worker_id=from_worker_id,
             dt__in=data['dates'],
             is_approved=data['is_approved'],
             is_fact=False,
         ))
-        main_worker_days_details = WorkerDayCashboxDetails.objects.qos_current_version().filter(
+        main_worker_days_details = WorkerDayCashboxDetails.objects.filter(
             worker_day__in=main_worker_days,
         )
         # todo: add several details, not last
         main_worker_days_details = {wdds.worker_day_id: wdds for wdds in main_worker_days_details}
 
-        trainee_worker_days = WorkerDay.objects.qos_current_version().filter(
+        trainee_worker_days = WorkerDay.objects.filter(
             worker_id=to_worker_id,
             dt__in=data['dates'],
             is_approved=False,
@@ -312,7 +311,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                         dttm_to=new_wdcds.dttm_to
                     )
                 )
-
+        #TODO запускать биржу смен
         WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
         return Response(WorkerDaySerializer(created_wds, many=True).data)
 
@@ -331,21 +330,24 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             'worker_day__is_approved': False,
             'worker_day__is_fact': False,
         }
+        dt_first = data['dt_from'].replace(day=1)
+        tts = ShopMonthStat.objects.filter(
+            shop_id=shop_id, 
+            dt=dt_first,
+        )
+        processing_tts = tts.filter(status=ShopMonthStat.PROCESSING, task_id__isnull=False)
+        for tt in processing_tts:
+            try:
+                requests.post(
+                    'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
+                )
+            except (requests.ConnectionError, requests.ConnectTimeout):
+                pass
+        processing_tts.update(status=ShopMonthStat.NOT_DONE)
         if data.get('delete_all'):
             dt_from = set_timetable_date_from(data['dt_from'].year, data['dt_from'].month)
             if dt_from and not data['dt_to']:
-                dt_first = dt_from.replace(day=1)
-                dt_to = (dt_first + relativedelta(months=1))
-                tts = ShopMonthStat.objects.filter(shop_id=shop_id, dt=dt_first)
-                for tt in tts:
-                    if (tt.status == ShopMonthStat.PROCESSING) and (not tt.task_id is None):
-                        try:
-                            requests.post(
-                                'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
-                            )
-                        except (requests.ConnectionError, requests.ConnectTimeout):
-                            pass
-                        send_notification('D', tt, sender=request.user)
+                dt_to = (dt_first + relativedelta(months=1))                
                 tts.update(status=ShopMonthStat.NOT_DONE)
             else:
                 dt_from = data['dt_from']
@@ -457,7 +459,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         data = data.validated_data
         days = len(data['dates'])
 
-        wd_parent_list = list(WorkerDay.objects.qos_current_version().prefetch_related('child').filter(
+        wd_parent_list = list(WorkerDay.objects.prefetch_related('child').filter(
             worker_id__in=(data['worker1_id'], data['worker2_id']),
             dt__in=data['dates'],
             is_approved=data['is_approved'],
