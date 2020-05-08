@@ -55,11 +55,11 @@ class Migration(migrations.Migration):
             name='do_forecast',
             field=models.CharField(choices=[('H', 'Forecast'), ('N', 'None'), ('T', 'Template'), ('F', 'Formula')], default='H', max_length=1),
         ),
-        migrations.AlterField(
-            model_name='operationtype',
-            name='work_type',
-            field=models.OneToOneField(null=True, on_delete=django.db.models.deletion.PROTECT, related_name='operation_type', to='timetable.WorkType'),
-        ),
+        # migrations.AlterField(
+        #     model_name='operationtype',
+        #     name='work_type',
+        #     field=models.OneToOneField(null=True, on_delete=django.db.models.deletion.PROTECT, related_name='operation_type', to='timetable.WorkType'),
+        # ),
         migrations.CreateModel(
             name='OperationTypeTemplate',
             fields=[
