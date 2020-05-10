@@ -61,7 +61,7 @@ if DEBUG:
 
 from django.views.generic import TemplateView
 
-urlpatterns += [path('openapi', get_schema_view(
+urlpatterns += [path('openapi/', get_schema_view(
     title="Your Project",
     description="API for all things …",
     version="1.0.0"
