@@ -1,5 +1,10 @@
-from django.db.models import OuterRef, Subquery
+import json
+import requests
+from dateutil.relativedelta import relativedelta
+
 from django_filters import utils
+from django.db.models import OuterRef, Subquery, Q
+from django.utils import timezone
 
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -7,6 +12,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action
 
 from src.base.permissions import FilteredListPermission, EmploymentFilteredListPermission
+from src.base.models import Employment, Shop, User
+from src.base.exceptions import MessageError
 
 from src.timetable.serializers import (
     WorkerDaySerializer,
@@ -19,8 +26,7 @@ from src.timetable.serializers import (
     DeleteTimetableSerializer,
     ExchangeSerializer,
 )
-
-from src.timetable.filters import WorkerDayFilter, EmploymentWorkTypeFilter, WorkerConstraintFilter
+from src.timetable.filters import WorkerDayFilter, EmploymentWorkTypeFilter, WorkerConstraintFilter, WorkerDayStatFilter
 from src.timetable.models import (
     WorkerDay, 
     EmploymentWorkType, 
@@ -29,17 +35,12 @@ from src.timetable.models import (
     WorkType, 
     ShopMonthStat,
 )
-from src.base.models import Employment, Shop, User
 from src.timetable.backends import MultiShopsFilterBackend
-from django.db.models import OuterRef, Subquery, Q
-from django.utils import timezone
-from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy
-from src.base.exceptions import MessageError
-from src.main.timetable.auto_settings.utils import set_timetable_date_from
-from src.timetable.worker_day.stat import count_worker_stat
-from dateutil.relativedelta import relativedelta
-
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
+
+from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy
+from src.main.timetable.auto_settings.utils import set_timetable_date_from
+
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
     permission_classes = [FilteredListPermission]
@@ -136,26 +137,24 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], )
     def worker_stat(self, request):
-        filterset = self.filter_backends[0]().get_filterset(request, self.get_queryset(), self)
+        filterset = WorkerDayStatFilter(request.query_params)
         if filterset.form.is_valid():
             data = filterset.form.cleaned_data
         else:
             raise utils.translate_validation(filterset.errors)
 
-        shop_id = int(request.query_params.get('shop_id'))
-        stat = count_worker_stat(shop_id, data)
+        stat = count_worker_stat(data)
         return Response(stat)
 
     @action(detail=False, methods=['get'], )
     def daily_stat(self, request):
-        filterset = self.filter_backends[0]().get_filterset(request, self.get_queryset(), self)
+        filterset = WorkerDayStatFilter(request.query_params)
         if filterset.form.is_valid():
             data = filterset.form.cleaned_data
         else:
             raise utils.translate_validation(filterset.errors)
 
-        shop_id = request.query_params.get('shop_id')
-        stat = count_daily_stat(shop_id, data)
+        stat = count_daily_stat(data)
         return Response(stat)
 
 

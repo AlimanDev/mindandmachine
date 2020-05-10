@@ -28,17 +28,14 @@ class WorkerDayFilter(FilterSet):
         }
 
 
-class WorkerDayMonthStatFilter(FilterSet):
+class WorkerDayStatFilter(FilterSet):
+    shop_id = NumberFilter(required=True)
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода", required=True)
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода', required=True)
-
-    #shop_id определен в
-    # shop_id = NumberFilter(required=True)
 
     class Meta:
         model = WorkerDay
         fields = {
-            # 'shop_id': ['exact'],
             'worker_id': ['exact', 'in'],
         }
 

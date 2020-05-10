@@ -5,10 +5,6 @@ from django_filters import utils
 
 from src.base.models import Employment
 
-from django_filters.rest_framework import DjangoFilterBackend
-
-from src.timetable.filters import WorkerDayFilter, WorkerDayMonthStatFilter
-
 
 class MultiShopsFilterBackend(DjangoFilterBackend):
     """
@@ -22,7 +18,7 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
 
         shop_id = request.query_params.get('shop_id')
 
-        filterset = self.get_filterset(request,queryset,view)
+        filterset = self.get_filterset(request, queryset, view)
 
         if filterset is None:
             return queryset
@@ -59,9 +55,3 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
                 worker_id__in=ids,
                 # employment__in=all_employments_for_users\
             ).order_by('worker_id','dt','dttm_work_start')
-
-    def get_filterset_class(self, view, queryset=None):
-        if view.action == 'month_stat':
-            return WorkerDayMonthStatFilter
-        else:
-            return WorkerDayFilter
