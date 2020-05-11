@@ -31,8 +31,7 @@ class Permission(permissions.BasePermission):
             q=Q(shop__in=department.get_ancestors(include_self=True, ascending=True))
 
         employments = Employment.objects.get_active(
-            q,
-            user=request.user)
+            user=request.user).filter(q)
 
         return self.check_employment_permission(employments, request, view)
 

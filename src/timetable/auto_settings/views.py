@@ -914,7 +914,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         tts.update(status=ShopMonthStat.NOT_DONE)
 
         user_ids=Employment.objects.get_active(
-            dt_from=dt_from,dt_to=dt_to,
+            dt_from=dt_from,
+            dt_to=dt_to,
             shop_id=shop_id,
             auto_timetable=True
         ).values('user_id')
