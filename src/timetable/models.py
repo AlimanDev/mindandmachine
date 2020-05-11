@@ -260,6 +260,10 @@ class WorkerDayManager(models.Manager):
             return self.qos_initial_version()
 
     def get_last_plan(self,  *args, **kwargs):
+        """
+        Возвращает плановый график - микс подтвержденного и неподтвержденного,
+        последнюю версию за каждый день.
+        """
         super().get_queryset()
         max_dt_subq = WorkerDay.objects.filter(
             dt=OuterRef('dt'),
