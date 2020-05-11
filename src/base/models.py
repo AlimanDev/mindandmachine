@@ -370,7 +370,12 @@ class FunctionGroup(AbstractModel):
         'WorkerConstraint',
         'WorkerDay',
         'WorkerDay_approve',
+        'WorkerDay_daily_stat',
         'WorkerDay_worker_stat',
+        'WorkerDay_change_list',
+        'WorkerDay_duplicate',
+        'WorkerDay_delete_timetable',
+        'WorkerDay_exchange',
         'ShopMonthStat',
         'ShopSettings',
 

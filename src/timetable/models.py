@@ -384,7 +384,7 @@ class WorkerDay(AbstractModel):
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
 
-    worker = models.ForeignKey(User, on_delete=models.PROTECT, related_name='worker_day', related_query_name='worker_day')  # todo: make immutable
+    worker = models.ForeignKey(User, null=True, on_delete=models.PROTECT, related_name='worker_day', related_query_name='worker_day')  # todo: make immutable
     type = models.CharField(choices=TYPES, max_length=2, default=TYPE_EMPTY)
 
     work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')
@@ -397,6 +397,7 @@ class WorkerDay(AbstractModel):
     work_hours = models.DurationField(default=datetime.timedelta(days=0))
 
     is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
+    is_vacancy = models.BooleanField(default=False)
     dttm_added = models.DateTimeField(default=timezone.now)
 
     objects = WorkerDayManager()

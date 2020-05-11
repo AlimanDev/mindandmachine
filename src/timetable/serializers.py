@@ -1,8 +1,13 @@
+from  django.db import DatabaseError
+
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from src.base.models import Employment
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
+from src.base.models import Employment, User
+from src.util.models_converter import Converter
+from src.conf.djconfig import QOS_DATE_FORMAT
+from src.base.exceptions import MessageError
 
 
 class WorkerDayApproveSerializer(serializers.Serializer):
@@ -218,3 +223,75 @@ class AutoSettingsSerializer(serializers.Serializer):
 
 
 
+class ListChangeSrializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    workers = serializers.JSONField()
+    type = serializers.CharField()
+    tm_work_start = serializers.TimeField(required=False)
+    tm_work_end = serializers.TimeField(required=False)
+    work_type = serializers.IntegerField(required=False)
+    comment = serializers.CharField(max_length=128, required=False)
+
+
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+        if WorkerDay.is_type_with_tm_range(self.validated_data['type']):
+            if self.validated_data.get('tm_work_start') is None:
+                raise MessageError(code="tm_work_start_req", lang=self.context['request'].user.lang)
+            if self.validated_data.get('tm_work_end') is None:
+                raise MessageError(code="tm_work_end_req", lang=self.context['request'].user.lang)
+            workers = self.validated_data.get('workers')
+            for key, value in workers.items():
+                try:
+                    workers[key] = list(map(lambda x: Converter.parse_date(x), value))
+                except:
+                    raise MessageError(code="invalid_dt_change_list", lang=self.context['request'].user.lang)
+
+
+class DuplicateSrializer(serializers.Serializer):
+    from_worker_id = serializers.IntegerField()
+    to_worker_id = serializers.IntegerField()
+    dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
+    is_approved = serializers.BooleanField(default=False)
+
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+        if not User.objects.filter(id=self.validated_data['from_worker_id']).exists():
+            raise MessageError(code="user_does_not_exist", lang=self.context['request'].user.lang)
+        if not User.objects.filter(id=self.validated_data['to_worker_id']).exists():
+            raise MessageError(code="user_does_not_exist", lang=self.context['request'].user.lang)
+
+
+class DeleteTimetableSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT, required=False, default=None)
+    users = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
+    types = serializers.ListField(child=serializers.CharField(), required=False, default=[])
+    delete_all = serializers.BooleanField(default=False)
+    except_created_by = serializers.BooleanField(default=True)
+    
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+        dt_from = self.validated_data.get('dt_from')
+        dt_to = self.validated_data.get('dt_to')
+        
+        if not self.validated_data.get('delete_all') and not dt_to:
+            raise MessageError(code="dt_to_required", lang=self.context['request'].user.lang)
+
+        if dt_to and dt_from > dt_to:
+            raise MessageError(code="dt_from_gt_dt_to", lang=self.context['request'].user.lang)
+
+
+class ExchangeSerializer(serializers.Serializer):
+    worker1_id = serializers.IntegerField()
+    worker2_id = serializers.IntegerField()
+    dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
+    is_approved = serializers.BooleanField(default=False)
+
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+        if not User.objects.filter(id=self.validated_data['worker1_id']).exists():
+            raise MessageError(code="exchange_user", lang=self.context['request'].user.lang)
+        if not User.objects.filter(id=self.validated_data['worker2_id']).exists():
+            raise MessageError(code="exchange_user", lang=self.context['request'].user.lang)
