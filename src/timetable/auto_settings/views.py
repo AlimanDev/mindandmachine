@@ -41,7 +41,7 @@ REBUILD_TIMETABLE_MIN_DELTA = 2
 
 class TokenAuthentication(BaseAuthentication):
     def authenticate(self, request):
-        token = request.META.get('HTTP_X_USERNAME')
+        token = request.data.get('access_token') or request.query_params.get('access_token')
         if not token:
             return None
 
