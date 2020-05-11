@@ -1,7 +1,8 @@
 from django.conf.urls import url, include
 from rest_framework import routers
 
-from src.timetable.views import WorkerDayViewSet, EmploymentWorkTypeViewSet, WorkerConstraintViewSet
+from src.timetable.views import EmploymentWorkTypeViewSet, WorkerConstraintViewSet
+from src.timetable.worker_day.views import WorkerDayViewSet
 from src.timetable.work_type_name.views import WorkTypeNameViewSet
 from src.timetable.work_type.views import WorkTypeViewSet
 from src.timetable.shop_month_stat.views import ShopMonthStatViewSet
