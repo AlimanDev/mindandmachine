@@ -156,6 +156,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({field:"This field is required"})
         return data
 
+
 class WorkerDayWithParentSerializer(WorkerDaySerializer):
     parent_worker_day_id = serializers.IntegerField()
 

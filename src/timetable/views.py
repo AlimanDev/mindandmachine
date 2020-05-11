@@ -1,5 +1,10 @@
-from django.db.models import OuterRef, Subquery
+import requests
+import json
+from dateutil.relativedelta import relativedelta
+
 from django_filters import utils
+from django.db.models import OuterRef, Subquery, Q
+from django.utils import timezone
 
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -31,13 +36,9 @@ from src.timetable.models import (
 )
 from src.base.models import Employment, Shop, User
 from src.timetable.backends import MultiShopsFilterBackend
-from django.db.models import OuterRef, Subquery, Q
-from django.utils import timezone
 from src.main.timetable.worker_exchange.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy
 from src.base.exceptions import MessageError
 from src.main.timetable.auto_settings.utils import set_timetable_date_from
-from src.timetable.worker_day.stat import count_worker_stat
-from dateutil.relativedelta import relativedelta
 
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
 

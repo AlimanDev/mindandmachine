@@ -4,8 +4,6 @@ from datetime import datetime, timedelta, date
 from django.conf import settings
 from django.db.models import F, Count, Sum, Q
 from django.db.models.functions import Coalesce, Extract
-from django.utils import timezone
-from dateutil.relativedelta import relativedelta
 
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -37,10 +35,22 @@ from src.util.models_converter import (
 )
 
 from src.timetable.worker_day.stat import CalendarPaidDays
-from rest_framework.exceptions import ValidationError
-
+from rest_framework.exceptions import ValidationError, AuthenticationFailed
+from rest_framework.authentication import BaseAuthentication
 REBUILD_TIMETABLE_MIN_DELTA = 2
 
+class TokenAuthentication(BaseAuthentication):
+    def authenticate(self, request):
+        token = request.META.get('HTTP_X_USERNAME')
+        if not token:
+            return None
+
+        try:
+            user = User.objects.get(access_token=token)
+        except User.DoesNotExist:
+            raise AuthenticationFailed('No such user')
+
+        return (user, None)
 
 class AutoSettingsViewSet(viewsets.ViewSet):
     serializer_class = AutoSettingsSerializer
@@ -757,7 +767,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         return Response()
 
 
-    @action(detail=False, methods=['post', 'get'])
+    @action(detail=False, methods=['post', 'get'], authentication_classes=[TokenAuthentication])
     def set_timetable(self, request):
         """
         Ждет request'a от qos_algo. Когда получает, записывает данные по расписанию в бд
