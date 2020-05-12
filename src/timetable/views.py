@@ -1,4 +1,4 @@
-from django.db.models import OuterRef, Subquery
+from django.db.models import OuterRef, Subquery, F
 from django_filters import utils
 
 from rest_framework import viewsets
@@ -13,7 +13,8 @@ from src.timetable.serializers import (
     WorkerDayApproveSerializer,
     WorkerDayWithParentSerializer,
     EmploymentWorkTypeSerializer,
-    WorkerConstraintSerializer
+    WorkerConstraintSerializer,
+    VacancySerializer,
 )
 
 from src.timetable.filters import WorkerDayFilter, EmploymentWorkTypeFilter, WorkerConstraintFilter
@@ -114,6 +115,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response()
 
+
     @action(detail=False, methods=['get'], )
     def worker_stat(self, request):
         filterset = self.filter_backends[0]().get_filterset(request, self.get_queryset(), self)
@@ -126,6 +128,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         stat = count_worker_stat(shop_id, data)
         return Response(stat)
 
+
     @action(detail=False, methods=['get'], )
     def daily_stat(self, request):
         filterset = self.filter_backends[0]().get_filterset(request, self.get_queryset(), self)
@@ -137,6 +140,25 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         shop_id = request.query_params.get('shop_id')
         stat = count_daily_stat(shop_id, data)
         return Response(stat)
+
+
+    @action(detail=False, methods=['get'], )
+    def vacancy(self, request):
+        filterset_class = self.filter_backends[0]().get_filterset(request, self.get_queryset(), self)
+        if not filterset_class.form.is_valid():
+            raise utils.translate_validation(filterset_class.errors)
+            
+        return Response(
+            VacancySerializer(
+                filterset_class.filter_queryset(
+                    self.get_queryset().select_related('shop').annotate(
+                        first_name=F('worker__first_name'),
+                        last_name=F('worker__last_name'),
+                    ),
+                ), 
+                many=True,
+            ).data
+        ) 
 
 
 class EmploymentWorkTypeViewSet(viewsets.ModelViewSet):

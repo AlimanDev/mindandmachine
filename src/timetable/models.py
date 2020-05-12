@@ -382,6 +382,7 @@ class WorkerDay(AbstractModel):
     is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
     is_vacancy = models.BooleanField(default=False)
     dttm_added = models.DateTimeField(default=timezone.now)
+    canceled = models.BooleanField(default=False)
 
     objects = WorkerDayManager()
 
@@ -431,53 +432,11 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
     class Meta:
         verbose_name = 'Детали в течение рабочего дня'
 
-    TYPE_WORK = 'W'
-    TYPE_WORK_TRADING_FLOOR = 'Z'
-    TYPE_BREAK = 'B'
-    TYPE_STUDY = 'S'
-    TYPE_VACANCY = 'V'
-    TYPE_SOON = 'C'
-    TYPE_FINISH = 'H'
-    TYPE_ABSENCE = 'A'
-    TYPE_DELETED = 'D'
-
-    DETAILS_TYPES = (
-            (TYPE_WORK, 'work period'),
-            (TYPE_BREAK, 'rest / break'),
-            (TYPE_STUDY, 'study period'),
-            (TYPE_VACANCY, 'vacancy'),
-            (TYPE_WORK_TRADING_FLOOR, 'work in trading floor'),
-    )
-
-    TYPE_T = 'T'
-
-    WORK_TYPES_LIST = (
-        TYPE_WORK,
-        TYPE_STUDY,
-        TYPE_WORK_TRADING_FLOOR,
-    )
-
-    DETAILS_TYPES_LIST = (
-        TYPE_WORK,
-        TYPE_BREAK,
-        TYPE_STUDY,
-        TYPE_WORK_TRADING_FLOOR,
-    )
-
     id = models.BigAutoField(primary_key=True)
 
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.CASCADE, null=True, blank=True, related_name='worker_day_details')
-    on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, null=True, blank=True)
-
-    status = models.CharField(max_length=1, choices=DETAILS_TYPES, default=TYPE_WORK)
-    is_vacancy = models.BooleanField(default=False)
-
-    is_tablet = models.BooleanField(default=False)
-
-    dttm_from = models.DateTimeField()
-    dttm_to = models.DateTimeField(null=True, blank=True)
-    event = models.OneToOneField(Event, on_delete=models.SET_NULL, null=True, blank=True, related_name='worker_day_details', related_query_name='worker_day_details')
+    work_part = models.FloatField(default=1.0)
 
     def __str__(self):
         return '{}, {}, {}, {}, {}-{}, id: {}'.format(

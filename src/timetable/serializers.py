@@ -4,6 +4,7 @@ from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentW
 from rest_framework.exceptions import ValidationError
 from  django.db import DatabaseError
 from src.base.models import Employment
+from src.base.shop.views import ShopSerializer
 
 
 class WorkerDayApproveSerializer(serializers.Serializer):
@@ -17,13 +18,13 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
     work_type_id = serializers.IntegerField(required=False)
     class Meta:
         model = WorkerDayCashboxDetails
-        fields = ['id', 'work_type_id', 'dttm_from', 'dttm_to', 'status']
+        fields = ['id', 'work_type_id']
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):
     worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
-    worker_id = serializers.IntegerField()
-    employment_id = serializers.IntegerField()
+    worker_id = serializers.IntegerField(required=False)
+    employment_id = serializers.IntegerField(required=False)
     shop_id = serializers.IntegerField()
     parent_worker_day_id = serializers.IntegerField(required=False, read_only=True)
     is_fact = serializers.BooleanField(required=False)
@@ -209,3 +210,17 @@ class WorkerConstraintSerializer(serializers.ModelSerializer):
         model = WorkerConstraint
         fields = ['id', 'employment_id', 'weekday', 'is_lite', 'tm']
         list_serializer_class = WorkerConstraintListSerializer
+
+
+class VacancySerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
+    shop = ShopSerializer()
+    dttm_work_start = serializers.DateTimeField(default=None)
+    dttm_work_end = serializers.DateTimeField(default=None)
+
+    class Meta:
+        model = WorkerDay
+        fields = ['id', 'first_name', 'last_name', 'worker_id', 'worker_day_details', 'shop', 'is_fact', 'is_approved', 'dttm_work_start', 'dttm_work_end', 'type']
+

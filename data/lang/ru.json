@@ -1,5 +1,8 @@
 {
-  "vacancy": "Создана вакансия на {dt} с {details.dttm_from} по {details.dttm_to} в магазине {shop.address} http://{domain}/vacancy/{details.id}",
+  "vacancy": "Создана вакансия на {dt} с {details.dttm_work_start} по {details.dttm_work_end} в магазине {shop.address} http://{domain}/vacancy/{details.id}",
+  "no_vacancy": "Такой вакансии не существует",
+  "no_timetable": "График на этот период еще не составлен",
+  "cant_apply_vacancy": "Вы не можете выйти на эту смену",
   "emp_check_dates": "В этом магазине уже заведено трудоустройство с {employment.dt_hired} по {employment.dt_fired}",
   "password_wrong": "Неверный пароль",
   "password_mismatch": "Пароли не совпадают",

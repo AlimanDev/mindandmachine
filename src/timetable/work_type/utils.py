@@ -99,30 +99,33 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
     )
 
     # query selecting cashbox_details
-    status_list = list(WorkerDayCashboxDetails.WORK_TYPES_LIST)
-    if consider_vacancies:
-        status_list.append(WorkerDayCashboxDetails.TYPE_VACANCY)
+    status_list = list(WorkerDay.TYPES_PAID)
+    wd_details_filter = {}
+    if not consider_vacancies:
+        wd_details_filter['worker_day__is_vacancy'] = False
 
     cashbox_details = WorkerDayCashboxDetails.objects.filter(
         Q(worker_day__employment__dt_fired__gte=from_dt) &
-        Q(dttm_to__lte=F('worker_day__employment__dt_fired')) |
+        Q(worker_day__dt__lte=F('worker_day__employment__dt_fired')) |
         Q(worker_day__employment__dt_fired__isnull=True),
 
         Q(worker_day__employment__dt_hired__lte=to_dt) &
-        Q(dttm_from__gte = F('worker_day__employment__dt_hired')) |
+        Q(worker_day__dt__gte = F('worker_day__employment__dt_hired')) |
         Q(worker_day__employment__dt_hired__isnull=True),
 
-        dttm_from__gte=from_dt,
-        dttm_to__lte=to_dt,
+        worker_day__dt__gte=from_dt,
+        worker_day__dt__lte=to_dt,
         work_type_id__in=work_types.keys(),
-        status__in=status_list
+        worker_day__type__in=status_list,
+        worker_day__is_fact=False,
+        worker_day__is_approved=True,
     ).select_related('worker_day', 'worker_day__worker')
 
     lambda_index_work_details = lambda x: list(range(
-            dttm2index(from_dt, x.dttm_from, period_in_day, period_lengths_minutes),
-            dttm2index(from_dt, x.dttm_to, period_in_day, period_lengths_minutes),
+            dttm2index(from_dt, x.worker_day.dttm_work_start, period_in_day, period_lengths_minutes),
+            dttm2index(from_dt, x.worker_day.dttm_work_end, period_in_day, period_lengths_minutes),
         ))
-    lambda_add_work_details = lambda x: 1
+    lambda_add_work_details = lambda x: x.work_part
 
     fill_array(
         init_work,

@@ -356,6 +356,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_approve',
         'WorkerDay_daily_stat',
         'WorkerDay_worker_stat',
+        'WorkerDay_vacancy',
         'ShopMonthStat',
 
         'signout',
@@ -509,6 +510,7 @@ EVENT_TYPES = [
 class Event(AbstractModel):
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_valid_to = models.DateTimeField(auto_now_add=True)
+    worker_day = models.ForeignKey('timetable.WorkerDay', null=True, blank=True, on_delete=models.CASCADE)
 
     type = models.CharField(choices=EVENT_TYPES, max_length=20)
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT, related_name="events")
