@@ -10,6 +10,8 @@ class Message(object):
         self.message_dict = json.load(file)
 
     def get_message(self, key, params={}):
-        message = self.message_dict.get(key, '')
+        message = self.message_dict.get(key, None)
+        if not message:
+            return key
         message = message.format(**params)
         return message

@@ -276,7 +276,6 @@ class PeriodClients(AbstractModel):
     value = models.FloatField(default=0)
 
 
-
 class PeriodDemandChangeLog(AbstractModel):
     class Meta(object):
         verbose_name = 'Лог изменений спроса'
