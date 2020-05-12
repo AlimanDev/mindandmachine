@@ -733,7 +733,7 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
             send_noti2candidates(workers, worker_day_detail)
 
 
-def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None):
+def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=False):
     """
     Автоматически отменяем вакансии, в которых нет потребности
     :return:
@@ -781,7 +781,9 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None):
         dt__lte=to_dt,
         work_types__id=work_type_id,
         is_vacancy=True,
+        is_fact=False,
         created_by__isnull=True,
+        is_approved=approved,
     ).order_by('dt')
 
     for vacancy in vacancies:

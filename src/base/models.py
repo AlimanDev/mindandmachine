@@ -357,6 +357,10 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_daily_stat',
         'WorkerDay_worker_stat',
         'WorkerDay_vacancy',
+        'WorkerDay_change_list',
+        'WorkerDay_duplicate',
+        'WorkerDay_delete_timetable',
+        'WorkerDay_exchange',
         'ShopMonthStat',
 
         'signout',
