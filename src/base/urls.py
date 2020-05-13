@@ -1,10 +1,21 @@
 from django.conf.urls import url, include
+
 from rest_framework import routers
-from src.base.shop.views import ShopViewSet
-from src.base.views import EmploymentViewSet, UserViewSet, FunctionGroupView, AuthUserView, WorkerPositionViewSet, NotificationViewSet, SubscribeViewSet, ShopSettingsViewSet
 from rest_auth.views import (
     LoginView, LogoutView, PasswordChangeView
 )
+from src.base.shop.views import ShopViewSet
+from src.base.views import(
+    EmploymentViewSet,
+    UserViewSet,
+    FunctionGroupView,
+    AuthUserView,
+    WorkerPositionViewSet,
+    NotificationViewSet,
+    SubscribeViewSet,
+    ShopSettingsViewSet,
+    NetworkViewSet)
+
 
 rest_auth_urls = [
     url(r'^login/$', LoginView.as_view(), name='rest_login'),
@@ -24,6 +35,7 @@ router.register(r'worker_position', WorkerPositionViewSet, basename='WorkerPosit
 router.register(r'subscribe', SubscribeViewSet, basename='Subscribe')
 router.register(r'notification', NotificationViewSet, basename='Notification')
 router.register(r'shop_settings', ShopSettingsViewSet, basename='ShopSettings')
+router.register(r'network', NetworkViewSet, basename='Network')
 
 
 # Wire up our API using automatic URL routing.

@@ -239,3 +239,4 @@ class NetworkViewSet(ModelViewSet):
     serializer_class = NetworkSerializer
     queryset = Network.objects.all()
 
+

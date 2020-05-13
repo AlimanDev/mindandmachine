@@ -14,6 +14,12 @@ class Network(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Сеть магазинов'
         verbose_name_plural = 'Сети магазинов'
+    logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
+    url = models.CharField(blank=True,null=True,max_length=255)
+
+    def get_department(self):
+        return None
+
 
 class Region(AbstractActiveNamedModel):
     class Meta:
