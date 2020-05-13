@@ -10,6 +10,11 @@ from mptt.models import MPTTModel, TreeForeignKey
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
 
 
+class Network(AbstractActiveNamedModel):
+    class Meta:
+        verbose_name = 'Сеть магазинов'
+        verbose_name_plural = 'Сети магазинов'
+
 class Region(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Регион'
@@ -112,6 +117,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     staff_number = models.SmallIntegerField(default=0)
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
     settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True)
 
