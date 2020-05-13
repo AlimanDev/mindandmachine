@@ -21,6 +21,8 @@ class OperationTypeName(AbstractActiveNamedModel):
         )
         return self
 
+    is_special = models.BooleanField(default=False)
+
 
 class LoadTemplate(AbstractModel):
     class Meta:
@@ -59,6 +61,7 @@ class OperationType(AbstractActiveModel):
         (UPDATED, 'Обновлён'),
     ]
 
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True, related_name='operation_types')
     work_type = models.OneToOneField(WorkType, on_delete=models.PROTECT, related_name='operation_type', null=True)
     operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
     do_forecast = models.CharField(
@@ -271,7 +274,6 @@ class PeriodClients(AbstractModel):
     type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
     operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT)
     value = models.FloatField(default=0)
-
 
 
 class PeriodDemandChangeLog(AbstractModel):

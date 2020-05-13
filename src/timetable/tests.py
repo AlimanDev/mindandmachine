@@ -1,4 +1,4 @@
-from datetime import timedelta, time, datetime
+from datetime import timedelta, time, datetime, date
 
 from django.utils.timezone import now
 
@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 
 from src.util.test import create_departments_and_users
 
-from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName
+from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName, WorkerDayCashboxDetails
 from src.base.models import FunctionGroup
 from src.util.models_converter import Converter
 
@@ -264,7 +264,7 @@ class TestWorkerDay(APITestCase):
         response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(), {
-            'error': ['dttm_work_start, dttm_work_end, and worker_day_details required for type W']})
+            'error': ['worker_day_details is required for type W']})
 
         data = {
             "shop_id": self.shop.id,
@@ -283,7 +283,7 @@ class TestWorkerDay(APITestCase):
         response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(), {
-            'error': ['dttm_work_start, dttm_work_end, and worker_day_details required for type W']})
+            'error': ['dttm_work_start, dttm_work_end are required for type W']})
 
     def test_edit_approved_wd_secondly(self):
         data = {
@@ -566,3 +566,222 @@ class TestAttendanceRecords(APITestCase):
         self.assertTrue(wd.exists())
         wd = wd.first()
         self.assertEqual(wd.parent_worker_day_id, self.worker_day_plan_approved.id)
+
+
+class TestAditionalFunctions(APITestCase):
+    USER_USERNAME = "user1"
+    USER_EMAIL = "q@q.q"
+    USER_PASSWORD = "4242"
+
+    def setUp(self):
+        from src.timetable.models import ExchangeSettings
+        super().setUp()
+
+        self.url = '/rest_api/worker_day/'
+        create_departments_and_users(self)
+        self.work_type_name = WorkTypeName.objects.create(name='Магазин')
+        self.work_type = WorkType.objects.create(
+            work_type_name=self.work_type_name,
+            shop=self.shop)
+        ExchangeSettings.objects.create()
+        FunctionGroup.objects.bulk_create([
+            FunctionGroup(group=self.admin_group,
+                          method=method,
+                          func=func,
+                          level_up=1,
+                          level_down=99,
+            ) for method in ['POST', 'PUT', 'DELETE'] 
+            for func in ['WorkerDay_change_list', 'WorkerDay_duplicate', 'WorkerDay_delete_timetable', 'WorkerDay_exchange']
+        ])
+        self.client.force_authenticate(user=self.user1)
+
+
+    def create_holidays(self, employment, dt_from, count, approved, wds={}):
+        result = {}
+        for day in range(count):
+            date = dt_from + timedelta(days=day)
+            parent_worker_day = None if approved else wds.get(date, None)
+            result[date] = WorkerDay.objects.create(
+                employment=employment,
+                worker=employment.user,
+                shop=employment.shop,
+                dt=date,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_approved=approved,
+                parent_worker_day=parent_worker_day,
+            )
+        return result
+
+
+    def create_worker_days(self, employment, dt_from, count, from_tm, to_tm, approved, wds={}):
+        result = {}
+        for day in range(count):
+            date = dt_from + timedelta(days=day)
+            parent_worker_day = None if approved else wds.get(date, None)
+            wd = WorkerDay.objects.create(
+                employment=employment,
+                worker=employment.user,
+                shop=employment.shop,
+                dt=date,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(date, time(from_tm)),
+                dttm_work_end=datetime.combine(date, time(to_tm)),
+                is_approved=approved,
+                parent_worker_day=parent_worker_day,
+            )
+            result[date] = wd
+
+            WorkerDayCashboxDetails.objects.create(
+                dttm_from='{} 09:00:00'.format(date),
+                dttm_to='{} 23:00:00'.format(date),
+                work_type=self.work_type,
+                status=WorkerDayCashboxDetails.TYPE_WORK,
+                is_vacancy=False,
+                worker_day=wd
+            )
+        return result
+
+
+    def test_delete_all(self):
+        dt_from = date.today()
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': Converter.convert_date(dt_from),
+            'dt_to': Converter.convert_date(dt_from + timedelta(4)),
+            'delete_all': True,
+        }
+        self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
+        self.create_worker_days(self.employment2, dt_from, 4, 16, 20, False)
+        self.create_worker_days(self.employment3, dt_from, 4, 10, 21, False)
+        url = f'{self.url}delete_timetable/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 8)
+        #остаётся 4 т.к. у сотрудника auto_timetable=False
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 4)
+
+
+    def test_delete(self):
+        dt_from = date.today()
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': Converter.convert_date(dt_from),
+            'dt_to': Converter.convert_date(dt_from + timedelta(4)),
+            'types': ['W',],
+            'users': [self.user2.id, self.user3.id],
+        }
+        self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
+        self.create_worker_days(self.employment2, dt_from, 3, 16, 20, False)
+        self.create_worker_days(self.employment3, dt_from, 4, 10, 21, False)
+        self.create_holidays(self.employment2, dt_from + timedelta(3), 1, False)
+        url = f'{self.url}delete_timetable/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 8)
+        #остаётся 1 выходной т.к. удаляем только рабочие дни
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 1)
+
+
+    def test_exchange_approved(self):
+        dt_from = date.today()
+        data = {
+            'worker1_id': self.user2.id,
+            'worker2_id': self.user3.id,
+            'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
+            'is_approved': True,
+        }
+        self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
+        url = f'{self.url}exchange/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(len(response.json()), 8)
+
+
+    def test_exchange_not_approved(self):
+        dt_from = date.today()
+        data = {
+            'worker1_id': self.user2.id,
+            'worker2_id': self.user3.id,
+            'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
+            'is_approved': False,
+        }
+        self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
+        self.create_worker_days(self.employment2, dt_from, 4, 16, 20, False)
+        self.create_worker_days(self.employment3, dt_from, 4, 10, 21, False)
+        url = f'{self.url}exchange/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(len(response.json()), 8)
+
+
+    def test_duplicate_approved(self):
+        dt_from = date.today()
+        data = {
+            'from_worker_id': self.user2.id,
+            'to_worker_id': self.user3.id,
+            'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
+            'is_approved': True,
+        }
+        self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
+        self.create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
+        url = f'{self.url}duplicate/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(len(response.json()), 5)
+
+
+    def test_duplicate_not_approved(self):
+        dt_from = date.today()
+        data = {
+            'from_worker_id': self.user2.id,
+            'to_worker_id': self.user3.id,
+            'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
+            'is_approved': False,
+        }
+        self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
+        wds = self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
+        self.create_worker_days(self.employment2, dt_from, 5, 16, 20, False)
+        self.create_worker_days(self.employment3, dt_from, 4, 10, 21, False, wds=wds)
+        self.create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
+        url = f'{self.url}duplicate/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(len(response.json()), 5)
+
+
+    def test_change_list(self):
+        dt_from = date.today()
+        data = {
+            'shop_id': self.shop.id,
+            'workers': {
+                self.user2.id: [
+                    Converter.convert_date(dt_from),
+                    Converter.convert_date(dt_from + timedelta(1)),
+                    Converter.convert_date(dt_from + timedelta(3)),
+                ],
+                self.user3.id: [
+                    Converter.convert_date(dt_from),
+                    Converter.convert_date(dt_from + timedelta(2)),
+                    Converter.convert_date(dt_from + timedelta(3)),
+                ],
+            },
+            'type': WorkerDay.TYPE_WORKDAY,
+            'tm_work_start': '10:00:00',
+            'tm_work_end': '22:00:00',
+            'work_type': self.work_type.id,
+            'comment': 'Test change',
+        }
+        wds = self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
+        self.create_worker_days(self.employment2, dt_from, 2, 10, 20, False, wds=wds)
+        wds = self.create_worker_days(self.employment2, dt_from, 3, 10, 20, True)
+        wds.update(self.create_holidays(self.employment3, dt_from + timedelta(3), 1, True))
+        self.create_worker_days(self.employment3, dt_from, 4, 10, 21, False, wds=wds)
+        self.create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
+        url = f'{self.url}change_list/'
+        response = self.client.post(url, data, format='json')
+        data = response.json()
+        self.assertEqual(len(data), 2)
+        self.assertEqual(len(data[str(self.user2.id)]), 3)
+        self.assertEqual(len(data[str(self.user3.id)]), 3)
+

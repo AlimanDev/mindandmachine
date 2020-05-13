@@ -3,6 +3,7 @@ from src.base.models import (
     Employment,
     User,
     Shop,
+    ShopSettings,
     Group,
     FunctionGroup,
     WorkerPosition,
@@ -55,6 +56,12 @@ class ShopAdmin(admin.ModelAdmin):
     @staticmethod
     def parent_title(instance: Shop):
         return instance.parent_title()
+
+
+@admin.register(ShopSettings)
+class ShopSettingsAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name' )
+    search_fields = ('id', 'name')
 
 
 @admin.register(Group)

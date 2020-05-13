@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.RenameModel('Timetable', 'ShopMonthStat'),
         migrations.AlterModelOptions(
             name='shopmonthstat',
-            options={'verbose_name': 'Статистика по мгазину за месяц', 'verbose_name_plural': 'Статистики по мгазинам за месяц'},
+            options={'verbose_name': 'Статистика по магазину за месяц', 'verbose_name_plural': 'Статистики по магазинам за месяц'},
         ),
         migrations.AlterField(
             model_name='shopmonthstat',

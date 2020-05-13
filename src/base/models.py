@@ -1,14 +1,14 @@
+import datetime
+from timezone_field import TimeZoneField
+
 from django.db import models
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
-from timezone_field import TimeZoneField
-
-import datetime
+from mptt.models import MPTTModel, TreeForeignKey
 
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
 
-from mptt.models import MPTTModel, TreeForeignKey
 
 class Region(AbstractActiveNamedModel):
     class Meta:
@@ -16,12 +16,11 @@ class Region(AbstractActiveNamedModel):
         verbose_name_plural = 'Регионы'
 
 
-# на самом деле это отдел
-class Shop(MPTTModel, AbstractActiveNamedModel):
+class ShopSettings(AbstractActiveNamedModel):
+
     class Meta(object):
-        # unique_together = ('parent', 'title')
-        verbose_name = 'Отдел'
-        verbose_name_plural = 'Отделы'
+        verbose_name = 'Настройки автосоставления'
+        verbose_name_plural = 'Настройки автосоставления'
 
     PRODUCTION_CAL = 'P'
     YEAR_NORM = 'N'
@@ -30,6 +29,42 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         (PRODUCTION_CAL, 'production calendar'),
         (YEAR_NORM, 'norm per year')
     )
+    # json fields
+    method_params = models.CharField(max_length=4096, default='[]')
+    cost_weights = models.CharField(max_length=4096, default='{}')
+    init_params = models.CharField(max_length=2048, default='{"n_working_days_optimal": 20}')
+    break_triplets = models.CharField(max_length=1024, default='[]')
+
+    # added on 21.12.2018
+    idle = models.SmallIntegerField(default=0)  # percents
+    fot = models.IntegerField(default=0)
+    less_norm = models.SmallIntegerField(default=0)  # percents
+    more_norm = models.SmallIntegerField(default=0)  # percents
+    shift_start = models.SmallIntegerField(default=6)
+    shift_end = models.SmallIntegerField(default=12)
+    min_change_time = models.IntegerField(default=12)
+    even_shift_morning_evening = models.BooleanField(default=False)
+    # workdays_holidays_same = models.BooleanField(default=False)
+    paired_weekday = models.BooleanField(default=False)
+    exit1day = models.BooleanField(default=False)
+    exit42hours = models.BooleanField(default=False)
+    process_type = models.CharField(max_length=1, choices=PROCESS_TYPE, default=YEAR_NORM)
+    absenteeism = models.SmallIntegerField(default=0)  # percents
+    # added on 16.05.2019
+    queue_length = models.FloatField(default=3.0)
+
+    max_work_hours_7days = models.SmallIntegerField(default=48)
+
+    def get_department(self):
+        return None
+
+
+# на самом деле это отдел
+class Shop(MPTTModel, AbstractActiveNamedModel):
+    class Meta(object):
+        # unique_together = ('parent', 'title')
+        verbose_name = 'Отдел'
+        verbose_name_plural = 'Отделы'
 
     id = models.BigAutoField(primary_key=True)
 
@@ -45,7 +80,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         (TYPE_REGION, 'region'),
         (TYPE_SHOP, 'shop'),
     )
-
 
     code = models.CharField(max_length=64, null=True, blank=True)
     #From supershop
@@ -68,41 +102,19 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     count_lack = models.BooleanField(default=False)
 
-    # json fields
-    method_params  = models.CharField(max_length=4096, default='[]')
-    cost_weights   = models.CharField(max_length=4096, default='{}')
-    init_params    = models.CharField(max_length=2048, default='{"n_working_days_optimal": 20}')
-    break_triplets = models.CharField(max_length=1024, default='[]')
-
-    # added on 21.12.2018
-    idle = models.SmallIntegerField(default=0)  # percents
-    fot = models.IntegerField(default=0)
-    less_norm = models.SmallIntegerField(default=0)  # percents
-    more_norm = models.SmallIntegerField(default=0)  # percents
     tm_shop_opens = models.TimeField(default=datetime.time(6, 0))
     tm_shop_closes = models.TimeField(default=datetime.time(23, 0))
-    shift_start = models.SmallIntegerField(default=6)
-    shift_end = models.SmallIntegerField(default=12)
     restricted_start_times = models.CharField(max_length=1024, default='[]')
     restricted_end_times = models.CharField(max_length=1024, default='[]')
-    min_change_time = models.IntegerField(default=12)
-    even_shift_morning_evening = models.BooleanField(default=False)
-    # workdays_holidays_same = models.BooleanField(default=False)
-    paired_weekday = models.BooleanField(default=False)
-    exit1day = models.BooleanField(default=False)
-    exit42hours = models.BooleanField(default=False)
-    process_type = models.CharField(max_length=1, choices=PROCESS_TYPE, default=YEAR_NORM)
-    absenteeism = models.SmallIntegerField(default=0)  # percents
-    # added on 16.05.2019
-    queue_length = models.FloatField(default=3.0)
 
     load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops')
-
-    max_work_hours_7days = models.SmallIntegerField(default=48)
 
     staff_number = models.SmallIntegerField(default=0)
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
+
+    settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True)
+
     def __str__(self):
         return '{}, {}, {}'.format(
             self.name,
@@ -129,6 +141,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         return self.get_ancestors().filter(level=level)[0]
     def get_department(self):
         return self
+
 
 class EmploymentManager(models.Manager):
     def get_active(self, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):
@@ -332,6 +345,9 @@ class FunctionGroup(AbstractModel):
     )
 
     FUNCS = (
+        'AutoSettings_create_timetable',
+        'AutoSettings_set_timetable',
+        'AutoSettings_delete_timetable',
         'AuthUserView',
         'Employment',
         'EmploymentWorkType',
@@ -354,8 +370,14 @@ class FunctionGroup(AbstractModel):
         'WorkerConstraint',
         'WorkerDay',
         'WorkerDay_approve',
+        'WorkerDay_daily_stat',
         'WorkerDay_worker_stat',
+        'WorkerDay_change_list',
+        'WorkerDay_duplicate',
+        'WorkerDay_delete_timetable',
+        'WorkerDay_exchange',
         'ShopMonthStat',
+        'ShopSettings',
 
         'signout',
         'password_edit',
