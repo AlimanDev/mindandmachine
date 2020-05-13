@@ -10,7 +10,6 @@
     <div id="swagger-ui"></div>
     <script src="//unpkg.com/swagger-ui-dist@3/swagger-ui-bundle.js"></script>
     <script>
-<!--    var SwaggerUIBundle = require('swagger-ui-dist').SwaggerUIBundle-->
     const ui = SwaggerUIBundle({
         url: "{% url schema_url %}",
         dom_id: '#swagger-ui',
