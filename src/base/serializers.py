@@ -14,7 +14,7 @@ from src.base.exceptions import MessageError
 class NetworkSerializer(serializers.ModelSerializer):
     class Meta:
         model = Network
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'logo', 'url', 'primary_color', 'secondary_color']
 
 
 class UserSerializer(serializers.ModelSerializer):
