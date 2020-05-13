@@ -358,6 +358,7 @@ class FunctionGroup(AbstractModel):
         'Employment',
         'EmploymentWorkType',
         'FunctionGroupView',
+        'Network',
         'Notification',
         'OperationTemplate',
         'WorkTypeName',

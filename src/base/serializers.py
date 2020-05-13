@@ -1,15 +1,22 @@
 from rest_framework import serializers
 
-from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
+from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
 from django.contrib.auth.forms import SetPasswordForm
 from rest_framework.validators import UniqueValidator
-from rest_framework.exceptions import ValidationError
 from django.db.models import Q
 
 from django.conf import settings
 from src.base.message import Message
 from src.base.exceptions import MessageError
+
+
+class NetworkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Network
+        fields = ['id', 'name']
+
+
 class UserSerializer(serializers.ModelSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
 

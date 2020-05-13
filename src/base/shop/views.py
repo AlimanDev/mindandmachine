@@ -25,11 +25,13 @@ class TimeZoneField(serializers.ChoiceField):
 class ShopSerializer(serializers.ModelSerializer):
     parent_id = serializers.IntegerField(required=False)
     region_id = serializers.IntegerField(required=False)
+    network_id = serializers.IntegerField(required=False)
     timezone = TimeZoneField()
     class Meta:
         model = Shop
         fields = ['id', 'parent_id', 'name', 'tm_shop_opens', 'tm_shop_closes', 'code',
-                  'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id']
+                  'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id', 'network_id']
+
 
 class ShopStatSerializer(serializers.Serializer):
     id=serializers.IntegerField()

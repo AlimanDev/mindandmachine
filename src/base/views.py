@@ -11,9 +11,19 @@ from rest_framework.status import HTTP_400_BAD_REQUEST
 from rest_framework.decorators import action
 
 from src.base.permissions import Permission
-from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer, ShopSettingsSerializer
+from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer, ShopSettingsSerializer, NetworkSerializer
 from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter
-from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Subscribe, Notification, ShopSettings
+from src.base.models import (
+    Employment,
+    FunctionGroup,
+    Network,
+    Notification,
+    Subscribe,
+    ShopSettings,
+    WorkerPosition,
+    User,
+)
+
 from src.base.filters import UserFilter
 
 
@@ -223,4 +233,9 @@ class ShopSettingsViewSet(ModelViewSet):
     permission_classes = [Permission]
     serializer_class = ShopSettingsSerializer
     queryset = ShopSettings.objects.all()
+
+class NetworkViewSet(ModelViewSet):
+    permission_classes = [Permission]
+    serializer_class = NetworkSerializer
+    queryset = Network.objects.all()
 
