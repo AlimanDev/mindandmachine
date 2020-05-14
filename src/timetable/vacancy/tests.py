@@ -10,6 +10,7 @@ from src.base.models import (
     User,
     Region,
     Event,
+    ShopSettings,
 )
 from src.timetable.models import (
     WorkType,
@@ -50,24 +51,27 @@ class Test_auto_worker_exchange(TestCase):
         )
 
         fill_calendar.main('2018.1.1', (datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y.%m.%d'), region_id=1)
-
+        self.shop_settings = ShopSettings.objects.create()
 
         self.root_shop = Shop.objects.create(
             name='SuperShop1',
             tm_shop_opens=datetime.time(7, 0, 0),
-            tm_shop_closes=datetime.time(0, 0, 0)
+            tm_shop_closes=datetime.time(0, 0, 0),
+            settings=self.shop_settings,
         )
 
         self.shop = Shop.objects.create(
             parent=self.root_shop,
             name='Shop1',
             region=self.region,
+            settings=self.shop_settings,
         )
 
         self.shop2 = Shop.objects.create(
             parent=self.root_shop,
             name='Shop2',
             region=self.region,
+            settings=self.shop_settings,
         )
         
         self.shop.exchange_shops.add(self.shop)
@@ -77,6 +81,7 @@ class Test_auto_worker_exchange(TestCase):
             parent=self.root_shop,
             name='Shop3',
             region=self.region,
+            settings=self.shop_settings,
         )
 
         self.shop.exchange_shops.add(self.shop3)
@@ -85,6 +90,7 @@ class Test_auto_worker_exchange(TestCase):
             parent=self.root_shop,
             name='Shop4',
             region=self.region,
+            settings=self.shop_settings,
         )
 
         shops = [self.shop, self.shop2, self.shop3, self.shop4]

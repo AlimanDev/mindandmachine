@@ -1,9 +1,10 @@
-from rest_framework import serializers
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
-
-from rest_framework.exceptions import ValidationError
 from  django.db import DatabaseError
+
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 from src.base.shop.views import ShopSerializer
+
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
 from src.base.models import Employment, User
 from src.util.models_converter import Converter
 from src.conf.djconfig import QOS_DATE_FORMAT
@@ -60,7 +61,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         if not type == WorkerDay.TYPE_WORKDAY or is_fact:
             attrs.pop('worker_day_details', None)
         elif not ( attrs.get('worker_day_details')):
-            raise ValidationError({"error": f" worker_day_details is required for type {type}"})
+            raise ValidationError({"error": f"worker_day_details is required for type {type}"})
         return attrs
 
     def create(self, validated_data):
@@ -156,6 +157,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({field:"This field is required"})
         return data
 
+
 class WorkerDayWithParentSerializer(WorkerDaySerializer):
     parent_worker_day_id = serializers.IntegerField()
 
@@ -226,6 +228,14 @@ class VacancySerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkerDay
         fields = ['id', 'first_name', 'last_name', 'worker_id', 'worker_day_details', 'shop', 'is_fact', 'is_approved', 'dttm_work_start', 'dttm_work_end', 'type']
+
+        
+class AutoSettingsSerializer(serializers.Serializer):
+    shop_id=serializers.IntegerField()
+    dt_from=serializers.DateField()
+    dt_to=serializers.DateField()
+    is_remaking=serializers.BooleanField(default=False)
+
 
 
 class ListChangeSrializer(serializers.Serializer):

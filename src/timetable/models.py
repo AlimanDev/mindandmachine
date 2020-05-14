@@ -9,7 +9,7 @@ from src.base.models import Shop, Employment, User, Event
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
 from django.utils import timezone
-
+from django.db.models import Subquery, OuterRef, Max
 
 class WorkerManager(UserManager):
     pass
@@ -225,7 +225,7 @@ class WorkerConstraint(AbstractModel):
 
     id = models.BigAutoField(primary_key=True)
     shop = models.ForeignKey(Shop, blank=True, null=True, on_delete=models.PROTECT, related_name='worker_constraints')
-    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True, related_name='worker_constraints')
+    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, related_name='worker_constraints')
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
@@ -258,6 +258,27 @@ class WorkerDayManager(models.Manager):
             return self.qos_current_version(approved_only)
         else:
             return self.qos_initial_version()
+
+    def get_last_plan(self,  *args, **kwargs):
+        """
+        Возвращает плановый график - микс подтвержденного и неподтвержденного,
+        последнюю версию за каждый день.
+        """
+        super().get_queryset()
+        max_dt_subq = WorkerDay.objects.filter(
+            dt=OuterRef('dt'),
+            worker_id=OuterRef('worker_id'),
+            is_fact=False,
+            shop_id=OuterRef('shop_id')
+        ).values( # for group by
+            'dttm_added'
+        ).annotate(dt_max=Max('dttm_added')).values('dt_max')
+        return super().get_queryset().filter(
+            *args,
+            **kwargs,
+            is_fact=False,
+            dttm_added=Subquery(max_dt_subq),
+        )
 
     @staticmethod
     def qos_get_current_worker_day(worker_day):
@@ -367,7 +388,7 @@ class WorkerDay(AbstractModel):
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
 
-    worker = models.ForeignKey(User, null=True,on_delete=models.PROTECT)  # todo: make immutable
+    worker = models.ForeignKey(User, null=True, on_delete=models.PROTECT, related_name='worker_day', related_query_name='worker_day')  # todo: make immutable
     type = models.CharField(choices=TYPES, max_length=2, default=TYPE_EMPTY)
 
     work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')

@@ -291,7 +291,7 @@ def do_shift_elongation(vacancy, max_working_hours):
     shop = vacancy.shop
     vacancy_dt = vacancy.dt
     work_hours = vacancy.work_hours
-    max_shift_len = time(shop.shift_end)
+    max_shift_len = time(shop.settings.shift_end)
     work_types = vacancy.work_types.all().values_list('work_type_name_id', flat=True)
     workers = list(User.objects.filter(
         Q(employments__dt_fired__isnull=True) | Q(employments__dt_fired__gt=vacancy_dt),
@@ -845,7 +845,7 @@ def holiday_workers_exchange():
             shop=shop,
             is_vacancy=True,
             worker__isnull=True,
-        )
+        ).select_related('shop')
         for vacancy in vacancies:
             candidate = search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_positions=exclude_positions)
             if candidate:
@@ -890,7 +890,7 @@ def worker_shift_elongation():
             is_approved=True,
             is_vacancy=True,
             worker__isnull=True,
-        )
+        ).select_related('shop', 'shop__settings')
         for vacancy in vacancies:
             do_shift_elongation(vacancy, max_working_hours)
 

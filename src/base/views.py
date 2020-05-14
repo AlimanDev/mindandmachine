@@ -11,9 +11,9 @@ from rest_framework.status import HTTP_400_BAD_REQUEST
 from rest_framework.decorators import action
 
 from src.base.permissions import Permission
-from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer
+from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer, ShopSettingsSerializer
 from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter
-from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Subscribe, Notification
+from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Subscribe, Notification, ShopSettings
 from src.base.filters import UserFilter
 
 
@@ -217,4 +217,10 @@ class NotificationViewSet(
     def get_queryset(self):
         user = self.request.user
         return Notification.objects.filter(worker=user).select_related('event', 'event__worker_day_details', 'event__shop')
+
+
+class ShopSettingsViewSet(ModelViewSet):
+    permission_classes = [Permission]
+    serializer_class = ShopSettingsSerializer
+    queryset = ShopSettings.objects.all()
 

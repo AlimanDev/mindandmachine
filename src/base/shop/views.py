@@ -29,7 +29,7 @@ class ShopSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shop
         fields = ['id', 'parent_id', 'name', 'tm_shop_opens', 'tm_shop_closes', 'code',
-                  'address', 'type', 'dt_opened', 'dt_closed', 'timezone','break_triplets', 'region_id']
+                  'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id']
 
 class ShopStatSerializer(serializers.Serializer):
     id=serializers.IntegerField()

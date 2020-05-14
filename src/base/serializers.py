@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event
+from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
 from django.contrib.auth.forms import SetPasswordForm
 from rest_framework.validators import UniqueValidator
@@ -145,6 +145,25 @@ class NotificationSerializer(serializers.ModelSerializer):
         else:
             params = event.params
         return message.get_message(event.type, params)
+
+class ShopSettingsSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ShopSettings
+        fields = ['id', 'name', 'fot', 'idle', 'less_norm',
+                  'shift_start',
+                  'shift_end',
+                  'min_change_time',
+                  'even_shift_morning_evening',
+                  'paired_weekday',
+                  'exit1day',
+                  'exit42hours',
+                  'process_type',
+                  'absenteeism',
+                  'queue_length',
+                  'max_work_hours_7days'
+                  ]
+
 
 class SubscribeSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField(required=True)
