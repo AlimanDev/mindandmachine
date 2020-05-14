@@ -169,12 +169,14 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         response = {}
 
         shop_id = data['shop_id']
-        shop = Shop.objects.get(id=shop_id)
+        # shop = Shop.objects.get(id=shop_id)
 
         work_type = WorkType.objects.get(id=data['work_type']) if data['work_type'] else None
         work_types = []
         for user_id, dates in data['workers'].items():
+            user = User.objects.get(id=user_id)
             employment = Employment.objects.get_active(
+                network_id=user.network_id,
                 user_id=user_id,
                 shop_id=shop_id,
             ).first()
@@ -321,6 +323,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         data.is_valid(raise_exception=True)
         data = data.validated_data
         shop_id = data['shop_id']
+        shop = Shop.objects.get(id=shop_id)
         worker_day_filter = {
             'is_approved': False,
             'is_fact': False,
@@ -353,13 +356,17 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 dt_from = data['dt_from']
                 dt_to = data['dt_to'] if data['dt_to'] else (dt_from.replace(day=1) + relativedelta(months=1))
 
-            employments = Employment.objects.get_active(dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
+            employments = Employment.objects.get_active(
+                shop.network_id,
+                dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
             workers = User.objects.filter(id__in=employments.values_list('user_id'))
         else:
             dt_from = data['dt_from']
             dt_to = data['dt_to']
             if not len(data['users']):
-                employments = Employment.objects.get_active(dt_from, dt_to, shop_id=shop_id)
+                employments = Employment.objects.get_active(
+                    shop.network_id,
+                    dt_from, dt_to, shop_id=shop_id)
                 workers = User.objects.filter(id__in=employments.values_list('user_id'))
             else:
                 workers = User.objects.filter(id__in=data['users'])
