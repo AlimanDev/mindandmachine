@@ -532,6 +532,7 @@ EVENT_TYPES = [
     ('shift_elongation', 'Расширение смены'),
     ('holiday_exchange', 'Вывод с выходного'),
     ('auto_vacancy', 'Автоматическая биржа смен'),
+    ('vacancy_canceled', 'Вакансия отменена'),
 ]
 
 
