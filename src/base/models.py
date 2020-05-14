@@ -174,7 +174,8 @@ class EmploymentManager(models.Manager):
         return self.filter(
             models.Q(dt_hired__lte=dt_to) | models.Q(dt_hired__isnull=True),
             models.Q(dt_fired__gte=dt_from) | models.Q(dt_fired__isnull=True),
-            shop__network_id=network_id
+            shop__network_id=network_id,
+            user__network_id = network_id
         ).filter(*args, **kwargs)
 
 

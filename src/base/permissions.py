@@ -20,6 +20,7 @@ class Permission(permissions.BasePermission):
             return False
 
         employments = Employment.objects.get_active(
+            network_id=request.user.network_id,
             user=request.user)
         return self.check_employment_permission(employments, request, view)
 
@@ -119,7 +120,7 @@ class EmploymentFilteredListPermission(Permission):
         department = employment.shop
 
         employments = Employment.objects.get_active(
-            request.user.network_id,
+            employment.user.network_id,
             shop__in=department.get_ancestors(include_self=True, ascending=True),
             user=request.user)
 

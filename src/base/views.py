@@ -93,8 +93,9 @@ class FunctionGroupView(ListAPIView):
     def get_queryset(self):
         user = self.request.user
 
-        groups = Employment.objects \
-            .get_active(user=user).values_list("function_group_id", flat=True)
+        groups = Employment.objects.get_active(
+            network_id=user.network_id,
+            user=user).values_list("function_group_id", flat=True)
         return FunctionGroup.objects.filter(group__in=groups).distinct('func')
 
 
