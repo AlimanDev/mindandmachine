@@ -4,7 +4,7 @@ from django.contrib.auth.models import (
 )
 
 import datetime
-
+import json
 from src.base.models import Shop, Employment, User, Event
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
@@ -346,7 +346,7 @@ class WorkerDay(AbstractModel):
 
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
-            self.worker.last_name,
+            self.worker.last_name if self.worker else 'No worker',
             self.shop.name if self.shop else '',
             self.shop.parent.name if self.shop and self.shop.parent else '',
             self.dt,
@@ -439,13 +439,11 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
     work_part = models.FloatField(default=1.0)
 
     def __str__(self):
-        return '{}, {}, {}, {}, {}-{}, id: {}'.format(
+        return '{}, {}, {}, id: {}'.format(
             # self.worker_day.worker.last_name,
-            self.dttm_from.date(),
-            '', '',
+            self.worker_day,
+            self.work_part,
             self.work_type.work_type_name.name if self.work_type else None,
-            self.dttm_from.replace(microsecond=0).time() if self.dttm_from else self.dttm_from,
-            self.dttm_to.replace(microsecond=0).time() if self.dttm_to else self.dttm_to,
             self.id,
         )
 
@@ -791,11 +789,28 @@ class AttendanceRecords(AbstractModel):
 
 
 class ExchangeSettings(AbstractModel):
+    default_constraints = {
+        'second_day_before': 40,
+        'second_day_after': 32,
+        'first_day_after': 32,
+        'first_day_before': 40,
+        '1day_before': 40,
+        '1day_after': 40,
+    }
+
     # Создаем ли автоматически вакансии
     automatic_check_lack = models.BooleanField(default=False)
     # Период, за который проверяем
     automatic_check_lack_timegap = models.DurationField(default=datetime.timedelta(days=7))
+    #с какого дня выводить с выходного
+    automatic_holiday_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=8))
+    #включать ли автоматическую биржу смен
+    automatic_exchange = models.BooleanField(default=False)
+    #максимальное количество рабочих часов в месяц для вывода с выходного
+    max_working_hours = models.IntegerField(default=192)
 
+    constraints = models.CharField(max_length=250, default=json.dumps(default_constraints))
+    exclude_positions = models.ManyToManyField('base.WorkerPosition')
     # Минимальная потребность в сотруднике при создании вакансии
     automatic_create_vacancy_lack_min = models.FloatField(default=.5)
     # Максимальная потребность в сотруднике для удалении вакансии
@@ -803,6 +818,8 @@ class ExchangeSettings(AbstractModel):
 
     # Только автоназначение сотрудников
     automatic_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=1))
+    #период за который делаем обмен сменами
+    automatic_worker_select_timegap_to = models.DurationField(default=datetime.timedelta(days=2))
     # Дробное число, на какую долю сотрудник не занят, чтобы совершить обмен
     automatic_worker_select_overflow_min = models.FloatField(default=0.8)
 

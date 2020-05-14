@@ -103,6 +103,11 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     staff_number = models.SmallIntegerField(default=0)
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
+
+    email = models.EmailField(blank=True, null=True)
+    exchange_shops = models.ManyToManyField('self')
+
+
     def __str__(self):
         return '{}, {}, {}'.format(
             self.name,
@@ -508,6 +513,9 @@ EVENT_TYPES = [
     ('timetable', 'Изменения в расписании'),
     ('load_template_err', 'Ошибка применения шаблона нагрузки'),
     ('load_template_apply', 'Шаблон нагрузки применён'),
+    ('shift_elongation', 'Расширение смены'),
+    ('holiday_exchange', 'Вывод с выходного'),
+    ('auto_vacancy', 'Автоматическая биржа смен'),
 ]
 
 

@@ -102,7 +102,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
     status_list = list(WorkerDay.TYPES_PAID)
     wd_details_filter = {}
     if not consider_vacancies:
-        wd_details_filter['worker_day__is_vacancy'] = False
+        wd_details_filter['worker_day__worker__isnull'] = False
 
     cashbox_details = WorkerDayCashboxDetails.objects.filter(
         Q(worker_day__employment__dt_fired__gte=from_dt) &
@@ -119,6 +119,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
         worker_day__type__in=status_list,
         worker_day__is_fact=False,
         worker_day__is_approved=True,
+        **wd_details_filter,
     ).select_related('worker_day', 'worker_day__worker')
 
     lambda_index_work_details = lambda x: list(range(
@@ -129,7 +130,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
 
     fill_array(
         init_work,
-        cashbox_details.filter(worker_day__parent_worker_day__isnull=True),
+        cashbox_details,
         lambda_index_work_details,
         lambda_add_work_details,
     )
@@ -141,6 +142,8 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
         dt__gte=from_dt,
         dt__lte=to_dt,
         employment__in=employments,
+        is_fact=False,
+        is_approved=True,
         # employment__shop_id=shop_id,
         type=WorkerDay.TYPE_WORKDAY
     )
@@ -166,7 +169,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
             employment_dict[row['employment_id']].salary / Decimal(norm_work_hours)
         )
 
-    finite_workdetails = list(cashbox_details.filter(worker_day__child__id__isnull=True).select_related('worker_day'))
+    finite_workdetails = list(cashbox_details.select_related('worker_day'))
     fill_array(
         finite_work,
         finite_workdetails,

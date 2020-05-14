@@ -25,9 +25,9 @@ Note:
 
 #TODO разобраться с Event
 from datetime import timedelta, datetime, time
-
+from django.conf import settings
 import pandas
-from django.db.models import Q, Exists, OuterRef, Sum, Subquery, FloatField, F
+from django.db.models import Q, Exists, OuterRef, Sum, Subquery, DurationField
 from django.utils.timezone import now
 import json
 from src.conf.djconfig import (
@@ -37,12 +37,13 @@ from src.conf.djconfig import (
 from src.base.models import (
     Employment,
     User,
-    Shop
+    Shop,
+    Event,
+    Notification,
 )
 from src.timetable.models import (
     ExchangeSettings,
     WorkerDay,
-    Event,
     WorkerDayCashboxDetails,
     WorkType,
     EmploymentWorkType,
@@ -52,6 +53,23 @@ from src.timetable.work_type.utils import get_efficiency as get_shop_stats
 from src.util.models_converter import Converter
 from django.core.mail import EmailMultiAlternatives
 from dateutil.relativedelta import relativedelta
+
+
+def create_event_and_notify(workers, **kwargs):
+    notification_list = []
+    event = Event.objects.create(
+        **kwargs,
+    )
+    for worker in workers:
+        notification_list.append(
+            Notification(
+                worker=worker,
+                event=event
+            )
+        )
+        print(f"Create notification for {worker}, {event}")
+    Notification.objects.bulk_create(notification_list)
+
 
 def search_candidates(vacancy, **kwargs):
     """
@@ -110,7 +128,7 @@ def search_candidates(vacancy, **kwargs):
 def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_positions=[]):
     shop = vacancy.shop
     vacancy_dt = vacancy.dt
-    work_hours = vacancy.work_hours.seconds // 3600
+    work_hours = vacancy.work_hours
     work_types = vacancy.work_types.all().values_list('work_type_name_id', flat=True)
     workers = User.objects.filter(
         Q(employments__dt_fired__isnull=True) | Q(employments__dt_fired__gt=vacancy_dt),
@@ -146,7 +164,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             type__in=WorkerDay.TYPES_PAID,
             is_fact=False,
             is_approved=True,
-        ).order_by().values('worker_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=FloatField()) + work_hours,
+        ).order_by().values('worker_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=DurationField()) + work_hours,
     ).filter(
         work_hours__lte=max_working_hours,
     ).order_by('work_hours')
@@ -193,7 +211,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             worker_id=worker['worker'].id,
         ).order_by('dt'):
             if worker_day.type in WorkerDay.TYPES_PAID:
-                tmp_hours += worker_day.work_hours
+                tmp_hours += worker_day.work_hours.seconds // 3600
             else:
                 if all(worker['work_days'][1:3]) and worker_day.dt + timedelta(days=1) == vacancy_dt:
                     hours_before = tmp_hours
@@ -226,7 +244,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             worker_id=worker['worker'].id,
         ).order_by('dt'):
             if worker_day.type in WorkerDay.TYPES_PAID:
-                tmp_hours += worker_day.work_hours
+                tmp_hours += worker_day.work_hours.seconds // 3600
             else:
                 if worker_day.dt == vacancy_dt:
                     hours_before = tmp_hours
@@ -272,8 +290,8 @@ def do_shift_elongation(vacancy, max_working_hours):
     '''
     shop = vacancy.shop
     vacancy_dt = vacancy.dt
-    work_hours = vacancy.work_hours.seconds // 3600
-    max_shift_len = shop.shift_end
+    work_hours = vacancy.work_hours
+    max_shift_len = time(shop.shift_end)
     work_types = vacancy.work_types.all().values_list('work_type_name_id', flat=True)
     workers = list(User.objects.filter(
         Q(employments__dt_fired__isnull=True) | Q(employments__dt_fired__gt=vacancy_dt),
@@ -289,7 +307,7 @@ def do_shift_elongation(vacancy, max_working_hours):
                 shop=shop,
                 dt=vacancy_dt,
                 work_types__work_type_name_id__in=work_types,
-                work_hours__hour__lt=max_shift_len,
+                work_hours__lt=max_shift_len,
                 is_approved=True,
                 is_fact=False,
             )
@@ -304,7 +322,7 @@ def do_shift_elongation(vacancy, max_working_hours):
             type__in=WorkerDay.TYPES_PAID,
             is_fact=False,
             is_approved=True,
-        ).order_by().values('worker_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=FloatField()) + work_hours,
+        ).order_by().values('worker_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=DurationField()) + work_hours,
     ).filter(
         work_hours__lte=max_working_hours,
     ).order_by('work_hours'))
@@ -348,101 +366,84 @@ def do_shift_elongation(vacancy, max_working_hours):
         prev_dttm_end = worker_day.dttm_work_end
         cancel_vacancy(vacancy.id)
         print(
-            f'shift elongation: vacancy {wd_details.work_type.work_type_name.name}, '
+            f'shift elongation: vacancy {vacancy}, '
             f'{worker_day.dt}, prev {prev_dttm_start}-{prev_dttm_end}, '
-            f'new {worker_day.dttm_work_start}-{worker_day.dttm_work_end}, '
+            f'new {wd.dttm_work_start}-{wd.dttm_work_end}, '
             f'worker {candidate.first_name} {candidate.last_name} '
         )
-        # Event.objects.mm_event_create(
-        #     [candidate],
-        #     text='Вам была автоматически расширена смена связи с нехваткой сотрудников ' +\
-        #     f'с {worker_day.dttm_work_start} до {worker_day.dttm_work_end}, дата {worker_day.dt}',
-        #     department=shop,
-        # )
-        # if (worker_day.shop.email):
-        #     message = f'Это автоматическое уведомление для {worker_day.shop.name} об изменениях в графике:\n\n' + \
-        #             f'У сотрудника {candidate.last_name} {candidate.first_name} на типе работ ' + \
-        #             f'{wd_details.work_type.work_type_name.name} изменено время работы. ' +\
-        #             f'Новое время работы с {worker_day.dttm_work_start} до {worker_day.dttm_work_end}, дата {worker_day.dt}.\n\n' +\
-        #             'Посмотреть детали можно по ссылке: http://zoloto585.mindandmachine.ru'
-        #     msg = EmailMultiAlternatives(
-        #         subject='Изменение в графике выхода сотрудников',
-        #         body=message,
-        #         from_email=EMAIL_HOST_USER,
-        #         to=[worker_day.shop.email,],
-        #     )
-        #     msg.send()
-
-
-def send_noti2candidates(users, worker_day_detail):
-    event = Event.objects.mm_event_create(
-        users,
-        push_title='Открыта вакансия на {}'.format(Converter.convert_date(worker_day_detail.dttm_from.date())),
-
-        text='',
-        department_id=worker_day_detail.work_type.shop_id,
-        workerday_details=worker_day_detail,
-    )
-    return event
+        create_event_and_notify(
+            [candidate], 
+            shop=shop,
+            type='shift_elongation',
+            params={'worker_day':wd},
+        )
+        if (worker_day.shop.email):
+            message = f'Это автоматическое уведомление для {worker_day.shop.name} об изменениях в графике:\n\n' + \
+                    f'У сотрудника {candidate.last_name} {candidate.first_name} изменено время работы. ' +\
+                    f'Новое время работы с {wd.dttm_work_start} до {wd.dttm_work_end}, дата {wd.dt}.\n\n' +\
+                    f'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
+            msg = EmailMultiAlternatives(
+                subject='Изменение в графике выхода сотрудников',
+                body=message,
+                from_email=EMAIL_HOST_USER,
+                to=[worker_day.shop.email,],
+            )
+            msg.send()
 
 
 def notify_about_canceled_vacancy(vacancy):
     if vacancy.worker_id:
         user = vacancy.worker
         shop = vacancy.shop
-        Event.objects.mm_event_create(
+        create_event_and_notify(
             [user],
-            push_title='Отменена вакансия на {}'.format(Converter.convert_date(worker_day_details.dttm_from.date())),
-            text='',
-            department_id=shop.id,
+            type='vacancy_canceled',
+            shop=shop,
+            params={'vacancy': vacancy, 'shop': shop},
         )
-        # if shop.email:
-        #     message = f'Это автоматическое уведомление для {shop.name} об изменениях в графике:\n\n' + \
-        #             f'У сотрудника {user.last_name} {user.first_name} ' + \
-        #             f'отменена вакансия на {worker_day_details.dttm_from}.\n\n' + \
-        #             'Посмотреть детали можно по ссылке: http://zoloto585.mindandmachine.ru'
-        #     msg = EmailMultiAlternatives(
-        #         subject='Изменение в графике выхода сотрудников',
-        #         body=message,
-        #         from_email=EMAIL_HOST_USER,
-        #         to=[shop.email,],
-        #     )
-        #     msg.send()
+        if shop.email:
+            message = f'Это автоматическое уведомление для {shop.name} об изменениях в графике:\n\n' + \
+                    f'У сотрудника {user.last_name} {user.first_name} ' + \
+                    f'отменена вакансия на {vacancy.dt}.\n\n' + \
+                    f'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
+            msg = EmailMultiAlternatives(
+                subject='Изменение в графике выхода сотрудников',
+                body=message,
+                from_email=EMAIL_HOST_USER,
+                to=[shop.email,],
+            )
+            msg.send()
 
 
 def cancel_vacancy(vacancy_id):
-    # todo: change user work day if selected
     vacancy = WorkerDay.objects.filter(id=vacancy_id, is_vacancy=True).first()
     if vacancy:
         notify_about_canceled_vacancy(vacancy)
-        if vacancy.worker:
-            wd, created = WorkerDay.objects.update_or_create(
-                dt=vacancy.dt,
-                worker_id=vacancy.worker_id,
-                is_approved=False,
-                is_fact=False,
-                defaults={
-                    'dttm_work_start': None,
-                    'dttm_work_end': None,
-                    'shop_id': vacancy.shop_id,
-                    'type': WorkerDay.TYPE_HOLIDAY,
-                    'employment': vacancy.employment,
-                    'parent_worker_day': vacancy,
-                    'is_vacancy': False,
-                }
-            )
-            if not created:
-                WorkerDayCashboxDetails.objects.filter(
-                    worker_day=wd,
-                ).delete()            
-        else:
-            WorkerDayCashboxDetails.objects.filter(
-                    worker_day=vacancy,
-            ).delete()     
-            vacancy.delete()
+        # if vacancy.worker:
+        #     wd, created = WorkerDay.objects.update_or_create(
+        #         dt=vacancy.dt,
+        #         worker_id=vacancy.worker_id,
+        #         is_approved=False,
+        #         is_fact=False,
+        #         defaults={
+        #             'dttm_work_start': None,
+        #             'dttm_work_end': None,
+        #             'shop_id': vacancy.shop_id,
+        #             'type': WorkerDay.TYPE_HOLIDAY,
+        #             'employment': vacancy.employment,
+        #             'parent_worker_day': vacancy,
+        #             'is_vacancy': False,
+        #         }
+        #     )
+        #     if not created:
+        #         WorkerDayCashboxDetails.objects.filter(
+        #             worker_day=wd,
+        #         ).delete()            
+        # else:   
+        vacancy.delete()
 
 
-def confirm_vacancy(vacancy_id, user):
+def confirm_vacancy(vacancy_id, user, exchange=False):
     """
     :param vacancy_id:
     :param user:
@@ -452,9 +453,13 @@ def confirm_vacancy(vacancy_id, user):
         is_vacancy=True,
         worker__isnull=True,
     ).first()
+    res = {
+        'status_code': 200,
+    }
     if not vacancy:
-        return {'code': 'no_vacancy'}
-    res = {}
+        res['code'] = 'no_vacancy'
+        res['status_code'] = 404
+        return res
     
     user_worker_day = WorkerDay.objects.select_related('shop', 'employment').filter(
         worker=user,
@@ -469,29 +474,38 @@ def confirm_vacancy(vacancy_id, user):
         (user_worker_day.employment.shop_id == vacancy_shop.id and \
         (user_worker_day.dttm_work_start >= vacancy.dttm_work_end or user_worker_day.dttm_work_end <= vacancy.dttm_work_start)) or \
         (user_worker_day.shop != vacancy_shop and vacancy_shop.id == user_worker_day.employment.shop_id)
-        if user_worker_day.employment.shop_id != vacancy_shop.id:
+        if user_worker_day.employment.shop_id != vacancy_shop.id and not exchange:
             try:
                 tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
             except:
                 res['code'] = 'no_timetable'
+                res['status_code'] = 400
                 return res
             if tt.dt.month != tt.dttm_status_change.date().month and\
-                (datetime.date.today() - tt.dttm_status_change.date()).days <= 2:
+                (datetime.now().date() - tt.dttm_status_change.date()).days <= 2\
+                or tt.status != ShopMonthStat.READY:
                 update_condition = False
         # todo: actually should be transaction (check condition and update)
         # todo: add time for go between shops
-        if update_condition:
-            
+        if update_condition or exchange:
+            if not user_worker_day.dttm_work_start:
+                dttm_work_start = vacancy.dttm_work_start
+            else:
+                dttm_work_start = vacancy.dttm_work_start \
+                        if user_worker_day.dttm_work_start > vacancy.dttm_work_start else user_worker_day.dttm_work_start
+            if not user_worker_day.dttm_work_end:
+                dttm_work_end = vacancy.dttm_work_start
+            else:
+                dttm_work_end = vacancy.dttm_work_end \
+                        if user_worker_day.dttm_work_end > vacancy.dttm_work_end else user_worker_day.dttm_work_end
             worker_day, created = WorkerDay.objects.update_or_create(
                 dt=vacancy.dt,
                 worker_id=user_worker_day.worker_id,
                 is_approved=False,
                 is_fact=False,
                 defaults={
-                    'dttm_work_start': vacancy.dttm_work_start \
-                        if user_worker_day.dttm_work_start > vacancy.dttm_work_start else user_worker_day.dttm_work_start,
-                    'dttm_work_end': vacancy.dttm_work_end \
-                        if user_worker_day.dttm_work_end < vacancy.dttm_work_end else user_worker_day.dttm_work_end,
+                    'dttm_work_start': dttm_work_start,
+                    'dttm_work_end': dttm_work_end,
                     'shop_id': vacancy.shop_id,
                     'type': WorkerDay.TYPE_WORKDAY,
                     'employment': user_worker_day.employment,
@@ -514,7 +528,7 @@ def confirm_vacancy(vacancy_id, user):
                     ]
                 )
             else:
-                percent_from_new_time = float(user_worker_day.work_hours.hour) / worker_day.work_hours.hour
+                percent_from_new_time = float(user_worker_day.work_hours.seconds) / worker_day.work_hours.seconds
                 WorkerDayCashboxDetails.objects.bulk_create(
                     [
                         WorkerDayCashboxDetails(
@@ -535,35 +549,42 @@ def confirm_vacancy(vacancy_id, user):
                         for detail in new_details
                     ]
                 )
-                # if is_canceled and user_worker_day.shop and user_worker_day.shop.email:
-                #     message = f'Это автоматическое уведомление для {user_worker_day.shop.name} об изменениях в графике:\n\n' + \
-                #             f'Сотрудник {user.last_name} {user.first_name} ' + \
-                #             f'отмененил вакансию на типе работ {vacancy.work_type.work_type_name.name}, ' +\
-                #             f'с {vacancy.dttm_from} по {vacancy.dttm_to}, дата {vacancy.dttm_from.date()}.\n\n' +\
-                #             'Посмотреть детали можно по ссылке: http://zoloto585.mindandmachine.ru'
-                #     msg = EmailMultiAlternatives(
-                #         subject='Изменение в графике выхода сотрудников',
-                #         body=message,
-                #         from_email=EMAIL_HOST_USER,
-                #         to=[user_worker_day.shop.email,],
-                #     )
-                #     msg.send()
-                # if vacancy_shop.email:
-                #     message = f'Это автоматическое уведомление для {vacancy_shop.name} об изменениях в графике:\n\n' + \
-                #             f'Сотрудник {user.last_name} {user.first_name} ' + \
-                #             f'назначен на вакансию на {vacancy.dttm_from}.\n\n' + \
-                #             'Посмотреть детали можно по ссылке: http://zoloto585.mindandmachine.ru'
-                #     msg = EmailMultiAlternatives(
-                #         subject='Изменение в графике выхода сотрудников',
-                #         body=message,
-                #         from_email=EMAIL_HOST_USER,
-                #         to=[vacancy_shop.email,],
-                #     )
-                #     msg.send()
+                if user_worker_day.is_vacancy and user_worker_day.shop and user_worker_day.shop.email:
+                    work_types = list(user_worker_day.work_types.all().values_list('work_type_name__name', flat=True))
+                    work_types = ', '.join(work_types)
+                    message = f'Это автоматическое уведомление для {user_worker_day.shop.name} об изменениях в графике:\n\n' + \
+                            f'Сотрудник {user.last_name} {user.first_name} ' + \
+                            f'отмененил вакансию на типах работ {work_types}, ' +\
+                            f'с {user_worker_day.dttm_work_start} по {user_worker_day.dttm_work_end}, дата {user_worker_day.dt}.\n\n' +\
+                            f'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
+                    msg = EmailMultiAlternatives(
+                        subject='Изменение в графике выхода сотрудников',
+                        body=message,
+                        from_email=EMAIL_HOST_USER,
+                        to=[user_worker_day.shop.email,],
+                    )
+                    msg.send()
+                if vacancy_shop.email:
+                    message = f'Это автоматическое уведомление для {vacancy_shop.name} об изменениях в графике:\n\n' + \
+                            f'Сотрудник {user.last_name} {user.first_name} ' + \
+                            f'назначен на вакансию на {vacancy.dt}.\n\n' + \
+                            f'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
+                    msg = EmailMultiAlternatives(
+                        subject='Изменение в графике выхода сотрудников',
+                        body=message,
+                        from_email=EMAIL_HOST_USER,
+                        to=[vacancy_shop.email,],
+                    )
+                    msg.send()
+            Event.objects.filter(worker_day=vacancy).delete()
+            vacancy.delete()
+            res['code'] = 'vacancy_success'
         else:
             res['code'] = 'cant_apply_vacancy'
+            res['status_code'] = 400
     else:
         res['code'] = 'no_timetable'
+        res['status_code'] = 400
     return res
 
 
@@ -601,8 +622,6 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
         shop_id,
         params,
         consider_vacancies=True,
-        hours_count_fact=False,
-        min_workers_amount=True
     )
     df_stat = pandas.DataFrame(shop_stat['lack_of_cashiers_on_period'])
 
@@ -717,6 +736,8 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
                 dttm_work_end=dttm_to,
                 type=WorkerDay.TYPE_WORKDAY,
                 is_vacancy=True,
+                dt=dttm_from.date(),
+                shop=shop,
             )
 
             WorkerDayCashboxDetails.objects.create(
@@ -730,7 +751,13 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
                 other_shops=True,
                 other_supershops=True,
                 outsource=True)
-            send_noti2candidates(workers, worker_day_detail)
+
+            create_event_and_notify(
+                workers,
+                worker_day=worker_day,
+                type='vacancy',
+                shop=shop,
+            )
 
 
 def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=False):
@@ -764,8 +791,6 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
         shop_id,
         params,
         consider_vacancies=True,
-        hours_count_fact=False,
-        min_workers_amount=True
     )
     df_stat=pandas.DataFrame(shop_stat['tt_periods']['real_cashiers']).rename({'amount':'real_cashiers'}, axis=1)
     df_stat['predict_cashier_needs'] = pandas.DataFrame(shop_stat['tt_periods']['predict_cashier_needs']).amount
@@ -802,6 +827,9 @@ def holiday_workers_exchange():
     if not exchange_settings.automatic_exchange:
         return
     max_working_hours = exchange_settings.max_working_hours
+    days = max_working_hours / 24
+    hours = max_working_hours % 24
+    max_working_hours = timedelta(days=days, hours=hours)
     constraints = json.loads(exchange_settings.constraints)
     exclude_positions = exchange_settings.exclude_positions.all()
     dt_from = datetime.now().date() + exchange_settings.automatic_holiday_worker_select_timegap
@@ -824,20 +852,16 @@ def holiday_workers_exchange():
                 print(
                     f'holiday exchange: to_shop {shop.name}, '
                     f'vacancy {vacancy.work_types.first().work_type_name.name}, '
-                    f'{vacancy.dt}, {vacancy.dttm_work_start}-{wd_details.dttm_work_end}, '
+                    f'{vacancy.dt}, {vacancy.dttm_work_start}-{vacancy.dttm_work_end}, '
                     f'worker {candidate.first_name} {candidate.last_name}, '
                 )
                 confirm_vacancy(vacancy.id, candidate)
-                #TODO Event do action
-                # event = Event.objects.get(workerday_details=wd_details.id)
-                # event.do_action(candidate.user)
-                # Event.objects.mm_event_create(
-                #     [candidate.user],
-                #     text='Вам была автоматически назначена смена' +\
-                #     f' вместо выходного в связи с нехваткой сотрудников в магазин {shop.name}' +\
-                #     f'с {wd_details.dttm_from} по {wd_details.dttm_to}, дата {wd_details.dttm_from.date()}',
-                #     department=shop,
-                # )
+                create_event_and_notify(
+                    [candidate], 
+                    type='holiday_exchange', 
+                    shop=shop, 
+                    params={'worker_day': vacancy, 'shop': shop}
+                )
 
 
 def worker_shift_elongation():
@@ -851,6 +875,9 @@ def worker_shift_elongation():
     if not exchange_settings.automatic_exchange:
         return
     max_working_hours = exchange_settings.max_working_hours
+    days = max_working_hours / 24
+    hours = max_working_hours % 24
+    max_working_hours = timedelta(days=days, hours=hours)
     dt_from = (now().replace(minute=0, second=0, microsecond=0) + exchange_settings.automatic_worker_select_timegap).date()
     dt_to = dt_from + exchange_settings.automatic_worker_select_timegap_to
     shops = Shop.objects.filter(dttm_deleted__isnull=True)
@@ -895,7 +922,6 @@ def workers_exchange():
                 shop.id,
                 params,
                 consider_vacancies=False,
-                min_workers_amount=True
             )
 
             df_stat=pandas.DataFrame(shop_stat['tt_periods']['real_cashiers']).rename({'amount':'real_cashiers'}, axis=1)
@@ -908,7 +934,6 @@ def workers_exchange():
 
     df_shop_stat.set_index([# df_shop_stat.shop_id,
                             df_shop_stat.work_type_id, df_shop_stat.dttm], inplace=True)
-
     for shop in shop_list:
         exchange_shops = list(shop.exchange_shops.all())
         for work_type in WorkType.objects.select_related('work_type_name').filter(shop_id=shop.id):
@@ -927,77 +952,84 @@ def workers_exchange():
                 print ('lack: {}; vacancy: {}; work_type: {}'.format(vacancy_lack, vacancy, work_type))
                 dttm_from_workers = vacancy.dttm_work_start - timedelta(hours=4)
                 if vacancy_lack > 0:
-                    worker_days = list(WorkerDay.objects.filter(
-                        dttm_work_start=vacancy.dttm_work_start,
-                        dttm_work_end=vacancy.dttm_work_end,
+                    worker_days = list(WorkerDayCashboxDetails.objects.filter(
+                        worker_day__dttm_work_start=vacancy.dttm_work_start,
+                        worker_day__dttm_work_end=vacancy.dttm_work_end,
                         # work_type_id__in=[1],
-                        work_types__shop__in=exchange_shops,
-                        is_vacancy=False,
-                        type__in=WorkerDay.TYPES_PAID,
-                        work_types__work_type_name=work_type.work_type_name,
-                        # worker_day__canceled=False,
+                        work_type__shop__in=exchange_shops,
+                        worker_day__is_vacancy=False,
+                        worker_day__is_fact=False,
+                        worker_day__is_approved=True,
+                        worker_day__type__in=WorkerDay.TYPES_PAID,
+                        work_type__work_type_name=work_type.work_type_name,
+                        worker_day__canceled=False,
                     ).exclude(
-                        work_types__id=work_type.id,
-                        employment__position__in=exclude_positions,
-                    ).prefetch_related('work_types').order_by('dt'))
+                        work_type_id=work_type.id,
+                        worker_day__employment__position__in=exclude_positions,
+                    ).select_related('worker_day').order_by('worker_day__dt'))
                     if not len(worker_days):
                         continue
                     worker_lack = None
                     candidate_to_change = None
                     for worker_day in worker_days:
-                        lack = _lack_calc(df_shop_stat, worker_day.work_types.id, worker_day.dttm_work_start, worker_day.dttm_work_end )
+                        lack = _lack_calc(df_shop_stat, worker_day.work_type_id, worker_day.worker_day.dttm_work_start, worker_day.worker_day.dttm_work_end )
                         if worker_lack is None or lack < worker_lack:
                             worker_lack = lack
                             candidate_to_change = worker_day
-                    print ('worker lack: {}; wd_detail: {}; work type: {}'.format(worker_lack, worker_day, worker_day.work_types.id))
+                    print ('worker lack: {}; wd_detail: {}; work type: {}'.format(worker_lack, worker_day, worker_day.work_type_id))
                     if  worker_lack < -exchange_settings.automatic_worker_select_overflow_min:
-                        user = candidate_to_change.worker
+                        user = candidate_to_change.worker_day.worker
                         print('hard exchange date {} worker_lack {} vacancy_lack {} shop_to {} shop_from {} candidate_to_change {} to vac {} user {}'.format(
-                            vacancy.dttm_from, worker_lack, vacancy_lack,
-                            work_type, candidate_to_change.work_types,
+                            vacancy.dt, worker_lack, vacancy_lack,
+                            work_type, candidate_to_change.work_type,
                             candidate_to_change, vacancy, user
                         ))
                         shop_to = work_type.shop
-                        shop_from = candidate_to_change.shop
-                        candidate_to_change.delete()
-                        confirm_vacancy(vacancy.id, user)
-                        # event = Event.objects.get(workerday_details=vacancy)
-                        # event.do_action(user)
-                        # Event.objects.mm_event_create(
-                        #     [user],
-                        #     text=f'Вам была автоматически назначена смена в {shop_to}' +\
-                        #     f' в связи с нехваткой сотрудников с {vacancy.dttm_from} до {vacancy.dttm_to}',
-                        #     department=shop_to,
-                        # )
-                        # if shop_to.email:
-                        #     message = f'Это автоматическое уведомление для {shop_to.name} об изменениях в графике:\n\n' + \
-                        #     f'К Вам был переведён сотрудник {user.last_name} {user.first_name}, ' + \
-                        #     f'на тип работы {work_type.work_type_name.name}, на {vacancy.dttm_from.time()}-{vacancy.dttm_to.time()}, ' + \
-                        #     f'из магазина {shop_from.name} ({shop_from.address}), дата {vacancy.dttm_from.date()}.\n\n' + \
-                        #     'Посмотреть детали можно по ссылке: http://zoloto585.mindandmachine.ru'
-                        #     msg = EmailMultiAlternatives(
-                        #         subject='Изменение в графике выхода сотрудников',
-                        #         body=message,
-                        #         from_email=EMAIL_HOST_USER,
-                        #         to=[shop_to.email,],
-                        #     )
-                        #     msg.send()
-                        # if shop_from.email:
-                        #     message = f'Это автоматическое уведомление для {shop_from.name} об изменениях в графике:\n\n' + \
-                        #         f'От Вас был переведён сотрудник {user.last_name} {user.first_name}, ' + \
-                        #         f'на тип работы {work_type.work_type_name.name}, на {vacancy.dttm_from.time()}-{vacancy.dttm_to.time()}, ' + \
-                        #         f'в магазин {shop_to.name} ({shop_from.address}), дата {vacancy.dttm_from.date()}.\n\n' + \
-                        #         'Посмотреть детали можно по ссылке: http://zoloto585.mindandmachine.ru'
-                        #     msg = EmailMultiAlternatives(
-                        #         subject='Изменение в графике выхода сотрудников',
-                        #         body=message,
-                        #         from_email=EMAIL_HOST_USER,
-                        #         to=[shop_from.email,],
-                        #     )
-                        #     msg.send()
+                        shop_from = candidate_to_change.worker_day.shop
+                        candidate_worker_day = candidate_to_change.worker_day
+                        candidate_details = {
+                            detail.work_type_id: detail.work_part
+                            for detail in WorkerDayCashboxDetails.objects.filter(worker_day=candidate_worker_day)
+                        }
+                        #не удаляем candidate_to_change потому что создаем неподтвержденную вакансию
+                        confirm_vacancy(vacancy.id, user, exchange=True)
+                        create_event_and_notify(
+                            [user],
+                            type='auto_vacancy', 
+                            shop=shop_to, 
+                            params={'shop': shop_to, 'vacancy': vacancy}
+                        )
+
+                        if shop_to.email:
+                            message = f'Это автоматическое уведомление для {shop_to.name} об изменениях в графике:\n\n' + \
+                            f'К Вам был переведён сотрудник {user.last_name} {user.first_name}, ' + \
+                            f'на тип работы {work_type.work_type_name.name}, на {vacancy.dttm_work_start.time()}-{vacancy.dttm_work_end.time()}, ' + \
+                            f'из магазина {shop_from.name} ({shop_from.address}), дата {vacancy.dt}.\n\n' + \
+                            'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
+                            msg = EmailMultiAlternatives(
+                                subject='Изменение в графике выхода сотрудников',
+                                body=message,
+                                from_email=EMAIL_HOST_USER,
+                                to=[shop_to.email,],
+                            )
+                            msg.send()
+                        if shop_from.email:
+                            message = f'Это автоматическое уведомление для {shop_from.name} об изменениях в графике:\n\n' + \
+                                f'От Вас был переведён сотрудник {user.last_name} {user.first_name}, ' + \
+                                f'на тип работы {work_type.work_type_name.name}, на {vacancy.dttm_work_start.time()}-{vacancy.dttm_work_end.time()}, ' + \
+                                f'в магазин {shop_to.name} ({shop_from.address}), дата {vacancy.dt}.\n\n' + \
+                                'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
+                            msg = EmailMultiAlternatives(
+                                subject='Изменение в графике выхода сотрудников',
+                                body=message,
+                                from_email=EMAIL_HOST_USER,
+                                to=[shop_from.email,],
+                            )
+                            msg.send()
 
                         _lack_add(df_shop_stat, work_type.id, vacancy.dttm_work_start, vacancy.dttm_work_end, -1 )
-                        _lack_add(df_shop_stat, candidate_to_change.work_types.id, candidate_to_change.dttm_work_start, candidate_to_change.dttm_work_end, 1 )
+                        for work_type_id, lack in candidate_details.items():
+                            _lack_add(df_shop_stat, work_type_id, candidate_worker_day.dttm_work_start, candidate_worker_day.dttm_work_end, lack )
 
 
 def _lack_add(df, work_type_id, dttm_from, dttm_to, add):
