@@ -5,7 +5,7 @@ from django.contrib.auth.models import (
 
 import datetime
 
-from src.base.models import Shop, Employment, User, Event
+from src.base.models import Shop, Employment, User, Event, Network
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
 from django.utils import timezone
@@ -46,6 +46,8 @@ class WorkTypeName(AbstractActiveNamedModel):
         super(WorkTypeName, self).delete()
         WorkType.objects.qos_delete(work_type_name__id=self.pk)
         return self
+
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
 
 class WorkType(AbstractActiveModel):
@@ -853,6 +855,7 @@ class AttendanceRecords(AbstractModel):
 
 
 class ExchangeSettings(AbstractModel):
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     # Создаем ли автоматически вакансии
     automatic_check_lack = models.BooleanField(default=False)
     # Период, за который проверяем

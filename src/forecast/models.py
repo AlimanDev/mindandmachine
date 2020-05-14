@@ -7,9 +7,10 @@ from django.utils import timezone
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel
 from src.base.models import Shop
 
-from src.timetable.models import WorkType, WorkTypeName
+from src.timetable.models import WorkType, WorkTypeName, Network
 
 class OperationTypeName(AbstractActiveNamedModel):
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     class Meta:
         verbose_name = 'Название операции'
         verbose_name_plural = 'Названия операций'
@@ -30,6 +31,7 @@ class LoadTemplate(AbstractModel):
         verbose_name_plural = 'Шаблоны нагрузки'
 
     name = models.CharField(max_length=64, unique=True)
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
 
 class OperationType(AbstractActiveModel):
