@@ -11,7 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from src.base.models import Employment, Shop
-
+from src.base.serializers import CurrentUserNetwork
 
 class TimeZoneField(serializers.ChoiceField):
     def __init__(self, **kwargs):
@@ -25,7 +25,8 @@ class TimeZoneField(serializers.ChoiceField):
 class ShopSerializer(serializers.ModelSerializer):
     parent_id = serializers.IntegerField(required=False)
     region_id = serializers.IntegerField(required=False)
-    network_id = serializers.IntegerField(required=False)
+    network_id = serializers.HiddenField(default=CurrentUserNetwork())
+
     timezone = TimeZoneField()
     class Meta:
         model = Shop
@@ -89,11 +90,14 @@ class ShopViewSet(viewsets.ModelViewSet):
         user = self.request.user
         only_top = self.request.query_params.get('only_top')
 
-        employments = Employment.objects \
-            .get_active(user=user).values('shop_id')
+        employments = Employment.objects.get_active(
+            network_id=user.network_id,
+            user=user).values('shop_id')
         shops = Shop.objects.filter(id__in=employments.values('shop_id'))
         if not only_top:
-            return Shop.objects.get_queryset_descendants(shops, include_self=True)
+            return Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
+                network_id=user.network_id,
+            )
         else:
             return shops
 

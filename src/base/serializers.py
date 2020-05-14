@@ -10,6 +10,16 @@ from django.conf import settings
 from src.base.message import Message
 from src.base.exceptions import MessageError
 
+class CurrentUserNetwork:
+    requires_context = True
+
+    def __call__(self, serializer_field):
+        return serializer_field.context['request'].user.network_id
+
+
+class BaseNetworkSerializer(serializers.ModelSerializer):
+    network_id = serializers.HiddenField(default=CurrentUserNetwork())
+
 
 class NetworkSerializer(serializers.ModelSerializer):
     class Meta:
@@ -17,13 +27,13 @@ class NetworkSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'logo', 'url', 'primary_color', 'secondary_color']
 
 
-class UserSerializer(serializers.ModelSerializer):
+class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
 
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username', 'network_id' ]
 
 
 class PasswordSerializer(serializers.Serializer):
@@ -118,10 +128,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
         return data
 
 
-class WorkerPositionSerializer(serializers.ModelSerializer):
+class WorkerPositionSerializer(BaseNetworkSerializer):
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name',]
+        fields = ['id', 'name', 'network_id']
 
 
 class EventSerializer(serializers.ModelSerializer):

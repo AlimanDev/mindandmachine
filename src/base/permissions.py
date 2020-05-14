@@ -31,6 +31,7 @@ class Permission(permissions.BasePermission):
             q=Q(shop__in=department.get_ancestors(include_self=True, ascending=True))
 
         employments = Employment.objects.get_active(
+            network_id=request.user.network_id,
             user=request.user).filter(q)
 
         return self.check_employment_permission(employments, request, view)
@@ -76,10 +77,12 @@ class FilteredListPermission(Permission):
         department = Shop.objects.get(id=shop_id)
 
         employments = Employment.objects.get_active(
+            network_id=request.user.network_id,
             shop__in=department.get_ancestors(include_self=True, ascending=True),
             user=request.user)
 
         return self.check_employment_permission(employments, request, view)
+
 
 class EmploymentFilteredListPermission(Permission):
     """
@@ -116,6 +119,7 @@ class EmploymentFilteredListPermission(Permission):
         department = employment.shop
 
         employments = Employment.objects.get_active(
+            request.user.network_id,
             shop__in=department.get_ancestors(include_self=True, ascending=True),
             user=request.user)
 

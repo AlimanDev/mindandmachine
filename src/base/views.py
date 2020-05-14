@@ -42,7 +42,10 @@ class EmploymentViewSet(ModelViewSet):
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
 
-    queryset = Employment.objects.all()
+    def get_queryset(self):
+        return Employment.objects.filter(
+            shop__network_id=self.request.user.network_id
+        )
 
 
 class UserViewSet(ModelViewSet):
@@ -52,7 +55,11 @@ class UserViewSet(ModelViewSet):
     serializer_class = UserSerializer
     filterset_class = UserFilter
 
-    queryset = User.objects.all()
+    def get_queryset(self):
+        user = self.request.user
+        return User.objects.filter(
+            network_id=user.network_id
+        )
 
     def perform_create(self, serializer):
         if 'username' not in serializer.validated_data:
@@ -92,113 +99,14 @@ class FunctionGroupView(ListAPIView):
 
 
 class WorkerPositionViewSet(ReadOnlyModelViewSet):
-    """
-
-    GET /rest_api/work_type/
-    :params
-        shop_id: int, required=False
-    :return [
-        {
-            "id": 2,
-            "priority": 23,
-            "dttm_last_update_queue": None,
-            "min_workers_amount": 2,
-            "max_workers_amount": 10,
-            "probability": 2.0,
-            "prior_weigth": 1.0,
-            "shop_id": 1,
-            "work_type_name":{
-                "id": 1,
-                "name": "Work type",
-                "code": "1",
-            }
-        },
-        ...
-    ]
-
-
-    GET /rest_api/work_type/6/
-    :return {
-        "id": 6,
-        "priority": 23,
-        "dttm_last_update_queue": None,
-        "min_workers_amount": 2,
-        "max_workers_amount": 10,
-        "probability": 2.0,
-        "prior_weigth": 1.0,
-        "shop_id": 1,
-        "work_type_name":{
-            "id": 1,
-            "name": "Work type",
-            "code": "1",
-        }
-    }
-
-
-    POST /rest_api/work_type/
-    :params
-        priority: int, required=False
-        min_workers_amount: int, required=False
-        max_workers_amount: int, required=False
-        probability: float, required=Fasle
-        prior_weigth: float, required=False
-        shop_id: int, required=True
-        code: str, required=False
-        work_type_name_id: int, required=False
-    :return
-        code 201
-        {
-            "id": 6,
-            "priority": 23,
-            "dttm_last_update_queue": None,
-            "min_workers_amount": 2,
-            "max_workers_amount": 10,
-            "probability": 2.0,
-            "prior_weigth": 1.0,
-            "shop_id": 1,
-            "work_type_name":{
-                "id": 1,
-                "name": "Work type",
-                "code": "1",
-            }
-        }
-
-
-    PUT /rest_api/work_type/6/
-    :params
-        priority: int, required=False
-        min_workers_amount: int, required=False
-        max_workers_amount: int, required=False
-        probability: float, required=Fasle
-        prior_weigth: float, required=False
-        shop_id: int, required=True
-        code: str, required=False
-        work_type_name_id: int, required=False
-    :return {
-        "id": 6,
-        "priority": 23,
-        "dttm_last_update_queue": None,
-        "min_workers_amount": 2,
-        "max_workers_amount": 10,
-        "probability": 2.0,
-        "prior_weigth": 1.0,
-        "shop_id": 1,
-        "work_type_name":{
-            "id": 1,
-            "name": "Work type",
-            "code": "1",
-        }
-    }
-
-
-    DELETE /rest_api/work_type/6/
-    :return
-        code 204
-
-    """
     permission_classes = [IsAuthenticated]
     serializer_class = WorkerPositionSerializer
-    queryset = WorkerPosition.objects.filter(dttm_deleted__isnull=True)
+
+    def get_queryset(self):
+        return WorkerPosition.objects.filter(
+            dttm_deleted__isnull=True,
+            network_id=self.request.user.network_id
+        )
 
 
 class SubscribeViewSet(ModelViewSet):
@@ -232,11 +140,16 @@ class NotificationViewSet(
 class ShopSettingsViewSet(ModelViewSet):
     permission_classes = [Permission]
     serializer_class = ShopSettingsSerializer
-    queryset = ShopSettings.objects.all()
+
+    def get_queryset(self):
+        user = self.request.user
+        return ShopSettings.objects.filter(
+            network_id=user.network_id
+        )
+
 
 class NetworkViewSet(ModelViewSet):
     permission_classes = [Permission]
     serializer_class = NetworkSerializer
     queryset = Network.objects.all()
-
 
