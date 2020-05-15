@@ -47,6 +47,13 @@ class WorkTypeName(AbstractActiveNamedModel):
         WorkType.objects.qos_delete(work_type_name__id=self.pk)
         return self
 
+    def __str__(self):
+        return 'id: {}, name: {}, code: {}'.format(
+            self.id,
+            self.name,
+            self.code,
+        )
+
 
 class WorkType(AbstractActiveModel):
     class Meta:

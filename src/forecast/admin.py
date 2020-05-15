@@ -5,6 +5,10 @@ from src.forecast.models import (
     WorkType,
     OperationType,
     OperationTemplate,
+    OperationTypeName,
+    LoadTemplate,
+    OperationTypeTemplate,
+    OperationTypeRelation,
 )
 
 
@@ -66,3 +70,25 @@ class OperationTemplateAdmin(admin.ModelAdmin):
     list_filter = ('operation_type', )
     search_fields = ('name',)
 
+
+@admin.register(OperationTypeName)
+class OperationTypeNameAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
+
+
+@admin.register(LoadTemplate)
+class LoadTemplateAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
+
+
+@admin.register(OperationTypeTemplate)
+class OperationTypeTemplateAdmin(admin.ModelAdmin):
+    list_display = ('id', 'operation_type_name', 'work_type_name', 'do_forecast')
+    search_fields = ('operation_type_name__name', 'work_type_name__name')
+
+
+@admin.register(OperationTypeRelation)
+class OperationTypeRelationAdmin(admin.ModelAdmin):
+    list_display = ('id', 'base_id', 'depended_id', 'formula')
