@@ -92,7 +92,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super(EmploymentSerializer, self).__init__(*args, **kwargs)
 
-        show_constraints = self.context['request'].query_params.get('show_constraints')
+        show_constraints = None
+        if self.context['request']:
+            show_constraints = self.context['request'].query_params.get('show_constraints')
+
         if not show_constraints:
             self.fields.pop('worker_constraints')
 
