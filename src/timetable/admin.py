@@ -13,6 +13,7 @@ from src.timetable.models import (
     ExchangeSettings,
     Event,
     WorkerDay,
+    WorkTypeName,
 )
 
 
@@ -217,3 +218,9 @@ class ExchangeSettingsAdmin(admin.ModelAdmin):
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
     pass
+
+
+@admin.register(WorkTypeName)
+class WorkTypeNameAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
