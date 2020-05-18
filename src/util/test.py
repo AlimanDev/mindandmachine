@@ -339,11 +339,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
                 cashbox = active_cashboxes.order_by('?').first()
                 WorkerDayCashboxDetails.objects.create(
                     worker_day=wd,
-                    on_cashbox=cashbox,
                     work_type=cashbox.type,
-                    dttm_from=wd.dttm_work_start,
-                    dttm_to=wd.dttm_work_end,
-                    is_tablet=True
                 )
                 dt += datetime.timedelta(days=1)
 
@@ -373,10 +369,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         cashbox = self.cashbox3
         WorkerDayCashboxDetails.objects.create(
             worker_day=worker_day,
-            on_cashbox=cashbox,
             work_type=cashbox.type,
-            dttm_from=worker_day.dttm_work_start,
-            dttm_to=worker_day.dttm_work_end,
         )
         return worker_day
 

@@ -2,6 +2,7 @@ from  django.db import DatabaseError
 
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from src.base.shop.views import ShopSerializer
 
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
 from src.base.models import Employment, User
@@ -21,13 +22,13 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
     work_type_id = serializers.IntegerField(required=False)
     class Meta:
         model = WorkerDayCashboxDetails
-        fields = ['id', 'work_type_id', 'dttm_from', 'dttm_to', 'status']
+        fields = ['id', 'work_type_id']
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):
     worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
-    worker_id = serializers.IntegerField()
-    employment_id = serializers.IntegerField()
+    worker_id = serializers.IntegerField(required=False)
+    employment_id = serializers.IntegerField(required=False)
     shop_id = serializers.IntegerField()
     parent_worker_day_id = serializers.IntegerField(required=False, read_only=True)
     is_fact = serializers.BooleanField(required=False)
@@ -216,6 +217,19 @@ class WorkerConstraintSerializer(serializers.ModelSerializer):
         list_serializer_class = WorkerConstraintListSerializer
 
 
+class VacancySerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
+    shop = ShopSerializer()
+    dttm_work_start = serializers.DateTimeField(default=None)
+    dttm_work_end = serializers.DateTimeField(default=None)
+
+    class Meta:
+        model = WorkerDay
+        fields = ['id', 'first_name', 'last_name', 'worker_id', 'worker_day_details', 'shop', 'is_fact', 'is_approved', 'dttm_work_start', 'dttm_work_end', 'type']
+
+        
 class AutoSettingsSerializer(serializers.Serializer):
     shop_id=serializers.IntegerField()
     dt_from=serializers.DateField()

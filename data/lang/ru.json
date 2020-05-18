@@ -1,5 +1,12 @@
 {
-  "vacancy": "Создана вакансия на {dt} с {details.dttm_from} по {details.dttm_to} в магазине {shop.address} http://{domain}/vacancy/{details.id}",
+  "vacancy": "Создана вакансия на {dt} с {details.dttm_work_start} по {details.dttm_work_end} в магазине {shop.address} http://{domain}/vacancy/{details.id}",
+  "no_vacancy": "Такой вакансии не существует",
+  "vacancy_success": "Вакансия успешно принята.",
+  "cant_apply_vacancy": "Вы не можете выйти на эту смену",
+  "shift_elongation": "Вам была автоматически расширена смена связи с нехваткой сотрудников с {worker_day.dttm_work_start} до {worker_day.dttm_work_end}, дата {worker_day.dt}",
+  "holiday_exchange": "Вам была автоматически назначена смена вместо выходного в связи с нехваткой сотрудников в магазин {shop.name} с {worker_day.dttm_work_start} по {worker_day.dttm_work_end}, дата {worker_day.dt}",
+  "auto_vacancy": "Вам была автоматически назначена смена в {shop.name} по адресу {shop.address} в связи с нехваткой сотрудников с {vacancy.dttm_work_start} до {vacancy.dttm_work_end}",
+  "vacancy_canceled": "Отменена вакансия в магазине {shop.name}, дата {vacancy.dt}.",
   "emp_check_dates": "В этом магазине уже заведено трудоустройство с {employment.dt_hired} по {employment.dt_fired}",
   "password_wrong": "Неверный пароль",
   "password_mismatch": "Пароли не совпадают",

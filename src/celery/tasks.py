@@ -6,22 +6,21 @@ from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
-from src.main.timetable.worker_exchange.utils import (
+from src.timetable.vacancy.utils import (
     # get_init_params,
     # has_deficiency,
     # split_cashiers_periods,
     # intervals_to_shifts,
     search_candidates,
-    send_noti2candidates,
     cancel_vacancy,
     confirm_vacancy,
     create_vacancies_and_notify,
     cancel_vacancies,
-    workers_exchange
+    workers_exchange,
 )
 
 from src.main.demand.utils import create_predbills_request_function
-from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
+from src.timetable.work_type.utils import get_efficiency as get_shop_stats
 from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
 
 from src.main.operation_template.utils import build_period_clients
@@ -63,7 +62,7 @@ def create_notifications_for_event(event_id):
             )
         )
         print(f"Create notification for {subscribe.user}, {event}")
-        Notification.objects.bulk_create(notification_list)
+    Notification.objects.bulk_create(notification_list)
 
 @app.task
 def create_notifications_for_subscribe(subscribe_id):

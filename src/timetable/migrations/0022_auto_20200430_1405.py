@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='workerday',
             name='worker',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='worker_day', related_query_name='worker_day', to=settings.AUTH_USER_MODEL),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='worker_day', related_query_name='worker_day', to=settings.AUTH_USER_MODEL, null=True, blank=True),
         ),
     ]

@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 
 from src.util.test import create_departments_and_users
 
-from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName, WorkerDayCashboxDetails
+from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName, WorkerDayCashboxDetails, ShopMonthStat
 from src.base.models import FunctionGroup
 from src.util.models_converter import Converter
 
@@ -568,6 +568,99 @@ class TestAttendanceRecords(APITestCase):
         self.assertEqual(wd.parent_worker_day_id, self.worker_day_plan_approved.id)
 
 
+class TestVacancy(APITestCase):
+    USER_USERNAME = "user1"
+    USER_EMAIL = "q@q.q"
+    USER_PASSWORD = "4242"
+
+    def setUp(self):
+        super().setUp()
+        self.url = '/rest_api/worker_day/vacancy/'
+        create_departments_and_users(self)
+        self.dt_now = date.today()
+        self.work_type_name1 = WorkTypeName.objects.create(
+            name='Кассы',
+        )
+        self.work_type1 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
+        self.worker_day = WorkerDay.objects.create(
+            shop=self.shop,
+            worker=self.user1,
+            employment=self.employment1,
+            dttm_work_start=datetime.combine(self.dt_now, time(9)),
+            dttm_work_end=datetime.combine(self.dt_now, time(20)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            is_vacancy=True,
+        )
+        self.vacancy = WorkerDay.objects.create(
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt_now, time(9)),
+            dttm_work_end=datetime.combine(self.dt_now, time(17)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            is_vacancy=True,
+        )
+        self.wd_details = WorkerDayCashboxDetails.objects.create(
+            work_type=self.work_type1,
+            worker_day=self.worker_day,
+            work_part=0.5,
+        )
+        self.wd_details2 = WorkerDayCashboxDetails.objects.create(
+            work_type=self.work_type1,
+            worker_day=self.worker_day,
+            work_part=0.5,
+        )
+
+        self.client.force_authenticate(user=self.user1)
+
+
+    def test_get_list(self):
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 2)
+
+    
+    def test_get_list_shift_length(self):
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&shift_length_min=8:00:00&shift_length_max=9:00:00')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 1)
+
+    
+    def test_get_vacant_list(self):
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&is_vacant=true')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 1)
+
+
+    def test_confirm_vacancy(self):
+        WorkerDay.objects.create(
+            shop=self.shop,
+            worker=self.user2,
+            employment=self.employment2,
+            type=WorkerDay.TYPE_HOLIDAY,
+            dt=self.dt_now,
+            is_approved=True,
+        )
+        self.client.force_authenticate(user=self.user2)
+        ShopMonthStat.objects.create(
+            shop=self.shop,
+            dt=now().date().replace(day=1),
+            dttm_status_change=now(),
+            status=ShopMonthStat.READY,
+        )
+        FunctionGroup.objects.create(
+            group=self.admin_group,
+            method='POST',
+            func='WorkerDay_confirm_vacancy',
+            level_up=1,
+            level_down=99,
+        )
+        response = self.client.post(f'/rest_api/worker_day/{self.vacancy.id}/confirm_vacancy/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+
+        
 class TestAditionalFunctions(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -632,11 +725,7 @@ class TestAditionalFunctions(APITestCase):
             result[date] = wd
 
             WorkerDayCashboxDetails.objects.create(
-                dttm_from='{} 09:00:00'.format(date),
-                dttm_to='{} 23:00:00'.format(date),
                 work_type=self.work_type,
-                status=WorkerDayCashboxDetails.TYPE_WORK,
-                is_vacancy=False,
                 worker_day=wd
             )
         return result

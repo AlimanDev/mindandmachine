@@ -113,6 +113,9 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
 
+    email = models.EmailField(blank=True, null=True)
+    exchange_shops = models.ManyToManyField('self')
+
     settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True)
 
     def __str__(self):
@@ -372,10 +375,12 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_approve',
         'WorkerDay_daily_stat',
         'WorkerDay_worker_stat',
+        'WorkerDay_vacancy',
         'WorkerDay_change_list',
         'WorkerDay_duplicate',
         'WorkerDay_delete_timetable',
         'WorkerDay_exchange',
+        'WorkerDay_confirm_vacancy',
         'ShopMonthStat',
         'ShopSettings',
 
@@ -524,12 +529,17 @@ EVENT_TYPES = [
     ('timetable', 'Изменения в расписании'),
     ('load_template_err', 'Ошибка применения шаблона нагрузки'),
     ('load_template_apply', 'Шаблон нагрузки применён'),
+    ('shift_elongation', 'Расширение смены'),
+    ('holiday_exchange', 'Вывод с выходного'),
+    ('auto_vacancy', 'Автоматическая биржа смен'),
+    ('vacancy_canceled', 'Вакансия отменена'),
 ]
 
 
 class Event(AbstractModel):
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_valid_to = models.DateTimeField(auto_now_add=True)
+    worker_day = models.ForeignKey('timetable.WorkerDay', null=True, blank=True, on_delete=models.CASCADE)
 
     type = models.CharField(choices=EVENT_TYPES, max_length=20)
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT, related_name="events")
