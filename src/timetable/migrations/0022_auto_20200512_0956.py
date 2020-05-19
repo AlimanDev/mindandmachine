@@ -14,34 +14,6 @@ class Migration(migrations.Migration):
             name='shopmonthstat',
             options={'verbose_name': 'Статистика по мгазину за месяц', 'verbose_name_plural': 'Статистики по мгазинам за месяц'},
         ),
-        migrations.RemoveField(
-            model_name='workerdaycashboxdetails',
-            name='dttm_from',
-        ),
-        migrations.RemoveField(
-            model_name='workerdaycashboxdetails',
-            name='dttm_to',
-        ),
-        migrations.RemoveField(
-            model_name='workerdaycashboxdetails',
-            name='event',
-        ),
-        migrations.RemoveField(
-            model_name='workerdaycashboxdetails',
-            name='is_tablet',
-        ),
-        migrations.RemoveField(
-            model_name='workerdaycashboxdetails',
-            name='is_vacancy',
-        ),
-        migrations.RemoveField(
-            model_name='workerdaycashboxdetails',
-            name='on_cashbox',
-        ),
-        migrations.RemoveField(
-            model_name='workerdaycashboxdetails',
-            name='status',
-        ),
         migrations.AddField(
             model_name='workerday',
             name='canceled',
