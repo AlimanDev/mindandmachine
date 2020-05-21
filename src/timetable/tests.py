@@ -263,9 +263,7 @@ class TestWorkerDay(APITestCase):
 
         response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {
-            'error': ['worker_day_details is required for type W']})
-
+        self.assertEqual(response.json(),{'worker_day_details': ['Это поле обязательно.']})
         data = {
             "shop_id": self.shop.id,
             "worker_id": self.user2.id,
@@ -282,8 +280,7 @@ class TestWorkerDay(APITestCase):
 
         response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {
-            'error': ['dttm_work_start, dttm_work_end are required for type W']})
+        self.assertEqual(response.json(), {'dttm_work_start': ['Это поле обязательно.']})
 
     def test_edit_approved_wd_secondly(self):
         data = {

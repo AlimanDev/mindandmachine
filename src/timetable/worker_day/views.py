@@ -1,6 +1,7 @@
 import requests
 import json
 from dateutil.relativedelta import relativedelta
+from django.utils.translation import gettext_lazy as _
 
 from django_filters import utils
 from django.db.models import OuterRef, Subquery, Q, F
@@ -36,7 +37,6 @@ from src.timetable.vacancy.utils import cancel_vacancies, create_vacancies_and_n
 from src.main.timetable.auto_settings.utils import set_timetable_date_from
 
 from src.base.models import Employment, Shop, User
-from src.base.exceptions import MessageError
 from src.base.message import Message
 
 from src.timetable.backends import MultiShopsFilterBackend
@@ -44,6 +44,13 @@ from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
 
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
+    error_messages = {
+        "worker_days_mismatch": _("Worker days mismatch."),
+        "no_timetable": _("Workers don't have timetable."),
+        'cannot_delete': _("Cannot_delete approved version."),
+        'na_worker_day_exists': _("Not approved version already exists."),
+    }
+
     permission_classes = [FilteredListPermission]
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
@@ -60,7 +67,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         if instance.is_approved:
             if instance.child.filter(is_fact=instance.is_fact):
-                raise ValidationError({"error": "У расписания уже есть неподтвержденная версия."})
+                raise ValidationError(self.error_messages['na_worker_day_exists'])
 
             data = serializer.validated_data
             data['parent_worker_day_id'] = instance.id
@@ -79,7 +86,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, worker_day):
         if worker_day.is_approved:
-            raise ValidationError({"error": f"Нельзя удалить подтвержденную версию"})
+            raise ValidationError(self.error_messages['cannot_delete'])
         super().perform_destroy(worker_day)
 
     @action(detail=False, methods=['post'])
@@ -352,7 +359,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                         work_part=new_wdcd.work_part,
                     )
                 )
-        
 
         WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
 
@@ -492,13 +498,13 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             id_to_delete = [wd.id for wd in wd_parent_list]
 
         if len(wd_parent_list) != days * 2:
-            raise MessageError(code="no_timetable", lang=request.user.lang)
+            raise ValidationError(self.error_messages['no_timetable'])
 
         day_pairs = []
         for day_ind in range(days):
             day_pair = [wd_parent_list[day_ind * 2], wd_parent_list[day_ind * 2 + 1]]
             if day_pair[0].dt != day_pair[1].dt:
-                raise MessageError(code="worker_days_mismatch", lang=request.user.lang)
+                raise ValidationError(self.error_messages['worker_days_mismatch'])
             day_pairs.append(day_pair)
 
         for day_pair in day_pairs:
