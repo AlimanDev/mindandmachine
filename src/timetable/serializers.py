@@ -310,3 +310,15 @@ class ExchangeSerializer(serializers.Serializer):
             raise MessageError(code="exchange_user", lang=self.context['request'].user.lang)
         if not User.objects.filter(id=self.validated_data['worker2_id']).exists():
             raise MessageError(code="exchange_user", lang=self.context['request'].user.lang)
+
+
+class UploadTimetableSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    file = serializers.FileField()
+
+
+class DownloadSerializer(serializers.Serializer):
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    is_approved = serializers.BooleanField(default=True)
+    inspection_version = serializers.BooleanField(default=False)
+    shop_id=serializers.IntegerField()
