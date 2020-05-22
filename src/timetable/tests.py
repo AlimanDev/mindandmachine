@@ -300,18 +300,18 @@ class TestWorkerDay(APITestCase):
 
         response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': 'У расписания уже есть неподтвержденная версия.'})
+        self.assertEqual(response.json(), {'non_field_errors': 'У расписания уже есть неподтвержденная версия.'})
 
         response = self.client.put(f"{self.url}{self.worker_day_fact_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': 'У расписания уже есть неподтвержденная версия.'})
+        self.assertEqual(response.json(), {'non_field_errors': 'У расписания уже есть неподтвержденная версия.'})
 
 
     def test_delete(self):
         # План подтвержденный
         response = self.client.delete(f'{self.url}{self.worker_day_plan_approved.id}/')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': 'Нельзя удалить подтвержденную версию'})
+        self.assertEqual(response.json(), {'non_field_errors': 'Нельзя удалить подтвержденную версию.'})
 
         # План неподтвержденный
         response = self.client.delete(f'{self.url}{self.worker_day_plan_not_approved.id}/')
@@ -321,7 +321,7 @@ class TestWorkerDay(APITestCase):
         # Факт подтвержденный
         response = self.client.delete(f'{self.url}{self.worker_day_fact_approved.id}/')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': 'Нельзя удалить подтвержденную версию'})
+        self.assertEqual(response.json(), {'non_field_errors': 'Нельзя удалить подтвержденную версию.'})
 
         # Факт неподтвержденный
         response = self.client.delete(f'{self.url}{self.worker_day_fact_not_approved.id}/')
