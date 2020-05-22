@@ -444,7 +444,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         if shop.settings.process_type == ShopSettings.YEAR_NORM:
             max_work_coef += shop.settings.more_norm / 100
             min_work_coef -= shop.settings.less_norm / 100
-
+        method_params = json.loads(shop.settings.method_params)
         shop_dict = {
             'shop_name': shop.name,
             'process_type': shop.settings.process_type,
@@ -471,6 +471,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'fot': 0,  # fixme: tmp, special for 585
             'idle': shop.settings.idle,
             'is_remaking': form['is_remaking'],
+            'use_multiple_work_types': method_params[0].get('use_multiple_work_types', False) if len(method_params) else False,
         }
 
         ########### Группируем ###########
@@ -739,7 +740,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'algo_params': {
                 'min_add_coef': shop.mean_queue_length,
                 'cost_weights': json.loads(shop.settings.cost_weights),
-                'method_params': json.loads(shop.settings.method_params),
+                'method_params': method_params,
                 'breaks_triplets': json.loads(shop.settings.break_triplets),
                 'init_params': init_params,
             },
@@ -846,13 +847,13 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         for wdd in wd['details']:
                             wdd_el = WorkerDayCashboxDetails(
                                 worker_day=wd_obj,
-                                dttm_from=Converter.parse_datetime(wdd['dttm_from']),
-                                dttm_to=Converter.parse_datetime(wdd['dttm_to']),
+                                work_part=wdd['percent'] / 100,
+                                work_type_id=wdd['work_type_id'],
                             )
-                            if wdd['type'] > 0:
-                                wdd_el.work_type_id = wdd['type']
-                            else:
-                                wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
+                            # if wdd['work_type_id'] > 0:
+                            #     wdd_el.work_type_id = wdd['type']
+                            # else:
+                            #     wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
 
                             wdd_list.append(wdd_el)
                         WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
