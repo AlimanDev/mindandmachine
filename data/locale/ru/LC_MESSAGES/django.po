@@ -465,7 +465,7 @@ msgstr "Пароли не совпадают."
 msgid "Password is wrong."
 msgstr "Неверный пароль."
 
-msgid "Employment from {dt_hired} to {employment.dt_fired} already exists."
+msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
 msgid "Worker days mismatch."
@@ -476,11 +476,12 @@ msgstr "Отсутствует расписание у сотрудников."
 
 msgid "Cannot_delete approved version."
 msgstr "Нельзя удалить подтвержденную версию."
+
 msgid "Not approved version already exists."
 msgstr "У расписания уже есть неподтвержденная версия."
 
 #: src.timetable.auto_settings.views.py
-msgid "Timetable could be built at least from {num} day from now."
+msgid "Timetable should be built at least from {num} day from now."
 msgstr "Расписание можно строить не раньше чем через {num} дня от текущего"
 
 #: src.timetable.auto_settings.views.py
@@ -504,33 +505,29 @@ msgid "Fail sending data to server."
 msgstr "Ошибка отправки данных на сервер."
 
 
-  "cycle_relation": "Циклическая зависимость: операция зависит сама от себя",
-  "reversed_relation": "Уже существует обратная зависимость",
-  "not_same_template": "Базовая и зависимая модели не могут иметь разный шаблон нагрузки",
-  "error_in_formula": "Ошибка в формуле: {formula}",
-  "depended_base_same": "Базовая и зависимая модели нагрузки не могут совпадать",
-  "base_not_formula": "У базовой модели тип расчета должен быть формула",
+#: src.forecast.operation_type_relation.views.py
+msgid "Base and depended demand models cannot be the same."
+msgstr "Базовая и зависимая модели нагрузки не могут совпадать."
 
+#: src.forecast.operation_type_relation.views.py
+msgid "Demand model cannot depend on itself."
+msgstr "Циклическая зависимость: операция зависит сама от себя."
 
- {
-  "vacancy": "Создана вакансия на {dt} с {details.dttm_work_start} по {details.dttm_work_end} в магазине {shop.address} http://{domain}/vacancy/{details.id}",
-  "no_vacancy": "Такой вакансии не существует",
-  "vacancy_success": "Вакансия успешно принята.",
-  "cant_apply_vacancy": "Вы не можете выйти на эту смену",
-  "shift_elongation": "Вам была автоматически расширена смена связи с нехваткой сотрудников с {worker_day.dttm_work_start} до {worker_day.dttm_work_end}, дата {worker_day.dt}",
-  "holiday_exchange": "Вам была автоматически назначена смена вместо выходного в связи с нехваткой сотрудников в магазин {shop.name} с {worker_day.dttm_work_start} по {worker_day.dttm_work_end}, дата {worker_day.dt}",
-  "auto_vacancy": "Вам была автоматически назначена смена в {shop.name} по адресу {shop.address} в связи с нехваткой сотрудников с {vacancy.dttm_work_start} до {vacancy.dttm_work_end}",
-  "vacancy_canceled": "Отменена вакансия в магазине {shop.name}, дата {vacancy.dt}.",
-  "tm_work_start_req": "Время начала работы обязательно.",
-  "tm_work_end_req": "Время окончания работы обязательно.",
-  "no_timetable": "Отуствует расписание у сотрудников.",
-  "dt_from_required": "Дата, с которой выполнять действие, обязательна.",
-  "cant_delete_past_period": "Невозможно удалить расписание за прошлый период.",
-  "load_template_attached_shops": "Данный шаблон невозможно удалить, так как используется в расчете нагрузки",
-  "not_ready_forecasts": "Для операций {operation_types} не составлен прогноз. Необходимо рассчитать прогноз вначале.",
-  "error_in_formula_rel": "Ошибка в формуле {formula} между типами операций {base} и {depended}. {e}",
-  "no_relations": "У типа операции {operation_type} указан расчёт по формуле, но не указана базовая операция.",
-  "load_template_not_applied": "Шаблон нагрузки не применён",
-  "load_template_err":"При применении шаблона нагрузки в {shop.name} произошла ошибка: {message}",
-  "load_template_apply": "Шаблон нагрузки {name} успешно применён."
-}
+#: src.forecast.operation_type_relation.views.py
+msgid "Backward dependency already exists."
+msgstr "Уже существует обратная зависимость"
+
+#: src.forecast.operation_type_relation.views.py
+msgid "Base and depended demand models cannot have different templates."
+msgstr "Базовая и зависимая модели не могут иметь разный шаблон нагрузки"
+
+#: src.forecast.operation_type_relation.views.py
+msgid "Error in formula: {formula}."
+msgstr "Ошибка в формуле: {formula}"
+
+#: src.forecast.operation_type_relation.views.py
+msgid "Base model."
+msgstr "У базовой модели тип расчета должен быть формула"
+
+msgid "Cannot delete template as it's used in demand calulations."
+msgstr "Данный шаблон невозможно удалить, так как используется в расчете нагрузки"
