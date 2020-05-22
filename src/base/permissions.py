@@ -26,12 +26,12 @@ class Permission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         department = obj.get_department()
 
-        q = Q()
-        if department:
-            q=Q(shop__in=department.get_ancestors(include_self=True, ascending=True))
+        # q = Q()
+        # if department:
+        #     q=Q(shop__in=department.get_ancestors(include_self=True, ascending=True))
 
         employments = Employment.objects.get_active(
-            user=request.user).filter(q)
+            user=request.user)#.filter(q)
 
         return self.check_employment_permission(employments, request, view)
 
