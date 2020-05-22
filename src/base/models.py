@@ -366,6 +366,8 @@ class FunctionGroup(AbstractModel):
         'PeriodClients_indicators',
         'PeriodClients_put',
         'PeriodClients_delete',
+        'PeriodClients_upload',
+        'PeriodClients_download',
         'Shop',
         'Shop_stat',
         'Subscribe',
@@ -381,6 +383,9 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_delete_timetable',
         'WorkerDay_exchange',
         'WorkerDay_confirm_vacancy',
+        'WorkerDay_upload',
+        'WorkerDay_download_timetable',
+        'WorkerDay_download_tabel',
         'ShopMonthStat',
         'ShopSettings',
 

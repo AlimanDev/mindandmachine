@@ -1,10 +1,13 @@
 from datetime import timedelta, time, datetime
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
-
+from src.base.models import FunctionGroup, WorkerPosition
 from src.util.test import create_departments_and_users
 from src.timetable.models import WorkerDay, WorkType, WorkTypeName
 from src.forecast.models import PeriodClients, OperationType, OperationTypeName
+import pandas, io
+from etc.scripts.fill_calendar import main as fill_calendar
+
 
 class TestWorkerDayStat(APITestCase):
     USER_USERNAME = "user1"
@@ -236,3 +239,66 @@ class TestWorkerDayStat(APITestCase):
         }
 
         self.assertEqual(response.json(), stat)
+
+
+class TestUploadDownload(APITestCase):
+    USER_USERNAME = "user1"
+    USER_EMAIL = "q@q.q"
+    USER_PASSWORD = "4242"
+
+
+    def setUp(self):
+        super().setUp()
+        create_departments_and_users(self)
+        FunctionGroup.objects.create(
+            group=self.admin_group,
+            method='POST',
+            func='WorkerDay_upload',
+            level_up=1,
+            level_down=99,
+        )
+        WorkerPosition.objects.bulk_create(
+            [
+                WorkerPosition(
+                    name=name,
+                )
+                for name in ['Директор магазина', 'Продавец', 'Продавец-кассир', 'ЗДМ']
+            ]
+        )
+        
+        WorkType.objects.create(work_type_name=WorkTypeName.objects.create(name='Кассы'), shop_id=self.shop.id)
+        self.url = '/rest_api/worker_day/'
+        self.client.force_authenticate(user=self.user1)
+
+
+    def test_upload_timetable(self):
+
+        file = open('etc/scripts/timetable.xlsx', 'rb')
+        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file})
+        file.close()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 150)
+
+    def test_download_tabel(self):
+        fill_calendar('2020.4.1', '2021.12.31', self.region.id)
+        file = open('etc/scripts/timetable.xlsx', 'rb')
+        self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file})
+        file.close()
+        response = self.client.get(f'{self.url}download_tabel/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(tabel[tabel.columns[1]][1], 'ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ АПРЕЛЬ  2020г.')
+        self.assertEqual(tabel[tabel.columns[7]][20], '10')
+
+
+    def test_download_timetable(self):
+        fill_calendar('2020.4.1', '2021.12.31', self.region.id)
+        file = open('etc/scripts/timetable.xlsx', 'rb')
+        self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file})
+        file.close()
+        response = self.client.get(f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1')
+        self.assertEqual(tabel[tabel.columns[1]][9], 'Иванов Иван Иванович')
+        self.assertEqual(tabel[tabel.columns[29]][12], 'В')

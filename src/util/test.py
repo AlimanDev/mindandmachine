@@ -495,7 +495,6 @@ def create_departments_and_users(self):
         self.USER_USERNAME,
         self.USER_EMAIL,
         self.USER_PASSWORD,
-        id=1,
         last_name='Васнецов',
         first_name='Иван',
     )
@@ -508,7 +507,6 @@ def create_departments_and_users(self):
         'user2',
         'u2@b.b',
         '4242',
-        id=2,
         first_name='Иван2',
         last_name='Иванов')
     self.employment2 = Employment.objects.create(
@@ -522,7 +520,6 @@ def create_departments_and_users(self):
         'user3',
         'u3@b.b',
         '4242',
-        id=3,
         first_name='Иван3',
         last_name='Сидоров',
     )
@@ -539,7 +536,6 @@ def create_departments_and_users(self):
         'user4',
         '4b@b.b',
         '4242',
-        id=4,
         last_name='Петров',
         first_name='Иван4',
     )
@@ -553,7 +549,6 @@ def create_departments_and_users(self):
         'user5',
         'm@m.m',
         '4242',
-        id=5,
         last_name='Васнецов5',
         first_name='Иван5',
     )
@@ -567,7 +562,6 @@ def create_departments_and_users(self):
         'user6',
         'b@b.b',
         '4242',
-        id=6,
         last_name='Васнецов6',
         first_name='Иван6',
     )
@@ -581,7 +575,6 @@ def create_departments_and_users(self):
         'user7',
         'k@k.k',
         '4242',
-        id=7,
         last_name='Васнецов7',
         first_name='Иван7',
     )

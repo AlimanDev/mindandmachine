@@ -22,6 +22,8 @@ from src.timetable.serializers import (
     DuplicateSrializer,
     DeleteTimetableSerializer,
     ExchangeSerializer,
+    UploadTimetableSerializer,
+    DownloadSerializer,
 )
 
 from src.timetable.filters import WorkerDayFilter
@@ -41,6 +43,8 @@ from src.base.message import Message
 
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
+from src.timetable.worker_day.utils import download_tabel_util, download_timetable_util, upload_timetable_util
+from src.util.upload import get_uploaded_file
 
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
@@ -509,3 +513,25 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response(WorkerDaySerializer(new_wds, many=True).data)
 
+
+    @action(detail=False, methods=['post'])
+    @get_uploaded_file
+    def upload(self, request, file):
+        data = UploadTimetableSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        data.validated_data['lang'] = request.user.lang
+        return upload_timetable_util(data.validated_data, file)
+
+    
+    @action(detail=False, methods=['get'])
+    def download_timetable(self, request):
+        data = DownloadSerializer(data=request.query_params)
+        data.is_valid(raise_exception=True)
+        return download_timetable_util(request, data.validated_data)
+
+
+    @action(detail=False, methods=['get'])
+    def download_tabel(self, request):
+        data = DownloadSerializer(data=request.query_params)
+        data.is_valid(raise_exception=True)
+        return download_tabel_util(request, data.validated_data)
