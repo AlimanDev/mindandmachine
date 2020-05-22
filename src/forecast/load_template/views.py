@@ -1,16 +1,20 @@
-from rest_framework import serializers, viewsets, status, permissions
-from rest_framework.response import Response
-from django_filters.rest_framework import FilterSet
-from django_filters import CharFilter
-from src.forecast.models import LoadTemplate
-from src.forecast.load_template.utils import create_load_template_for_shop
-from src.celery.tasks import calculate_shops_load, apply_load_template_to_shops
-from rest_framework.decorators import action
-from src.conf.djconfig import QOS_DATE_FORMAT
-from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
-from src.base.exceptions import MessageError
 from celery import exceptions as celery_exceptions
 
+from rest_framework import serializers, viewsets, permissions
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+from django_filters.rest_framework import FilterSet
+from django_filters import CharFilter
+
+
+from src.forecast.models import LoadTemplate
+from src.forecast.load_template.utils import create_load_template_for_shop
+from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
+
+from src.celery.tasks import calculate_shops_load, apply_load_template_to_shops
+from src.conf.djconfig import QOS_DATE_FORMAT
+from src.base.exceptions import FieldError
 
 # Serializers define the API representation.
 class LoadTemplateSerializer(serializers.ModelSerializer):
@@ -142,6 +146,10 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
 
 
     """
+    error_messages = {
+        "load_template_attached_shops": "Cannot delete template as it's used in demand calulations."
+
+    }
     permission_classes = [permissions.IsAdminUser]
     filterset_class = LoadTemplateFilter
     serializer_class = LoadTemplateSerializer
@@ -190,7 +198,9 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
         dt_from = data.validated_data.get('dt_from')
         dt_to = data.validated_data.get('dt_to')
         if not dt_to:
-            raise MessageError(code="dt_to_required", lang=request.user.lang)
+            raise ValidationError(
+                {'dt_to': self.error_messages['required']}
+            )
         try:
             calculate_shops_load.delay(request.user.lang, load_template_id, dt_from, dt_to, shop_id=shop_id)
         except celery_exceptions.OperationalError:
@@ -202,7 +212,8 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     def destroy(self, request, pk=None):
         load_template = LoadTemplate.objects.get(pk=pk)
         if load_template.shops.exists():
-            raise MessageError(code="load_template_attached_shops", lang=request.user.lang)
+            raise FieldError(self.error_messages["load_template_attached_shops"])
+
         load_template.delete()
 
         return Response(status=204)
