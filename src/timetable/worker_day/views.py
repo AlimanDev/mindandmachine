@@ -67,7 +67,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         if instance.is_approved:
             if instance.child.filter(is_fact=instance.is_fact):
-                raise ValidationError(self.error_messages['na_worker_day_exists'])
+                raise ValidationError({'non_field_errors': self.error_messages['na_worker_day_exists']})
 
             data = serializer.validated_data
             data['parent_worker_day_id'] = instance.id
@@ -86,7 +86,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, worker_day):
         if worker_day.is_approved:
-            raise ValidationError(self.error_messages['cannot_delete'])
+            raise ValidationError({'non_field_errors': self.error_messages['cannot_delete']})
         super().perform_destroy(worker_day)
 
     @action(detail=False, methods=['post'])

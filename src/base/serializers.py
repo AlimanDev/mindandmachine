@@ -1,13 +1,14 @@
 from django.utils.translation import gettext_lazy as _
+from django.contrib.auth.forms import SetPasswordForm
+from django.db.models import Q
+from django.conf import settings
+
+from rest_framework.validators import UniqueValidator
+from rest_framework.exceptions import ValidationError
 from rest_framework import serializers
 
 from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
-from django.contrib.auth.forms import SetPasswordForm
-from rest_framework.validators import UniqueValidator
-from django.db.models import Q
-
-from django.conf import settings
 from src.base.message import Message
 
 
@@ -31,13 +32,13 @@ class PasswordSerializer(serializers.Serializer):
 
     def validate(self, data):
         if not self.context['request'].user.check_password(data.get('confirmation_password')):
-            self.fail(self.error_messages['password_wrong'])
+            self.fail('password_wrong')
 
         if data.get('new_password1') != data.get('new_password2'):
-            self.fail(self.error_messages['password_mismatch'])
+            self.fail('password_mismatch')
         form = SetPasswordForm(user=self.instance, data=data )
         if not form.is_valid():
-            raise serializers.ValidationError(form.errors)
+            raise ValidationError(form.errors)
 
         return data
 
@@ -58,7 +59,7 @@ class FunctionGroupSerializer(serializers.ModelSerializer):
 
 class EmploymentSerializer(serializers.ModelSerializer):
     default_error_messages = {
-        "emp_check_dates": _("Employment from {dt_hired} to {employment.dt_fired} already exists"),
+        "emp_check_dates": _("Employment from {dt_hired} to {dt_fired} already exists."),
     }
     user = UserSerializer(read_only=True)
     position_id = serializers.IntegerField()
@@ -94,7 +95,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
         if self.instance:
             employments = employments.exclude(id=self.instance.id)
         if employments:
-            self.fail(self.error_messages['emp_check_dates'])
+            e=employments.first()
+            self.fail('emp_check_dates',dt_hired=e.dt_hired,dt_fired=e.dt_fired)
         return attrs
 
     def __init__(self, *args, **kwargs):
@@ -118,7 +120,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
             # shop_id is required for create
             for field in self.Meta.create_only_fields:
                 if field not in data:
-                    self.fail({field: self.error_messages['required']})
+                    raise ValidationError({field: self.error_messages['required']})
         return data
 
 
