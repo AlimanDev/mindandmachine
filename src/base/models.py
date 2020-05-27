@@ -382,6 +382,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_exchange',
         'WorkerDay_confirm_vacancy',
         'ShopMonthStat',
+        'ShopMonthStat_status',
         'ShopSettings',
 
         'signout',
