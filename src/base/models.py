@@ -189,6 +189,7 @@ class Group(AbstractActiveNamedModel):
 
     dttm_modified = models.DateTimeField(blank=True, null=True)
     subordinates = models.ManyToManyField("self", blank=True)
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
     def __str__(self):
         return '{}, {}, {}'.format(
