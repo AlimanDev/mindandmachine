@@ -24,6 +24,13 @@ class OperationTypeName(AbstractActiveNamedModel):
 
     is_special = models.BooleanField(default=False)
 
+    def __str__(self):
+        return 'id: {}, name: {}, code: {}'.format(
+            self.id,
+            self.name,
+            self.code,
+        )
+
 
 class LoadTemplate(AbstractModel):
     class Meta:
@@ -32,6 +39,9 @@ class LoadTemplate(AbstractModel):
 
     name = models.CharField(max_length=64, unique=True)
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
+
+    def __str__(self):
+        return f'id: {self.id}, name: {self.name}'
 
 
 class OperationType(AbstractActiveModel):
@@ -109,14 +119,32 @@ class OperationTypeTemplate(AbstractModel):
     work_type_name = models.ForeignKey(WorkTypeName, on_delete=models.PROTECT, null=True, blank=True)
     do_forecast = models.CharField(max_length=1, choices=OperationType.FORECAST_CHOICES, default=OperationType.FORECAST)
 
+    def __str__(self):
+        return 'id: {}, load_template: {}, operation_type_name: ({}), work_type_name: ({}), do_forecast: {}'.format(
+                 self.id,
+                 self.load_template.name,
+                 self.operation_type_name,
+                 self.work_type_name,
+                 self.do_forecast,
+            )
+
 
 class OperationTypeRelation(AbstractModel):
     class Meta:
+        verbose_name = 'Отношение типов операций'
+        verbose_name_plural = 'Отношения типов операций'
         unique_together = ('base', 'depended')
 
     base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends')
     depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases')
     formula = models.CharField(max_length=256)
+
+    def __str__(self):
+        return 'base_id {}, depended_id: {}, formula: {}'.format(
+            self.base_id,
+            self.depended_id,
+            self.formula,
+        )
 
 
 class OperationTemplate(AbstractActiveNamedModel):
@@ -159,7 +187,7 @@ class OperationTemplate(AbstractActiveNamedModel):
             self.name,
             self.period,
             self.days_in_period,
-            self.operation_type.name)
+            self.operation_type.operation_type_name.name)
 
     PERIOD_DAILY = 'D'
     PERIOD_WEEKLY = 'W'

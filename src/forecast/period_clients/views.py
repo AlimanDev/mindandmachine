@@ -7,11 +7,14 @@ from src.util.utils import JsonResponse
 from src.base.permissions import FilteredListPermission
 from src.forecast.models import OperationType, PeriodClients, PeriodDemandChangeLog
 from django.db.models import Q, F, Sum
-from src.conf.djconfig import QOS_DATETIME_FORMAT
+from src.conf.djconfig import QOS_DATETIME_FORMAT, QOS_DATE_FORMAT
 from rest_framework.decorators import action
 from src.base.models import Shop, Employment, FunctionGroup
 from src.util.models_converter import Converter
 from src.forecast.load_template.utils import apply_reverse_formula # чтобы тесты не падали
+from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util
+from src.util.upload import get_uploaded_file
+
 
 # Serializers define the API representation.
 class PeriodClientsDeleteSerializer(serializers.Serializer):
@@ -46,6 +49,17 @@ class PeriodClientsSerializer(serializers.ModelSerializer):
 
 class PeriodClientsCreateSerializer(serializers.Serializer):
     data = serializers.JSONField(write_only=True)
+
+
+class UploadSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    file = serializers.FileField()
+
+
+class DownloadSerializer(serializers.Serializer):
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
+    shop_id = serializers.IntegerField()
 
 
 class PeriodClientsFilter(FilterSet):
@@ -338,3 +352,18 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
             # 'operations_growth': growth,
             'fact_overall_operations': fact_type_clients / 1000 if fact_type_clients else None,
         })
+
+
+    @action(detail=False, methods=['post'])
+    @get_uploaded_file
+    def upload(self, request, file):
+        data = UploadSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        return upload_demand_util(file, data.validated_data['shop_id'], lang=request.user.lang)
+
+
+    @action(detail=False, methods=['get'])
+    def download(self, request):
+        data = DownloadSerializer(data=request.query_params)
+        data.is_valid(raise_exception=True)
+        return download_demand_xlsx_util(request, data.validated_data)

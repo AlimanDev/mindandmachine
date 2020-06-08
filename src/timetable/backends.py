@@ -6,7 +6,7 @@ from src.base.models import Employment, Shop
 
 from django_filters.rest_framework import DjangoFilterBackend
 
-from src.timetable.filters import WorkerDayFilter, WorkerDayMonthStatFilter
+from src.timetable.filters import WorkerDayFilter, WorkerDayMonthStatFilter, VacancyFilter
 
 
 class MultiShopsFilterBackend(DjangoFilterBackend):
@@ -64,5 +64,7 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
     def get_filterset_class(self, view, queryset=None):
         if view.action == 'month_stat':
             return WorkerDayMonthStatFilter
+        elif view.action == 'vacancy':
+            return VacancyFilter
         else:
             return WorkerDayFilter

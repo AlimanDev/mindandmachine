@@ -339,11 +339,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
                 cashbox = active_cashboxes.order_by('?').first()
                 WorkerDayCashboxDetails.objects.create(
                     worker_day=wd,
-                    on_cashbox=cashbox,
                     work_type=cashbox.type,
-                    dttm_from=wd.dttm_work_start,
-                    dttm_to=wd.dttm_work_end,
-                    is_tablet=True
                 )
                 dt += datetime.timedelta(days=1)
 
@@ -373,10 +369,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         cashbox = self.cashbox3
         WorkerDayCashboxDetails.objects.create(
             worker_day=worker_day,
-            on_cashbox=cashbox,
             work_type=cashbox.type,
-            dttm_from=worker_day.dttm_work_start,
-            dttm_to=worker_day.dttm_work_end,
         )
         return worker_day
 
@@ -502,7 +495,6 @@ def create_departments_and_users(self):
         self.USER_USERNAME,
         self.USER_EMAIL,
         self.USER_PASSWORD,
-        id=1,
         last_name='Васнецов',
         first_name='Иван',
     )
@@ -515,7 +507,6 @@ def create_departments_and_users(self):
         'user2',
         'u2@b.b',
         '4242',
-        id=2,
         first_name='Иван2',
         last_name='Иванов')
     self.employment2 = Employment.objects.create(
@@ -529,7 +520,6 @@ def create_departments_and_users(self):
         'user3',
         'u3@b.b',
         '4242',
-        id=3,
         first_name='Иван3',
         last_name='Сидоров',
     )
@@ -546,7 +536,6 @@ def create_departments_and_users(self):
         'user4',
         '4b@b.b',
         '4242',
-        id=4,
         last_name='Петров',
         first_name='Иван4',
     )
@@ -560,7 +549,6 @@ def create_departments_and_users(self):
         'user5',
         'm@m.m',
         '4242',
-        id=5,
         last_name='Васнецов5',
         first_name='Иван5',
     )
@@ -574,7 +562,6 @@ def create_departments_and_users(self):
         'user6',
         'b@b.b',
         '4242',
-        id=6,
         last_name='Васнецов6',
         first_name='Иван6',
     )
@@ -588,7 +575,6 @@ def create_departments_and_users(self):
         'user7',
         'k@k.k',
         '4242',
-        id=7,
         last_name='Васнецов7',
         first_name='Иван7',
     )

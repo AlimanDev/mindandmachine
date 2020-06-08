@@ -3,6 +3,7 @@ from django.conf.urls import include
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path
+from rest_framework.schemas import get_schema_view
 
 from src.main.auth import urls as auth_urls
 from src.main.cashbox import urls as cashbox_urls
@@ -56,3 +57,22 @@ if DEBUG:
         path('__debug__/', include(debug_toolbar.urls)),
 
     ] + urlpatterns
+
+
+from django.views.generic import TemplateView
+
+urlpatterns += [path('openapi/', get_schema_view(
+    title="WFM",
+    description="Документация REST API",
+    version="1.0.0"
+), name='openapi-schema'),
+]
+urlpatterns +=  [
+    # ...
+    # Route TemplateView to serve Swagger UI template.
+    #   * Provide `extra_context` with view name of `SchemaView`.
+    path('swagger-ui/', TemplateView.as_view(
+        template_name='swagger-ui.html',
+        extra_context={'schema_url':'openapi-schema'}
+    ), name='swagger-ui'),
+]

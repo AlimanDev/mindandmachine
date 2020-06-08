@@ -109,7 +109,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super(EmploymentSerializer, self).__init__(*args, **kwargs)
 
-        show_constraints = self.context['request'].query_params.get('show_constraints')
+        show_constraints = None
+        if self.context['request']:
+            show_constraints = self.context['request'].query_params.get('show_constraints')
+
         if not show_constraints:
             self.fields.pop('worker_constraints')
 
@@ -157,8 +160,8 @@ class NotificationSerializer(serializers.ModelSerializer):
         event = instance.event
         message = Message(lang=lang)
         if event.type=='vacancy':
-            details = event.worker_day_details
-            params = {'details': details, 'dt': details.dttm_from.date(), 'shop': event.shop, 'domain': settings.DOMAIN}
+            details = event.worker_day
+            params = {'details': details, 'dt': details.dt, 'shop': event.shop, 'domain': settings.DOMAIN}
         else:
             params = event.params
         return message.get_message(event.type, params)
