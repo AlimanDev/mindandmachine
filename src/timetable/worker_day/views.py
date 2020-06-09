@@ -441,7 +441,12 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             **worker_day_filter,
         ).delete()
         if not employments:
-            employments = list(Employment.objects.get_active(dt_from, dt_to, shop_id=shop_id, user__in=workers))
+            employments = list(Employment.objects.get_active(
+                network_id=shop.network_id,
+                dt_from=dt_from,
+                dt_to=dt_to,
+                shop_id=shop_id,
+                user__in=workers))
         WorkerDay.objects.filter(
             employment__in=employments,
             dt__gte=dt_from,
