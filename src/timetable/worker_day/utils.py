@@ -183,6 +183,7 @@ def download_timetable_util(request, workbook, form):
     )
 
     employments = Employment.objects.get_active(
+        network_id=shop.network_id,
         dt_from=timetable.prod_days[0].dt,
         dt_to=timetable.prod_days[-1].dt,
         shop=shop,
@@ -255,6 +256,7 @@ def download_tabel_util(request, workbook, form):
     to_dt = tabel.prod_days[-1].dt
 
     employments = Employment.objects.get_active(
+        network_id=shop.network_id,
         dt_from=from_dt,
         dt_to=to_dt,
         shop=shop,
