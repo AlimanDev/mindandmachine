@@ -11,7 +11,7 @@ from rest_framework.status import HTTP_400_BAD_REQUEST
 from rest_framework.decorators import action
 
 from src.base.permissions import Permission
-from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer, ShopSettingsSerializer, NetworkSerializer
+from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer, ShopSettingsSerializer, NetworkSerializer, AuthUserSerializer
 from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter
 from src.base.models import (
     Employment,
@@ -83,7 +83,7 @@ class UserViewSet(ModelViewSet):
 
 
 class AuthUserView(UserDetailsView):
-    serializer_class = UserSerializer
+    serializer_class = AuthUserSerializer
 
 
 class FunctionGroupView(ListAPIView):

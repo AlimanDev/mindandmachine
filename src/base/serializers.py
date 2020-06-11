@@ -28,8 +28,14 @@ class UserSerializer(BaseNetworkSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username', 'network_id' ]
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
 
+
+class AuthUserSerializer(UserSerializer):
+    network = NetworkSerializer()
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ['network']
 
 class PasswordSerializer(serializers.Serializer):
     confirmation_password = serializers.CharField(required=True, max_length=30)
