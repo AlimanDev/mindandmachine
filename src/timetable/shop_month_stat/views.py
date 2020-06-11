@@ -6,6 +6,7 @@ from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import ShopMonthStat
 from django_filters.rest_framework import FilterSet
 from rest_framework.validators import UniqueTogetherValidator
+from rest_framework.decorators import action
 
 
 # Serializers define the API representation.
@@ -20,6 +21,12 @@ class ShopMonthStatSerializer(serializers.ModelSerializer):
                 fields=['shop_id', 'dt'],
             ),
         ]
+
+
+class StatusSerializer(serializers.Serializer):
+    dt = serializers.DateField(format=QOS_DATE_FORMAT)
+    shop_id = serializers.IntegerField()
+
 
 class ShopMonthStatFilter(FilterSet):
     class Meta:
@@ -74,3 +81,17 @@ class ShopMonthStatViewSet(mixins.UpdateModelMixin,
     permission_classes = [FilteredListPermission]
     serializer_class = ShopMonthStatSerializer
     queryset = ShopMonthStat.objects.filter(shop__dttm_deleted__isnull=True)
+
+
+    @action(detail=False, methods=['get',])
+    def status(self, request):
+        data = StatusSerializer(data=request.query_params)
+        data.is_valid(raise_exception=True)
+
+        shop_stat = ShopMonthStat.objects.get(
+            shop_id=data.validated_data['shop_id'],
+            dt=data.validated_data['dt'],
+        )
+
+        return Response(ShopMonthStatSerializer(shop_stat).data)
+

@@ -387,6 +387,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_download_timetable',
         'WorkerDay_download_tabel',
         'ShopMonthStat',
+        'ShopMonthStat_status',
         'ShopSettings',
 
         'signout',

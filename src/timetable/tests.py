@@ -162,8 +162,7 @@ class TestWorkerDay(APITestCase):
             "dttm_work_start": datetime.combine(dt, time(8,0,0)),
             "dttm_work_end":  datetime.combine(dt, time(20,0,0)),
             "worker_day_details": [{
-                "dttm_from":datetime.combine(self.dt, time(8,0,0)),
-                "dttm_to":datetime.combine(self.dt, time(20,0,0)),
+                 "work_part": 1.0,
                  "work_type_id":self.work_type.id}
             ]
         }
@@ -172,6 +171,7 @@ class TestWorkerDay(APITestCase):
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         plan_id = response.json()['id']
+        self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day_id=plan_id).count(), 1)
 
         #create not approved fact
         data['is_fact'] = True
@@ -275,8 +275,7 @@ class TestWorkerDay(APITestCase):
             # "dttm_work_start": None,
             "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
             "worker_day_details": [{
-                "dttm_from":datetime.combine(self.dt, time(8,0,0)),
-                "dttm_to":datetime.combine(self.dt, time(20,0,0)),
+                 "work_part": 1.0,
                  "work_type_id":self.work_type.id}]
         }
 
@@ -295,8 +294,7 @@ class TestWorkerDay(APITestCase):
             "dttm_work_start": datetime.combine(self.dt, time(8,0,0)),
             "dttm_work_end":  datetime.combine(self.dt, time(20,0,0)),
             "worker_day_details": [{
-                "dttm_from":datetime.combine(self.dt, time(8,0,0)),
-                "dttm_to":datetime.combine(self.dt, time(20,0,0)),
+                "work_part": 1.0,
                  "work_type_id":1}
             ]
         }
@@ -308,6 +306,39 @@ class TestWorkerDay(APITestCase):
         response = self.client.put(f"{self.url}{self.worker_day_fact_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(), {'error': 'У расписания уже есть неподтвержденная версия.'})
+
+
+    def test_edit_worker_day(self):
+        dt = self.dt + timedelta(days=1)
+
+        data = {
+            "shop_id": self.shop.id,
+            "worker_id": self.user2.id,
+            "employment_id": self.employment2.id,
+            "dt": dt,
+            "is_fact": False,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(dt, time(8,0,0)),
+            "dttm_work_end":  datetime.combine(dt, time(20,0,0)),
+            "worker_day_details": [{
+                 "work_part": 1.0,
+                 "work_type_id":self.work_type.id}
+            ]
+        }
+
+        #create not approved plan
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        plan_id = response.json()['id']
+        self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day_id=plan_id).count(), 1)
+        data["worker_day_details"] =  [{
+                 "work_part": 0.5,
+                 "work_type_id":self.work_type.id},
+                 {
+                 "work_part": 0.5,
+                 "work_type_id":self.work_type.id}]
+        response = self.client.put(f"{self.url}{plan_id}/", data, format='json')
+        self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day_id=plan_id).count(), 2)
 
 
     def test_delete(self):
@@ -371,8 +402,7 @@ class TestWorkerDayCreateFact(APITestCase):
             "dttm_work_start": datetime.combine(self.dt, time(8,0,0)),
             "dttm_work_end": datetime.combine(self.dt, time(20,0,0)),
             "worker_day_details": [{
-                "dttm_from": datetime.combine(self.dt, time(8, 0, 0)),
-                "dttm_to": datetime.combine(self.dt, time(20, 0, 0)),
+                "work_part": 1.0,
                 "work_type_id": self.work_type.id}
             ]
         }

@@ -22,7 +22,7 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
     work_type_id = serializers.IntegerField(required=False)
     class Meta:
         model = WorkerDayCashboxDetails
-        fields = ['id', 'work_type_id']
+        fields = ['id', 'work_type_id', 'work_part']
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):
