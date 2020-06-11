@@ -1,15 +1,16 @@
+import datetime
+import json
+
 from django.db import models
+from django.db.models import Subquery, OuterRef, Max
+from django.utils import timezone
 from django.contrib.auth.models import (
     UserManager
 )
 
-import datetime
-import json
-from src.base.models import Shop, Employment, User, Event
-
+from src.base.models import Shop, Employment, User, Event, Network
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
-from django.utils import timezone
-from django.db.models import Subquery, OuterRef, Max
+
 
 class WorkerManager(UserManager):
     pass
@@ -47,6 +48,7 @@ class WorkTypeName(AbstractActiveNamedModel):
         WorkType.objects.qos_delete(work_type_name__id=self.pk)
         return self
 
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     def __str__(self):
         return 'id: {}, name: {}, code: {}'.format(
             self.id,
@@ -817,6 +819,7 @@ class AttendanceRecords(AbstractModel):
 
 
 class ExchangeSettings(AbstractModel):
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     default_constraints = {
         'second_day_before': 40,
         'second_day_after': 32,

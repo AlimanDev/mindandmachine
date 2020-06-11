@@ -253,7 +253,9 @@ class Timetable_xlsx(Tabel_xlsx):
 
         prev_user_data = None
         employments = Employment.objects.get_active(
-            dt_to, dt_from, shop_id=shop.id).values_list('user_id', flat=True)
+            network_id=shop.network_id,
+            dt_from=dt_from,dt_to=dt_to,
+            shop_id=shop.id).values_list('user_id', flat=True)
         workers = User.objects.filter(id__in=employments).order_by('id')
         last_worker = len(workers) - 1
         for i, worker in enumerate(workers):

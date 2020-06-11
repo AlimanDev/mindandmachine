@@ -797,6 +797,7 @@ class TestAditionalFunctions(APITestCase):
         self.create_holidays(self.employment2, dt_from + timedelta(3), 1, False)
         url = f'{self.url}delete_timetable/'
         response = self.client.post(url, data, format='json')
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 8)
         #остаётся 1 выходной т.к. удаляем только рабочие дни

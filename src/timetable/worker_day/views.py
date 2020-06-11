@@ -2,9 +2,10 @@ import requests
 import json
 from dateutil.relativedelta import relativedelta
 
-from django_filters import utils
+from django.conf import settings
 from django.db.models import OuterRef, Subquery, Q, F
 from django.utils import timezone
+from django_filters import utils
 
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -213,6 +214,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         employments = {
             e.user_id: e
             for e in Employment.objects.get_active(
+                network_id=shop.network_id,
                 user_id__in=data['workers'].keys(),
                 shop_id=shop_id,
             )
@@ -377,6 +379,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         data = data.validated_data
         employments = None
         shop_id = data['shop_id']
+        shop = Shop.objects.get(id=shop_id)
         worker_day_filter = {
             'is_approved': False,
             'is_fact': False,
@@ -404,14 +407,20 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 dt_from = data['dt_from']
                 dt_to = data['dt_to'] if data['dt_to'] else (dt_from.replace(day=1) + relativedelta(months=1))
 
-            employments = Employment.objects.get_active(dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
+            employments = Employment.objects.get_active(
+                shop.network_id,
+                dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
             workers = User.objects.filter(id__in=employments.values_list('user_id'))
             employments = list(employments)
         else:
             dt_from = data['dt_from']
             dt_to = data['dt_to']
             if not len(data['users']):
-                employments = Employment.objects.get_active(dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
+                employments = Employment.objects.get_active(
+                    shop.network_id,
+                    dt_from, dt_to,
+                    shop_id=shop_id,
+                    auto_timetable=True)
                 workers = User.objects.filter(id__in=employments.values_list('user_id'))
                 employments = list(employments)
             else:
@@ -432,7 +441,12 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             **worker_day_filter,
         ).delete()
         if not employments:
-            employments = list(Employment.objects.get_active(dt_from, dt_to, shop_id=shop_id, user__in=workers))
+            employments = list(Employment.objects.get_active(
+                network_id=shop.network_id,
+                dt_from=dt_from,
+                dt_to=dt_to,
+                shop_id=shop_id,
+                user__in=workers))
         WorkerDay.objects.filter(
             employment__in=employments,
             dt__gte=dt_from,

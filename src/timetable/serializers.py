@@ -1,14 +1,13 @@
-from  django.db import DatabaseError
-
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from src.base.shop.views import ShopSerializer
 
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
-from src.base.models import Employment, User
-from src.util.models_converter import Converter
 from src.conf.djconfig import QOS_DATE_FORMAT
+from src.util.models_converter import Converter
+
+from src.base.models import Employment, User
 from src.base.exceptions import MessageError
+from src.base.shop.serializers import ShopSerializer
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
 
 
 class WorkerDayApproveSerializer(serializers.Serializer):

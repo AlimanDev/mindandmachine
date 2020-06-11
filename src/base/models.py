@@ -10,7 +10,21 @@ from mptt.models import MPTTModel, TreeForeignKey
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
 
 
+class Network(AbstractActiveNamedModel):
+    class Meta:
+        verbose_name = 'Сеть магазинов'
+        verbose_name_plural = 'Сети магазинов'
+    logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
+    url = models.CharField(blank=True,null=True,max_length=255)
+    primary_color = models.CharField(max_length=6, blank=True)
+    secondary_color = models.CharField(max_length=6, blank=True)
+
+    def get_department(self):
+        return None
+
+
 class Region(AbstractActiveNamedModel):
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     class Meta:
         verbose_name = 'Регион'
         verbose_name_plural = 'Регионы'
@@ -29,6 +43,8 @@ class ShopSettings(AbstractActiveNamedModel):
         (PRODUCTION_CAL, 'production calendar'),
         (YEAR_NORM, 'norm per year')
     )
+
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     # json fields
     method_params = models.CharField(max_length=4096, default='[]')
     cost_weights = models.CharField(max_length=4096, default='{}')
@@ -112,6 +128,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     staff_number = models.SmallIntegerField(default=0)
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
     email = models.EmailField(blank=True, null=True)
     exchange_shops = models.ManyToManyField('self')
@@ -147,7 +164,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
 
 class EmploymentManager(models.Manager):
-    def get_active(self, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):
+    def get_active(self, network_id, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):
         """
         hired earlier then dt_from, hired later then dt_to
         :paramShop dt_from:
@@ -160,6 +177,8 @@ class EmploymentManager(models.Manager):
         return self.filter(
             models.Q(dt_hired__lte=dt_to) | models.Q(dt_hired__isnull=True),
             models.Q(dt_fired__gte=dt_from) | models.Q(dt_fired__isnull=True),
+            shop__network_id=network_id,
+            user__network_id = network_id
         ).filter(*args, **kwargs)
 
 
@@ -170,6 +189,7 @@ class Group(AbstractActiveNamedModel):
 
     dttm_modified = models.DateTimeField(blank=True, null=True)
     subordinates = models.ManyToManyField("self", blank=True)
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -267,6 +287,7 @@ class User(DjangoAbstractUser, AbstractModel):
     access_token = models.CharField(max_length=64, blank=True, null=True)
     tabel_code = models.CharField(blank=True, max_length=15, null=True, unique=True)
     lang = models.CharField(max_length=2, default='ru')
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
 
 class WorkerPosition(AbstractActiveNamedModel):
@@ -278,6 +299,7 @@ class WorkerPosition(AbstractActiveNamedModel):
         verbose_name_plural = 'Должности сотрудников'
 
     id = models.BigAutoField(primary_key=True)
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
@@ -355,6 +377,7 @@ class FunctionGroup(AbstractModel):
         'Employment',
         'EmploymentWorkType',
         'FunctionGroupView',
+        'Network',
         'Notification',
         'OperationTemplate',
         'WorkTypeName',
