@@ -81,7 +81,7 @@ class Converter:
         return result  
 
     @classmethod
-    def convert(self, elements, ModelClass=None, fields=None, custom_converters=None, out_array=False):
+    def convert(self, elements, ModelClass=None, fields=None, custom_converters=None, out_array=False, **kwargs):
         '''
         Функция для преобразования данных из базы данных в формат json
         elements:list, tuple, QuerySet - данные
@@ -98,7 +98,7 @@ class Converter:
         # В случае наследования для сложных данных
         if hasattr(self, 'convert_function'):
             elements = [
-                self.convert_function(element)
+                self.convert_function(element, **kwargs)
                 for element in elements
             ]
         #Для простого конвертирования
@@ -151,7 +151,7 @@ class UserConverter(Converter):
 class WorkerDayConverter(Converter):
 
     @classmethod
-    def convert_function(cls, obj):
+    def convert_function(cls, obj, need_percentage=False):
         def __work_tm(__field):
             return cls.convert_time(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
 
@@ -163,7 +163,13 @@ class WorkerDayConverter(Converter):
             'type': obj.type,
             'dttm_work_start': __work_tm(obj.dttm_work_start),
             'dttm_work_end': __work_tm(obj.dttm_work_end),
-            'work_types': [w.id for w in obj.work_types.all()] if obj.id else [],
+            'work_types': [
+                {
+                    'work_type_id': wdds.work_type_id,
+                    'percent': wdds.work_part * 100,
+                }
+                for wdds in obj.worker_day_details.filter(work_part__gt=0)
+            ] if obj.id and WorkerDay.is_type_with_tm_range(obj.type) else [],
             'work_type': obj.work_type_id if hasattr(obj, 'work_type_id') else None,
             'created_by': obj.created_by_id,
             'comment': obj.comment,

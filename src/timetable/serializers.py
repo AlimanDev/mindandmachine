@@ -3,13 +3,12 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from src.base.shop.views import ShopSerializer
-from src.base.models import Employment, User
-
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
-
-from src.util.models_converter import Converter
 from src.conf.djconfig import QOS_DATE_FORMAT
+from src.util.models_converter import Converter
+
+from src.base.models import Employment, User
+from src.base.shop.serializers import ShopSerializer
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
 
 
 class WorkerDayApproveSerializer(serializers.Serializer):
@@ -23,7 +22,7 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
     work_type_id = serializers.IntegerField(required=False)
     class Meta:
         model = WorkerDayCashboxDetails
-        fields = ['id', 'work_type_id']
+        fields = ['id', 'work_type_id', 'work_part']
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):
@@ -335,3 +334,15 @@ class ExchangeSerializer(serializers.Serializer):
         for key in ['worker1_id', 'worker2_id']:
             if not User.objects.filter(id=self.validated_data[key]).exists():
                 raise ValidationError({key: self.error_messages['not_exist'].format(pk_value=self.validated_data[key])})
+
+
+class UploadTimetableSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    file = serializers.FileField()
+
+
+class DownloadSerializer(serializers.Serializer):
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    is_approved = serializers.BooleanField(default=True)
+    inspection_version = serializers.BooleanField(default=False)
+    shop_id=serializers.IntegerField()

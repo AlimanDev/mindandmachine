@@ -106,7 +106,9 @@ class OperationTypeRelationViewSet(viewsets.ModelViewSet):
     filterset_class = OperationTypeRelationFilter
 
     def get_queryset(self):
-        return self.filter_queryset(OperationTypeRelation.objects.all())
+        return OperationTypeRelation.objects.filter(
+            base__load_template__network_id=self.request.user.network_id,
+        )
 
 
     def update(self, request, pk=None):

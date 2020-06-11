@@ -15,9 +15,10 @@ from src.forecast.operation_type_template.views import OperationTypeTemplateSeri
 from src.celery.tasks import calculate_shops_load, apply_load_template_to_shops
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.base.exceptions import FieldError
+from src.base.serializers import BaseNetworkSerializer
 
 # Serializers define the API representation.
-class LoadTemplateSerializer(serializers.ModelSerializer):
+class LoadTemplateSerializer(BaseNetworkSerializer):
     shop_id = serializers.IntegerField(write_only=True, required=False)
     operation_type_templates = OperationTypeTemplateSerializer(many=True, read_only=True)
     class Meta:
@@ -155,7 +156,9 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     serializer_class = LoadTemplateSerializer
 
     def get_queryset(self):
-        return self.filter_queryset(LoadTemplate.objects.all())
+        return LoadTemplate.objects.filter(
+            network_id=self.request.user.network_id
+        )
     
 
     def create(self, request):

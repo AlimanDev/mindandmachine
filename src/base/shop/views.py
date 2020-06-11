@@ -1,49 +1,15 @@
 import datetime
 from dateutil.relativedelta import relativedelta
-from timezone_field import TimeZoneField as TimeZoneField_
 
 from django.db.models import Q, Sum
-from django.utils import six
 from django_filters.rest_framework import FilterSet
 
-from rest_framework import serializers, viewsets, permissions
+from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-
 from src.base.models import Employment, Shop
-import pytz
-
-class TimeZoneField(serializers.ChoiceField):
-    def __init__(self, **kwargs):
-        super().__init__(pytz.common_timezones + [(None, "")], **kwargs)
-
-    def to_representation(self, value):
-        return str(six.text_type(super().to_representation(value)))
-
-
-# Serializers define the API representation.
-class ShopSerializer(serializers.ModelSerializer):
-    parent_id = serializers.IntegerField(required=False)
-    region_id = serializers.IntegerField(required=False)
-    timezone = TimeZoneField()
-    class Meta:
-        model = Shop
-        fields = ['id', 'parent_id', 'name', 'tm_shop_opens', 'tm_shop_closes', 'code',
-                  'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id']
-
-
-class ShopStatSerializer(serializers.Serializer):
-    id=serializers.IntegerField()
-    parent_id=serializers.IntegerField()
-    name=serializers.CharField()
-    fot_curr=serializers.FloatField()
-    fot_prev=serializers.FloatField()
-    revenue_prev=serializers.FloatField()
-    revenue_curr=serializers.FloatField()
-    lack_prev=serializers.FloatField()
-    lack_curr=serializers.FloatField()
-
+from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
 
 class ShopFilter(FilterSet):
     class Meta:
@@ -89,11 +55,14 @@ class ShopViewSet(viewsets.ModelViewSet):
         user = self.request.user
         only_top = self.request.query_params.get('only_top')
 
-        employments = Employment.objects \
-            .get_active(user=user).values('shop_id')
+        employments = Employment.objects.get_active(
+            network_id=user.network_id,
+            user=user).values('shop_id')
         shops = Shop.objects.filter(id__in=employments.values('shop_id'))
         if not only_top:
-            return Shop.objects.get_queryset_descendants(shops, include_self=True)
+            return Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
+                network_id=user.network_id,
+            )
         else:
             return shops
 

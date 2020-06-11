@@ -1,18 +1,30 @@
 from django.utils.translation import gettext_lazy as _
+
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+from rest_framework.validators import UniqueValidator
+
+from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.db.models import Q
-from django.conf import settings
 
-from rest_framework.validators import UniqueValidator
-from rest_framework.exceptions import ValidationError
-from rest_framework import serializers
-
-from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
-from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
+from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
 from src.base.message import Message
+from src.base.fields import CurrentUserNetwork
+from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
 
 
-class UserSerializer(serializers.ModelSerializer):
+class BaseNetworkSerializer(serializers.ModelSerializer):
+    network_id = serializers.HiddenField(default=CurrentUserNetwork())
+
+
+class NetworkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Network
+        fields = ['id', 'name', 'logo', 'url', 'primary_color', 'secondary_color']
+
+
+class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
 
     class Meta:
@@ -20,6 +32,12 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'first_name', 'last_name', 'middle_name',
                   'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
 
+
+class AuthUserSerializer(UserSerializer):
+    network = NetworkSerializer()
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ['network']
 
 class PasswordSerializer(serializers.Serializer):
     default_error_messages = {
@@ -54,7 +72,7 @@ class PasswordSerializer(serializers.Serializer):
 class FunctionGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = FunctionGroup
-        fields = [ 'id', 'group_id', 'func', 'method']
+        fields = ['id', 'group_id', 'func', 'method']
 
 
 class EmploymentSerializer(serializers.ModelSerializer):
@@ -124,10 +142,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
         return data
 
 
-class WorkerPositionSerializer(serializers.ModelSerializer):
+class WorkerPositionSerializer(BaseNetworkSerializer):
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name',]
+        fields = ['id', 'name', 'network_id']
 
 
 class EventSerializer(serializers.ModelSerializer):
@@ -185,3 +203,4 @@ class SubscribeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subscribe
         fields = ['id','shop_id', 'type']
+

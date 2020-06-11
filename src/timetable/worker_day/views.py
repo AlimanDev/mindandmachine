@@ -3,9 +3,10 @@ import json
 from dateutil.relativedelta import relativedelta
 from django.utils.translation import gettext_lazy as _
 
-from django_filters import utils
+from django.conf import settings
 from django.db.models import OuterRef, Subquery, Q, F
 from django.utils import timezone
+from django_filters import utils
 
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -23,6 +24,8 @@ from src.timetable.serializers import (
     DuplicateSrializer,
     DeleteTimetableSerializer,
     ExchangeSerializer,
+    UploadTimetableSerializer,
+    DownloadSerializer,
 )
 
 from src.timetable.filters import WorkerDayFilter
@@ -41,6 +44,8 @@ from src.base.message import Message
 
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
+from src.timetable.worker_day.utils import download_tabel_util, download_timetable_util, upload_timetable_util
+from src.util.upload import get_uploaded_file
 
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
@@ -216,6 +221,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         employments = {
             e.user_id: e
             for e in Employment.objects.get_active(
+                network_id=shop.network_id,
                 user_id__in=data['workers'].keys(),
                 shop_id=shop_id,
             )
@@ -379,6 +385,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         data = data.validated_data
         employments = None
         shop_id = data['shop_id']
+        shop = Shop.objects.get(id=shop_id)
         worker_day_filter = {
             'is_approved': False,
             'is_fact': False,
@@ -406,14 +413,20 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 dt_from = data['dt_from']
                 dt_to = data['dt_to'] if data['dt_to'] else (dt_from.replace(day=1) + relativedelta(months=1))
 
-            employments = Employment.objects.get_active(dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
+            employments = Employment.objects.get_active(
+                shop.network_id,
+                dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
             workers = User.objects.filter(id__in=employments.values_list('user_id'))
             employments = list(employments)
         else:
             dt_from = data['dt_from']
             dt_to = data['dt_to']
             if not len(data['users']):
-                employments = Employment.objects.get_active(dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
+                employments = Employment.objects.get_active(
+                    shop.network_id,
+                    dt_from, dt_to,
+                    shop_id=shop_id,
+                    auto_timetable=True)
                 workers = User.objects.filter(id__in=employments.values_list('user_id'))
                 employments = list(employments)
             else:
@@ -434,7 +447,12 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             **worker_day_filter,
         ).delete()
         if not employments:
-            employments = list(Employment.objects.get_active(dt_from, dt_to, shop_id=shop_id, user__in=workers))
+            employments = list(Employment.objects.get_active(
+                network_id=shop.network_id,
+                dt_from=dt_from,
+                dt_to=dt_to,
+                shop_id=shop_id,
+                user__in=workers))
         WorkerDay.objects.filter(
             employment__in=employments,
             dt__gte=dt_from,
@@ -515,3 +533,25 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response(WorkerDaySerializer(new_wds, many=True).data)
 
+
+    @action(detail=False, methods=['post'])
+    @get_uploaded_file
+    def upload(self, request, file):
+        data = UploadTimetableSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        data.validated_data['lang'] = request.user.lang
+        return upload_timetable_util(data.validated_data, file)
+
+    
+    @action(detail=False, methods=['get'])
+    def download_timetable(self, request):
+        data = DownloadSerializer(data=request.query_params)
+        data.is_valid(raise_exception=True)
+        return download_timetable_util(request, data.validated_data)
+
+
+    @action(detail=False, methods=['get'])
+    def download_tabel(self, request):
+        data = DownloadSerializer(data=request.query_params)
+        data.is_valid(raise_exception=True)
+        return download_tabel_util(request, data.validated_data)

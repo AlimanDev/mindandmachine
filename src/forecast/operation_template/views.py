@@ -144,8 +144,10 @@ class OperationTemplateViewSet(viewsets.ModelViewSet):
     serializer_class = OperationTemplateSerializer
 
     def get_queryset(self):
-        return self.filter_queryset(OperationTemplate.objects.filter(dttm_deleted__isnull=True))
-    
+        return OperationTemplate.objects.filter(
+            load_template__network_id=self.request.user.network_id,
+            dttm_deleted__isnull=True)
+
     def update(self, request, pk=None):
         operation_template = self.get_queryset().get(pk=pk)
 
