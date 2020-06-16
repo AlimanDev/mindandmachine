@@ -21,7 +21,7 @@ class Permission(permissions.BasePermission):
 
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
-            user=request.user)
+            user=request.user).select_related('position')
         return self.check_employment_permission(employments, request, view)
 
     def has_object_permission(self, request, view, obj):
@@ -33,7 +33,7 @@ class Permission(permissions.BasePermission):
 
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
-            user=request.user).filter(q)
+            user=request.user).filter(q).select_related('position')
 
         return self.check_employment_permission(employments, request, view)
 
