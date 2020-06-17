@@ -190,8 +190,8 @@ class TestOperationTemplate(APITestCase):
         response = self.client.put(f'{self.url}{self.ot_monthly.id}/', data, format='json')
         self.assertEqual(response.json(), {
             'days_in_period': {
-                '0': ['A valid integer is required.'], 
-                '1': ['A valid integer is required.']
+                '0': ['Требуется целочисленное значение.'],
+                '1': ['Требуется целочисленное значение.']
             }
         })
         data['days_in_period'] = [1,2,4,15,20,50]

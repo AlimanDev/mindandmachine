@@ -79,6 +79,7 @@ FCM_DJANGO_SETTINGS = {
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'src.util.csrf.CsrfMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -215,16 +216,19 @@ LOGGING = {
 # log.exception("Exception occurred") # for saving traceback
 
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ru-RU'
 
 TIME_ZONE = 'UTC'
 
-USE_I18N = False
+USE_I18N = True 
 
-USE_L10N = False
+USE_L10N = False 
 
 USE_TZ = False
 
+LOCALE_PATHS = [
+    os.path.join(BASE_DIR,  'data/locale')
+]
 
 STATIC_URL = '/static/'
 

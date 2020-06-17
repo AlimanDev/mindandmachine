@@ -8,3 +8,9 @@ class MessageError(ValidationError):
         m = Message(lang=lang)
         message = m.get_message(code, params)
         self.detail = {"message": message}
+
+
+class FieldError(ValidationError):
+    def __init__(self, detail=None, field='non_field_errors', code=None ):
+        super().__init__(detail, code)
+        self.detail = {field: detail}

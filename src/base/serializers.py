@@ -1,13 +1,15 @@
+from django.utils.translation import gettext_lazy as _
+
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueValidator
 
 from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.db.models import Q
 
-from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop
+from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
 from src.base.message import Message
-from src.base.exceptions import MessageError
 from src.base.fields import CurrentUserNetwork
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
 
@@ -38,19 +40,23 @@ class AuthUserSerializer(UserSerializer):
         fields = UserSerializer.Meta.fields + ['network']
 
 class PasswordSerializer(serializers.Serializer):
+    default_error_messages = {
+        "password_mismatch": _("Passwords are mismatched."),
+        "password_wrong": _("Password is wrong."),
+    }
     confirmation_password = serializers.CharField(required=True, max_length=30)
     new_password1 = serializers.CharField(required=True, max_length=30)
     new_password2 = serializers.CharField(required=True, max_length=30)
 
     def validate(self, data):
         if not self.context['request'].user.check_password(data.get('confirmation_password')):
-            raise MessageError(code='password_wrong', lang=self.context['request'].user.lang)
+            self.fail('password_wrong')
 
         if data.get('new_password1') != data.get('new_password2'):
-            raise MessageError(code='password_mismatch', lang=self.context['request'].user.lang)
+            self.fail('password_mismatch')
         form = SetPasswordForm(user=self.instance, data=data )
         if not form.is_valid():
-            raise serializers.ValidationError(form.errors)
+            raise ValidationError(form.errors)
 
         return data
 
@@ -70,6 +76,9 @@ class FunctionGroupSerializer(serializers.ModelSerializer):
 
 
 class EmploymentSerializer(serializers.ModelSerializer):
+    default_error_messages = {
+        "emp_check_dates": _("Employment from {dt_hired} to {dt_fired} already exists."),
+    }
     user = UserSerializer(read_only=True)
     position_id = serializers.IntegerField()
     shop_id = serializers.IntegerField(required=False)
@@ -104,7 +113,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
         if self.instance:
             employments = employments.exclude(id=self.instance.id)
         if employments:
-            raise MessageError(code='emp_check_dates', params={'employment': employments.first()}, lang=self.context['request'].user.lang)
+            e=employments.first()
+            self.fail('emp_check_dates',dt_hired=e.dt_hired,dt_fired=e.dt_fired)
         return attrs
 
     def __init__(self, *args, **kwargs):
@@ -128,7 +138,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
             # shop_id is required for create
             for field in self.Meta.create_only_fields:
                 if field not in data:
-                    raise serializers.ValidationError({field:"This field is required"})
+                    raise ValidationError({field: self.error_messages['required']})
         return data
 
 
@@ -160,12 +170,13 @@ class NotificationSerializer(serializers.ModelSerializer):
 
         event = instance.event
         message = Message(lang=lang)
-        if event.type=='vacancy':
+        if event.type == 'vacancy':
             details = event.worker_day
             params = {'details': details, 'dt': details.dt, 'shop': event.shop, 'domain': settings.DOMAIN}
         else:
             params = event.params
         return message.get_message(event.type, params)
+
 
 class ShopSettingsSerializer(serializers.ModelSerializer):
 
