@@ -300,6 +300,7 @@ class WorkerPosition(AbstractActiveNamedModel):
 
     id = models.BigAutoField(primary_key=True)
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
+    group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
@@ -343,7 +344,8 @@ class Employment(AbstractActiveModel):
     objects = EmploymentManager()
 
     def has_permission(self, permission, method='GET'):
-        return self.function_group.allowed_functions.filter(
+        group = self.function_group or self.position.group
+        return group.allowed_functions.filter(
             func=permission,
             method=method
         ).first()

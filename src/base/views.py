@@ -1,4 +1,6 @@
 from django.utils.timezone import now
+from django.db.models import F
+from django.db.models.functions import Coalesce
 from rest_auth.views import UserDetailsView
 
 from rest_framework import mixins
@@ -95,7 +97,9 @@ class FunctionGroupView(ListAPIView):
 
         groups = Employment.objects.get_active(
             network_id=user.network_id,
-            user=user).values_list("function_group_id", flat=True)
+            user=user).annotate(
+            group_id=Coalesce(F('function_group_id'),F('position__group_id'))
+        ).values_list("group_id", flat=True)
         return FunctionGroup.objects.filter(group__in=groups).distinct('func')
 
 
