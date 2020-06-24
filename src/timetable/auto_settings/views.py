@@ -11,7 +11,6 @@ from rest_framework.decorators import action
 
 from src.celery.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
 from src.base.permissions import Permission
-from src.base.exceptions import MessageError
 
 from src.forecast.models import PeriodClients
 from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings
@@ -53,6 +52,14 @@ class TokenAuthentication(BaseAuthentication):
         return (user, None)
 
 class AutoSettingsViewSet(viewsets.ViewSet):
+    error_messages={
+        "tt_create_past": "Timetable should be built at least from {num} day from now.",
+        "tt_exists": "Timetable already exists.",
+        "tt_users_without_spec": "No work type set for users: {users}.",
+        "tt_period_empty": "Not enough demand {period} for work type {work_type}.",
+        "tt_user_extra_shifts": "More than one shift are selected for worker {id} {last_name} {first_name} with fixed hours.",
+        "tt_server_error": "Fail sending data to server.",
+    }
     serializer_class = AutoSettingsSerializer
     permission_classes = [Permission]
     basename = 'AutoSettings'
@@ -254,7 +261,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         dt_min = datetime.now().date() + timedelta(days=REBUILD_TIMETABLE_MIN_DELTA)
 
         if dt_from < dt_min:
-            raise MessageError("tt_create_past")
+            raise ValidationError(self.error_messages["tt_create_past"].format(num=REBUILD_TIMETABLE_MIN_DELTA))
 
         dt_first = dt_from.replace(day=1)
 
@@ -272,7 +279,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 tt.dttm_status_change = datetime.now()
                 tt.save()
             else:
-                raise MessageError("tt_exists")
+                raise ValidationError(self.error_messages["tt_exists"])
 
         employments = Employment.objects.get_active(
             dt_from=dt_from,
@@ -304,7 +311,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         if users_without_spec:
             tt.status = ShopMonthStat.ERROR
             tt.delete()
-            raise MessageError("tt_users_without_spec", params={'users': ', '.join(users_without_spec)})
+            raise ValidationError(
+                self.error_messages["tt_users_without_spec"].format(users=', '.join(users_without_spec)))
 
         # проверка что есть спрос на период
         # period_difference = {'work_type_name': [], 'difference': []}
@@ -372,7 +380,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     mask[info_day.weekday] += 1
                 if mask.count(1) != len(mask):
                     tt.delete()
-                    raise MessageError('tt_user_extra_shifts', {'user': user})
+                    raise ValidationError(self.error_messages['tt_user_extra_shifts'].format(
+                        id=user.id,last_name=user.last_name,first_name=user.first_name))
+
 
         ##################################################################
 
@@ -763,7 +773,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
             tt.status_message = str(e)
             tt.save()
-            raise MessageError('tt_server_error')
+            raise ValidationError(self.error_messages['tt_server_error'])
 
         return Response()
 
@@ -898,7 +908,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         dt_min = datetime.now().date() + timedelta(days=REBUILD_TIMETABLE_MIN_DELTA)
 
         if dt_from < dt_min:
-            raise MessageError("tt_delete_past")
+            raise ValidationError(self.error_messages["tt_delete_past"])
 
         dt_first = dt_from.replace(day=1)
 

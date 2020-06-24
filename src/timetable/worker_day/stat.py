@@ -138,7 +138,11 @@ def count_worker_stat(shop_id, data):
 
     cal = CalendarPaidDays(dt_year_start, dt_end, shop.region_id)
 
-    employments = Employment.objects.get_active(dt_year_start,dt_end, shop_id=shop_id)
+    employments = Employment.objects.get_active(
+        network_id=shop.network_id,
+        dt_from=dt_year_start,
+        dt_to=dt_end,
+        shop_id=shop_id)
     if worker_ids:
         employments = employments.filter(user_id__in=worker_ids)
 

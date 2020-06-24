@@ -43,7 +43,9 @@ class OperationTypeTemplateViewSet(viewsets.ModelViewSet):
     serializer_class = OperationTypeTemplateSerializer
 
     def get_queryset(self):
-        return self.filter_queryset(OperationTypeTemplate.objects.all())
+        return OperationTypeTemplate.objects.filter(
+            load_template__network_id=self.request.user.network_id
+        )
 
     def update(self, request, pk=None):
         data = OperationTypeTemplateSerializer(data=request.data, instance=OperationTypeTemplate.objects.get(pk=pk))

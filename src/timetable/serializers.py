@@ -1,14 +1,14 @@
-from  django.db import DatabaseError
+from django.utils.translation import gettext_lazy as _
 
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from src.base.shop.views import ShopSerializer
 
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
-from src.base.models import Employment, User
-from src.util.models_converter import Converter
 from src.conf.djconfig import QOS_DATE_FORMAT
-from src.base.exceptions import MessageError
+from src.util.models_converter import Converter
+
+from src.base.models import Employment, User
+from src.base.shop.serializers import ShopSerializer
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
 
 
 class WorkerDayApproveSerializer(serializers.Serializer):
@@ -26,6 +26,12 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):
+    default_error_messages = {
+        'check_dates': _('Date start should be less then date end'),
+        'worker_day_exist': _("Worker day already exist."),
+        'worker_day_intercept': _("Worker day intercepts with another: {shop_name}, {work_start}, {work_end}."),
+    }
+
     worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
     worker_id = serializers.IntegerField(required=False)
     employment_id = serializers.IntegerField(required=False)
@@ -54,14 +60,21 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             attrs['dttm_work_start'] = None
             attrs['dttm_work_end'] = None
         elif not ( attrs.get('dttm_work_start') and attrs.get('dttm_work_end')):
-            raise ValidationError({"error": f"dttm_work_start, dttm_work_end are required for type {type}"})
-        elif attrs['dttm_work_start'] > attrs['dttm_work_end'] or attrs['dt'] != attrs['dttm_work_start'].date() or attrs['dt'] != attrs['dttm_work_end'].date():
-            raise ValidationError({"error": f"dttm_work_start must be less then dttm_work_end and has the same date as dt"})
+            messages={}
+            for k in 'dttm_work_start', 'dttm_work_end':
+                if not attrs.get(k):
+                    messages[k] = self.error_messages['required']
+            raise ValidationError(messages)
+        elif attrs['dttm_work_start'] > attrs['dttm_work_end'] or attrs['dt'] != attrs['dttm_work_start'].date() or attrs['dt'] != attrs['dttm_work_start'].date():
+            self.fail('check_dates')
 
         if not type == WorkerDay.TYPE_WORKDAY or is_fact:
             attrs.pop('worker_day_details', None)
         elif not ( attrs.get('worker_day_details')):
-            raise ValidationError({"error": f"worker_day_details is required for type {type}"})
+            raise ValidationError({
+                "worker_day_details": self.error_messages['required']
+            })
+
         return attrs
 
     def create(self, validated_data):
@@ -139,9 +152,9 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             if wd.type == WorkerDay.TYPE_WORKDAY and validated_data.get('type') == WorkerDay.TYPE_WORKDAY:
                 if wd.dttm_work_start <=validated_data.get('dttm_work_end') and \
                    wd.dttm_work_end >= validated_data.get('dttm_work_start'):
-                    raise ValidationError({"error":f"Рабочий день пересекается с существующим рабочим днем. {wd.shop.name} {wd.dttm_work_start} {wd.dttm_work_end}"})
+                    self.fail('worker_day_intercept', shop_name=wd.shop.name,work_start=wd.dttm_work_start, work_end=wd.dttm_work_end)
             else:
-                raise ValidationError({"error": f"У сотрудника уже существует рабочий день: {wd} "})
+                self.fail('worker_day_exist')
 
     def to_internal_value(self, data):
         data = super(WorkerDaySerializer, self).to_internal_value(data)
@@ -154,7 +167,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             # shop_id is required for create
             for field in self.Meta.create_only_fields:
                 if field not in data:
-                    raise serializers.ValidationError({field:"This field is required"})
+                    raise serializers.ValidationError({field: self.error_messages['required']})
         return data
 
 
@@ -239,6 +252,8 @@ class AutoSettingsSerializer(serializers.Serializer):
 
 
 class ListChangeSrializer(serializers.Serializer):
+    default_error_messages = {
+        "invalid_dt_change_list": _("Wrong dates format.")}
     shop_id = serializers.IntegerField()
     workers = serializers.JSONField()
     type = serializers.CharField()
@@ -252,18 +267,22 @@ class ListChangeSrializer(serializers.Serializer):
         super().is_valid(*args, **kwargs)
         if WorkerDay.is_type_with_tm_range(self.validated_data['type']):
             if self.validated_data.get('tm_work_start') is None:
-                raise MessageError(code="tm_work_start_req", lang=self.context['request'].user.lang)
+                self.tm_work_start.fail('required')
             if self.validated_data.get('tm_work_end') is None:
-                raise MessageError(code="tm_work_end_req", lang=self.context['request'].user.lang)
+                self.tm_work_end.fail('required')
+
             workers = self.validated_data.get('workers')
             for key, value in workers.items():
                 try:
                     workers[key] = list(map(lambda x: Converter.parse_date(x), value))
                 except:
-                    raise MessageError(code="invalid_dt_change_list", lang=self.context['request'].user.lang)
+                    self.fail('invalid_dt_change_list')
 
 
 class DuplicateSrializer(serializers.Serializer):
+    default_error_messages = {
+         'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")
+    }
     from_worker_id = serializers.IntegerField()
     to_worker_id = serializers.IntegerField()
     dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
@@ -271,13 +290,15 @@ class DuplicateSrializer(serializers.Serializer):
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
-        if not User.objects.filter(id=self.validated_data['from_worker_id']).exists():
-            raise MessageError(code="user_does_not_exist", lang=self.context['request'].user.lang)
-        if not User.objects.filter(id=self.validated_data['to_worker_id']).exists():
-            raise MessageError(code="user_does_not_exist", lang=self.context['request'].user.lang)
+        for key in ['from_worker_id', 'to_worker_id']:
+            if not User.objects.filter(id=self.validated_data[key]).exists():
+                raise ValidationError({key: self.error_messages['not_exist'].format(pk_value=self.validated_data[key])})
 
 
 class DeleteTimetableSerializer(serializers.Serializer):
+    default_error_messages = {
+        'check_dates': _('Date start should be less then date end'),
+    }
     shop_id = serializers.IntegerField()
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT, required=False, default=None)
@@ -292,13 +313,17 @@ class DeleteTimetableSerializer(serializers.Serializer):
         dt_to = self.validated_data.get('dt_to')
         
         if not self.validated_data.get('delete_all') and not dt_to:
-            raise MessageError(code="dt_to_required", lang=self.context['request'].user.lang)
+            raise ValidationError({'dt_to': self.error_messages['required']})
 
         if dt_to and dt_from > dt_to:
-            raise MessageError(code="dt_from_gt_dt_to", lang=self.context['request'].user.lang)
+            self.fail('check_dates')
 
 
 class ExchangeSerializer(serializers.Serializer):
+    default_error_messages = {
+         'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")
+    }
+
     worker1_id = serializers.IntegerField()
     worker2_id = serializers.IntegerField()
     dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
@@ -306,10 +331,9 @@ class ExchangeSerializer(serializers.Serializer):
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
-        if not User.objects.filter(id=self.validated_data['worker1_id']).exists():
-            raise MessageError(code="exchange_user", lang=self.context['request'].user.lang)
-        if not User.objects.filter(id=self.validated_data['worker2_id']).exists():
-            raise MessageError(code="exchange_user", lang=self.context['request'].user.lang)
+        for key in ['worker1_id', 'worker2_id']:
+            if not User.objects.filter(id=self.validated_data[key]).exists():
+                raise ValidationError({key: self.error_messages['not_exist'].format(pk_value=self.validated_data[key])})
 
 
 class UploadTimetableSerializer(serializers.Serializer):

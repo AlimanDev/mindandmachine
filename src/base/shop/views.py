@@ -1,19 +1,17 @@
 import datetime
 from dateutil.relativedelta import relativedelta
-from timezone_field import TimeZoneField as TimeZoneField_
 
 from django.db.models import Q, Sum
-from django.utils import six
 from django_filters.rest_framework import FilterSet
 
-from rest_framework import serializers, viewsets, permissions
+from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-
 
 from src.base.models import Employment, Shop
 import pytz
 
+from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
 class TimeZoneField(serializers.ChoiceField):
     def __init__(self, **kwargs):
         super().__init__(pytz.common_timezones + [(None, "")], **kwargs)
@@ -90,11 +88,14 @@ class ShopViewSet(viewsets.ModelViewSet):
         user = self.request.user
         only_top = self.request.query_params.get('only_top')
 
-        employments = Employment.objects \
-            .get_active(user=user).values('shop_id')
+        employments = Employment.objects.get_active(
+            network_id=user.network_id,
+            user=user).values('shop_id')
         shops = Shop.objects.filter(id__in=employments.values('shop_id'))
         if not only_top:
-            return Shop.objects.get_queryset_descendants(shops, include_self=True)
+            return Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
+                network_id=user.network_id,
+            )
         else:
             return shops
 
