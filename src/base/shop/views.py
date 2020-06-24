@@ -9,39 +9,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from src.base.models import Employment, Shop
-import pytz
 
 from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
-class TimeZoneField(serializers.ChoiceField):
-    def __init__(self, **kwargs):
-        super().__init__(pytz.common_timezones + [(None, "")], **kwargs)
-
-    def to_representation(self, value):
-        return str(six.text_type(super().to_representation(value)))
-
-
-# Serializers define the API representation.
-class ShopSerializer(serializers.ModelSerializer):
-    parent_id = serializers.IntegerField(required=False)
-    region_id = serializers.IntegerField(required=False)
-    settings_id = serializers.IntegerField(required=False)
-    timezone = TimeZoneField()
-    class Meta:
-        model = Shop
-        fields = ['id', 'parent_id','settings_id', 'name', 'tm_shop_opens', 'tm_shop_closes', 'code',
-                  'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id', 'restricted_start_times','restricted_end_times']
-
-
-class ShopStatSerializer(serializers.Serializer):
-    id=serializers.IntegerField()
-    parent_id=serializers.IntegerField()
-    name=serializers.CharField()
-    fot_curr=serializers.FloatField()
-    fot_prev=serializers.FloatField()
-    revenue_prev=serializers.FloatField()
-    revenue_curr=serializers.FloatField()
-    lack_prev=serializers.FloatField()
-    lack_curr=serializers.FloatField()
 
 
 class ShopFilter(FilterSet):
