@@ -3,7 +3,7 @@ from src.base.models import (
     Shop,
 )
 from src.timetable.models import (
-    Timetable,
+    ShopMonthStat,
 )
 from math import ceil
 from src.util.utils import api_method, JsonResponse
@@ -308,10 +308,10 @@ def get_department_stats(request, form):
     dt_now = datetime.date.today().replace(day=1)
     dt_from = dt_now - relativedelta(months=6)
 
-    successful_tts = Timetable.objects.select_related('shop').filter(
+    successful_tts = ShopMonthStat.objects.select_related('shop').filter(
         dt=dt_now + relativedelta(months=1),
         shop_id__in=shop_ids,
-        status=Timetable.READY,
+        status=ShopMonthStat.READY,
     ).count()
 
     fot_revenue_stats = []

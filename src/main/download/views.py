@@ -160,7 +160,7 @@ def get_demand_xlsx(request, workbook, form):
         'operation_type__operation_type_name',
         'operation_type__work_type__work_type_name',
     ).filter(
-        operation_type__work_type__shop_id=form['shop_id'],
+        operation_type__shop_id=form['shop_id'],
         dttm_forecast__date__gte=from_dt,
         dttm_forecast__date__lte=to_dt,
         type__in=[PeriodClients.FACT_TYPE, PeriodClients.LONG_FORECASE_TYPE]

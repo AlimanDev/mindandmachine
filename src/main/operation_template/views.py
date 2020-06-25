@@ -67,7 +67,7 @@ def get_operation_templates(request, form):
         )
     else:
         operation_templates=operation_templates.filter(
-            operation_type__work_type__shop_id=shop.id,
+            operation_type__shop_id=shop.id,
         )
 
     return JsonResponse.success(

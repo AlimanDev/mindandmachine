@@ -16,7 +16,7 @@ from src.base.models import (
     ProductionDay,
 )
 from src.timetable.models import (
-    Timetable,
+    ShopMonthStat,
     WorkType,
     WorkerConstraint,
     EmploymentWorkType,
@@ -72,11 +72,11 @@ def get_status(request, form):
     """
 
     try:
-        tt = Timetable.objects.get(shop_id=request.shop.id, dt=form['dt'])
-    except Timetable.DoesNotExist:
+        tt = ShopMonthStat.objects.get(shop_id=request.shop.id, dt=form['dt'])
+    except ShopMonthStat.DoesNotExist:
         return JsonResponse.does_not_exists_error()
 
-    return JsonResponse.success(Converter.convert(tt, Timetable, fields=['id', 'shop_id', 'dt', 'status', 'dttm_status_change']))
+    return JsonResponse.success(Converter.convert(tt, ShopMonthStat, fields=['id', 'shop_id', 'dt', 'status', 'dttm_status_change']))
 
 
 @api_method(
@@ -305,14 +305,12 @@ def create_timetable(request, form):
     dt_first = dt_from.replace(day=1)
     dt_to = (dt_first + relativedelta(months=1))
 
-    try:
-        tt = Timetable.objects.create(
-            shop_id=shop_id,
-            dt=dt_first,
-            status=Timetable.PROCESSING,
-            dttm_status_change=datetime.now()
-        )
-    except:
+    tt, _ = ShopMonthStat.objects.get_or_create(shop_id=shop_id, dt=dt_first, defaults={'dttm_status_change': timezone.now()})
+    if tt.status is ShopMonthStat.NOT_DONE:
+        tt.status = ShopMonthStat.PROCESSING
+        tt.dttm_status_change = timezone.now()
+        tt.save()
+    else:
         return JsonResponse.already_exists_error()
 
     employments=Employment.objects.get_active(
@@ -343,7 +341,7 @@ def create_timetable(request, form):
         if not worker_cashbox_info.exists():
             users_without_spec.append(employment.user.first_name + ' ' + employment.user.last_name)
     if users_without_spec:
-        tt.status = Timetable.ERROR
+        tt.status = ShopMonthStat.ERROR
         status_message = 'Не проставлены типы работ у пользователей: {}.'.format(', '.join(users_without_spec))
         tt.delete()
         return JsonResponse.value_error(status_message)
@@ -657,7 +655,7 @@ def create_timetable(request, form):
     # Спрос
     periods = PeriodClients.objects.filter(
         operation_type__dttm_deleted__isnull=True,
-        operation_type__work_type__shop_id=shop_id,
+        operation_type__shop_id=shop_id,
         operation_type__work_type__dttm_deleted__isnull=True,
         type=PeriodClients.LONG_FORECASE_TYPE,
         dttm_forecast__date__gte=dt_from,
@@ -666,7 +664,7 @@ def create_timetable(request, form):
         'dttm_forecast',
         'operation_type__work_type_id',
     ).annotate(
-        clients=Sum(F('value') / (period_step / F('operation_type__speed_coef')) * (1.0 + (shop.absenteeism / 100)))
+        clients=Sum(F('value'))
     ).values_list(
         'dttm_forecast',
         'operation_type__work_type_id',
@@ -761,12 +759,12 @@ def create_timetable(request, form):
 
         tt.task_id = res.get('task_id', '')
         if tt.task_id is None:
-            tt.status = Timetable.ERROR
+            tt.status = ShopMonthStat.ERROR
             tt.save()
     except Exception as e:
 
         print(e)
-        tt.status = Timetable.ERROR
+        tt.status = ShopMonthStat.ERROR
 
         tt.status_message = str(e)
         tt.save()
@@ -801,9 +799,9 @@ def delete_timetable(request, form):
     dt_first = dt_from.replace(day=1)
     dt_to = (dt_first + relativedelta(months=1))
 
-    tts = Timetable.objects.filter(shop_id=shop_id, dt=dt_first)
+    tts = ShopMonthStat.objects.filter(shop_id=shop_id, dt=dt_first)
     for tt in tts:
-        if (tt.status == Timetable.PROCESSING) and (not tt.task_id is None):
+        if (tt.status == ShopMonthStat.PROCESSING) and (not tt.task_id is None):
             try:
                 requests.post(
                     'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
@@ -811,7 +809,7 @@ def delete_timetable(request, form):
             except (requests.ConnectionError, requests.ConnectTimeout):
                 pass
             send_notification('D', tt, sender=request.user)
-    tts.delete()
+    tts.update(status=ShopMonthStat.NOT_DONE)
 
 
     WorkerDayCashboxDetails.objects.filter(
@@ -878,7 +876,7 @@ def delete_timetable(request, form):
 #@api_method('POST', SetTimetableForm, auth_required=False)
 @api_method('POST',
             SetTimetableForm,
-            lambda_func=lambda x: Timetable.objects.get(id=x['timetable_id']).shop
+            lambda_func=lambda x: ShopMonthStat.objects.get(id=x['timetable_id']).shop
 )
 def set_timetable(request, form):
     """
@@ -901,7 +899,7 @@ def set_timetable(request, form):
     except:
         return JsonResponse.internal_error('cannot parse json')
 
-    timetable = Timetable.objects.get(id=form['timetable_id'])
+    timetable = ShopMonthStat.objects.get(id=form['timetable_id'])
 
     shop = request.shop
     break_triplets = json.loads(shop.break_triplets)
@@ -909,7 +907,7 @@ def set_timetable(request, form):
     timetable.status = data['timetable_status']
     timetable.status_message = data.get('status_message', False)
     timetable.save()
-    if timetable.status != Timetable.READY and timetable.status_message:
+    if timetable.status != ShopMonthStat.READY and timetable.status_message:
         return JsonResponse.success(timetable.status_message)
 
     if data['users']:

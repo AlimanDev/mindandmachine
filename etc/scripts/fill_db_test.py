@@ -31,7 +31,7 @@ from src.timetable.models import (
     WorkTypeName,
     Cashbox,
     AttendanceRecords,
-    Timetable,
+    ShopMonthStat,
     Notifications,
     Employment,
 )
@@ -56,8 +56,8 @@ def create_shop(shop_id, region_id):
 
 
 def create_timetable(shop_id, dttm):
-    tt = Timetable.objects.create(
-        status=Timetable.READY,
+    tt = ShopMonthStat.objects.create(
+        status=ShopMonthStat.READY,
         shop_id=shop_id,
         dt=dttm.date(),
         dttm_status_change=dttm,
@@ -81,7 +81,6 @@ def create_work_types(work_types, shop, operation_names, work_type_names):
         )
         OperationType.objects.create(
             operation_type_name=operation_names[i],
-            speed_coef=work_types[i]['speed_coef'],
             do_forecast=work_types[i]['do_forecast'],
             work_type=wt_m
         )
@@ -142,7 +141,7 @@ def create_forecast(demand: list, work_types_dict: dict, start_dt: timezone.date
                 value=item['clients'] * (1 + (np.random.rand() - 0.5) / 10),
                 dttm_forecast=item['dttm_forecast'] + dt_diff,
                 type=PeriodClients.LONG_FORECASE_TYPE,
-                operation_type=wt.work_type_reversed.all()[0],
+                operation_type=wt.opearion_type,
             ))
             wt_df_index = (wt_df_index + 1) % wt_df.shape[0]
             if prev_dt != item['dttm_forecast'].date():

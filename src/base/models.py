@@ -1,27 +1,40 @@
+import datetime
+from timezone_field import TimeZoneField
+
 from django.db import models
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
-from timezone_field import TimeZoneField
-
-import datetime
+from mptt.models import MPTTModel, TreeForeignKey
 
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
 
-from mptt.models import MPTTModel, TreeForeignKey
+
+class Network(AbstractActiveNamedModel):
+    class Meta:
+        verbose_name = 'Сеть магазинов'
+        verbose_name_plural = 'Сети магазинов'
+    logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
+    url = models.CharField(blank=True,null=True,max_length=255)
+    primary_color = models.CharField(max_length=6, blank=True)
+    secondary_color = models.CharField(max_length=6, blank=True)
+
+    def get_department(self):
+        return None
+
 
 class Region(AbstractActiveNamedModel):
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     class Meta:
         verbose_name = 'Регион'
         verbose_name_plural = 'Регионы'
 
 
-# на самом деле это отдел
-class Shop(MPTTModel, AbstractActiveNamedModel):
+class ShopSettings(AbstractActiveNamedModel):
+
     class Meta(object):
-        # unique_together = ('parent', 'title')
-        verbose_name = 'Отдел'
-        verbose_name_plural = 'Отделы'
+        verbose_name = 'Настройки автосоставления'
+        verbose_name_plural = 'Настройки автосоставления'
 
     PRODUCTION_CAL = 'P'
     YEAR_NORM = 'N'
@@ -30,6 +43,44 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         (PRODUCTION_CAL, 'production calendar'),
         (YEAR_NORM, 'norm per year')
     )
+
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
+    # json fields
+    method_params = models.CharField(max_length=4096, default='[]')
+    cost_weights = models.CharField(max_length=4096, default='{}')
+    init_params = models.CharField(max_length=2048, default='{"n_working_days_optimal": 20}')
+    break_triplets = models.CharField(max_length=1024, default='[]')
+
+    # added on 21.12.2018
+    idle = models.SmallIntegerField(default=0)  # percents
+    fot = models.IntegerField(default=0)
+    less_norm = models.SmallIntegerField(default=0)  # percents
+    more_norm = models.SmallIntegerField(default=0)  # percents
+    shift_start = models.SmallIntegerField(default=6)
+    shift_end = models.SmallIntegerField(default=12)
+    min_change_time = models.IntegerField(default=12)
+    even_shift_morning_evening = models.BooleanField(default=False)
+    # workdays_holidays_same = models.BooleanField(default=False)
+    paired_weekday = models.BooleanField(default=False)
+    exit1day = models.BooleanField(default=False)
+    exit42hours = models.BooleanField(default=False)
+    process_type = models.CharField(max_length=1, choices=PROCESS_TYPE, default=YEAR_NORM)
+    absenteeism = models.SmallIntegerField(default=0)  # percents
+    # added on 16.05.2019
+    queue_length = models.FloatField(default=3.0)
+
+    max_work_hours_7days = models.SmallIntegerField(default=48)
+
+    def get_department(self):
+        return None
+
+
+# на самом деле это отдел
+class Shop(MPTTModel, AbstractActiveNamedModel):
+    class Meta(object):
+        # unique_together = ('parent', 'title')
+        verbose_name = 'Отдел'
+        verbose_name_plural = 'Отделы'
 
     id = models.BigAutoField(primary_key=True)
 
@@ -45,7 +96,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         (TYPE_REGION, 'region'),
         (TYPE_SHOP, 'shop'),
     )
-
 
     code = models.CharField(max_length=64, null=True, blank=True)
     #From supershop
@@ -68,39 +118,23 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     count_lack = models.BooleanField(default=False)
 
-    # json fields
-    method_params  = models.CharField(max_length=4096, default='[]')
-    cost_weights   = models.CharField(max_length=4096, default='{}')
-    init_params    = models.CharField(max_length=2048, default='{"n_working_days_optimal": 20}')
-    break_triplets = models.CharField(max_length=1024, default='[]')
-
-    # added on 21.12.2018
-    idle = models.SmallIntegerField(default=0)  # percents
-    fot = models.IntegerField(default=0)
-    less_norm = models.SmallIntegerField(default=0)  # percents
-    more_norm = models.SmallIntegerField(default=0)  # percents
     tm_shop_opens = models.TimeField(default=datetime.time(6, 0))
     tm_shop_closes = models.TimeField(default=datetime.time(23, 0))
-    shift_start = models.SmallIntegerField(default=6)
-    shift_end = models.SmallIntegerField(default=12)
     restricted_start_times = models.CharField(max_length=1024, default='[]')
     restricted_end_times = models.CharField(max_length=1024, default='[]')
-    min_change_time = models.IntegerField(default=12)
-    even_shift_morning_evening = models.BooleanField(default=False)
-    # workdays_holidays_same = models.BooleanField(default=False)
-    paired_weekday = models.BooleanField(default=False)
-    exit1day = models.BooleanField(default=False)
-    exit42hours = models.BooleanField(default=False)
-    process_type = models.CharField(max_length=1, choices=PROCESS_TYPE, default=YEAR_NORM)
-    absenteeism = models.SmallIntegerField(default=0)  # percents
-    # added on 16.05.2019
-    queue_length = models.FloatField(default=3.0)
 
-    max_work_hours_7days = models.SmallIntegerField(default=48)
+    load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops')
 
     staff_number = models.SmallIntegerField(default=0)
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
+
+    email = models.EmailField(blank=True, null=True)
+    exchange_shops = models.ManyToManyField('self')
+
+    settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True)
+
     def __str__(self):
         return '{}, {}, {}'.format(
             self.name,
@@ -128,8 +162,9 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     def get_department(self):
         return self
 
+
 class EmploymentManager(models.Manager):
-    def get_active(self, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):
+    def get_active(self, network_id, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):
         """
         hired earlier then dt_from, hired later then dt_to
         :paramShop dt_from:
@@ -142,6 +177,8 @@ class EmploymentManager(models.Manager):
         return self.filter(
             models.Q(dt_hired__lte=dt_to) | models.Q(dt_hired__isnull=True),
             models.Q(dt_fired__gte=dt_from) | models.Q(dt_fired__isnull=True),
+            shop__network_id=network_id,
+            user__network_id = network_id
         ).filter(*args, **kwargs)
 
 
@@ -152,6 +189,7 @@ class Group(AbstractActiveNamedModel):
 
     dttm_modified = models.DateTimeField(blank=True, null=True)
     subordinates = models.ManyToManyField("self", blank=True)
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -249,6 +287,7 @@ class User(DjangoAbstractUser, AbstractModel):
     access_token = models.CharField(max_length=64, blank=True, null=True)
     tabel_code = models.CharField(blank=True, max_length=15, null=True, unique=True)
     lang = models.CharField(max_length=2, default='ru')
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
 
 class WorkerPosition(AbstractActiveNamedModel):
@@ -260,6 +299,8 @@ class WorkerPosition(AbstractActiveNamedModel):
         verbose_name_plural = 'Должности сотрудников'
 
     id = models.BigAutoField(primary_key=True)
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
+    group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
@@ -303,7 +344,8 @@ class Employment(AbstractActiveModel):
     objects = EmploymentManager()
 
     def has_permission(self, permission, method='GET'):
-        return self.function_group.allowed_functions.filter(
+        group = self.function_group or self.position.group
+        return group.allowed_functions.filter(
             func=permission,
             method=method
         ).first()
@@ -330,18 +372,27 @@ class FunctionGroup(AbstractModel):
     )
 
     FUNCS = (
+        'AutoSettings_create_timetable',
+        'AutoSettings_set_timetable',
+        'AutoSettings_delete_timetable',
         'AuthUserView',
         'Employment',
         'EmploymentWorkType',
         'FunctionGroupView',
+        'Network',
         'Notification',
         'OperationTemplate',
+        'WorkTypeName',
+        'WorkType',
+        'WorkType_efficiency',
         'OperationTypeName',
         'OperationType',
         'PeriodClients',
         'PeriodClients_indicators',
         'PeriodClients_put',
         'PeriodClients_delete',
+        'PeriodClients_upload',
+        'PeriodClients_download',
         'Shop',
         'Shop_stat',
         'Subscribe',
@@ -351,8 +402,18 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_approve',
         'WorkerDay_daily_stat',
         'WorkerDay_worker_stat',
-        'WorkType',
-        'WorkTypeName',
+        'WorkerDay_vacancy',
+        'WorkerDay_change_list',
+        'WorkerDay_duplicate',
+        'WorkerDay_delete_timetable',
+        'WorkerDay_exchange',
+        'WorkerDay_confirm_vacancy',
+        'WorkerDay_upload',
+        'WorkerDay_download_timetable',
+        'WorkerDay_download_tabel',
+        'ShopMonthStat',
+        'ShopMonthStat_status',
+        'ShopSettings',
 
         'signout',
         'password_edit',
@@ -493,12 +554,23 @@ class FunctionGroup(AbstractModel):
             self.func,
         )
 
-EVENT_TYPES = [('vacancy', 'Вакансия'),('timetable', 'Изменения в расписании')]
+
+EVENT_TYPES = [
+    ('vacancy', 'Вакансия'),
+    ('timetable', 'Изменения в расписании'),
+    ('load_template_err', 'Ошибка применения шаблона нагрузки'),
+    ('load_template_apply', 'Шаблон нагрузки применён'),
+    ('shift_elongation', 'Расширение смены'),
+    ('holiday_exchange', 'Вывод с выходного'),
+    ('auto_vacancy', 'Автоматическая биржа смен'),
+    ('vacancy_canceled', 'Вакансия отменена'),
+]
 
 
 class Event(AbstractModel):
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_valid_to = models.DateTimeField(auto_now_add=True)
+    worker_day = models.ForeignKey('timetable.WorkerDay', null=True, blank=True, on_delete=models.CASCADE)
 
     type = models.CharField(choices=EVENT_TYPES, max_length=20)
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT, related_name="events")

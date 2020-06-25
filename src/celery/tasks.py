@@ -1,28 +1,27 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import os
-
+from src.base.message import Message
 from django.db.models import Avg, Q
 from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
-from src.main.timetable.worker_exchange.utils import (
+from src.timetable.vacancy.utils import (
     # get_init_params,
     # has_deficiency,
     # split_cashiers_periods,
     # intervals_to_shifts,
     search_candidates,
-    send_noti2candidates,
     cancel_vacancy,
     confirm_vacancy,
     create_vacancies_and_notify,
     cancel_vacancies,
-    workers_exchange
+    workers_exchange,
 )
 
 from src.main.demand.utils import create_predbills_request_function
-from src.main.timetable.cashier_demand.utils import get_worker_timetable2 as get_shop_stats
-
+from src.timetable.work_type.utils import get_efficiency as get_shop_stats
+from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
 
 from src.main.operation_template.utils import build_period_clients
 
@@ -30,7 +29,7 @@ from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
     EmploymentWorkType,
-    Timetable,
+    ShopMonthStat,
     ExchangeSettings,
 )
 from src.base.models import (
@@ -39,10 +38,10 @@ from src.base.models import (
     Notification,
     Subscribe,
     Event
-
 )
 from src.forecast.models import (
-    OperationTemplate
+    OperationTemplate,
+    LoadTemplate,
 )
 from src.celery.celery import app
 from django.core.mail import EmailMultiAlternatives
@@ -63,7 +62,7 @@ def create_notifications_for_event(event_id):
             )
         )
         print(f"Create notification for {subscribe.user}, {event}")
-        Notification.objects.bulk_create(notification_list)
+    Notification.objects.bulk_create(notification_list)
 
 @app.task
 def create_notifications_for_subscribe(subscribe_id):
@@ -342,25 +341,54 @@ def create_pred_bills():
 def update_shop_stats(dt=None):
     if not dt:
         dt = date.today().replace(day=1)
-    shops = Shop.objects.filter(dttm_deleted__isnull=True)
-    tts = Timetable.objects.filter(shop__in=shops, dt__gte=dt, status=Timetable.READY)
-    for timetable in tts:
+    else:
+        dt = dt.replace(day=1)
+    shops = list(Shop.objects.filter(dttm_deleted__isnull=True, child__isnull=True))
+    month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt))
+    if len(shops) != len(month_stats):
+        shops_with_stats = list(ShopMonthStat.objects.filter(
+            shop__child__isnull=True,
+            shop__in=shops, 
+            dt=dt,
+        ).values_list('shop_id', flat=True))
+        ShopMonthStat.objects.bulk_create(
+            [
+                ShopMonthStat(
+                    shop=shop,
+                    dt=dt,
+                    dttm_status_change=datetime.now(),
+                )
+                for shop in shops
+                if shop.id not in shops_with_stats
+            ]
+        )
+        month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt))
+    for month_stat in month_stats:
+        if month_stat.status not in [ShopMonthStat.READY, ShopMonthStat.NOT_DONE]:
+            continue
         stats = get_shop_stats(
-            shop_id=timetable.shop_id,
+            shop_id=month_stat.shop_id,
             form=dict(
-                from_dt=timetable.dt,
-                to_dt=timetable.dt + relativedelta(months=1, days=-1),
+                from_dt=month_stat.dt,
+                to_dt=month_stat.dt + relativedelta(months=1, days=-1),
                 work_type_ids=[]
             ),
             indicators_only=True
         )['indicators']
-        timetable.idle = stats['deadtime_part']
-        timetable.fot = stats['FOT']
-        timetable.workers_amount = stats['cashier_amount']
-        timetable.revenue = stats['revenue']
-        timetable.lack = stats['covering_part']
-        timetable.fot_revenue = stats['fot_revenue']
-        timetable.save()
+        month_stat.idle = stats['deadtime_part']
+        month_stat.fot = stats['FOT']
+        month_stat.workers_amount = stats['cashier_amount']
+        month_stat.revenue = stats['revenue']
+        month_stat.lack = stats['covering_part']
+        month_stat.fot_revenue = stats['fot_revenue']
+        month_stat.save()
+
+
+@app.task
+def update_shop_stats_2_months():
+    dt = date.today().replace(day=1)
+    update_shop_stats(dt=dt)
+    update_shop_stats(dt=dt + relativedelta(months=1))
 
 
 @app.task
@@ -424,3 +452,40 @@ def upload_vacation_task():
     upload_vacation_util(file)
     file.close()
     os.remove(localpath)
+
+
+@app.task
+def calculate_shops_load(lang, load_template_id, dt_from, dt_to, shop_id=None):
+    load_template = LoadTemplate.objects.get(pk=load_template_id)
+    root_shop = Shop.objects.filter(level=0).first()
+    shops = [load_template.shops.get(pk=shop_id)] if shop_id else load_template.shops.all()
+    for shop in shops:
+        res = calculate_shop_load(shop, load_template, dt_from, dt_to, lang=lang)
+        if res['error']:
+            event = Event.objects.create(
+                type="load_template_err",
+                params={
+                    'shop': shop,
+                    'message': Message(lang=lang).get_message(res['code'], params=res.get('params', {})),
+                },
+                dttm_valid_to=datetime.now() + timedelta(days=2),
+                shop=root_shop,
+            )
+            create_notifications_for_event(event.id)
+
+
+@app.task
+def apply_load_template_to_shops(load_template_id, dt_from, shop_id=None):
+    load_template = LoadTemplate.objects.get(pk=load_template_id)
+    shops = [Shop.objects.get(pk=shop_id)] if shop_id else load_template.shops.all()
+    for shop in shops:
+        apply_load_template(load_template_id, shop.id, dt_from)
+    event = Event.objects.create(
+        type="load_template_apply",
+        params={
+            'name': load_template.name,
+        },
+        dttm_valid_to=datetime.now() + timedelta(days=2),
+        shop=Shop.objects.filter(level=0).first(),
+    )
+    create_notifications_for_event(event.id)

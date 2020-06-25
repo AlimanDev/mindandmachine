@@ -10,7 +10,7 @@ from src.base.models import (
     Shop,
 )
 from src.timetable.models import (
-    Timetable,
+    ShopMonthStat,
 )
 from dateutil.relativedelta import relativedelta
 from src.util.models_converter import Converter
@@ -32,7 +32,7 @@ def calculate_supershop_stats(month, shop_ids):
     """
     # if not isinstance(shop_ids, QuerySet):
     #     shop_ids = [shop_ids]
-    return Timetable.objects.filter(
+    return ShopMonthStat.objects.filter(
         dt=month,
         shop__id__in=shop_ids
     ).aggregate(

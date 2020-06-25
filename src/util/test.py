@@ -15,13 +15,14 @@ from src.base.models import (
     Group,
     Region,
     Shop,
+    ShopSettings,
     User,
 )
 from src.timetable.models import (
     AttendanceRecords,
     Cashbox,
     Slot,
-    Timetable,
+    ShopMonthStat,
     WorkerDayCashboxDetails,
     EmploymentWorkType,
     WorkType,
@@ -105,10 +106,25 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         WorkType.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 9, 0, 0))
 
         self.operation_type_name = OperationTypeName.objects.create(
-            name='',
+            name='Test',
+        )
+        self.operation_type_name2 = OperationTypeName.objects.create(
+            name='Test2',
+        )
+        self.operation_type_name3 = OperationTypeName.objects.create(
+            name='Test3',
+        )
+        self.operation_type_name4 = OperationTypeName.objects.create(
+            name='Test4',
         )
 
-        create_operation_type(OperationType.FORECAST_HARD, self.operation_type_name)
+        create_operation_type(OperationType.FORECAST, [
+            self.operation_type_name,
+            self.operation_type_name2,
+            self.operation_type_name3,
+            self.operation_type_name4,
+            ]
+        )
 
         # cashboxes
         self.cashbox1 = Cashbox.objects.create(
@@ -187,15 +203,14 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
                 dt_from += datetime.timedelta(days=1)
 
         # Timetable create
-        self.timetable1 = Timetable.objects.create(
+        self.timetable1 = ShopMonthStat.objects.create(
             shop = self.shop,
             dt = datetime.date(2019, 6, 1),
-            status = Timetable.READY,
-            dttm_status_change = datetime.datetime(2019, 6, 1, 9, 30, 0)
+            status = ShopMonthStat.READY,
+            dttm_status_change=datetime.datetime(2019, 6, 1, 9, 30, 0)
         )
-
         # AttendanceRecords
-        self.attendancerecords = AttendanceRecords.objects.create(
+        self.attendanShopMonthStat = AttendanceRecords.objects.create(
             dttm=datetime.datetime(2019, 6, 1, 9, 0, 0),
             type='C',
             user=self.user1,
@@ -324,11 +339,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
                 cashbox = active_cashboxes.order_by('?').first()
                 WorkerDayCashboxDetails.objects.create(
                     worker_day=wd,
-                    on_cashbox=cashbox,
                     work_type=cashbox.type,
-                    dttm_from=wd.dttm_work_start,
-                    dttm_to=wd.dttm_work_end,
-                    is_tablet=True
                 )
                 dt += datetime.timedelta(days=1)
 
@@ -358,15 +369,13 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         cashbox = self.cashbox3
         WorkerDayCashboxDetails.objects.create(
             worker_day=worker_day,
-            on_cashbox=cashbox,
             work_type=cashbox.type,
-            dttm_from=worker_day.dttm_work_start,
-            dttm_to=worker_day.dttm_work_end,
         )
         return worker_day
 
 
 def create_departments_and_users(self):
+    dt = now().date() - relativedelta(months=1)
 
     self.region = Region.objects.create(
         id=1,
@@ -425,15 +434,19 @@ def create_departments_and_users(self):
     # supershop
     self.root_shop = Shop.objects.first()
 
+    self.settings = ShopSettings.objects.create(
+        break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
+    )
     # shops
     self.reg_shop1 = Shop.objects.create(
         # id=11,
         parent=self.root_shop,
         name='Region Shop1',
-        break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
+        # break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
         tm_shop_opens=datetime.time(7, 0, 0),
         tm_shop_closes=datetime.time(0, 0, 0),
         region=self.region,
+        settings=self.settings,
     )
     self.reg_shop2 = Shop.objects.create(
         # id=12,
@@ -442,6 +455,7 @@ def create_departments_and_users(self):
         tm_shop_opens=datetime.time(7, 0, 0),
         tm_shop_closes=datetime.time(0, 0, 0),
         region=self.region,
+        settings=self.settings
     )
 
     # shops
@@ -449,10 +463,11 @@ def create_departments_and_users(self):
         # id=13,
         parent=self.reg_shop1,
         name='Shop1',
-        break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
+        # break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
         tm_shop_opens=datetime.time(7, 0, 0),
         tm_shop_closes=datetime.time(0, 0, 0),
         region=self.region,
+        settings=self.settings
     )
     self.shop2 = Shop.objects.create(
         # id=2,
@@ -461,6 +476,7 @@ def create_departments_and_users(self):
         tm_shop_opens=datetime.time(7, 0, 0),
         tm_shop_closes=datetime.time(0, 0, 0),
         region=self.region,
+        settings=self.settings
     )
 
     self.shop3 = Shop.objects.create(
@@ -470,6 +486,7 @@ def create_departments_and_users(self):
         tm_shop_opens=datetime.time(7, 0, 0),
         tm_shop_closes=datetime.time(0, 0, 0),
         region=self.region,
+        settings=self.settings
     )
     Shop.objects.rebuild()
 
@@ -478,7 +495,6 @@ def create_departments_and_users(self):
         self.USER_USERNAME,
         self.USER_EMAIL,
         self.USER_PASSWORD,
-        id=1,
         last_name='Васнецов',
         first_name='Иван',
     )
@@ -491,19 +507,19 @@ def create_departments_and_users(self):
         'user2',
         'u2@b.b',
         '4242',
-        id=2,
         first_name='Иван2',
         last_name='Иванов')
     self.employment2 = Employment.objects.create(
         user=self.user2,
         shop=self.shop,
         function_group=self.employee_group,
+        dt_hired=dt,
+        salary=100,
     )
     self.user3 = User.objects.create_user(
         'user3',
         'u3@b.b',
         '4242',
-        id=3,
         first_name='Иван3',
         last_name='Сидоров',
     )
@@ -512,14 +528,14 @@ def create_departments_and_users(self):
         shop=self.shop,
         auto_timetable=False,
         function_group=self.employee_group,
-
+        dt_hired=dt,
+        salary=150
     )
 
     self.user4 = User.objects.create_user(
         'user4',
         '4b@b.b',
         '4242',
-        id=4,
         last_name='Петров',
         first_name='Иван4',
     )
@@ -533,7 +549,6 @@ def create_departments_and_users(self):
         'user5',
         'm@m.m',
         '4242',
-        id=5,
         last_name='Васнецов5',
         first_name='Иван5',
     )
@@ -547,7 +562,6 @@ def create_departments_and_users(self):
         'user6',
         'b@b.b',
         '4242',
-        id=6,
         last_name='Васнецов6',
         first_name='Иван6',
     )
@@ -561,7 +575,6 @@ def create_departments_and_users(self):
         'user7',
         'k@k.k',
         '4242',
-        id=7,
         last_name='Васнецов7',
         first_name='Иван7',
     )
@@ -589,13 +602,14 @@ def create_work_type(shop, name, dttm_last_update_queue=None, dttm_deleted=None)
     return work_type
 
 
-def create_operation_type(do_forecast, operation_type_name, dttm_deleted=None):
-    for work_type in WorkType.objects.all():
+def create_operation_type(do_forecast, operation_type_names, dttm_deleted=None):
+    for i, work_type in enumerate(WorkType.objects.all()):
         OperationType.objects.create(
-            operation_type_name=operation_type_name,
+            operation_type_name=operation_type_names[i],
             work_type=work_type,
             do_forecast=do_forecast,
             dttm_deleted=dttm_deleted,
+            shop=work_type.shop,
         )
 
 

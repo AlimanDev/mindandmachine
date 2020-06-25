@@ -1,16 +1,30 @@
-from rest_framework import serializers
+from django.utils.translation import gettext_lazy as _
 
-from src.base.models import Employment, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event
-from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
-from django.contrib.auth.forms import SetPasswordForm
-from rest_framework.validators import UniqueValidator
+from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from django.db.models import Q
+from rest_framework.validators import UniqueValidator
 
 from django.conf import settings
+from django.contrib.auth.forms import SetPasswordForm
+from django.db.models import Q
+
+from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
 from src.base.message import Message
-from src.base.exceptions import MessageError
-class UserSerializer(serializers.ModelSerializer):
+from src.base.fields import CurrentUserNetwork
+from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
+
+
+class BaseNetworkSerializer(serializers.ModelSerializer):
+    network_id = serializers.HiddenField(default=CurrentUserNetwork())
+
+
+class NetworkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Network
+        fields = ['id', 'name', 'logo', 'url', 'primary_color', 'secondary_color']
+
+
+class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
 
     class Meta:
@@ -19,20 +33,30 @@ class UserSerializer(serializers.ModelSerializer):
                   'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
 
 
+class AuthUserSerializer(UserSerializer):
+    network = NetworkSerializer()
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ['network']
+
 class PasswordSerializer(serializers.Serializer):
+    default_error_messages = {
+        "password_mismatch": _("Passwords are mismatched."),
+        "password_wrong": _("Password is wrong."),
+    }
     confirmation_password = serializers.CharField(required=True, max_length=30)
     new_password1 = serializers.CharField(required=True, max_length=30)
     new_password2 = serializers.CharField(required=True, max_length=30)
 
     def validate(self, data):
         if not self.context['request'].user.check_password(data.get('confirmation_password')):
-            raise MessageError(code='password_wrong', lang=self.context['request'].user.lang)
+            self.fail('password_wrong')
 
         if data.get('new_password1') != data.get('new_password2'):
-            raise MessageError(code='password_mismatch', lang=self.context['request'].user.lang)
+            self.fail('password_mismatch')
         form = SetPasswordForm(user=self.instance, data=data )
         if not form.is_valid():
-            raise serializers.ValidationError(form.errors)
+            raise ValidationError(form.errors)
 
         return data
 
@@ -48,10 +72,13 @@ class PasswordSerializer(serializers.Serializer):
 class FunctionGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = FunctionGroup
-        fields = [ 'id', 'group_id', 'func', 'method']
+        fields = ['id', 'group_id', 'func', 'method']
 
 
 class EmploymentSerializer(serializers.ModelSerializer):
+    default_error_messages = {
+        "emp_check_dates": _("Employment from {dt_hired} to {dt_fired} already exists."),
+    }
     user = UserSerializer(read_only=True)
     position_id = serializers.IntegerField()
     shop_id = serializers.IntegerField(required=False)
@@ -86,13 +113,17 @@ class EmploymentSerializer(serializers.ModelSerializer):
         if self.instance:
             employments = employments.exclude(id=self.instance.id)
         if employments:
-            raise MessageError(code='emp_check_dates', params={'employment': employments.first()}, lang=self.context['request'].user.lang)
+            e=employments.first()
+            self.fail('emp_check_dates',dt_hired=e.dt_hired,dt_fired=e.dt_fired)
         return attrs
 
     def __init__(self, *args, **kwargs):
         super(EmploymentSerializer, self).__init__(*args, **kwargs)
 
-        show_constraints = self.context['request'].query_params.get('show_constraints')
+        show_constraints = None
+        if self.context['request']:
+            show_constraints = self.context['request'].query_params.get('show_constraints')
+
         if not show_constraints:
             self.fields.pop('worker_constraints')
 
@@ -107,14 +138,14 @@ class EmploymentSerializer(serializers.ModelSerializer):
             # shop_id is required for create
             for field in self.Meta.create_only_fields:
                 if field not in data:
-                    raise serializers.ValidationError({field:"This field is required"})
+                    raise ValidationError({field: self.error_messages['required']})
         return data
 
 
-class WorkerPositionSerializer(serializers.ModelSerializer):
+class WorkerPositionSerializer(BaseNetworkSerializer):
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name',]
+        fields = ['id', 'name', 'network_id']
 
 
 class EventSerializer(serializers.ModelSerializer):
@@ -139,12 +170,32 @@ class NotificationSerializer(serializers.ModelSerializer):
 
         event = instance.event
         message = Message(lang=lang)
-        if event.type=='vacancy':
-            details = event.worker_day_details
-            params = {'details': details, 'dt': details.dttm_from.date(), 'shop': event.shop, 'domain': settings.DOMAIN}
+        if event.type == 'vacancy':
+            details = event.worker_day
+            params = {'details': details, 'dt': details.dt, 'shop': event.shop, 'domain': settings.DOMAIN}
         else:
             params = event.params
         return message.get_message(event.type, params)
+
+
+class ShopSettingsSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ShopSettings
+        fields = ['id', 'name', 'fot', 'idle', 'less_norm',
+                  'shift_start',
+                  'shift_end',
+                  'min_change_time',
+                  'even_shift_morning_evening',
+                  'paired_weekday',
+                  'exit1day',
+                  'exit42hours',
+                  'process_type',
+                  'absenteeism',
+                  'queue_length',
+                  'max_work_hours_7days'
+                  ]
+
 
 class SubscribeSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField(required=True)
@@ -152,3 +203,4 @@ class SubscribeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subscribe
         fields = ['id','shop_id', 'type']
+

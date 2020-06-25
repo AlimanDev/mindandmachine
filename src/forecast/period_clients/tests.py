@@ -23,6 +23,8 @@ from rest_framework.test import APITestCase
 from src.util.test import create_departments_and_users
 
 from src.base.models import FunctionGroup
+import pandas, io
+
 
 class TestDemand(APITestCase):
 
@@ -57,12 +59,19 @@ class TestDemand(APITestCase):
             level_up=1,
             level_down=99,
         )
+        FunctionGroup.objects.create(
+            group=self.admin_group,
+            method='POST',
+            func='PeriodClients_upload',
+            level_up=1,
+            level_down=99,
+        )
 
         self.work_type_name1 = WorkTypeName.objects.create(
-            name='Кассы1',
+            name='Кассы',
         )
         self.work_type_name2 = WorkTypeName.objects.create(
-            name='Кассы2',
+            name='Торговый зал',
         )
         self.work_type_name3 = WorkTypeName.objects.create(
             name='Кассы3',
@@ -86,27 +95,41 @@ class TestDemand(APITestCase):
         op_type_name2 = OperationTypeName.objects.create(
             name='O_TYPE2',
         )
+        op_type_name3 = OperationTypeName.objects.create(
+            name='O_TYPE3',
+        )
+        op_type_name4 = OperationTypeName.objects.create(
+            name='O_TYPE4',
+        )
+        op_type_name5 = OperationTypeName.objects.create(
+            name='O_TYPE5',
+        )
         self.o_type_1 = OperationType.objects.create(
             work_type=self.work_type1,
             operation_type_name=op_type_name,
-            do_forecast=OperationType.FORECAST_HARD,
+            do_forecast=OperationType.FORECAST,
+            shop=self.work_type1.shop,
             )
         self.o_type_2 = OperationType.objects.create(
             work_type=self.work_type2,
-            operation_type_name=op_type_name,
+            operation_type_name=op_type_name4,
+            shop=self.work_type2.shop,
             )
         self.o_type_3 = OperationType.objects.create(
             work_type=self.work_type3,
-            operation_type_name=op_type_name,
-            do_forecast=OperationType.FORECAST_HARD,
+            operation_type_name=op_type_name3,
+            do_forecast=OperationType.FORECAST,
+            shop=self.work_type3.shop,
             )
         self.o_type_4 = OperationType.objects.create(
             work_type=self.work_type5,
             operation_type_name=op_type_name2,
+            shop=self.work_type5.shop,
             )
         self.o_type_5 = OperationType.objects.create(
             work_type=self.work_type4,
-            operation_type_name=op_type_name,
+            operation_type_name=op_type_name5,
+            shop=self.work_type4.shop,
             )
         test_data = {
             'PeriodClients': [
@@ -527,3 +550,29 @@ class TestDemand(APITestCase):
             },
             response.json()
         )
+
+
+    # Сервер для обработки алгоритма недоступен.
+    def test_upload_demand(self):
+
+        file = open('etc/scripts/demand.xlsx', 'rb')
+        response = self.client.post(f'{self.url}upload/', {'shop_id': 1, 'file': file})
+        file.close()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            PeriodClients.objects.filter(
+                operation_type__work_type__work_type_name__in=[self.work_type_name1, self.work_type_name2],
+                dttm_forecast__date__gte=datetime(2020, 4, 30),
+                dttm_forecast__date__lte=datetime(2020, 5, 1),
+            ).count(), 
+            40
+        )
+
+
+    def test_get_demand_xlsx(self):
+
+        response = self.client.get(f'{self.url}download/?dt_from={Converter.convert_date(datetime(2019, 5, 30).date())}&dt_to={Converter.convert_date(datetime(2019, 6, 2).date())}&shop_id={self.shop.id}')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(tabel[tabel.columns[0]][0], 'Кассы O_TYPE')
+        self.assertEqual(tabel[tabel.columns[1]][0], '30.05.2019 00:00:00')

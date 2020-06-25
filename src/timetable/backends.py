@@ -1,13 +1,12 @@
 import datetime
 
-from django_filters.rest_framework import DjangoFilterBackend
 from django_filters import utils
 
-from src.base.models import Employment
+from src.base.models import Employment, Shop
 
 from django_filters.rest_framework import DjangoFilterBackend
 
-from src.timetable.filters import WorkerDayFilter, WorkerDayMonthStatFilter
+from src.timetable.filters import WorkerDayFilter, WorkerDayMonthStatFilter, VacancyFilter
 
 
 class MultiShopsFilterBackend(DjangoFilterBackend):
@@ -21,8 +20,9 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
             return super().filter_queryset(request, queryset, view)
 
         shop_id = request.query_params.get('shop_id')
+        shop = Shop.objects.get(id=shop_id)
 
-        filterset = self.get_filterset(request,queryset,view)
+        filterset = self.get_filterset(request, queryset, view)
 
         if filterset is None:
             return queryset
@@ -42,7 +42,8 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
         if not dt_to:
             dt_to = dt if dt else datetime.date.today()
         ids = Employment.objects.get_active(
-            dt_from, dt_to,
+            network_id=shop.network_id,
+            dt_from=dt_from, dt_to=dt_to,
             shop_id=shop_id,
         ).values('user_id')
 
@@ -63,5 +64,7 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
     def get_filterset_class(self, view, queryset=None):
         if view.action == 'month_stat':
             return WorkerDayMonthStatFilter
+        elif view.action == 'vacancy':
+            return VacancyFilter
         else:
             return WorkerDayFilter

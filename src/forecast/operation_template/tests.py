@@ -37,11 +37,13 @@ class TestOperationTemplate(APITestCase):
         self.operation_type = OperationType.objects.create(
             operation_type_name=self.operation_type_name1,
             work_type=self.work_type1,
+            shop=self.work_type1.shop,
         )
 
         self.operation_type2 = OperationType.objects.create(
             operation_type_name=self.operation_type_name2,
             work_type=self.work_type2,
+            shop=self.work_type2.shop,
         )
 
         self.dt_from = datetime.now().date() + timedelta(days=5)
@@ -188,8 +190,8 @@ class TestOperationTemplate(APITestCase):
         response = self.client.put(f'{self.url}{self.ot_monthly.id}/', data, format='json')
         self.assertEqual(response.json(), {
             'days_in_period': {
-                '0': ['A valid integer is required.'], 
-                '1': ['A valid integer is required.']
+                '0': ['Требуется целочисленное значение.'],
+                '1': ['Требуется целочисленное значение.']
             }
         })
         data['days_in_period'] = [1,2,4,15,20,50]

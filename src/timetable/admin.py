@@ -7,12 +7,13 @@ from src.timetable.models import (
     Slot,
     UserWeekdaySlot,
     WorkerConstraint,
-    Timetable,
+    ShopMonthStat,
     WorkerDayChangeRequest,
     AttendanceRecords,
     ExchangeSettings,
     Event,
     WorkerDay,
+    WorkTypeName,
 )
 
 
@@ -131,7 +132,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
 
 
     @staticmethod
-    def parent_title(instance: Timetable):
+    def parent_title(instance: ShopMonthStat):
         return instance.shop.parent_title() if instance.shop else ''
 
 
@@ -139,9 +140,9 @@ class WorkerDayAdmin(admin.ModelAdmin):
 class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
     # todo: upd: сервак просто падает если туда зайти
-    list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_work_type', 'id', 'dttm_from', 'dttm_to')
+    list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_work_type', 'id')
     search_fields = ('worker_day__worker__last_name', 'worker_day__shop__title', 'id')
-    list_filter = ('worker_day__shop', 'is_vacancy')
+    list_filter = ('worker_day__shop',)
     raw_id_fields = ('worker_day',)
     list_select_related = (
         'worker_day__worker', 'worker_day__shop', 'work_type')
@@ -170,19 +171,19 @@ class NotificationsAdmin(admin.ModelAdmin):
     list_filter = ('shop',)
 
     @staticmethod
-    def worker_last_name(instance: Timetable):
+    def worker_last_name(instance: ShopMonthStat):
         return instance.to_worker.last_name
 
     @staticmethod
-    def shop_title(instance: Timetable):
+    def shop_title(instance: ShopMonthStat):
         return instance.shop.name
 
     @staticmethod
-    def parent_title(instance: Timetable):
+    def parent_title(instance: ShopMonthStat):
         return instance.shop.parent_title()
 
 
-@admin.register(Timetable)
+@admin.register(ShopMonthStat)
 class TimetableAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop_title', 'parent_title', 'dt', 'status', 'dttm_status_change',
                     'fot', 'idle', 'lack', 'workers_amount', 'revenue', 'fot_revenue',)
@@ -190,11 +191,11 @@ class TimetableAdmin(admin.ModelAdmin):
     list_filter = ('shop',)
 
     @staticmethod
-    def parent_title(instance: Timetable):
+    def parent_title(instance: ShopMonthStat):
         return instance.shop.parent_title()
 
     @staticmethod
-    def shop_title(instance: Timetable):
+    def shop_title(instance: ShopMonthStat):
         return instance.shop.name
 
 
@@ -217,3 +218,9 @@ class ExchangeSettingsAdmin(admin.ModelAdmin):
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
     pass
+
+
+@admin.register(WorkTypeName)
+class WorkTypeNameAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)

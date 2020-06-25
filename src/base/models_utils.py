@@ -65,6 +65,21 @@ def check_func_groups():
         'signin',
         'get_user_allowed_funcs',
         'rotate_fcm_token',
+        #rest
+        'ShopViewSet',
+        'WorkerDayViewSet',
+        'UserViewSet',
+        'EmploymentViewSet',
+        'APIRootView',
+        'LoginView',
+        'LogoutView',
+        'PasswordChangeView',
+        'WorkTypeNameViewSet',
+        'WorkTypeViewSet',
+        'OperationTypeNameViewSet',
+        'OperationTypeViewSet',
+        'PeriodClientsViewSet',
+        'ShopMonthStatViewSet',
     ]
 
     def get_all_view_names(all_url_patterns=None, all_views=[]):

@@ -26,27 +26,28 @@ class TestDemand(LocalTestCase):
             name='O_TYPE2',
         )
         self.work_type5 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name4)
-        self.o_type_1 = OperationType.objects.create(
+        self.o_type_1 = OperationType.objects.get(
             work_type=self.work_type1,
-            operation_type_name=op_type_name,
-            do_forecast=OperationType.FORECAST_HARD,
+            # operation_type_name=op_type_name,
+            # do_forecast=OperationType.FORECAST,
             )
-        self.o_type_2 = OperationType.objects.create(
+        self.o_type_2 = OperationType.objects.get(
             work_type=self.work_type2,
-            operation_type_name=op_type_name,
+            # operation_type_name=op_type_name,
             )
-        self.o_type_3 = OperationType.objects.create(
+        self.o_type_3 = OperationType.objects.get(
             work_type=self.work_type3,
-            operation_type_name=op_type_name,
-            do_forecast=OperationType.FORECAST_HARD,
+            # operation_type_name=op_type_name,
+            # do_forecast=OperationType.FORECAST,
             )
         self.o_type_4 = OperationType.objects.create(
             work_type=self.work_type5,
             operation_type_name=op_type_name2,
+            shop=self.work_type5.shop,
             )
-        self.o_type_5 = OperationType.objects.create(
+        self.o_type_5 = OperationType.objects.get(
             work_type=self.work_type4,
-            operation_type_name=op_type_name,
+            # operation_type_name=op_type_name,
             )
         test_data = {
             'PeriodClients': [

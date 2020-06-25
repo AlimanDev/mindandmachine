@@ -7,10 +7,14 @@ from src.util.utils import JsonResponse
 from src.base.permissions import FilteredListPermission
 from src.forecast.models import OperationType, PeriodClients, PeriodDemandChangeLog
 from django.db.models import Q, F, Sum
-from src.conf.djconfig import QOS_DATETIME_FORMAT
+from src.conf.djconfig import QOS_DATETIME_FORMAT, QOS_DATE_FORMAT
 from rest_framework.decorators import action
 from src.base.models import Shop, Employment, FunctionGroup
 from src.util.models_converter import Converter
+from src.forecast.load_template.utils import apply_reverse_formula # чтобы тесты не падали
+from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util
+from src.util.upload import get_uploaded_file
+
 
 # Serializers define the API representation.
 class PeriodClientsDeleteSerializer(serializers.Serializer):
@@ -47,9 +51,20 @@ class PeriodClientsCreateSerializer(serializers.Serializer):
     data = serializers.JSONField(write_only=True)
 
 
+class UploadSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    file = serializers.FileField()
+
+
+class DownloadSerializer(serializers.Serializer):
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
+    shop_id = serializers.IntegerField()
+
+
 class PeriodClientsFilter(FilterSet):
-    shop_id = NumberFilter(field_name='operation_type__work_type__shop_id')
-    work_type_id = NumberFilter(field_name='operation_type__work_type_id', lookup_expr='in')
+    shop_id = NumberFilter(field_name='operation_type__shop_id')
+    work_type_id = NumberFilter(field_name='operation_type__work_type_id')
     dt_from = DateFilter(field_name='dttm_forecast', lookup_expr='date__gte')
     dt_to = DateFilter(field_name='dttm_forecast', lookup_expr='date__lte')
 
@@ -154,8 +169,8 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
             type=type,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lte=dt_to,
-            operation_type__work_type__shop_id=shop.id,
-            operation_type__do_forecast=OperationType.FORECAST_HARD,
+            operation_type__shop_id=shop.id,
+            operation_type__do_forecast=OperationType.FORECAST,
         ).delete()
         
         for period_demand_value in data['demand']:
@@ -216,7 +231,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         period_clients = PeriodClients.objects.select_related(
             'operation_type__work_type'
         ).filter(
-            operation_type__work_type__shop_id=shop_id,
+            operation_type__shop_id=shop_id,
             type=type,
             dttm_forecast__time__gte=dttm_from.time(),
             dttm_forecast__time__lte=dttm_to.time(),
@@ -260,6 +275,16 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         PeriodClients.objects.bulk_create(models)
         period_clients.update(value=set_value if set_value else F('value')*multiply_coef)
         changed_operation_type_ids = set(period_clients.values_list('operation_type_id', flat=True))
+        if Shop.objects.filter(pk=shop_id, load_template__isnull=False).exists():
+            for o_type in OperationType.objects.select_related('shop').filter(id__in=operation_type_ids):
+                apply_reverse_formula(
+                    o_type, 
+                    dt_from=dttm_from.date(), 
+                    dt_to=dttm_to.date(), 
+                    tm_from=dttm_from.time(), 
+                    tm_to=dttm_to.time(),
+                    lang=request.user.lang,
+                )
         for x in changed_operation_type_ids:
             PeriodDemandChangeLog.objects.create(
                 dttm_from=dttm_from,
@@ -283,7 +308,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         shop_id = data.validated_data.get('shop_id')
         type = data.validated_data.get('type')
         PeriodClients.objects.filter(
-            operation_type__work_type__shop_id=shop_id,
+            operation_type__shop_id=shop_id,
             type=type,
             dttm_forecast__date__gte=dttm_from.date(),
             dttm_forecast__date__lte=dttm_to.date(),
@@ -327,3 +352,18 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
             # 'operations_growth': growth,
             'fact_overall_operations': fact_type_clients / 1000 if fact_type_clients else None,
         })
+
+
+    @action(detail=False, methods=['post'])
+    @get_uploaded_file
+    def upload(self, request, file):
+        data = UploadSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        return upload_demand_util(file, data.validated_data['shop_id'], lang=request.user.lang)
+
+
+    @action(detail=False, methods=['get'])
+    def download(self, request):
+        data = DownloadSerializer(data=request.query_params)
+        data.is_valid(raise_exception=True)
+        return download_demand_xlsx_util(request, data.validated_data)

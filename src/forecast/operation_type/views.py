@@ -1,30 +1,38 @@
-import datetime
-
+from rest_framework.validators import UniqueTogetherValidator
 from rest_framework import serializers, viewsets
-from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from django_filters import NumberFilter
-from src.util.utils import JsonResponse
+
 from src.base.permissions import FilteredListPermission
 from src.forecast.models import OperationType, OperationTypeName
-from django.db.models import Q, F
 from src.forecast.operation_type_name.views import OperationTypeNameSerializer
 
 
-# Serializers define the API representation.
 class OperationTypeSerializer(serializers.ModelSerializer):
     operation_type_name = OperationTypeNameSerializer(required=False)
     work_type_id = serializers.IntegerField(required=False)
     code = serializers.CharField(required=False, write_only=True)
     operation_type_name_id = serializers.IntegerField(write_only=True, required=False)
+    shop_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = OperationType
-        fields = ['id', 'work_type_id', 'speed_coef', 'do_forecast', 'operation_type_name', 'code', 'operation_type_name_id']
+        fields = ['id', 'work_type_id', 'do_forecast', 'operation_type_name', 'code', 'operation_type_name_id', 'shop_id']
+        validators = [
+            UniqueTogetherValidator(
+                queryset=OperationType.objects.all(),
+                fields=['operation_type_name_id', 'shop_id'],
+            ),
+        ]
+
+    def is_valid(self, *args, **kwargs):
+        if self.initial_data.get('code', False):
+            self.initial_data['operation_type_name_id'] = OperationTypeName.objects.get(code=self.initial_data.get('code')).id
+        super().is_valid(*args, **kwargs)
 
 
 class OperationTypeFilter(FilterSet):
-    shop_id = NumberFilter(field_name='work_type__shop_id')
+    shop_id = NumberFilter(field_name='shop_id')
     class Meta:
         model = OperationType
         fields = {
@@ -52,7 +60,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
                 "code": '2',
             },
             "work_type_id": 1,
-            "speed_coef": 3.0,
             "do_forecast": "H"
         },
         ...
@@ -68,7 +75,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
             "code": '4',
         },
         "work_type_id": 1,
-        "speed_coef": 3.0,
         "do_forecast": "H"
     }
 
@@ -78,7 +84,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
         work_type_id: int, required=True
         operation_type_name_id: int, required=False
         code: str, required=False
-        speed_coef: float, required=True
         do_forecast: OperationType do_forecast, required=False
     :return 
         code 201
@@ -90,7 +95,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
                 "code": '4',
             },
             "work_type_id": 1,
-            "speed_coef": 3.0,
             "do_forecast": "H"
         }
 
@@ -100,7 +104,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
         work_type_id: int, required=False
         operation_type_name_id: int, required=False
         code: str, required=False
-        speed_coef: float, required=False
         do_forecast: OperationType do_forecast, required=False
     :return {
         "id":6,
@@ -110,7 +113,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
             "code": '4',
         },
         "work_type_id": 1,
-        "speed_coef": 3.0,
         "do_forecast": "H"
     }
 
@@ -125,6 +127,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
     filterset_class = OperationTypeFilter
 
     def get_queryset(self):
-        return self.filter_queryset(
-            OperationType.objects.select_related('operation_type_name').filter(dttm_deleted__isnull=True)
+        return OperationType.objects.select_related('operation_type_name').filter(
+                dttm_deleted__isnull=True
         )
