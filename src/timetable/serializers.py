@@ -82,7 +82,6 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         self.check_other_worker_days(None, validated_data)
-
         is_fact = validated_data.get('is_fact')
 
         # Если создаем факт то делаем его потомком подтвержденного факта или плана. Если создаем план - делаем родителем факта и потомком подтвержденного плана
@@ -109,6 +108,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             validated_data['parent_worker_day_id'] = fact_to_bind.id
         elif plan_to_bind:
             validated_data['parent_worker_day_id'] = plan_to_bind.id
+
 
         details = validated_data.pop('worker_day_details', None)
 
@@ -146,7 +146,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             worker_id=validated_data.get('worker_id'),
             dt=validated_data.get('dt'),
             is_fact=is_fact,
-            # is_approved=False
+            is_approved=False
         )
 
         parent_worker_day_id = None
@@ -158,9 +158,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             worker_days = worker_days.exclude(id=parent_worker_day_id)
 
         if worker_days:
-            wd = worker_days[0]
-            self.fail('worker_day_intercept', shop_name=wd.shop.name, work_start=wd.dttm_work_start,
-                  work_end=wd.dttm_work_end)
+            raise ValidationError({'error': self.error_messages['worker_day_exist']})
 
     def to_internal_value(self, data):
         data = super(WorkerDaySerializer, self).to_internal_value(data)
@@ -282,7 +280,7 @@ class ListChangeSrializer(serializers.Serializer):
                 try:
                     workers[key] = list(map(lambda x: Converter.parse_date(x), value))
                 except:
-                    self.fail('invalid_dt_change_list')
+                    raise ValidationError({'error': self.error_messages['invalid_dt_change_list']})
 
 
 class DuplicateSrializer(serializers.Serializer):

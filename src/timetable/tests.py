@@ -230,7 +230,7 @@ class TestWorkerDay(APITestCase):
         data['is_fact'] = False
         response = self.client.post(f"{self.url}", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        new_plan_id=response.json()['id']
+        new_plan_id = response.json()['id']
         new_plan = WorkerDay.objects.get(id=new_plan_id)
         self.assertNotEqual(new_plan_id, plan_id)
         self.assertEqual(response.json()['parent_worker_day_id'], plan_id)
@@ -239,7 +239,7 @@ class TestWorkerDay(APITestCase):
         # edit approved plan again
         response = self.client.post(f"{self.url}", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день: {new_plan}"})
+        self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день."})
 
         # edit approved fact
         data['dttm_work_start'] = Converter.convert_datetime(datetime.combine(dt, time(8, 8, 0)))
@@ -261,7 +261,7 @@ class TestWorkerDay(APITestCase):
         #edit approved fact again
         response = self.client.post(f"{self.url}", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день: {new_fact}"})
+        self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день."})
 
     def test_empty_params(self):
         data = {
@@ -313,11 +313,13 @@ class TestWorkerDay(APITestCase):
 
         response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'non_field_errors': 'У расписания уже есть неподтвержденная версия.'})
+        self.assertEqual(response.json(),
+            {'error': ['Нельзя менять подтвержденную версию.']}
+        )
 
         response = self.client.put(f"{self.url}{self.worker_day_fact_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'non_field_errors': 'У расписания уже есть неподтвержденная версия.'})
+        self.assertEqual(response.json(), {'error': ['Нельзя менять подтвержденную версию.']})
 
 
     def test_edit_worker_day(self):
@@ -654,24 +656,20 @@ class TestVacancy(APITestCase):
 
         self.client.force_authenticate(user=self.user1)
 
-
     def test_get_list(self):
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 2)
 
-    
     def test_get_list_shift_length(self):
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&shift_length_min=8:00:00&shift_length_max=9:00:00')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
 
-    
     def test_get_vacant_list(self):
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&is_vacant=true')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
-
 
     def test_confirm_vacancy(self):
         WorkerDay.objects.create(
@@ -729,23 +727,21 @@ class TestAditionalFunctions(APITestCase):
         ])
         self.client.force_authenticate(user=self.user1)
 
-
     def create_holidays(self, employment, dt_from, count, approved, wds={}):
         result = {}
         for day in range(count):
-            date = dt_from + timedelta(days=day)
-            parent_worker_day = None if approved else wds.get(date, None)
-            result[date] = WorkerDay.objects.create(
+            dt = dt_from + timedelta(days=day)
+            parent_worker_day = None if approved else wds.get(dt, None)
+            result[dt] = WorkerDay.objects.create(
                 employment=employment,
                 worker=employment.user,
                 shop=employment.shop,
-                dt=date,
+                dt=dt,
                 type=WorkerDay.TYPE_HOLIDAY,
                 is_approved=approved,
                 parent_worker_day=parent_worker_day,
             )
         return result
-
 
     def create_worker_days(self, employment, dt_from, count, from_tm, to_tm, approved, wds={}):
         result = {}
@@ -771,7 +767,6 @@ class TestAditionalFunctions(APITestCase):
             )
         return result
 
-
     def test_delete_all(self):
         dt_from = date.today()
         data = {
@@ -790,7 +785,6 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 8)
         #остаётся 4 т.к. у сотрудника auto_timetable=False
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 4)
-
 
     def test_delete(self):
         dt_from = date.today()
@@ -814,7 +808,6 @@ class TestAditionalFunctions(APITestCase):
         #остаётся 1 выходной т.к. удаляем только рабочие дни
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 1)
 
-
     def test_exchange_approved(self):
         dt_from = date.today()
         data = {
@@ -828,7 +821,6 @@ class TestAditionalFunctions(APITestCase):
         url = f'{self.url}exchange/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 8)
-
 
     def test_exchange_not_approved(self):
         dt_from = date.today()
@@ -846,7 +838,6 @@ class TestAditionalFunctions(APITestCase):
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 8)
 
-
     def test_duplicate_approved(self):
         dt_from = date.today()
         data = {
@@ -861,7 +852,6 @@ class TestAditionalFunctions(APITestCase):
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 5)
-
 
     def test_duplicate_not_approved(self):
         dt_from = date.today()
@@ -879,7 +869,6 @@ class TestAditionalFunctions(APITestCase):
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 5)
-
 
     def test_change_list(self):
         dt_from = date.today()
