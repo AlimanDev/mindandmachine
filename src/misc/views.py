@@ -22,5 +22,5 @@ def metabase_url(request):
     }
     token = jwt.encode(payload, METABASE_SECRET_KEY, algorithm="HS256")
 
-    iframeUrl = METABASE_SITE_URL + "/embed/dashboard/" + token.decode("utf8") + "#bordered=true&titled=true"
+    iframeUrl = METABASE_SITE_URL + "/embed/dashboard/" + token.decode("utf8") + "#bordered=false&titled=false&hide_parameters=shop_id"
     return Response({"url": iframeUrl})
