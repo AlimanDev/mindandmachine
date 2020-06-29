@@ -145,7 +145,7 @@ class OperationTemplateViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return OperationTemplate.objects.filter(
-            load_template__network_id=self.request.user.network_id,
+            # load_template__network_id=self.request.user.network_id,
             dttm_deleted__isnull=True)
 
     def update(self, request, pk=None):
