@@ -108,7 +108,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
             user_id=user_id,
             shop_id=shop_id,
         )
-        if attrs['dt_fired']:
+        if attrs.get('dt_fired'):
             employments=employments.filter( dt_hired__lte=attrs['dt_fired'])
         if self.instance:
             employments = employments.exclude(id=self.instance.id)
