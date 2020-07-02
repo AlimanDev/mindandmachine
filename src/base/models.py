@@ -124,6 +124,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     restricted_end_times = models.CharField(max_length=1024, default='[]')
 
     load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops')
+    exchange_settings = models.ForeignKey('timetable.ExchangeSettings', on_delete=models.SET_NULL, null=True, related_name='shops')
 
     staff_number = models.SmallIntegerField(default=0)
 

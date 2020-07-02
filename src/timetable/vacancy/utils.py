@@ -79,11 +79,10 @@ def search_candidates(vacancy, **kwargs):
     }
     :return:
     """
-
-    exchange_settings = ExchangeSettings.objects.first()
+    shop = vacancy.shop
+    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True)
     if not exchange_settings.automatic_worker_select_tree_level:
         return
-    shop = vacancy.shop
     parent = shop.get_ancestor_by_level_distance(exchange_settings.automatic_worker_select_tree_level)
     shops = parent.get_descendants()
 
@@ -594,7 +593,7 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
     """
 
     shop=Shop.objects.get(id=shop_id)
-    exchange_settings = ExchangeSettings.objects.first()
+    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True)
     if exchange_settings is None:
         return
     if not exchange_settings.automatic_check_lack:
@@ -765,7 +764,8 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
     Автоматически отменяем вакансии, в которых нет потребности
     :return:
     """
-    exchange_settings = ExchangeSettings.objects.first()
+    shop = Shop.objects.get(id=shop_id)
+    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True)
     if not exchange_settings.automatic_check_lack:
         return
 
@@ -823,9 +823,10 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
 
 
 def holiday_workers_exchange():
-    exchange_settings = ExchangeSettings.objects.first()
-    if not exchange_settings.automatic_exchange:
-        return
+    exchange_settings_network = {
+        e.network_id: e
+        for e in ExchangeSettings.objects.filter(shops__isnull=True)
+    }
     max_working_hours = exchange_settings.max_working_hours
     days = max_working_hours / 24
     hours = max_working_hours % 24
@@ -835,9 +836,12 @@ def holiday_workers_exchange():
     dt_from = datetime.now().date() + exchange_settings.automatic_holiday_worker_select_timegap
     dt_to = dt_from + timedelta(days=1)
 
-    shops = Shop.objects.filter(dttm_deleted__isnull=True)
+    shops = Shop.objects.select_related('exchange_settings').filter(dttm_deleted__isnull=True)
 
     for shop in shops:
+        exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
+        if not exchange_settings.automatic_exchange:
+            continue
         vacancies = WorkerDay.objects.filter(
             dt__gte=dt_from,
             dt__lte=dt_to,
@@ -871,18 +875,22 @@ def worker_shift_elongation():
     Проходится по всем вакансиям всех не удалённых магазинов
     Выполняет функцию рпасширения смены для каждой вакансии
     '''
-    exchange_settings = ExchangeSettings.objects.first()
-    if not exchange_settings.automatic_exchange:
-        return
+    exchange_settings_network = {
+        e.network_id: e
+        for e in ExchangeSettings.objects.filter(shops__isnull=True)
+    }
     max_working_hours = exchange_settings.max_working_hours
     days = max_working_hours / 24
     hours = max_working_hours % 24
     max_working_hours = timedelta(days=days, hours=hours)
     dt_from = (now().replace(minute=0, second=0, microsecond=0) + exchange_settings.automatic_worker_select_timegap).date()
     dt_to = dt_from + exchange_settings.automatic_worker_select_timegap_to
-    shops = Shop.objects.filter(dttm_deleted__isnull=True)
+    shops = Shop.objects.select_related('exchange_settings').filter(dttm_deleted__isnull=True)
 
     for shop in shops:
+        exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
+        if not exchange_settings.automatic_exchange:
+            continue
         vacancies = WorkerDay.objects.filter(
             dt__gte=dt_from,
             dt__lte=dt_to,
@@ -900,9 +908,10 @@ def workers_exchange():
     Автоматически перекидываем сотрудников из других магазинов, если это приносит ценность (todo: добавить описание, что такое ценность).
     :return:
     """
-    exchange_settings = ExchangeSettings.objects.first()
-    if not exchange_settings.automatic_exchange:
-        return
+    exchange_settings_network = {
+        e.network_id: e
+        for e in ExchangeSettings.objects.filter(shops__isnull=True)
+    }
     exclude_positions = exchange_settings.exclude_positions.all()
     from_dt = (now().replace(minute=0, second=0, microsecond=0) + exchange_settings.automatic_worker_select_timegap).date()
     to_dt = from_dt + exchange_settings.automatic_worker_select_timegap_to
@@ -911,10 +920,13 @@ def workers_exchange():
         'to_dt': to_dt,
     }
 
-    shop_list = Shop.objects.all()
+    shop_list = Shop.objects.select_related('exchange_settings').all()
     df_shop_stat = pandas.DataFrame()
 
     for shop in shop_list:
+        exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
+        if not exchange_settings.automatic_check_lack:
+            continue
         for work_type in shop.worktype_set.all():
             params['work_type_ids'] = [work_type.id]
 
@@ -935,6 +947,9 @@ def workers_exchange():
     df_shop_stat.set_index([# df_shop_stat.shop_id,
                             df_shop_stat.work_type_id, df_shop_stat.dttm], inplace=True)
     for shop in shop_list:
+        exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
+        if not exchange_settings.automatic_check_lack:
+            continue
         exchange_shops = list(shop.exchange_shops.all())
         for work_type in WorkType.objects.select_related('work_type_name').filter(shop_id=shop.id):
 
