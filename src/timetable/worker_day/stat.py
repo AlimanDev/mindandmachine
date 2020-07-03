@@ -2,7 +2,12 @@ from datetime import timedelta, date
 from copy import deepcopy
 import pandas
 
-from django.db.models import Count, Sum,OuterRef, Subquery, F, Q, FloatField, Exists
+from django.db.models import (
+    Count, Sum,
+    Exists, OuterRef, Subquery,
+    F, Q,
+    Case, When, Value,
+    BooleanField, FloatField)
 from django.db.models.functions import Extract, Cast, Coalesce, TruncDate
 
 from src.base.models import Employment, Shop, ProductionDay
@@ -11,6 +16,22 @@ from src.timetable.models import WorkerDay
 
 
 def count_daily_stat(shop_id, data):
+    def daily_stat_tmpl():
+        day = {"shifts": 0, "paid_hours": 0, "fot": 0.0}
+        ap_na = {
+            "shop": deepcopy(day),
+            "outsource": deepcopy(day),
+            "vacancies": deepcopy(day)
+        }
+        plan_fact = {
+            "approved": deepcopy(ap_na),
+            "not_approved": deepcopy(ap_na),
+            "combined": deepcopy(ap_na)
+        }
+        return {
+            'plan': deepcopy(plan_fact),
+            'fact': deepcopy(plan_fact),
+        }
     dt_start = data['dt_from']
     dt_end = data['dt_to']
 
@@ -36,6 +57,12 @@ def count_daily_stat(shop_id, data):
         type=WorkerDay.TYPE_WORKDAY,
     )
 
+    not_approved_subq = WorkerDay.objects.filter(
+        dt=OuterRef('dt'),
+        is_fact=OuterRef('is_fact'),
+        is_approved=False,
+        worker_id = OuterRef('worker_id'),
+    )
     cond = Q()
     if 'worker_id__in' in data and data['worker_id__in'] is not None:
         cond = Q(worker_id__in=data['worker_id__in'])
@@ -50,10 +77,12 @@ def count_daily_stat(shop_id, data):
     ).annotate(
         salary=Coalesce(Subquery(emp_subq_shop.values('salary')[:1]), Subquery(emp_subq.values('salary')[:1]), 0),
         is_shop=Exists(emp_subq_shop),
-        has_plan=Exists(plan_approved_subq)
+        has_plan=Exists(plan_approved_subq),
     ).filter(
         Q(is_fact=False)|Q(has_plan=True)
-    ).values(
+    )
+
+    worker_days_stat = worker_days.values(
         'dt', 'is_fact', 'is_approved', 'is_shop'
     ).annotate(
         shifts=Count('dt'),
@@ -62,18 +91,34 @@ def count_daily_stat(shop_id, data):
     )
 
     stat = {}
-    for day in worker_days:
+    for day in worker_days_stat:
         dt = str(day.pop('dt'))
         if dt not in stat:
-            stat[dt] = {
-                'plan':{'approved': {}, 'not_approved': {}},
-                'fact': {'approved': {}, 'not_approved': {}}
-            }
+            stat[dt] = daily_stat_tmpl()
         plan_or_fact = 'fact' if day.pop('is_fact') else 'plan'
         approved = 'approved' if day.pop('is_approved') else 'not_approved'
         shop = 'shop' if day.pop('is_shop') else 'outsource'
 
         stat[dt][plan_or_fact][approved][shop] = day
+
+    worker_days_combined = worker_days.annotate(
+        has_na_child=Exists(not_approved_subq)).filter(
+        Q(is_approved=False) | Q(has_na_child=False)
+    ).values(
+        'dt', 'is_fact', 'is_shop'
+    ).annotate(
+        shifts=Count('dt'),
+        paid_hours=Sum(Extract(F('work_hours'), 'epoch') / 3600),
+        fot=Sum(Cast(Extract(F('work_hours'), 'epoch') / 3600 * F('salary'), FloatField()))
+    )
+    for day in worker_days_combined:
+        dt = str(day.pop('dt'))
+        if dt not in stat:
+            stat[dt] = daily_stat_tmpl()
+        plan_or_fact = 'fact' if day.pop('is_fact') else 'plan'
+        shop = 'shop' if day.pop('is_shop') else 'outsource'
+
+        stat[dt][plan_or_fact]['combined'][shop] = day
 
     #Открытые вакансии
     worker_days = WorkerDay.objects.filter(
@@ -95,37 +140,33 @@ def count_daily_stat(shop_id, data):
         approved = 'approved' if day.pop('is_approved') else 'not_approved'
         dt = str(day.pop('dt'))
         if dt not in stat:
-            stat[dt] = {
-                'plan': {'approved': {}, 'not_approved': {}},
-                'fact': {'approved': {}, 'not_approved': {}}
-            }
+            stat[dt] = daily_stat_tmpl()
         stat[dt]['plan'][approved]['vacancies'] = day
 
-    q = [
+    q = [# (metric_name, field_name, Q)
         ('work_types', 'operation_type__work_type_id', Q(operation_type__work_type__shop_id=shop_id)),
         ('operation_types', 'operation_type_id', Q(operation_type__operation_type_name__is_special=True)),
     ]
 
-    for item in q:
-        (name, field, cond) = item
+    for (metric_name, field_name, cond) in q:
         period_clients = PeriodClients.objects.filter(
             cond,
             dttm_forecast__gte=dt_start,
             dttm_forecast__lte=dt_end,
         ).annotate(
             dt=TruncDate('dttm_forecast'),
-            field=F(field)
+            field=F(field_name)
         ).values('dt','field'
         ).annotate(value=Sum('value'))
 
         for day in period_clients:
             dt = str(day.pop('dt'))
             if dt not in stat:
-                stat[dt] = {}
-            if name not in stat[dt]:
-                stat[dt][name] = {
+                stat[dt] = daily_stat_tmpl()
+            if metric_name not in stat[dt]:
+                stat[dt][metric_name] = {
                 }
-            stat[dt][name][day['field']]=day['value']
+            stat[dt][metric_name][day['field']]=day['value']
     return stat
 
 
