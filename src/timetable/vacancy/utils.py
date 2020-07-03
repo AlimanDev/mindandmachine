@@ -80,7 +80,7 @@ def search_candidates(vacancy, **kwargs):
     :return:
     """
     shop = vacancy.shop
-    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True)
+    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True).first()
     if not exchange_settings.automatic_worker_select_tree_level:
         return
     parent = shop.get_ancestor_by_level_distance(exchange_settings.automatic_worker_select_tree_level)
@@ -593,7 +593,7 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
     """
 
     shop=Shop.objects.get(id=shop_id)
-    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True)
+    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True).first()
     if exchange_settings is None:
         return
     if not exchange_settings.automatic_check_lack:
@@ -765,7 +765,7 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
     :return:
     """
     shop = Shop.objects.get(id=shop_id)
-    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True)
+    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True).first()
     if not exchange_settings.automatic_check_lack:
         return
 
@@ -827,14 +827,7 @@ def holiday_workers_exchange():
         e.network_id: e
         for e in ExchangeSettings.objects.filter(shops__isnull=True)
     }
-    max_working_hours = exchange_settings.max_working_hours
-    days = max_working_hours / 24
-    hours = max_working_hours % 24
-    max_working_hours = timedelta(days=days, hours=hours)
-    constraints = json.loads(exchange_settings.constraints)
-    exclude_positions = exchange_settings.exclude_positions.all()
-    dt_from = datetime.now().date() + exchange_settings.automatic_holiday_worker_select_timegap
-    dt_to = dt_from + timedelta(days=1)
+    
 
     shops = Shop.objects.select_related('exchange_settings').filter(dttm_deleted__isnull=True)
 
@@ -842,6 +835,14 @@ def holiday_workers_exchange():
         exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
         if not exchange_settings.automatic_exchange:
             continue
+        max_working_hours = exchange_settings.max_working_hours
+        days = max_working_hours / 24
+        hours = max_working_hours % 24
+        max_working_hours = timedelta(days=days, hours=hours)
+        constraints = json.loads(exchange_settings.constraints)
+        exclude_positions = exchange_settings.exclude_positions.all()
+        dt_from = datetime.now().date() + exchange_settings.automatic_holiday_worker_select_timegap
+        dt_to = dt_from + timedelta(days=1)
         vacancies = WorkerDay.objects.filter(
             dt__gte=dt_from,
             dt__lte=dt_to,
@@ -879,18 +880,19 @@ def worker_shift_elongation():
         e.network_id: e
         for e in ExchangeSettings.objects.filter(shops__isnull=True)
     }
-    max_working_hours = exchange_settings.max_working_hours
-    days = max_working_hours / 24
-    hours = max_working_hours % 24
-    max_working_hours = timedelta(days=days, hours=hours)
-    dt_from = (now().replace(minute=0, second=0, microsecond=0) + exchange_settings.automatic_worker_select_timegap).date()
-    dt_to = dt_from + exchange_settings.automatic_worker_select_timegap_to
+    
     shops = Shop.objects.select_related('exchange_settings').filter(dttm_deleted__isnull=True)
 
     for shop in shops:
         exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
         if not exchange_settings.automatic_exchange:
             continue
+        max_working_hours = exchange_settings.max_working_hours
+        days = max_working_hours / 24
+        hours = max_working_hours % 24
+        max_working_hours = timedelta(days=days, hours=hours)
+        dt_from = (now().replace(minute=0, second=0, microsecond=0) + exchange_settings.automatic_worker_select_timegap).date()
+        dt_to = dt_from + exchange_settings.automatic_worker_select_timegap_to
         vacancies = WorkerDay.objects.filter(
             dt__gte=dt_from,
             dt__lte=dt_to,
@@ -912,13 +914,6 @@ def workers_exchange():
         e.network_id: e
         for e in ExchangeSettings.objects.filter(shops__isnull=True)
     }
-    exclude_positions = exchange_settings.exclude_positions.all()
-    from_dt = (now().replace(minute=0, second=0, microsecond=0) + exchange_settings.automatic_worker_select_timegap).date()
-    to_dt = from_dt + exchange_settings.automatic_worker_select_timegap_to
-    params = {
-        'from_dt': from_dt,
-        'to_dt': to_dt,
-    }
 
     shop_list = Shop.objects.select_related('exchange_settings').all()
     df_shop_stat = pandas.DataFrame()
@@ -927,6 +922,12 @@ def workers_exchange():
         exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
         if not exchange_settings.automatic_check_lack:
             continue
+        from_dt = (now().replace(minute=0, second=0, microsecond=0) + exchange_settings.automatic_worker_select_timegap).date()
+        to_dt = from_dt + exchange_settings.automatic_worker_select_timegap_to
+        params = {
+            'from_dt': from_dt,
+            'to_dt': to_dt,
+        }
         for work_type in shop.worktype_set.all():
             params['work_type_ids'] = [work_type.id]
 
@@ -951,6 +952,8 @@ def workers_exchange():
         if not exchange_settings.automatic_check_lack:
             continue
         exchange_shops = list(shop.exchange_shops.all())
+        exclude_positions = exchange_settings.exclude_positions.all()
+        
         for work_type in WorkType.objects.select_related('work_type_name').filter(shop_id=shop.id):
 
             vacancies = WorkerDay.objects.filter(

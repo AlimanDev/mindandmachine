@@ -98,8 +98,6 @@ class TestDepartment(APITestCase):
             "dt_opened": '2019-01-01',
             # "dt_closed": None,
             "timezone": 'Europe/Moscow',
-            'exchange_settings_id': None,
-            'load_template_id': None,
         }
         # response = self.client.post(self.url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -117,6 +115,8 @@ class TestDepartment(APITestCase):
         shop = response.json()
         data['id'] = shop['id']
         data['dt_closed'] = None
+        data['load_template_id'] = None
+        data['exchange_settings_id'] = None
         self.assertEqual(shop, data)
 
     def test_update(self):
@@ -132,8 +132,6 @@ class TestDepartment(APITestCase):
             "dt_opened": '2019-01-01',
             "dt_closed": "2020-01-01",
             "timezone": 'Europe/Berlin',
-            'exchange_settings_id': None,
-            'load_template_id': None,
         }
         # response = self.client.put(self.shop_url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -150,6 +148,8 @@ class TestDepartment(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         shop = response.json()
         data['id'] = shop['id']
+        data['load_template_id'] = None
+        data['exchange_settings_id'] = None
         self.assertEqual(shop, data)
 
     def test_stat(self):
