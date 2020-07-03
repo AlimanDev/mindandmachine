@@ -5,7 +5,7 @@ from django_filters.rest_framework import FilterSet
 
 # Serializers define the API representation.
 class ExchangeSettingsSerializer(serializers.ModelSerializer):
-    constraints = serializers.JSONField()
+    constraints = serializers.JSONField(required=False)
     class Meta:
         model = ExchangeSettings
         fields = '__all__'

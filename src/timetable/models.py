@@ -841,7 +841,7 @@ class ExchangeSettings(AbstractModel):
     max_working_hours = models.IntegerField(default=192)
 
     constraints = models.CharField(max_length=250, default=json.dumps(default_constraints))
-    exclude_positions = models.ManyToManyField('base.WorkerPosition')
+    exclude_positions = models.ManyToManyField('base.WorkerPosition', blank=True)
     # Минимальная потребность в сотруднике при создании вакансии
     automatic_create_vacancy_lack_min = models.FloatField(default=.5)
     # Максимальная потребность в сотруднике для удалении вакансии

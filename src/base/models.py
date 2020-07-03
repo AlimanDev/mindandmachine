@@ -415,6 +415,7 @@ class FunctionGroup(AbstractModel):
         'ShopMonthStat',
         'ShopMonthStat_status',
         'ShopSettings',
+        'ExchangeSettings',
 
         'signout',
         'password_edit',
