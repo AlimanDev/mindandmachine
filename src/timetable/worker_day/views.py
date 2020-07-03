@@ -182,7 +182,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         return Response(
             VacancySerializer(
                 filterset_class.filter_queryset(
-                    self.get_queryset().select_related('shop').annotate(
+                    self.get_queryset().filter(is_vacancy=True).select_related('shop').annotate(
                         first_name=F('worker__first_name'),
                         last_name=F('worker__last_name'),
                     ),
