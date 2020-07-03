@@ -61,7 +61,7 @@ def count_daily_stat(shop_id, data):
         dt=OuterRef('dt'),
         is_fact=OuterRef('is_fact'),
         is_approved=False,
-        worker_id = OuterRef('worker_id'),
+        parent_worker_day_id=OuterRef('id'),
     )
     cond = Q()
     if 'worker_id__in' in data and data['worker_id__in'] is not None:
@@ -73,8 +73,10 @@ def count_daily_stat(shop_id, data):
         dt__lte=dt_end,
         shop_id=shop_id,
         type=WorkerDay.TYPE_WORKDAY,
-        worker_id__isnull=False,
+        # worker_id__isnull=False,
     ).annotate(
+        has_worker=Case(When(worker_id__isnull=True, then=Value(False)),default=Value(True),output_field=BooleanField()),
+
         salary=Coalesce(Subquery(emp_subq_shop.values('salary')[:1]), Subquery(emp_subq.values('salary')[:1]), 0),
         is_shop=Exists(emp_subq_shop),
         has_plan=Exists(plan_approved_subq),
@@ -83,7 +85,7 @@ def count_daily_stat(shop_id, data):
     )
 
     worker_days_stat = worker_days.values(
-        'dt', 'is_fact', 'is_approved', 'is_shop'
+        'dt', 'is_fact', 'is_approved', 'is_shop', 'has_worker'
     ).annotate(
         shifts=Count('dt'),
         paid_hours=Sum(Extract(F('work_hours'), 'epoch') / 3600),
@@ -97,7 +99,11 @@ def count_daily_stat(shop_id, data):
             stat[dt] = daily_stat_tmpl()
         plan_or_fact = 'fact' if day.pop('is_fact') else 'plan'
         approved = 'approved' if day.pop('is_approved') else 'not_approved'
-        shop = 'shop' if day.pop('is_shop') else 'outsource'
+        is_shop = day.pop('is_shop')
+        has_worker = day.pop('has_worker')
+        shop = 'shop' if is_shop else \
+            'outsource' if has_worker else\
+            'vacancies'
 
         stat[dt][plan_or_fact][approved][shop] = day
 
@@ -105,7 +111,7 @@ def count_daily_stat(shop_id, data):
         has_na_child=Exists(not_approved_subq)).filter(
         Q(is_approved=False) | Q(has_na_child=False)
     ).values(
-        'dt', 'is_fact', 'is_shop'
+        'dt', 'is_fact', 'is_shop', 'has_worker'
     ).annotate(
         shifts=Count('dt'),
         paid_hours=Sum(Extract(F('work_hours'), 'epoch') / 3600),
@@ -116,32 +122,13 @@ def count_daily_stat(shop_id, data):
         if dt not in stat:
             stat[dt] = daily_stat_tmpl()
         plan_or_fact = 'fact' if day.pop('is_fact') else 'plan'
-        shop = 'shop' if day.pop('is_shop') else 'outsource'
+        has_worker = day.pop('has_worker')
+        is_shop = day.pop('is_shop')
+        shop = 'shop' if is_shop else \
+            'outsource' if has_worker else\
+            'vacancies'
 
         stat[dt][plan_or_fact]['combined'][shop] = day
-
-    #Открытые вакансии
-    worker_days = WorkerDay.objects.filter(
-        dt__gte=dt_start,
-        dt__lte=dt_end,
-        shop_id=shop_id,
-        type=WorkerDay.TYPE_WORKDAY,
-        is_vacancy=True,
-        worker_id__isnull=True,
-    ).values(
-        'dt',
-        'is_approved'
-    ).annotate(
-        shifts=Count('dt'),
-        paid_hours = Sum(Extract(F('work_hours'), 'epoch') / 3600),
-    )
-
-    for day in worker_days:
-        approved = 'approved' if day.pop('is_approved') else 'not_approved'
-        dt = str(day.pop('dt'))
-        if dt not in stat:
-            stat[dt] = daily_stat_tmpl()
-        stat[dt]['plan'][approved]['vacancies'] = day
 
     q = [# (metric_name, field_name, Q)
         ('work_types', 'operation_type__work_type_id', Q(operation_type__work_type__shop_id=shop_id)),
