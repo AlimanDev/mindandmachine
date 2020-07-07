@@ -6,7 +6,7 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from mptt.models import MPTTModel, TreeForeignKey
-
+from django.apps import apps
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
 
 
@@ -162,6 +162,16 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         return self.get_ancestors().filter(level=level)[0]
     def get_department(self):
         return self
+
+    def get_exchange_settings(self):
+        return self.exchange_settings if self.exchange_settings_id\
+            else apps.get_model(
+                'timetable', 
+                'ExchangeSettings',
+            ).objects.filter(
+                network_id=self.network_id, 
+                shops__isnull=True,
+            ).first()
 
 
 class EmploymentManager(models.Manager):

@@ -80,7 +80,7 @@ def search_candidates(vacancy, **kwargs):
     :return:
     """
     shop = vacancy.shop
-    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True).first()
+    exchange_settings = shop.get_exchange_settings()   
     if not exchange_settings.automatic_worker_select_tree_level:
         return
     parent = shop.get_ancestor_by_level_distance(exchange_settings.automatic_worker_select_tree_level)
@@ -593,7 +593,7 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
     """
 
     shop=Shop.objects.get(id=shop_id)
-    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True).first()
+    exchange_settings = shop.get_exchange_settings()
     if exchange_settings is None:
         return
     if not exchange_settings.automatic_check_lack:
@@ -765,7 +765,7 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
     :return:
     """
     shop = Shop.objects.get(id=shop_id)
-    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True).first()
+    exchange_settings = shop.get_exchange_settings()
     if not exchange_settings.automatic_check_lack:
         return
 
@@ -832,7 +832,7 @@ def holiday_workers_exchange():
     shops = Shop.objects.select_related('exchange_settings').filter(dttm_deleted__isnull=True)
 
     for shop in shops:
-        exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
+        exchange_settings = shop.get_exchange_settings()
         if not exchange_settings.automatic_exchange:
             continue
         max_working_hours = exchange_settings.max_working_hours
@@ -884,7 +884,7 @@ def worker_shift_elongation():
     shops = Shop.objects.select_related('exchange_settings').filter(dttm_deleted__isnull=True)
 
     for shop in shops:
-        exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
+        exchange_settings = shop.get_exchange_settings()
         if not exchange_settings.automatic_exchange:
             continue
         max_working_hours = exchange_settings.max_working_hours
@@ -910,16 +910,16 @@ def workers_exchange():
     Автоматически перекидываем сотрудников из других магазинов, если это приносит ценность (todo: добавить описание, что такое ценность).
     :return:
     """
-    exchange_settings_network = {
-        e.network_id: e
-        for e in ExchangeSettings.objects.filter(shops__isnull=True)
-    }
+    # exchange_settings_network = {
+    #     e.network_id: e
+    #     for e in ExchangeSettings.objects.filter(shops__isnull=True)
+    # }
 
     shop_list = Shop.objects.select_related('exchange_settings').all()
     df_shop_stat = pandas.DataFrame()
 
     for shop in shop_list:
-        exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
+        exchange_settings = shop.get_exchange_settings()
         if not exchange_settings.automatic_check_lack:
             continue
         from_dt = (now().replace(minute=0, second=0, microsecond=0) + exchange_settings.automatic_worker_select_timegap).date()
@@ -948,7 +948,7 @@ def workers_exchange():
     df_shop_stat.set_index([# df_shop_stat.shop_id,
                             df_shop_stat.work_type_id, df_shop_stat.dttm], inplace=True)
     for shop in shop_list:
-        exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
+        exchange_settings = shop.get_exchange_settings()
         if not exchange_settings.automatic_check_lack:
             continue
         exchange_shops = list(shop.exchange_shops.all())

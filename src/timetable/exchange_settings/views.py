@@ -23,6 +23,11 @@ class ExchangeSettingsViewSet(viewsets.ModelViewSet):
     
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ExchangeSettingsSerializer
-    queryset = ExchangeSettings.objects.all()
+    
 
+    def get_queryset(self):
+
+        return ExchangeSettings.objects.filter(
+            network_id=self.request.user.network_id,
+        )
 
