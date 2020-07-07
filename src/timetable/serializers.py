@@ -33,16 +33,16 @@ class WorkerDayCashboxDetailsListSerializer(serializers.Serializer):
 
 class WorkerDayListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
-    worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True)
     worker_id = serializers.IntegerField()
-    employment_id = serializers.IntegerField()
     shop_id = serializers.IntegerField()
+    employment_id = serializers.IntegerField()
     type = serializers.CharField()
     dt = serializers.DateField()
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
     comment = serializers.CharField()
     is_approved = serializers.BooleanField()
+    worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True)
     is_fact = serializers.BooleanField()
     work_hours = serializers.DurationField()
     parent_worker_day_id = serializers.IntegerField()

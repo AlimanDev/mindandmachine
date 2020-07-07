@@ -98,7 +98,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
     def list(self, request):
         return Response(
-            WorkerDayListSerializer(self.filter_queryset(self.get_queryset()), many=True).data,
+            WorkerDayListSerializer(self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')), many=True).data,
         )
 
 
