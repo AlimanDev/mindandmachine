@@ -26,6 +26,7 @@ from src.timetable.serializers import (
     ExchangeSerializer,
     UploadTimetableSerializer,
     DownloadSerializer,
+    WorkerDayListSerializer,
 )
 
 from src.timetable.filters import WorkerDayFilter
@@ -93,6 +94,13 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         if worker_day.is_approved:
             raise FieldError(self.error_messages['cannot_delete'])
         super().perform_destroy(worker_day)
+
+
+    def list(self, request):
+        return Response(
+            WorkerDayListSerializer(self.filter_queryset(self.get_queryset()), many=True).data,
+        )
+
 
     @action(detail=False, methods=['post'])
     def approve(self, request):

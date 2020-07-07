@@ -25,6 +25,29 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
         fields = ['id', 'work_type_id', 'work_part']
 
 
+class WorkerDayCashboxDetailsListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    work_type_id = serializers.IntegerField()
+    work_part = serializers.FloatField()
+
+
+class WorkerDayListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True)
+    worker_id = serializers.IntegerField()
+    employment_id = serializers.IntegerField()
+    shop_id = serializers.IntegerField()
+    type = serializers.CharField()
+    dt = serializers.DateField()
+    dttm_work_start = serializers.DateTimeField(default=None)
+    dttm_work_end = serializers.DateTimeField(default=None)
+    comment = serializers.CharField()
+    is_approved = serializers.BooleanField()
+    is_fact = serializers.BooleanField()
+    work_hours = serializers.DurationField()
+    parent_worker_day_id = serializers.IntegerField()
+
+
 class WorkerDaySerializer(serializers.ModelSerializer):
     default_error_messages = {
         'check_dates': _('Date start should be less then date end'),
