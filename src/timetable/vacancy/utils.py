@@ -470,17 +470,7 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
         return res
 
 
-    shops_for_black_list = []
-
-    _shop = vacancy_shop
-
-    while True:
-        shops_for_black_list.append(
-            _shop
-        )
-        _shop = _shop.get_ancestors().first()
-        if _shop is None:
-            break
+    shops_for_black_list = vacancy_shop.get_ancestors(include_self=True)
 
     
     if VacancyBlackList.objects.filter(symbol=user.black_list_symbol, shop__in=shops_for_black_list).exists():
