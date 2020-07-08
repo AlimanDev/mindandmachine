@@ -202,6 +202,16 @@ class WorkerDayWithParentSerializer(WorkerDaySerializer):
     parent_worker_day_id = serializers.IntegerField()
 
 
+class EmploymentWorkTypeListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    work_type_id = serializers.IntegerField()
+    employment_id = serializers.IntegerField()
+    period = serializers.IntegerField()
+    bills_amount = serializers.IntegerField()
+    priority = serializers.IntegerField()
+    duration = serializers.FloatField()
+
+
 class EmploymentWorkTypeSerializer(serializers.ModelSerializer):
     employment_id = serializers.IntegerField(required=False)
     work_type_id = serializers.IntegerField(required=False)
@@ -255,6 +265,14 @@ class WorkerConstraintSerializer(serializers.ModelSerializer):
         model = WorkerConstraint
         fields = ['id', 'employment_id', 'weekday', 'is_lite', 'tm']
         list_serializer_class = WorkerConstraintListSerializer
+
+
+class WorkerConstraintListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    employment_id = serializers.IntegerField()
+    weekday = serializers.IntegerField()
+    is_lite = serializers.BooleanField()
+    tm = serializers.TimeField()
 
 
 class VacancySerializer(serializers.ModelSerializer):

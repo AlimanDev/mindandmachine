@@ -11,7 +11,7 @@ from django.db.models import Q
 from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
 from src.base.message import Message
 from src.base.fields import CurrentUserNetwork
-from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
+from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
 
 
 class BaseNetworkSerializer(serializers.ModelSerializer):
@@ -22,6 +22,21 @@ class NetworkSerializer(serializers.ModelSerializer):
     class Meta:
         model = Network
         fields = ['id', 'name', 'logo', 'url', 'primary_color', 'secondary_color']
+
+
+class UserListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    middle_name = serializers.CharField()
+    birthday = serializers.DateField()
+    sex = serializers.CharField()
+    avatar = serializers.ImageField()
+    email = serializers.CharField()
+    phone_number = serializers.CharField()
+    tabel_code = serializers.CharField()
+    username = serializers.CharField()
+    network_id = serializers.IntegerField()
 
 
 class UserSerializer(BaseNetworkSerializer):
@@ -93,10 +108,10 @@ class EmploymentListSerializer(serializers.Serializer):
     tabel_code = serializers.CharField()
     is_ready_for_overworkings = serializers.BooleanField()
     dt_new_week_availability_from = serializers.DateField()
-    user = UserSerializer(read_only=True)
+    user = UserListSerializer()
     is_visible = serializers.BooleanField()
-    worker_constraints = WorkerConstraintSerializer(many=True, read_only=True)
-    work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
+    worker_constraints = WorkerConstraintListSerializer(many=True)
+    work_types = EmploymentWorkTypeListSerializer(many=True)
 
 
 class EmploymentSerializer(serializers.ModelSerializer):

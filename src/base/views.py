@@ -25,6 +25,7 @@ from src.base.serializers import (
     NetworkSerializer, 
     AuthUserSerializer,
     EmploymentListSerializer,
+    UserListSerializer,
 )
 from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter
 from src.base.models import (
@@ -99,6 +100,12 @@ class UserViewSet(ModelViewSet):
         else:
             return Response(serializer.errors,
                             status=HTTP_400_BAD_REQUEST)
+
+    
+    def list(self, request):
+        return Response(
+            UserListSerializer(self.filter_queryset(self.get_queryset()), many=True).data
+        )
 
 
 class AuthUserView(UserDetailsView):
