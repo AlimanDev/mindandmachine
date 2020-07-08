@@ -102,6 +102,14 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         )
 
 
+    def retrieve(self, request, pk=None):
+        return Response(
+            WorkerDayListSerializer(
+                WorkerDay.objects.get(pk=pk)
+            ).data
+        )
+
+
     @action(detail=False, methods=['post'])
     def approve(self, request):
         kwargs = {'context': self.get_serializer_context()}
