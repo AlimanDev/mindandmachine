@@ -181,12 +181,12 @@ def count_worker_stat(shop_id, data):
         dt__lte=dt_end,
         worker_id__in=worker_dict.keys()
     )
-    worker_days = worker_days.order_by(
+    worker_days = list(worker_days.order_by(
         'worker_id',
         'dt',
         'is_fact',
         'is_approved',
-    )
+    ))
     if not len(worker_days):
         return {}
 

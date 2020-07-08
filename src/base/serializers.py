@@ -75,6 +75,30 @@ class FunctionGroupSerializer(serializers.ModelSerializer):
         fields = ['id', 'group_id', 'func', 'method']
 
 
+class EmploymentListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    user_id = serializers.IntegerField(required=False)
+    shop_id = serializers.IntegerField(required=False)
+    position_id = serializers.IntegerField()
+    is_fixed_hours = serializers.BooleanField()
+    dt_hired = serializers.DateField()
+    dt_fired = serializers.DateField()
+    salary = serializers.DecimalField(max_digits=10, decimal_places=2, default=0)
+    week_availability = serializers.IntegerField()
+    norm_work_hours = serializers.IntegerField()
+    min_time_btw_shifts = serializers.IntegerField()
+    shift_hours_length_min = serializers.IntegerField()
+    shift_hours_length_max = serializers.IntegerField()
+    auto_timetable = serializers.BooleanField()
+    tabel_code = serializers.CharField()
+    is_ready_for_overworkings = serializers.BooleanField()
+    dt_new_week_availability_from = serializers.DateField()
+    user = UserSerializer(read_only=True)
+    is_visible = serializers.BooleanField()
+    worker_constraints = WorkerConstraintSerializer(many=True, read_only=True)
+    work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
+
+
 class EmploymentSerializer(serializers.ModelSerializer):
     default_error_messages = {
         "emp_check_dates": _("Employment from {dt_hired} to {dt_fired} already exists."),
