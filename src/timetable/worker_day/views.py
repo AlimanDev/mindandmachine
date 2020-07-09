@@ -105,7 +105,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, pk=None):
         return Response(
             WorkerDayListSerializer(
-                WorkerDay.objects.get(pk=pk)
+                WorkerDay.objects.get(id=pk)
             ).data
         )
 
