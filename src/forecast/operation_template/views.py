@@ -8,7 +8,7 @@ from src.forecast.models import OperationTemplate
 from src.conf.djconfig import QOS_DATE_FORMAT, QOS_TIME_FORMAT
 from src.forecast.operation_template.utils import build_period_clients
 
-
+#TODO добавить в шаблон нагрузки
 # Serializers define the API representation.
 class OperationTemplateSerializer(serializers.ModelSerializer):
     tm_start = serializers.TimeField(format=QOS_TIME_FORMAT)
