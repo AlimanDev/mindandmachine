@@ -49,13 +49,22 @@ class VacancyFilter(FilterSet):
     is_vacant = BooleanFilter(field_name='worker', lookup_expr='isnull')
     shift_length_min = TimeFilter(field_name='work_hours', lookup_expr='gte')
     shift_length_max = TimeFilter(field_name='work_hours', lookup_expr='lte')
+    shop = NumberFilter(field_name='shop_id', method='filter_include_outsource')
+
+    def filter_include_outsource(self, queryset, name, value):
+        shops = value.split(',')
+        if not self.request.query_params.get('include_outsource', False):
+            return queryset.filter(shop_id__in=shops)
+        return queryset.filter(
+            Q(shop_id__in=shops) | Q(is_outsource=True),
+        )
 
     class Meta:
         model = WorkerDay
         fields = {
             'work_types__id':['exact', 'in'],
             'is_approved': ['exact',],
-            'shop_id': ['exact', 'in'],
+            'is_outsource': ['exact',],
         }
 
 

@@ -22,14 +22,17 @@ from src.main.urv.utils import wd_stat_count
 import json
 from src.base.exceptions import MessageError
 from rest_framework.response import Response
+from src.conf.djconfig import UPLOAD_TT_MATCH_EMPLOYMENT
 
 
 WORK_TYPES = {
     'в': WorkerDay.TYPE_HOLIDAY,
     'от': WorkerDay.TYPE_VACATION,
-    'nan': WorkerDay.TYPE_HOLIDAY,
+    # 'nan': WorkerDay.TYPE_HOLIDAY,
     'b': WorkerDay.TYPE_HOLIDAY,
 }
+
+SKIP_SYMBOLS = ['nan', '']
 
 def upload_timetable_util(form, timetable_file):
     """
@@ -55,25 +58,93 @@ def upload_timetable_util(form, timetable_file):
         p.name.lower(): p
         for p in WorkerPosition.objects.all()
     }
-    users_df['Номер'] = users_df['Номер'].astype(str)
+    number_cloumn = df.columns[0]
+    name_column = df.columns[1]
+    position_column = df.columns[2]
+    users_df[number_cloumn] = users_df[number_cloumn].astype(str)
+    users_df[name_column] = users_df[name_column].astype(str)
+    users_df[position_column] = users_df[position_column].astype(str)
+    error_users = []
 
     for index, data in users_df.iterrows():
-        if data['Номер'].startswith('*') or data['Номер'] == 'nan':
+        if data[number_cloumn].startswith('*') or data[name_column].startswith('*') or data[position_column].startswith('*'):
             continue
-        position = positions.get(data['ДОЛЖНОСТЬ'].lower())
+        number_cond = data[number_cloumn] != 'nan'
+        name_cond = data[name_column] != 'nan'
+        position_cond = data[position_column] != 'nan'
+        if number_cond and (not position_cond or not name_cond):
+            result = f"У сотрудника на строке {index} не распознаны или не указаны "
+            if not number_cond:
+                result += "номер "
+            if not name_cond:
+                result += "ФИО "
+            if not position_cond:
+                result += "должность "
+            error_users.append(result)
+            continue
+        elif not position_cond:
+            continue
+        elif not name_cond:
+            continue
+        position = positions.get(data[position_column].lower().strip())
         if not position:
-            raise MessageError('xlsx_no_worker_position', lang=form.get('lang', 'ru'), params={'position':data["ДОЛЖНОСТЬ"]})
-        names = data['ФИО'].split()
-        user, created = User.objects.get_or_create(
-            tabel_code=str(data['Номер']).split('.')[0],
-            defaults={
-                'first_name': names[1],
-                'last_name': names[0],
-                'middle_name': names[2] if len(names) > 2 else None,
-                'username': str(time.time() * 1000000)[:-2]
-            }
-        )
-        func_group = groups.get(data['ДОЛЖНОСТЬ'].lower(), groups['сотрудник'])
+            raise MessageError('xlsx_no_worker_position', lang=form.get('lang', 'ru'), params={'position':data[position_column]})
+        names = data[name_column].split()
+        tabel_code = str(data[number_cloumn]).split('.')[0]
+        created = False
+        user_data = {
+            'first_name': names[1] if len(names) > 1 else '',
+            'last_name': names[0],
+            'middle_name': names[2] if len(names) > 2 else None,
+        }
+        user = None
+        if UPLOAD_TT_MATCH_EMPLOYMENT:
+            employment = Employment.objects.filter(tabel_code=tabel_code, shop=shop)
+            if number_cond and employment.exists():
+                user = employment.first().user
+                user.first_name = names[1] if len(names) > 1 else ''
+                user.last_name = names[0]
+                user.middle_name = names[2] if len(names) > 2 else None
+                user.save()
+            else:
+                employment = Employment.objects.filter(
+                    shop=shop,
+                    user__first_name=names[1] if len(names) > 1 else '',
+                    user__last_name=names[0],
+                    user__middle_name=names[2] if len(names) > 2 else None
+                )
+                if employment.exists():
+                    if number_cond:
+                        employment.update(tabel_code=tabel_code,)
+                    user = employment.first().user
+                else:
+                    user_data['username'] = str(time.time() * 1000000)[:-2],
+                    user = User.objects.create(**user_data)
+                    created = True
+        else:
+            if number_cond and User.objects.filter(tabel_code=tabel_code,).exists():
+                user = User.objects.filter(
+                    tabel_code=tabel_code,
+                )
+                user.update(
+                **user_data,
+                )
+                user = user.first()
+            else:
+                user = User.objects.filter(
+                    **user_data
+                )
+                if user.exists():
+                    if number_cond:
+                        user.update(tabel_code=tabel_code,)
+                    user = user.first()
+                else:
+                    user_data['username'] = str(time.time() * 1000000)[:-2],
+                    if number_cond:
+                        user_data['tabel_code'] = tabel_code
+                    user = User.objects.create(**user_data)
+                    created = True
+        func_group = groups.get(data[position_column].lower().strip(), groups['сотрудник'])
         if created:
             user.username = f'u{user.id}'
             user.save()
@@ -83,20 +154,26 @@ def upload_timetable_util(form, timetable_file):
                 function_group=func_group,
                 position=position,
             )
+            if UPLOAD_TT_MATCH_EMPLOYMENT and number_cond:
+                employment.tabel_code = tabel_code
+                employment.save()
         else:
-            employment, _ = Employment.objects.update_or_create(
+            employment, emp_created = Employment.objects.update_or_create(
                 shop_id=shop_id,
                 user=user,
                 defaults={
-                    'function_group': func_group,
                     'position': position,
                 }
             )
+            if emp_created:
+                employment.function_group = func_group
+                employment.save()
         users.append([
             user,
             employment,
         ])
-    
+    if len(error_users):
+        return Response('\n'.join(error_users), status=400)
     dates = []
     for dt in df.columns[3:]:
         if not isinstance(dt, datetime.datetime):
@@ -109,23 +186,39 @@ def upload_timetable_util(form, timetable_file):
         w.work_type_name.name.lower(): w
         for w in WorkType.objects.select_related('work_type_name').filter(shop_id=shop_id, dttm_deleted__isnull=True)
     }
+    if (len(work_types) == 0):
+        raise MessageError(code='no_active_work_types', lang=form.get('lang', 'ru'))
+
     first_type = next(iter(work_types.values()))
     timetable_df = df[df.columns[:3 + len(dates)]]
 
-    timetable_df['Номер'] = timetable_df['Номер'].astype(str)
-
+    timetable_df[number_cloumn] = timetable_df[number_cloumn].astype(str)
+    timetable_df[name_column] = timetable_df[name_column].astype(str)
+    timetable_df[position_column] = timetable_df[position_column].astype(str)
+    index_shift = 0
 
     for index, data in timetable_df.iterrows():
-        if data['Номер'].startswith('*') or data['Номер'] == 'nan':
+        if data[number_cloumn].startswith('*') or data[name_column].startswith('*') \
+            or data[position_column].startswith('*'):
+            index_shift += 1
             continue
-        user, employment = users[index]
+        number_cond = data[number_cloumn] != 'nan'
+        name_cond = data[name_column] != 'nan'
+        position_cond = data[position_column] != 'nan'
+        if not number_cond and (not name_cond or not position_cond):
+            index_shift += 1
+            continue
+        user, employment = users[index - index_shift]
         for i, dt in enumerate(dates):
             dttm_work_start = None
             dttm_work_end = None
             try:
-                if not (str(data[i + 3]).lower() in WORK_TYPES):
-                    splited_cell = data[i + 3].replace('\n', '').split()
-                    work_type = first_type if len(splited_cell) == 1 else work_types.get(splited_cell[1].lower(), first_type)
+                cell_data = str(data[i + 3]).lower().strip()
+                if cell_data.replace(' ', '').replace('\n', '') in SKIP_SYMBOLS:
+                    continue
+                if not (cell_data in WORK_TYPES):
+                    splited_cell = data[i + 3].replace('\n', '').strip().split()
+                    work_type = work_types.get(data[position_column].lower(), first_type) if len(splited_cell) == 1 else work_types.get(splited_cell[1].lower(), first_type)
                     times = splited_cell[0].split('-')
                     type_of_work = WorkerDay.TYPE_WORKDAY
                     dttm_work_start = datetime.datetime.combine(
@@ -137,9 +230,10 @@ def upload_timetable_util(form, timetable_file):
                     if dttm_work_end < dttm_work_start:
                         dttm_work_end += datetime.timedelta(days=1)
                 else:
-                    type_of_work = WORK_TYPES[str(data[i + 3]).lower()]
+                    type_of_work = WORK_TYPES[cell_data]
             except:
-                raise MessageError(code='xlsx_undefined_cell', lang=form.get('lang', 'ru'), params={'user': user, 'i': i + 1})
+                raise MessageError(code='xlsx_undefined_cell', lang=form.get('lang', 'ru'), params={'user': user, 'dt': dt, 'value': str(data[i + 3])})
+
             wd_query_set = list(WorkerDay.objects.filter(dt=dt, worker=user).order_by('-id'))
             WorkerDayCashboxDetails.objects.filter(
                 worker_day__in=wd_query_set,

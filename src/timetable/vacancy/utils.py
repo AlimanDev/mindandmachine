@@ -48,6 +48,7 @@ from src.timetable.models import (
     WorkType,
     EmploymentWorkType,
     ShopMonthStat,
+    VacancyBlackList,
 )
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
 from src.util.models_converter import Converter
@@ -461,14 +462,34 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
         res['status_code'] = 404
         return res
     
+    vacancy_shop = vacancy.shop
+
+    if user.black_list_symbol is None and vacancy_shop.network.need_symbol_for_vacancy:
+        res['code'] = 'need_symbol_for_vacancy'
+        res['status_code'] = 400
+        return res
+
+
+    shops_for_black_list = vacancy_shop.get_ancestors(include_self=True)
+
+    
+    if VacancyBlackList.objects.filter(symbol=user.black_list_symbol, shop__in=shops_for_black_list).exists():
+        res['code'] = 'cant_apply_vacancy'
+        res['status_code'] = 400
+        return res
+
     user_worker_day = WorkerDay.objects.select_related('shop', 'employment').filter(
         worker=user,
         dt=vacancy.dt,
         is_approved=True,
         is_fact=False,
     ).first()
+
     if user_worker_day and vacancy:
-        vacancy_shop = vacancy.shop
+        if not vacancy.is_outsource and user_worker_day.employment.shop.network_id != vacancy_shop.network_id:
+            res['code'] = 'cant_apply_vacancy'
+            res['status_code'] = 400
+            return res
         is_updated = False
         update_condition = user_worker_day.type != WorkerDay.TYPE_WORKDAY or \
         (user_worker_day.employment.shop_id == vacancy_shop.id and \
@@ -992,7 +1013,7 @@ def workers_exchange():
                             for detail in WorkerDayCashboxDetails.objects.filter(worker_day=candidate_worker_day)
                         }
                         #не удаляем candidate_to_change потому что создаем неподтвержденную вакансию
-                        confirm_vacancy(vacancy.id, user, exchange=True)
+                        print(confirm_vacancy(vacancy.id, user, exchange=True))
                         create_event_and_notify(
                             [user],
                             type='auto_vacancy', 

@@ -23,6 +23,8 @@ QOS_DEV_CSRF_DISABLED = False
 QOS_DEV_AUTOLOGIN_ENABLED = False
 QOS_DEV_AUTOLOGIN_USERNAME = None
 QOS_DEV_AUTOLOGIN_PASSWORD = None
+# переменная указывающая как матчить табельный номер при загрузке расписания (через User или через Employment)
+UPLOAD_TT_MATCH_EMPLOYMENT = True
 
 QOS_CAMERA_KEY = '1'
 

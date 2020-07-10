@@ -8,7 +8,7 @@ from rest_framework.test import APITestCase
 from src.util.test import create_departments_and_users
 
 from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName, WorkerDayCashboxDetails, ShopMonthStat
-from src.base.models import FunctionGroup
+from src.base.models import FunctionGroup, Network
 from src.util.models_converter import Converter
 
 class TestWorkerDay(APITestCase):
@@ -116,6 +116,8 @@ class TestWorkerDay(APITestCase):
             'dttm_work_end': Converter.convert_datetime(datetime.combine(self.dt, time(20, 0, 0))),
             'work_hours': '12:00:00',
             'worker_day_details': [],
+            'is_outsource': False,
+            'is_vacancy': False,
         }
 
         self.assertEqual(response.json(), data)
@@ -624,6 +626,12 @@ class TestVacancy(APITestCase):
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
         )
+        self.network = Network.objects.create(
+            primary_color='#BDF82',
+            secondary_color='#390AC',
+        )
+        self.shop.network = self.network
+        self.shop.save()
         self.work_type1 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
         self.worker_day = WorkerDay.objects.create(
             shop=self.shop,
