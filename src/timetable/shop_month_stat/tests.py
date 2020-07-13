@@ -89,4 +89,23 @@ class TestShopMonthStat(APITestCase):
             }
         )
         self.assertEqual(month_stat, data)
+
+    
+    def test_get_status(self):
+        response = self.client.get(f'{self.url}status/?shop_id={self.shop.id}&dt={Converter.convert_date(date.today().replace(day=1))}')
+        month_stat = response.json()
+        data = {
+            'id': self.month_stat.id, 
+            'shop_id': self.shop.id, 
+            'status_message': None, 
+            'dt': Converter.convert_date(date.today().replace(day=1)), 
+            'status': 'N', 
+            'fot': 0, 
+            'lack': 0, 
+            'idle': 0, 
+            'workers_amount': 0, 
+            'revenue': 0, 
+            'fot_revenue': 0
+        }
+        self.assertEqual(month_stat, data)
         

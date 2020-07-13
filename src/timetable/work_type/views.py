@@ -4,7 +4,6 @@ from src.base.permissions import FilteredListPermission
 from src.timetable.models import WorkType,WorkTypeName
 from src.timetable.work_type_name.views import WorkTypeNameSerializer
 from rest_framework.decorators import action
-from src.main.timetable.cashier_demand.forms import GetCashiersTimetableForm
 from src.timetable.work_type.utils import get_efficiency
 from src.conf.djconfig import QOS_DATE_FORMAT
 from rest_framework.validators import UniqueTogetherValidator

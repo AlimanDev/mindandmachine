@@ -1,14 +1,15 @@
+import datetime
+import json
+
 from django.db import models
+from django.db.models import Subquery, OuterRef, Max
+from django.utils import timezone
 from django.contrib.auth.models import (
     UserManager
 )
 
-import datetime
-
-from src.base.models import Shop, Employment, User, Event
-
+from src.base.models import Shop, Employment, User, Event, Network
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
-from django.utils import timezone
 
 
 class WorkerManager(UserManager):
@@ -46,6 +47,14 @@ class WorkTypeName(AbstractActiveNamedModel):
         super(WorkTypeName, self).delete()
         WorkType.objects.qos_delete(work_type_name__id=self.pk)
         return self
+
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
+    def __str__(self):
+        return 'id: {}, name: {}, code: {}'.format(
+            self.id,
+            self.name,
+            self.code,
+        )
 
 
 class WorkType(AbstractActiveModel):
@@ -225,7 +234,7 @@ class WorkerConstraint(AbstractModel):
 
     id = models.BigAutoField(primary_key=True)
     shop = models.ForeignKey(Shop, blank=True, null=True, on_delete=models.PROTECT, related_name='worker_constraints')
-    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True, related_name='worker_constraints')
+    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, related_name='worker_constraints')
 
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
@@ -258,6 +267,27 @@ class WorkerDayManager(models.Manager):
             return self.qos_current_version(approved_only)
         else:
             return self.qos_initial_version()
+
+    def get_last_plan(self,  *args, **kwargs):
+        """
+        Возвращает плановый график - микс подтвержденного и неподтвержденного,
+        последнюю версию за каждый день.
+        """
+        super().get_queryset()
+        max_dt_subq = WorkerDay.objects.filter(
+            dt=OuterRef('dt'),
+            worker_id=OuterRef('worker_id'),
+            is_fact=False,
+            shop_id=OuterRef('shop_id')
+        ).values( # for group by
+            'dttm_added'
+        ).annotate(dt_max=Max('dttm_added')).values('dt_max')
+        return super().get_queryset().filter(
+            *args,
+            **kwargs,
+            is_fact=False,
+            dttm_added=Subquery(max_dt_subq),
+        )
 
     @staticmethod
     def qos_get_current_worker_day(worker_day):
@@ -346,7 +376,7 @@ class WorkerDay(AbstractModel):
 
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
-            self.worker.last_name,
+            self.worker.last_name if self.worker else 'No worker',
             self.shop.name if self.shop else '',
             self.shop.parent.name if self.shop and self.shop.parent else '',
             self.dt,
@@ -367,7 +397,7 @@ class WorkerDay(AbstractModel):
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
 
-    worker = models.ForeignKey(User, null=True,on_delete=models.PROTECT)  # todo: make immutable
+    worker = models.ForeignKey(User, null=True, on_delete=models.PROTECT, related_name='worker_day', related_query_name='worker_day')  # todo: make immutable
     type = models.CharField(choices=TYPES, max_length=2, default=TYPE_EMPTY)
 
     work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')
@@ -382,6 +412,8 @@ class WorkerDay(AbstractModel):
     is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
     is_vacancy = models.BooleanField(default=False)
     dttm_added = models.DateTimeField(default=timezone.now)
+    canceled = models.BooleanField(default=False)
+    is_outsource = models.BooleanField(default=False)
 
     objects = WorkerDayManager()
 
@@ -431,62 +463,18 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
     class Meta:
         verbose_name = 'Детали в течение рабочего дня'
 
-    TYPE_WORK = 'W'
-    TYPE_WORK_TRADING_FLOOR = 'Z'
-    TYPE_BREAK = 'B'
-    TYPE_STUDY = 'S'
-    TYPE_VACANCY = 'V'
-    TYPE_SOON = 'C'
-    TYPE_FINISH = 'H'
-    TYPE_ABSENCE = 'A'
-    TYPE_DELETED = 'D'
-
-    DETAILS_TYPES = (
-            (TYPE_WORK, 'work period'),
-            (TYPE_BREAK, 'rest / break'),
-            (TYPE_STUDY, 'study period'),
-            (TYPE_VACANCY, 'vacancy'),
-            (TYPE_WORK_TRADING_FLOOR, 'work in trading floor'),
-    )
-
-    TYPE_T = 'T'
-
-    WORK_TYPES_LIST = (
-        TYPE_WORK,
-        TYPE_STUDY,
-        TYPE_WORK_TRADING_FLOOR,
-    )
-
-    DETAILS_TYPES_LIST = (
-        TYPE_WORK,
-        TYPE_BREAK,
-        TYPE_STUDY,
-        TYPE_WORK_TRADING_FLOOR,
-    )
-
     id = models.BigAutoField(primary_key=True)
 
     worker_day = models.ForeignKey(WorkerDay, on_delete=models.CASCADE, null=True, blank=True, related_name='worker_day_details')
-    on_cashbox = models.ForeignKey(Cashbox, on_delete=models.PROTECT, null=True, blank=True)
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT, null=True, blank=True)
-
-    status = models.CharField(max_length=1, choices=DETAILS_TYPES, default=TYPE_WORK)
-    is_vacancy = models.BooleanField(default=False)
-
-    is_tablet = models.BooleanField(default=False)
-
-    dttm_from = models.DateTimeField()
-    dttm_to = models.DateTimeField(null=True, blank=True)
-    event = models.OneToOneField(Event, on_delete=models.SET_NULL, null=True, blank=True, related_name='worker_day_details', related_query_name='worker_day_details')
+    work_part = models.FloatField(default=1.0)
 
     def __str__(self):
-        return '{}, {}, {}, {}, {}-{}, id: {}'.format(
+        return '{}, {}, {}, id: {}'.format(
             # self.worker_day.worker.last_name,
-            self.dttm_from.date(),
-            '', '',
+            self.worker_day,
+            self.work_part,
             self.work_type.work_type_name.name if self.work_type else None,
-            self.dttm_from.replace(microsecond=0).time() if self.dttm_from else self.dttm_from,
-            self.dttm_to.replace(microsecond=0).time() if self.dttm_to else self.dttm_to,
             self.id,
         )
 
@@ -832,11 +820,29 @@ class AttendanceRecords(AbstractModel):
 
 
 class ExchangeSettings(AbstractModel):
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
+    default_constraints = {
+        'second_day_before': 40,
+        'second_day_after': 32,
+        'first_day_after': 32,
+        'first_day_before': 40,
+        '1day_before': 40,
+        '1day_after': 40,
+    }
+
     # Создаем ли автоматически вакансии
     automatic_check_lack = models.BooleanField(default=False)
     # Период, за который проверяем
     automatic_check_lack_timegap = models.DurationField(default=datetime.timedelta(days=7))
+    #с какого дня выводить с выходного
+    automatic_holiday_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=8))
+    #включать ли автоматическую биржу смен
+    automatic_exchange = models.BooleanField(default=False)
+    #максимальное количество рабочих часов в месяц для вывода с выходного
+    max_working_hours = models.IntegerField(default=192)
 
+    constraints = models.CharField(max_length=250, default=json.dumps(default_constraints))
+    exclude_positions = models.ManyToManyField('base.WorkerPosition')
     # Минимальная потребность в сотруднике при создании вакансии
     automatic_create_vacancy_lack_min = models.FloatField(default=.5)
     # Максимальная потребность в сотруднике для удалении вакансии
@@ -844,6 +850,8 @@ class ExchangeSettings(AbstractModel):
 
     # Только автоназначение сотрудников
     automatic_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=1))
+    #период за который делаем обмен сменами
+    automatic_worker_select_timegap_to = models.DurationField(default=datetime.timedelta(days=2))
     # Дробное число, на какую долю сотрудник не занят, чтобы совершить обмен
     automatic_worker_select_overflow_min = models.FloatField(default=0.8)
 
@@ -854,3 +862,15 @@ class ExchangeSettings(AbstractModel):
     # Расстояние до родителя, в поддереве которого ищем сотрудников для автоназначения
     automatic_worker_select_tree_level = models.IntegerField(default=1)
 
+
+class VacancyBlackList(models.Model):
+
+    class Meta:
+        unique_together = ('shop', 'symbol',)
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
+    symbol = models.CharField(max_length=128)
+
+
+    def get_department(self):
+        return self.shop

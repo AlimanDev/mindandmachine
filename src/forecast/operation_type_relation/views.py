@@ -1,17 +1,29 @@
-from rest_framework import serializers, viewsets, status, permissions
-from rest_framework.response import Response
-from django_filters.rest_framework import FilterSet
-from src.forecast.models import OperationTypeTemplate, OperationTypeRelation, OperationType
 import re
-from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
-from django_filters import NumberFilter
-from rest_framework.validators import UniqueTogetherValidator
-from src.base.exceptions import MessageError
-from src.forecast.load_template.utils import create_operation_type_relations_dict
 
+from django_filters import NumberFilter
+from django_filters.rest_framework import FilterSet
+from django.utils.translation import gettext_lazy as _
+
+from rest_framework import serializers, viewsets, status, permissions
+from rest_framework.validators import UniqueTogetherValidator
+from rest_framework.response import Response
+
+from src.forecast.models import OperationTypeTemplate, OperationTypeRelation, OperationType
+from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
+from src.forecast.load_template.utils import create_operation_type_relations_dict
+from src.base.exceptions import FieldError
 
 # Serializers define the API representation.
 class OperationTypeRelationSerializer(serializers.ModelSerializer):
+    default_error_messages = {
+        "depended_base_same": _("Base and depended demand models cannot be the same."),
+        "cycle_relation": _("Demand model cannot depend on itself."),
+        "reversed_relation": _("Backward dependency already exists."),
+        "not_same_template": _("Base and depended demand models cannot have different templates."),
+        "error_in_formula": _("Error in formula: {formula}."),
+        "base_not_formula": _("Base model."),
+    }
+
     formula = serializers.CharField()
     depended = OperationTypeTemplateSerializer(read_only=True)
     base = OperationTypeTemplateSerializer(read_only=True)
@@ -35,26 +47,26 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
             return False
         lambda_check = r'^(if|else|\+|-|\*|/|\s|a|[0-9]|=|>|<|\.)*'
         if not re.fullmatch(lambda_check, self.validated_data['formula']):
-            raise MessageError(code="error_in_formula", lang=self.context['request'].user.lang, params={'formula': self.validated_data['formula']})
+            raise FieldError(self.error_messages["base_not_formula"].format(formula=self.validated_data['formula']), 'formula')
 
         self.validated_data['formula'] = "lambda a: " + self.validated_data['formula']
         if self.validated_data['depended_id'] == self.validated_data['base_id']:
-            raise MessageError(code="depended_base_same", lang=self.context['request'].user.lang,)
-        
+            raise FieldError(self.error_messages["depended_base_same"])
+
         depended = OperationTypeTemplate.objects.get(pk=self.validated_data['depended_id'])
         base = OperationTypeTemplate.objects.get(pk=self.validated_data['base_id'])
         self.validated_data['depended'] = depended
         self.validated_data['base'] = base
 
         if base.do_forecast != OperationType.FORECAST_FORMULA:
-            raise MessageError(code="base_not_formula", lang=self.context['request'].user.lang,)
-        
+            raise FieldError(self.error_messages["base_not_formula"], 'base')
+
         if (depended.load_template_id != base.load_template_id):
-            raise MessageError(code="not_same_template", lang=self.context['request'].user.lang,)
-        
+            raise FieldError(self.error_messages["not_same_template"])
+
         if OperationTypeRelation.objects.filter(base=depended, depended=base).exists():
-            raise MessageError(code="reversed_relation", lang=self.context['request'].user.lang,)
-        
+            raise FieldError(self.error_messages["reversed_relation"], 'base')
+
         self.relations = create_operation_type_relations_dict(base.load_template_id)
 
         self.check_relations(base.id, depended.id)
@@ -69,7 +81,7 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         else:
             for relation in relations:
                 if relation['depended'].id == base_id:
-                    raise MessageError(code="cycle_relation", lang=self.context['request'].user.lang,)
+                    raise FieldError(self.error_messages["cycle_relation"],'base')
                 else:
                     self.check_relations(base_id, relation['depended'].id)
 
@@ -94,7 +106,9 @@ class OperationTypeRelationViewSet(viewsets.ModelViewSet):
     filterset_class = OperationTypeRelationFilter
 
     def get_queryset(self):
-        return self.filter_queryset(OperationTypeRelation.objects.all())
+        return OperationTypeRelation.objects.filter(
+            base__load_template__network_id=self.request.user.network_id,
+        )
 
 
     def update(self, request, pk=None):

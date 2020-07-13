@@ -1,9 +1,9 @@
 import datetime
 
-from django_filters.rest_framework import DjangoFilterBackend
 from django_filters import utils
+from django_filters.rest_framework import DjangoFilterBackend
 
-from src.base.models import Employment
+from src.base.models import Employment, Shop
 
 
 class MultiShopsFilterBackend(DjangoFilterBackend):
@@ -17,6 +17,7 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
             return super().filter_queryset(request, queryset, view)
 
         shop_id = request.query_params.get('shop_id')
+        shop = Shop.objects.get(id=shop_id)
 
         filterset = self.get_filterset(request, queryset, view)
 
@@ -38,7 +39,8 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
         if not dt_to:
             dt_to = dt if dt else datetime.date.today()
         ids = Employment.objects.get_active(
-            dt_from, dt_to,
+            network_id=shop.network_id,
+            dt_from=dt_from, dt_to=dt_to,
             shop_id=shop_id,
         ).values('user_id')
 
