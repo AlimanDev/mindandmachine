@@ -194,6 +194,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 first_name=F('worker__first_name'),
                 last_name=F('worker__last_name'),
                 avatar=F('worker__avatar'),
+                worker_shop=F('employment__shop_id'),
             ),
         )
         data = paginator.paginate_queryset(queryset, request)
