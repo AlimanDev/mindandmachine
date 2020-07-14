@@ -10,14 +10,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='shop',
-            name='email',
-            field=models.EmailField(blank=True, max_length=254, null=True),
-        ),
-        migrations.AddField(
-            model_name='shop',
-            name='exchange_shops',
-            field=models.ManyToManyField(related_name='_shop_exchange_shops_+', to='base.Shop'),
-        ),
+
     ]

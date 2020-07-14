@@ -59,6 +59,7 @@ class Migration(migrations.Migration):
                 ('access_token', models.CharField(blank=True, max_length=64, null=True)),
                 ('groups', models.ManyToManyField(blank=True, help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.', related_name='user_set', related_query_name='user', to='auth.Group', verbose_name='groups')),
                 ('user_permissions', models.ManyToManyField(blank=True, help_text='Specific permissions for this user.', related_name='user_set', related_query_name='user', to='auth.Permission', verbose_name='user permissions')),
+                ('tabel_code', models.CharField(max_length=15, null=True, unique=True)),
             ],
             options={
                 'verbose_name': 'Пользователь',
@@ -141,6 +142,7 @@ class Migration(migrations.Migration):
                 ('level', models.PositiveIntegerField(editable=False)),
                 ('parent', mptt.fields.TreeForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='child', to='base.Shop')),
                 ('region', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='base.Region')),
+                ('email', models.EmailField(blank=True, max_length=254, null=True)),
             ],
             options={
                 'verbose_name': 'Отдел',
@@ -184,6 +186,7 @@ class Migration(migrations.Migration):
                 ('position', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='base.WorkerPosition')),
                 ('shop', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='employments', to='base.Shop')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='employments', to=settings.AUTH_USER_MODEL)),
+                ('is_visible', models.BooleanField(default=True)),
             ],
             options={
                 'verbose_name': 'Трудоустройство',
@@ -222,6 +225,11 @@ class Migration(migrations.Migration):
                 'verbose_name': 'День производственного календаря',
                 'unique_together': {('dt', 'region')},
             },
+        ),
+        migrations.AddField(
+            model_name='shop',
+            name='exchange_shops',
+            field=models.ManyToManyField(related_name='_shop_exchange_shops_+', to='base.Shop'),
         ),
         migrations.RunPython(create_shop_tree),
     ]

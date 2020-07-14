@@ -10,14 +10,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='employment',
-            name='is_visible',
-            field=models.BooleanField(default=True),
-        ),
-        migrations.AddField(
-            model_name='user',
-            name='tabel_code',
-            field=models.CharField(max_length=15, null=True, unique=True),
-        ),
+        # migrations.AddField(
+        #     model_name='user',
+        #     name='tabel_code',
+        #     field=models.CharField(max_length=15, null=True, unique=True),
+        # ),
     ]

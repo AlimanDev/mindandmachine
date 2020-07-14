@@ -11,34 +11,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='exchangesettings',
-            name='automatic_exchange',
-            field=models.BooleanField(default=False),
-        ),
-        migrations.AddField(
-            model_name='exchangesettings',
-            name='automatic_holiday_worker_select_timegap',
-            field=models.DurationField(default=datetime.timedelta(8)),
-        ),
-        migrations.AddField(
-            model_name='exchangesettings',
-            name='automatic_worker_select_timegap_to',
-            field=models.DurationField(default=datetime.timedelta(2)),
-        ),
-        migrations.AddField(
-            model_name='exchangesettings',
-            name='constraints',
-            field=models.CharField(default='{"second_day_before": 40, "second_day_after": 32, "first_day_after": 32, "first_day_before": 40, "1day_before": 40, "1day_after": 40}', max_length=250),
-        ),
-        migrations.AddField(
-            model_name='exchangesettings',
-            name='exclude_positions',
-            field=models.ManyToManyField(to='base.WorkerPosition'),
-        ),
-        migrations.AddField(
-            model_name='exchangesettings',
-            name='max_working_hours',
-            field=models.IntegerField(default=192),
-        ),
+
     ]
