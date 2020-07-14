@@ -25,6 +25,29 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
         fields = ['id', 'work_type_id', 'work_part']
 
 
+class WorkerDayCashboxDetailsListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    work_type_id = serializers.IntegerField()
+    work_part = serializers.FloatField()
+
+
+class WorkerDayListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    worker_id = serializers.IntegerField()
+    shop_id = serializers.IntegerField()
+    employment_id = serializers.IntegerField()
+    type = serializers.CharField()
+    dt = serializers.DateField()
+    dttm_work_start = serializers.DateTimeField(default=None)
+    dttm_work_end = serializers.DateTimeField(default=None)
+    comment = serializers.CharField()
+    is_approved = serializers.BooleanField()
+    worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True)
+    is_fact = serializers.BooleanField()
+    work_hours = serializers.DurationField()
+    parent_worker_day_id = serializers.IntegerField()
+
+
 class WorkerDaySerializer(serializers.ModelSerializer):
     default_error_messages = {
         'check_dates': _('Date start should be less then date end'),
@@ -179,6 +202,16 @@ class WorkerDayWithParentSerializer(WorkerDaySerializer):
     parent_worker_day_id = serializers.IntegerField()
 
 
+class EmploymentWorkTypeListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    work_type_id = serializers.IntegerField()
+    employment_id = serializers.IntegerField()
+    period = serializers.IntegerField()
+    bills_amount = serializers.IntegerField()
+    priority = serializers.IntegerField()
+    duration = serializers.FloatField()
+
+
 class EmploymentWorkTypeSerializer(serializers.ModelSerializer):
     employment_id = serializers.IntegerField(required=False)
     work_type_id = serializers.IntegerField(required=False)
@@ -232,6 +265,14 @@ class WorkerConstraintSerializer(serializers.ModelSerializer):
         model = WorkerConstraint
         fields = ['id', 'employment_id', 'weekday', 'is_lite', 'tm']
         list_serializer_class = WorkerConstraintListSerializer
+
+
+class WorkerConstraintListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    employment_id = serializers.IntegerField()
+    weekday = serializers.IntegerField()
+    is_lite = serializers.BooleanField()
+    tm = serializers.TimeField()
 
 
 class VacancySerializer(serializers.ModelSerializer):

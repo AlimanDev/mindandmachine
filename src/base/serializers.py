@@ -11,7 +11,7 @@ from django.db.models import Q
 from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
 from src.base.message import Message
 from src.base.fields import CurrentUserNetwork
-from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
+from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
 
 
 class BaseNetworkSerializer(serializers.ModelSerializer):
@@ -22,6 +22,21 @@ class NetworkSerializer(serializers.ModelSerializer):
     class Meta:
         model = Network
         fields = ['id', 'name', 'logo', 'url', 'primary_color', 'secondary_color']
+
+
+class UserListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    middle_name = serializers.CharField()
+    birthday = serializers.DateField()
+    sex = serializers.CharField()
+    avatar = serializers.ImageField()
+    email = serializers.CharField()
+    phone_number = serializers.CharField()
+    tabel_code = serializers.CharField()
+    username = serializers.CharField()
+    network_id = serializers.IntegerField()
 
 
 class UserSerializer(BaseNetworkSerializer):
@@ -73,6 +88,30 @@ class FunctionGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = FunctionGroup
         fields = ['id', 'group_id', 'func', 'method']
+
+
+class EmploymentListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    user_id = serializers.IntegerField(required=False)
+    shop_id = serializers.IntegerField(required=False)
+    position_id = serializers.IntegerField()
+    is_fixed_hours = serializers.BooleanField()
+    dt_hired = serializers.DateField()
+    dt_fired = serializers.DateField()
+    salary = serializers.DecimalField(max_digits=10, decimal_places=2, default=0)
+    week_availability = serializers.IntegerField()
+    norm_work_hours = serializers.IntegerField()
+    min_time_btw_shifts = serializers.IntegerField()
+    shift_hours_length_min = serializers.IntegerField()
+    shift_hours_length_max = serializers.IntegerField()
+    auto_timetable = serializers.BooleanField()
+    tabel_code = serializers.CharField()
+    is_ready_for_overworkings = serializers.BooleanField()
+    dt_new_week_availability_from = serializers.DateField()
+    user = UserListSerializer()
+    is_visible = serializers.BooleanField()
+    worker_constraints = WorkerConstraintListSerializer(many=True)
+    work_types = EmploymentWorkTypeListSerializer(many=True)
 
 
 class EmploymentSerializer(serializers.ModelSerializer):

@@ -16,8 +16,8 @@ class Network(AbstractActiveNamedModel):
         verbose_name_plural = 'Сети магазинов'
     logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
     url = models.CharField(blank=True,null=True,max_length=255)
-    primary_color = models.CharField(max_length=6, blank=True)
-    secondary_color = models.CharField(max_length=6, blank=True)
+    primary_color = models.CharField(max_length=7, blank=True)
+    secondary_color = models.CharField(max_length=7, blank=True)
 
     def get_department(self):
         return None

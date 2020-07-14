@@ -389,11 +389,11 @@ class WorkerDay(AbstractModel):
     def __repr__(self):
         return self.__str__()
 
-    id = models.BigAutoField(primary_key=True)
+    id = models.BigAutoField(primary_key=True, db_index=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
     employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
 
-    dt = models.DateField()  # todo: make immutable
+    dt = models.DateField(db_index=True)  # todo: make immutable
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
 

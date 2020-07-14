@@ -13,7 +13,20 @@ from rest_framework.status import HTTP_400_BAD_REQUEST
 from rest_framework.decorators import action
 
 from src.base.permissions import Permission
-from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer, ShopSettingsSerializer, NetworkSerializer, AuthUserSerializer
+from src.base.serializers import (
+    EmploymentSerializer,
+    UserSerializer, 
+    FunctionGroupSerializer, 
+    WorkerPositionSerializer, 
+    NotificationSerializer, 
+    SubscribeSerializer, 
+    PasswordSerializer, 
+    ShopSettingsSerializer, 
+    NetworkSerializer, 
+    AuthUserSerializer,
+    EmploymentListSerializer,
+    UserListSerializer,
+)
 from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter
 from src.base.models import (
     Employment,
@@ -49,6 +62,11 @@ class EmploymentViewSet(ModelViewSet):
             shop__network_id=self.request.user.network_id
         )
 
+    def list(self, request):
+        return Response(
+            EmploymentListSerializer(self.filter_queryset(self.get_queryset().select_related('user').prefetch_related('work_types', 'worker_constraints')), many=True).data
+        )
+
 
 class UserViewSet(ModelViewSet):
     page_size = 10
@@ -82,6 +100,12 @@ class UserViewSet(ModelViewSet):
         else:
             return Response(serializer.errors,
                             status=HTTP_400_BAD_REQUEST)
+
+    
+    def list(self, request):
+        return Response(
+            UserListSerializer(self.filter_queryset(self.get_queryset()), many=True).data
+        )
 
 
 class AuthUserView(UserDetailsView):

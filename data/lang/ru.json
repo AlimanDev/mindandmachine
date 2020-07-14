@@ -14,7 +14,6 @@
   "load_template_err":"При применении шаблона нагрузки в {shop.name} произошла ошибка: {message}",
   "load_template_apply": "Шаблон нагрузки {name} успешно применён.",
   "dt_to_required": "Дата, до которой выполнять действие, обязательна.",
-  "load_template_apply": "Шаблон нагрузки {name} успешно применён.",
   "xlsx_no_active_list": "Не удалось открыть активный лист.",
   "xlsx_no_worker_position": "Нет такой должности {position}",
   "xlsx_undefined_cell": "У сотрудника {user.first_name} {user.last_name} не распознана ячейка № {i}",

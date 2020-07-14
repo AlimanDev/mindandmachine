@@ -1,6 +1,7 @@
 from django.contrib import admin
 from src.base.models import (
     Employment,
+    Network,
     User,
     Shop,
     ShopSettings,
@@ -82,6 +83,11 @@ class EmploymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop', 'user')
     list_filter = ('shop', 'user')
     search_fields = ('user__first_name', 'user__last_name', 'shop__name', 'shop__parent__name')
+
+
+@admin.register(Network)
+class NetworkAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'logo')
 
 
 @admin.register(ProductionDay)
