@@ -413,6 +413,7 @@ class WorkerDay(AbstractModel):
     is_vacancy = models.BooleanField(default=False)
     dttm_added = models.DateTimeField(default=timezone.now)
     canceled = models.BooleanField(default=False)
+    is_outsource = models.BooleanField(default=False)
 
     objects = WorkerDayManager()
 
@@ -861,3 +862,15 @@ class ExchangeSettings(AbstractModel):
     # Расстояние до родителя, в поддереве которого ищем сотрудников для автоназначения
     automatic_worker_select_tree_level = models.IntegerField(default=1)
 
+
+class VacancyBlackList(models.Model):
+
+    class Meta:
+        unique_together = ('shop', 'symbol',)
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
+    symbol = models.CharField(max_length=128)
+
+
+    def get_department(self):
+        return self.shop

@@ -10,8 +10,9 @@ from src.timetable.serializers import (
 from src.timetable.filters import EmploymentWorkTypeFilter, WorkerConstraintFilter
 from src.timetable.models import (
     EmploymentWorkType,
-    WorkerConstraint, 
+    WorkerConstraint,
 )
+
 
 class EmploymentWorkTypeViewSet(viewsets.ModelViewSet):
     permission_classes = [FilteredListPermission]

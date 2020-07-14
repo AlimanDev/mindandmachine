@@ -9,7 +9,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from src.base.models import Employment, Shop
+
 from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
+
 
 class ShopFilter(FilterSet):
     class Meta:

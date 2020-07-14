@@ -8,7 +8,7 @@ from rest_framework.test import APITestCase
 from src.util.test import create_departments_and_users
 
 from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName, WorkerDayCashboxDetails, ShopMonthStat
-from src.base.models import FunctionGroup
+from src.base.models import FunctionGroup, Network
 from src.util.models_converter import Converter
 
 class TestWorkerDay(APITestCase):
@@ -87,7 +87,7 @@ class TestWorkerDay(APITestCase):
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):
-        dt=Converter.convert_date(self.dt)
+        dt = Converter.convert_date(self.dt)
 
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&dt={dt}')
         self.assertEqual(len(response.json()), 4)
@@ -116,6 +116,8 @@ class TestWorkerDay(APITestCase):
             'dttm_work_end': Converter.convert_datetime(datetime.combine(self.dt, time(20, 0, 0))),
             'work_hours': '12:00:00',
             'worker_day_details': [],
+            'is_outsource': False,
+            'is_vacancy': False,
         }
 
         self.assertEqual(response.json(), data)
@@ -206,7 +208,7 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(response.json()['dttm_work_start'], data['dttm_work_start'])
         self.assertEqual(response.json()['dttm_work_end'], data['dttm_work_end'])
 
-        #Approve plan
+        # Approve plan
         data_approve = {
             'shop_id': self.shop.id,
             'dt_from': dt,
@@ -219,7 +221,7 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(WorkerDay.objects.get(id=plan_id).is_approved, True)
         self.assertEqual(WorkerDay.objects.get(id=fact_id).is_approved, False)
 
-        #Approve fact
+        # Approve fact
         data_approve['is_fact'] = True
 
         response = self.client.post(self.url_approve, data_approve, format='json')
@@ -227,27 +229,41 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(WorkerDay.objects.get(id=fact_id).is_approved, True)
 
         # edit approved plan
-        # data['is_fact'] = False
-        response = self.client.put(f"{self.url}{plan_id}/", data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        new_plan_id=response.json()['id']
+        data['is_fact'] = False
+        response = self.client.post(f"{self.url}", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        new_plan_id = response.json()['id']
+        new_plan = WorkerDay.objects.get(id=new_plan_id)
         self.assertNotEqual(new_plan_id, plan_id)
         self.assertEqual(response.json()['parent_worker_day_id'], plan_id)
         self.assertEqual(response.json()['type'], data['type'])
+
+        # edit approved plan again
+        response = self.client.post(f"{self.url}", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день."})
 
         # edit approved fact
         data['dttm_work_start'] = Converter.convert_datetime(datetime.combine(dt, time(8, 8, 0)))
         data['dttm_work_end'] = Converter.convert_datetime(datetime.combine(dt, time(21, 2, 0)))
 
-        response = self.client.put(f"{self.url}{fact_id}/", data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data['is_fact'] = True
+        response = self.client.post(f"{self.url}", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         res = response.json()
         new_fact_id = res['id']
+        new_fact = WorkerDay.objects.get(id=new_fact_id)
         self.assertNotEqual(new_fact_id, fact_id)
         self.assertEqual(WorkerDay.objects.get(id=new_fact_id).parent_worker_day_id, fact_id)
         self.assertEqual(res['dttm_work_start'], data['dttm_work_start'])
         self.assertEqual(res['dttm_work_end'], data['dttm_work_end'])
+
+        #edit approved fact again
+        response = self.client.post(f"{self.url}", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день."})
 
     def test_empty_params(self):
         data = {
@@ -257,27 +273,28 @@ class TestWorkerDay(APITestCase):
             "dt": self.dt,
             "type": WorkerDay.TYPE_WORKDAY,
             "dttm_work_start": datetime.combine(self.dt, time(8,0,0)),
-            "dttm_work_end":  datetime.combine(self.dt, time(20,0,0)),
-            "worker_day_details":[]
+            "dttm_work_end": datetime.combine(self.dt, time(20,0,0)),
+            "worker_day_details": []
         }
 
-        response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
+        response = self.client.put(f"{self.url}{self.worker_day_plan_not_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(),{'worker_day_details': ['Это поле обязательно.']})
+        self.assertEqual(response.json(), {'worker_day_details': ['Это поле обязательно.']})
+
         data = {
             "shop_id": self.shop.id,
             "worker_id": self.user2.id,
             "employment_id": self.employment2.id,
             "dt": self.dt,
-            "type": WorkerDay.TYPE_WORKDAY,
+            "type": WorkerDay.TYPE_BUSINESS_TRIP,
             # "dttm_work_start": None,
             "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
             "worker_day_details": [{
                  "work_part": 1.0,
-                 "work_type_id":self.work_type.id}]
+                 "work_type_id": self.work_type.id}]
         }
 
-        response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
+        response = self.client.put(f"{self.url}{self.worker_day_plan_not_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(), {'dttm_work_start': ['Это поле обязательно.']})
 
@@ -292,17 +309,19 @@ class TestWorkerDay(APITestCase):
             "dttm_work_end":  datetime.combine(self.dt, time(20,0,0)),
             "worker_day_details": [{
                 "work_part": 1.0,
-                 "work_type_id":1}
+                 "work_type_id": 1}
             ]
         }
 
         response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'non_field_errors': 'У расписания уже есть неподтвержденная версия.'})
+        self.assertEqual(response.json(),
+            {'error': ['Нельзя менять подтвержденную версию.']}
+        )
 
         response = self.client.put(f"{self.url}{self.worker_day_fact_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'non_field_errors': 'У расписания уже есть неподтвержденная версия.'})
+        self.assertEqual(response.json(), {'error': ['Нельзя менять подтвержденную версию.']})
 
 
     def test_edit_worker_day(self):
@@ -316,10 +335,10 @@ class TestWorkerDay(APITestCase):
             "is_fact": False,
             "type": WorkerDay.TYPE_WORKDAY,
             "dttm_work_start": datetime.combine(dt, time(8,0,0)),
-            "dttm_work_end":  datetime.combine(dt, time(20,0,0)),
+            "dttm_work_end": datetime.combine(dt, time(20,0,0)),
             "worker_day_details": [{
                  "work_part": 1.0,
-                 "work_type_id":self.work_type.id}
+                 "work_type_id": self.work_type.id}
             ]
         }
 
@@ -501,7 +520,6 @@ class TestAttendanceRecords(APITestCase):
         # # self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_start, datetime.combine(self.dt, time(6,0,0)))
 
-
         AttendanceRecords.objects.create(
             dttm=tm_end,
             type=AttendanceRecords.TYPE_LEAVING,
@@ -608,6 +626,12 @@ class TestVacancy(APITestCase):
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
         )
+        self.network = Network.objects.create(
+            primary_color='#BDF82',
+            secondary_color='#390AC',
+        )
+        self.shop.network = self.network
+        self.shop.save()
         self.work_type1 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
         self.worker_day = WorkerDay.objects.create(
             shop=self.shop,
@@ -640,24 +664,20 @@ class TestVacancy(APITestCase):
 
         self.client.force_authenticate(user=self.user1)
 
-
     def test_get_list(self):
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 2)
 
-    
     def test_get_list_shift_length(self):
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&shift_length_min=8:00:00&shift_length_max=9:00:00')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
 
-    
     def test_get_vacant_list(self):
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&is_vacant=true')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
-
 
     def test_confirm_vacancy(self):
         WorkerDay.objects.create(
@@ -715,23 +735,21 @@ class TestAditionalFunctions(APITestCase):
         ])
         self.client.force_authenticate(user=self.user1)
 
-
     def create_holidays(self, employment, dt_from, count, approved, wds={}):
         result = {}
         for day in range(count):
-            date = dt_from + timedelta(days=day)
-            parent_worker_day = None if approved else wds.get(date, None)
-            result[date] = WorkerDay.objects.create(
+            dt = dt_from + timedelta(days=day)
+            parent_worker_day = None if approved else wds.get(dt, None)
+            result[dt] = WorkerDay.objects.create(
                 employment=employment,
                 worker=employment.user,
                 shop=employment.shop,
-                dt=date,
+                dt=dt,
                 type=WorkerDay.TYPE_HOLIDAY,
                 is_approved=approved,
                 parent_worker_day=parent_worker_day,
             )
         return result
-
 
     def create_worker_days(self, employment, dt_from, count, from_tm, to_tm, approved, wds={}):
         result = {}
@@ -757,7 +775,6 @@ class TestAditionalFunctions(APITestCase):
             )
         return result
 
-
     def test_delete_all(self):
         dt_from = date.today()
         data = {
@@ -776,7 +793,6 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 8)
         #остаётся 4 т.к. у сотрудника auto_timetable=False
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 4)
-
 
     def test_delete(self):
         dt_from = date.today()
@@ -800,7 +816,6 @@ class TestAditionalFunctions(APITestCase):
         #остаётся 1 выходной т.к. удаляем только рабочие дни
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 1)
 
-
     def test_exchange_approved(self):
         dt_from = date.today()
         data = {
@@ -814,7 +829,6 @@ class TestAditionalFunctions(APITestCase):
         url = f'{self.url}exchange/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 8)
-
 
     def test_exchange_not_approved(self):
         dt_from = date.today()
@@ -832,7 +846,6 @@ class TestAditionalFunctions(APITestCase):
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 8)
 
-
     def test_duplicate_approved(self):
         dt_from = date.today()
         data = {
@@ -847,7 +860,6 @@ class TestAditionalFunctions(APITestCase):
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 5)
-
 
     def test_duplicate_not_approved(self):
         dt_from = date.today()
@@ -865,7 +877,6 @@ class TestAditionalFunctions(APITestCase):
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 5)
-
 
     def test_change_list(self):
         dt_from = date.today()

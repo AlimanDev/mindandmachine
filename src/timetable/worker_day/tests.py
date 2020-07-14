@@ -7,7 +7,7 @@ from src.timetable.models import WorkerDay, WorkType, WorkTypeName
 from src.forecast.models import PeriodClients, OperationType, OperationTypeName
 import pandas, io
 from etc.scripts.fill_calendar import main as fill_calendar
-
+from copy import deepcopy
 
 class TestWorkerDayStat(APITestCase):
     USER_USERNAME = "user1"
@@ -66,7 +66,8 @@ class TestWorkerDayStat(APITestCase):
             dttm_work_end=datetime.combine(dt, time(20,0,0)),
             parent_worker_day=parent_worker_day,
             work_hours=datetime.combine(dt, time(20,0,0)) - datetime.combine(dt, time(8,0,0)),
-            is_vacancy=True
+            is_vacancy=True,
+            is_fact=False
         )
     def test_worker_stat(self):
 
@@ -149,10 +150,14 @@ class TestWorkerDayStat(APITestCase):
         fnawd2=self.create_worker_day(is_approved=False, is_fact=True, dt=dt2, parent_worker_day=pawd2)
 
 
-        vnawd3=self.create_vacancy(dt=dt3)
-        vna1wd3=self.create_vacancy(dt=dt3)
+        #Две подтвержденные вакансии. Одна na - заменяет предыдущую, вторая - новая
         vawd3=self.create_vacancy(is_approved=True, dt=dt3)
         va2wd3=self.create_vacancy(is_approved=True, dt=dt3)
+        vnawd3=self.create_vacancy(dt=dt3,parent_worker_day=vawd3)
+        vna1wd3=self.create_vacancy(dt=dt3)
+
+        # print(vnawd3.__dict__)
+        # print(vna1wd3.__dict__)
 
         pnawd3=self.create_worker_day(
             user=self.user3,
@@ -237,8 +242,53 @@ class TestWorkerDayStat(APITestCase):
                     'approved': {},
                     'not_approved': {'shop': {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}}}}
         }
+        shop_empty = {'fot': 0.0, 'paid_hours': 0, 'shifts': 0}
+        approved_empty = {
+            'shop': shop_empty.copy(),
+            'vacancies': shop_empty.copy(),
+            'outsource': shop_empty.copy(),
+        }
 
-        self.assertEqual(response.json(), stat)
+        plan_empty = {
+            'approved': deepcopy(approved_empty),
+            'not_approved': deepcopy(approved_empty),
+            'combined': deepcopy(approved_empty),
+        }
+        dt_empty = {
+            "plan": deepcopy(plan_empty),
+            "fact": deepcopy(plan_empty),
+        }
+
+        dt1_json = deepcopy(dt_empty)
+        dt1_json['plan']['approved']['shop'] = {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}
+        dt1_json['fact']['approved']['shop'] = {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}
+        dt1_json['fact']['not_approved']['shop'] = {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}
+        dt1_json['fact']['combined']['shop'] = {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}
+        dt1_json['operation_types']= {str(ot1.id): 13.0}
+        dt1_json['work_types']= {str(ot2.work_type.id): 13.0}
+
+
+        dt2_json = deepcopy(dt_empty)
+        dt2_json['plan']['not_approved']['shop'] = {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}
+        dt2_json['plan']['combined']['shop'] = {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}
+
+        dt3_json = deepcopy(dt_empty)
+        dt3_json['plan']['approved']['vacancies'] = {'shifts': 2, 'paid_hours': 24, 'fot':0.0}
+        dt3_json['plan']['not_approved']['outsource'] = {'shifts': 1, 'paid_hours': 12, 'fot': 1800.0}
+        dt3_json['plan']['not_approved']['vacancies'] = {'shifts': 2, 'paid_hours': 24, 'fot':0.0}
+        dt3_json['plan']['combined']['outsource'] = {'shifts': 1, 'paid_hours': 12, 'fot': 1800.0}
+        dt3_json['plan']['combined']['vacancies'] = {'shifts': 3, 'paid_hours': 36, 'fot':0.0}
+
+        dt4_json = deepcopy(dt_empty)
+        dt4_json['plan']['approved']['shop'] = {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}
+        dt4_json['fact']['not_approved']['shop'] = {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}
+        dt4_json['plan']['combined']['shop'] = {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}
+        dt4_json['fact']['combined']['shop'] = {'shifts': 1, 'paid_hours': 12, 'fot': 1200.0}
+
+        self.assertEqual(response.json()[dt1_str], dt1_json)
+        self.assertEqual(response.json()[dt2_str], dt2_json)
+        self.assertEqual(response.json()[dt3_str], dt3_json)
+        self.assertEqual(response.json()[dt4_str], dt4_json)
 
 
 class TestUploadDownload(APITestCase):

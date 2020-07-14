@@ -17,13 +17,14 @@ class ShopSerializer(serializers.ModelSerializer):
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
     exchange_settings_id = serializers.IntegerField(required=False)
     load_template_id = serializers.IntegerField(required=False)
+    settings_id = serializers.IntegerField(required=False)
 
     timezone = TimeZoneField()
     class Meta:
         model = Shop
-        fields = ['id', 'parent_id', 'name', 'tm_shop_opens', 'tm_shop_closes', 'code',
-                  'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id',
-                  'network_id', 'exchange_settings_id', 'load_template_id']
+        fields = ['id', 'parent_id', 'name', 'settings_id', 'tm_shop_opens', 'tm_shop_closes', 
+                'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id', 
+                'network_id', 'restricted_start_times','restricted_end_times', 'exchange_settings_id', 'load_template_id']
 
 
 class ShopStatSerializer(serializers.Serializer):
