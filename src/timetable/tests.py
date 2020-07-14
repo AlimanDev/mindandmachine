@@ -8,7 +8,7 @@ from rest_framework.test import APITestCase
 from src.util.test import create_departments_and_users
 
 from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName, WorkerDayCashboxDetails, ShopMonthStat
-from src.base.models import FunctionGroup
+from src.base.models import FunctionGroup, Network
 from src.util.models_converter import Converter
 
 class TestWorkerDay(APITestCase):
@@ -116,6 +116,8 @@ class TestWorkerDay(APITestCase):
             'dttm_work_end': Converter.convert_datetime(datetime.combine(self.dt, time(20, 0, 0))),
             'work_hours': '12:00:00',
             'worker_day_details': [],
+            'is_outsource': False,
+            'is_vacancy': False,
         }
 
         self.assertEqual(response.json(), data)
@@ -624,6 +626,12 @@ class TestVacancy(APITestCase):
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
         )
+        self.network = Network.objects.create(
+            primary_color='#BDF82',
+            secondary_color='#390AC',
+        )
+        self.shop.network = self.network
+        self.shop.save()
         self.work_type1 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
         self.worker_day = WorkerDay.objects.create(
             shop=self.shop,
@@ -657,19 +665,19 @@ class TestVacancy(APITestCase):
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):
-        response = self.client.get(f'{self.url}?shop_id={self.shop.id}')
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&limit=100')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 2)
+        self.assertEqual(len(response.json()['results']), 2)
 
     def test_get_list_shift_length(self):
-        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&shift_length_min=8:00:00&shift_length_max=9:00:00')
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&shift_length_min=8:00:00&shift_length_max=9:00:00&limit=100')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()['results']), 1)
 
     def test_get_vacant_list(self):
-        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&is_vacant=true')
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&is_vacant=true&limit=100')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()['results']), 1)
 
     def test_confirm_vacancy(self):
         WorkerDay.objects.create(

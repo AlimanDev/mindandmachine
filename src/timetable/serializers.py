@@ -68,7 +68,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkerDay
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
-                  'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id']
+                  'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id',
+                  'is_outsource', 'is_vacancy']
         read_only_fields =['is_approved', 'work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
 
@@ -278,14 +279,15 @@ class WorkerConstraintListSerializer(serializers.Serializer):
 class VacancySerializer(serializers.ModelSerializer):
     first_name = serializers.CharField()
     last_name = serializers.CharField()
-    worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
+    worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True, required=False)
     shop = ShopSerializer()
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
+    avatar = serializers.ImageField(required=False)
 
     class Meta:
         model = WorkerDay
-        fields = ['id', 'first_name', 'last_name', 'worker_id', 'worker_day_details', 'shop', 'is_fact', 'is_approved', 'dttm_work_start', 'dttm_work_end', 'type']
+        fields = ['id', 'first_name', 'last_name', 'worker_id', 'worker_day_details', 'shop', 'is_fact', 'is_approved', 'dttm_work_start', 'dttm_work_end', 'type', 'is_outsource', 'avatar']
 
         
 class AutoSettingsSerializer(serializers.Serializer):

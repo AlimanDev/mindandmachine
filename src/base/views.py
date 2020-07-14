@@ -62,10 +62,12 @@ class EmploymentViewSet(ModelViewSet):
             shop__network_id=self.request.user.network_id
         )
 
-    def list(self, request):
-        return Response(
-            EmploymentListSerializer(self.filter_queryset(self.get_queryset().select_related('user').prefetch_related('work_types', 'worker_constraints')), many=True).data
-        )
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return EmploymentListSerializer
+        else:
+            return EmploymentSerializer
 
 
 class UserViewSet(ModelViewSet):
@@ -101,11 +103,12 @@ class UserViewSet(ModelViewSet):
             return Response(serializer.errors,
                             status=HTTP_400_BAD_REQUEST)
 
-    
-    def list(self, request):
-        return Response(
-            UserListSerializer(self.filter_queryset(self.get_queryset()), many=True).data
-        )
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return UserListSerializer
+        else:
+            return UserSerializer
 
 
 class AuthUserView(UserDetailsView):

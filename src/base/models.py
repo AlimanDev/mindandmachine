@@ -18,6 +18,8 @@ class Network(AbstractActiveNamedModel):
     url = models.CharField(blank=True,null=True,max_length=255)
     primary_color = models.CharField(max_length=7, blank=True)
     secondary_color = models.CharField(max_length=7, blank=True)
+    # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
+    need_symbol_for_vacancy = models.BooleanField(default=False)
 
     def get_department(self):
         return None
@@ -288,6 +290,7 @@ class User(DjangoAbstractUser, AbstractModel):
     tabel_code = models.CharField(blank=True, max_length=15, null=True, unique=True)
     lang = models.CharField(max_length=2, default='ru')
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
+    black_list_symbol = models.CharField(max_length=128, null=True, blank=True)
 
 
 class WorkerPosition(AbstractActiveNamedModel):
@@ -414,6 +417,7 @@ class FunctionGroup(AbstractModel):
         'ShopMonthStat',
         'ShopMonthStat_status',
         'ShopSettings',
+        'VacancyBlackList',
 
         'signout',
         'password_edit',
