@@ -283,10 +283,11 @@ class VacancySerializer(serializers.ModelSerializer):
     shop = ShopSerializer()
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
+    avatar = serializers.ImageField(required=False)
 
     class Meta:
         model = WorkerDay
-        fields = ['id', 'first_name', 'last_name', 'worker_id', 'worker_day_details', 'shop', 'is_fact', 'is_approved', 'dttm_work_start', 'dttm_work_end', 'type', 'is_outsource']
+        fields = ['id', 'first_name', 'last_name', 'worker_id', 'worker_day_details', 'shop', 'is_fact', 'is_approved', 'dttm_work_start', 'dttm_work_end', 'type', 'is_outsource', 'avatar']
 
         
 class AutoSettingsSerializer(serializers.Serializer):

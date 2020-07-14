@@ -193,6 +193,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             self.get_queryset().select_related('shop').prefetch_related('worker_day_details').annotate(
                 first_name=F('worker__first_name'),
                 last_name=F('worker__last_name'),
+                avatar=F('worker__avatar'),
             ),
         )
         data = paginator.paginate_queryset(queryset, request)
