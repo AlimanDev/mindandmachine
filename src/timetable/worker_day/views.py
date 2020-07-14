@@ -12,6 +12,7 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 
 from src.base.permissions import FilteredListPermission
 from src.base.exceptions import FieldError
@@ -102,14 +103,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         )
 
 
-    def retrieve(self, request, pk=None):
-        return Response(
-            WorkerDayListSerializer(
-                WorkerDay.objects.get(id=pk)
-            ).data
-        )
-
-
     @action(detail=False, methods=['post'])
     def approve(self, request):
         kwargs = {'context': self.get_serializer_context()}
@@ -194,18 +187,19 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         filterset_class = self.filter_backends[0]().get_filterset(request, self.get_queryset(), self)
         if not filterset_class.form.is_valid():
             raise utils.translate_validation(filterset_class.errors)
-            
-        return Response(
-            VacancySerializer(
-                filterset_class.filter_queryset(
-                    self.get_queryset().select_related('shop').annotate(
-                        first_name=F('worker__first_name'),
-                        last_name=F('worker__last_name'),
-                    ),
-                ), 
-                many=True,
-            ).data
-        ) 
+        
+        paginator = LimitOffsetPagination()
+        queryset = filterset_class.filter_queryset(
+            self.get_queryset().select_related('shop').prefetch_related('worker_day_details').annotate(
+                first_name=F('worker__first_name'),
+                last_name=F('worker__last_name'),
+            ),
+        )
+        data = paginator.paginate_queryset(queryset, request)
+        data = VacancySerializer(data, many=True)
+
+
+        return paginator.get_paginated_response(data.data)
 
 
     @action(detail=True, methods=['post'])

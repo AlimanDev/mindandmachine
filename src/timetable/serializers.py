@@ -278,7 +278,7 @@ class WorkerConstraintListSerializer(serializers.Serializer):
 class VacancySerializer(serializers.ModelSerializer):
     first_name = serializers.CharField()
     last_name = serializers.CharField()
-    worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
+    worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True, required=False)
     shop = ShopSerializer()
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
