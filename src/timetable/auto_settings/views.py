@@ -414,6 +414,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             worker_id__in=user_ids,
             dt__gte=dt_from,
             dt__lt=dt_to,
+            approved=form['approved'],
         ).order_by(
             'dt', 'worker_id'
         ).values(
@@ -434,6 +435,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             worker_id__in=user_ids,
             dt__gte=dt_from - timedelta(days=7),
             dt__lt=dt_from,
+            approved=form['approved'],
         ).order_by(
             'dt'
         ).values(
