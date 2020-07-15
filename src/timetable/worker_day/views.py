@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from django.utils.translation import gettext_lazy as _
 
 from django.conf import settings
-from django.db.models import OuterRef, Subquery, Q, F
+from django.db.models import OuterRef, Subquery, Q, F, IntegerField
 from django.utils import timezone
 from django_filters import utils
 
@@ -194,7 +194,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 first_name=F('worker__first_name'),
                 last_name=F('worker__last_name'),
                 avatar=F('worker__avatar'),
-                worker_shop=F('employment__shop_id'),
+                worker_shop=Subquery(Employment.objects.get_active(OuterRef('worker__network_id'),user_id=OuterRef('worker_id')).values('shop_id')[:1]),
             ),
         )
         data = paginator.paginate_queryset(queryset, request)
