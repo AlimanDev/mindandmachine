@@ -31,7 +31,7 @@ class UserListSerializer(serializers.Serializer):
     middle_name = serializers.CharField()
     birthday = serializers.DateField()
     sex = serializers.CharField()
-    avatar = serializers.ImageField()
+    avatar = serializers.CharField()
     email = serializers.CharField()
     phone_number = serializers.CharField()
     tabel_code = serializers.CharField()
