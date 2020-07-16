@@ -1,5 +1,6 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from django.conf import settings
 import jwt
 import time
@@ -12,9 +13,17 @@ METABASE_SECRET_KEY = settings.METABASE_SECRET_KEY
 def metabase_url(request):
     # You'll need to install PyJWT via pip 'pip install PyJWT' or your project packages file
 
+    dashboard = request.query_params.get('dashboard','worker_day')
+    dashboard_dict = {
+        'worker_day': 3,
+        'indicator': 4
+    }
+    id = dashboard_dict.get(dashboard,None)
+    if not id:
+        raise ValidationError(f"dashboard {dashboard} does not exist")
 
     payload = {
-        "resource": {"dashboard": 3},
+        "resource": {"dashboard": id},
         "params": {
 
         },
