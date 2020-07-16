@@ -283,7 +283,7 @@ class VacancySerializer(serializers.ModelSerializer):
     shop = ShopSerializer()
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
-    avatar = serializers.ImageField(required=False)
+    avatar = serializers.CharField(required=False)
     worker_shop = serializers.IntegerField(required=False, default=None)
 
     class Meta:
