@@ -230,6 +230,41 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         return Response(WorkerDaySerializer(vacancy).data)
 
 
+    @action(detail=True, methods=['get'])
+    def editable_vacancy(self, request, pk=None):
+        vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True).first()
+        if vacancy == None:
+            raise MessageError(code='no_vacancy', lang=request.user.lang)
+        if not vacancy.is_approved:
+            return Response(WorkerDaySerializer(vacancy).data)
+        if vacancy.worker_id:
+            raise MessageError(code='cant_edit_vacancy', lang=request.user.lang)
+        editable_vacancy = WorkerDay.objects.filter(parent_worker_day=vacancy).first()
+        if editable_vacancy == None:
+            editable_vacancy = WorkerDay.objects.create(
+                shop_id=vacancy.shop_id,
+                dt=vacancy.dt,
+                dttm_work_start=vacancy.dttm_work_start,
+                dttm_work_end=vacancy.dttm_work_end,
+                type=vacancy.type,
+                is_approved=False,
+                created_by_id=vacancy.created_by.id,
+                comment=vacancy.comment,
+                parent_worker_day=vacancy,
+                is_vacancy=True,
+                is_outsource=vacancy.is_outsource,
+            )
+            WorkerDayCashboxDetails.objects.bulk_create([
+                WorkerDayCashboxDetails(
+                    worker_day=editable_vacancy,
+                    work_part=d.work_part,
+                    work_type_id=d.work_type_id,
+                )
+                for d in WorkerDayCashboxDetails.objects.filter(worker_day=vacancy)
+            ])
+        return Response(WorkerDaySerializer(editable_vacancy).data)
+
+
     @action(detail=False, methods=['post'])
     def change_list(self, request):
         data = ListChangeSrializer(data=request.data, context={'request': request})

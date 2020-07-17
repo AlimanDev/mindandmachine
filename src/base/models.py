@@ -414,6 +414,8 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_upload',
         'WorkerDay_download_timetable',
         'WorkerDay_download_tabel',
+        'WorkerDay_editable_vacancy',
+        'WorkerDay_approve_vacancy',
         'ShopMonthStat',
         'ShopMonthStat_status',
         'ShopSettings',
