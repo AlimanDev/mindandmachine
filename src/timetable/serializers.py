@@ -293,7 +293,7 @@ class VacancySerializer(serializers.Serializer):
     worker_shop = serializers.IntegerField(required=False, default=None)
 
     def get_avatar_url(self, obj):
-        if obj.worker.avatar:
+        if obj.worker_id and obj.worker.avatar:
             return obj.worker.avatar.url
         return None
 

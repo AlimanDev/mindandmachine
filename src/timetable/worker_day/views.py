@@ -43,6 +43,7 @@ from src.main.timetable.auto_settings.utils import set_timetable_date_from
 
 from src.base.models import Employment, Shop, User
 from src.base.message import Message
+from src.base.exceptions import MessageError
 
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
@@ -214,7 +215,21 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response({'result':result}, status=status_code)
 
-        
+    
+    @action(detail=True, methods=['post'])
+    def approve_vacancy(self, request, pk=None):
+        vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True, is_approved=False).first()
+        if vacancy == None:
+            raise MessageError(code='no_vacancy_or_approved', lang=request.user.lang)
+        vacancy.approved = True
+        parent = vacancy.parent_worker_day
+        vacancy.parent_worker_day = None
+        vacancy.save()
+        if parent:
+            parent.delete()
+        return Response()
+
+
     @action(detail=False, methods=['post'])
     def change_list(self, request):
         data = ListChangeSrializer(data=request.data, context={'request': request})
