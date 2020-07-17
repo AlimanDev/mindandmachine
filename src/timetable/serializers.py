@@ -283,7 +283,7 @@ class VacancySerializer(serializers.ModelSerializer):
     shop = ShopSerializer()
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
-    avatar = serializers.CharField(required=False)
+    avatar = serializers.SerializerMethodField('get_avatar_url')
     worker_shop = serializers.IntegerField(required=False, default=None)
 
     class Meta:
@@ -291,6 +291,11 @@ class VacancySerializer(serializers.ModelSerializer):
         fields = ['id', 'first_name', 'last_name', 'worker_id', 'worker_day_details',
          'shop', 'is_fact', 'is_approved', 'dttm_work_start', 'dttm_work_end', 'type',
           'is_outsource', 'avatar', 'worker_shop',]
+
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            return obj.avatar.url
+        return None
 
         
 class AutoSettingsSerializer(serializers.Serializer):

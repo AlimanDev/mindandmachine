@@ -31,13 +31,17 @@ class UserListSerializer(serializers.Serializer):
     middle_name = serializers.CharField()
     birthday = serializers.DateField()
     sex = serializers.CharField()
-    avatar = serializers.CharField()
+    avatar = serializers.SerializerMethodField('get_avatar_url')
     email = serializers.CharField()
     phone_number = serializers.CharField()
     tabel_code = serializers.CharField()
     username = serializers.CharField()
     network_id = serializers.IntegerField()
 
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            return obj.avatar.url
+        return None
 
 class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
