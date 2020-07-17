@@ -227,7 +227,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         vacancy.save()
         if parent:
             parent.delete()
-        return Response()
+        return Response(WorkerDaySerializer(vacancy).data)
 
 
     @action(detail=False, methods=['post'])
