@@ -276,25 +276,25 @@ class WorkerConstraintListSerializer(serializers.Serializer):
     tm = serializers.TimeField()
 
 
-class VacancySerializer(serializers.ModelSerializer):
+class VacancySerializer(serializers.Serializer):
+    id = serializers.IntegerField()
     first_name = serializers.CharField()
     last_name = serializers.CharField()
+    worker_id = serializers.IntegerField()
     worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True, required=False)
     shop = ShopSerializer()
+    is_fact = serializers.BooleanField()
+    is_approved = serializers.BooleanField()
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
+    type = serializers.CharField()
+    is_outsource = serializers.BooleanField()
     avatar = serializers.SerializerMethodField('get_avatar_url')
     worker_shop = serializers.IntegerField(required=False, default=None)
 
-    class Meta:
-        model = WorkerDay
-        fields = ['id', 'first_name', 'last_name', 'worker_id', 'worker_day_details',
-         'shop', 'is_fact', 'is_approved', 'dttm_work_start', 'dttm_work_end', 'type',
-          'is_outsource', 'avatar', 'worker_shop',]
-
     def get_avatar_url(self, obj):
-        if obj.avatar:
-            return obj.avatar.url
+        if obj.worker.avatar:
+            return obj.worker.avatar.url
         return None
 
         
