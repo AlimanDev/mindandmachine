@@ -410,11 +410,14 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 array.append(wd_mod)
 
         new_worker_days = []
+        new_worker_days_filter = {}
+        if form['use_not_approved']:
+            new_worker_days_filter['is_approved'] = False
         worker_days_db = WorkerDay.objects.get_last_plan(
             worker_id__in=user_ids,
             dt__gte=dt_from,
             dt__lt=dt_to,
-            approved=form['approved'],
+            **new_worker_days_filter,
         ).order_by(
             'dt', 'worker_id'
         ).values(
@@ -435,7 +438,6 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             worker_id__in=user_ids,
             dt__gte=dt_from - timedelta(days=7),
             dt__lt=dt_from,
-            approved=form['approved'],
         ).order_by(
             'dt'
         ).values(
