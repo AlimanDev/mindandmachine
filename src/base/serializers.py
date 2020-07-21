@@ -82,7 +82,9 @@ class EmploymentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     position_id = serializers.IntegerField()
     shop_id = serializers.IntegerField(required=False)
+    shop_code = serializers.CharField(required=False)
     user_id = serializers.IntegerField(required=False)
+    user_code = serializers.CharField(required=False)
     work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
 

@@ -164,6 +164,17 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     def get_department(self):
         return self
 
+    def __init__(self, *args, **kwargs):
+        code = kwargs.pop('parent_code', None)
+        super().__init__(*args, **kwargs)
+        if code:
+            self.parent = Shop.objects.get(code=code)
+
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'parent_code'):
+            self.parent = Shop.objects.get(code=self.parent_code)
+        super().save(*args, **kwargs)
+
 
 class EmploymentManager(models.Manager):
     def get_active(self, network_id, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):
@@ -355,6 +366,22 @@ class Employment(AbstractActiveModel):
 
     def get_department(self):
         return self.shop
+
+    def __init__(self, *args, **kwargs):
+        shop_code = kwargs.pop('shop_code', None)
+        user_code = kwargs.pop('user_code', None)
+        super().__init__(*args, **kwargs)
+        if shop_code:
+            self.shop = Shop.objects.get(code=shop_code)
+        if user_code:
+            self.user = User.objects.get(username=shop_code)
+
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'shop_code'):
+            self.shop = Shop.objects.get(code=self.shop_code)
+        if hasattr(self, 'user_code'):
+            self.user = User.objects.get(username=self.user_code)
+        super().save(*args, **kwargs)
 
 
 class FunctionGroup(AbstractModel):

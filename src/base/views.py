@@ -44,6 +44,16 @@ class EmploymentViewSet(ModelViewSet):
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
 
+    def get_object(self):
+        if self.request.method == 'GET':
+            by_code = self.request.query_params.get('by_code', False)
+        else:
+            by_code = self.request.data.get('by_code', False)
+        if by_code:
+            self.lookup_field = 'tabel_code'
+            self.kwargs['tabel_code'] = self.kwargs['pk']
+        return super().get_object()
+
     def get_queryset(self):
         return Employment.objects.filter(
             shop__network_id=self.request.user.network_id
@@ -56,6 +66,16 @@ class UserViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = UserSerializer
     filterset_class = UserFilter
+
+    def get_object(self):
+        if self.request.method == 'GET':
+            by_code = self.request.query_params.get('by_code', False)
+        else:
+            by_code = self.request.data.get('by_code', False)
+        if by_code:
+            self.lookup_field = 'username'
+            self.kwargs['username'] = self.kwargs['pk']
+        return super().get_object()
 
     def get_queryset(self):
         user = self.request.user
