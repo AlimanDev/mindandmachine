@@ -165,31 +165,48 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         dt_to = Converter.parse_date(data['dt_to'])
         type = data.get('type', PeriodClients.LONG_FORECASE_TYPE)
 
+        operation_types = list(OperationType.objects.filter(Q(shop_id=shop.id) | Q(work_type__shop_id=shop.id)))
+        operation_codes = {
+            ot.code: ot
+            for ot in operation_types
+        }
+        operation_ids = {
+            ot.id: ot
+            for ot in operation_types
+        }
+
         PeriodClients.objects.select_related('operation_type__work_type').filter(
+            Q(operation_type__shop_id=shop.id) | Q(operation_type__work_type__shop_id=shop.id),
             type=type,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lte=dt_to,
-            operation_type__shop_id=shop.id,
             operation_type__do_forecast=OperationType.FORECAST,
         ).delete()
         
-        for period_demand_value in data['demand']:
+        for period_demand_value in data['serie']:
             clients = period_demand_value['value']
             clients = 0 if clients < 0 else clients
+            operation_type = None
+            if period_demand_value.get('timeserie_code', False):
+                operation_type = operation_codes.get(period_demand_value.get('timeserie_code'))
+            elif period_demand_value.get('timeserie_id', False):
+                operation_type = operation_ids.get(period_demand_value.get('timeserie_id'))
+            else:
+                operation_type = operation_ids.get(period_demand_value.get('work_type')) # для поддержки алгоритмов
             models_list.append(
                 PeriodClients(
                     type=type,
                     dttm_forecast=Converter.parse_datetime(period_demand_value['dttm']),
-                    operation_type_id=period_demand_value['work_type'],
+                    operation_type=operation_type,
                     value=clients,
                 )
             )
         PeriodClients.objects.bulk_create(models_list)
-        employments = Employment.objects.filter(
-            function_group__allowed_functions__func='set_demand',
-            function_group__allowed_functions__access_type__in=[FunctionGroup.TYPE_SHOP, FunctionGroup.TYPE_SUPERSHOP],
-            shop=shop,
-        ).values_list('user_id', flat=True)
+        # employments = Employment.objects.filter(
+        #     function_group__allowed_functions__func='set_demand',
+        #     function_group__allowed_functions__access_type__in=[FunctionGroup.TYPE_SHOP, FunctionGroup.TYPE_SUPERSHOP],
+        #     shop=shop,
+        # ).values_list('user_id', flat=True)
 
         # notify4users = User.objects.filter(
         #     id__in=employments
