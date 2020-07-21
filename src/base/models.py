@@ -384,13 +384,15 @@ class Employment(AbstractActiveModel):
         if shop_code:
             self.shop = Shop.objects.get(code=shop_code)
         if user_code:
-            self.user = User.objects.get(username=shop_code)
+            self.user = User.objects.get(username=user_code)
+            self.tabel_code = user_code
 
     def save(self, *args, **kwargs):
         if hasattr(self, 'shop_code'):
             self.shop = Shop.objects.get(code=self.shop_code)
         if hasattr(self, 'user_code'):
             self.user = User.objects.get(username=self.user_code)
+            self.tabel_code = self.user_code
         super().save(*args, **kwargs)
 
 
