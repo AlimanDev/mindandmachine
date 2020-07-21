@@ -7,6 +7,7 @@ from src.timetable.work_type_name.views import WorkTypeNameViewSet
 from src.timetable.work_type.views import WorkTypeViewSet
 from src.timetable.shop_month_stat.views import ShopMonthStatViewSet
 from src.timetable.auto_settings.views import AutoSettingsViewSet
+from src.timetable.exchange_settings.views import ExchangeSettingsViewSet
 from src.timetable.vacancy_black_list.views import VacancyBlackListViewSet
 
 
@@ -18,6 +19,8 @@ router.register(r'employment_work_type', EmploymentWorkTypeViewSet, basename='Em
 router.register(r'worker_constraint', WorkerConstraintViewSet, basename='WorkerConstraint')
 router.register(r'shop_month_stat', ShopMonthStatViewSet, basename='ShopMonthStat')
 router.register(r'auto_settings', AutoSettingsViewSet, basename='AutoSettings')
+router.register(r'exchange_settings', ExchangeSettingsViewSet, basename='ExchangeSettings')
+
 router.register(r'vacancy_black_list', VacancyBlackListViewSet, basename='VacancyBlackList')
 
 urlpatterns = [

@@ -202,11 +202,20 @@ def vacancies_create_and_cancel():
     Создание вакансий для всех магазинов
     """
 
-    exchange_settings = ExchangeSettings.objects.first()
-    if not exchange_settings.automatic_check_lack:
-        return
+    exchange_settings_network = {
+        e.network_id: e
+        for e in ExchangeSettings.objects.filter(shops__isnull=True)
+    }
 
-    for shop in Shop.objects.all():
+    # exchange_settings = ExchangeSettings.objects.first()
+    # if not exchange_settings.automatic_check_lack:
+    #     return
+
+    for shop in Shop.objects.select_related('exchange_settings').all():
+        exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
+        if exchange_settings == None or not exchange_settings.automatic_check_lack:
+            continue
+
         for work_type in shop.worktype_set.all():
             cancel_shop_vacancies.apply_async((shop.id, work_type.id))
             create_shop_vacancies_and_notify.apply_async((shop.id, work_type.id))

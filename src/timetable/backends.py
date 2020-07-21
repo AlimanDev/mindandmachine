@@ -1,12 +1,9 @@
 import datetime
 
 from django_filters import utils
-
-from src.base.models import Employment, Shop
-
 from django_filters.rest_framework import DjangoFilterBackend
 
-from src.timetable.filters import WorkerDayFilter, WorkerDayMonthStatFilter, VacancyFilter
+from src.base.models import Employment, Shop
 
 
 class MultiShopsFilterBackend(DjangoFilterBackend):
@@ -60,11 +57,3 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
                 worker_id__in=ids,
                 # employment__in=all_employments_for_users\
             ).order_by('worker_id','dt','dttm_work_start')
-
-    def get_filterset_class(self, view, queryset=None):
-        if view.action == 'month_stat':
-            return WorkerDayMonthStatFilter
-        elif view.action == 'vacancy':
-            return VacancyFilter
-        else:
-            return WorkerDayFilter
