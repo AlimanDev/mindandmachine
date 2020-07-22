@@ -221,7 +221,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True, is_approved=False).first()
         if vacancy == None:
             raise MessageError(code='no_vacancy_or_approved', lang=request.user.lang)
-        vacancy.approved = True
+        vacancy.is_approved = True
         parent = vacancy.parent_worker_day
         vacancy.parent_worker_day = None
         vacancy.save()
@@ -248,7 +248,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 dttm_work_end=vacancy.dttm_work_end,
                 type=vacancy.type,
                 is_approved=False,
-                created_by_id=vacancy.created_by.id,
+                created_by=vacancy.created_by,
                 comment=vacancy.comment,
                 parent_worker_day=vacancy,
                 is_vacancy=True,
