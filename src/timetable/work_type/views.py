@@ -1,6 +1,6 @@
 from rest_framework import serializers, viewsets
 from django_filters.rest_framework import FilterSet
-from src.base.permissions import FilteredListPermission
+from src.base.permissions import Permission
 from src.timetable.models import WorkType,WorkTypeName
 from src.timetable.work_type_name.views import WorkTypeNameSerializer
 from rest_framework.decorators import action
@@ -157,7 +157,7 @@ class WorkTypeViewSet(viewsets.ModelViewSet):
         code 204
 
     """
-    permission_classes = [FilteredListPermission]
+    permission_classes = [Permission]
     serializer_class = WorkTypeSerializer
     filterset_class = WorkTypeFilter
 
