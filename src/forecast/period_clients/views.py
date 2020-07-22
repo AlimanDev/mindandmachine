@@ -160,14 +160,19 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         data.is_valid(raise_exception=True)
         data = data.validated_data['data']
 
-        shop = Shop.objects.get(id=data['shop_id'])
+        shop_id = data.get('shop_id')
+        if not shop_id:
+            shop = Shop.objects.get(code=data.get('shop_code'))
+        else:
+            shop = Shop.objects.get(id=shop_id)
+            
         dt_from = Converter.parse_date(data['dt_from'])
         dt_to = Converter.parse_date(data['dt_to'])
         type = data.get('type', PeriodClients.LONG_FORECASE_TYPE)
 
-        operation_types = list(OperationType.objects.filter(Q(shop_id=shop.id) | Q(work_type__shop_id=shop.id)))
+        operation_types = list(OperationType.objects.select_related('operation_type_name').filter(Q(shop_id=shop.id) | Q(work_type__shop_id=shop.id)))
         operation_codes = {
-            ot.code: ot
+            ot.operation_type_name.code: ot
             for ot in operation_types
         }
         operation_ids = {
@@ -175,7 +180,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
             for ot in operation_types
         }
 
-        PeriodClients.objects.select_related('operation_type__work_type').filter(
+        PeriodClients.objects.filter(
             Q(operation_type__shop_id=shop.id) | Q(operation_type__work_type__shop_id=shop.id),
             type=type,
             dttm_forecast__date__gte=dt_from,
@@ -196,7 +201,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
             models_list.append(
                 PeriodClients(
                     type=type,
-                    dttm_forecast=Converter.parse_datetime(period_demand_value['dttm']),
+                    dttm_forecast=Converter.parse_datetime(period_demand_value.get('dttm')),
                     operation_type=operation_type,
                     value=clients,
                 )

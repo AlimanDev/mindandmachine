@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.db.models import Q
 
-from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
+from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop
 from src.base.message import Message
 from src.base.fields import CurrentUserNetwork
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
@@ -104,8 +104,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
             user_id = self.instance.user_id
             shop_id = self.instance.shop_id
         else:
-            user_id = attrs['user_id']
-            shop_id = attrs['shop_id']
+            user_id = attrs.get('user_id') or User.objects.get(username=attrs.get('user_code')).id
+            shop_id = attrs.get('shop_id') or Shop.objects.get(code=attrs.get('shop_code')).id
         employments = Employment.objects.filter(
             Q(dt_fired__isnull=True)|Q(dt_fired__gte=attrs['dt_hired']),
             user_id=user_id,
@@ -140,7 +140,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
         else:
             # shop_id is required for create
             for field in self.Meta.create_only_fields:
-                if field not in data:
+                if field not in data and field.replace('_id', '_code') not in data:
                     raise ValidationError({field: self.error_messages['required']})
         return data
 
