@@ -4,7 +4,7 @@ from django.db.models.functions import Coalesce
 from rest_auth.views import UserDetailsView
 
 from rest_framework import mixins
-from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet, GenericViewSet
+from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
@@ -123,9 +123,19 @@ class FunctionGroupView(ListAPIView):
         return FunctionGroup.objects.filter(group__in=groups).distinct('func')
 
 
-class WorkerPositionViewSet(ReadOnlyModelViewSet):
-    permission_classes = [IsAuthenticated]
+class WorkerPositionViewSet(ModelViewSet):
+    permission_classes = [Permission]
     serializer_class = WorkerPositionSerializer
+
+    def get_object(self):
+        if self.request.method == 'GET':
+            by_code = self.request.query_params.get('by_code', False)
+        else:
+            by_code = self.request.data.get('by_code', False)
+        if by_code:
+            self.lookup_field = 'code'
+            self.kwargs['code'] = self.kwargs['pk']
+        return super().get_object()
 
     def get_queryset(self):
         return WorkerPosition.objects.filter(
