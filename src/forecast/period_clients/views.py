@@ -120,6 +120,22 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
     POST /rest_api/period_clietns/
     :params
         data: JSON, required=True,
+        {
+            "data": {
+                "shop_id": 2, //or "shop_code": "SHOP2"
+                "dt_from": "2020-07-01",
+                "dt_to": "2020-07-30",
+                "type": "L", //(L, F)
+                "serie": [
+                    {
+                        "dttm": "2020-07-01T10:00:00",
+                        "value": 2,
+                        "timeserie_code": "bills" //or "timeserie_id": 2 or "work_type": 2
+                    },
+                    ...
+                ]
+            }
+        }
     :return 
         code=201
 
