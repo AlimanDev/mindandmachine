@@ -1,4 +1,4 @@
-from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter, DateFilter, TimeFilter
+from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter, DateFilter, TimeFiltera, CharFilter
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 from django.db.models import Q
 
@@ -49,8 +49,8 @@ class VacancyFilter(FilterSet):
     is_vacant = BooleanFilter(field_name='worker', lookup_expr='isnull')
     shift_length_min = TimeFilter(field_name='work_hours', lookup_expr='gte')
     shift_length_max = TimeFilter(field_name='work_hours', lookup_expr='lte')
-    shop = NumberFilter(field_name='shop_id', method='filter_include_outsource')
-    work_type_name = NumberFilter(field_name='work_types', method='filter_by_name')
+    shop = CharFilter(field_name='shop_id', method='filter_include_outsource')
+    work_type_name = CharFilter(field_name='work_types', method='filter_by_name')
 
     def filter_include_outsource(self, queryset, name, value):
         shops = value.split(',')
