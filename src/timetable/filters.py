@@ -50,6 +50,7 @@ class VacancyFilter(FilterSet):
     shift_length_min = TimeFilter(field_name='work_hours', lookup_expr='gte')
     shift_length_max = TimeFilter(field_name='work_hours', lookup_expr='lte')
     shop = NumberFilter(field_name='shop_id', method='filter_include_outsource')
+    work_type_name = NumberFilter(field_name='work_types', method='filter_by_name')
 
     def filter_include_outsource(self, queryset, name, value):
         shops = value.split(',')
@@ -57,6 +58,12 @@ class VacancyFilter(FilterSet):
             return queryset.filter(shop_id__in=shops)
         return queryset.filter(
             Q(shop_id__in=shops) | Q(is_outsource=True),
+        )
+
+    def filter_by_name(self, queryset, name, value):
+        names = value.split(',')
+        return queryset.filter(
+            work_types__work_type_name_id__in=names,
         )
 
     class Meta:
