@@ -56,8 +56,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     }
 
     worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
-    worker_id = serializers.IntegerField(required=False)
-    employment_id = serializers.IntegerField(required=False)
+    worker_id = serializers.IntegerField(required=False, allow_null=True)
+    employment_id = serializers.IntegerField(required=False, allow_null=True)
     shop_id = serializers.IntegerField()
     parent_worker_day_id = serializers.IntegerField(required=False, read_only=True)
     is_fact = serializers.BooleanField(required=False)
