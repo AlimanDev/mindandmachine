@@ -6,7 +6,7 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from mptt.models import MPTTModel, TreeForeignKey
-
+from django.apps import apps
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
 
 
@@ -126,6 +126,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     restricted_end_times = models.CharField(max_length=1024, default='[]')
 
     load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops')
+    exchange_settings = models.ForeignKey('timetable.ExchangeSettings', on_delete=models.SET_NULL, null=True, related_name='shops')
 
     staff_number = models.SmallIntegerField(default=0)
 
@@ -163,6 +164,16 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         return self.get_ancestors().filter(level=level)[0]
     def get_department(self):
         return self
+
+    def get_exchange_settings(self):
+        return self.exchange_settings if self.exchange_settings_id\
+            else apps.get_model(
+                'timetable', 
+                'ExchangeSettings',
+            ).objects.filter(
+                network_id=self.network_id, 
+                shops__isnull=True,
+            ).first()
 
 
 class EmploymentManager(models.Manager):
@@ -417,6 +428,7 @@ class FunctionGroup(AbstractModel):
         'ShopMonthStat',
         'ShopMonthStat_status',
         'ShopSettings',
+        'ExchangeSettings',
         'VacancyBlackList',
 
         'signout',
