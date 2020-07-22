@@ -14,6 +14,7 @@ class Network(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Сеть магазинов'
         verbose_name_plural = 'Сети магазинов'
+
     logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
     url = models.CharField(blank=True,null=True,max_length=255)
     primary_color = models.CharField(max_length=6, blank=True)
@@ -125,18 +126,18 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     restricted_start_times = models.CharField(max_length=1024, default='[]')
     restricted_end_times = models.CharField(max_length=1024, default='[]')
 
-    load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops')
-    exchange_settings = models.ForeignKey('timetable.ExchangeSettings', on_delete=models.SET_NULL, null=True, related_name='shops')
+    load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
+    exchange_settings = models.ForeignKey('timetable.ExchangeSettings', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
 
     staff_number = models.SmallIntegerField(default=0)
 
-    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
+    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True, blank=True)
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
     email = models.EmailField(blank=True, null=True)
-    exchange_shops = models.ManyToManyField('self')
+    exchange_shops = models.ManyToManyField('self', blank=True)
 
-    settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True)
+    settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -165,6 +166,16 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     def get_department(self):
         return self
 
+    def __init__(self, *args, **kwargs):
+        code = kwargs.pop('parent_code', None)
+        super().__init__(*args, **kwargs)
+        if code:
+            self.parent = Shop.objects.get(code=code)
+
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'parent_code'):
+            self.parent = Shop.objects.get(code=self.parent_code)
+        super().save(*args, **kwargs)
     def get_exchange_settings(self):
         return self.exchange_settings if self.exchange_settings_id\
             else apps.get_model(
@@ -298,7 +309,7 @@ class User(DjangoAbstractUser, AbstractModel):
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     access_token = models.CharField(max_length=64, blank=True, null=True)
-    tabel_code = models.CharField(blank=True, max_length=15, null=True, unique=True)
+    tabel_code = models.CharField(blank=True, max_length=64, null=True, unique=True)
     lang = models.CharField(max_length=2, default='ru')
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     black_list_symbol = models.CharField(max_length=128, null=True, blank=True)
@@ -318,6 +329,9 @@ class WorkerPosition(AbstractActiveNamedModel):
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
+
+    def get_department(self):
+        return None
 
 
 class Employment(AbstractActiveModel):
@@ -349,7 +363,7 @@ class Employment(AbstractActiveModel):
 
     auto_timetable = models.BooleanField(default=True)
 
-    tabel_code = models.CharField(max_length=15, null=True, blank=True)
+    tabel_code = models.CharField(max_length=64, null=True, blank=True)
     is_ready_for_overworkings = models.BooleanField(default=False)
 
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
@@ -366,6 +380,29 @@ class Employment(AbstractActiveModel):
 
     def get_department(self):
         return self.shop
+
+    def __init__(self, *args, **kwargs):
+        shop_code = kwargs.pop('shop_code', None)
+        user_code = kwargs.pop('user_code', None)
+        position_code = kwargs.pop('position_code', None)
+        super().__init__(*args, **kwargs)
+        if shop_code:
+            self.shop = Shop.objects.get(code=shop_code)
+        if user_code:
+            self.user = User.objects.get(username=user_code)
+            self.tabel_code = user_code
+        if position_code:
+            self.position = WorkerPosition.objects.get(code=position_code)
+
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'shop_code'):
+            self.shop = Shop.objects.get(code=self.shop_code)
+        if hasattr(self, 'user_code'):
+            self.user = User.objects.get(username=self.user_code)
+            self.tabel_code = self.user_code
+        if hasattr(self, 'position_code'):
+            self.position = WorkerPosition.objects.get(code=self.position_code)
+        super().save(*args, **kwargs)
 
 
 class FunctionGroup(AbstractModel):
@@ -430,6 +467,7 @@ class FunctionGroup(AbstractModel):
         'ShopSettings',
         'ExchangeSettings',
         'VacancyBlackList',
+        'WorkerPosition',
 
         'signout',
         'password_edit',
