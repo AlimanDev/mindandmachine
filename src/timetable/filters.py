@@ -1,4 +1,4 @@
-from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter, DateFilter, TimeFiltera, CharFilter
+from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter, DateFilter, TimeFilter, CharFilter
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 from django.db.models import Q
 
