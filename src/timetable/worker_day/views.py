@@ -62,6 +62,14 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
     queryset = WorkerDay.objects.all()
     filter_backends = [MultiShopsFilterBackend]
 
+    def get_queryset(self):
+        if self.request.query_params.get('append_code', False):
+            return WorkerDay.objects.all().annotate(
+                shop_code=F('shop__code'),
+                user_login=F('worker__username'),
+            )
+        return self.queryset
+
     # тут переопределяется update а не perform_update потому что надо в Response вернуть
     # не тот объект, который был изначально
     def update(self, request, *args, **kwargs):

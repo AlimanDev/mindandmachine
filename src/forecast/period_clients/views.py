@@ -12,8 +12,9 @@ from rest_framework.decorators import action
 from src.base.models import Shop, Employment, FunctionGroup
 from src.util.models_converter import Converter
 from src.forecast.load_template.utils import apply_reverse_formula # чтобы тесты не падали
-from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util
+from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util, create_demand, group_bills_and_income
 from src.util.upload import get_uploaded_file
+import json
 
 
 # Serializers define the API representation.
@@ -171,76 +172,26 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         return self.filter_queryset(PeriodClients.objects.all())
 
     def create(self, request):
-        models_list = []
         data = PeriodClientsCreateSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         data = data.validated_data['data']
-
-        shop_id = data.get('shop_id')
-        if not shop_id:
-            shop = Shop.objects.get(code=data.get('shop_code'))
-        else:
-            shop = Shop.objects.get(id=shop_id)
-            
-        dt_from = Converter.parse_date(data['dt_from'])
-        dt_to = Converter.parse_date(data['dt_to'])
-        type = data.get('type', PeriodClients.LONG_FORECASE_TYPE)
-
-        operation_types = list(OperationType.objects.select_related('operation_type_name').filter(Q(shop_id=shop.id) | Q(work_type__shop_id=shop.id)))
-        operation_codes = {
-            ot.operation_type_name.code: ot
-            for ot in operation_types
-        }
-        operation_ids = {
-            ot.id: ot
-            for ot in operation_types
-        }
-
-        PeriodClients.objects.filter(
-            Q(operation_type__shop_id=shop.id) | Q(operation_type__work_type__shop_id=shop.id),
-            type=type,
-            dttm_forecast__date__gte=dt_from,
-            dttm_forecast__date__lte=dt_to,
-            operation_type__do_forecast=OperationType.FORECAST,
-        ).delete()
-        
-        for period_demand_value in data['serie']:
-            clients = period_demand_value['value']
-            clients = 0 if clients < 0 else clients
-            operation_type = None
-            if period_demand_value.get('timeserie_code', False):
-                operation_type = operation_codes.get(period_demand_value.get('timeserie_code'))
-            elif period_demand_value.get('timeserie_id', False):
-                operation_type = operation_ids.get(period_demand_value.get('timeserie_id'))
-            else:
-                operation_type = operation_ids.get(period_demand_value.get('work_type')) # для поддержки алгоритмов
-            models_list.append(
-                PeriodClients(
-                    type=type,
-                    dttm_forecast=Converter.parse_datetime(period_demand_value.get('dttm')),
-                    operation_type=operation_type,
-                    value=clients,
-                )
-            )
-        PeriodClients.objects.bulk_create(models_list)
-        # employments = Employment.objects.filter(
-        #     function_group__allowed_functions__func='set_demand',
-        #     function_group__allowed_functions__access_type__in=[FunctionGroup.TYPE_SHOP, FunctionGroup.TYPE_SUPERSHOP],
-        #     shop=shop,
-        # ).values_list('user_id', flat=True)
-
-        # notify4users = User.objects.filter(
-        #     id__in=employments
-        # )
-
-        # Event.objects.mm_event_create(
-        #     notify4users,
-        #     text='Cоставлен новый спрос на период с {} по {}'.format(data['dt_from'], data['dt_to']),
-        #     department=shop,
-        # )
-
+        create_demand(data)
         return Response(status=status.HTTP_201_CREATED)
+        
     
+    @action(detail=False, methods=['post'])
+    def set_timeserie(self, request):
+        data = PeriodClientsCreateSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        values = data.validated_data['data']
+        data = {}
+        data['values'] = values
+        data['settings'] = json.loads(request.user.network.settings_values)
+        data = group_bills_and_income(data)
+        for _, value in data.items():
+            create_demand(value)
+        return Response(status=status.HTTP_201_CREATED)
+
     @action(detail=False, methods=['put'])
     def put(self, request, pk=None):
         data = PeriodClientsUpdateSerializer(data=request.data)

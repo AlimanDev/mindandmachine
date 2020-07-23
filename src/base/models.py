@@ -8,6 +8,7 @@ from django.contrib.auth.models import (
 from mptt.models import MPTTModel, TreeForeignKey
 from django.apps import apps
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
+from src.base.exceptions import MessageError
 
 
 class Network(AbstractActiveNamedModel):
@@ -20,6 +21,7 @@ class Network(AbstractActiveNamedModel):
     secondary_color = models.CharField(max_length=6, blank=True)
     # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
     need_symbol_for_vacancy = models.BooleanField(default=False)
+    settings_values = models.TextField(default='{}')
 
     def get_department(self):
         return None
@@ -371,7 +373,9 @@ class Employment(AbstractActiveModel):
     objects = EmploymentManager()
 
     def has_permission(self, permission, method='GET'):
-        group = self.function_group or self.position.group
+        group = self.function_group or self.position.group if self.position else None
+        if not group:
+            raise MessageError(code='no_group_or_position')
         return group.allowed_functions.filter(
             func=permission,
             method=method
