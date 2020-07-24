@@ -20,6 +20,7 @@ from src.timetable.models import (
 
 from django.db.models import Q
 from src.base.exceptions import MessageError
+from src.util.models_converter import Converter
 
 
 def upload_demand_util(demand_file, shop_id, lang='ru'):
@@ -238,12 +239,14 @@ def group_bills_and_income(form):
         dttm = Converter.parse_datetime(bill['Дата'])
         dttm = Converter.convert_datetime(datetime.combine(dttm.date(), time(dttm.hour)))
         if not dttm in result[shop]['temp_data']:
-            result[shop]['temp_data'][dttm]['bills'] = 0
-            result[shop]['temp_data'][dttm]['income'] = 0
+            result[shop]['temp_data'][dttm] = {
+                'bills': 0,
+                'income':0,
+            }
         result[shop]['temp_data'][dttm]['bills'] += 1
         result[shop]['temp_data'][dttm]['income'] += float(bill[settings.get('timeserie_income_sum','СуммаДокумента')])
     for shop, values in result.items():
-        for t, data in values['tesmp_data'].items():
+        for t, data in values['temp_data'].items():
             dttm = Converter.parse_datetime(t)
             dt_from = values.get('dt_from')
             dt_to = values.get('dt_to')
