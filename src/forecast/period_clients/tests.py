@@ -237,22 +237,22 @@ class TestDemand(APITestCase):
                 {
                     "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 10)),
                     "value": 2.1225757598876953,
-                    "work_type": self.o_type_5.id,
+                    "timeserie_id": self.o_type_5.id,
                 },
                 {
                     "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 10, 30)),
                     "value": 2.2346010208129883,
-                    "work_type": self.o_type_5.id,
+                    "timeserie_id": self.o_type_5.id,
                 },
                 {
                     "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 11)),
                     "value": 2.195962905883789,
-                    "work_type": self.o_type_5.id,
+                    "timeserie_id": self.o_type_5.id,
                 },
                 {
                     "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 11, 30)),
                     "value": 2.307988166809082,
-                    "work_type": self.o_type_5.id,
+                    "timeserie_id": self.o_type_5.id,
                 },
             ],
             "dt_from": Converter.convert_date(datetime(2019, 9, 1)),

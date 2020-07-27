@@ -198,7 +198,7 @@ def create_demand(data):
     if data['serie'][0].get('timeserie_code', False):
         operation_types_to_delete = set([ operation_codes.get(x.get('timeserie_code')) for x in data['serie']])
     else:
-        operation_types_to_delete = set([ operation_ids.get(x.get('timeserie_id') or x.get('work_type')) for x in data['serie']])
+        operation_types_to_delete = set([ operation_ids.get(x.get('timeserie_id')) for x in data['serie']])
     PeriodClients.objects.filter(
         Q(operation_type__shop_id=shop.id) | Q(operation_type__work_type__shop_id=shop.id),
         type=forecase_type,
@@ -216,8 +216,6 @@ def create_demand(data):
             operation_type = operation_codes.get(period_demand_value.get('timeserie_code'))
         elif period_demand_value.get('timeserie_id', False):
             operation_type = operation_ids.get(period_demand_value.get('timeserie_id'))
-        else:
-            operation_type = operation_ids.get(period_demand_value.get('work_type')) # для поддержки алгоритмов
         models_list.append(
             PeriodClients(
                 type=forecase_type,
