@@ -185,7 +185,7 @@ def create_demand(data):
     
     dt_from = Converter.parse_date(data['dt_from']) if type(data['dt_from']) is str else data['dt_from']
     dt_to = Converter.parse_date(data['dt_to']) if type(data['dt_to']) is str else data['dt_to']
-    type = data.get('type', PeriodClients.LONG_FORECASE_TYPE)
+    forecase_type = data.get('type', PeriodClients.LONG_FORECASE_TYPE)
     operation_types = list(OperationType.objects.select_related('operation_type_name').filter(Q(shop_id=shop.id) | Q(work_type__shop_id=shop.id)))
     operation_codes = {
         ot.operation_type_name.code: ot
@@ -195,12 +195,17 @@ def create_demand(data):
         ot.id: ot
         for ot in operation_types
     }
+    if data['serie'][0].get('timeserie_code', False):
+        operation_types_to_delete = set([ operation_codes.get(x.get('timeserie_code')) for x in data['serie']])
+    else:
+        operation_types_to_delete = set([ operation_ids.get(x.get('timeserie_id') or x.get('work_type')) for x in data['serie']])
     PeriodClients.objects.filter(
         Q(operation_type__shop_id=shop.id) | Q(operation_type__work_type__shop_id=shop.id),
-        type=type,
+        type=forecase_type,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to,
         operation_type__do_forecast=OperationType.FORECAST,
+        operation_type__in=operation_types_to_delete,
     ).delete()
     
     for period_demand_value in data['serie']:
@@ -215,7 +220,7 @@ def create_demand(data):
             operation_type = operation_ids.get(period_demand_value.get('work_type')) # для поддержки алгоритмов
         models_list.append(
             PeriodClients(
-                type=type,
+                type=forecase_type,
                 dttm_forecast=Converter.parse_datetime(period_demand_value.get('dttm')),
                 operation_type=operation_type,
                 value=clients,

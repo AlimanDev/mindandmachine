@@ -233,7 +233,7 @@ class TestDemand(APITestCase):
 
         self.create_data = {
             "status": "R",
-            "demand": [
+            "serie": [
                 {
                     "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 10)),
                     "value": 2.1225757598876953,

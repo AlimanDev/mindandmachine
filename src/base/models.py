@@ -373,7 +373,7 @@ class Employment(AbstractActiveModel):
     objects = EmploymentManager()
 
     def has_permission(self, permission, method='GET'):
-        group = self.function_group or self.position.group if self.position else None
+        group = self.function_group or (self.position.group if self.position else None)
         if not group:
             raise MessageError(code='no_group_or_position')
         return group.allowed_functions.filter(
