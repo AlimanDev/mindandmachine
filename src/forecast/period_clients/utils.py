@@ -175,6 +175,30 @@ def download_demand_xlsx_util(request, workbook, form):
 
 
 def create_demand(data):
+    '''
+    Функция для внесения значений операций.
+    :param 
+        data JSON
+        {
+            'shop_id': 1, || 'shop_code': 'shop'
+            'dt_from': '2020-07-01', || datetime.date(2020, 7, 1)
+            'dt_to': '2020-07-31', || datetime.date(2020, 7, 31)
+            'type': 'F', || 'L'
+            'serie': [
+                {
+                    'dttm': '2020-07-01T08:00:00',
+                    'timeserie_id': 1, || 'timeserie_code': 'bills'
+                    'value': 2.0,
+                },
+                ...
+                {
+                    'dttm': '2020-07-31T22:00:00',
+                    'timeserie_id': 1, || 'timeserie_code': 'bills'
+                    'value': 3.0,
+                }
+            ]
+        }
+    '''
     models_list = []
 
     shop_id = data.get('shop_id')
