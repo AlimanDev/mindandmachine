@@ -1,6 +1,7 @@
 import json
 import requests
 from datetime import datetime, timedelta, date
+from django.utils import timezone
 from django.conf import settings
 from django.db.models import F, Count, Sum, Q
 from django.db.models.functions import Coalesce, Extract
@@ -265,23 +266,21 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         dt_first = dt_from.replace(day=1)
 
-        try:
-            tt = ShopMonthStat.objects.create(
-                shop_id=shop_id,
-                dt=dt_first,
-                status=ShopMonthStat.PROCESSING,
-                dttm_status_change=datetime.now()
-            )
-        except:
-            if (form['is_remaking']):
-                tt = ShopMonthStat.objects.get(shop_id=shop_id, dt=dt_first)
-                tt.status = ShopMonthStat.PROCESSING
-                tt.dttm_status_change = datetime.now()
-                tt.save()
-            else:
-                raise ValidationError(self.error_messages["tt_exists"])
+        tt, _ = ShopMonthStat.objects.get_or_create(shop_id=shop_id, dt=dt_first, defaults={'dttm_status_change': timezone.now()})
+        if tt.status is ShopMonthStat.NOT_DONE:
+            tt.status = ShopMonthStat.PROCESSING
+            tt.dttm_status_change = timezone.now()
+            tt.save()
+        elif (form['is_remaking']):
+            tt.status = ShopMonthStat.PROCESSING
+            tt.dttm_status_change = datetime.now()
+            tt.save()
+        else:
+            raise ValidationError(self.error_messages["tt_exists"])
 
+        shop = Shop.objects.get(id=shop_id)
         employments = Employment.objects.get_active(
+            shop.network_id,    
             dt_from=dt_from,
             dt_to=dt_to,
             shop_id=shop_id,
@@ -293,7 +292,6 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         users = User.objects.filter(id__in=user_ids)
         user_dict = {u.id: u for u in users}
 
-        shop = Shop.objects.get(id=shop_id)
 
         period_step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
 
@@ -304,13 +302,13 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         for employment in employments:
             employment_work_type = EmploymentWorkType.objects.filter(
                 employment=employment,
-                is_active='True'
+                is_active=True
             )
             if not employment_work_type.exists():
                 users_without_spec.append(employment.user.first_name + ' ' + employment.user.last_name)
         if users_without_spec:
-            tt.status = ShopMonthStat.ERROR
-            tt.delete()
+            tt.status = ShopMonthStat.NOT_DONE
+            tt.save()
             raise ValidationError(
                 self.error_messages["tt_users_without_spec"].format(users=', '.join(users_without_spec)))
 
@@ -927,8 +925,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     pass
                 # send_notification('D', tt, sender=request.user)
         tts.update(status=ShopMonthStat.NOT_DONE)
+        shop = Shop.objects.get(id=shop_id)
 
         user_ids=Employment.objects.get_active(
+            shop.network_id,
             dt_from=dt_from,
             dt_to=dt_to,
             shop_id=shop_id,
