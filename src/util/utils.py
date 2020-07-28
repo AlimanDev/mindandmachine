@@ -253,6 +253,7 @@ def api_method(
                     dt = now().date()
 
                     employments = Employment.objects.get_active(
+                        shop.network_id,
                         dt, dt,
                         shop__in=shop.get_ancestors(include_self=True, ascending=True),
                         user=request.user)
