@@ -21,7 +21,7 @@ class ShopSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shop
         fields = ['id', 'parent_id', 'name', 'settings_id', 'tm_shop_opens', 'tm_shop_closes', 'code',
-                  'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id', 'network_id', 'restricted_start_times','restricted_end_times']
+                  'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id', 'network_id', 'restricted_start_times','restricted_end_times', 'forecast_step_minutes']
 
 
 class ShopStatSerializer(serializers.Serializer):
