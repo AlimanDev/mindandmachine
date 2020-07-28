@@ -39,6 +39,7 @@ class AuthUserSerializer(UserSerializer):
     class Meta(UserSerializer.Meta):
         fields = UserSerializer.Meta.fields + ['network']
 
+
 class PasswordSerializer(serializers.Serializer):
     default_error_messages = {
         "password_mismatch": _("Passwords are mismatched."),
@@ -83,11 +84,12 @@ class EmploymentSerializer(serializers.ModelSerializer):
     position_id = serializers.IntegerField(required=False)
     position_code = serializers.CharField(required=False)
     shop_id = serializers.IntegerField(required=False)
-    shop_code = serializers.CharField(required=False)
+    shop_code = serializers.CharField(required=False, source='shop.code')
     user_id = serializers.IntegerField(required=False)
-    user_code = serializers.CharField(required=False)
     work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
+    username = serializers.CharField(required=False, source='user.username')
+    dt_hired = serializers.DateField(required=True)
 
     class Meta:
         model = Employment
@@ -95,9 +97,9 @@ class EmploymentSerializer(serializers.ModelSerializer):
                   'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
                   'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
                   'dt_new_week_availability_from', 'user', 'is_visible',  'worker_constraints', 'work_types',
-                  'shop_code', 'user_code', 'position_code',
+                  'shop_code', 'position_code', 'username'
         ]
-        create_only_fields = ['user_id', 'shop_id']
+        create_only_fields = ['user_id', 'shop_id', 'shop', 'tabel_code', 'user']
         read_only_fields = ['user']
 
     def validate(self, attrs):
@@ -105,10 +107,19 @@ class EmploymentSerializer(serializers.ModelSerializer):
             user_id = self.instance.user_id
             shop_id = self.instance.shop_id
         else:
-            user_id = attrs.get('user_id') or User.objects.get(username=attrs.get('user_code')).id
-            shop_id = attrs.get('shop_id') or Shop.objects.get(code=attrs.get('shop_code')).id
+            if not attrs.get('user_id'):
+                user = attrs.pop('user')
+                attrs['user_id'] = User.objects.get(username=user['username']).id
+
+            if not attrs.get('shop_id'):
+                shop = attrs.pop('shop')
+                attrs['shop_id'] = Shop.objects.get(code=shop['code']).id
+
+            user_id = attrs['user_id']
+            shop_id = attrs['shop_id']
+
         employments = Employment.objects.filter(
-            Q(dt_fired__isnull=True)|Q(dt_fired__gte=attrs['dt_hired']),
+            Q(dt_fired__isnull=True)|Q(dt_fired__gte=attrs.get('dt_hired')),
             user_id=user_id,
             shop_id=shop_id,
         )
@@ -139,10 +150,11 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 if field in data:
                     data.pop(field)
         else:
-            # shop_id is required for create
-            for field in self.Meta.create_only_fields:
-                if field not in data and field.replace('_id', '_code') not in data:
-                    raise ValidationError({field: self.error_messages['required']})
+            if 'shop_id' not in data and 'shop' not in data and 'code' not in data['shop']:
+                raise ValidationError({'shop_id': self.error_messages['required']})
+            if 'user_id' not in data and 'user' not in data:
+                raise ValidationError({'user_id': self.error_messages['required']})
+
         return data
 
 

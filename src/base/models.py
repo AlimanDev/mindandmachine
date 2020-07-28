@@ -386,23 +386,24 @@ class Employment(AbstractActiveModel):
 
     def __init__(self, *args, **kwargs):
         shop_code = kwargs.pop('shop_code', None)
-        user_code = kwargs.pop('user_code', None)
+        username = kwargs.get('username', None)
+        user_id = kwargs.get('user_id', None)
         position_code = kwargs.pop('position_code', None)
         super().__init__(*args, **kwargs)
         if shop_code:
             self.shop = Shop.objects.get(code=shop_code)
-        if user_code:
-            self.user = User.objects.get(username=user_code)
-            self.tabel_code = user_code
+        if username and not user_id:
+            self.user = User.objects.get(username=username)
+            self.user_id = self.user.id
+
         if position_code:
             self.position = WorkerPosition.objects.get(code=position_code)
 
     def save(self, *args, **kwargs):
         if hasattr(self, 'shop_code'):
             self.shop = Shop.objects.get(code=self.shop_code)
-        if hasattr(self, 'user_code'):
-            self.user = User.objects.get(username=self.user_code)
-            self.tabel_code = self.user_code
+        if hasattr(self, 'username'):
+            self.user = User.objects.get(username=self.username)
         if hasattr(self, 'position_code'):
             self.position = WorkerPosition.objects.get(code=self.position_code)
         super().save(*args, **kwargs)

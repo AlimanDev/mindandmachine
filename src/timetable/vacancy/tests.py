@@ -159,7 +159,8 @@ class Test_auto_worker_exchange(TestCase):
             automatic_create_vacancy_lack_min=0.4,
             automatic_delete_vacancy_lack_max=0.5,
             automatic_worker_select_overflow_min=0.6,
-            automatic_worker_select_timegap=datetime.timedelta(hours=4)
+            automatic_worker_select_timegap=datetime.timedelta(hours=4),
+            network = self.network,
         )
 
     def create_vacancy(self, tm_from, tm_to, work_type):
