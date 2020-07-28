@@ -82,7 +82,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
     }
     user = UserSerializer(read_only=True)
     position_id = serializers.IntegerField(required=False)
-    position_code = serializers.CharField(required=False)
+    position_code = serializers.CharField(required=False, source='position.code')
     shop_id = serializers.IntegerField(required=False)
     shop_code = serializers.CharField(required=False, source='shop.code')
     user_id = serializers.IntegerField(required=False)
@@ -117,6 +117,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
             user_id = attrs['user_id']
             shop_id = attrs['shop_id']
+
+        position = attrs.pop('position', None)
+        if position and 'code' in position and not attrs.get('position_id'):
+            attrs['position_id'] = WorkerPosition.objects.get(code=position['code']).id
 
         employments = Employment.objects.filter(
             Q(dt_fired__isnull=True)|Q(dt_fired__gte=attrs.get('dt_hired')),
@@ -154,6 +158,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 raise ValidationError({'shop_id': self.error_messages['required']})
             if 'user_id' not in data and 'user' not in data:
                 raise ValidationError({'user_id': self.error_messages['required']})
+            if 'position_id' not in data and 'position' not in data:
+                raise ValidationError({'position_id': self.error_messages['required']})
 
         return data
 
