@@ -281,7 +281,7 @@ class WorkerDayManager(models.Manager):
             shop_id=OuterRef('shop_id')
         ).values( # for group by
             'dttm_added'
-        ).annotate(dt_max=Max('dttm_added')).values('dt_max')
+        ).annotate(dt_max=Max('dttm_added')).values('dt_max')[:1]
         return super().get_queryset().filter(
             *args,
             **kwargs,
@@ -364,6 +364,7 @@ class WorkerDay(AbstractModel):
         TYPE_MATERNITY,
         TYPE_BUSINESS_TRIP,
         TYPE_ETC,
+        TYPE_EMPTY,
     ]
     TYPES_PAID = [
         TYPE_WORKDAY,
