@@ -7,6 +7,7 @@ from django_filters.rest_framework import FilterSet
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.pagination import LimitOffsetPagination
 
 from src.base.models import Employment, Shop
 
@@ -45,6 +46,8 @@ class ShopViewSet(viewsets.ModelViewSet):
 
     GET /rest_api/department/stat?id=6
     """
+    page_size = 10
+    pagination_class = LimitOffsetPagination
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
@@ -100,7 +103,8 @@ class ShopViewSet(viewsets.ModelViewSet):
         serializer = ShopStatSerializer(shops, many=True)
         return Response(serializer.data)
 
-    def list(self, request):
+    @action(detail=False, methods=['get'])
+    def tree(self, request):
         """
         Дерево магазинов в формате для Quasar
         :param request:
