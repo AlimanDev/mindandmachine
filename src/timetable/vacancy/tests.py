@@ -58,12 +58,14 @@ class Test_auto_worker_exchange(TestCase):
             primary_color='#BDF82',
             secondary_color='#390AC',
         )
+        Shop.objects.all().update(network=self.network)
         
         self.root_shop = Shop.objects.create(
             name='SuperShop1',
             tm_shop_opens=datetime.time(7, 0, 0),
             tm_shop_closes=datetime.time(0, 0, 0),
             settings=self.shop_settings,
+            network=self.network,
         )
 
         self.shop = Shop.objects.create(
