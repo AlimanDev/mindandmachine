@@ -15,6 +15,7 @@ class Network(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Сеть магазинов'
         verbose_name_plural = 'Сети магазинов'
+
     logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
     url = models.CharField(blank=True,null=True,max_length=255)
     primary_color = models.CharField(max_length=6, blank=True)
@@ -127,18 +128,18 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     restricted_start_times = models.CharField(max_length=1024, default='[]')
     restricted_end_times = models.CharField(max_length=1024, default='[]')
 
-    load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops')
-    exchange_settings = models.ForeignKey('timetable.ExchangeSettings', on_delete=models.SET_NULL, null=True, related_name='shops')
+    load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
+    exchange_settings = models.ForeignKey('timetable.ExchangeSettings', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
 
     staff_number = models.SmallIntegerField(default=0)
 
-    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
+    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True, blank=True)
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
     email = models.EmailField(blank=True, null=True)
-    exchange_shops = models.ManyToManyField('self')
+    exchange_shops = models.ManyToManyField('self', blank=True)
 
-    settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True)
+    settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return '{}, {}, {}'.format(
