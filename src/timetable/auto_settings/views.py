@@ -973,14 +973,14 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             created_by__isnull=True,
             child__isnull=True
         )
-        WorkerDay.objects.bulk_create(
-            [WorkerDay(
-                # worker_id=w.worker_id, TODO: ???
-                type=WorkerDay.TYPE_EMPTY,
-                dt=w.dt,
-                parent_worker_day=w
-            ) for w in wdays]
-        )
+        # WorkerDay.objects.bulk_create(
+        #     [WorkerDay(
+        #         # worker_id=w.worker_id, TODO: ???
+        #         type=WorkerDay.TYPE_EMPTY,
+        #         dt=w.dt,
+        #         parent_worker_day=w
+        #     ) for w in wdays]
+        # )
 
         # # cancel vacancy
         # # todo: add deleting workerdays
