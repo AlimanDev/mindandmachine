@@ -443,8 +443,10 @@ def create_departments_and_users(self):
         parent=self.root_shop,
         name='Region Shop1',
         # break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
-        tm_shop_opens=datetime.time(7, 0, 0),
-        tm_shop_closes=datetime.time(0, 0, 0),
+        tm_open_list='["07:00:00"]',
+        tm_close_list='["23:00:00"]',
+        # tm_shop_opens=datetime.time(7, 0, 0),
+        # tm_shop_closes=datetime.time(0, 0, 0),
         region=self.region,
         settings=self.settings,
     )
@@ -452,8 +454,8 @@ def create_departments_and_users(self):
         # id=12,
         parent=self.root_shop,
         name='Region Shop2',
-        tm_shop_opens=datetime.time(7, 0, 0),
-        tm_shop_closes=datetime.time(0, 0, 0),
+        tm_open_list='["07:00:00"]',
+        tm_close_list='["00:00:00"]',
         region=self.region,
         settings=self.settings
     )
@@ -464,8 +466,8 @@ def create_departments_and_users(self):
         parent=self.reg_shop1,
         name='Shop1',
         # break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
-        tm_shop_opens=datetime.time(7, 0, 0),
-        tm_shop_closes=datetime.time(0, 0, 0),
+        tm_open_list='["07:00:00"]',
+        tm_close_list='["00:00:00"]',
         region=self.region,
         settings=self.settings
     )
@@ -473,8 +475,8 @@ def create_departments_and_users(self):
         # id=2,
         parent=self.reg_shop1,
         name='Shop2',
-        tm_shop_opens=datetime.time(7, 0, 0),
-        tm_shop_closes=datetime.time(0, 0, 0),
+        tm_open_list='["07:00:00"]',
+        tm_close_list='["00:00:00"]',
         region=self.region,
         settings=self.settings
     )
@@ -483,8 +485,8 @@ def create_departments_and_users(self):
         # id=3,
         parent=self.reg_shop2,
         name='Shop3',
-        tm_shop_opens=datetime.time(7, 0, 0),
-        tm_shop_closes=datetime.time(0, 0, 0),
+        tm_open_list='["07:00:00"]',
+        tm_close_list='["00:00:00"]',
         region=self.region,
         settings=self.settings
     )

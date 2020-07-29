@@ -39,8 +39,8 @@ class TestDepartment(APITestCase):
                 {'id': 1,
                  'forecast_step_minutes': '00:30:00',
                  'label': 'Корневой магазин',
-                 'tm_shop_opens': '06:00:00',
-                 'tm_shop_closes': '23:00:00',
+                 "tm_open_list": '["06:00:00"]',
+                 "tm_close_list": '["23:00:00"]',
                  'children':[]
                  },
         ]
@@ -86,11 +86,12 @@ class TestDepartment(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_create(self):
-        data = {        
+        data = {
+            "area":None,
             "parent_id": self.root_shop.id,
             "name": 'Region Shop3',
-            "tm_shop_opens": '07:00:00',
-            "tm_shop_closes": '23:00:00',
+            "tm_open_list": '["07:00:00"]',
+            "tm_close_list": '["23:00:00"]',
             "region_id": self.region.id,
             "code": None,
             "address": None,
@@ -123,8 +124,8 @@ class TestDepartment(APITestCase):
         data = {
             "parent_id": self.root_shop.id,
             "name": 'Title 2',
-            "tm_shop_opens": '07:00:00',
-            "tm_shop_closes": '23:00:00',
+            "tm_open_list": '["07:00:00"]',
+            "tm_close_list": '["23:00:00"]',
             "region_id": self.region.id,
             "code": "10",
             "address": 'address',
@@ -132,6 +133,7 @@ class TestDepartment(APITestCase):
             "dt_opened": '2019-01-01',
             "dt_closed": "2020-01-01",
             "timezone": 'Europe/Berlin',
+            "area": None
         }
         # response = self.client.put(self.shop_url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
