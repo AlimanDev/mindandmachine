@@ -121,8 +121,10 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     count_lack = models.BooleanField(default=False)
 
-    tm_shop_opens = models.TimeField(default=datetime.time(6, 0))
-    tm_shop_closes = models.TimeField(default=datetime.time(23, 0))
+    tm_open_list = models.TextField(default='["06:00"]')
+    tm_close_list = models.TextField(default='["23:00"]')
+    area = models.FloatField(null=True) #Торговая площадь магазина
+
     restricted_start_times = models.CharField(max_length=1024, default='[]')
     restricted_end_times = models.CharField(max_length=1024, default='[]')
 
