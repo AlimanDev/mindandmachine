@@ -170,6 +170,8 @@ class NotificationViewSet(
 
 
 class ShopSettingsViewSet(ModelViewSet):
+    page_size = 10
+    pagination_class = LimitOffsetPagination
     permission_classes = [Permission]
     serializer_class = ShopSettingsSerializer
 
