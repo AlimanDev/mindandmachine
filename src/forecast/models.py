@@ -300,7 +300,7 @@ class PeriodClients(AbstractModel):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
     id = models.BigAutoField(primary_key=True)
-    dttm_forecast = models.DateTimeField()
+    dttm_forecast = models.DateTimeField(db_index=True)
     type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
     operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT)
     value = models.FloatField(default=0)
