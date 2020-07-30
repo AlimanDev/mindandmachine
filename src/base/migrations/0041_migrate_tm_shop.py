@@ -9,5 +9,5 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunSQL(
-            "update base_shop set tm_open_list = concat('[\"',tm_shop_opens,'\"]'), tm_close_list = concat('[\"',tm_shop_closes,'\"]')"
+            "update base_shop set tm_open_list = concat('{\"all\":\"',tm_shop_opens,'\"}'), tm_close_list = concat('{\"all\":\"',tm_shop_closes,'\"}')"
         )]
