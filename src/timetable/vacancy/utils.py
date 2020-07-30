@@ -619,6 +619,14 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
         return
     if not exchange_settings.automatic_check_lack:
         return
+    tm_open_dict = {
+        k: Converter.parse_time(v)
+        for k, v in json.loads(shop.tm_open_dict).items()
+    }
+    tm_close_dict = {
+        k: Converter.parse_time(v)
+        for k, v in json.loads(shop.tm_close_dict).items()
+    }
 
     if dt_from is None:
         dttm_now = now().replace(minute=0, second=0, microsecond=0)
@@ -734,11 +742,15 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
             working_shifts = [min_shift]
 
         dttm_to = dttm_from = df_vacancies.dttm_from[i]
+        tm_shop_opens = tm_open_dict.get(dttm_from.weekday()) if tm_open_dict.get('all') == None else tm_open_dict.get('all')
+        tm_shop_closes = tm_close_dict.get(dttm_from.weekday()) if tm_close_dict.get('all') == None else tm_close_dict.get('all')
+        if tm_shop_opens == None or tm_shop_closes == None:
+            continue
 
-        dttm_shop_opens = datetime.combine(dttm_from.date(), shop.tm_shop_opens)
-        dttm_shop_closes = datetime.combine(dttm_from.date(), shop.tm_shop_closes)
+        dttm_shop_opens = datetime.combine(dttm_from.date(), tm_shop_opens)
+        dttm_shop_closes = datetime.combine(dttm_from.date(), tm_shop_closes)
 
-        if shop.tm_shop_closes == time(hour=0, minute=0, second=0):
+        if tm_shop_closes == time(hour=0, minute=0, second=0):
             dttm_shop_closes += timedelta(days=1)
 
         for shift in working_shifts:

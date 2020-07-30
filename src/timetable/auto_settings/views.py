@@ -464,8 +464,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'max_work_coef': max_work_coef,
             'min_work_coef': min_work_coef,
             'period_step': period_step,
-            'tm_start_work': Converter.convert_time(shop.tm_shop_opens),
-            'tm_end_work': Converter.convert_time(shop.tm_shop_closes),
+            'tm_start_work': shop.tm_open_dict if len(shop.tm_open_dict) else shop.tm_open_dict.get('all'), #для временной поддержки алгоритмов
+            'tm_end_work': shop.tm_close_dict if len(shop.tm_close_dict) else shop.tm_close_dict.get('all'),
             'min_work_period': shop.settings.shift_start * 60,
             'max_work_period': shop.settings.shift_end * 60,
             'tm_lock_start': list(map(lambda x: x + ':00', json.loads(shop.restricted_start_times))),
