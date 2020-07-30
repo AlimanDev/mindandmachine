@@ -79,4 +79,6 @@ class AbstractActiveNamedModel(AbstractActiveModel):
 
     objects = AbstractActiveNamedModelManager()
 
+    def __str__(self):
+        return f'name: {self.name}, code: {self.code}'
 
