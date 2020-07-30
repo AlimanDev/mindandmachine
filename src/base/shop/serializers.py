@@ -19,12 +19,12 @@ class ShopSerializer(serializers.ModelSerializer):
     exchange_settings_id = serializers.IntegerField(required=False)
     load_template_id = serializers.IntegerField(required=False)
     settings_id = serializers.IntegerField(required=False)
-    tm_open_list = serializers.JSONField(required=False)
-    tm_close_list = serializers.JSONField(required=False)
+    tm_open_dict = serializers.JSONField(required=False)
+    tm_close_dict = serializers.JSONField(required=False)
     timezone = TimeZoneField()
     class Meta:
         model = Shop
-        fields = ['id', 'parent_id', 'parent_code', 'name', 'settings_id', 'tm_open_list', 'tm_close_list',
+        fields = ['id', 'parent_id', 'parent_code', 'name', 'settings_id', 'tm_open_dict', 'tm_close_dict',
                 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id', 
                 'network_id', 'restricted_start_times','restricted_end_times', 'exchange_settings_id', 'load_template_id', 'area']
 
