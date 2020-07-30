@@ -39,8 +39,8 @@ class TestDepartment(APITestCase):
                 {'id': 1,
                  'forecast_step_minutes': '00:30:00',
                  'label': 'Корневой магазин',
-                 "tm_open_list": '["06:00:00"]',
-                 "tm_close_list": '["23:00:00"]',
+                 "tm_open_dict": '["06:00:00"]',
+                 "tm_close_dict": '["23:00:00"]',
                  'children':[]
                  },
         ]
@@ -90,8 +90,8 @@ class TestDepartment(APITestCase):
             "area":None,
             "parent_id": self.root_shop.id,
             "name": 'Region Shop3',
-            "tm_open_list": '["07:00:00"]',
-            "tm_close_list": '["23:00:00"]',
+            "tm_open_dict": '["07:00:00"]',
+            "tm_close_dict": '["23:00:00"]',
             "region_id": self.region.id,
             "code": None,
             "address": None,
@@ -124,8 +124,8 @@ class TestDepartment(APITestCase):
         data = {
             "parent_id": self.root_shop.id,
             "name": 'Title 2',
-            "tm_open_list": '["07:00:00"]',
-            "tm_close_list": '["23:00:00"]',
+            "tm_open_dict": '["07:00:00"]',
+            "tm_close_dict": '["23:00:00"]',
             "region_id": self.region.id,
             "code": "10",
             "address": 'address',
