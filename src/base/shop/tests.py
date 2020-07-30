@@ -39,8 +39,8 @@ class TestDepartment(APITestCase):
                 {'id': 1,
                  'forecast_step_minutes': '00:30:00',
                  'label': 'Корневой магазин',
-                 "tm_open_dict": '["06:00:00"]',
-                 "tm_close_dict": '["23:00:00"]',
+                 "tm_open_dict": '{"all":"06:00:00"}',
+                 "tm_close_dict": '{"all":"23:00:00"}',
                  'children':[]
                  },
         ]
