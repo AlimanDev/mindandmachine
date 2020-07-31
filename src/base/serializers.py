@@ -222,6 +222,7 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 
 class ShopSettingsSerializer(serializers.ModelSerializer):
+    network_id = serializers.IntegerField(default=CurrentUserNetwork(), write_only=True)
 
     class Meta:
         model = ShopSettings
@@ -236,7 +237,8 @@ class ShopSettingsSerializer(serializers.ModelSerializer):
                   'process_type',
                   'absenteeism',
                   'queue_length',
-                  'max_work_hours_7days'
+                  'max_work_hours_7days',
+                  'network_id',
                   ]
 
 
