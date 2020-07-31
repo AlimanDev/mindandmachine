@@ -7,6 +7,7 @@ from src.forecast.operation_template.views import OperationTemplateViewSet
 from src.forecast.operation_type_template.views import OperationTypeTemplateViewSet
 from src.forecast.operation_type_relation.views import OperationTypeRelationViewSet
 from src.forecast.load_template.views import LoadTemplateViewSet
+from src.forecast.receipt.views import ReceiptViewSet
 
 router = routers.DefaultRouter()
 router.register(r'operation_type_name', OperationTypeNameViewSet, basename='OperationTypeName')
@@ -18,6 +19,7 @@ router.register(r'operation_template', OperationTemplateViewSet, basename='Opera
 router.register(r'operation_type_template', OperationTypeTemplateViewSet, basename='OperationTypeTemplate')
 router.register(r'operation_type_relation', OperationTypeRelationViewSet, basename='OperationTypeRelation')
 router.register(r'load_template', LoadTemplateViewSet, 'LoadTemplate')
+router.register(r'receipt', ReceiptViewSet, 'Receipt')
 
 
 urlpatterns = [
