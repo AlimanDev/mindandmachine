@@ -3,10 +3,9 @@ from rest_framework import serializers, viewsets, exceptions, permissions
 from django_filters.rest_framework import FilterSet
 from django_filters import NumberFilter
 
-from src.base.permissions import Permission
 from src.forecast.models import Receipt
 from src.base.models import Shop
-
+import json
 
 class ReceiptSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField(required=False)
@@ -31,12 +30,14 @@ class ReceiptSerializer(serializers.ModelSerializer):
         validated_data['shop_id'] = shop.id
         validated_data['code'] = info['Ссылка']
         validated_data['dttm'] = info['Дата']
+        validated_data['info'] = json.dumps(info)
         return Receipt.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
         info = validated_data['info']
         instance.dttm = info['Дата']
         instance.is_aggregated = False
+        instance.info = json.dumps(info)
         instance.save()
 
 
