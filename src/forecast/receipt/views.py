@@ -11,7 +11,7 @@ from src.base.models import Shop
 class ReceiptSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField(required=False)
     code = serializers.UUIDField(required=False)
-    dttm = serializers.DateField(required=False)
+    dttm = serializers.DateTimeField(required=False)
     info = serializers.JSONField()
 
     class Meta:
@@ -21,22 +21,23 @@ class ReceiptSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['dttm_added', 'dttm_modified']
 
+
     def create(self, validated_data):
         info = validated_data['info']
         try:
             shop = Shop.objects.get(code=info['КодМагазина'])
         except Shop.DoesNotExist:
-            raise exceptions.ValidationError(f"department with id {info['КодМагазина']} does not exist")
+            raise exceptions.ValidationError(f"Department with code {info['КодМагазина']} does not exist")
         validated_data['shop_id'] = shop.id
         validated_data['code'] = info['Ссылка']
         validated_data['dttm'] = info['Дата']
         return Receipt.objects.create(**validated_data)
+
     def update(self, instance, validated_data):
         info = validated_data['info']
         instance.dttm = info['Дата']
+        instance.is_aggregated = False
         instance.save()
-
-
 
 
 class ReceiptFilter(FilterSet):
@@ -53,11 +54,11 @@ class ReceiptViewSet(viewsets.ModelViewSet):
     filterset_class = ReceiptFilter
     serializer_class = ReceiptSerializer
 
-    def perform_update(self, serializer):
-        info = serializer.info
-        serializer.dttm = info['Дата']
-        serializer.save()
-
+    def get_serializer(self, *args, **kwargs):
+        """ if an array is passed, set serializer to many """
+        if isinstance(kwargs.get('data', {}), list):
+            kwargs['many'] = True
+        return super(ReceiptViewSet, self).get_serializer(*args, **kwargs)
 # {
 # "Ссылка": "954a22a1-cd84-11ea-8edf-00155d012a03",
 # "Дата": "2020-07-24T11:06:32",

@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, time
 from rest_framework import status
 from rest_framework.test import APITestCase
-from dateutil.relativedelta import relativedelta
 from src.util.test import create_departments_and_users
 from src.util.models_converter import Converter
 from src.forecast.models import OperationTypeName, OperationType, OperationTemplate
