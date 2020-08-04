@@ -59,10 +59,10 @@ def search_candidates(wd_details, **kwargs):
     :return:
     """
 
-    exchange_settings = ExchangeSettings.objects.first()
+    shop = wd_details.work_type.shop
+    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True)
     if not exchange_settings.automatic_worker_select_tree_level:
         return
-    shop = wd_details.work_type.shop
     parent = shop.get_ancestor_by_level_distance(exchange_settings.automatic_worker_select_tree_level)
     shops = parent.get_descendants()
 
@@ -150,7 +150,7 @@ def create_vacancies_and_notify(shop_id, work_type_id):
     """
 
     shop=Shop.objects.get(id=shop_id)
-    exchange_settings = ExchangeSettings.objects.first()
+    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True)
     if exchange_settings is None:
         return
     if not exchange_settings.automatic_check_lack:
@@ -297,7 +297,8 @@ def cancel_vacancies(shop_id, work_type_id):
     Автоматически отменяем вакансии, в которых нет потребности
     :return:
     """
-    exchange_settings = ExchangeSettings.objects.first()
+    shop = Shop.objects.get(id=shop_id)
+    exchange_settings = shop.exchange_settings or ExchangeSettings.objects.filter(network_id=shop.network_id, shops__isnull=True)
     if not exchange_settings.automatic_check_lack:
         return
 
@@ -354,9 +355,13 @@ def workers_exchange():
 
     :return:
     """
-    exchange_settings = ExchangeSettings.objects.first()
-    if not exchange_settings.automatic_check_lack:
-        return
+    # exchange_settings = ExchangeSettings.objects.first()
+    # if not exchange_settings.automatic_check_lack:
+    #     return
+    exchange_settings_network = {
+        e.network_id: e
+        for e in ExchangeSettings.objects.filter(shops__isnull=True)
+    }
 
     from_dt = (now().replace(minute=0, second=0, microsecond=0) + exchange_settings.automatic_worker_select_timegap).date()
     to_dt = from_dt + exchange_settings.automatic_check_lack_timegap
@@ -365,10 +370,13 @@ def workers_exchange():
         'to_dt': to_dt,
     }
 
-    shop_list = Shop.objects.all()
+    shop_list = Shop.objects.select_related('exchange_settings').all()
     df_shop_stat = pandas.DataFrame()
 
     for shop in shop_list:
+        exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
+        if not exchange_settings.automatic_check_lack:
+            continue
         for work_type in shop.worktype_set.all():
             params['work_type_ids'] = [work_type.id]
 
@@ -389,6 +397,9 @@ def workers_exchange():
                             df_shop_stat.work_type_id, df_shop_stat.dttm], inplace=True)
 
     for shop in shop_list:
+        exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
+        if not exchange_settings.automatic_check_lack:
+            continue
         for work_type in shop.worktype_set.all():
 
             vacancies = WorkerDayCashboxDetails.objects.filter(

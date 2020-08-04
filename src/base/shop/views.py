@@ -52,6 +52,16 @@ class ShopViewSet(viewsets.ModelViewSet):
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
 
+    def get_object(self):
+        if self.request.method == 'GET':
+            by_code = self.request.query_params.get('by_code', False)
+        else:
+            by_code = self.request.data.get('by_code', False)
+        if by_code:
+            self.lookup_field = 'code'
+            self.kwargs['code'] = self.kwargs['pk']
+        return super().get_object()
+
     def get_queryset(self):
         """
         Возвращает queryset со списком регионов упорядоченных по структуре дерева. Этот queryset
@@ -132,8 +142,8 @@ class ShopViewSet(viewsets.ModelViewSet):
                 "id": shop.id,
                 "label": shop.name,
                 "address": shop.address,
-                "tm_shop_opens":shop.tm_shop_opens,
-                "tm_shop_closes":shop.tm_shop_closes,
+                "tm_open_dict": shop.tm_open_dict,
+                "tm_close_dict" :shop.tm_close_dict,
                 "forecast_step_minutes":shop.forecast_step_minutes,
                 "children": []
             })

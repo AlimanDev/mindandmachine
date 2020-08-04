@@ -9,8 +9,13 @@ from src.base.models import (
     FunctionGroup,
     WorkerPosition,
     Region,
-    ProductionDay
+    ProductionDay,
+    Network,
 )
+
+@admin.register(Network)
+class NetworkAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'code')
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):

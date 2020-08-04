@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.db.models import Q
 
-from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
+from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop
 from src.base.message import Message
 from src.base.fields import CurrentUserNetwork
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
@@ -123,9 +123,12 @@ class EmploymentSerializer(serializers.ModelSerializer):
         "emp_check_dates": _("Employment from {dt_hired} to {dt_fired} already exists."),
     }
     user = UserSerializer(read_only=True)
-    position_id = serializers.IntegerField()
+    position_id = serializers.IntegerField(required=False)
+    position_code = serializers.CharField(required=False)
     shop_id = serializers.IntegerField(required=False)
+    shop_code = serializers.CharField(required=False)
     user_id = serializers.IntegerField(required=False)
+    user_code = serializers.CharField(required=False)
     work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
 
@@ -134,7 +137,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
         fields = ['id', 'user_id', 'shop_id', 'position_id', 'is_fixed_hours', 'dt_hired', 'dt_fired',
                   'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
                   'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
-                  'dt_new_week_availability_from', 'user', 'is_visible',  'worker_constraints', 'work_types'
+                  'dt_new_week_availability_from', 'user', 'is_visible',  'worker_constraints', 'work_types',
+                  'shop_code', 'user_code', 'position_code',
         ]
         create_only_fields = ['user_id', 'shop_id']
         read_only_fields = ['user']
@@ -144,8 +148,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
             user_id = self.instance.user_id
             shop_id = self.instance.shop_id
         else:
-            user_id = attrs['user_id']
-            shop_id = attrs['shop_id']
+            user_id = attrs.get('user_id') or User.objects.get(username=attrs.get('user_code')).id
+            shop_id = attrs.get('shop_id') or Shop.objects.get(code=attrs.get('shop_code')).id
         employments = Employment.objects.filter(
             Q(dt_fired__isnull=True)|Q(dt_fired__gte=attrs['dt_hired']),
             user_id=user_id,
@@ -180,7 +184,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
         else:
             # shop_id is required for create
             for field in self.Meta.create_only_fields:
-                if field not in data:
+                if field not in data and field.replace('_id', '_code') not in data:
                     raise ValidationError({field: self.error_messages['required']})
         return data
 
@@ -188,7 +192,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
 class WorkerPositionSerializer(BaseNetworkSerializer):
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name', 'network_id']
+        fields = ['id', 'name', 'network_id', 'code']
 
 
 class EventSerializer(serializers.ModelSerializer):

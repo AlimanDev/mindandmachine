@@ -96,8 +96,8 @@ def apply_formula(operation_type, operation_type_template, operation_type_relati
     # shop = operation_type.shop
     period_lengths_minutes = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
     period_in_day = MINUTES_IN_DAY // period_lengths_minutes
-    tm_from = tm_from if tm_from else shop.tm_shop_opens
-    tm_to = tm_to if tm_to else shop.tm_shop_closes if shop.tm_shop_closes.hour != 0 else datetime.time(23, 59)
+    tm_from = tm_from if tm_from else datetime.time(0)
+    tm_to = tm_to if tm_to else datetime.time(23, 59)
     def dttm2index(dt_init, dttm):
         days = (dttm.date() - dt_init).days
         return days * period_in_day + (dttm.hour * 60 + dttm.minute) // period_lengths_minutes
