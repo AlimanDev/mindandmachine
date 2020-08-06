@@ -1,4 +1,5 @@
 from rest_framework import serializers, viewsets, permissions
+from rest_framework.pagination import LimitOffsetPagination
 
 from src.timetable.models import WorkTypeName
 from src.base.serializers import BaseNetworkSerializer
@@ -15,6 +16,7 @@ class WorkTypeNameSerializer(BaseNetworkSerializer):
 class WorkTypeNameViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = WorkTypeNameSerializer
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
         return WorkTypeName.objects.filter(

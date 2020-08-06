@@ -1,6 +1,8 @@
 from rest_framework import serializers, viewsets, permissions
+from rest_framework.pagination import LimitOffsetPagination
 from src.forecast.models import OperationTypeName
 from src.base.serializers import BaseNetworkSerializer
+
 
 class OperationTypeNameSerializer(BaseNetworkSerializer):
     name = serializers.CharField(required=False)
@@ -68,6 +70,7 @@ class OperationTypeNameViewSet(viewsets.ModelViewSet):
     """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OperationTypeNameSerializer
+    pagination_class = LimitOffsetPagination
     def get_queryset(self):
         return OperationTypeName.objects.filter(
             network_id=self.request.user.network_id,
