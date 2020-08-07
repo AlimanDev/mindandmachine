@@ -1,11 +1,12 @@
 from rest_framework import serializers
-
+import json
 import pytz
 from django.utils import six
 from src.base.models import Shop
 from src.base.fields import CurrentUserNetwork
 from src.base.exceptions import MessageError
 from src.conf.djconfig import QOS_TIME_FORMAT
+from src.util.models_converter import Converter
 
 
 POSSIBLE_KEYS = [
@@ -42,17 +43,17 @@ class ShopSerializer(serializers.ModelSerializer):
         def validate_time(data):
             for key, value in data.items():
                 if not (key in POSSIBLE_KEYS):
-                    raise MessageError(code='error_in_time_keys', params={'possible_keys': ', '.join(POSSIBLE_KEYS), 'key': key})
+                    raise MessageError(code='error_in_time_keys', params={'possible_keys': ', '.join(POSSIBLE_KEYS), 'key': key}, lang=self.context['request'].user.lang)
             try:
                 Converter.parse_time(value)
             except:
-                raise MessageError(code='error_in_times', params={'time': value, 'key': key, 'format': QOS_TIME_FORMAT})
+                raise MessageError(code='error_in_times', params={'time': value, 'key': key, 'format': QOS_TIME_FORMAT}, lang=self.context['request'].user.lang)
             
         if self.validated_data.get('tm_open_dict'):
-            validate_time(self.validated_data.get('tm_open_dict'))
+            validate_time(json.loads(self.validated_data.get('tm_open_dict')))
         
         if self.validated_data.get('tm_close_dict'):
-            validate_time(self.validated_data.get('tm_close_dict'))
+            validate_time(json.loads(self.validated_data.get('tm_close_dict')))
         
         return True
 
