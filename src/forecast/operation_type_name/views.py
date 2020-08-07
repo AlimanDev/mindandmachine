@@ -2,6 +2,7 @@ from rest_framework import serializers, viewsets, permissions
 from rest_framework.pagination import LimitOffsetPagination
 from src.forecast.models import OperationTypeName
 from src.base.serializers import BaseNetworkSerializer
+from src.base.exceptions import MessageError
 
 
 class OperationTypeNameSerializer(BaseNetworkSerializer):
@@ -12,6 +13,17 @@ class OperationTypeNameSerializer(BaseNetworkSerializer):
         model = OperationTypeName
         fields = ['id', 'name', 'code', 'network_id']
 
+    
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+        self.validated_data['code'] = None if self.validated_data.get('code') == '' else self.validated_data.get('code')
+        if self.validated_data.get('code') and OperationTypeName.objects.filter(code=self.validated_data.get('code')).exists():
+            raise MessageError('unique_name_code', params={'code': self.validated_data.get('code')}, lang=self.context['request'].user.lang)
+        
+        if OperationTypeName.objects.filter(name=self.validated_data.get('name')).exists():
+            raise MessageError('unique_name_name', params={'name': self.validated_data.get('name')}, lang=self.context['request'].user.lang)
+
+        return True
 
 class OperationTypeNameViewSet(viewsets.ModelViewSet):
     """
