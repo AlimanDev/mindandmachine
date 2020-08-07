@@ -4,6 +4,15 @@ import pytz
 from django.utils import six
 from src.base.models import Shop
 from src.base.fields import CurrentUserNetwork
+from src.base.exceptions import MessageError
+from src.conf.djconfig import QOS_TIME_FORMAT
+
+
+POSSIBLE_KEYS = [
+    '0', '1', '2', '3', '4', '5', '6', 'all', 
+    'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6',
+]
+
 class TimeZoneField(serializers.ChoiceField):
     def __init__(self, **kwargs):
         super().__init__(pytz.common_timezones + [(None, "")], **kwargs)
@@ -27,6 +36,25 @@ class ShopSerializer(serializers.ModelSerializer):
         fields = ['id', 'parent_id', 'parent_code', 'name', 'settings_id', 'tm_open_dict', 'tm_close_dict',
                 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id', 
                 'network_id', 'restricted_start_times','restricted_end_times', 'exchange_settings_id', 'load_template_id', 'area']
+
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+        def validate_time(data):
+            for key, value in data.items():
+                if not (key in POSSIBLE_KEYS):
+                    raise MessageError(code='error_in_time_keys', params={'possible_keys': ', '.join(POSSIBLE_KEYS), 'key': key})
+            try:
+                Converter.parse_time(value)
+            except:
+                raise MessageError(code='error_in_times', params={'time': value, 'key': key, 'format': QOS_TIME_FORMAT})
+            
+        if self.validated_data.get('tm_open_dict'):
+            validate_time(self.validated_data.get('tm_open_dict'))
+        
+        if self.validated_data.get('tm_close_dict'):
+            validate_time(self.validated_data.get('tm_close_dict'))
+        
+        return True
 
 
 class ShopStatSerializer(serializers.Serializer):
