@@ -15,11 +15,14 @@ class WorkTypeNameSerializer(BaseNetworkSerializer):
     
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
+        exclude_filter = {}
+        if self.instance:
+            exclude_filter['pk'] = self.instance.id
         self.validated_data['code'] = None if self.validated_data.get('code') == '' else self.validated_data.get('code')
-        if self.validated_data.get('code') and WorkTypeName.objects.filter(code=self.validated_data.get('code')).exists():
+        if self.validated_data.get('code') and WorkTypeName.objects.filter(code=self.validated_data.get('code')).exclude(**exclude_filter).exists():
             raise MessageError('unique_name_code', params={'code': self.validated_data.get('code')}, lang=self.context['request'].user.lang)
         
-        if WorkTypeName.objects.filter(name=self.validated_data.get('name')).exists():
+        if WorkTypeName.objects.filter(name=self.validated_data.get('name')).exclude(**exclude_filter).exists():
             raise MessageError('unique_name_name', params={'name': self.validated_data.get('name')}, lang=self.context['request'].user.lang)
 
         return True
