@@ -1,4 +1,5 @@
 import datetime
+import json
 from timezone_field import TimeZoneField
 
 from django.db import models
@@ -9,6 +10,7 @@ from mptt.models import MPTTModel, TreeForeignKey
 from django.apps import apps
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
 from src.base.exceptions import MessageError
+from src.conf.djconfig import QOS_TIME_FORMAT
 
 
 class Network(AbstractActiveNamedModel):
@@ -22,7 +24,7 @@ class Network(AbstractActiveNamedModel):
     secondary_color = models.CharField(max_length=6, blank=True)
     # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
     need_symbol_for_vacancy = models.BooleanField(default=False)
-    settings_values = models.TextField(default='{}')
+    settings_values = models.TextField(default='{}')  # настройки для сети. Cейчас есть настройки для приемки чеков
 
     def get_department(self):
         return None
@@ -123,8 +125,10 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     count_lack = models.BooleanField(default=False)
 
-    tm_shop_opens = models.TimeField(default=datetime.time(6, 0))
-    tm_shop_closes = models.TimeField(default=datetime.time(23, 0))
+    tm_open_dict = models.TextField(default='{}')
+    tm_close_dict = models.TextField(default='{}')
+    area = models.FloatField(null=True) #Торговая площадь магазина
+
     restricted_start_times = models.CharField(max_length=1024, default='[]')
     restricted_end_times = models.CharField(max_length=1024, default='[]')
 
@@ -175,6 +179,10 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             self.parent = Shop.objects.get(code=code)
 
     def save(self, *args, **kwargs):
+        if hasattr(self, 'tm_open_dict'):
+            self.tm_open_dict = self.tm_open_dict.replace('d', '')
+        if hasattr(self, 'tm_close_dict'):
+            self.tm_close_dict = self.tm_close_dict.replace('d', '')
         if hasattr(self, 'parent_code'):
             self.parent = Shop.objects.get(code=self.parent_code)
         super().save(*args, **kwargs)
@@ -187,6 +195,18 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 network_id=self.network_id, 
                 shops__isnull=True,
             ).first()
+    
+    def open_times(self):
+        return {
+            k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
+            for k, v in json.loads(self.tm_open_dict).items()
+        }
+
+    def close_times(self):
+        return {
+            k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
+            for k, v in json.loads(shop.tm_close_dict).items()
+        }
 
 
 class EmploymentManager(models.Manager):

@@ -52,7 +52,17 @@ class Migration(migrations.Migration):
                 ('working_shift_min_hours', models.DurationField(default=datetime.timedelta(0, 14400))),
                 ('working_shift_max_hours', models.DurationField(default=datetime.timedelta(0, 43200))),
                 ('automatic_worker_select_tree_level', models.IntegerField(default=1)),
+                ('automatic_exchange', models.BooleanField(default=False)),
+                ('automatic_holiday_worker_select_timegap', models.DurationField(default=datetime.timedelta(8))),
+                ('automatic_worker_select_timegap_to', models.DurationField(default=datetime.timedelta(2))),
+                ('constraints', models.CharField(default='{"second_day_before": 40, "second_day_after": 32, "first_day_after": 32, "first_day_before": 40, "1day_before": 40, "1day_after": 40}', max_length=250)),
+                ('max_working_hours', models.IntegerField(default=192)),
             ],
+        ),
+        migrations.AddField(
+            model_name='exchangesettings',
+            name='exclude_positions',
+            field=models.ManyToManyField(to='base.WorkerPosition'),
         ),
         migrations.CreateModel(
             name='Slot',
@@ -86,6 +96,7 @@ class Migration(migrations.Migration):
                 ('employment', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='base.Employment')),
                 ('parent_worker_day', models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='child', to='timetable.WorkerDay')),
                 ('shop', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='base.Shop')),
+                ('canceled', models.BooleanField(default=False)),
             ],
             options={
                 'verbose_name': 'Рабочий день сотрудника',
@@ -127,6 +138,7 @@ class Migration(migrations.Migration):
                 ('on_cashbox', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='timetable.Cashbox')),
                 ('work_type', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='timetable.WorkType')),
                 ('worker_day', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='timetable.WorkerDay')),
+                ('work_part', models.FloatField(default=1.0)),
             ],
             options={
                 'verbose_name': 'Детали в течение рабочего дня',
@@ -257,7 +269,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'verbose_name': 'Ограничения сотрудника',
-                'unique_together': {('worker', 'weekday', 'tm')},
+                'unique_together': {('employment', 'weekday', 'tm')},
             },
         ),
         migrations.CreateModel(
@@ -300,5 +312,9 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': 'Расписания',
                 'unique_together': {('shop', 'dt')},
             },
+        ),
+        migrations.AlterUniqueTogether(
+            name='workerconstraint',
+            unique_together={('employment', 'weekday', 'tm')},
         ),
     ]
