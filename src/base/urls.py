@@ -36,6 +36,8 @@ router.register(r'subscribe', SubscribeViewSet, basename='Subscribe')
 router.register(r'notification', NotificationViewSet, basename='Notification')
 router.register(r'shop_settings', ShopSettingsViewSet, basename='ShopSettings')
 router.register(r'network', NetworkViewSet, basename='Network')
+router.register(r'function_group', FunctionGroupView, basename='FunctionGroup')
+
 
 
 # Wire up our API using automatic URL routing.

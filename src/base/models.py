@@ -473,6 +473,7 @@ class FunctionGroup(AbstractModel):
         'ShopMonthStat_status',
         'ShopSettings',
         'VacancyBlackList',
+        'FunctionGroup',
 
         'signout',
         'password_edit',

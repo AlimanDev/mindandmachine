@@ -135,9 +135,10 @@ class AuthUserView(UserDetailsView):
     serializer_class = AuthUserSerializer
 
 
-class FunctionGroupView(ListAPIView):
-    permission_classes = [IsAuthenticated]
+class FunctionGroupView(ModelViewSet):
+    permission_classes = [Permission]
     serializer_class = FunctionGroupSerializer
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
         user = self.request.user
@@ -153,6 +154,7 @@ class FunctionGroupView(ListAPIView):
 class WorkerPositionViewSet(ModelViewSet):
     permission_classes = [Permission]
     serializer_class = WorkerPositionSerializer
+    pagination_class = LimitOffsetPagination
 
     def get_object(self):
         if self.request.method == 'GET':
