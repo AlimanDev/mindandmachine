@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from src.util.test import create_departments_and_users
 
-from src.base.models import Shop, FunctionGroup
+from src.base.models import Shop, FunctionGroup, ShopSettings
 from src.timetable.models import ShopMonthStat
 
 class TestDepartment(APITestCase):
@@ -20,6 +20,8 @@ class TestDepartment(APITestCase):
         self.url = '/rest_api/department/'
 
         create_departments_and_users(self)
+        self.settings = ShopSettings.objects.first()
+
 
         self.shop_url = f"{self.url}{self.shop.id}/"
         self.client.force_authenticate(user=self.user1)
@@ -102,6 +104,9 @@ class TestDepartment(APITestCase):
             "dt_opened": '2019-01-01',
             # "dt_closed": None,
             "timezone": 'Europe/Moscow',
+            'restricted_end_times': '[]',
+            'restricted_start_times': '[]',
+            'settings_id': self.settings.id,
         }
         # response = self.client.post(self.url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -139,7 +144,10 @@ class TestDepartment(APITestCase):
             "dt_opened": '2019-01-01',
             "dt_closed": "2020-01-01",
             "timezone": 'Europe/Berlin',
-            "area": None
+            'restricted_end_times': '[]',
+            'restricted_start_times': '[]',
+            'settings_id': self.settings.id,
+            "area": None,
         }
         # response = self.client.put(self.shop_url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
