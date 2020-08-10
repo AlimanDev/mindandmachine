@@ -22,7 +22,7 @@ rest_auth_urls = [
     url(r'^logout/$', LogoutView.as_view(), name='rest_logout'),
     url(r'^password/change/$', PasswordChangeView.as_view(), name='rest_password_change'),
     url(r'^user/$', AuthUserView.as_view(), name='user'),
-    url(r'^allowed_functions/$', FunctionGroupView.as_view({'get': 'list'}), name='FunctionGroup'),
+    url(r'^allowed_functions/$', FunctionGroupView.as_view({'get': 'list'}), name='user'),
     # url(r'^notification', NotificationViewSet.as_view(), name='notification')
 ]
 
@@ -36,7 +36,7 @@ router.register(r'subscribe', SubscribeViewSet, basename='Subscribe')
 router.register(r'notification', NotificationViewSet, basename='Notification')
 router.register(r'shop_settings', ShopSettingsViewSet, basename='ShopSettings')
 router.register(r'network', NetworkViewSet, basename='Network')
-router.register(r'function_group', FunctionGroupView, basename='FunctionGroup')
+router.register(r'function_group', FunctionGroupView, basename='FunctionGroupView')
 
 
 
