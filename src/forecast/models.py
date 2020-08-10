@@ -327,6 +327,7 @@ class PeriodDemandChangeLog(AbstractModel):
     multiply_coef = models.FloatField(null=True, blank=True)
     set_value = models.FloatField(null=True, blank=True)
 
+
 class Receipt(AbstractModel):
     class Meta(object):
         verbose_name='Чеки'

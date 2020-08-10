@@ -9,6 +9,7 @@ from src.forecast.models import (
     LoadTemplate,
     OperationTypeTemplate,
     OperationTypeRelation,
+    Receipt,
 )
 
 
@@ -92,3 +93,9 @@ class OperationTypeTemplateAdmin(admin.ModelAdmin):
 @admin.register(OperationTypeRelation)
 class OperationTypeRelationAdmin(admin.ModelAdmin):
     list_display = ('id', 'base_id', 'depended_id', 'formula')
+
+
+
+@admin.register(Receipt)
+class ReceiptAdmin(admin.ModelAdmin):
+    list_display = ('id', 'shop_id', 'dttm_modified', 'code')

@@ -1,65 +1,79 @@
-from rest_framework import serializers, viewsets, exceptions, permissions
-
-from django_filters.rest_framework import FilterSet
-from django_filters import NumberFilter
+from src.base.permissions import FilteredListPermission
+from src.base.exceptions import MessageError
+from rest_framework import serializers, viewsets, status, exceptions, permissions
+from rest_framework.response import Response
 
 from src.forecast.models import Receipt
 from src.base.models import Shop
 import json
 
-class ReceiptSerializer(serializers.ModelSerializer):
-    shop_id = serializers.IntegerField(required=False)
-    code = serializers.UUIDField(required=False)
-    dttm = serializers.DateTimeField(required=False)
-    info = serializers.JSONField()
 
-    class Meta:
-        model = Receipt
-        fields = [
-            'id', 'code', 'dttm', 'dttm_added', 'dttm_modified', 'shop_id', 'info',
-        ]
-        read_only_fields = ['dttm_added', 'dttm_modified']
+class PeriodClientsCreateSerializer(serializers.Serializer):
+    data = serializers.JSONField(write_only=True)
+
+# TODO: rewrite with check network
+# TODO: documantation
+class ReceiptViewSet(viewsets.ModelViewSet):
+    """
+    """
+    permission_classes = [FilteredListPermission]
+
+    def get_queryset(self):
+        return self.filter_queryset(Receipt.objects.all())
+
+    def get_object(self):
+        if self.request.method == 'GET':
+            by_code = self.request.query_params.get('by_code', False)
+        else:
+            by_code = self.request.data.get('by_code', False)
+        if by_code:
+            self.lookup_field = 'code'
+            self.kwargs['code'] = self.kwargs['pk']
+        return super().get_object()
+
+    def create(self, request, *args, **kwargs):
+        data = PeriodClientsCreateSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        data = data.validated_data['data']
+
+        shop_dict = {shop.code: shop.id for shop in Shop.objects.filter(code__in=[receipt['КодМагазина'] for receipt in data])}
+        receipt_codes = [receipt['Ссылка'] for receipt in data]
+        receipts = []
+        for receipt in data:
+            if shop_dict.get(receipt['КодМагазина'], '') == '':
+                raise MessageError(code='no_such_shop', params={'key': receipt['КодМагазина']})
+
+            receipts.append(Receipt(
+                shop_id=shop_dict[receipt['КодМагазина']],
+                code=receipt['Ссылка'],
+                dttm=receipt['Дата'],
+                info=json.dumps(receipt),
+            ))
+        if Receipt.objects.filter(code__in=receipt_codes).count():
+            raise MessageError(code='multi_object_unique')
+
+        Receipt.objects.bulk_create(receipts)
+        return Response(status=status.HTTP_201_CREATED)
 
 
-    def create(self, validated_data):
-        info = validated_data['info']
-        try:
-            shop = Shop.objects.get(code=info['КодМагазина'])
-        except Shop.DoesNotExist:
-            raise exceptions.ValidationError(f"Department with code {info['КодМагазина']} does not exist")
-        validated_data['shop_id'] = shop.id
-        validated_data['code'] = info['Ссылка']
-        validated_data['dttm'] = info['Дата']
-        validated_data['info'] = json.dumps(info)
-        return Receipt.objects.create(**validated_data)
+    def update(self, request, *args, **kwargs):
+        data = PeriodClientsCreateSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        data = data.validated_data['data']
 
-    def update(self, instance, validated_data):
-        info = validated_data['info']
-        instance.dttm = info['Дата']
-        instance.is_aggregated = False
-        instance.info = json.dumps(info)
+        shop = Shop.objects.filter(code=data['КодМагазина']).first()
+        if shop is None:
+            raise MessageError(code='no_such_shop', params={'key': data['КодМагазина']})
+        instance = self.get_object()
+        instance.shop_id=shop.id
+        instance.code=data['Ссылка']
+        instance.dttm=data['Дата']
+        instance.info=json.dumps(data)
         instance.save()
 
+        return Response(data)
 
-class ReceiptFilter(FilterSet):
-    shop_id = NumberFilter()
 
-    class Meta:
-        model = Receipt
-        fields=['shop_id']
-
- 
-class ReceiptViewSet(viewsets.ModelViewSet):
-    queryset = Receipt.objects.all()
-    permission_classes = [permissions.IsAdminUser]
-    filterset_class = ReceiptFilter
-    serializer_class = ReceiptSerializer
-
-    def get_serializer(self, *args, **kwargs):
-        """ if an array is passed, set serializer to many """
-        if isinstance(kwargs.get('data', {}), list):
-            kwargs['many'] = True
-        return super(ReceiptViewSet, self).get_serializer(*args, **kwargs)
 # {
 # "Ссылка": "954a22a1-cd84-11ea-8edf-00155d012a03",
 # "Дата": "2020-07-24T11:06:32",
