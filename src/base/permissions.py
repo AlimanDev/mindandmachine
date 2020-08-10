@@ -25,7 +25,7 @@ class Permission(permissions.BasePermission):
         return self.check_employment_permission(employments, request, view)
 
     def has_object_permission(self, request, view, obj):
-        department = obj.get_department()
+        # department = obj.get_department()
 
 
         employments = Employment.objects.get_active(
@@ -37,7 +37,7 @@ class Permission(permissions.BasePermission):
     def check_employment_permission(self, employments, request, view):
         method = request.method
         action = view.action
-        func = view.basename
+        func = view.basename or type(view).__name__
 
         request.employments=employments
 
