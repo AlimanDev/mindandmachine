@@ -40,6 +40,7 @@ class ShopSerializer(serializers.ModelSerializer):
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
+
         def validate_time(data):
             for key, value in data.items():
                 if not (key in POSSIBLE_KEYS):
@@ -50,10 +51,10 @@ class ShopSerializer(serializers.ModelSerializer):
                 raise MessageError(code='error_in_times', params={'time': value, 'key': key, 'format': QOS_TIME_FORMAT}, lang=self.context['request'].user.lang)
             
         if self.validated_data.get('tm_open_dict'):
-            validate_time(json.loads(self.validated_data.get('tm_open_dict')))
+            validate_time(self.validated_data.get('tm_open_dict'))
         
         if self.validated_data.get('tm_close_dict'):
-            validate_time(json.loads(self.validated_data.get('tm_close_dict')))
+            validate_time(self.validated_data.get('tm_close_dict'))
         
         return True
 

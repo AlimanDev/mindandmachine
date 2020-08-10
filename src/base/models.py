@@ -178,14 +178,24 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         if code:
             self.parent = Shop.objects.get(code=code)
 
+    @staticmethod
+    def clean_time_dict(time_dict):
+        new_dict = dict(time_dict)
+        dict_keys = list(new_dict.keys())
+        for key in dict_keys:
+            if 'd' in key:
+                new_dict[key.replace('d', '')] = new_dict.pop(key)
+        return json.dumps(new_dict)  # todo: actually values should be time object, so  django json serializer should be used
+
     def save(self, *args, **kwargs):
         if hasattr(self, 'tm_open_dict'):
-            self.tm_open_dict = self.tm_open_dict.replace('d', '')
+            self.tm_open_dict = self.clean_time_dict(self.tm_open_dict)
         if hasattr(self, 'tm_close_dict'):
-            self.tm_close_dict = self.tm_close_dict.replace('d', '')
+            self.tm_close_dict = self.clean_time_dict(self.tm_close_dict)
         if hasattr(self, 'parent_code'):
             self.parent = Shop.objects.get(code=self.parent_code)
         super().save(*args, **kwargs)
+
     def get_exchange_settings(self):
         return self.exchange_settings if self.exchange_settings_id\
             else apps.get_model(
@@ -195,7 +205,8 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 network_id=self.network_id, 
                 shops__isnull=True,
             ).first()
-    
+
+    # todo: rewrite
     def open_times(self):
         return {
             k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
@@ -205,7 +216,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     def close_times(self):
         return {
             k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
-            for k, v in json.loads(shop.tm_close_dict).items()
+            for k, v in json.loads(self.tm_close_dict).items()
         }
 
 

@@ -26,10 +26,11 @@ class NetworkSerializer(serializers.ModelSerializer):
 
 class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
+    network_id = serializers.HiddenField(default=CurrentUserNetwork())
 
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'middle_name',
+        fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
                   'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
 
 

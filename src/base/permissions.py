@@ -21,16 +21,15 @@ class Permission(permissions.BasePermission):
 
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
-            user=request.user).select_related('position')
+            user=request.user
+        ).select_related('position')
         return self.check_employment_permission(employments, request, view)
 
     def has_object_permission(self, request, view, obj):
-        department = obj.get_department()
-
-
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
-            user=request.user).select_related('position')
+            user=request.user
+        ).select_related('position')
 
         return self.check_employment_permission(employments, request, view)
 
@@ -38,7 +37,6 @@ class Permission(permissions.BasePermission):
         method = request.method
         action = view.action
         func = view.basename
-
         request.employments=employments
 
         if not self.actions.get(action) or method != self.actions[action]:
