@@ -1,4 +1,4 @@
-from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter, DateFilter, TimeFilter
+from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter, DateFilter, TimeFilter, CharFilter
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 from django.db.models import Q
 
@@ -22,6 +22,7 @@ class WorkerDayFilter(FilterSet):
         fields = {
             # 'shop_id':['exact'],
             'worker_id':['in','exact'],
+            'worker__username': ['in', 'exact'],
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
             'is_fact': ['exact']

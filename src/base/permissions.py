@@ -21,16 +21,15 @@ class Permission(permissions.BasePermission):
 
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
-            user=request.user).select_related('position')
+            user=request.user
+        ).select_related('position')
         return self.check_employment_permission(employments, request, view)
 
     def has_object_permission(self, request, view, obj):
-        department = obj.get_department()
-
-
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
-            user=request.user).select_related('position')
+            user=request.user
+        ).select_related('position')
 
         return self.check_employment_permission(employments, request, view)
 
@@ -38,7 +37,6 @@ class Permission(permissions.BasePermission):
         method = request.method
         action = view.action
         func = view.basename
-
         request.employments=employments
 
         if not self.actions.get(action) or method != self.actions[action]:
@@ -65,14 +63,15 @@ class FilteredListPermission(Permission):
 
         if request.method == 'GET':
             shop_id = request.query_params.get('shop_id')
-            if not shop_id:
+            shop_code = request.query_params.get('shop_code')
+            if not shop_id and not shop_code:
                 raise ValidationError("shop_id should be defined")
         else:
             shop_id = request.data.get('shop_id')
             # shop_id не меняется, права задаются has_object_permission
             if not shop_id:
                 return True
-        department = Shop.objects.get(id=shop_id)
+        department = Shop.objects.get(id=shop_id) if shop_id else Shop.objects.get(code=shop_code)
 
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,

@@ -18,6 +18,7 @@ class ShopFilter(FilterSet):
         model = Shop
         fields = {
             'id':['exact', 'in'],
+            'code': ['exact', 'in'],
         }
 
 
