@@ -11,6 +11,7 @@ from django.apps import apps
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
 from src.base.exceptions import MessageError
 from src.conf.djconfig import QOS_TIME_FORMAT
+from django.core.serializers.json import DjangoJSONEncoder
 
 
 class Network(AbstractActiveNamedModel):
@@ -178,6 +179,25 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         if code:
             self.parent = Shop.objects.get(code=code)
 
+
+    def __getattribute__(self, attr):
+        if attr in ['open_times', 'close_times']:
+            try:
+                return super().__getattribute__(attr)
+            except:
+                fields_scope = {
+                    'open_times': 'tm_open_dict',
+                    'close_times': 'tm_close_dict',
+                }
+                try:
+                    self.__setattr__(attr, {
+                        k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
+                        for k, v in json.loads(getattr(self, fields_scope.get(attr))).items()
+                    })
+                except:
+                    return {}
+        return super().__getattribute__(attr)
+
     @staticmethod
     def clean_time_dict(time_dict):
         new_dict = dict(time_dict)
@@ -188,10 +208,12 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         return json.dumps(new_dict)  # todo: actually values should be time object, so  django json serializer should be used
 
     def save(self, *args, **kwargs):
+        open_times = self.open_times
+        close_times = self.close_times
         if hasattr(self, 'tm_open_dict'):
-            self.tm_open_dict = self.clean_time_dict(self.tm_open_dict)
+            self.tm_open_dict = self.clean_time_dict(self.open_times)
         if hasattr(self, 'tm_close_dict'):
-            self.tm_close_dict = self.clean_time_dict(self.tm_close_dict)
+            self.tm_close_dict = self.clean_time_dict(self.close_times)
         if hasattr(self, 'parent_code'):
             self.parent = Shop.objects.get(code=self.parent_code)
         super().save(*args, **kwargs)
@@ -206,18 +228,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 shops__isnull=True,
             ).first()
 
-    # todo: rewrite
-    def open_times(self):
-        return {
-            k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
-            for k, v in json.loads(self.tm_open_dict).items()
-        }
-
-    def close_times(self):
-        return {
-            k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
-            for k, v in json.loads(self.tm_close_dict).items()
-        }
 
 
 class EmploymentManager(models.Manager):
