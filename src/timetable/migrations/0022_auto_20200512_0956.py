@@ -14,14 +14,4 @@ class Migration(migrations.Migration):
             name='shopmonthstat',
             options={'verbose_name': 'Статистика по мгазину за месяц', 'verbose_name_plural': 'Статистики по мгазинам за месяц'},
         ),
-        migrations.AddField(
-            model_name='workerday',
-            name='canceled',
-            field=models.BooleanField(default=False),
-        ),
-        migrations.AddField(
-            model_name='workerdaycashboxdetails',
-            name='work_part',
-            field=models.FloatField(default=1.0),
-        ),
     ]

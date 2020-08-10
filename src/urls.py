@@ -22,10 +22,9 @@ from src.base import urls as base_api
 from src.timetable import urls as timetable_api
 from src.forecast import urls as forecast_api
 
-
+from src.misc import urls as misc_api
 api_urlpatterns = [
     path('auth/', include(auth_urls)),
-    # path('camera/', include(camera_urls)),
     path('cashbox/', include(cashbox_urls)),
     path('demand/', include(demand_urls)),
     path('download/', include(download_urls)),
@@ -34,10 +33,10 @@ api_urlpatterns = [
     path('shop/', include(shop_urls)),
     path('tablet/', include(tablet_urls)),
     path('timetable/', include(timetable_urls)),
-    # path('queue/', include(queue_urls)),
     path('upload/', include(upload_urls)),
     path('urv/', include(urv_urls)),
 ]
+
 
 urlpatterns = [
     path('api/', include(api_urlpatterns)),
@@ -45,7 +44,9 @@ urlpatterns = [
     path('rest_api/', include(
         base_api.urlpatterns +
         timetable_api.urlpatterns +
-        forecast_api.urlpatterns)),
+        forecast_api.urlpatterns +
+        misc_api.urlpatterns
+    )),
 ]
 
 if settings.QOS_DEV_STATIC_ENABLED:
