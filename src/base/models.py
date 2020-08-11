@@ -205,15 +205,22 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         for key in dict_keys:
             if 'd' in key:
                 new_dict[key.replace('d', '')] = new_dict.pop(key)
-        return json.dumps(new_dict)  # todo: actually values should be time object, so  django json serializer should be used
+        return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
 
     def save(self, *args, **kwargs):
         open_times = self.open_times
         close_times = self.close_times
-        if hasattr(self, 'tm_open_dict'):
-            self.tm_open_dict = self.clean_time_dict(self.open_times)
-        if hasattr(self, 'tm_close_dict'):
-            self.tm_close_dict = self.clean_time_dict(self.close_times)
+        if open_times.keys() != close_times.keys():
+            raise MessageError(code='time_shop_differerent_keys')
+        if open_times.get('all') and len(open_times) != 1:
+            raise MessageError(code='time_shop_all_or_days')
+        
+        for key in open_times.keys():
+            close_hour = close_times[key].hour if close_times[key].hour != 0 else 24
+            if open_times[key].hour > close_hour:
+                raise MessageError(code='time_shop_incorrect_time_start_end')
+        self.tm_open_dict = self.clean_time_dict(self.open_times)
+        self.tm_close_dict = self.clean_time_dict(self.close_times)
         if hasattr(self, 'parent_code'):
             self.parent = Shop.objects.get(code=self.parent_code)
         super().save(*args, **kwargs)

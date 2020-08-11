@@ -138,8 +138,8 @@ class ShopViewSet(viewsets.ModelViewSet):
             child_list.append({
                 "id": shop.id,
                 "label": shop.name,
-                "tm_open_dict": shop.tm_open_dict,
-                "tm_close_dict" :shop.tm_close_dict,
+                "tm_open_dict": shop.open_times,
+                "tm_close_dict" :shop.close_times,
                 "forecast_step_minutes":shop.forecast_step_minutes,
                 "children": []
             })

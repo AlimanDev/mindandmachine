@@ -619,8 +619,8 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
         return
     if not exchange_settings.automatic_check_lack:
         return
-    tm_open_dict = shop.open_times()
-    tm_close_dict = shop.close_times()
+    tm_open_dict = shop.open_times
+    tm_close_dict = shop.close_times
 
     if dt_from is None:
         dttm_now = now().replace(minute=0, second=0, microsecond=0)
