@@ -50,10 +50,10 @@ class TestCelery(LocalTestCase):
     #     self.assertEqual(worker_month_stat[4].work_hours, 179.25)
 
 
-    def test_release_all_workers(self):
-        release_all_workers()
-        amount_of_unreleased_workers = WorkerDayCashboxDetails.objects.filter(dttm_to__isnull=True).count()
-        self.assertEqual(amount_of_unreleased_workers, 0)
+    # def test_release_all_workers(self):
+    #     release_all_workers()
+    #     amount_of_unreleased_workers = WorkerDayCashboxDetails.objects.filter(dttm_to__isnull=True).count()
+    #     self.assertEqual(amount_of_unreleased_workers, 0)
 
     # def test_notify_cashiers_lack(self):
     #     dt_now = now().date()
@@ -70,15 +70,15 @@ class TestCelery(LocalTestCase):
     #     Notifications.objects.all().delete()  # удаляем только что созданные
     #     Notifications.objects.bulk_create(existing_notifications)  # возвращаем те, которые были до этого
 
-    def test_allocation_of_time_for_work_on_cashbox(self):
-        allocation_of_time_for_work_on_cashbox()
-        x = EmploymentWorkType.objects.all()
-        self.assertEqual(x[0].duration, 0)
-        # x[1].duration = 81.0
-        # self.assertEqual(x[1].duration, 0)
-        self.assertEqual(x[2].duration, 0)
-        # 0.0 not greater than 0
-        # self.assertGreater(x[3].duration, 0)
+    # def test_allocation_of_time_for_work_on_cashbox(self):
+    #     allocation_of_time_for_work_on_cashbox()
+    #     x = EmploymentWorkType.objects.all()
+    #     self.assertEqual(x[0].duration, 0)
+    #     # x[1].duration = 81.0
+    #     # self.assertEqual(x[1].duration, 0)
+    #     self.assertEqual(x[2].duration, 0)
+    #     # 0.0 not greater than 0
+    #     # self.assertGreater(x[3].duration, 0)
 
     def test_create_pred_bills(self):
         from django.core.exceptions import EmptyResultSet
