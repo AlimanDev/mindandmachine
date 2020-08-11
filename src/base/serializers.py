@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.db.models import Q
 
-from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings
+from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop
 from src.base.message import Message
 from src.base.fields import CurrentUserNetwork
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
@@ -45,10 +45,11 @@ class UserListSerializer(serializers.Serializer):
 
 class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
+    network_id = serializers.HiddenField(default=CurrentUserNetwork())
 
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'middle_name',
+        fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
                   'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
 
 
@@ -57,6 +58,7 @@ class AuthUserSerializer(UserSerializer):
 
     class Meta(UserSerializer.Meta):
         fields = UserSerializer.Meta.fields + ['network']
+
 
 class PasswordSerializer(serializers.Serializer):
     default_error_messages = {
@@ -123,20 +125,25 @@ class EmploymentSerializer(serializers.ModelSerializer):
         "emp_check_dates": _("Employment from {dt_hired} to {dt_fired} already exists."),
     }
     user = UserSerializer(read_only=True)
-    position_id = serializers.IntegerField()
+    position_id = serializers.IntegerField(required=False)
+    position_code = serializers.CharField(required=False, source='position.code')
     shop_id = serializers.IntegerField(required=False)
+    shop_code = serializers.CharField(required=False, source='shop.code')
     user_id = serializers.IntegerField(required=False)
     work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
+    username = serializers.CharField(required=False, source='user.username')
+    dt_hired = serializers.DateField(required=True)
 
     class Meta:
         model = Employment
         fields = ['id', 'user_id', 'shop_id', 'position_id', 'is_fixed_hours', 'dt_hired', 'dt_fired',
                   'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
                   'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
-                  'dt_new_week_availability_from', 'user', 'is_visible',  'worker_constraints', 'work_types'
+                  'dt_new_week_availability_from', 'user', 'is_visible',  'worker_constraints', 'work_types',
+                  'shop_code', 'position_code', 'username'
         ]
-        create_only_fields = ['user_id', 'shop_id']
+        create_only_fields = ['user_id', 'shop_id', 'shop', 'tabel_code', 'user']
         read_only_fields = ['user']
 
     def validate(self, attrs):
@@ -144,10 +151,23 @@ class EmploymentSerializer(serializers.ModelSerializer):
             user_id = self.instance.user_id
             shop_id = self.instance.shop_id
         else:
+            if not attrs.get('user_id'):
+                user = attrs.pop('user')
+                attrs['user_id'] = User.objects.get(username=user['username']).id
+
+            if not attrs.get('shop_id'):
+                shop = attrs.pop('shop')
+                attrs['shop_id'] = Shop.objects.get(code=shop['code']).id
+
             user_id = attrs['user_id']
             shop_id = attrs['shop_id']
+
+        position = attrs.pop('position', None)
+        if position and 'code' in position and not attrs.get('position_id'):
+            attrs['position_id'] = WorkerPosition.objects.get(code=position['code']).id
+
         employments = Employment.objects.filter(
-            Q(dt_fired__isnull=True)|Q(dt_fired__gte=attrs['dt_hired']),
+            Q(dt_fired__isnull=True)|Q(dt_fired__gte=attrs.get('dt_hired')),
             user_id=user_id,
             shop_id=shop_id,
         )
@@ -178,17 +198,20 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 if field in data:
                     data.pop(field)
         else:
-            # shop_id is required for create
-            for field in self.Meta.create_only_fields:
-                if field not in data:
-                    raise ValidationError({field: self.error_messages['required']})
+            if 'shop_id' not in data and 'shop' not in data and 'code' not in data['shop']:
+                raise ValidationError({'shop_id': self.error_messages['required']})
+            if 'user_id' not in data and 'user' not in data:
+                raise ValidationError({'user_id': self.error_messages['required']})
+            if 'position_id' not in data and 'position' not in data:
+                raise ValidationError({'position_id': self.error_messages['required']})
+
         return data
 
 
 class WorkerPositionSerializer(BaseNetworkSerializer):
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name', 'network_id']
+        fields = ['id', 'name', 'network_id', 'code']
 
 
 class EventSerializer(serializers.ModelSerializer):

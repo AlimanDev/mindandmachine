@@ -46,7 +46,7 @@ class PeriodClientsAdmin(admin.ModelAdmin):
 
     @staticmethod
     def operation_type_name(instance: PeriodClients):
-        return instance.operation_type.operation_ype_name.name or instance.operation_type.id
+        return instance.operation_type.operation_type_name.name or instance.operation_type.id
 
 
 @admin.register(PeriodDemandChangeLog)

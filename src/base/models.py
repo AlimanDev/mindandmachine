@@ -1,4 +1,5 @@
 import datetime
+import json
 from timezone_field import TimeZoneField
 
 from django.db import models
@@ -6,20 +7,24 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from mptt.models import MPTTModel, TreeForeignKey
-
+from django.apps import apps
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
+from src.base.exceptions import MessageError
+from src.conf.djconfig import QOS_TIME_FORMAT
 
 
 class Network(AbstractActiveNamedModel):
     class Meta:
         verbose_name = 'Сеть магазинов'
         verbose_name_plural = 'Сети магазинов'
+
     logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
     url = models.CharField(blank=True,null=True,max_length=255)
     primary_color = models.CharField(max_length=6, blank=True)
     secondary_color = models.CharField(max_length=6, blank=True)
     # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
     need_symbol_for_vacancy = models.BooleanField(default=False)
+    settings_values = models.TextField(default='{}')  # настройки для сети. Cейчас есть настройки для приемки чеков
 
     def get_department(self):
         return None
@@ -120,22 +125,25 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     count_lack = models.BooleanField(default=False)
 
-    tm_shop_opens = models.TimeField(default=datetime.time(6, 0))
-    tm_shop_closes = models.TimeField(default=datetime.time(23, 0))
+    tm_open_dict = models.TextField(default='{}')
+    tm_close_dict = models.TextField(default='{}')
+    area = models.FloatField(null=True) #Торговая площадь магазина
+
     restricted_start_times = models.CharField(max_length=1024, default='[]')
     restricted_end_times = models.CharField(max_length=1024, default='[]')
 
-    load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops')
+    load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
+    exchange_settings = models.ForeignKey('timetable.ExchangeSettings', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
 
     staff_number = models.SmallIntegerField(default=0)
 
-    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
+    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True, blank=True)
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
     email = models.EmailField(blank=True, null=True)
-    exchange_shops = models.ManyToManyField('self')
+    exchange_shops = models.ManyToManyField('self', blank=True)
 
-    settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True)
+    settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -163,6 +171,53 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         return self.get_ancestors().filter(level=level)[0]
     def get_department(self):
         return self
+
+    def __init__(self, *args, **kwargs):
+        code = kwargs.pop('parent_code', None)
+        super().__init__(*args, **kwargs)
+        if code:
+            self.parent = Shop.objects.get(code=code)
+
+    @staticmethod
+    def clean_time_dict(time_dict):
+        new_dict = dict(time_dict)
+        dict_keys = list(new_dict.keys())
+        for key in dict_keys:
+            if 'd' in key:
+                new_dict[key.replace('d', '')] = new_dict.pop(key)
+        return json.dumps(new_dict)  # todo: actually values should be time object, so  django json serializer should be used
+
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'tm_open_dict'):
+            self.tm_open_dict = self.clean_time_dict(self.tm_open_dict)
+        if hasattr(self, 'tm_close_dict'):
+            self.tm_close_dict = self.clean_time_dict(self.tm_close_dict)
+        if hasattr(self, 'parent_code'):
+            self.parent = Shop.objects.get(code=self.parent_code)
+        super().save(*args, **kwargs)
+
+    def get_exchange_settings(self):
+        return self.exchange_settings if self.exchange_settings_id\
+            else apps.get_model(
+                'timetable', 
+                'ExchangeSettings',
+            ).objects.filter(
+                network_id=self.network_id, 
+                shops__isnull=True,
+            ).first()
+
+    # todo: rewrite
+    def open_times(self):
+        return {
+            k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
+            for k, v in json.loads(self.tm_open_dict).items()
+        }
+
+    def close_times(self):
+        return {
+            k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
+            for k, v in json.loads(self.tm_close_dict).items()
+        }
 
 
 class EmploymentManager(models.Manager):
@@ -287,7 +342,7 @@ class User(DjangoAbstractUser, AbstractModel):
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     access_token = models.CharField(max_length=64, blank=True, null=True)
-    tabel_code = models.CharField(blank=True, max_length=15, null=True, unique=True)
+    tabel_code = models.CharField(blank=True, max_length=64, null=True, unique=True)
     lang = models.CharField(max_length=2, default='ru')
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     black_list_symbol = models.CharField(max_length=128, null=True, blank=True)
@@ -307,6 +362,9 @@ class WorkerPosition(AbstractActiveNamedModel):
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
+
+    def get_department(self):
+        return None
 
 
 class Employment(AbstractActiveModel):
@@ -338,7 +396,7 @@ class Employment(AbstractActiveModel):
 
     auto_timetable = models.BooleanField(default=True)
 
-    tabel_code = models.CharField(max_length=15, null=True, blank=True)
+    tabel_code = models.CharField(max_length=64, null=True, blank=True)
     is_ready_for_overworkings = models.BooleanField(default=False)
 
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
@@ -347,7 +405,9 @@ class Employment(AbstractActiveModel):
     objects = EmploymentManager()
 
     def has_permission(self, permission, method='GET'):
-        group = self.function_group or self.position.group
+        group = self.function_group or (self.position.group if self.position else None)
+        if not group:
+            raise MessageError(code='no_group_or_position')
         return group.allowed_functions.filter(
             func=permission,
             method=method
@@ -355,6 +415,30 @@ class Employment(AbstractActiveModel):
 
     def get_department(self):
         return self.shop
+
+    def __init__(self, *args, **kwargs):
+        shop_code = kwargs.pop('shop_code', None)
+        username = kwargs.get('username', None)
+        user_id = kwargs.get('user_id', None)
+        position_code = kwargs.pop('position_code', None)
+        super().__init__(*args, **kwargs)
+        if shop_code:
+            self.shop = Shop.objects.get(code=shop_code)
+        if username and not user_id:
+            self.user = User.objects.get(username=username)
+            self.user_id = self.user.id
+
+        if position_code:
+            self.position = WorkerPosition.objects.get(code=position_code)
+
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'shop_code'):
+            self.shop = Shop.objects.get(code=self.shop_code)
+        if hasattr(self, 'username'):
+            self.user = User.objects.get(username=self.username)
+        if hasattr(self, 'position_code'):
+            self.position = WorkerPosition.objects.get(code=self.position_code)
+        super().save(*args, **kwargs)
 
 
 class FunctionGroup(AbstractModel):
@@ -419,7 +503,9 @@ class FunctionGroup(AbstractModel):
         'ShopMonthStat',
         'ShopMonthStat_status',
         'ShopSettings',
+        'ExchangeSettings',
         'VacancyBlackList',
+        'WorkerPosition',
 
         'signout',
         'password_edit',

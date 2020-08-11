@@ -58,12 +58,14 @@ class Test_auto_worker_exchange(TestCase):
             primary_color='#BDF82',
             secondary_color='#390AC',
         )
+        Shop.objects.all().update(network=self.network)
         
         self.root_shop = Shop.objects.create(
             name='SuperShop1',
-            tm_shop_opens=datetime.time(7, 0, 0),
-            tm_shop_closes=datetime.time(0, 0, 0),
             settings=self.shop_settings,
+            network=self.network,
+            tm_open_dict='{"all":"07:00:00"}',
+            tm_close_dict='{"all":"23:00:00"}',
         )
 
         self.shop = Shop.objects.create(
@@ -72,6 +74,8 @@ class Test_auto_worker_exchange(TestCase):
             region=self.region,
             settings=self.shop_settings,
             network=self.network,
+            tm_open_dict='{"all":"07:00:00"}',
+            tm_close_dict='{"all":"23:00:00"}',
         )
 
         self.shop2 = Shop.objects.create(
@@ -80,6 +84,8 @@ class Test_auto_worker_exchange(TestCase):
             region=self.region,
             settings=self.shop_settings,
             network=self.network,
+            tm_open_dict='{"all":"07:00:00"}',
+            tm_close_dict='{"all":"23:00:00"}',
         )
         
         self.shop.exchange_shops.add(self.shop)
@@ -91,6 +97,8 @@ class Test_auto_worker_exchange(TestCase):
             region=self.region,
             settings=self.shop_settings,
             network=self.network,
+            tm_open_dict='{"all":"07:00:00"}',
+            tm_close_dict='{"all":"23:00:00"}',
         )
 
         self.shop.exchange_shops.add(self.shop3)
@@ -101,6 +109,8 @@ class Test_auto_worker_exchange(TestCase):
             region=self.region,
             settings=self.shop_settings,
             network=self.network,
+            tm_open_dict='{"all":"07:00:00"}',
+            tm_close_dict='{"all":"23:00:00"}',
         )
 
         shops = [self.shop, self.shop2, self.shop3, self.shop4]
@@ -159,7 +169,8 @@ class Test_auto_worker_exchange(TestCase):
             automatic_create_vacancy_lack_min=0.4,
             automatic_delete_vacancy_lack_max=0.5,
             automatic_worker_select_overflow_min=0.6,
-            automatic_worker_select_timegap=datetime.timedelta(hours=4)
+            automatic_worker_select_timegap=datetime.timedelta(hours=4),
+            network = self.network,
         )
 
     def create_vacancy(self, tm_from, tm_to, work_type):

@@ -11,7 +11,9 @@ from src.forecast.load_template.views import LoadTemplateViewSet
 router = routers.DefaultRouter()
 router.register(r'operation_type_name', OperationTypeNameViewSet, basename='OperationTypeName')
 router.register(r'operation_type', OperationTypeViewSet, basename='OperationType')
+#Depricated
 router.register(r'period_clients', PeriodClientsViewSet, basename='PeriodClients')
+router.register(r'timeserie_value', PeriodClientsViewSet, basename='PeriodClients')
 router.register(r'operation_template', OperationTemplateViewSet, basename='OperationTemplate')
 router.register(r'operation_type_template', OperationTypeTemplateViewSet, basename='OperationTypeTemplate')
 router.register(r'operation_type_relation', OperationTypeRelationViewSet, basename='OperationTypeRelation')
