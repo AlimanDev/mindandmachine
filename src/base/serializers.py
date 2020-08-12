@@ -148,8 +148,9 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if self.instance:
+            #Нельзя обновить пользователя по коду
             user_id = self.instance.user_id
-            shop_id = self.instance.shop_id
+            shop_id = self.instance.shop_id if not self.initial_data.get('shop_code', False) else Shop.objects.get(code=self.initial_data.get('shop_code')).id
         else:
             if not attrs.get('user_id'):
                 user = attrs.pop('user')

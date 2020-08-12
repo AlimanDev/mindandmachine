@@ -499,6 +499,7 @@ class FunctionGroup(AbstractModel):
         'PeriodClients_download',
         'Shop',
         'Shop_stat',
+        'Shop_tree',
         'Subscribe',
         'User',
         'WorkerConstraint',

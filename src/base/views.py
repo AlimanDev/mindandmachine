@@ -83,7 +83,7 @@ class EmploymentViewSet(ModelViewSet):
 class UserViewSet(ModelViewSet):
     page_size = 10
     pagination_class = LimitOffsetPagination
-    permission_classes = [IsAuthenticated]
+    permission_classes = [Permission]
     serializer_class = UserSerializer
     filterset_class = UserFilter
 
