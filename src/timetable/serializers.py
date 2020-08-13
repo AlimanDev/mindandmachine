@@ -182,6 +182,9 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
         if parent_worker_day_id:
             worker_days = worker_days.exclude(id=parent_worker_day_id)
+        
+        if validated_data.get('is_vacancy') and validated_data.get('worker_id') == None:
+            worker_days = None
 
         if worker_days:
             raise ValidationError({'error': self.error_messages['worker_day_exist']})
