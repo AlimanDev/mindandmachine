@@ -496,6 +496,7 @@ class FunctionGroup(AbstractModel):
         'PeriodClients_upload',
         'PeriodClients_download',
         'Receipt',
+        'Group',
         'Shop',
         'Shop_stat',
         'Shop_tree',

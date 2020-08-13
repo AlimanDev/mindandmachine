@@ -14,7 +14,9 @@ from src.base.views import(
     NotificationViewSet,
     SubscribeViewSet,
     ShopSettingsViewSet,
-    NetworkViewSet)
+    NetworkViewSet,
+    GroupViewSet,
+)
 
 
 rest_auth_urls = [
@@ -37,6 +39,7 @@ router.register(r'notification', NotificationViewSet, basename='Notification')
 router.register(r'shop_settings', ShopSettingsViewSet, basename='ShopSettings')
 router.register(r'network', NetworkViewSet, basename='Network')
 router.register(r'function_group', FunctionGroupView, basename='FunctionGroupView')
+router.register(r'group', GroupViewSet, basename='Group')
 
 
 
