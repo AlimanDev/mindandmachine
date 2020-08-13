@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.db.models import Q
 
-from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop
+from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop, Group
 from src.base.message import Message
 from src.base.fields import CurrentUserNetwork
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
@@ -273,3 +273,9 @@ class SubscribeSerializer(serializers.ModelSerializer):
         model = Subscribe
         fields = ['id','shop_id', 'type']
 
+
+class GroupSerializer(serializers.ModelSerializer):
+    network_id = serializers.HiddenField(default=CurrentUserNetwork())
+    class Meta:
+        model = Group
+        fields = ['id', 'name', 'code']
