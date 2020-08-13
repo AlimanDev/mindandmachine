@@ -1,4 +1,5 @@
 import datetime
+import json
 from timezone_field import TimeZoneField
 
 from django.db import models
@@ -8,6 +9,9 @@ from django.contrib.auth.models import (
 from mptt.models import MPTTModel, TreeForeignKey
 from django.apps import apps
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
+from src.base.exceptions import MessageError
+from src.conf.djconfig import QOS_TIME_FORMAT
+from django.core.serializers.json import DjangoJSONEncoder
 
 
 class Network(AbstractActiveNamedModel):
@@ -21,6 +25,7 @@ class Network(AbstractActiveNamedModel):
     secondary_color = models.CharField(max_length=7, blank=True)
     # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
     need_symbol_for_vacancy = models.BooleanField(default=False)
+    settings_values = models.TextField(default='{}')  # настройки для сети. Cейчас есть настройки для приемки чеков
 
     def get_department(self):
         return None
@@ -174,10 +179,52 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         if code:
             self.parent = Shop.objects.get(code=code)
 
+
+    def __getattribute__(self, attr):
+        if attr in ['open_times', 'close_times']:
+            try:
+                return super().__getattribute__(attr)
+            except:
+                fields_scope = {
+                    'open_times': 'tm_open_dict',
+                    'close_times': 'tm_close_dict',
+                }
+                try:
+                    self.__setattr__(attr, {
+                        k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
+                        for k, v in json.loads(getattr(self, fields_scope.get(attr))).items()
+                    })
+                except:
+                    return {}
+        return super().__getattribute__(attr)
+
+    @staticmethod
+    def clean_time_dict(time_dict):
+        new_dict = dict(time_dict)
+        dict_keys = list(new_dict.keys())
+        for key in dict_keys:
+            if 'd' in key:
+                new_dict[key.replace('d', '')] = new_dict.pop(key)
+        return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
+
     def save(self, *args, **kwargs):
+        open_times = self.open_times
+        close_times = self.close_times
+        if open_times.keys() != close_times.keys():
+            raise MessageError(code='time_shop_differerent_keys')
+        if open_times.get('all') and len(open_times) != 1:
+            raise MessageError(code='time_shop_all_or_days')
+        
+        for key in open_times.keys():
+            close_hour = close_times[key].hour if close_times[key].hour != 0 else 24
+            if open_times[key].hour > close_hour:
+                raise MessageError(code='time_shop_incorrect_time_start_end')
+        self.tm_open_dict = self.clean_time_dict(self.open_times)
+        self.tm_close_dict = self.clean_time_dict(self.close_times)
         if hasattr(self, 'parent_code'):
             self.parent = Shop.objects.get(code=self.parent_code)
         super().save(*args, **kwargs)
+
     def get_exchange_settings(self):
         return self.exchange_settings if self.exchange_settings_id\
             else apps.get_model(
@@ -187,6 +234,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 network_id=self.network_id, 
                 shops__isnull=True,
             ).first()
+
 
 
 class EmploymentManager(models.Manager):
@@ -374,7 +422,9 @@ class Employment(AbstractActiveModel):
     objects = EmploymentManager()
 
     def has_permission(self, permission, method='GET'):
-        group = self.function_group or self.position.group
+        group = self.function_group or (self.position.group if self.position else None)
+        if not group:
+            raise MessageError(code='no_group_or_position')
         return group.allowed_functions.filter(
             func=permission,
             method=method
@@ -385,23 +435,24 @@ class Employment(AbstractActiveModel):
 
     def __init__(self, *args, **kwargs):
         shop_code = kwargs.pop('shop_code', None)
-        user_code = kwargs.pop('user_code', None)
+        username = kwargs.get('username', None)
+        user_id = kwargs.get('user_id', None)
         position_code = kwargs.pop('position_code', None)
         super().__init__(*args, **kwargs)
         if shop_code:
             self.shop = Shop.objects.get(code=shop_code)
-        if user_code:
-            self.user = User.objects.get(username=user_code)
-            self.tabel_code = user_code
+        if username and not user_id:
+            self.user = User.objects.get(username=username)
+            self.user_id = self.user.id
+
         if position_code:
             self.position = WorkerPosition.objects.get(code=position_code)
 
     def save(self, *args, **kwargs):
         if hasattr(self, 'shop_code'):
             self.shop = Shop.objects.get(code=self.shop_code)
-        if hasattr(self, 'user_code'):
-            self.user = User.objects.get(username=self.user_code)
-            self.tabel_code = self.user_code
+        if hasattr(self, 'username'):
+            self.user = User.objects.get(username=self.username)
         if hasattr(self, 'position_code'):
             self.position = WorkerPosition.objects.get(code=self.position_code)
         super().save(*args, **kwargs)
@@ -447,6 +498,7 @@ class FunctionGroup(AbstractModel):
         'Receipt',
         'Shop',
         'Shop_stat',
+        'Shop_tree',
         'Subscribe',
         'User',
         'WorkerConstraint',

@@ -4,12 +4,13 @@ from dateutil.relativedelta import relativedelta
 from django.db.models import Q, Sum
 from django_filters.rest_framework import FilterSet
 
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.pagination import LimitOffsetPagination
 
 from src.base.models import Employment, Shop
+from src.base.permissions import Permission
 
 from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
 
@@ -19,6 +20,7 @@ class ShopFilter(FilterSet):
         model = Shop
         fields = {
             'id':['exact', 'in'],
+            'code': ['exact', 'in'],
         }
 
 
@@ -48,7 +50,7 @@ class ShopViewSet(viewsets.ModelViewSet):
     """
     page_size = 10
     pagination_class = LimitOffsetPagination
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [Permission]
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
 
@@ -141,9 +143,9 @@ class ShopViewSet(viewsets.ModelViewSet):
             child_list.append({
                 "id": shop.id,
                 "label": shop.name,
+                "tm_open_dict": shop.open_times,
+                "tm_close_dict" :shop.close_times,
                 "address": shop.address,
-                "tm_open_dict": shop.tm_open_dict,
-                "tm_close_dict" :shop.tm_close_dict,
                 "forecast_step_minutes":shop.forecast_step_minutes,
                 "children": []
             })

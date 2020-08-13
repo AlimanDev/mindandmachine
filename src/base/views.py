@@ -26,6 +26,7 @@ from src.base.serializers import (
     AuthUserSerializer,
     EmploymentListSerializer,
     UserListSerializer,
+    GroupSerializer,
 )
 from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter
 from src.base.models import (
@@ -37,6 +38,7 @@ from src.base.models import (
     ShopSettings,
     WorkerPosition,
     User,
+    Group,
 )
 
 from src.base.filters import UserFilter
@@ -83,7 +85,7 @@ class EmploymentViewSet(ModelViewSet):
 class UserViewSet(ModelViewSet):
     page_size = 10
     pagination_class = LimitOffsetPagination
-    permission_classes = [IsAuthenticated]
+    permission_classes = [Permission]
     serializer_class = UserSerializer
     filterset_class = UserFilter
 
@@ -219,3 +221,13 @@ class NetworkViewSet(ModelViewSet):
     serializer_class = NetworkSerializer
     queryset = Network.objects.all()
 
+
+class GroupViewSet(ModelViewSet):
+    permission_classes = [Permission]
+    serializer_class = GroupSerializer
+    pagination_class = LimitOffsetPagination
+    
+    def get_queryset(self):
+        return Group.objects.filter(
+            network_id=self.request.user.network_id,
+        )

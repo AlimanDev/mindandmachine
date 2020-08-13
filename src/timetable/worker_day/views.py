@@ -33,7 +33,7 @@ from src.timetable.serializers import (
     WorkerDayListSerializer,
 )
 
-from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter
+from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
@@ -68,6 +68,14 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
     filterset_class = WorkerDayFilter
     queryset = WorkerDay.objects.all()
     filter_backends = [MultiShopsFilterBackend]
+
+    def get_queryset(self):
+        if self.request.query_params.get('append_code', False):
+            return WorkerDay.objects.all().annotate(
+                shop_code=F('shop__code'),
+                user_login=F('worker__username'),
+            )
+        return self.queryset
 
     # тут переопределяется update а не perform_update потому что надо в Response вернуть
     # не тот объект, который был изначально
@@ -187,7 +195,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], )
     def vacancy(self, request):
-        filterset_class = self.filter_backends[0]().get_filterset(request, self.get_queryset().filter(is_vacancy=True), self)
+        filterset_class = VacancyFilter(request.query_params)
         if not filterset_class.form.is_valid():
             raise utils.translate_validation(filterset_class.errors)
         

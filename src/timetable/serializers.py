@@ -64,12 +64,14 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
     type = serializers.CharField(required=True)
+    shop_code = serializers.CharField(required=False, read_only=True)
+    user_login = serializers.CharField(required=False, read_only=True)
 
     class Meta:
         model = WorkerDay
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id',
-                  'is_outsource', 'is_vacancy']
+                  'is_outsource', 'is_vacancy', 'shop_code', 'user_login']
         read_only_fields =['is_approved', 'work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
 

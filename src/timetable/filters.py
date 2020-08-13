@@ -22,6 +22,7 @@ class WorkerDayFilter(FilterSet):
         fields = {
             # 'shop_id':['exact'],
             'worker_id':['in','exact'],
+            'worker__username': ['in', 'exact'],
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
             'is_fact': ['exact']

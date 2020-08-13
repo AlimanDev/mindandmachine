@@ -74,7 +74,7 @@ class OperationType(AbstractActiveModel):
     ]
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True, related_name='operation_types')
-    work_type = models.OneToOneField(WorkType, on_delete=models.PROTECT, related_name='operation_type', null=True)
+    work_type = models.OneToOneField(WorkType, on_delete=models.PROTECT, related_name='operation_type', null=True, blank=True)
     operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
     do_forecast = models.CharField(
         max_length=1,
