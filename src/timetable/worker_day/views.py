@@ -201,7 +201,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         
         paginator = LimitOffsetPagination()
         queryset = filterset_class.filter_queryset(
-            self.get_queryset().select_related('shop', 'worker').prefetch_related('worker_day_details').annotate(
+            self.get_queryset().filter(is_vacancy=True).select_related('shop', 'worker').prefetch_related('worker_day_details').annotate(
                 first_name=F('worker__first_name'),
                 last_name=F('worker__last_name'),
                 worker_shop=Subquery(Employment.objects.get_active(OuterRef('worker__network_id'),user_id=OuterRef('worker_id')).values('shop_id')[:1]),
