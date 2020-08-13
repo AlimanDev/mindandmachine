@@ -278,4 +278,4 @@ class GroupSerializer(serializers.ModelSerializer):
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
     class Meta:
         model = Group
-        fields = ['id', 'name', 'code']
+        fields = ['id', 'name', 'code', 'network_id']
