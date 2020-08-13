@@ -10,8 +10,7 @@ from src.base.models import Shop
 from src.timetable.models import WorkType, WorkTypeName, Network
 
 class OperationTypeName(AbstractActiveNamedModel):
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Название операции'
         verbose_name_plural = 'Названия операций'
 
@@ -177,7 +176,7 @@ class OperationTemplate(AbstractActiveNamedModel):
         В PeriodClients создадутся записи о потребности в 1 человеке
             с 10 до 12 каждый месяц 1,3,5,15 числа
     """
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Шаблон операций'
         verbose_name_plural = 'Шаблоны операций'
 

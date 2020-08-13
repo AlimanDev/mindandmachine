@@ -39,7 +39,7 @@ class WorkTypeManager(AbstractActiveModelManager):
 
 
 class WorkTypeName(AbstractActiveNamedModel):
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Название типа работ'
         verbose_name_plural = 'Названия типов работ'
 
@@ -48,7 +48,6 @@ class WorkTypeName(AbstractActiveNamedModel):
         WorkType.objects.qos_delete(work_type_name__id=self.pk)
         return self
 
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     def __str__(self):
         return 'id: {}, name: {}, code: {}'.format(
             self.id,
@@ -124,7 +123,7 @@ class UserWeekdaySlot(AbstractModel):
 
 
 class Slot(AbstractActiveNamedModel):
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Слот'
         verbose_name_plural = 'Слоты'
 
@@ -174,7 +173,7 @@ class CashboxManager(models.Manager):
 
 
 class Cashbox(AbstractActiveNamedModel):
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Рабочее место '
         verbose_name_plural = 'Рабочие места'
 
