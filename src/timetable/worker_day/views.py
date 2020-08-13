@@ -42,15 +42,11 @@ from src.timetable.models import (
 )
 
 from src.timetable.vacancy.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy, confirm_vacancy
-<<<<<<< HEAD
 from src.main.timetable.auto_settings.utils import set_timetable_date_from
 
 from src.base.models import Employment, Shop, User
 from src.base.message import Message
 from src.base.exceptions import MessageError
-
-=======
->>>>>>> 83edfc1c2ea400391aef162accf2977911c7fe9f
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
 from src.timetable.worker_day.utils import download_tabel_util, download_timetable_util, upload_timetable_util

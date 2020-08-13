@@ -15,7 +15,7 @@ from src.base.models import (
 
 @admin.register(Network)
 class NetworkAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'code')
+    list_display = ('id', 'name', 'code', 'logo')
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):
@@ -88,11 +88,6 @@ class EmploymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop', 'user')
     list_filter = ('shop', 'user')
     search_fields = ('user__first_name', 'user__last_name', 'shop__name', 'shop__parent__name')
-
-
-@admin.register(Network)
-class NetworkAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'logo')
 
 
 @admin.register(ProductionDay)
