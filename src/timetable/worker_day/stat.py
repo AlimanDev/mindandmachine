@@ -182,6 +182,7 @@ def count_worker_stat(data):
         dt__gte=dt_year_start,
         dt__lte=dt_end,
         worker_id__in=worker_dict.keys()
+        type__in=WorkerDay.TYPES_USED,
     )
     worker_days = list(worker_days.order_by(
         'worker_id',
