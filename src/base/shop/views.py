@@ -4,7 +4,6 @@ from dateutil.relativedelta import relativedelta
 from django.db.models import Q, Sum
 from django_filters.rest_framework import FilterSet
 
-from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.pagination import LimitOffsetPagination
@@ -13,6 +12,7 @@ from src.base.models import Employment, Shop
 from src.base.permissions import Permission
 
 from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
+from src.base.views import BaseActiveNamedModelViewSet
 
 
 class ShopFilter(FilterSet):
@@ -24,7 +24,7 @@ class ShopFilter(FilterSet):
         }
 
 
-class ShopViewSet(viewsets.ModelViewSet):
+class ShopViewSet(BaseActiveNamedModelViewSet):
     """
     GET /rest_api/department/?id__in=6,7
     :return [{"id":6, ...},{"id":7, ...}]
@@ -53,16 +53,6 @@ class ShopViewSet(viewsets.ModelViewSet):
     permission_classes = [Permission]
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
-
-    def get_object(self):
-        if self.request.method == 'GET':
-            by_code = self.request.query_params.get('by_code', False)
-        else:
-            by_code = self.request.data.get('by_code', False)
-        if by_code:
-            self.lookup_field = 'code'
-            self.kwargs['code'] = self.kwargs['pk']
-        return super().get_object()
 
     def get_queryset(self):
         """

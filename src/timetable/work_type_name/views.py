@@ -4,6 +4,7 @@ from rest_framework.pagination import LimitOffsetPagination
 from src.timetable.models import WorkTypeName
 from src.base.serializers import BaseNetworkSerializer
 from src.base.exceptions import MessageError
+from src.base.views import BaseActiveNamedModelViewSet
 
 
 class WorkTypeNameSerializer(BaseNetworkSerializer):
@@ -28,7 +29,7 @@ class WorkTypeNameSerializer(BaseNetworkSerializer):
         return True
 
 
-class WorkTypeNameViewSet(viewsets.ModelViewSet):
+class WorkTypeNameViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = WorkTypeNameSerializer
     pagination_class = LimitOffsetPagination

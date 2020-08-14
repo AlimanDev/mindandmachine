@@ -7,6 +7,8 @@ from src.base.permissions import FilteredListPermission
 from src.forecast.models import OperationTemplate
 from src.conf.djconfig import QOS_DATE_FORMAT, QOS_TIME_FORMAT
 from src.forecast.operation_template.utils import build_period_clients
+from src.base.views import BaseActiveNamedModelViewSet
+
 
 #TODO добавить в шаблон нагрузки
 # Serializers define the API representation.
@@ -41,7 +43,7 @@ class OperationTemplateFilter(FilterSet):
         }
 
 
-class OperationTemplateViewSet(viewsets.ModelViewSet):
+class OperationTemplateViewSet(BaseActiveNamedModelViewSet):
     """
 
     GET /rest_api/operation_template/

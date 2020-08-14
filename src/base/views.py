@@ -44,7 +44,25 @@ from src.base.models import (
 from src.base.filters import UserFilter
 
 
-class EmploymentViewSet(ModelViewSet):
+class BaseActiveNamedModelViewSet(ModelViewSet):
+    '''
+    Класс переопределяющий get_object() для возможности
+    получения сущности по коду либо иному полю, указанному
+    в свойстве get_object_field
+    '''
+    get_object_field = 'code'
+    def get_object(self):
+        if self.request.method == 'GET':
+            by_code = self.request.query_params.get('by_code', False)
+        else:
+            by_code = self.request.data.get('by_code', False)
+        if by_code:
+            self.lookup_field = self.get_object_field
+            self.kwargs[self.get_object_field] = self.kwargs['pk']
+        return super().get_object()
+
+
+class EmploymentViewSet(BaseActiveNamedModelViewSet):
     """
         обязательные поля при редактировании PUT:
             position_id
@@ -58,16 +76,8 @@ class EmploymentViewSet(ModelViewSet):
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
+    get_object_field = 'tabel_code'
 
-    def get_object(self):
-        if self.request.method == 'GET':
-            by_code = self.request.query_params.get('by_code', False)
-        else:
-            by_code = self.request.data.get('by_code', False)
-        if by_code:
-            self.lookup_field = 'tabel_code'
-            self.kwargs['tabel_code'] = self.kwargs['pk']
-        return super().get_object()
 
     def get_queryset(self):
         return Employment.objects.filter(
@@ -82,22 +92,13 @@ class EmploymentViewSet(ModelViewSet):
             return EmploymentSerializer
 
 
-class UserViewSet(ModelViewSet):
+class UserViewSet(BaseActiveNamedModelViewSet):
     page_size = 10
     pagination_class = LimitOffsetPagination
     permission_classes = [Permission]
     serializer_class = UserSerializer
     filterset_class = UserFilter
-
-    def get_object(self):
-        if self.request.method == 'GET':
-            by_code = self.request.query_params.get('by_code', False)
-        else:
-            by_code = self.request.data.get('by_code', False)
-        if by_code:
-            self.lookup_field = 'username'
-            self.kwargs['username'] = self.kwargs['pk']
-        return super().get_object()
+    get_object_field = 'username'
 
     def get_queryset(self):
         user = self.request.user
@@ -153,20 +154,10 @@ class FunctionGroupView(ModelViewSet):
         return FunctionGroup.objects.filter(group__in=groups).distinct('func')
 
 
-class WorkerPositionViewSet(ModelViewSet):
+class WorkerPositionViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [Permission]
     serializer_class = WorkerPositionSerializer
     pagination_class = LimitOffsetPagination
-
-    def get_object(self):
-        if self.request.method == 'GET':
-            by_code = self.request.query_params.get('by_code', False)
-        else:
-            by_code = self.request.data.get('by_code', False)
-        if by_code:
-            self.lookup_field = 'code'
-            self.kwargs['code'] = self.kwargs['pk']
-        return super().get_object()
 
     def get_queryset(self):
         return WorkerPosition.objects.filter(
@@ -203,7 +194,7 @@ class NotificationViewSet(
         return Notification.objects.filter(worker=user).select_related('event', 'event__worker_day_details', 'event__shop')
 
 
-class ShopSettingsViewSet(ModelViewSet):
+class ShopSettingsViewSet(BaseActiveNamedModelViewSet):
     page_size = 10
     pagination_class = LimitOffsetPagination
     permission_classes = [Permission]
@@ -216,13 +207,13 @@ class ShopSettingsViewSet(ModelViewSet):
         )
 
 
-class NetworkViewSet(ModelViewSet):
+class NetworkViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [Permission]
     serializer_class = NetworkSerializer
     queryset = Network.objects.all()
 
 
-class GroupViewSet(ModelViewSet):
+class GroupViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [Permission]
     serializer_class = GroupSerializer
     pagination_class = LimitOffsetPagination

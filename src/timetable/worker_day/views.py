@@ -106,6 +106,9 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def perform_destroy(self, worker_day):
+        if worker_day.is_vacancy and worker_day.worker_id == None:
+            worker_day.is_approved = False
+            worker_day.child.all().delete()
         if worker_day.is_approved:
             raise FieldError(self.error_messages['cannot_delete'])
         super().perform_destroy(worker_day)
