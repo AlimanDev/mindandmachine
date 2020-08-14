@@ -20,7 +20,7 @@ def move_vacancy_to_worker_day(apps, schema_editor):
             dt=vacancy.dttm_from.date(),
             dttm_work_start=vacancy.dttm_from,
             dttm_work_end=vacancy.dttm_to,
-            type=WorkerDay.TYPE_WORKDAY,
+            type='W',
         )
         vacancy.worker_day = worker_day
         vacancy.save()
