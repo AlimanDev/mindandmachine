@@ -4,7 +4,7 @@ from django.db import migrations, models
 from django.conf import settings
 import django.db.models.deletion
 
-
+#TODO ускорить 90000 вакансий очень долго переносятся
 def move_vacancy_to_worker_day(apps, schema_editor):
     WorkerDay = apps.get_model('timetable', 'WorkerDay')
     WorkerDayCashboxDetails = apps.get_model('timetable', 'WorkerDayCashboxDetails')

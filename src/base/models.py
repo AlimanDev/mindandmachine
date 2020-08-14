@@ -221,7 +221,21 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         self.tm_close_dict = self.clean_time_dict(self.close_times)
         if hasattr(self, 'parent_code'):
             self.parent = Shop.objects.get(code=self.parent_code)
+        load_template = None
+        if self.load_template_id and self.id:
+            new_template = self.load_template_id
+            self.refresh_from_db(fields=['load_template_id'])
+            load_template = self.load_template_id
+            self.load_template_id = new_template
         super().save(*args, **kwargs)
+        if self.load_template_id:
+            from src.forecast.load_template.utils import apply_load_template
+            if load_template != None and load_template != new_template:
+                apply_load_template(new_template, self.id)
+            elif load_template == None:
+                apply_load_template(self.load_template_id, self.id)
+               
+
 
     def get_exchange_settings(self):
         return self.exchange_settings if self.exchange_settings_id\

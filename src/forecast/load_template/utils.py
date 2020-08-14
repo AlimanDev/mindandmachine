@@ -221,7 +221,7 @@ def create_load_template_for_shop(shop_id):
     return load_template
 
 
-def apply_load_template(load_template_id, shop_id, dt_from):
+def apply_load_template(load_template_id, shop_id, dt_from=None):
     '''
     Применяет шаблон нагрузки к магазину. 
     Создает типы операций, типы работ.
@@ -274,7 +274,7 @@ def apply_load_template(load_template_id, shop_id, dt_from):
         dttm_deleted=timezone.now(),
     )
     Shop.objects.filter(pk=shop_id).update(load_template_id=load_template_id)
-    if OperationType.objects.filter(do_forecast=OperationType.FORECAST, dttm_deleted__isnull=True).exists():
+    if OperationType.objects.filter(do_forecast=OperationType.FORECAST, dttm_deleted__isnull=True).exists() and dt_from:
         create_predbills_request_function(shop_id, dt=dt_from)
 
 
