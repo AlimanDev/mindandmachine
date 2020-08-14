@@ -38,4 +38,5 @@ class Migration(migrations.Migration):
             name='is_vacancy',
             field=models.BooleanField(default=False),
         ),
+        migrations.RunPython(move_vacancy_to_worker_day),
     ]
