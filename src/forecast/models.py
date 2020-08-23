@@ -9,6 +9,7 @@ from src.base.models import Shop
 
 from src.timetable.models import WorkType, WorkTypeName, Network
 
+
 class OperationTypeName(AbstractActiveNamedModel):
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     class Meta:
@@ -329,15 +330,20 @@ class PeriodDemandChangeLog(AbstractModel):
 
 
 class Receipt(AbstractModel):
-    class Meta(object):
-        verbose_name='Чеки'
+    """
+    Событийная сущность, которая потом используется для аггрегации в PeriodClients
 
-    id = models.BigAutoField(primary_key=True)
+    изначально для чеков
+    """
+
+    class Meta(object):
+        verbose_name = 'Чеки'
+
+    # id = models.BigAutoField(primary_key=True)
     code = models.UUIDField(unique=True)
     dttm = models.DateTimeField()
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_modified = models.DateTimeField(auto_now=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True)
     info = models.TextField()
-    is_aggregated = models.BooleanField(default=False)
 
