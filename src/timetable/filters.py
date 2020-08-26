@@ -9,9 +9,9 @@ class WorkerDayFilter(FilterSet):
 
     def filter_approved(self, queryset, name, value):
         if value:
-            return queryset.filter(worker_day_approve_id__isnull=False)
+            return queryset.filter(worker_day__approve_id__isnull=False)
         else:
-            # Подтвержденная версия, это на самом деле последняя версия
+            # неподтвержденная версия, это на самом деле последняя версия, а последняя эта та, у которой нет детей
             return queryset.filter(
                 is_fact=False,
                 child__id__isnull=True
