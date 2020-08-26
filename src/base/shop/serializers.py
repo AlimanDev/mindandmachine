@@ -38,23 +38,32 @@ class ShopSerializer(serializers.ModelSerializer):
                 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id', 
                 'network_id', 'restricted_start_times','restricted_end_times', 'exchange_settings_id', 'load_template_id', 'area']
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['tm_open_dict'] = instance.open_times
+        data['tm_close_dict'] = instance.close_times
+        return data
+
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
 
         def validate_time(data):
             for key, value in data.items():
                 if not (key in POSSIBLE_KEYS):
-                    raise MessageError(code='error_in_time_keys', params={'possible_keys': ', '.join(POSSIBLE_KEYS), 'key': key}, lang=self.context['request'].user.lang)
+                    raise MessageError(code='time_shop_error_in_time_keys', params={'possible_keys': ', '.join(POSSIBLE_KEYS), 'key': key}, lang=self.context['request'].user.lang)
             try:
                 Converter.parse_time(value)
             except:
-                raise MessageError(code='error_in_times', params={'time': value, 'key': key, 'format': QOS_TIME_FORMAT}, lang=self.context['request'].user.lang)
+                raise MessageError(code='time_shop_error_in_times', params={'time': value, 'key': key, 'format': QOS_TIME_FORMAT}, lang=self.context['request'].user.lang)
             
         if self.validated_data.get('tm_open_dict'):
             validate_time(self.validated_data.get('tm_open_dict'))
         
         if self.validated_data.get('tm_close_dict'):
             validate_time(self.validated_data.get('tm_close_dict'))
+        
+        self.validated_data['tm_open_dict'] = json.dumps(self.validated_data.get('tm_open_dict'))
+        self.validated_data['tm_close_dict'] = json.dumps(self.validated_data.get('tm_close_dict'))
         
         return True
 
