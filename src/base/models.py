@@ -498,6 +498,7 @@ class FunctionGroup(AbstractModel):
         'Shop_tree',
         'Subscribe',
         'User',
+        'User_change_password',
         'WorkerConstraint',
         'WorkerDay',
         'WorkerDay_approve',
