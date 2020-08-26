@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('timetable', '0007_auto_20200220_0727'),
-        ('timetable', '0020_auto_20200424_1526'),
+        ('timetable', '0019_workerday_is_vacancy'),
     ]
 
     operations = [

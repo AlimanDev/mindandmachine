@@ -3,6 +3,7 @@ from rest_framework.pagination import LimitOffsetPagination
 from src.forecast.models import OperationTypeName
 from src.base.serializers import BaseNetworkSerializer
 from src.base.exceptions import MessageError
+from src.base.views import BaseActiveNamedModelViewSet
 
 
 class OperationTypeNameSerializer(BaseNetworkSerializer):
@@ -28,7 +29,7 @@ class OperationTypeNameSerializer(BaseNetworkSerializer):
 
         return True
 
-class OperationTypeNameViewSet(viewsets.ModelViewSet):
+class OperationTypeNameViewSet(BaseActiveNamedModelViewSet):
     """
 
     GET /rest_api/operation_type_name/
