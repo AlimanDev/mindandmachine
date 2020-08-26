@@ -9,6 +9,7 @@ from src.base.models import Shop
 
 from src.timetable.models import WorkType, WorkTypeName, Network
 
+
 class OperationTypeName(AbstractActiveNamedModel):
     class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Название операции'
@@ -227,7 +228,6 @@ class OperationTemplate(AbstractActiveNamedModel):
                     return False
         return True
 
-
     def generate_dates(self, dt_from, dt_to):
         def generate_times(dt, step):
             dt0 = datetime.datetime.combine(dt, self.tm_start)
@@ -326,4 +326,23 @@ class PeriodDemandChangeLog(AbstractModel):
     operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT)
     multiply_coef = models.FloatField(null=True, blank=True)
     set_value = models.FloatField(null=True, blank=True)
+
+
+class Receipt(AbstractModel):
+    """
+    Событийная сущность, которая потом используется для аггрегации в PeriodClients
+
+    изначально для чеков
+    """
+
+    class Meta(object):
+        verbose_name = 'Чеки'
+
+    # id = models.BigAutoField(primary_key=True)
+    code = models.UUIDField(unique=True)
+    dttm = models.DateTimeField()
+    dttm_added = models.DateTimeField(auto_now_add=True)
+    dttm_modified = models.DateTimeField(auto_now=True)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True)
+    info = models.TextField()
 

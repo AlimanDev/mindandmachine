@@ -47,7 +47,6 @@ from src.main.timetable.auto_settings.utils import set_timetable_date_from
 from src.base.models import Employment, Shop, User
 from src.base.message import Message
 from src.base.exceptions import MessageError
-
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
 from src.timetable.worker_day.utils import download_tabel_util, download_timetable_util, upload_timetable_util

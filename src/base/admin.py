@@ -1,6 +1,7 @@
 from django.contrib import admin
 from src.base.models import (
     Employment,
+    Network,
     User,
     Shop,
     ShopSettings,
