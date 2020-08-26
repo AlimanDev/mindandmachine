@@ -28,19 +28,20 @@ class TestDepartment(APITestCase):
 
     def test_get_list(self):
         # Админ
-        response = self.client.get(self.url) # full tree
+        response = self.client.get(f'{self.url}tree/') # full tree
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         res = response.json()
         self.assertEqual(len(res), 1)
         self.assertEqual(len(res[0]['children']), 2)
 
-        response = self.client.get(f"{self.url}?only_top=1" )
+        response = self.client.get(f"{self.url}tree/?only_top=1" )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         shops = [
                 {'id': 1,
                  'forecast_step_minutes': '00:30:00',
                  'label': 'Корневой магазин',
+                 'address': None,
                  "tm_open_dict": {"all":"06:00:00"},
                  "tm_close_dict": {"all":"23:00:00"},
                  'children':[]
@@ -107,6 +108,7 @@ class TestDepartment(APITestCase):
             'restricted_end_times': '[]',
             'restricted_start_times': '[]',
             'settings_id': self.settings.id,
+            'forecast_step_minutes': '00:30:00',
         }
         # response = self.client.post(self.url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -148,6 +150,7 @@ class TestDepartment(APITestCase):
             'restricted_start_times': '[]',
             'settings_id': self.settings.id,
             "area": None,
+            'forecast_step_minutes': '00:30:00',
         }
         # response = self.client.put(self.shop_url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from django.utils.translation import gettext_lazy as _
 
 from django.conf import settings
-from django.db.models import OuterRef, Subquery, Q, F
+from django.db.models import OuterRef, Subquery, Q, F, IntegerField
 from django.utils import timezone
 from django_filters import utils
 
@@ -12,6 +12,7 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 
 from src.base.permissions import FilteredListPermission
 from src.base.exceptions import FieldError
@@ -29,6 +30,7 @@ from src.timetable.serializers import (
     ExchangeSerializer,
     UploadTimetableSerializer,
     DownloadSerializer,
+    WorkerDayListSerializer,
 )
 
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
@@ -40,6 +42,12 @@ from src.timetable.models import (
 )
 
 from src.timetable.vacancy.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy, confirm_vacancy
+from src.main.timetable.auto_settings.utils import set_timetable_date_from
+
+from src.base.models import Employment, Shop, User
+from src.base.message import Message
+from src.base.exceptions import MessageError
+
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
 from src.timetable.worker_day.utils import download_tabel_util, download_timetable_util, upload_timetable_util
@@ -98,9 +106,19 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def perform_destroy(self, worker_day):
+        if worker_day.is_vacancy and worker_day.worker_id == None:
+            worker_day.is_approved = False
+            worker_day.child.all().delete()
         if worker_day.is_approved:
             raise FieldError(self.error_messages['cannot_delete'])
         super().perform_destroy(worker_day)
+
+
+    def list(self, request):
+        return Response(
+            WorkerDayListSerializer(self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')), many=True).data,
+        )
+
 
     @action(detail=False, methods=['post'])
     def approve(self, request):
@@ -184,18 +202,20 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         filterset_class = VacancyFilter(request.query_params)
         if not filterset_class.form.is_valid():
             raise utils.translate_validation(filterset_class.errors)
-            
-        return Response(
-            VacancySerializer(
-                filterset_class.filter_queryset(
-                    self.get_queryset().filter(is_vacancy=True).select_related('shop').annotate(
-                        first_name=F('worker__first_name'),
-                        last_name=F('worker__last_name'),
-                    ),
-                ), 
-                many=True,
-            ).data
-        ) 
+        
+        paginator = LimitOffsetPagination()
+        queryset = filterset_class.filter_queryset(
+            self.get_queryset().filter(is_vacancy=True).select_related('shop', 'worker').prefetch_related('worker_day_details').annotate(
+                first_name=F('worker__first_name'),
+                last_name=F('worker__last_name'),
+                worker_shop=Subquery(Employment.objects.get_active(OuterRef('worker__network_id'),user_id=OuterRef('worker_id')).values('shop_id')[:1]),
+            ),
+        )
+        data = paginator.paginate_queryset(queryset, request)
+        data = VacancySerializer(data, many=True)
+
+
+        return paginator.get_paginated_response(data.data)
 
 
     @action(detail=True, methods=['post'])
@@ -209,7 +229,56 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response({'result':result}, status=status_code)
 
-        
+    
+    @action(detail=True, methods=['post'])
+    def approve_vacancy(self, request, pk=None):
+        vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True, is_approved=False).first()
+        if vacancy == None:
+            raise MessageError(code='no_vacancy_or_approved', lang=request.user.lang)
+        vacancy.is_approved = True
+        parent = vacancy.parent_worker_day
+        vacancy.parent_worker_day = None
+        vacancy.save()
+        if parent:
+            parent.delete()
+        return Response(WorkerDaySerializer(vacancy).data)
+
+
+    @action(detail=True, methods=['get'])
+    def editable_vacancy(self, request, pk=None):
+        vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True).first()
+        if vacancy == None:
+            raise MessageError(code='no_vacancy', lang=request.user.lang)
+        if not vacancy.is_approved:
+            return Response(WorkerDaySerializer(vacancy).data)
+        if vacancy.worker_id:
+            raise MessageError(code='cant_edit_vacancy', lang=request.user.lang)
+        editable_vacancy = WorkerDay.objects.filter(parent_worker_day=vacancy).first()
+        if editable_vacancy == None:
+            editable_vacancy = WorkerDay.objects.create(
+                shop_id=vacancy.shop_id,
+                dt=vacancy.dt,
+                dttm_work_start=vacancy.dttm_work_start,
+                dttm_work_end=vacancy.dttm_work_end,
+                type=vacancy.type,
+                is_approved=False,
+                created_by=vacancy.created_by,
+                comment=vacancy.comment,
+                parent_worker_day=vacancy,
+                is_vacancy=True,
+                is_outsource=vacancy.is_outsource,
+            )
+            WorkerDayCashboxDetails.objects.bulk_create([
+                WorkerDayCashboxDetails(
+                    worker_day=editable_vacancy,
+                    work_part=d.work_part,
+                    work_type_id=d.work_type_id,
+                )
+                for d in WorkerDayCashboxDetails.objects.filter(worker_day=vacancy)
+            ])
+        return Response(WorkerDaySerializer(editable_vacancy).data)
+
+
     @action(detail=False, methods=['post'])
     def change_list(self, request):
         data = ListChangeSrializer(data=request.data, context={'request': request})

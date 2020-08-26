@@ -36,7 +36,8 @@ class Permission(permissions.BasePermission):
     def check_employment_permission(self, employments, request, view):
         method = request.method
         action = view.action
-        func = view.basename
+        func = view.basename or type(view).__name__
+
         request.employments=employments
 
         if not self.actions.get(action) or method != self.actions[action]:

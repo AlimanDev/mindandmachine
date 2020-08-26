@@ -14,15 +14,17 @@ from src.conf.djconfig import QOS_TIME_FORMAT
 from django.core.serializers.json import DjangoJSONEncoder
 
 
-class Network(AbstractActiveNamedModel):
+class Network(AbstractActiveModel):
     class Meta:
         verbose_name = 'Сеть магазинов'
         verbose_name_plural = 'Сети магазинов'
 
     logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
     url = models.CharField(blank=True,null=True,max_length=255)
-    primary_color = models.CharField(max_length=6, blank=True)
-    secondary_color = models.CharField(max_length=6, blank=True)
+    primary_color = models.CharField(max_length=7, blank=True)
+    secondary_color = models.CharField(max_length=7, blank=True)
+    name = models.CharField(max_length=128, unique=True)
+    code = models.CharField(max_length=64, unique=True, null=True, blank=True)
     # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
     need_symbol_for_vacancy = models.BooleanField(default=False)
     settings_values = models.TextField(default='{}')  # настройки для сети. Cейчас есть настройки для приемки чеков
@@ -32,15 +34,14 @@ class Network(AbstractActiveNamedModel):
 
 
 class Region(AbstractActiveNamedModel):
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Регион'
         verbose_name_plural = 'Регионы'
 
 
 class ShopSettings(AbstractActiveNamedModel):
 
-    class Meta(object):
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Настройки автосоставления'
         verbose_name_plural = 'Настройки автосоставления'
 
@@ -51,8 +52,6 @@ class ShopSettings(AbstractActiveNamedModel):
         (PRODUCTION_CAL, 'production calendar'),
         (YEAR_NORM, 'norm per year')
     )
-
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     # json fields
     method_params = models.CharField(max_length=4096, default='[]')
     cost_weights = models.CharField(max_length=4096, default='{}')
@@ -85,7 +84,7 @@ class ShopSettings(AbstractActiveNamedModel):
 
 # на самом деле это отдел
 class Shop(MPTTModel, AbstractActiveNamedModel):
-    class Meta(object):
+    class Meta:
         # unique_together = ('parent', 'title')
         verbose_name = 'Отдел'
         verbose_name_plural = 'Отделы'
@@ -139,7 +138,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     staff_number = models.SmallIntegerField(default=0)
 
     region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True, blank=True)
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
     email = models.EmailField(blank=True, null=True)
     exchange_shops = models.ManyToManyField('self', blank=True)
@@ -223,7 +221,21 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         self.tm_close_dict = self.clean_time_dict(self.close_times)
         if hasattr(self, 'parent_code'):
             self.parent = Shop.objects.get(code=self.parent_code)
+        load_template = None
+        if self.load_template_id and self.id:
+            new_template = self.load_template_id
+            self.refresh_from_db(fields=['load_template_id'])
+            load_template = self.load_template_id
+            self.load_template_id = new_template
         super().save(*args, **kwargs)
+        if self.load_template_id:
+            from src.forecast.load_template.utils import apply_load_template
+            if load_template != None and load_template != new_template:
+                apply_load_template(new_template, self.id)
+            elif load_template == None:
+                apply_load_template(self.load_template_id, self.id)
+               
+
 
     def get_exchange_settings(self):
         return self.exchange_settings if self.exchange_settings_id\
@@ -257,13 +269,12 @@ class EmploymentManager(models.Manager):
 
 
 class Group(AbstractActiveNamedModel):
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Группа пользователей'
         verbose_name_plural = 'Группы пользователей'
 
     dttm_modified = models.DateTimeField(blank=True, null=True)
     subordinates = models.ManyToManyField("self", blank=True)
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -369,12 +380,11 @@ class WorkerPosition(AbstractActiveNamedModel):
     """
     Describe employee's position
     """
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Должность сотрудника'
         verbose_name_plural = 'Должности сотрудников'
 
     id = models.BigAutoField(primary_key=True)
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
 
     def __str__(self):
@@ -497,8 +507,10 @@ class FunctionGroup(AbstractModel):
         'PeriodClients_delete',
         'PeriodClients_upload',
         'PeriodClients_download',
+        'Group',
         'Shop',
         'Shop_stat',
+        'Shop_tree',
         'Subscribe',
         'User',
         'WorkerConstraint',
@@ -515,6 +527,8 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_upload',
         'WorkerDay_download_timetable',
         'WorkerDay_download_tabel',
+        'WorkerDay_editable_vacancy',
+        'WorkerDay_approve_vacancy',
         'ShopMonthStat',
         'ShopMonthStat_status',
         'ShopSettings',

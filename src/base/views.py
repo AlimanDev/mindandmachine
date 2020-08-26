@@ -13,7 +13,21 @@ from rest_framework.status import HTTP_400_BAD_REQUEST
 from rest_framework.decorators import action
 
 from src.base.permissions import Permission
-from src.base.serializers import EmploymentSerializer, UserSerializer, FunctionGroupSerializer, WorkerPositionSerializer, NotificationSerializer, SubscribeSerializer, PasswordSerializer, ShopSettingsSerializer, NetworkSerializer, AuthUserSerializer
+from src.base.serializers import (
+    EmploymentSerializer,
+    UserSerializer, 
+    FunctionGroupSerializer, 
+    WorkerPositionSerializer, 
+    NotificationSerializer, 
+    SubscribeSerializer, 
+    PasswordSerializer, 
+    ShopSettingsSerializer, 
+    NetworkSerializer, 
+    AuthUserSerializer,
+    EmploymentListSerializer,
+    UserListSerializer,
+    GroupSerializer,
+)
 from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter
 from src.base.models import (
     Employment,
@@ -24,12 +38,31 @@ from src.base.models import (
     ShopSettings,
     WorkerPosition,
     User,
+    Group,
 )
 
 from src.base.filters import UserFilter
 
 
-class EmploymentViewSet(ModelViewSet):
+class BaseActiveNamedModelViewSet(ModelViewSet):
+    '''
+    Класс переопределяющий get_object() для возможности
+    получения сущности по коду либо иному полю, указанному
+    в свойстве get_object_field
+    '''
+    get_object_field = 'code'
+    def get_object(self):
+        if self.request.method == 'GET':
+            by_code = self.request.query_params.get('by_code', False)
+        else:
+            by_code = self.request.data.get('by_code', False)
+        if by_code:
+            self.lookup_field = self.get_object_field
+            self.kwargs[self.get_object_field] = self.kwargs['pk']
+        return super().get_object()
+
+
+class EmploymentViewSet(BaseActiveNamedModelViewSet):
     """
         обязательные поля при редактировании PUT:
             position_id
@@ -43,16 +76,8 @@ class EmploymentViewSet(ModelViewSet):
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
+    get_object_field = 'tabel_code'
 
-    def get_object(self):
-        if self.request.method == 'GET':
-            by_code = self.request.query_params.get('by_code', False)
-        else:
-            by_code = self.request.data.get('by_code', False)
-        if by_code:
-            self.lookup_field = 'tabel_code'
-            self.kwargs['tabel_code'] = self.kwargs['pk']
-        return super().get_object()
 
     def get_queryset(self):
         return Employment.objects.filter(
@@ -60,22 +85,20 @@ class EmploymentViewSet(ModelViewSet):
         )
 
 
-class UserViewSet(ModelViewSet):
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return EmploymentListSerializer
+        else:
+            return EmploymentSerializer
+
+
+class UserViewSet(BaseActiveNamedModelViewSet):
     page_size = 10
     pagination_class = LimitOffsetPagination
-    permission_classes = [IsAuthenticated]
+    permission_classes = [Permission]
     serializer_class = UserSerializer
     filterset_class = UserFilter
-
-    def get_object(self):
-        if self.request.method == 'GET':
-            by_code = self.request.query_params.get('by_code', False)
-        else:
-            by_code = self.request.data.get('by_code', False)
-        if by_code:
-            self.lookup_field = 'username'
-            self.kwargs['username'] = self.kwargs['pk']
-        return super().get_object()
+    get_object_field = 'username'
 
     def get_queryset(self):
         user = self.request.user
@@ -104,13 +127,21 @@ class UserViewSet(ModelViewSet):
                             status=HTTP_400_BAD_REQUEST)
 
 
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return UserListSerializer
+        else:
+            return UserSerializer
+
+
 class AuthUserView(UserDetailsView):
     serializer_class = AuthUserSerializer
 
 
-class FunctionGroupView(ListAPIView):
-    permission_classes = [IsAuthenticated]
+class FunctionGroupView(ModelViewSet):
+    permission_classes = [Permission]
     serializer_class = FunctionGroupSerializer
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
         user = self.request.user
@@ -123,19 +154,10 @@ class FunctionGroupView(ListAPIView):
         return FunctionGroup.objects.filter(group__in=groups).distinct('func')
 
 
-class WorkerPositionViewSet(ModelViewSet):
+class WorkerPositionViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [Permission]
     serializer_class = WorkerPositionSerializer
-
-    def get_object(self):
-        if self.request.method == 'GET':
-            by_code = self.request.query_params.get('by_code', False)
-        else:
-            by_code = self.request.data.get('by_code', False)
-        if by_code:
-            self.lookup_field = 'code'
-            self.kwargs['code'] = self.kwargs['pk']
-        return super().get_object()
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
         return WorkerPosition.objects.filter(
@@ -172,7 +194,9 @@ class NotificationViewSet(
         return Notification.objects.filter(worker=user).select_related('event', 'event__worker_day_details', 'event__shop')
 
 
-class ShopSettingsViewSet(ModelViewSet):
+class ShopSettingsViewSet(BaseActiveNamedModelViewSet):
+    page_size = 10
+    pagination_class = LimitOffsetPagination
     permission_classes = [Permission]
     serializer_class = ShopSettingsSerializer
 
@@ -183,8 +207,18 @@ class ShopSettingsViewSet(ModelViewSet):
         )
 
 
-class NetworkViewSet(ModelViewSet):
+class NetworkViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [Permission]
     serializer_class = NetworkSerializer
     queryset = Network.objects.all()
 
+
+class GroupViewSet(BaseActiveNamedModelViewSet):
+    permission_classes = [Permission]
+    serializer_class = GroupSerializer
+    pagination_class = LimitOffsetPagination
+    
+    def get_queryset(self):
+        return Group.objects.filter(
+            network_id=self.request.user.network_id,
+        )

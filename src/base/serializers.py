@@ -8,10 +8,10 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.db.models import Q
 
-from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop
+from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop, Group
 from src.base.message import Message
 from src.base.fields import CurrentUserNetwork
-from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer
+from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
 
 
 class BaseNetworkSerializer(serializers.ModelSerializer):
@@ -23,6 +23,25 @@ class NetworkSerializer(serializers.ModelSerializer):
         model = Network
         fields = ['id', 'name', 'logo', 'url', 'primary_color', 'secondary_color']
 
+
+class UserListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    middle_name = serializers.CharField()
+    birthday = serializers.DateField()
+    sex = serializers.CharField()
+    avatar = serializers.SerializerMethodField('get_avatar_url')
+    email = serializers.CharField()
+    phone_number = serializers.CharField()
+    tabel_code = serializers.CharField()
+    username = serializers.CharField()
+    network_id = serializers.IntegerField()
+
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            return obj.avatar.url
+        return None
 
 class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
@@ -77,6 +96,30 @@ class FunctionGroupSerializer(serializers.ModelSerializer):
         fields = ['id', 'group_id', 'func', 'method']
 
 
+class EmploymentListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    user_id = serializers.IntegerField(required=False)
+    shop_id = serializers.IntegerField(required=False)
+    position_id = serializers.IntegerField()
+    is_fixed_hours = serializers.BooleanField()
+    dt_hired = serializers.DateField()
+    dt_fired = serializers.DateField()
+    salary = serializers.DecimalField(max_digits=10, decimal_places=2, default=0)
+    week_availability = serializers.IntegerField()
+    norm_work_hours = serializers.IntegerField()
+    min_time_btw_shifts = serializers.IntegerField()
+    shift_hours_length_min = serializers.IntegerField()
+    shift_hours_length_max = serializers.IntegerField()
+    auto_timetable = serializers.BooleanField()
+    tabel_code = serializers.CharField()
+    is_ready_for_overworkings = serializers.BooleanField()
+    dt_new_week_availability_from = serializers.DateField()
+    user = UserListSerializer()
+    is_visible = serializers.BooleanField()
+    worker_constraints = WorkerConstraintListSerializer(many=True)
+    work_types = EmploymentWorkTypeListSerializer(many=True)
+
+
 class EmploymentSerializer(serializers.ModelSerializer):
     default_error_messages = {
         "emp_check_dates": _("Employment from {dt_hired} to {dt_fired} already exists."),
@@ -105,8 +148,9 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if self.instance:
+            #Нельзя обновить пользователя по коду
             user_id = self.instance.user_id
-            shop_id = self.instance.shop_id
+            shop_id = self.instance.shop_id if not self.initial_data.get('shop_code', False) else Shop.objects.get(code=self.initial_data.get('shop_code')).id
         else:
             if not attrs.get('user_id'):
                 user = attrs.pop('user')
@@ -202,6 +246,7 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 
 class ShopSettingsSerializer(serializers.ModelSerializer):
+    network_id = serializers.IntegerField(default=CurrentUserNetwork(), write_only=True)
 
     class Meta:
         model = ShopSettings
@@ -216,7 +261,8 @@ class ShopSettingsSerializer(serializers.ModelSerializer):
                   'process_type',
                   'absenteeism',
                   'queue_length',
-                  'max_work_hours_7days'
+                  'max_work_hours_7days',
+                  'network_id',
                   ]
 
 
@@ -227,3 +273,9 @@ class SubscribeSerializer(serializers.ModelSerializer):
         model = Subscribe
         fields = ['id','shop_id', 'type']
 
+
+class GroupSerializer(serializers.ModelSerializer):
+    network_id = serializers.HiddenField(default=CurrentUserNetwork())
+    class Meta:
+        model = Group
+        fields = ['id', 'name', 'code', 'network_id']

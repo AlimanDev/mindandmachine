@@ -14,7 +14,7 @@ from src.base.models import (
 
 @admin.register(Network)
 class NetworkAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'code')
+    list_display = ('id', 'name', 'code', 'logo')
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):

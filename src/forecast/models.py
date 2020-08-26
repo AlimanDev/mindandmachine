@@ -10,8 +10,7 @@ from src.base.models import Shop
 from src.timetable.models import WorkType, WorkTypeName, Network
 
 class OperationTypeName(AbstractActiveNamedModel):
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Название операции'
         verbose_name_plural = 'Названия операций'
 
@@ -74,7 +73,7 @@ class OperationType(AbstractActiveModel):
     ]
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True, related_name='operation_types')
-    work_type = models.OneToOneField(WorkType, on_delete=models.PROTECT, related_name='operation_type', null=True)
+    work_type = models.OneToOneField(WorkType, on_delete=models.PROTECT, related_name='operation_type', null=True, blank=True)
     operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
     do_forecast = models.CharField(
         max_length=1,
@@ -177,7 +176,7 @@ class OperationTemplate(AbstractActiveNamedModel):
         В PeriodClients создадутся записи о потребности в 1 человеке
             с 10 до 12 каждый месяц 1,3,5,15 числа
     """
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Шаблон операций'
         verbose_name_plural = 'Шаблоны операций'
 
@@ -300,7 +299,7 @@ class PeriodClients(AbstractModel):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
     id = models.BigAutoField(primary_key=True)
-    dttm_forecast = models.DateTimeField()
+    dttm_forecast = models.DateTimeField(db_index=True)
     type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
     operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT)
     value = models.FloatField(default=0)

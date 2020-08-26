@@ -63,7 +63,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
     work_types = WorkType.objects.filter(shop_id=shop_id).order_by('id')
     if 'work_type_ids' in form and len(form['work_type_ids']) > 0:
         work_types = work_types.filter(id__in=form['work_type_ids'])
-        if len(work_types) != len(form['work_type_ids']):
+        if work_types.count() != len(form['work_type_ids']):
             return 'bad work_type_ids'
     work_types = {
         wt.id: wt
@@ -85,7 +85,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
 
     fill_array(
         predict_needs,
-        need_workers.filter(type=PeriodClients.LONG_FORECASE_TYPE),
+        list(need_workers.filter(type=PeriodClients.LONG_FORECASE_TYPE)),
         lambda_index_periodclients,
         lambda_add_periodclients,
     )
@@ -93,7 +93,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
 
     fill_array(
         fact_needs,
-        need_workers.filter(type=PeriodClients.FACT_TYPE),
+        list(need_workers.filter(type=PeriodClients.FACT_TYPE)),
         lambda_index_periodclients,
         lambda_add_periodclients,
     )
@@ -127,15 +127,15 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
             dttm2index(from_dt, x.worker_day.dttm_work_end, period_in_day, period_lengths_minutes),
         ))
     lambda_add_work_details = lambda x: x.work_part
-
+    cashbox_details_list = list(cashbox_details.select_related('worker_day'))
     fill_array(
         init_work,
-        cashbox_details,
+        cashbox_details_list,
         lambda_index_work_details,
         lambda_add_work_details,
     )
 
-    employments = Employment.objects.filter(id__in=cashbox_details.values_list('worker_day__employment'))
+    employments = list(Employment.objects.filter(id__in=cashbox_details.values_list('worker_day__employment')))
     employment_dict= {e.id: e for e in employments}
 
     worker_days = WorkerDay.objects.qos_filter_version(1).filter(
@@ -169,7 +169,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
             employment_dict[row['employment_id']].salary / Decimal(norm_work_hours)
         )
 
-    finite_workdetails = list(cashbox_details.select_related('worker_day'))
+    finite_workdetails = cashbox_details_list
     fill_array(
         finite_work,
         finite_workdetails,

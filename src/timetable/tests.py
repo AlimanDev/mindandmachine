@@ -665,19 +665,19 @@ class TestVacancy(APITestCase):
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):
-        response = self.client.get(f'{self.url}?shop_id={self.shop.id}')
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&limit=100')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 2)
+        self.assertEqual(len(response.json()['results']), 2)
 
     def test_get_list_shift_length(self):
-        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&shift_length_min=8:00:00&shift_length_max=9:00:00')
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&shift_length_min=8:00:00&shift_length_max=9:00:00&limit=100')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()['results']), 1)
 
     def test_get_vacant_list(self):
-        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&is_vacant=true')
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&is_vacant=true&limit=100')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()['results']), 1)
 
     def test_confirm_vacancy(self):
         WorkerDay.objects.create(
