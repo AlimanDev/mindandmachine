@@ -345,6 +345,16 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
+    'task-aggregate-receipts': {
+        'task': 'src.celery.tasks.aggregate_timeserie_value',
+        'schedule': crontab(hour=0, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-delete-old=receipts': {
+        'task': 'src.celery.tasks.clean_timeserie_actions',
+        'schedule': crontab(hour=1, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
 }
 
 if 'test' in sys.argv:
