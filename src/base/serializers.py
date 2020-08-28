@@ -10,7 +10,7 @@ from django.db.models import Q
 
 from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop, Group
 from src.base.message import Message
-from src.base.fields import CurrentUserNetwork
+from src.base.fields import CurrentUserNetwork, UserworkShop
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
 
 
@@ -55,9 +55,10 @@ class UserSerializer(BaseNetworkSerializer):
 
 class AuthUserSerializer(UserSerializer):
     network = NetworkSerializer()
+    shop_id = serializers.CharField(default=UserworkShop())
 
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ['network']
+        fields = UserSerializer.Meta.fields + ['network', 'shop_id']
 
 
 class PasswordSerializer(serializers.Serializer):

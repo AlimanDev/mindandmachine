@@ -33,6 +33,8 @@ TIMETABLE_IP = "127.0.0.1:5000"
 
 
 SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
+MDAUDIT_AUTHTOKEN_SALT = 'DLKAXGKFPP57B2NEQ4NLB2TLDT3QR20I7QKAGE8I'
+
 
 DEBUG = True
 
@@ -45,6 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
     'rest_framework',
     'django_filters',
     'rest_auth',
@@ -62,7 +65,7 @@ INSTALLED_APPS = [
 REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'src.base.authentication.SessionAuthentication',
+        'src.base.auth.authentication.WFMSessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ]
 }
@@ -80,12 +83,15 @@ FCM_DJANGO_SETTINGS = {
 }
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    'django_cookies_samesite.middleware.CookiesSameSite',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'src.util.csrf.CsrfMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # 'src.main.auth.middleware.JWTAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -239,6 +245,8 @@ MEDIA_URL = '/_i/media/'
 
 
 SESSION_COOKIE_SECURE = True
+
+DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
 
 QOS_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S" #'%H:%M:%S %d.%m.%Y'
 QOS_DATE_FORMAT = '%Y-%m-%d'
