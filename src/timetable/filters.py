@@ -51,12 +51,14 @@ class VacancyFilter(FilterSet):
     work_type_name = CharFilter(field_name='work_types', method='filter_by_name')
 
     def filter_include_outsource(self, queryset, name, value):
-        shops = value.split(',')
-        if not self.request.query_params.get('include_outsource', False):
-            return queryset.filter(shop_id__in=shops)
-        return queryset.filter(
-            Q(shop_id__in=shops) | Q(is_outsource=True),
-        )
+        if value:
+            shops = value.split(',')
+            if not self.request.query_params.get('include_outsource', False):
+                return queryset.filter(shop_id__in=shops)
+            return queryset.filter(
+                Q(shop_id__in=shops) | Q(is_outsource=True),
+            )
+        return queryset
 
     def filter_by_name(self, queryset, name, value):
         names = value.split(',')

@@ -14,7 +14,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 
-from src.base.permissions import FilteredListPermission
+from src.base.permissions import FilteredListPermission, Permission
 from src.base.exceptions import FieldError
 from src.base.models import Employment, Shop, User
 from src.base.message import Message
@@ -63,7 +63,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         'na_worker_day_exists': _("Not approved version already exists."),
     }
 
-    permission_classes = [FilteredListPermission]
+    permission_classes = [Permission] # временно из-за биржи смен vacancy  [FilteredListPermission]
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
     queryset = WorkerDay.objects.all()
