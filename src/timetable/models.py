@@ -422,19 +422,19 @@ class WorkerDay(AbstractModel):
 
     @staticmethod
     def count_work_hours(break_triplets, dttm_work_start, dttm_work_end):
-        work_hours = int((dttm_work_end - dttm_work_start).total_seconds()) / 60
+        work_hours = (dttm_work_end - dttm_work_start).total_seconds() / 60
         for break_triplet in break_triplets:
             if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
                 work_hours = work_hours - sum(break_triplet[2])
                 break
-        return round(work_hours / 60)
+        return datetime.timedelta(minutes=work_hours)
     
     def get_department(self):
         return self.shop
 
     def save(self, *args, **kwargs):
         if self.dttm_work_end and self.dttm_work_start:
-            self.work_hours = self.dttm_work_end - self.dttm_work_start
+            self.work_hours = self.count_work_hours(json.loads(self.shop.settings.break_triplets), self.dttm_work_start, self.dttm_work_end)
         else:
             self.work_hours = datetime.timedelta(0)
         super().save(*args, **kwargs)

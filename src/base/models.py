@@ -27,7 +27,7 @@ class Network(AbstractActiveModel):
     code = models.CharField(max_length=64, unique=True, null=True, blank=True)
     # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
     need_symbol_for_vacancy = models.BooleanField(default=False)
-    settings_values = models.TextField(default='{}')  # настройки для сети. Cейчас есть настройки для приемки чеков
+    settings_values = models.TextField(default='{}')  # настройки для сети. Cейчас есть настройки для приемки чеков + ночные смены
 
     def get_department(self):
         return None
