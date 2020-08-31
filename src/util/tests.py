@@ -1,7 +1,8 @@
 from src.util.test import LocalTestCase
 from unittest import skip
 
-class TestApiMethod(LocalTestCase):
+#старое апи. Не используется
+class TestApiMethod:
     def auth(self, username):
         self.client.post(
             '/api/auth/signin',
@@ -109,4 +110,4 @@ class TestApiMethod(LocalTestCase):
         response = self.api_get('/api/timetable/auto_settings/get_status')
         self.assertEqual(response.json()['code'], 400)
         self.assertResponseCodeEqual(response, 400)
-        self.assertEqual(response.json()['data']['error_message'], "[('dt', ['This field is required.'])]")
+        self.assertEqual(response.json()['data']['error_message'], "[('dt', ['Это поле обязательно.'])]")

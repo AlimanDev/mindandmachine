@@ -9,6 +9,7 @@ from src.forecast.models import (
     LoadTemplate,
     OperationTypeTemplate,
     OperationTypeRelation,
+    Receipt,
 )
 
 
@@ -46,7 +47,7 @@ class PeriodClientsAdmin(admin.ModelAdmin):
 
     @staticmethod
     def operation_type_name(instance: PeriodClients):
-        return instance.operation_type.operation_ype_name.name or instance.operation_type.id
+        return instance.operation_type.operation_type_name.name or instance.operation_type.id
 
 
 @admin.register(PeriodDemandChangeLog)
@@ -92,3 +93,9 @@ class OperationTypeTemplateAdmin(admin.ModelAdmin):
 @admin.register(OperationTypeRelation)
 class OperationTypeRelationAdmin(admin.ModelAdmin):
     list_display = ('id', 'base_id', 'depended_id', 'formula')
+
+
+
+@admin.register(Receipt)
+class ReceiptAdmin(admin.ModelAdmin):
+    list_display = ('id', 'shop_id', 'dttm_modified', 'code')

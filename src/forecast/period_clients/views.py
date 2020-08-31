@@ -12,8 +12,9 @@ from rest_framework.decorators import action
 from src.base.models import Shop, Employment, FunctionGroup
 from src.util.models_converter import Converter
 from src.forecast.load_template.utils import apply_reverse_formula # чтобы тесты не падали
-from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util
+from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util, create_demand, group_bills_and_income
 from src.util.upload import get_uploaded_file
+import json
 
 
 # Serializers define the API representation.
@@ -120,6 +121,22 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
     POST /rest_api/period_clietns/
     :params
         data: JSON, required=True,
+        {
+            "data": {
+                "shop_id": 2, //or "shop_code": "SHOP2"
+                "dt_from": "2020-07-01",
+                "dt_to": "2020-07-30",
+                "type": "L", //(L, F)
+                "serie": [
+                    {
+                        "dttm": "2020-07-01T10:00:00",
+                        "value": 2,
+                        "timeserie_code": "bills" //or "timeserie_id": 2 or "work_type": 2
+                    },
+                    ...
+                ]
+            }
+        }
     :return 
         code=201
 
@@ -155,54 +172,26 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         return self.filter_queryset(PeriodClients.objects.all())
 
     def create(self, request):
-        models_list = []
         data = PeriodClientsCreateSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         data = data.validated_data['data']
-
-        shop = Shop.objects.get(id=data['shop_id'])
-        dt_from = Converter.parse_date(data['dt_from'])
-        dt_to = Converter.parse_date(data['dt_to'])
-        type = data.get('type', PeriodClients.LONG_FORECASE_TYPE)
-
-        PeriodClients.objects.select_related('operation_type__work_type').filter(
-            type=type,
-            dttm_forecast__date__gte=dt_from,
-            dttm_forecast__date__lte=dt_to,
-            operation_type__shop_id=shop.id,
-            operation_type__do_forecast=OperationType.FORECAST,
-        ).delete()
-        
-        for period_demand_value in data['demand']:
-            clients = period_demand_value['value']
-            clients = 0 if clients < 0 else clients
-            models_list.append(
-                PeriodClients(
-                    type=type,
-                    dttm_forecast=Converter.parse_datetime(period_demand_value['dttm']),
-                    operation_type_id=period_demand_value['work_type'],
-                    value=clients,
-                )
-            )
-        PeriodClients.objects.bulk_create(models_list)
-        employments = Employment.objects.filter(
-            function_group__allowed_functions__func='set_demand',
-            function_group__allowed_functions__access_type__in=[FunctionGroup.TYPE_SHOP, FunctionGroup.TYPE_SUPERSHOP],
-            shop=shop,
-        ).values_list('user_id', flat=True)
-
-        # notify4users = User.objects.filter(
-        #     id__in=employments
-        # )
-
-        # Event.objects.mm_event_create(
-        #     notify4users,
-        #     text='Cоставлен новый спрос на период с {} по {}'.format(data['dt_from'], data['dt_to']),
-        #     department=shop,
-        # )
-
+        create_demand(data)
         return Response(status=status.HTTP_201_CREATED)
+        
     
+    @action(detail=False, methods=['post'])
+    def set_timeserie(self, request):
+        data = PeriodClientsCreateSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        values = data.validated_data['data']
+        data = {}
+        data['values'] = values
+        data['settings'] = json.loads(request.user.network.settings_values)
+        data = group_bills_and_income(data)
+        for _, value in data.items():
+            create_demand(value)
+        return Response(status=status.HTTP_201_CREATED)
+
     @action(detail=False, methods=['put'])
     def put(self, request, pk=None):
         data = PeriodClientsUpdateSerializer(data=request.data)

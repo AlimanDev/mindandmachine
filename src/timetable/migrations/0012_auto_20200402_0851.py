@@ -22,8 +22,4 @@ class Migration(migrations.Migration):
             name='employment',
             field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='work_types', to='base.Employment'),
         ),
-        migrations.AlterUniqueTogether(
-            name='workerconstraint',
-            unique_together={('employment', 'weekday', 'tm')},
-        ),
     ]

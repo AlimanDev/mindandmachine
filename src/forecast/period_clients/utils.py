@@ -20,6 +20,7 @@ from src.timetable.models import (
 
 from django.db.models import Q
 from src.base.exceptions import MessageError
+from src.util.models_converter import Converter
 
 
 def upload_demand_util(demand_file, shop_id, lang='ru'):
@@ -172,3 +173,126 @@ def download_demand_xlsx_util(request, workbook, form):
         to_dt.strftime('%Y.%m.%d'),
     )
 
+
+def create_demand(data):
+    '''
+    Функция для внесения значений операций.
+    :param 
+        data JSON
+        {
+            'shop_id': 1, || 'shop_code': 'shop'
+            'dt_from': '2020-07-01', || datetime.date(2020, 7, 1)
+            'dt_to': '2020-07-31', || datetime.date(2020, 7, 31)
+            'type': 'F', || 'L'
+            'serie': [
+                {
+                    'dttm': '2020-07-01T08:00:00',
+                    'timeserie_id': 1, || 'timeserie_code': 'bills'
+                    'value': 2.0,
+                },
+                ...
+                {
+                    'dttm': '2020-07-31T22:00:00',
+                    'timeserie_id': 1, || 'timeserie_code': 'bills'
+                    'value': 3.0,
+                }
+            ]
+        }
+    '''
+    models_list = []
+
+    shop_id = data.get('shop_id')
+    if not shop_id:
+        shop = Shop.objects.get(code=data.get('shop_code'))
+    else:
+        shop = Shop.objects.get(id=shop_id)
+    
+    dt_from = Converter.parse_date(data['dt_from']) if type(data['dt_from']) is str else data['dt_from']
+    dt_to = Converter.parse_date(data['dt_to']) if type(data['dt_to']) is str else data['dt_to']
+    forecase_type = data.get('type', PeriodClients.LONG_FORECASE_TYPE)
+    operation_types = list(OperationType.objects.select_related('operation_type_name').filter(Q(shop_id=shop.id) | Q(work_type__shop_id=shop.id)))
+    operation_codes = {
+        ot.operation_type_name.code: ot
+        for ot in operation_types
+    }
+    operation_ids = {
+        ot.id: ot
+        for ot in operation_types
+    }
+    if data['serie'][0].get('timeserie_code', False):
+        operation_types_to_delete = set([ operation_codes.get(x.get('timeserie_code')) for x in data['serie']])
+    else:
+        operation_types_to_delete = set([ operation_ids.get(x.get('timeserie_id')) for x in data['serie']])
+    PeriodClients.objects.filter(
+        Q(operation_type__shop_id=shop.id) | Q(operation_type__work_type__shop_id=shop.id),
+        type=forecase_type,
+        dttm_forecast__date__gte=dt_from,
+        dttm_forecast__date__lte=dt_to,
+        operation_type__do_forecast=OperationType.FORECAST,
+        operation_type__in=operation_types_to_delete,
+    ).delete()
+    
+    for period_demand_value in data['serie']:
+        clients = period_demand_value['value']
+        clients = 0 if clients < 0 else clients
+        operation_type = None
+        if period_demand_value.get('timeserie_code', False):
+            operation_type = operation_codes.get(period_demand_value.get('timeserie_code'))
+        elif period_demand_value.get('timeserie_id', False):
+            operation_type = operation_ids.get(period_demand_value.get('timeserie_id'))
+        models_list.append(
+            PeriodClients(
+                type=forecase_type,
+                dttm_forecast=Converter.parse_datetime(period_demand_value.get('dttm')),
+                operation_type=operation_type,
+                value=clients,
+            )
+        )
+    PeriodClients.objects.bulk_create(models_list)
+    return True
+
+
+def group_bills_and_income(form):
+    result = {}
+    settings = form['settings']
+    for bill in form['values']:
+        shop = bill[settings.get('timeserie_shop_code','КодМагазина')]
+        if not shop in result:
+            result[shop] = {}
+            result[shop]['shop_code'] = shop
+            result[shop]['type'] = 'F'
+            result[shop]['data'] = []
+            result[shop]['temp_data'] = {}
+        dttm = Converter.parse_datetime(bill['Дата'])
+        dttm = Converter.convert_datetime(datetime.combine(dttm.date(), time(dttm.hour)))
+        if not dttm in result[shop]['temp_data']:
+            result[shop]['temp_data'][dttm] = {
+                'bills': 0,
+                'income':0,
+            }
+        result[shop]['temp_data'][dttm]['bills'] += 1
+        result[shop]['temp_data'][dttm]['income'] += float(bill[settings.get('timeserie_income_sum','СуммаДокумента')])
+    for shop, values in result.items():
+        for t, data in values['temp_data'].items():
+            dttm = Converter.parse_datetime(t)
+            dt_from = values.get('dt_from')
+            dt_to = values.get('dt_to')
+            if not dt_from or dt_from > dttm.date():
+                values['dt_from'] = dttm.date()
+            if not dt_to or dt_to < dttm.date():
+                values['dt_to'] = dttm.date()
+            values['data'].append(
+                {
+                    'dttm': t,
+                    'value': data['bills'],
+                    'timeserie_code': settings.get('timeserie_bills_type_code','bills'),
+                }
+            )
+            values['data'].append(
+                {
+                    'dttm': t,
+                    'value': data['income'],
+                    'timeserie_code': settings.get('timeserie_income_type_code','income'),
+                }
+            )
+    return result

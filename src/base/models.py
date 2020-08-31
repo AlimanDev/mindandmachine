@@ -1,4 +1,5 @@
 import datetime
+import json
 from timezone_field import TimeZoneField
 
 from django.db import models
@@ -6,35 +7,41 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from mptt.models import MPTTModel, TreeForeignKey
-
+from django.apps import apps
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
+from src.base.exceptions import MessageError
+from src.conf.djconfig import QOS_TIME_FORMAT
+from django.core.serializers.json import DjangoJSONEncoder
 
 
-class Network(AbstractActiveNamedModel):
+class Network(AbstractActiveModel):
     class Meta:
         verbose_name = 'Сеть магазинов'
         verbose_name_plural = 'Сети магазинов'
+
     logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
     url = models.CharField(blank=True,null=True,max_length=255)
-    primary_color = models.CharField(max_length=6, blank=True)
-    secondary_color = models.CharField(max_length=6, blank=True)
+    primary_color = models.CharField(max_length=7, blank=True)
+    secondary_color = models.CharField(max_length=7, blank=True)
+    name = models.CharField(max_length=128, unique=True)
+    code = models.CharField(max_length=64, unique=True, null=True, blank=True)
     # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
     need_symbol_for_vacancy = models.BooleanField(default=False)
+    settings_values = models.TextField(default='{}')  # настройки для сети. Cейчас есть настройки для приемки чеков
 
     def get_department(self):
         return None
 
 
 class Region(AbstractActiveNamedModel):
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Регион'
         verbose_name_plural = 'Регионы'
 
 
 class ShopSettings(AbstractActiveNamedModel):
 
-    class Meta(object):
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Настройки автосоставления'
         verbose_name_plural = 'Настройки автосоставления'
 
@@ -45,8 +52,6 @@ class ShopSettings(AbstractActiveNamedModel):
         (PRODUCTION_CAL, 'production calendar'),
         (YEAR_NORM, 'norm per year')
     )
-
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     # json fields
     method_params = models.CharField(max_length=4096, default='[]')
     cost_weights = models.CharField(max_length=4096, default='{}')
@@ -79,7 +84,7 @@ class ShopSettings(AbstractActiveNamedModel):
 
 # на самом деле это отдел
 class Shop(MPTTModel, AbstractActiveNamedModel):
-    class Meta(object):
+    class Meta:
         # unique_together = ('parent', 'title')
         verbose_name = 'Отдел'
         verbose_name_plural = 'Отделы'
@@ -120,22 +125,24 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     count_lack = models.BooleanField(default=False)
 
-    tm_shop_opens = models.TimeField(default=datetime.time(6, 0))
-    tm_shop_closes = models.TimeField(default=datetime.time(23, 0))
+    tm_open_dict = models.TextField(default='{}')
+    tm_close_dict = models.TextField(default='{}')
+    area = models.FloatField(null=True) #Торговая площадь магазина
+
     restricted_start_times = models.CharField(max_length=1024, default='[]')
     restricted_end_times = models.CharField(max_length=1024, default='[]')
 
-    load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops')
+    load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
+    exchange_settings = models.ForeignKey('timetable.ExchangeSettings', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
 
     staff_number = models.SmallIntegerField(default=0)
 
-    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True)
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
+    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True, blank=True)
 
     email = models.EmailField(blank=True, null=True)
-    exchange_shops = models.ManyToManyField('self')
+    exchange_shops = models.ManyToManyField('self', blank=True)
 
-    settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True)
+    settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -164,6 +171,83 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     def get_department(self):
         return self
 
+    def __init__(self, *args, **kwargs):
+        code = kwargs.pop('parent_code', None)
+        super().__init__(*args, **kwargs)
+        if code:
+            self.parent = Shop.objects.get(code=code)
+
+
+    def __getattribute__(self, attr):
+        if attr in ['open_times', 'close_times']:
+            try:
+                return super().__getattribute__(attr)
+            except:
+                fields_scope = {
+                    'open_times': 'tm_open_dict',
+                    'close_times': 'tm_close_dict',
+                }
+                try:
+                    self.__setattr__(attr, {
+                        k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
+                        for k, v in json.loads(getattr(self, fields_scope.get(attr))).items()
+                    })
+                except:
+                    return {}
+        return super().__getattribute__(attr)
+
+    @staticmethod
+    def clean_time_dict(time_dict):
+        new_dict = dict(time_dict)
+        dict_keys = list(new_dict.keys())
+        for key in dict_keys:
+            if 'd' in key:
+                new_dict[key.replace('d', '')] = new_dict.pop(key)
+        return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
+
+    def save(self, *args, **kwargs):
+        open_times = self.open_times
+        close_times = self.close_times
+        if open_times.keys() != close_times.keys():
+            raise MessageError(code='time_shop_differerent_keys')
+        if open_times.get('all') and len(open_times) != 1:
+            raise MessageError(code='time_shop_all_or_days')
+        
+        for key in open_times.keys():
+            close_hour = close_times[key].hour if close_times[key].hour != 0 else 24
+            if open_times[key].hour > close_hour:
+                raise MessageError(code='time_shop_incorrect_time_start_end')
+        self.tm_open_dict = self.clean_time_dict(self.open_times)
+        self.tm_close_dict = self.clean_time_dict(self.close_times)
+        if hasattr(self, 'parent_code'):
+            self.parent = Shop.objects.get(code=self.parent_code)
+        load_template = None
+        if self.load_template_id and self.id:
+            new_template = self.load_template_id
+            self.refresh_from_db(fields=['load_template_id'])
+            load_template = self.load_template_id
+            self.load_template_id = new_template
+        super().save(*args, **kwargs)
+        if self.load_template_id:
+            from src.forecast.load_template.utils import apply_load_template
+            if load_template != None and load_template != new_template:
+                apply_load_template(new_template, self.id)
+            elif load_template == None:
+                apply_load_template(self.load_template_id, self.id)
+               
+
+
+    def get_exchange_settings(self):
+        return self.exchange_settings if self.exchange_settings_id\
+            else apps.get_model(
+                'timetable', 
+                'ExchangeSettings',
+            ).objects.filter(
+                network_id=self.network_id, 
+                shops__isnull=True,
+            ).first()
+
+
 
 class EmploymentManager(models.Manager):
     def get_active(self, network_id, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):
@@ -185,13 +269,12 @@ class EmploymentManager(models.Manager):
 
 
 class Group(AbstractActiveNamedModel):
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Группа пользователей'
         verbose_name_plural = 'Группы пользователей'
 
     dttm_modified = models.DateTimeField(blank=True, null=True)
     subordinates = models.ManyToManyField("self", blank=True)
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -287,7 +370,7 @@ class User(DjangoAbstractUser, AbstractModel):
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     access_token = models.CharField(max_length=64, blank=True, null=True)
-    tabel_code = models.CharField(blank=True, max_length=15, null=True, unique=True)
+    tabel_code = models.CharField(blank=True, max_length=64, null=True, unique=True)
     lang = models.CharField(max_length=2, default='ru')
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     black_list_symbol = models.CharField(max_length=128, null=True, blank=True)
@@ -297,16 +380,18 @@ class WorkerPosition(AbstractActiveNamedModel):
     """
     Describe employee's position
     """
-    class Meta:
+    class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Должность сотрудника'
         verbose_name_plural = 'Должности сотрудников'
 
     id = models.BigAutoField(primary_key=True)
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
+
+    def get_department(self):
+        return None
 
 
 class Employment(AbstractActiveModel):
@@ -338,7 +423,7 @@ class Employment(AbstractActiveModel):
 
     auto_timetable = models.BooleanField(default=True)
 
-    tabel_code = models.CharField(max_length=15, null=True, blank=True)
+    tabel_code = models.CharField(max_length=64, null=True, blank=True)
     is_ready_for_overworkings = models.BooleanField(default=False)
 
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
@@ -347,7 +432,9 @@ class Employment(AbstractActiveModel):
     objects = EmploymentManager()
 
     def has_permission(self, permission, method='GET'):
-        group = self.function_group or self.position.group
+        group = self.function_group or (self.position.group if self.position else None)
+        if not group:
+            raise MessageError(code='no_group_or_position')
         return group.allowed_functions.filter(
             func=permission,
             method=method
@@ -355,6 +442,30 @@ class Employment(AbstractActiveModel):
 
     def get_department(self):
         return self.shop
+
+    def __init__(self, *args, **kwargs):
+        shop_code = kwargs.pop('shop_code', None)
+        username = kwargs.get('username', None)
+        user_id = kwargs.get('user_id', None)
+        position_code = kwargs.pop('position_code', None)
+        super().__init__(*args, **kwargs)
+        if shop_code:
+            self.shop = Shop.objects.get(code=shop_code)
+        if username and not user_id:
+            self.user = User.objects.get(username=username)
+            self.user_id = self.user.id
+
+        if position_code:
+            self.position = WorkerPosition.objects.get(code=position_code)
+
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'shop_code'):
+            self.shop = Shop.objects.get(code=self.shop_code)
+        if hasattr(self, 'username'):
+            self.user = User.objects.get(username=self.username)
+        if hasattr(self, 'position_code'):
+            self.position = WorkerPosition.objects.get(code=self.position_code)
+        super().save(*args, **kwargs)
 
 
 class FunctionGroup(AbstractModel):
@@ -381,13 +492,11 @@ class FunctionGroup(AbstractModel):
         'AuthUserView',
         'Employment',
         'EmploymentWorkType',
+        'ExchangeSettings',
         'FunctionGroupView',
         'Network',
         'Notification',
         'OperationTemplate',
-        'WorkTypeName',
-        'WorkType',
-        'WorkType_efficiency',
         'OperationTypeName',
         'OperationType',
         'PeriodClients',
@@ -396,10 +505,14 @@ class FunctionGroup(AbstractModel):
         'PeriodClients_delete',
         'PeriodClients_upload',
         'PeriodClients_download',
+        'Receipt',
+        'Group',
         'Shop',
         'Shop_stat',
+        'Shop_tree',
         'Subscribe',
         'User',
+        'User_change_password',
         'WorkerConstraint',
         'WorkerDay',
         'WorkerDay_approve',
@@ -414,6 +527,12 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_upload',
         'WorkerDay_download_timetable',
         'WorkerDay_download_tabel',
+        'WorkerDay_editable_vacancy',
+        'WorkerDay_approve_vacancy',
+        'WorkerPosition',
+        'WorkTypeName',
+        'WorkType',
+        'WorkType_efficiency',
         'ShopMonthStat',
         'ShopMonthStat_status',
         'ShopSettings',

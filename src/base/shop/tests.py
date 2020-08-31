@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from src.util.test import create_departments_and_users
 
-from src.base.models import Shop, FunctionGroup
+from src.base.models import Shop, FunctionGroup, ShopSettings
 from src.timetable.models import ShopMonthStat
 
 class TestDepartment(APITestCase):
@@ -20,27 +20,30 @@ class TestDepartment(APITestCase):
         self.url = '/rest_api/department/'
 
         create_departments_and_users(self)
+        self.settings = ShopSettings.objects.first()
+
 
         self.shop_url = f"{self.url}{self.shop.id}/"
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):
         # Админ
-        response = self.client.get(self.url) # full tree
+        response = self.client.get(f'{self.url}tree/') # full tree
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         res = response.json()
         self.assertEqual(len(res), 1)
         self.assertEqual(len(res[0]['children']), 2)
 
-        response = self.client.get(f"{self.url}?only_top=1" )
+        response = self.client.get(f"{self.url}tree/?only_top=1" )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         shops = [
                 {'id': 1,
                  'forecast_step_minutes': '00:30:00',
                  'label': 'Корневой магазин',
-                 'tm_shop_opens': '06:00:00',
-                 'tm_shop_closes': '23:00:00',
+                 'address': None,
+                 "tm_open_dict": {"all":"06:00:00"},
+                 "tm_close_dict": {"all":"23:00:00"},
                  'children':[]
                  },
         ]
@@ -86,18 +89,26 @@ class TestDepartment(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_create(self):
-        data = {        
+        data = {
+            "area":None,
             "parent_id": self.root_shop.id,
             "name": 'Region Shop3',
-            "tm_shop_opens": '07:00:00',
-            "tm_shop_closes": '23:00:00',
+            "tm_open_dict": {"all":"07:00:00"},
+            "tm_close_dict": {"all":"23:00:00"},
             "region_id": self.region.id,
+            "restricted_end_times": '[]',
+            "restricted_start_times": '[]',
+            "settings_id": self.settings.id,
             "code": None,
             "address": None,
             "type": 's',
             "dt_opened": '2019-01-01',
             # "dt_closed": None,
-            "timezone": 'Europe/Moscow'
+            "timezone": 'Europe/Moscow',
+            'restricted_end_times': '[]',
+            'restricted_start_times': '[]',
+            'settings_id': self.settings.id,
+            'forecast_step_minutes': '00:30:00',
         }
         # response = self.client.post(self.url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -115,21 +126,31 @@ class TestDepartment(APITestCase):
         shop = response.json()
         data['id'] = shop['id']
         data['dt_closed'] = None
+        data['load_template_id'] = None
+        data['exchange_settings_id'] = None
         self.assertEqual(shop, data)
 
     def test_update(self):
         data = {
             "parent_id": self.root_shop.id,
             "name": 'Title 2',
-            "tm_shop_opens": '07:00:00',
-            "tm_shop_closes": '23:00:00',
+            "tm_open_dict": {"all":"07:00:00"},
+            "tm_close_dict": {"all":"23:00:00"},
             "region_id": self.region.id,
+            "restricted_end_times": '[]',
+            "restricted_start_times": '[]',
+            "settings_id": self.settings.id,
             "code": "10",
             "address": 'address',
             "type": Shop.TYPE_REGION,
             "dt_opened": '2019-01-01',
             "dt_closed": "2020-01-01",
-            "timezone": 'Europe/Berlin'
+            "timezone": 'Europe/Berlin',
+            'restricted_end_times': '[]',
+            'restricted_start_times': '[]',
+            'settings_id': self.settings.id,
+            "area": None,
+            'forecast_step_minutes': '00:30:00',
         }
         # response = self.client.put(self.shop_url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -146,6 +167,8 @@ class TestDepartment(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         shop = response.json()
         data['id'] = shop['id']
+        data['load_template_id'] = None
+        data['exchange_settings_id'] = None
         self.assertEqual(shop, data)
 
     def test_stat(self):

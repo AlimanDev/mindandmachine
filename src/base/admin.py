@@ -1,6 +1,7 @@
 from django.contrib import admin
 from src.base.models import (
     Employment,
+    Network,
     User,
     Shop,
     ShopSettings,
@@ -8,8 +9,13 @@ from src.base.models import (
     FunctionGroup,
     WorkerPosition,
     Region,
-    ProductionDay
+    ProductionDay,
+    Network,
 )
+
+@admin.register(Network)
+class NetworkAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'code', 'logo')
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):

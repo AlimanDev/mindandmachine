@@ -4,13 +4,15 @@ from dateutil.relativedelta import relativedelta
 from django.db.models import Q, Sum
 from django_filters.rest_framework import FilterSet
 
-from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.pagination import LimitOffsetPagination
 
 from src.base.models import Employment, Shop
+from src.base.permissions import Permission
 
 from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
+from src.base.views import BaseActiveNamedModelViewSet
 
 
 class ShopFilter(FilterSet):
@@ -18,10 +20,11 @@ class ShopFilter(FilterSet):
         model = Shop
         fields = {
             'id':['exact', 'in'],
+            'code': ['exact', 'in'],
         }
 
 
-class ShopViewSet(viewsets.ModelViewSet):
+class ShopViewSet(BaseActiveNamedModelViewSet):
     """
     GET /rest_api/department/?id__in=6,7
     :return [{"id":6, ...},{"id":7, ...}]
@@ -45,7 +48,9 @@ class ShopViewSet(viewsets.ModelViewSet):
 
     GET /rest_api/department/stat?id=6
     """
-    permission_classes = [permissions.IsAuthenticated]
+    page_size = 10
+    pagination_class = LimitOffsetPagination
+    permission_classes = [Permission]
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
 
@@ -57,16 +62,18 @@ class ShopViewSet(viewsets.ModelViewSet):
         user = self.request.user
         only_top = self.request.query_params.get('only_top')
 
-        employments = Employment.objects.get_active(
-            network_id=user.network_id,
-            user=user).values('shop_id')
-        shops = Shop.objects.filter(id__in=employments.values('shop_id'))
-        if not only_top:
-            return Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
-                network_id=user.network_id,
-            )
-        else:
-            return shops
+        # aa: fixme: refactor code
+        # employments = Employment.objects.get_active(
+        #     network_id=user.network_id,
+        #     user=user).values('shop_id')
+        # shops = Shop.objects.filter(id__in=employments.values('shop_id'))
+        # if not only_top:
+        #     return Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
+        #         network_id=user.network_id,
+        #     )
+        # else:
+        #     return shops
+        return Shop.objects.filter(network_id=user.network_id)
 
     @action(detail=False, methods=['get'], serializer_class=ShopStatSerializer)#, permission_classes=[IsAdminOrIsSelf])
     def stat(self, request):
@@ -100,7 +107,8 @@ class ShopViewSet(viewsets.ModelViewSet):
         serializer = ShopStatSerializer(shops, many=True)
         return Response(serializer.data)
 
-    def list(self, request):
+    @action(detail=False, methods=['get'])
+    def tree(self, request):
         """
         Дерево магазинов в формате для Quasar
         :param request:
@@ -127,8 +135,9 @@ class ShopViewSet(viewsets.ModelViewSet):
             child_list.append({
                 "id": shop.id,
                 "label": shop.name,
-                "tm_shop_opens":shop.tm_shop_opens,
-                "tm_shop_closes":shop.tm_shop_closes,
+                "tm_open_dict": shop.open_times,
+                "tm_close_dict" :shop.close_times,
+                "address": shop.address,
                 "forecast_step_minutes":shop.forecast_step_minutes,
                 "children": []
             })

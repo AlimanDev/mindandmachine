@@ -25,6 +25,29 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
         fields = ['id', 'work_type_id', 'work_part']
 
 
+class WorkerDayCashboxDetailsListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    work_type_id = serializers.IntegerField()
+    work_part = serializers.FloatField()
+
+
+class WorkerDayListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    worker_id = serializers.IntegerField()
+    shop_id = serializers.IntegerField()
+    employment_id = serializers.IntegerField()
+    type = serializers.CharField()
+    dt = serializers.DateField()
+    dttm_work_start = serializers.DateTimeField(default=None)
+    dttm_work_end = serializers.DateTimeField(default=None)
+    comment = serializers.CharField()
+    is_approved = serializers.BooleanField()
+    worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True)
+    is_fact = serializers.BooleanField()
+    work_hours = serializers.DurationField()
+    parent_worker_day_id = serializers.IntegerField()
+
+
 class WorkerDaySerializer(serializers.ModelSerializer):
     default_error_messages = {
         'check_dates': _('Date start should be less then date end'),
@@ -33,20 +56,22 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     }
 
     worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
-    worker_id = serializers.IntegerField(required=False)
-    employment_id = serializers.IntegerField(required=False)
+    worker_id = serializers.IntegerField(required=False, allow_null=True)
+    employment_id = serializers.IntegerField(required=False, allow_null=True)
     shop_id = serializers.IntegerField()
     parent_worker_day_id = serializers.IntegerField(required=False, read_only=True)
     is_fact = serializers.BooleanField(required=False)
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
     type = serializers.CharField(required=True)
+    shop_code = serializers.CharField(required=False, read_only=True)
+    user_login = serializers.CharField(required=False, read_only=True)
 
     class Meta:
         model = WorkerDay
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id',
-                  'is_outsource', 'is_vacancy']
+                  'is_outsource', 'is_vacancy', 'shop_code', 'user_login']
         read_only_fields =['is_approved', 'work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
 
@@ -157,6 +182,9 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
         if parent_worker_day_id:
             worker_days = worker_days.exclude(id=parent_worker_day_id)
+        
+        if validated_data.get('is_vacancy') and validated_data.get('worker_id') == None:
+            worker_days = None
 
         if worker_days:
             raise ValidationError({'error': self.error_messages['worker_day_exist']})
@@ -178,6 +206,16 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
 class WorkerDayWithParentSerializer(WorkerDaySerializer):
     parent_worker_day_id = serializers.IntegerField()
+
+
+class EmploymentWorkTypeListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    work_type_id = serializers.IntegerField()
+    employment_id = serializers.IntegerField()
+    period = serializers.IntegerField()
+    bills_amount = serializers.IntegerField()
+    priority = serializers.IntegerField()
+    duration = serializers.FloatField()
 
 
 class EmploymentWorkTypeSerializer(serializers.ModelSerializer):
@@ -235,17 +273,34 @@ class WorkerConstraintSerializer(serializers.ModelSerializer):
         list_serializer_class = WorkerConstraintListSerializer
 
 
-class VacancySerializer(serializers.ModelSerializer):
+class WorkerConstraintListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    employment_id = serializers.IntegerField()
+    weekday = serializers.IntegerField()
+    is_lite = serializers.BooleanField()
+    tm = serializers.TimeField()
+
+
+class VacancySerializer(serializers.Serializer):
+    id = serializers.IntegerField()
     first_name = serializers.CharField()
     last_name = serializers.CharField()
-    worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
+    worker_id = serializers.IntegerField()
+    worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True, required=False)
     shop = ShopSerializer()
+    is_fact = serializers.BooleanField()
+    is_approved = serializers.BooleanField()
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
+    type = serializers.CharField()
+    is_outsource = serializers.BooleanField()
+    avatar = serializers.SerializerMethodField('get_avatar_url')
+    worker_shop = serializers.IntegerField(required=False, default=None)
 
-    class Meta:
-        model = WorkerDay
-        fields = ['id', 'first_name', 'last_name', 'worker_id', 'worker_day_details', 'shop', 'is_fact', 'is_approved', 'dttm_work_start', 'dttm_work_end', 'type', 'is_outsource']
+    def get_avatar_url(self, obj):
+        if obj.worker_id and obj.worker.avatar:
+            return obj.worker.avatar.url
+        return None
 
         
 class AutoSettingsSerializer(serializers.Serializer):

@@ -137,8 +137,8 @@ def create_predbills_request_function(shop_id, dt=None):
             # 'dt_start': Converter.convert_date(dt),
             # 'days': predict2days,
             'period_step': Converter.convert_time(shop.forecast_step_minutes),
-            'tm_start': Converter.convert_time(shop.tm_shop_opens),
-            'tm_end': Converter.convert_time(shop.tm_shop_closes),
+            'tm_start': shop.open_times,
+            'tm_end': shop.close_times,
         },
         'work_types': operation_types_dict,
         'period_demands': [

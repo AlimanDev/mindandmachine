@@ -1,6 +1,10 @@
 from rest_framework import serializers, viewsets, permissions
+from rest_framework.pagination import LimitOffsetPagination
 from src.forecast.models import OperationTypeName
 from src.base.serializers import BaseNetworkSerializer
+from src.base.exceptions import MessageError
+from src.base.views import BaseActiveNamedModelViewSet
+
 
 class OperationTypeNameSerializer(BaseNetworkSerializer):
     name = serializers.CharField(required=False)
@@ -10,8 +14,22 @@ class OperationTypeNameSerializer(BaseNetworkSerializer):
         model = OperationTypeName
         fields = ['id', 'name', 'code', 'network_id']
 
+    
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+        exclude_filter = {}
+        if self.instance:
+            exclude_filter['pk'] = self.instance.id
+        self.validated_data['code'] = None if self.validated_data.get('code') == '' else self.validated_data.get('code')
+        if self.validated_data.get('code') and OperationTypeName.objects.filter(code=self.validated_data.get('code')).exclude(**exclude_filter).exists():
+            raise MessageError('unique_name_code', params={'code': self.validated_data.get('code')}, lang=self.context['request'].user.lang)
+        
+        if OperationTypeName.objects.filter(name=self.validated_data.get('name')).exclude(**exclude_filter).exists():
+            raise MessageError('unique_name_name', params={'name': self.validated_data.get('name')}, lang=self.context['request'].user.lang)
 
-class OperationTypeNameViewSet(viewsets.ModelViewSet):
+        return True
+
+class OperationTypeNameViewSet(BaseActiveNamedModelViewSet):
     """
 
     GET /rest_api/operation_type_name/
@@ -68,6 +86,7 @@ class OperationTypeNameViewSet(viewsets.ModelViewSet):
     """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OperationTypeNameSerializer
+    pagination_class = LimitOffsetPagination
     def get_queryset(self):
         return OperationTypeName.objects.filter(
             network_id=self.request.user.network_id,

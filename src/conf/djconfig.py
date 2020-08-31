@@ -251,6 +251,9 @@ ALLOWED_UPLOAD_EXTENSIONS = ['xlsx', 'xls']
 
 MOBILE_USER_AGENTS = ('QoS_mobile_app', 'okhttp',)
 
+METABASE_SITE_URL = 'metabase-url'
+METABASE_SECRET_KEY = 'secret-key'
+
 CELERY_IMPORTS = ('src.celery.tasks',)
 CELERY_BROKER_URL = 'redis://localhost:6379'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379'
@@ -262,8 +265,12 @@ CELERYD_CONCURRENCY = 2
 CELERYD_PREFETCH_MULTIPLIER = 1
 BACKEND_QUEUE = 'backend_queue'
 CELERY_TASK_DEFAULT_QUEUE = BACKEND_QUEUE
+
 # for change celery configs must be before (for BACKEND_QUEUE)
 # todo: do normal parameters changer
+
+
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
 
@@ -335,6 +342,16 @@ CELERY_BEAT_SCHEDULE = {
     },
     'task-update-operation-templates': {
         'task': 'src.celery.tasks.op_type_build_period_clients',
+        'schedule': crontab(hour=1, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-aggregate-receipts': {
+        'task': 'src.celery.tasks.aggregate_timeserie_value',
+        'schedule': crontab(hour=0, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-delete-old=receipts': {
+        'task': 'src.celery.tasks.clean_timeserie_actions',
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },

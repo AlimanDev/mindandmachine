@@ -15,7 +15,8 @@ from src.forecast.models import PeriodClients
 from src.timetable.models import WorkerDay
 
 
-def count_daily_stat(shop_id, data):
+def count_daily_stat(data):
+    shop_id = data['shop_id']
     def daily_stat_tmpl():
         day = {"shifts": 0, "paid_hours": 0, "fot": 0.0}
         ap_na = {
@@ -157,7 +158,8 @@ def count_daily_stat(shop_id, data):
     return stat
 
 
-def count_worker_stat(shop_id, data):
+def count_worker_stat(data):
+    shop_id = data['shop_id']
     dt_start = data['dt_from']
     dt_end = data['dt_to']
     worker_ids = data['worker_id__in']
@@ -179,14 +181,15 @@ def count_worker_stat(shop_id, data):
     worker_days = WorkerDay.objects.filter(
         dt__gte=dt_year_start,
         dt__lte=dt_end,
-        worker_id__in=worker_dict.keys()
+        worker_id__in=worker_dict.keys(),
+        type__in=WorkerDay.TYPES_USED,
     )
-    worker_days = worker_days.order_by(
+    worker_days = list(worker_days.order_by(
         'worker_id',
         'dt',
         'is_fact',
         'is_approved',
-    )
+    ))
     if not len(worker_days):
         return {}
 
@@ -291,7 +294,6 @@ def init_values(overtime, overtime_prev):
         'combined': deepcopy(approved)
     }
     return dict
-
 
 
 class CalendarPaidDays:
