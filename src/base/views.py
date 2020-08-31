@@ -1,16 +1,16 @@
-from django.utils.timezone import now
-from django.db.models import F
+from django.utils import timezone
+from django.db.models import F, Q
 from django.db.models.functions import Coalesce
 from rest_auth.views import UserDetailsView
 
 from rest_framework import mixins
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
-from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
-from rest_framework.status import HTTP_400_BAD_REQUEST
+from rest_framework import status
 from rest_framework.decorators import action
+
 
 from src.base.permissions import Permission
 from src.base.serializers import (
@@ -42,27 +42,13 @@ from src.base.models import (
 )
 
 from src.base.filters import UserFilter
+from src.base.views_abstract import (
+    BaseActiveNamedModelViewSet,
+    UpdateorCreateViewSet
+)
 
 
-class BaseActiveNamedModelViewSet(ModelViewSet):
-    '''
-    Класс переопределяющий get_object() для возможности
-    получения сущности по коду либо иному полю, указанному
-    в свойстве get_object_field
-    '''
-    get_object_field = 'code'
-    def get_object(self):
-        if self.request.method == 'GET':
-            by_code = self.request.query_params.get('by_code', False)
-        else:
-            by_code = self.request.data.get('by_code', False)
-        if by_code:
-            self.lookup_field = self.get_object_field
-            self.kwargs[self.get_object_field] = self.kwargs['pk']
-        return super().get_object()
-
-
-class EmploymentViewSet(BaseActiveNamedModelViewSet):
+class EmploymentViewSet(UpdateorCreateViewSet):
     """
         обязательные поля при редактировании PUT:
             position_id
@@ -84,12 +70,54 @@ class EmploymentViewSet(BaseActiveNamedModelViewSet):
             shop__network_id=self.request.user.network_id
         )
 
-
     def get_serializer_class(self):
         if self.action == 'list':
             return EmploymentListSerializer
         else:
             return EmploymentSerializer
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        serializer = self.get_serializer(data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+
+        fired_filter = Q(dt_fired__isnull=True)
+        if serializer.validated_data.get('dt_hired'):
+            fired_filter = fired_filter | Q(dt_fired__gte=serializer.validated_data.get('dt_hired'))
+
+        employment = Employment.objects.filter(
+            fired_filter,
+            user_id=serializer.validated_data['user_id'],
+            shop_id=serializer.validated_data['shop_id'],
+        ).order_by('dt_fired', 'dt_hired').last()
+
+        month_ago = timezone.now().date() - timezone.timedelta(days=31)
+        if employment and (employment.dt_fired is None or employment.dt_fired > month_ago):
+            # updating
+            # специфическая логика с cond_for_not_updating так как не поддерживаем несколько трудоустройств
+            # fixme
+            # cond_for_not_updating = employment.dt_fired and serializer.validated_data.get('dt_fired') and \
+            #                         (employment.dt_fired > serializer.validated_data.get('dt_fired')) and \
+            #                         (employment.position_id != serializer.validated_data.get('position_id'))
+            cond_for_not_updating = (employment.dt_hired_next and (employment.dt_hired_next > serializer.validated_data.get('dt_hired')))
+            # cond_for_not_updating |= employment.dt_hired_next and serializer.validated_data.get('dt_fired') and \
+            #                          (employment.dt_hired_next >= serializer.validated_data.get('dt_fired'))
+
+            if cond_for_not_updating:
+                # в этом кейсе ничего не надо обновлять -- трудоустройства накладываются друг на друга и в базе актуальные данные итоговые
+                return_data = {}
+            else:
+                # опять же специфическая логика не все поля обновляем, а еще есть поле dt_hired_next
+                employment.dt_hired_next = serializer.validated_data.pop('dt_hired')
+                serializer.instance = employment
+                self.perform_update(serializer)
+                return_data = serializer.data
+            return Response(return_data)
+
+        else:
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.validated_data)
+            return Response(serializer.validated_data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class UserViewSet(BaseActiveNamedModelViewSet):
@@ -108,7 +136,7 @@ class UserViewSet(BaseActiveNamedModelViewSet):
 
     def perform_create(self, serializer):
         if 'username' not in serializer.validated_data:
-            instance = serializer.save(username = now())
+            instance = serializer.save(username = timezone.now())
             instance.username = 'user_' + str(instance.id)
             instance.save()
         else:
@@ -123,8 +151,7 @@ class UserViewSet(BaseActiveNamedModelViewSet):
             serializer.save()
             return Response()
         else:
-            return Response(serializer.errors,
-                            status=HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
     def get_serializer_class(self):

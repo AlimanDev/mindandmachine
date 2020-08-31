@@ -124,7 +124,11 @@ class EmploymentListSerializer(serializers.Serializer):
 class EmploymentSerializer(serializers.ModelSerializer):
     default_error_messages = {
         "emp_check_dates": _("Employment from {dt_hired} to {dt_fired} already exists."),
+        "no_user": _("There is {amount} models of user with username: {username}."),
+        "no_shop": _("There is {amount} models of shop with code: {code}."),
+        "no_position": _("There is {amount} models of position with code: {code}."),
     }
+
     user = UserSerializer(read_only=True)
     position_id = serializers.IntegerField(required=False)
     position_code = serializers.CharField(required=False, source='position.code')
@@ -149,37 +153,58 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if self.instance:
-            #Нельзя обновить пользователя по коду
-            user_id = self.instance.user_id
-            shop_id = self.instance.shop_id if not self.initial_data.get('shop_code', False) else Shop.objects.get(code=self.initial_data.get('shop_code')).id
+            # Нельзя обновить пользователя по коду
+            attrs['user_id'] = self.instance.user_id
+            # shop_id = self.instance.user_id
         else:
+
             if not attrs.get('user_id'):
                 user = attrs.pop('user')
-                attrs['user_id'] = User.objects.get(username=user['username']).id
+                users = list(User.objects.filter(username=user['username'], network_id=self.context['request'].user.network_id))
+                if len(users) == 1:
+                    attrs['user_id'] = users[0].id
+                else:
+                    self.fail('no_user', amount=len(users), username=user['username'])
+            #
+            # if not attrs.get('shop_id'):
+            #     shop = attrs.pop('shop')
+            #     shops = list(Shop.objects.filter(code=shop['code'], network_id=self.context['request'].user.network_id))
+            #     if len(shops) == 1:
+            #         attrs['shop_id'] = shops[0].id
+            #     else:
+            #         self.fail('no_shop', amount=len(shops), code=shop['code'])
+            #
+            # user_id = attrs['user_id']
+            # shop_id = attrs['shop_id']
 
-            if not attrs.get('shop_id'):
-                shop = attrs.pop('shop')
-                attrs['shop_id'] = Shop.objects.get(code=shop['code']).id
+        if (attrs.get('shop_id') is None) and ('code' in attrs.get('position', {})):
+            position = attrs.pop('position', None)
+            positions = list(WorkerPosition.objects.filter(code=position['code'], network_id=self.context['request'].user.network_id))
+            if len(positions) == 1:
+                attrs['position_id'] = positions[0].id
+            else:
+                self.fail('no_position', amount=len(positions), code=position['code'])
 
-            user_id = attrs['user_id']
-            shop_id = attrs['shop_id']
+        if (attrs.get('shop_id') is None) and ('code' in attrs.get('shop', {})):
+            shop = attrs.pop('shop')
+            shops = list(Shop.objects.filter(code=shop['code'], network_id=self.context['request'].user.network_id))
+            if len(shops) == 1:
+                attrs['shop_id'] = shops[0].id
+            else:
+                self.fail('no_shop', amount=len(shops), code=shop['code'])
 
-        position = attrs.pop('position', None)
-        if position and 'code' in position and not attrs.get('position_id'):
-            attrs['position_id'] = WorkerPosition.objects.get(code=position['code']).id
-
-        employments = Employment.objects.filter(
-            Q(dt_fired__isnull=True)|Q(dt_fired__gte=attrs.get('dt_hired')),
-            user_id=user_id,
-            shop_id=shop_id,
-        )
-        if attrs.get('dt_fired'):
-            employments=employments.filter( dt_hired__lte=attrs['dt_fired'])
-        if self.instance:
-            employments = employments.exclude(id=self.instance.id)
-        if employments:
-            e=employments.first()
-            self.fail('emp_check_dates',dt_hired=e.dt_hired,dt_fired=e.dt_fired)
+        # employments = Employment.objects.filter(
+        #     Q(dt_fired__isnull=True) | Q(dt_fired__gte=attrs.get('dt_hired')),
+        #     user_id=user_id,
+        #     shop_id=shop_id,
+        # )
+        # if attrs.get('dt_fired'):
+        #     employments=employments.filter(dt_hired__lte=attrs['dt_fired'])
+        # if self.instance:
+        #     employments = employments.exclude(id=self.instance.id)
+        # if employments:
+        #     e = employments.first()
+        #     self.fail('emp_check_dates',dt_hired=e.dt_hired,dt_fired=e.dt_fired)
         return attrs
 
     def __init__(self, *args, **kwargs):
