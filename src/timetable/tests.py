@@ -114,7 +114,7 @@ class TestWorkerDay(APITestCase):
             'dt': Converter.convert_date(self.dt),
             'dttm_work_start': Converter.convert_datetime(datetime.combine(self.dt, time(8, 0, 0))),
             'dttm_work_end': Converter.convert_datetime(datetime.combine(self.dt, time(20, 0, 0))),
-            'work_hours': '12:00:00',
+            'work_hours': '10:45:00',
             'worker_day_details': [],
             'is_outsource': False,
             'is_vacancy': False,
@@ -632,6 +632,8 @@ class TestVacancy(APITestCase):
         )
         self.shop.network = self.network
         self.shop.save()
+        self.user2.network = self.network
+        self.user2.save()
         self.work_type1 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
         self.worker_day = WorkerDay.objects.create(
             shop=self.shop,
@@ -670,7 +672,7 @@ class TestVacancy(APITestCase):
         self.assertEqual(len(response.json()['results']), 2)
 
     def test_get_list_shift_length(self):
-        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&shift_length_min=8:00:00&shift_length_max=9:00:00&limit=100')
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&shift_length_min=7:00:00&shift_length_max=9:00:00&limit=100')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()['results']), 1)
 
@@ -696,7 +698,7 @@ class TestVacancy(APITestCase):
             status=ShopMonthStat.READY,
         )
         FunctionGroup.objects.create(
-            group=self.admin_group,
+            group=self.employee_group,
             method='POST',
             func='WorkerDay_confirm_vacancy',
             level_up=1,
