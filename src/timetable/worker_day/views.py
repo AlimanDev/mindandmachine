@@ -132,8 +132,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         ).values_list('user_id', flat=True)
 
         wdays_to_approve = WorkerDay.objects.filter(
-            Q(shop_id=serializer.data['shop_id']) | Q(shop__isnull=True),
-            worker_id__in=user_ids,
+            Q(shop_id=serializer.data['shop_id']) | Q(shop__isnull=True, worker_id__in=user_ids),
             dt__lte=serializer.data['dt_to'],
             dt__gte=serializer.data['dt_from'],
             is_fact=serializer.data['is_fact'],
