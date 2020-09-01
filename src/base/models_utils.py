@@ -80,6 +80,9 @@ def check_func_groups():
         'OperationTypeViewSet',
         'PeriodClientsViewSet',
         'ShopMonthStatViewSet',
+
+        'check_func_groups',
+        # 'get_user_month_info',  # in old version
     ]
 
     def get_all_view_names(all_url_patterns=None, all_views=[]):

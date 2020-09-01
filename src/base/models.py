@@ -32,6 +32,9 @@ class Network(AbstractActiveModel):
     def get_department(self):
         return None
 
+    def __str__(self):
+        return f'name: {self.name}, code: {self.code}'
+
 
 class Region(AbstractActiveNamedModel):
     class Meta(AbstractActiveNamedModel.Meta):
@@ -243,7 +246,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 'timetable', 
                 'ExchangeSettings',
             ).objects.filter(
-                network_id=self.network_id, 
+                network_id=self.network_id,
                 shops__isnull=True,
             ).first()
 
@@ -411,6 +414,8 @@ class Employment(AbstractActiveModel):
     is_fixed_hours = models.BooleanField(default=False)
 
     dt_hired = models.DateField(default=datetime.date(2019, 1, 1))
+    dt_hired_next = models.DateField(null=True, blank=True)  # todo: удалить поле, временное для интеграции из-за того, что не поддерживаем несколько трудоустройств в течение месяца
+    # Сотрудник может на несколько недель уйти поработать в другой магазин и вернуться. Официально как временный перевод могут оформить
     dt_fired = models.DateField(null=True, blank=True)
     salary = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 

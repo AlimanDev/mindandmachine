@@ -1,5 +1,7 @@
 from rest_framework.authentication import SessionAuthentication
-class SessionAuthentication(SessionAuthentication):
+
+
+class WFMSessionAuthentication(SessionAuthentication):
     """
     This class is needed, because REST Framework's default SessionAuthentication does never return 401's,
     because they cannot fill the WWW-Authenticate header with a valid value in the 401 response. As a

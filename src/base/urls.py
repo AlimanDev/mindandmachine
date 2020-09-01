@@ -2,8 +2,11 @@ from django.conf.urls import url, include
 
 from rest_framework import routers
 from rest_auth.views import (
-    LoginView, LogoutView, PasswordChangeView
+    LogoutView,
+    PasswordChangeView
 )
+from rest_auth.views import LoginView
+from src.base.auth.views import WFMTokenLoginView
 from src.base.shop.views import ShopViewSet
 from src.base.views import(
     EmploymentViewSet,
@@ -25,6 +28,7 @@ rest_auth_urls = [
     url(r'^password/change/$', PasswordChangeView.as_view(), name='rest_password_change'),
     url(r'^user/$', AuthUserView.as_view(), name='user'),
     url(r'^allowed_functions/$', FunctionGroupView.as_view({'get': 'list'}), name='user'),
+    url(r'^signin_token/$', WFMTokenLoginView.as_view(), name='signin_token'),
     # url(r'^notification', NotificationViewSet.as_view(), name='notification')
 ]
 
