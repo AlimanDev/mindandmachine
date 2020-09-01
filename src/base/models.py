@@ -499,6 +499,7 @@ class FunctionGroup(AbstractModel):
         'EmploymentWorkType',
         'ExchangeSettings',
         'FunctionGroupView',
+        'FunctionGroupView_functions',
         'Network',
         'Notification',
         'OperationTemplate',

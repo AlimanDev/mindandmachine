@@ -181,6 +181,11 @@ class FunctionGroupView(ModelViewSet):
         return FunctionGroup.objects.filter(group__in=groups).distinct('func')
 
 
+    @action(detail=False, methods=['get'])
+    def functions(self, request):
+        return Response(FunctionGroup.FUNCS)
+
+
 class WorkerPositionViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [Permission]
     serializer_class = WorkerPositionSerializer

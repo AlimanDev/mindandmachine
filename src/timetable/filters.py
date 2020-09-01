@@ -53,7 +53,7 @@ class VacancyFilter(FilterSet):
     def filter_include_outsource(self, queryset, name, value):
         if value:
             shops = value.split(',')
-            if not self.request.query_params.get('include_outsource', False):
+            if not self.data.get('include_outsource', False):
                 return queryset.filter(shop_id__in=shops)
             return queryset.filter(
                 Q(shop_id__in=shops) | Q(is_outsource=True),
