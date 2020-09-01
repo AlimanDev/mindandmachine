@@ -435,7 +435,7 @@ def create_departments_and_users(self):
     self.root_shop = Shop.objects.first()
 
     self.settings = ShopSettings.objects.create(
-        break_triplets=[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]],
+        break_triplets='[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]]',
     )
     # shops
     self.reg_shop1 = Shop.objects.create(
