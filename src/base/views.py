@@ -165,10 +165,9 @@ class UserViewSet(BaseActiveNamedModelViewSet):
 class AuthUserView(UserDetailsView):
     serializer_class = AuthUserSerializer
 
-    def get(self, request, *args, **kwargs):
+    def check_permissions(self, request, *args, **kwargs):
         rotate_token(request)
-        return super().get(request, *args, **kwargs)
-
+        return super().check_permissions(request, *args, **kwargs)
 
 
 class FunctionGroupView(ModelViewSet):
