@@ -24,7 +24,7 @@ class LoadTemplateSerializer(BaseNetworkSerializer):
     operation_type_templates = OperationTypeTemplateSerializer(many=True, read_only=True)
     class Meta:
         model = LoadTemplate
-        fields = ['id', 'name', 'shop_id', 'operation_type_templates']
+        fields = ['id', 'name', 'shop_id', 'operation_type_templates', 'status']
 
 
 class LoadTemplateSpecSerializer(serializers.Serializer):
