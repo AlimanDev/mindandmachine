@@ -46,6 +46,7 @@ from src.base.views_abstract import (
     BaseActiveNamedModelViewSet,
     UpdateorCreateViewSet
 )
+from django.middleware.csrf import rotate_token
 
 
 class EmploymentViewSet(UpdateorCreateViewSet):
@@ -163,6 +164,11 @@ class UserViewSet(BaseActiveNamedModelViewSet):
 
 class AuthUserView(UserDetailsView):
     serializer_class = AuthUserSerializer
+
+    def get(self, request, *args, **kwargs):
+        rotate_token(request)
+        return super().get(request, *args, **kwargs)
+
 
 
 class FunctionGroupView(ModelViewSet):
