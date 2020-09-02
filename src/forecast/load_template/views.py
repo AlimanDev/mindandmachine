@@ -4,6 +4,7 @@ from rest_framework import serializers, viewsets, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.pagination import LimitOffsetPagination
 from django_filters.rest_framework import FilterSet
 from django_filters import CharFilter
 
@@ -52,6 +53,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
         {
            "id": 1,
            "name": "Load template",
+           "status": "R", | "P" R - готов P - в процессе
            "operation_type_templates":[
                {
                     'id': 1, 
@@ -75,6 +77,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     :return {
        "id": 1,
        "name": "Load template",
+       "type": "R",
        "operation_type_templates":[
            {
                 'id': 1, 
@@ -103,6 +106,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     {
         "id": 1,
         "name": "Load template",
+        "type": "R",
         "operation_type_templates":[],
     }
 
@@ -154,6 +158,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAdminUser]
     filterset_class = LoadTemplateFilter
     serializer_class = LoadTemplateSerializer
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
         return LoadTemplate.objects.filter(
