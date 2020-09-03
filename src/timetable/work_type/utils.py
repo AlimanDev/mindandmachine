@@ -36,10 +36,13 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
             array[indexes] += lambda_add(db_model)
 
     MINUTES_IN_DAY = 24 * 60
-    shop = Shop.objects.get(id=shop_id)
+    shop = Shop.objects.all().select_related('settings').get(id=shop_id)
     period_lengths_minutes = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
     period_in_day = MINUTES_IN_DAY // period_lengths_minutes
-    absenteeism_coef = 1 + shop.settings.absenteeism / 100
+
+    absenteeism_coef = 1
+    if shop.settings:
+        absenteeism_coef += shop.settings.absenteeism / 100
 
     from_dt = form['from_dt']
     # To include last day in "x < to_dt" conds
