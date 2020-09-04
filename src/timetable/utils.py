@@ -12,7 +12,7 @@ from src.timetable.models import (
 
 
 def wd_stat_count(worker_days, shop):
-    break_triplets = json.loads(shop.settings.break_triplets)
+    break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
     break_triplets = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), break_triplets))
     breaktime_plan = Value(0, output_field=FloatField())
     breaktime_fact = Value(0, output_field=FloatField())
