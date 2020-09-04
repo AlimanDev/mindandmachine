@@ -166,6 +166,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
         ).aggregate(
             norm_work_hours=Sum('work_hours', output_field=IntegerField())
         )['norm_work_hours']
+
     for row in hours_stat:
         fot += round(
             Decimal(row['hours_plan']) *
