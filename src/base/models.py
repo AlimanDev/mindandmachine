@@ -140,7 +140,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     staff_number = models.SmallIntegerField(default=0)
 
-    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True, blank=True)
+    region = models.ForeignKey(Region, on_delete=models.PROTECT)
 
     email = models.EmailField(blank=True, null=True)
     exchange_shops = models.ManyToManyField('self', blank=True)

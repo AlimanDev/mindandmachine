@@ -20,7 +20,7 @@ from src.forecast.models import (
     PeriodClients,
 )
 from src.util.models_converter import Converter
-from src.main.urv.utils import wd_stat_count_total, wd_stat_count
+from src.timetable.utils import wd_stat_count_total, wd_stat_count
 
 
 def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=False):

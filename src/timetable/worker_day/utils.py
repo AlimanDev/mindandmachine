@@ -18,7 +18,7 @@ from django.db.models import Q, F
 from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
 from src.timetable.worker_day.xlsx_utils.tabel import Tabel_xlsx
 from src.util.download import xlsx_method
-from src.main.urv.utils import wd_stat_count
+from src.timetable.utils import wd_stat_count
 import json
 from src.base.exceptions import MessageError
 from rest_framework.response import Response
