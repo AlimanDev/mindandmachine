@@ -201,6 +201,7 @@ def create_demand(data):
     '''
     def parse_datetime(value):
         value['dttm'] = Converter.parse_datetime(value.get('dttm'))
+        return value
 
     models_list = []
 
