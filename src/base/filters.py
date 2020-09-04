@@ -18,8 +18,8 @@ class EmploymentFilter(FilterSet):
         model = Employment
         fields = {
             'id': ['in'],
-            'shop_id': ['exact'],
-            'shop_code': ['exact'],
+            'shop_id': ['exact', 'in'],
+            'shop_code': ['exact', 'in'],
             'user_id': ['exact', 'in'],
             'username': ['exact', 'in'],
         }
@@ -27,14 +27,27 @@ class EmploymentFilter(FilterSet):
 
 class UserFilter(FilterSet):
     shop_id = NumberFilter(field_name='employments__shop_id')
+    shop_id__in = CharFilter(method='shop_id_in')
     shop_code = CharFilter(field_name='employments__shop__code', label='Код магазина')
+    shop_code__in = CharFilter(method='shop_code_in')
+
+    def shop_id_in(self, queryset, name, value):
+        return queryset.filter(
+            employments__shop_id__in=value.split(','),
+        )
+
+    def shop_code_in(self, queryset, name, value):
+        return queryset.filter(
+            employments__shop_code__in=value.split(','),
+        )
+
     class Meta:
         model = User
         fields = {
             'id':['exact', 'in'],
             'tabel_code':['exact', 'in'],
             'username':['exact', 'in'],
-            'shop_id': ['exact'],
+            'shop_id': ['exact', 'in'],
             'shop_code': ['exact'],
         }
 
