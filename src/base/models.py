@@ -130,7 +130,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     tm_open_dict = models.TextField(default='{}')
     tm_close_dict = models.TextField(default='{}')
-    area = models.FloatField(null=True) #Торговая площадь магазина
+    area = models.FloatField(default=0)  # Торговая площадь магазина
 
     restricted_start_times = models.CharField(max_length=1024, default='[]')
     restricted_end_times = models.CharField(max_length=1024, default='[]')

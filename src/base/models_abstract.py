@@ -75,7 +75,7 @@ class AbstractActiveNamedModel(AbstractActiveModel):
         abstract = True
         unique_together = (('code', 'network'),)
 
-    name = models.CharField(max_length=128, unique=True)
+    name = models.CharField(max_length=128)
     code = models.CharField(max_length=64, null=True, blank=True)
     network = models.ForeignKey('base.Network', on_delete=models.PROTECT, null=True)
 
