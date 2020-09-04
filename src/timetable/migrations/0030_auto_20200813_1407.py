@@ -3,6 +3,11 @@
 from django.db import migrations, models
 import django.db.models.deletion
 
+def set_network(apps, schema_editor):
+    network = apps.get_model('base', 'Network').objects.get(name='Base network')
+    apps.get_model('timetable', 'WorkTypeName').objects.filter(network__isnull=True).update(network=network)
+    apps.get_model('timetable', 'Slot').objects.filter(network__isnull=True).update(network=network)
+    apps.get_model('timetable', 'Cashbox').objects.filter(network__isnull=True).update(network=network)
 
 class Migration(migrations.Migration):
 
@@ -44,4 +49,5 @@ class Migration(migrations.Migration):
             name='worktypename',
             unique_together={('code', 'network')},
         ),
+        migrations.RunPython(set_network)
     ]

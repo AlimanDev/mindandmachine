@@ -4,6 +4,12 @@ from django.db import migrations, models
 import django.db.models.deletion
 
 
+def set_network(apps, schema_editor):
+    network = apps.get_model('base', 'Network').objects.get(name='Base network')
+    apps.get_model('forecast', 'OperationTypeName').objects.filter(network__isnull=True).update(network=network)
+    apps.get_model('forecast', 'OperationTemplate').objects.filter(network__isnull=True).update(network=network)
+    apps.get_model('forecast', 'LoadTemplate').objects.filter(network__isnull=True).update(network=network)
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -35,4 +41,5 @@ class Migration(migrations.Migration):
             name='operationtypename',
             unique_together={('code', 'network')},
         ),
+        migrations.RunPython(set_network),
     ]

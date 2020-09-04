@@ -8,6 +8,7 @@ from django.db import migrations, models
 import django.utils.timezone
 import mptt.fields
 import timezone_field.fields
+from etc.scripts.fill_calendar import main
 
 
 def create_shop_tree(apps, schema_editor):
@@ -24,6 +25,16 @@ def create_shop_tree(apps, schema_editor):
         ~models.Q(id = shop.id)
     ).update(parent=shop)
     #Shop._tree_manager.rebuild()
+
+
+def create_region(apps, schema_editor):
+    Region = apps.get_model('base', 'Region')
+    r = Region.objects.create(name='Регион', code='region')
+    main(
+        (datetime.date.today() - datetime.timedelta(days=365)).strftime('%Y.%m.%d'),
+        (datetime.date.today() + datetime.timedelta(days=365)).strftime('%Y.%m.%d'),
+        r.id,
+    )
 
 
 class Migration(migrations.Migration):
@@ -232,6 +243,7 @@ class Migration(migrations.Migration):
             field=models.ManyToManyField(related_name='_shop_exchange_shops_+', to='base.Shop'),
         ),
         migrations.RunPython(create_shop_tree),
+        migrations.RunPython(create_region),
     ]
 
 
