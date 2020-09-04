@@ -5,10 +5,10 @@ import django.db.models.deletion
 
 
 def set_network(apps, schema_editor):
-    network = apps.get_model('base', 'Network').objects.first()
-    apps.get_model('forecast', 'OperationTypeName').objects.all().update(network=network)
-    apps.get_model('forecast', 'OperationTemplate').objects.all().update(network=network)
-    apps.get_model('forecast', 'LoadTemplate').objects.all().update(network=network)
+    network = apps.get_model('base', 'Network').objects.get(name='Base network')
+    apps.get_model('forecast', 'OperationTypeName').objects.filter(network__isnull=True).update(network=network)
+    apps.get_model('forecast', 'OperationTemplate').objects.filter(network__isnull=True).update(network=network)
+    apps.get_model('forecast', 'LoadTemplate').objects.filter(network__isnull=True).update(network=network)
 
 class Migration(migrations.Migration):
 
