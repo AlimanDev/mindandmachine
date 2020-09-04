@@ -21,6 +21,8 @@ class ShopFilter(FilterSet):
         fields = {
             'id':['exact', 'in'],
             'code': ['exact', 'in'],
+            'load_template_id': ['exact',],
+            'load_template_status': ['exact'],
         }
 
 

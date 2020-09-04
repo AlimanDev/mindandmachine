@@ -219,8 +219,14 @@ def create_demand(data):
         ot.id: ot
         for ot in operation_types
     }
+    operation_names = {
+        ot.operation_type_name_id: ot
+        for ot in operation_types
+    }
     if data['serie'][0].get('timeserie_code', False):
         operation_types_to_delete = set([ operation_codes.get(x.get('timeserie_code')) for x in data['serie']])
+    elif data['serie'][0].get('timeserie_name', False):
+        operation_types_to_delete = set([ operation_names.get(x.get('timeserie_name')) for x in data['serie']])
     else:
         operation_types_to_delete = set([ operation_ids.get(x.get('timeserie_id')) for x in data['serie']])
     PeriodClients.objects.filter(
@@ -238,6 +244,8 @@ def create_demand(data):
         operation_type = None
         if period_demand_value.get('timeserie_code', False):
             operation_type = operation_codes.get(period_demand_value.get('timeserie_code'))
+        elif period_demand_value.get('timeserie_name', False):
+            operation_type = operation_names.get(period_demand_value.get('timeserie_name'))
         elif period_demand_value.get('timeserie_id', False):
             operation_type = operation_ids.get(period_demand_value.get('timeserie_id'))
         models_list.append(

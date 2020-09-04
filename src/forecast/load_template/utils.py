@@ -11,6 +11,9 @@ from src.main.demand.utils import create_predbills_request_function
 import numpy as np
 from django.utils import timezone
 import datetime
+from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
+from src.base.shop.serializers import ShopSerializer
+from django.db.models import F
 
 
 ########################## Вспомогательные функции ##########################
@@ -381,3 +384,43 @@ def search_related_operation_types(operation_type, operation_type_relations, ope
                 operation_types,
             )
         return result
+
+
+def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
+    data = {
+        'dt_from': dt_from,
+        'dt_to': dt_to,
+        'shop': ShopSerializer(Shop.objects.get(id=shop_id)),
+    }
+    data['opeartion_types'] = OperationTypeTemplateSerializer(OperationTypeTemplate.objects.filter(load_template_id=load_template_id), many=True)
+    data['relations'] = list(OperationTypeRelation.objects.filter(
+        base__load_template_id=load_template_id,
+    ).annotate(
+        base_name=F('base__operation_type_name_id'),
+        depended_name=F('depended__operation_type_name_id'),
+    ).values())
+    timeseries = {}
+    values = list(PeriodClients.objects.select_related('operation_type').filter(
+        operation_type__shop_id=shop_id,
+        dttm_forecast__date__gte=dt_from,
+        dttm_forecast__date__lte=dt_to,
+        type=PeriodClients.FACT_TYPE,
+    ).order_by('dttm_forecast'))
+    for timeserie in values:
+        key = timeserie.operation_type.operation_type_name_id
+        if not key in timeseries:
+            timeseries[key] = []
+        timeseries[key].append(
+            {
+                'value': timeserie.value,
+                'dttm': timeserie.dttm_forecast,
+            }
+        )
+    data['timeserie'] = timeserie
+    for o_type in date['opeartion_types']:
+        if o_type['operation_type_name_id'] in timeserie:
+            o_type['type'] = 'F'
+        else:
+            o_type['type'] = 'O'
+        
+    return data

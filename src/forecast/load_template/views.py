@@ -17,11 +17,16 @@ from src.celery.tasks import calculate_shops_load, apply_load_template_to_shops
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.base.exceptions import FieldError
 from src.base.serializers import BaseNetworkSerializer
+from src.base.models import Shop
+
+from django.db.models import Exists, OuterRef, Case, When, CharField, Value
+
 
 # Serializers define the API representation.
 class LoadTemplateSerializer(BaseNetworkSerializer):
     shop_id = serializers.IntegerField(write_only=True, required=False)
     operation_type_templates = OperationTypeTemplateSerializer(many=True, read_only=True)
+    status = serializers.CharField(read_only=True)
     class Meta:
         model = LoadTemplate
         fields = ['id', 'name', 'shop_id', 'operation_type_templates', 'status']
@@ -163,6 +168,16 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return LoadTemplate.objects.filter(
             network_id=self.request.user.network_id
+        ).annotate(
+            error=Exists(Shop.objects.filter(load_template_id=OuterRef('pk'), load_template_status=Shop.LOAD_TEMPLATE_ERROR)),
+            process=Exists(Shop.objects.filter(load_template_id=OuterRef('pk'), load_template_status=Shop.LOAD_TEMPLATE_PROCESS)),
+        ).annotate(
+            status=Case(
+                When(error=True, then=Value('E')),
+                When(process=True, then=Value('P')),
+                default=Value('R'),
+                output_field=CharField(),
+            )
         )
     
 

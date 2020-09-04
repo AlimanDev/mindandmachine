@@ -37,17 +37,9 @@ class LoadTemplate(AbstractModel):
         verbose_name = 'Шаблон нагрузки'
         verbose_name_plural = 'Шаблоны нагрузки'
 
-    PROCESS = 'P'
-    READY = 'R'
-
-    STATUSES = [
-        (PROCESS, 'В процессе'),
-        (READY, 'Готово'),
-    ]
 
     name = models.CharField(max_length=64, unique=True)
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
-    status = models.CharField(max_length=1, default=READY, choices=STATUSES)
 
 
     def __str__(self):

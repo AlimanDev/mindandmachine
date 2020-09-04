@@ -92,6 +92,17 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         verbose_name = 'Отдел'
         verbose_name_plural = 'Отделы'
 
+    LOAD_TEMPLATE_PROCESS = 'P'
+    LOAD_TEMPLATE_READY = 'R'
+    LOAD_TEMPLATE_ERROR = 'E'
+
+
+    LOAD_TEMPLATE_STATUSES = [
+        (LOAD_TEMPLATE_PROCESS, 'В процессе'),
+        (LOAD_TEMPLATE_READY, 'Готово'),
+        (LOAD_TEMPLATE_ERROR, 'Ошибка'),
+    ]
+
     id = models.BigAutoField(primary_key=True)
 
     parent = TreeForeignKey('self', on_delete=models.PROTECT, null=True, blank=True, related_name='child')
@@ -136,6 +147,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     restricted_end_times = models.CharField(max_length=1024, default='[]')
 
     load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
+    load_template_status = models.CharField(max_length=1, default=LOAD_TEMPLATE_READY, choices=LOAD_TEMPLATE_STATUSES)
     exchange_settings = models.ForeignKey('timetable.ExchangeSettings', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
 
     staff_number = models.SmallIntegerField(default=0)

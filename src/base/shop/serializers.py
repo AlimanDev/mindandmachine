@@ -31,12 +31,14 @@ class ShopSerializer(serializers.ModelSerializer):
     settings_id = serializers.IntegerField(required=False)
     tm_open_dict = serializers.JSONField(required=False)
     tm_close_dict = serializers.JSONField(required=False)
+    load_template_status = serializers.CharField(read_only=True)
     timezone = TimeZoneField()
     class Meta:
         model = Shop
         fields = ['id', 'parent_id', 'parent_code', 'name', 'settings_id', 'tm_open_dict', 'tm_close_dict',
                 'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id', 
-                'network_id', 'restricted_start_times','restricted_end_times', 'exchange_settings_id', 'load_template_id', 'area', 'forecast_step_minutes']
+                'network_id', 'restricted_start_times','restricted_end_times', 'exchange_settings_id', 
+                'load_template_id', 'area', 'forecast_step_minutes', 'load_template_status']
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
