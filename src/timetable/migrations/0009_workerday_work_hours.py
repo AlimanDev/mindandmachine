@@ -2,7 +2,23 @@
 
 import datetime
 from django.db import migrations, models
+import json
 
+def count_work_hours(break_triplets, dttm_work_start, dttm_work_end):
+    work_hours = (dttm_work_end - dttm_work_start).total_seconds() / 60
+    for break_triplet in break_triplets:
+        if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
+            work_hours = work_hours - sum(break_triplet[2])
+            break
+    return datetime.timedelta(minutes=work_hours)
+
+def work_hours_worker_day(apps, schema_editor):
+    WorkerDay = apps.get_model('timetable', 'WorkerDay')
+    worker_days = WorkerDay.objects.filter(type__in=['W', 'T', 'Q'], dttm_work_start__isnull=False, dttm_work_end__isnull=False).select_related('shop')
+    for worker_day in worker_days:
+        break_triplets = json.loads(worker_day.shop.break_triplets)
+        worker_day.work_hours = count_work_hours(break_triplets, worker_day.dttm_work_start, worker_day.dttm_work_end)
+    WorkerDay.objects.bulk_update(worker_days, ['work_hours'])
 
 class Migration(migrations.Migration):
 
@@ -16,4 +32,5 @@ class Migration(migrations.Migration):
             name='work_hours',
             field=models.DurationField(default=datetime.timedelta(0)),
         ),
+        migrations.RunPython(work_hours_worker_day),
     ]

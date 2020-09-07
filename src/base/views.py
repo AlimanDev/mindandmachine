@@ -46,6 +46,7 @@ from src.base.views_abstract import (
     BaseActiveNamedModelViewSet,
     UpdateorCreateViewSet
 )
+from django.middleware.csrf import rotate_token
 
 
 class EmploymentViewSet(UpdateorCreateViewSet):
@@ -164,6 +165,10 @@ class UserViewSet(BaseActiveNamedModelViewSet):
 class AuthUserView(UserDetailsView):
     serializer_class = AuthUserSerializer
 
+    def check_permissions(self, request, *args, **kwargs):
+        rotate_token(request)
+        return super().check_permissions(request, *args, **kwargs)
+
 
 class FunctionGroupView(ModelViewSet):
     permission_classes = [Permission]
@@ -179,6 +184,11 @@ class FunctionGroupView(ModelViewSet):
             group_id=Coalesce(F('function_group_id'),F('position__group_id'))
         ).values_list("group_id", flat=True)
         return FunctionGroup.objects.filter(group__in=groups).distinct('func')
+
+
+    @action(detail=False, methods=['get'])
+    def functions(self, request):
+        return Response(FunctionGroup.FUNCS)
 
 
 class WorkerPositionViewSet(BaseActiveNamedModelViewSet):

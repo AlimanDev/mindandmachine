@@ -141,7 +141,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     tm_open_dict = models.TextField(default='{}')
     tm_close_dict = models.TextField(default='{}')
-    area = models.FloatField(null=True) #Торговая площадь магазина
+    area = models.FloatField(default=0)  # Торговая площадь магазина
 
     restricted_start_times = models.CharField(max_length=1024, default='[]')
     restricted_end_times = models.CharField(max_length=1024, default='[]')
@@ -152,7 +152,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     staff_number = models.SmallIntegerField(default=0)
 
-    region = models.ForeignKey(Region, on_delete=models.PROTECT, null=True, blank=True)
+    region = models.ForeignKey(Region, on_delete=models.PROTECT)
 
     email = models.EmailField(blank=True, null=True)
     exchange_shops = models.ManyToManyField('self', blank=True)
@@ -511,6 +511,7 @@ class FunctionGroup(AbstractModel):
         'EmploymentWorkType',
         'ExchangeSettings',
         'FunctionGroupView',
+        'FunctionGroupView_functions',
         'Network',
         'Notification',
         'OperationTemplate',

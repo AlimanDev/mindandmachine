@@ -199,6 +199,9 @@ def create_demand(data):
             ]
         }
     '''
+    def parse_datetime(value):
+        value['dttm'] = Converter.parse_datetime(value.get('dttm'))
+
     models_list = []
 
     shop_id = data.get('shop_id')
@@ -229,11 +232,26 @@ def create_demand(data):
         operation_types_to_delete = set([ operation_names.get(x.get('timeserie_name')) for x in data['serie']])
     else:
         operation_types_to_delete = set([ operation_ids.get(x.get('timeserie_id')) for x in data['serie']])
+    
+    data['serie'] = list(map(parse_datetime, data['serie']))
+
+    min_time = time(23)
+    max_time = time(0)
+
+    for serie in data['serie']:
+        if serie['dttm'].time() > max_time:
+            max_time = serie['dttm'].time()
+
+        if serie['dttm'].time() < min_time:
+            max_time = serie['dttm'].time()
+
     PeriodClients.objects.filter(
         Q(operation_type__shop_id=shop.id) | Q(operation_type__work_type__shop_id=shop.id),
         type=forecase_type,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to,
+        dttm_forecast__time__gte=min_time,
+        dttm_forecast__time__lte=max_time,
         operation_type__do_forecast=OperationType.FORECAST,
         operation_type__in=operation_types_to_delete,
     ).delete()
@@ -251,7 +269,7 @@ def create_demand(data):
         models_list.append(
             PeriodClients(
                 type=forecase_type,
-                dttm_forecast=Converter.parse_datetime(period_demand_value.get('dttm')),
+                dttm_forecast=period_demand_value.get('dttm'),
                 operation_type=operation_type,
                 value=clients,
             )
