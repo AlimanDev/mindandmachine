@@ -115,10 +115,12 @@ class EmploymentViewSet(UpdateorCreateViewSet):
                 return_data = serializer.data
             return Response(return_data)
 
-        else:
+        elif not (serializer.validated_data.get('dt_hired', False) and Employment.objects.filter(dt_hired=serializer.validated_data.get('dt_hired'),user_id=serializer.validated_data['user_id'],
+            shop_id=serializer.validated_data['shop_id'],).exists()):
             self.perform_create(serializer)
             headers = self.get_success_headers(serializer.validated_data)
             return Response(serializer.validated_data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response({})
 
 
 class UserViewSet(BaseActiveNamedModelViewSet):
