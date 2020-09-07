@@ -73,7 +73,7 @@ class ShopViewSet(BaseActiveNamedModelViewSet):
         #     )
         # else:
         #     return shops
-        return Shop.objects.filter(network_id=user.network_id)
+        return Shop.objects.filter(network_id=user.network_id).order_by('level', 'name')
 
     @action(detail=False, methods=['get'], serializer_class=ShopStatSerializer)#, permission_classes=[IsAdminOrIsSelf])
     def stat(self, request):
@@ -116,33 +116,64 @@ class ShopViewSet(BaseActiveNamedModelViewSet):
         """
 
         shops = self.filter_queryset(self.get_queryset())
+        level = 0
         tree = []
-        ids = []
-        elems = []
+        parent_indexes = {}
         for shop in shops:
-            parent_id = shop.parent_id
-            if parent_id in ids:
-                for i, elem in enumerate(elems):
-                    if elem['id'] == parent_id:
-                        ids = ids[0:i+1]
-                        elems = elems[0:i+1]
-                        child_list = elem["children"]
+            if not shop.parent_id in parent_indexes:
+                tree.append({
+                    "id": shop.id,
+                    "label": shop.name,
+                    "tm_open_dict": shop.open_times,
+                    "tm_close_dict" :shop.close_times,
+                    "address": shop.address,
+                    "forecast_step_minutes":shop.forecast_step_minutes,
+                    "children": []
+                })
+                parent_indexes[shop.id] = [len(tree) - 1,]
             else:
-                ids = []
-                elems = []
-                child_list = tree
+                root = tree[parent_indexes[shop.parent_id][0]]
+                parent = root
+                for i in parent_indexes[shop.parent_id][1:]:
+                    parent = parent['children'][i]
+                parent['children'].append({
+                    "id": shop.id,
+                    "label": shop.name,
+                    "tm_open_dict": shop.open_times,
+                    "tm_close_dict" :shop.close_times,
+                    "address": shop.address,
+                    "forecast_step_minutes":shop.forecast_step_minutes,
+                    "children": []
+                })
+                parent_indexes[shop.id] = parent_indexes[shop.parent_id].copy()
+                parent_indexes[shop.id].append(len(parent['children']) - 1)
+        # tree = []
+        # ids = []
+        # elems = []
+        # for shop in shops:
+        #     parent_id = shop.parent_id
+        #     if parent_id in ids:
+        #         for i, elem in enumerate(elems):
+        #             if elem['id'] == parent_id:
+        #                 ids = ids[0:i+1]
+        #                 elems = elems[0:i+1]
+        #                 child_list = elem["children"]
+        #     else:
+        #         ids = []
+        #         elems = []
+        #         child_list = tree
 
-            child_list.append({
-                "id": shop.id,
-                "label": shop.name,
-                "tm_open_dict": shop.open_times,
-                "tm_close_dict" :shop.close_times,
-                "address": shop.address,
-                "forecast_step_minutes":shop.forecast_step_minutes,
-                "children": []
-            })
+        #     child_list.append({
+        #         "id": shop.id,
+        #         "label": shop.name,
+        #         "tm_open_dict": shop.open_times,
+        #         "tm_close_dict" :shop.close_times,
+        #         "address": shop.address,
+        #         "forecast_step_minutes":shop.forecast_step_minutes,
+        #         "children": []
+        #     })
 
-            elems.append(child_list[-1])
-            ids.append(shop.id)
+        #     elems.append(child_list[-1])
+        #     ids.append(shop.id)
 
         return Response(tree)
