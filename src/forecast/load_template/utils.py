@@ -195,7 +195,7 @@ def apply_formula(operation_type, operation_type_template, operation_type_relati
     return prepare_answer(False)
 
 
-def create_load_template_for_shop(shop_id):
+def create_load_template_for_shop(shop_id, network_id):
     '''
     Создаёт шаблон нагрузки относительно типов операций и типов работ
     определнного магазина.
@@ -203,7 +203,8 @@ def create_load_template_for_shop(shop_id):
     shop = Shop.objects.get(pk=shop_id)
 
     load_template = LoadTemplate.objects.create(
-        name=f'Шаблон нагрузки для магазина {shop.name}'
+        name=f'Шаблон нагрузки для магазина {shop.name}',
+        network_id=network_id,
     )
     operation_types = OperationType.objects.select_related('work_type').filter(
         shop_id=shop_id, dttm_deleted__isnull=True
