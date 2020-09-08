@@ -4,6 +4,7 @@ from rest_framework import serializers, viewsets, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.pagination import LimitOffsetPagination
 from django_filters.rest_framework import FilterSet
 from django_filters import CharFilter
 
@@ -16,14 +17,19 @@ from src.celery.tasks import calculate_shops_load, apply_load_template_to_shops
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.base.exceptions import FieldError
 from src.base.serializers import BaseNetworkSerializer
+from src.base.models import Shop
+
+from django.db.models import Exists, OuterRef, Case, When, CharField, Value
+
 
 # Serializers define the API representation.
 class LoadTemplateSerializer(BaseNetworkSerializer):
     shop_id = serializers.IntegerField(write_only=True, required=False)
     operation_type_templates = OperationTypeTemplateSerializer(many=True, read_only=True)
+    status = serializers.CharField(read_only=True)
     class Meta:
         model = LoadTemplate
-        fields = ['id', 'name', 'shop_id', 'operation_type_templates']
+        fields = ['id', 'name', 'shop_id', 'operation_type_templates', 'status']
 
 
 class LoadTemplateSpecSerializer(serializers.Serializer):
@@ -52,6 +58,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
         {
            "id": 1,
            "name": "Load template",
+           "status": "R", | "P" R - готов P - в процессе
            "operation_type_templates":[
                {
                     'id': 1, 
@@ -75,6 +82,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     :return {
        "id": 1,
        "name": "Load template",
+       "type": "R",
        "operation_type_templates":[
            {
                 'id': 1, 
@@ -103,6 +111,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     {
         "id": 1,
         "name": "Load template",
+        "type": "R",
         "operation_type_templates":[],
     }
 
@@ -154,10 +163,21 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAdminUser]
     filterset_class = LoadTemplateFilter
     serializer_class = LoadTemplateSerializer
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
         return LoadTemplate.objects.filter(
             network_id=self.request.user.network_id
+        ).annotate(
+            error=Exists(Shop.objects.filter(load_template_id=OuterRef('pk'), load_template_status=Shop.LOAD_TEMPLATE_ERROR)),
+            process=Exists(Shop.objects.filter(load_template_id=OuterRef('pk'), load_template_status=Shop.LOAD_TEMPLATE_PROCESS)),
+        ).annotate(
+            status=Case(
+                When(error=True, then=Value('E')),
+                When(process=True, then=Value('P')),
+                default=Value('R'),
+                output_field=CharField(),
+            )
         )
     
 
