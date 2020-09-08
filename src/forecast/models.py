@@ -91,7 +91,6 @@ class OperationType(AbstractActiveModel):
         max_length=1024,
         default='{"max_depth": 10, "eta": 0.2, "min_split_loss": 200, "reg_lambda": 2, "silent": 1, "iterations": 20}'
     )
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
 
     def __init__(self, *args, **kwargs):
         code = kwargs.pop('code', None)

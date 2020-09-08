@@ -100,7 +100,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
             # cond_for_not_updating = employment.dt_fired and serializer.validated_data.get('dt_fired') and \
             #                         (employment.dt_fired > serializer.validated_data.get('dt_fired')) and \
             #                         (employment.position_id != serializer.validated_data.get('position_id'))
-            cond_for_not_updating = (employment.dt_hired_next and (employment.dt_hired_next > serializer.validated_data.get('dt_hired')))
+            cond_for_not_updating = (employment.dt_hired_next and (employment.dt_hired_next >= serializer.validated_data.get('dt_hired')))
             # cond_for_not_updating |= employment.dt_hired_next and serializer.validated_data.get('dt_fired') and \
             #                          (employment.dt_hired_next >= serializer.validated_data.get('dt_fired'))
 
@@ -115,12 +115,15 @@ class EmploymentViewSet(UpdateorCreateViewSet):
                 return_data = serializer.data
             return Response(return_data)
 
-        elif not (serializer.validated_data.get('dt_hired', False) and Employment.objects.filter(dt_hired=serializer.validated_data.get('dt_hired'),user_id=serializer.validated_data['user_id'],
-            shop_id=serializer.validated_data['shop_id'],).exists()):
+        elif employment:
+            serializer.instance = employment
+            self.perform_update(serializer)
+            return_data = serializer.data
+            return Response(return_data)
+        else:
             self.perform_create(serializer)
             headers = self.get_success_headers(serializer.validated_data)
             return Response(serializer.validated_data, status=status.HTTP_201_CREATED, headers=headers)
-        return Response({})
 
 
 class UserViewSet(BaseActiveNamedModelViewSet):
