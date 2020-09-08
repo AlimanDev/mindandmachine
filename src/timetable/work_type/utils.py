@@ -75,7 +75,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
     #work_types = group_by(work_types, group_key=lambda x: x.id)
     # query selecting PeriodClients
     need_workers = PeriodClients.objects.annotate(
-        need_workers=F('value') / period_lengths_minutes,
+        need_workers=F('value'),
     ).select_related('operation_type').filter(
         dttm_forecast__gte=from_dt,
         dttm_forecast__lte=to_dt,
