@@ -32,7 +32,7 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OperationTypeRelation
-        fields = ['id', 'base', 'depended', 'formula', 'depended_id', 'base_id']
+        fields = ['id', 'base', 'depended', 'formula', 'depended_id', 'base_id', 'type']
         validators = [
             UniqueTogetherValidator(
                 queryset=OperationTypeRelation.objects.all(),
@@ -46,10 +46,12 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         if not super().is_valid(*args, **kwargs):
             return False
         lambda_check = r'^(if|else|\+|-|\*|/|\s|a|[0-9]|=|>|<|\.)*'
+        if self.validated_data['type'] == OperationTypeRelation.TYPE_PREDICTION:
+            self.validated_data['formula'] = 'a'
         if not re.fullmatch(lambda_check, self.validated_data['formula']):
-            raise FieldError(self.error_messages["base_not_formula"].format(formula=self.validated_data['formula']), 'formula')
+            raise FieldError(self.error_messages["error_in_formula"].format(formula=self.validated_data['formula']), 'formula')
 
-        self.validated_data['formula'] = "lambda a: " + self.validated_data['formula']
+        # self.validated_data['formula'] = "lambda a: " + self.validated_data['formula']
         if self.validated_data['depended_id'] == self.validated_data['base_id']:
             raise FieldError(self.error_messages["depended_base_same"])
 

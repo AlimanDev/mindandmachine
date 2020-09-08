@@ -37,8 +37,10 @@ class LoadTemplate(AbstractModel):
         verbose_name = 'Шаблон нагрузки'
         verbose_name_plural = 'Шаблоны нагрузки'
 
+
     name = models.CharField(max_length=64, unique=True)
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
+
 
     def __str__(self):
         return f'id: {self.id}, name: {self.name}'
@@ -117,6 +119,9 @@ class OperationTypeTemplate(AbstractModel):
     operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
     work_type_name = models.ForeignKey(WorkTypeName, on_delete=models.PROTECT, null=True, blank=True)
     do_forecast = models.CharField(max_length=1, choices=OperationType.FORECAST_CHOICES, default=OperationType.FORECAST)
+    tm_from = models.TimeField(null=True, blank=True)
+    tm_to = models.TimeField(null=True, blank=True)
+    forecast_step = models.DurationField(default=datetime.timedelta(hours=1))
 
     def __str__(self):
         return 'id: {}, load_template: {}, operation_type_name: ({}), work_type_name: ({}), do_forecast: {}'.format(
@@ -134,9 +139,17 @@ class OperationTypeRelation(AbstractModel):
         verbose_name_plural = 'Отношения типов операций'
         unique_together = ('base', 'depended')
 
+    TYPE_FORMULA = 'F'
+    TYPE_PREDICTION = 'P'
+    TYPES = [
+        (TYPE_FORMULA, 'Формула'),
+        (TYPE_PREDICTION, 'Прогнозирование'),
+    ]
+
     base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends')
     depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases')
     formula = models.CharField(max_length=256)
+    type = models.CharField(max_length=1, default=TYPE_FORMULA)
 
     def __str__(self):
         return 'base_id {}, depended_id: {}, formula: {}'.format(
