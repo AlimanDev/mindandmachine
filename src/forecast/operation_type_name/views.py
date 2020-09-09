@@ -100,6 +100,8 @@ class OperationTypeNameViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OperationTypeNameSerializer
     pagination_class = LimitOffsetPagination
+    filterset_class = OperationTypeNameFilter
+
     def get_queryset(self):
         return OperationTypeName.objects.filter(
             network_id=self.request.user.network_id,
