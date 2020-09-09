@@ -22,7 +22,16 @@ class OperationTypeName(AbstractActiveNamedModel):
         )
         return self
 
+    FORECAST = 'H'
+    FORECAST_FORMULA = 'F'
+    FORECAST_CHOICES = (
+        (FORECAST, 'Forecast',),
+        (FORECAST_FORMULA, 'Formula'),
+    )
+
     is_special = models.BooleanField(default=False)
+    work_type_name = models.ForeignKey('timetable.WorkTypeName', on_delete=models.PROTECT, null=True, blank=True)
+    do_forecast = models.CharField(max_length=1, default=FORECAST, choices=FORECAST_CHOICES)
 
     def __str__(self):
         return 'id: {}, name: {}, code: {}'.format(
@@ -55,18 +64,6 @@ class OperationType(AbstractActiveModel):
     def __str__(self):
         return 'id: {}, name: {}, work type: {}'.format(self.id, self.operation_type_name.name, self.work_type)
 
-
-    FORECAST = 'H'
-    FORECAST_NONE = 'N'
-    FORECAST_TEMPLATE = 'T'
-    FORECAST_FORMULA = 'F'
-    FORECAST_CHOICES = (
-        (FORECAST, 'Forecast',),
-        (FORECAST_NONE, 'None',),
-        (FORECAST_TEMPLATE, 'Template'),
-        (FORECAST_FORMULA, 'Formula'),
-    )
-
     READY = 'R'
     UPDATED = 'U'
 
@@ -78,11 +75,6 @@ class OperationType(AbstractActiveModel):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True, related_name='operation_types')
     work_type = models.OneToOneField(WorkType, on_delete=models.PROTECT, related_name='operation_type', null=True, blank=True)
     operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
-    do_forecast = models.CharField(
-        max_length=1,
-        default=FORECAST,
-        choices=FORECAST_CHOICES,
-    )
     status = models.CharField(
         max_length=1,
         default=UPDATED,
@@ -118,19 +110,15 @@ class OperationTypeTemplate(AbstractModel):
 
     load_template = models.ForeignKey(LoadTemplate, on_delete=models.CASCADE, related_name='operation_type_templates')
     operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
-    work_type_name = models.ForeignKey(WorkTypeName, on_delete=models.PROTECT, null=True, blank=True)
-    do_forecast = models.CharField(max_length=1, choices=OperationType.FORECAST_CHOICES, default=OperationType.FORECAST)
     tm_from = models.TimeField(null=True, blank=True)
     tm_to = models.TimeField(null=True, blank=True)
     forecast_step = models.DurationField(default=datetime.timedelta(hours=1))
 
     def __str__(self):
-        return 'id: {}, load_template: {}, operation_type_name: ({}), work_type_name: ({}), do_forecast: {}'.format(
+        return 'id: {}, load_template: {}, operation_type_name: ({})'.format(
                  self.id,
                  self.load_template.name,
                  self.operation_type_name,
-                 self.work_type_name,
-                 self.do_forecast,
             )
 
 
