@@ -1,13 +1,9 @@
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.util.test import create_departments_and_users
-
+from src.base.models import Network
 from src.timetable.models import WorkTypeName, WorkType
-from src.base.models import FunctionGroup
+from src.util.test import create_departments_and_users
 
 
 class TestWorkTypeName(APITestCase):
@@ -16,23 +12,26 @@ class TestWorkTypeName(APITestCase):
     USER_PASSWORD = "4242"
 
     def setUp(self):
-        super().setUp()
-
         self.url = '/rest_api/work_type_name/'
 
         create_departments_and_users(self)
+        network = Network.objects.first()
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
+            network=network,
         )
         self.wt = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
         self.work_type_name2 = WorkTypeName.objects.create(
             name='Тип_кассы_2',
+            network=network,
         )
         self.work_type_name3 = WorkTypeName.objects.create(
             name='Тип_кассы_3',
+            network=network,
         )
         self.work_type_name4 = WorkTypeName.objects.create(
             name='тип_кассы_4',
+            network=network,
         )
 
         self.client.force_authenticate(user=self.user1)
@@ -79,7 +78,7 @@ class TestWorkTypeName(APITestCase):
         data['id'] = self.work_type_name1.id
         data['name'] = self.work_type_name1.name
         self.assertEqual(work_type_name, data)
-    
+
     def test_update_name(self):
         data = {
             'name': 'Склад',
@@ -95,4 +94,3 @@ class TestWorkTypeName(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertIsNotNone(WorkTypeName.objects.get(id=self.work_type_name1.id).dttm_deleted)
         self.assertEqual(WorkType.objects.filter(dttm_deleted__isnull=False).count(), 1)
-        

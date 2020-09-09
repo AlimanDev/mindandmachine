@@ -115,3 +115,4 @@ wrapt==1.10.11
 xlrd==1.2.0
 XlsxWriter==1.2.6
 zipp==0.6.0
+django-model-utils==4.0.0
