@@ -33,7 +33,7 @@ class OperationTypeNameSerializer(BaseNetworkSerializer):
 
 class OperationTypeNameFilter(FilterSet):
 
-    no_work_type = BooleanFilter(field='work_type_name', lookup_expr='isnull')
+    no_work_type = BooleanFilter(field_name='work_type_name_id', lookup_expr='isnull')
 
     class Meta:
         model = OperationTypeName
