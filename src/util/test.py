@@ -17,6 +17,7 @@ from src.base.models import (
     Shop,
     ShopSettings,
     User,
+    Network,
 )
 from src.timetable.models import (
     AttendanceRecords,
@@ -377,11 +378,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 def create_departments_and_users(self):
     dt = now().date() - relativedelta(months=1)
 
-    self.region = Region.objects.create(
-        id=1,
-        name='Москва',
-        code=77,
-    )
+    self.region = Region.objects.first()
     # admin_group
     self.admin_group = Group.objects.create(name='Администратор')
     FunctionGroup.objects.bulk_create([
@@ -433,6 +430,8 @@ def create_departments_and_users(self):
     Shop._tree_manager.rebuild()
     # supershop
     self.root_shop = Shop.objects.first()
+    self.root_shop.network = None
+    self.root_shop.save()
 
     self.settings = ShopSettings.objects.create(
         break_triplets='[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]]',

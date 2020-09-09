@@ -6,6 +6,25 @@ class WorkerDayFilter(FilterSet):
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода")
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода')
     is_approved = BooleanFilter(field_name='worker_day_approve_id', method='filter_approved')
+    is_fact = BooleanFilter(field_name='worker_day_is_fact', method='filter_fact')
+
+
+
+    def filter_fact(self, queryset, name, value):
+        if value:
+            query = queryset.filter(Q(is_fact=True)|(Q(is_approved=True)&~Q(type__in=WorkerDay.TYPES_PAID)))
+            worker_days = list(query.order_by('worker_id', 'dt', '-is_fact'))
+            exists = []
+            remove = []
+            for worker_day in worker_days:
+                if (worker_day.worker_id, worker_day.dt) in exists:
+                    remove.append(worker_day.id)
+                else:
+                    exists.append((worker_day.worker_id, worker_day.dt))
+            return query.exclude(id__in=remove)
+        else:
+            return queryset.filter(is_fact=value)
+
 
     def filter_approved(self, queryset, name, value):
         if value:

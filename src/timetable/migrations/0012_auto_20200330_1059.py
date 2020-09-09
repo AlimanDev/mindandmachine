@@ -4,6 +4,11 @@ from django.db import migrations, models
 import django.db.models.deletion
 
 
+def approve_worker_days(apps, schema_editor):
+    WorkerDay = apps.get_model('timetable', 'WorkerDay')
+    WorkerDay.objects.all().update(is_approved=True)
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
