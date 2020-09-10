@@ -377,10 +377,12 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 def create_departments_and_users(self):
     dt = now().date() - relativedelta(months=1)
 
-    self.region = Region.objects.create(
+    self.region, _created = Region.objects.update_or_create(
         id=1,
-        name='Москва',
-        code=77,
+        defaults=dict(
+            name='Москва',
+            code='77',
+        )
     )
     # admin_group
     self.admin_group = Group.objects.create(name='Администратор')
