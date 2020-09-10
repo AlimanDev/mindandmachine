@@ -93,7 +93,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         ).order_by('dt_fired', 'dt_hired').last()
 
         month_ago = timezone.now().date() - timezone.timedelta(days=31)
-        if employment and (employment.dt_fired is None or employment.dt_fired > month_ago):
+        if employment:
             # updating
             # специфическая логика с cond_for_not_updating так как не поддерживаем несколько трудоустройств
             # fixme
@@ -115,12 +115,15 @@ class EmploymentViewSet(UpdateorCreateViewSet):
                 return_data = serializer.data
             return Response(return_data)
 
-        elif not (serializer.validated_data.get('dt_hired', False) and Employment.objects.filter(dt_hired=serializer.validated_data.get('dt_hired'),user_id=serializer.validated_data['user_id'],
-            shop_id=serializer.validated_data['shop_id'],).exists()):
+        # elif employment:
+        #     serializer.instance = employment
+        #     self.perform_update(serializer)
+        #     return_data = serializer.data
+        #     return Response(return_data)
+        else:
             self.perform_create(serializer)
             headers = self.get_success_headers(serializer.validated_data)
             return Response(serializer.validated_data, status=status.HTTP_201_CREATED, headers=headers)
-        return Response({})
 
 
 class UserViewSet(BaseActiveNamedModelViewSet):

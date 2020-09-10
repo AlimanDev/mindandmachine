@@ -139,6 +139,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
     worker_constraints = WorkerConstraintSerializer(many=True)
     username = serializers.CharField(required=False, source='user.username')
     dt_hired = serializers.DateField(required=True)
+    dt_fired = serializers.DateField(required=False, default=None)
 
     class Meta:
         model = Employment
