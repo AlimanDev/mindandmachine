@@ -29,7 +29,7 @@ class LoadTemplateSerializer(BaseNetworkSerializer):
     status = serializers.CharField(read_only=True)
     class Meta:
         model = LoadTemplate
-        fields = ['id', 'name', 'shop_id', 'operation_type_templates', 'status']
+        fields = ['id', 'name', 'shop_id', 'operation_type_templates', 'status', 'network_id']
 
 
 class LoadTemplateSpecSerializer(serializers.Serializer):
@@ -182,17 +182,15 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     
 
     def create(self, request):
-        data = LoadTemplateSerializer(data=request.data)
+        data = LoadTemplateSerializer(data=request.data, context={'request': request})
         data.is_valid(raise_exception=True)
 
         shop_id = data.validated_data.get('shop_id')
         
         if shop_id:
-            load_template = create_load_template_for_shop(shop_id)
+            load_template = create_load_template_for_shop(shop_id, data.validated_data.get('network_id'))
         else:
-            load_template = LoadTemplate.objects.create(
-                name=data.validated_data.get('name'),
-            )
+            load_template = data.save()
 
         return Response(LoadTemplateSerializer(instance=load_template).data, status=201)
 
