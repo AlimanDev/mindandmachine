@@ -63,7 +63,7 @@ class WorkType(AbstractActiveModel):
         unique_together = ['shop', 'work_type_name']
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.work_type_name.name, self.shop.name, self.shop.parent.name, self.id)
+        return '{}, {}, {}, {}'.format(self.work_type_name.name, self.shop.name, self.shop.parent.name if self.shop.parent else '', self.id)
 
     id = models.BigAutoField(primary_key=True)
 
