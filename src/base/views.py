@@ -93,14 +93,14 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         ).order_by('dt_fired', 'dt_hired').last()
 
         month_ago = timezone.now().date() - timezone.timedelta(days=31)
-        if employment and (employment.dt_fired is None or employment.dt_fired > month_ago):
+        if employment:
             # updating
             # специфическая логика с cond_for_not_updating так как не поддерживаем несколько трудоустройств
             # fixme
             # cond_for_not_updating = employment.dt_fired and serializer.validated_data.get('dt_fired') and \
             #                         (employment.dt_fired > serializer.validated_data.get('dt_fired')) and \
             #                         (employment.position_id != serializer.validated_data.get('position_id'))
-            cond_for_not_updating = (employment.dt_hired_next and (employment.dt_hired_next >= serializer.validated_data.get('dt_hired')))
+            cond_for_not_updating = (employment.dt_hired_next and (employment.dt_hired_next > serializer.validated_data.get('dt_hired')))
             # cond_for_not_updating |= employment.dt_hired_next and serializer.validated_data.get('dt_fired') and \
             #                          (employment.dt_hired_next >= serializer.validated_data.get('dt_fired'))
 
@@ -115,11 +115,11 @@ class EmploymentViewSet(UpdateorCreateViewSet):
                 return_data = serializer.data
             return Response(return_data)
 
-        elif employment:
-            serializer.instance = employment
-            self.perform_update(serializer)
-            return_data = serializer.data
-            return Response(return_data)
+        # elif employment:
+        #     serializer.instance = employment
+        #     self.perform_update(serializer)
+        #     return_data = serializer.data
+        #     return Response(return_data)
         else:
             self.perform_create(serializer)
             headers = self.get_success_headers(serializer.validated_data)

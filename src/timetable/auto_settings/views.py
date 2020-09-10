@@ -788,7 +788,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         Args:
             method: POST
-            url: /api/timetable/auto_settings/set_timetable
+            url: /rest_api/auto_settings/set_timetable/
             data(str): json data с данными от qos_algo
 
         Raises:
@@ -807,7 +807,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         timetable = ShopMonthStat.objects.get(id=form['timetable_id'])
 
         shop = timetable.shop
-        break_triplets = json.loads(shop.settings.break_triplets)
+        break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
 
         timetable.status = data['timetable_status']
         timetable.status_message = data.get('status_message', False)
