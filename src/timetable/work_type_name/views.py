@@ -1,6 +1,6 @@
 from rest_framework import serializers, viewsets, permissions
 from rest_framework.pagination import LimitOffsetPagination
-
+from src.forecast.models import OperationTypeName
 from src.timetable.models import WorkTypeName
 from src.base.serializers import BaseNetworkSerializer
 from src.base.exceptions import MessageError
@@ -27,6 +27,29 @@ class WorkTypeNameSerializer(BaseNetworkSerializer):
             raise MessageError('unique_name_name', params={'name': self.validated_data.get('name')}, lang=self.context['request'].user.lang)
 
         return True
+    
+    def create(self, validated_data, *args, **kwargs):
+        instance = super().create(validated_data, *args, **kwargs)
+        validated_data['work_type_name'] = instance
+        validated_data['do_forecast'] = 'F'
+        OperationTypeName.objects.update_or_create(
+            network_id=validated_data.pop('network_id'),
+            name=validated_data.pop('name'),
+            defaults=validated_data,
+        )
+        return instance
+    
+    def update(self, instance, validated_data, *args, **kwargs):
+        instance = super().update(instance, validated_data, *args, **kwargs)
+        validated_data.pop('network_id', None)
+        validated_data.pop('id', None)
+        validated_data['do_forecast'] = 'F'
+        OperationTypeName.objects.update_or_create(
+            network_id=instance.network_id, 
+            work_type_name=instance, 
+            defaults=validated_data
+        )
+        return instance
 
 
 class WorkTypeNameViewSet(BaseActiveNamedModelViewSet):
