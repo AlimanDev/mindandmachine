@@ -478,6 +478,8 @@ def create_departments_and_users(self):
         settings=self.settings,
         network=self.network,
     )
+    self.shop.code = str(self.shop.id)
+    self.shop.save(update_fields=['code'])
     self.shop2 = Shop.objects.create(
         # id=2,
         parent=self.reg_shop1,

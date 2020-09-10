@@ -348,14 +348,15 @@ class Receipt(AbstractModel):
     изначально для чеков
     """
 
-    class Meta(object):
-        verbose_name = 'Чеки'
+    class Meta:
+        verbose_name = 'Событие'
+        verbose_name_plural = 'События'
 
     # id = models.BigAutoField(primary_key=True)
-    code = models.UUIDField(unique=True)
-    dttm = models.DateTimeField()
+    code = models.UUIDField()
+    dttm = models.DateTimeField(verbose_name='Дата и время события')
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_modified = models.DateTimeField(auto_now=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True)
     info = models.TextField()
-
+    event_type = models.CharField(max_length=128, verbose_name='Тип события', null=True, blank=True)
