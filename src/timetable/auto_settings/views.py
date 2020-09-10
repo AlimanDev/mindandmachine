@@ -61,6 +61,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         "tt_period_empty": "Not enough demand {period} for work type {work_type}.",
         "tt_user_extra_shifts": "More than one shift are selected for worker {id} {last_name} {first_name} with fixed hours.",
         "tt_server_error": "Fail sending data to server.",
+        "tt_delete_past": "You can't delete timetable in the past.",
     }
     serializer_class = AutoSettingsSerializer
     permission_classes = [Permission]
