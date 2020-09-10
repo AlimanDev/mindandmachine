@@ -11,6 +11,7 @@ class OperationTypeTemplateSerializer(serializers.ModelSerializer):
     operation_type_name_id = serializers.IntegerField(write_only=True)
     load_template_id = serializers.IntegerField()
     work_type_name_id = serializers.IntegerField(required=False)
+
     class Meta:
         model = OperationTypeTemplate
         fields = ['id', 'load_template_id', 'operation_type_name_id', 'work_type_name_id', 'do_forecast', 'operation_type_name', 'tm_from', 'tm_to', 'forecast_step']
