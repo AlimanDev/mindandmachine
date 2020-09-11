@@ -433,8 +433,8 @@ class WorkerDay(AbstractModel):
     def get_department(self):
         return self.shop
 
-    def save(self, *args, **kwargs):
-        if self.dttm_work_end and self.dttm_work_start and self.shop:
+    def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
+        if self.dttm_work_end and self.dttm_work_start and self.shop and self.shop.settings.break_triplets:
             self.work_hours = self.count_work_hours(json.loads(self.shop.settings.break_triplets), self.dttm_work_start, self.dttm_work_end)
         else:
             self.work_hours = datetime.timedelta(0)
