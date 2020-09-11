@@ -46,6 +46,8 @@ class WorkerDayListSerializer(serializers.Serializer):
     is_fact = serializers.BooleanField()
     work_hours = serializers.DurationField()
     parent_worker_day_id = serializers.IntegerField()
+    shop_code = serializers.CharField(required=False, read_only=True)
+    user_login = serializers.CharField(required=False, read_only=True)
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):
