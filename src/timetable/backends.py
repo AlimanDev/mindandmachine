@@ -18,7 +18,9 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
 
         shop_id = request.query_params.get('shop_id')
         shop_code = request.query_params.get('shop_code')
-        shop = Shop.objects.get(id=shop_id) if shop_id else Shop.objects.get(id=shop_code)
+        if shop_id or shop_code:
+            shop = Shop.objects.get(id=shop_id) if shop_id else Shop.objects.get(id=shop_code)
+            shop_id = shop.id
 
         filterset = self.get_filterset(request, queryset, view)
 
@@ -41,10 +43,13 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
             dt_from = dt if dt else datetime.date.today()
         if not dt_to:
             dt_to = dt if dt else datetime.date.today()
+        shop_filter = {}
+        if shop_id:
+            shop_filter['shop_id'] = shop_id
         ids = Employment.objects.get_active(
-            network_id=shop.network_id,
+            network_id=request.user.network_id,
             dt_from=dt_from, dt_to=dt_to,
-            shop_id=shop_id,
+            **shop_filter,
         ).values('user_id')
 
         if worker_id__in:
