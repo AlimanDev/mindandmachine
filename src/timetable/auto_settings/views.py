@@ -853,8 +853,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         wd_obj.shop=shop
 
                     if WorkerDay.is_type_with_tm_range(wd_obj.type):
-                        wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start'])
-                        wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])
+                        wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
+                        wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
                         wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
                         wd_obj.save()
 
