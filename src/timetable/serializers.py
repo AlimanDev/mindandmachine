@@ -161,17 +161,17 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         delete_model = None
         if is_fact:
             if is_approved:
-                validated_data['parent_worker_day_id'] = wd['plan']['approved'] or wd['plan']['not_approved']
+                validated_data['parent_worker_day'] = wd['plan']['approved'] or wd['plan']['not_approved']
                 delete_model = wd['fact']['approved']
             else:
-                validated_data['parent_worker_day_id'] = wd['fact']['approved'] or wd['plan']['approved'] or wd['plan']['not_approved']
+                validated_data['parent_worker_day'] = wd['fact']['approved'] or wd['plan']['approved'] or wd['plan']['not_approved']
                 delete_model = wd['fact']['not_approved']
         else:
             # план
             if is_approved:
                 delete_model = wd['plan']['approved']
             else:
-                validated_data['parent_worker_day_id'] = wd['plan']['approved']
+                validated_data['parent_worker_day'] = wd['plan']['approved']
                 delete_model = wd['plan']['not_approved']
 
         worker_day = WorkerDay.objects.create(**validated_data)
