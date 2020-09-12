@@ -128,8 +128,9 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        self.check_other_worker_days(None, validated_data)
+        # self.check_other_worker_days(None, validated_data)
         is_fact = validated_data.get('is_fact')
+        is_approved = validated_data.get('is_approved')
 
         # Если создаем факт то делаем его потомком подтвержденного факта или плана. Если создаем план - делаем родителем факта и потомком подтвержденного плана
         worker_days = WorkerDay.objects.filter(
@@ -147,28 +148,40 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             approved = 'approved' if w.is_approved else 'not_approved'
             wd[plan_or_fact][approved] = w
 
-        plan_to_bind = wd['plan']['approved'] if wd['plan']['approved'] else wd['plan']['not_approved'] if is_fact else None
-        fact_to_bind = wd['fact']['approved'] if wd['fact']['approved'] else wd['fact']['not_approved'] if not is_fact else None
+        # plan_to_bind = wd['plan']['approved'] if wd['plan']['approved'] else wd['plan']['not_approved'] if is_fact else None
+        # fact_to_bind = wd['fact']['approved'] if wd['fact']['approved'] else wd['fact']['not_approved'] if not is_fact else None
 
         # Привязываем факт к подтвержденному факту или любому плану, план к подтвержденному плану
-        if is_fact and fact_to_bind:
-            validated_data['parent_worker_day_id'] = fact_to_bind.id
-        elif plan_to_bind:
-            validated_data['parent_worker_day_id'] = plan_to_bind.id
-
+        # if is_fact and fact_to_bind:
+        #     validated_data['parent_worker_day_id'] = fact_to_bind.id
+        # elif plan_to_bind:
+        #     validated_data['parent_worker_day_id'] = plan_to_bind.id
 
         details = validated_data.pop('worker_day_details', None)
+        delete_model = None
+        if is_fact:
+            if is_approved:
+                validated_data['parent_worker_day_id'] = wd['plan']['approved'] or wd['plan']['not_approved']
+                delete_model = wd['fact']['approved']
+            else:
+                validated_data['parent_worker_day_id'] = wd['fact']['approved'] or wd['plan']['approved'] or wd['plan']['not_approved']
+                delete_model = wd['fact']['not_approved']
+        else:
+            # план
+            if is_approved:
+                delete_model = wd['plan']['approved']
+            else:
+                validated_data['parent_worker_day_id'] = wd['plan']['approved']
+                delete_model = wd['plan']['not_approved']
 
         worker_day = WorkerDay.objects.create(**validated_data)
+        if delete_model:
+            WorkerDay.objects.filter(parent_worker_day_id=delete_model.id).update(parent_worker_day_id=worker_day.id)
+            delete_model.delete()
 
-        # К созданному плану привязываем факт
-        if not is_fact:
-            if fact_to_bind and fact_to_bind.parent_worker_day_id == None:
-                fact_to_bind.parent_worker_day = worker_day
-                fact_to_bind.save()
-            if details:
-                for wd_detail in details:
-                    WorkerDayCashboxDetails.objects.create(worker_day=worker_day, **wd_detail)
+        if details:
+            for wd_detail in details:
+                WorkerDayCashboxDetails.objects.create(worker_day=worker_day, **wd_detail)
 
         return worker_day
 
