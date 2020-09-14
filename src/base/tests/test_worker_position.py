@@ -2,10 +2,10 @@ from rest_framework.test import APITestCase
 
 from src.base.models import WorkerPosition, FunctionGroup
 from src.timetable.models import WorkTypeName
-from src.util.mixins.tests import APITestsHelperMixin
+from src.util.mixins.tests import TestsHelperMixin
 
 
-class TestWorkerPositionAPI(APITestsHelperMixin, APITestCase):
+class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()

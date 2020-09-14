@@ -5,7 +5,7 @@ from django.urls import reverse
 from src.util.test import create_departments_and_users
 
 
-class APITestsHelperMixin:
+class TestsHelperMixin:
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"

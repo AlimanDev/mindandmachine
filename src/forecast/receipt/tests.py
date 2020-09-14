@@ -4,10 +4,10 @@ from rest_framework.test import APITestCase
 
 from src.base.models import FunctionGroup
 from src.forecast.factories import ReceiptFactory
-from src.util.mixins.tests import APITestsHelperMixin
+from src.util.mixins.tests import TestsHelperMixin
 
 
-class TestReceiptCreateAndUpdate(APITestsHelperMixin, APITestCase):
+class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()

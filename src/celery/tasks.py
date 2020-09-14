@@ -564,10 +564,12 @@ def aggregate_timeserie_value():
                         raise Exception(f"no needed values in timeserie: {timeserie}. Network: {network}")
 
                     print(network, aggregate['timeserie_code'])
-                    operation_type_name = OperationTypeName.objects.get(network=network, code=aggregate['timeserie_code'])
+                    operation_type_name = OperationTypeName.objects.get(
+                        network=network,
+                        code=aggregate['timeserie_code'],
+                    )
 
                     # по выборке всех типов очень много может быть, поэтому цикл по магазинам:
-
                     operations_type = OperationType.objects.filter(
                         shop__network=network,
                         operation_type_name=operation_type_name,
