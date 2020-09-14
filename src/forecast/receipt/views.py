@@ -10,6 +10,7 @@ import json
 
 class PeriodClientsCreateSerializer(serializers.Serializer):
     data = serializers.JSONField(write_only=True)
+    data_type = serializers.CharField(max_length=128, write_only=True)
 
 
 # TODO: documentation
@@ -32,31 +33,20 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         return super().get_object()
 
     @staticmethod
-    def _get_event_type(data, settings_values):
-        if isinstance(data, list):
-            data = data[0]  # предполагается, что типы событий в списке будут однородными
-
-        event_type_field_name = settings_values['event_type_field_name']
-        if event_type_field_name not in data:
-            raise MessageError(code='event_type_is_missing')
-
-        return data[event_type_field_name]
-
-    @staticmethod
-    def _get_receive_data_info(event_type, settings_values):
+    def _get_receive_data_info(data_type, settings_values):
         for receive_data_info in settings_values['receive_data_info']:
-            if receive_data_info['event_type'] == event_type:
+            if receive_data_info['data_type'] == data_type:
                 return receive_data_info
 
         raise MessageError(code='receive_data_info_not_found')
 
     def create(self, request, *args, **kwargs):
-        data = PeriodClientsCreateSerializer(data=request.data)
-        data.is_valid(raise_exception=True)
-        data = data.validated_data['data']
+        serializer = PeriodClientsCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data['data']
+        data_type = serializer.validated_data['data_type']
         settings_values = json.loads(self.request.user.network.settings_values)
-        event_type = self._get_event_type(data, settings_values)
-        receive_data_info = self._get_receive_data_info(event_type, settings_values)
+        receive_data_info = self._get_receive_data_info(data_type, settings_values)
 
         receipt_codes = [receipt[receive_data_info['receipt_code_field_name']] for receipt in data]
         if Receipt.objects.filter(code__in=receipt_codes).exists():
@@ -79,19 +69,19 @@ class ReceiptViewSet(viewsets.ModelViewSet):
                 code=receipt[receive_data_info['receipt_code_field_name']],
                 dttm=receipt[receive_data_info['dttm_field_name']],
                 info=json.dumps(receipt),
-                event_type=event_type,
+                data_type=data_type,
             ))
         Receipt.objects.bulk_create(receipts)
 
         return Response(status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
-        data = PeriodClientsCreateSerializer(data=request.data)
-        data.is_valid(raise_exception=True)
-        data = data.validated_data['data']
+        serializer = PeriodClientsCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data['data']
+        data_type = serializer.validated_data['data_type']
         settings_values = json.loads(self.request.user.network.settings_values)
-        event_type = self._get_event_type(data, settings_values)
-        receive_data_info = self._get_receive_data_info(event_type, settings_values)
+        receive_data_info = self._get_receive_data_info(data_type, settings_values)
 
         shop = Shop.objects.filter(code=data[receive_data_info['shop_code_field_name']]).first()
         if shop is None:
@@ -101,7 +91,7 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         instance.code = data[receive_data_info['receipt_code_field_name']]
         instance.dttm = data[receive_data_info['dttm_field_name']]
         instance.info = json.dumps(data)
-        instance.event_type = event_type
+        instance.data_type = data_type
         instance.save()
 
         return Response(data)

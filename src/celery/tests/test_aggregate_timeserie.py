@@ -21,7 +21,6 @@ class TestAggregateTimeserie(TestsHelperMixin, TestCase):
     def setUpTestData(cls):
         cls.create_departments_and_users()
         cls.network.settings_values = json.dumps({
-            'event_type_field_name': 'ТипСобытия',
             'receive_data_info': [
                 {
                     'update_gap': 30,
@@ -42,7 +41,7 @@ class TestAggregateTimeserie(TestsHelperMixin, TestCase):
                     'shop_code_field_name': 'КодМагазина',
                     'receipt_code_field_name': 'Ссылка',
                     'dttm_field_name': 'Дата',
-                    'event_type': 'Чек'
+                    'data_type': 'Чек'
                 }
             ]
         })
@@ -62,11 +61,11 @@ class TestAggregateTimeserie(TestsHelperMixin, TestCase):
                 shop=cls.shop,
                 operation_type_name=otm,
             )
-        ReceiptFactory.create_batch(10, shop=cls.shop, event_type='Чек')
+        ReceiptFactory.create_batch(10, shop=cls.shop, data_type='Чек')
 
     def test_aggregate_timeserie_value_task(self):
         aggregate_timeserie_value()
 
     def test_clean_timeserie_actions(self):
-        ReceiptFactory.create_batch(5, shop=self.shop, event_type='Чек', dttm=timezone.now() - timedelta(days=60))
+        ReceiptFactory.create_batch(5, shop=self.shop, data_type='Чек', dttm=timezone.now() - timedelta(days=60))
         clean_timeserie_actions()

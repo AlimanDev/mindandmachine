@@ -85,11 +85,13 @@ def create_notifications_for_subscribe(subscribe_id):
         print(f"Create notification for {subscribe.user}, {event}")
         Notification.objects.bulk_create(notification_list)
 
+
 @app.task
 def delete_notifications():
     Event.objects.filter(
         dttm_valid_to__lte=now()
     ).delete()
+
 
 @app.task
 def op_type_build_period_clients():
@@ -526,10 +528,8 @@ def apply_load_template_to_shops(load_template_id, dt_from, shop_id=None):
         'shop_code_field_name': имя поля, где искать код магазина,
         'receipt_code_field_name': имя поля, где искать receipt code (uuid),
         'dttm_field_name': имя поля, где искать дату и время события,
-        'event_type': тип события
+        'data_type': тип данных
 }
-
-Имя поля, по которому определять event_type должно храниться в network.settings_values['event_type_field_name']
 '''
 
 

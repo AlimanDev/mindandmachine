@@ -13,7 +13,6 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
         cls.create_departments_and_users()
         cls.network = cls.user1.network
         cls.network.settings_values = json.dumps({
-            'event_type_field_name': 'ТипСобытия',
             'receive_data_info': [
                 {
                     'update_gap': 15,
@@ -34,7 +33,7 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
                     'shop_code_field_name': 'КодМагазина',
                     'receipt_code_field_name': 'Ссылка',
                     'dttm_field_name': 'Дата',
-                    'event_type': 'Чек'
+                    'data_type': 'Чек'
                 }
             ]
         })
@@ -60,7 +59,6 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
             "КоличествоТоваровВЧеке": "1",
             "СуммаДокумента": "1323",
             "КодКупона": "",
-            "ТипСобытия": "Чек",
             "Товары": [
                 {
                     "Нкод": "Ц0000000021",
@@ -86,7 +84,7 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
     def test_create_receipt(self):
         resp = self.client.post(
             path=self.get_url('Receipt-list'),
-            data=self.dump_data({'data': [self._get_data()]}), content_type='application/json',
+            data=self.dump_data({'data': [self._get_data()], 'data_type': 'Чек'}), content_type='application/json',
         )
         self.assertEqual(resp.status_code, 201)
 
@@ -102,10 +100,10 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
         receipt = ReceiptFactory(
             shop=self.shop,
             info=self.dump_data({}),
-            event_type='Чек',
+            data_type='Чек',
         )
         resp = self.client.put(
             path=self.get_url('Receipt-detail', pk=receipt.pk),
-            data=self.dump_data({'data': self._get_data()}), content_type='application/json',
+            data=self.dump_data({'data': self._get_data(), 'data_type': 'Чек'}), content_type='application/json',
         )
         self.assertEqual(resp.status_code, 200)

@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='receipt',
             name='event_type',
-            field=models.CharField(blank=True, max_length=128, null=True, verbose_name='Тип события'),
+            field=models.CharField(blank=True, max_length=128, null=True, verbose_name='Тип данных'),
         ),
         migrations.AlterField(
             model_name='receipt',
