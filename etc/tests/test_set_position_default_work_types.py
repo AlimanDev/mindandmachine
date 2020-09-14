@@ -1,5 +1,6 @@
 from django.test import TestCase
 
+from etc.scripts.fill_default_work_types import set_position_default_work_type_names
 from src.base.models import (
     WorkerPosition,
     Network,
@@ -7,7 +8,6 @@ from src.base.models import (
 from src.timetable.models import (
     WorkTypeName,
 )
-from src.util.utils import set_position_default_work_type_names
 
 
 class TestSetPositionDefaultWorkTypeNames(TestCase):
