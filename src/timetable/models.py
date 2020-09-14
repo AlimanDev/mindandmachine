@@ -303,6 +303,7 @@ class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
+        index_together = [('dt', 'worker')]
     
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
@@ -393,7 +394,7 @@ class WorkerDay(AbstractModel):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
     employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
 
-    dt = models.DateField(db_index=True)  # todo: make immutable
+    dt = models.DateField()  # todo: make immutable
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
 
