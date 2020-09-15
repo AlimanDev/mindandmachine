@@ -185,7 +185,6 @@ class TestWorkType(APITestCase):
         response = self.client.delete(f'{self.url}{self.work_type1.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertIsNotNone(WorkType.objects.get(id=self.work_type1.id).dttm_deleted)
-    
 
     def test_get_efficiency(self):
         dt_now = datetime.now().date()

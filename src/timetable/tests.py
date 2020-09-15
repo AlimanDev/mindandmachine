@@ -410,7 +410,7 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_not_approved.id).exists())
 
-    def test_sick_type_plan_approved_returned_as_fact_approved_if_fact_approved_is_missing(self):
+    def test_S_type_plan_approved_returned_in_tabel_if_fact_approved_is_missing(self):
         WorkerDay.objects.filter(
             id=self.worker_day_plan_approved.id,
         ).update(type=WorkerDay.TYPE_SICK)
@@ -421,8 +421,7 @@ class TestWorkerDay(APITestCase):
         get_params = {
             'shop_id': self.shop.id,
             'limit': 100,
-            'is_fact': 'true',
-            'is_approved': 'true',
+            'is_tabel': 'true',
             'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
             'dt__lte': self.dt.strftime('%Y-%m-%d'),
         }

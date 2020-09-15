@@ -91,7 +91,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         if not WorkerDay.is_type_with_tm_range(type):
             attrs['dttm_work_start'] = None
             attrs['dttm_work_end'] = None
-        elif not ( attrs.get('dttm_work_start') and attrs.get('dttm_work_end')):
+        elif not (attrs.get('dttm_work_start') and attrs.get('dttm_work_end')):
             messages={}
             for k in 'dttm_work_start', 'dttm_work_end':
                 if not attrs.get(k):
@@ -129,7 +129,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         self.check_other_worker_days(None, validated_data)
         is_fact = validated_data.get('is_fact')
 
-        # Если создаем факт то делаем его потомком подтвержденного факта или плана. Если создаем план - делаем родителем факта и потомком подтвержденного плана
+        # Если создаем факт то делаем его потомком подтвержденного факта или плана.
+        # Если создаем план - делаем родителем факта и потомком подтвержденного плана.
         worker_days = WorkerDay.objects.filter(
             worker_id=validated_data.get('worker_id'),
             dt=validated_data.get('dt'),
@@ -153,7 +154,6 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             validated_data['parent_worker_day_id'] = fact_to_bind.id
         elif plan_to_bind:
             validated_data['parent_worker_day_id'] = plan_to_bind.id
-
 
         details = validated_data.pop('worker_day_details', None)
 
