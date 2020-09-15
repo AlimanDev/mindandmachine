@@ -6,7 +6,7 @@ from rest_framework.exceptions import ValidationError
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.util.models_converter import Converter
 
-from src.base.models import Employment, User
+from src.base.models import Employment, User, Shop
 from src.base.shop.serializers import ShopSerializer
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
 
@@ -53,25 +53,28 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         'check_dates': _('Date start should be less then date end'),
         'worker_day_exist': _("Worker day already exist."),
         'worker_day_intercept': _("Worker day intercepts with another: {shop_name}, {work_start}, {work_end}."),
+        "no_user": _("There is {amount} models of user with username: {username}."),
+        "no_shop": _("There is {amount} models of shop with code: {code}."),
     }
 
     worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
     worker_id = serializers.IntegerField(required=False, allow_null=True)
     employment_id = serializers.IntegerField(required=False, allow_null=True)
-    shop_id = serializers.IntegerField()
+    shop_id = serializers.IntegerField(required=False)
     parent_worker_day_id = serializers.IntegerField(required=False, read_only=True)
     is_fact = serializers.BooleanField(required=False)
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
     type = serializers.CharField(required=True)
-    shop_code = serializers.CharField(required=False, read_only=True)
+    shop_code = serializers.CharField(required=False)
     user_login = serializers.CharField(required=False, read_only=True)
+    username = serializers.CharField(required=False, write_only=True)
 
     class Meta:
         model = WorkerDay
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id',
-                  'is_outsource', 'is_vacancy', 'shop_code', 'user_login']
+                  'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username']
         read_only_fields =['is_approved', 'work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
 
@@ -96,6 +99,22 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             raise ValidationError(messages)
         elif attrs['dttm_work_start'] > attrs['dttm_work_end'] or attrs['dt'] != attrs['dttm_work_start'].date() or attrs['dt'] != attrs['dttm_work_start'].date():
             self.fail('check_dates')
+
+        if (attrs.get('shop_id') is None) and ('shop_code' in attrs):
+            shop_code = attrs.pop('shop_code')
+            shops = list(Shop.objects.filter(code=shop_code, network_id=self.context['request'].user.network_id))
+            if len(shops) == 1:
+                attrs['shop_id'] = shops[0].id
+            else:
+                self.fail('no_shop', amount=len(shops), code=shop_code)
+
+        if (attrs.get('worker_id') is None) and ('username' in attrs):
+            username = attrs.pop('username')
+            users = list(User.objects.filter(username=username, network_id=self.context['request'].user.network_id))
+            if len(users) == 1:
+                attrs['worker_id'] = users[0].id
+            else:
+                self.fail('no_user', amount=len(users), username=username)
 
         if not type == WorkerDay.TYPE_WORKDAY or is_fact:
             attrs.pop('worker_day_details', None)
