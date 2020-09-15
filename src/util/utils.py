@@ -321,4 +321,3 @@ def test_algo_server_connection():
         return True
     else:
         return JsonResponse.algo_internal_error('Что-то не так при подключении к серверу с алгоритмом')
-
