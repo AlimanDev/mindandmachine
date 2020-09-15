@@ -11,6 +11,7 @@ from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTyp
 from src.base.models import FunctionGroup, Network
 from src.util.models_converter import Converter
 
+
 class TestWorkerDay(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -409,6 +410,28 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_not_approved.id).exists())
 
+    def test_sick_type_plan_approved_returned_as_fact_approved_if_fact_approved_is_missing(self):
+        WorkerDay.objects.filter(
+            id=self.worker_day_plan_approved.id,
+        ).update(type=WorkerDay.TYPE_SICK)
+        WorkerDay.objects.filter(
+            id=self.worker_day_fact_approved.id,  # не удаляется, поэтому обновим дату на другой день
+        ).update(parent_worker_day=None, dt=self.dt - timedelta(days=365))
+
+        get_params = {
+            'shop_id': self.shop.id,
+            'limit': 100,
+            'is_fact': 'true',
+            'is_approved': 'true',
+            'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
+            'dt__lte': self.dt.strftime('%Y-%m-%d'),
+        }
+        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        self.assertEqual(response.status_code, 200)
+        resp_data = response.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['type'], 'S')
+
 
 class TestWorkerDayCreateFact(APITestCase):
     USER_USERNAME = "user1"
@@ -740,7 +763,7 @@ class TestVacancy(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
 
-        
+
 class TestAditionalFunctions(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -945,4 +968,3 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(len(data), 2)
         self.assertEqual(len(data[str(self.user2.id)]), 3)
         self.assertEqual(len(data[str(self.user3.id)]), 3)
-

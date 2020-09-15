@@ -2,17 +2,15 @@ from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 from django.db.models import Q
 
+
 class WorkerDayFilter(FilterSet):
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода")
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода')
-    is_approved = BooleanFilter(field_name='worker_day_approve_id', method='filter_approved')
     is_fact = BooleanFilter(field_name='worker_day_is_fact', method='filter_fact')
-
-
 
     def filter_fact(self, queryset, name, value):
         if value:
-            query = queryset.filter(Q(is_fact=True)|(Q(is_approved=True)&~Q(type__in=WorkerDay.TYPES_PAID)))
+            query = queryset.filter(Q(is_fact=True) | (Q(is_approved=True) & ~Q(type__in=WorkerDay.TYPES_PAID)))
             worker_days = list(query.order_by('worker_id', 'dt', '-is_fact'))
             exists = []
             remove = []
@@ -25,17 +23,6 @@ class WorkerDayFilter(FilterSet):
         else:
             return queryset.filter(is_fact=value)
 
-
-    def filter_approved(self, queryset, name, value):
-        if value:
-            return queryset.filter(worker_day__approve_id__isnull=False)
-        else:
-            # неподтвержденная версия, это на самом деле последняя версия, а последняя эта та, у которой нет детей
-            return queryset.filter(
-                is_fact=False,
-                child__id__isnull=True
-            )
-
     class Meta:
         model = WorkerDay
         fields = {
@@ -44,7 +31,6 @@ class WorkerDayFilter(FilterSet):
             'worker__username': ['in', 'exact'],
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
-            'is_fact': ['exact']
         }
 
 
