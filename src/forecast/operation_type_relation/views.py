@@ -4,7 +4,7 @@ from django_filters import NumberFilter
 from django_filters.rest_framework import FilterSet
 from django.utils.translation import gettext_lazy as _
 
-from rest_framework import serializers, viewsets, status, permissions
+from rest_framework import serializers, viewsets, status
 from rest_framework.validators import UniqueTogetherValidator
 from rest_framework.response import Response
 
@@ -12,6 +12,7 @@ from src.forecast.models import OperationTypeTemplate, OperationTypeRelation, Op
 from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
 from src.forecast.load_template.utils import create_operation_type_relations_dict
 from src.base.exceptions import FieldError
+from src.base.permissions import Permission
 
 # Serializers define the API representation.
 class OperationTypeRelationSerializer(serializers.ModelSerializer):
@@ -46,7 +47,7 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         if not super().is_valid(*args, **kwargs):
             return False
         lambda_check = r'^(if|else|\+|-|\*|/|\s|a|[0-9]|=|>|<|\.)*'
-        if self.validated_data['type'] == OperationTypeRelation.TYPE_PREDICTION:
+        if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_PREDICTION:
             self.validated_data['formula'] = 'a'
         if not re.fullmatch(lambda_check, self.validated_data['formula']):
             raise FieldError(self.error_messages["error_in_formula"].format(formula=self.validated_data['formula']), 'formula')
@@ -103,7 +104,7 @@ class OperationTypeRelationViewSet(viewsets.ModelViewSet):
 
    
     """
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [Permission]
     serializer_class = OperationTypeRelationSerializer
     filterset_class = OperationTypeRelationFilter
 
