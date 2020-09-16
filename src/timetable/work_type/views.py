@@ -31,11 +31,14 @@ class WorkTypeSerializer(serializers.ModelSerializer):
             self.initial_data['work_type_name_id'] = WorkTypeName.objects.get(code=self.initial_data.get('code')).id
         super().is_valid(*args, **kwargs)
 
+
 class EfficiencySerializer(serializers.Serializer):
     from_dt = serializers.DateField(format=QOS_DATE_FORMAT)
     to_dt = serializers.DateField(format=QOS_DATE_FORMAT)
-    work_type_ids = serializers.ListField(allow_empty=True, child=serializers.IntegerField(), required=False, default=[])
+    work_type_ids = serializers.ListField(
+        allow_empty=True, child=serializers.IntegerField(), required=False, default=[])
     shop_id = serializers.IntegerField()
+    plan_editing = serializers.BooleanField(default=False, label='График для страницы "план редактируемый"')
 
     def is_valid(self, *args, **kwargs):
         super(EfficiencySerializer, self).is_valid(*args, **kwargs)
