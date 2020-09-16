@@ -4,6 +4,7 @@ from src.forecast.models import OperationTypeName
 from src.base.serializers import BaseNetworkSerializer
 from src.base.exceptions import MessageError
 from src.base.views import BaseActiveNamedModelViewSet
+from django_filters.rest_framework import FilterSet, BooleanFilter
 
 
 class OperationTypeNameSerializer(BaseNetworkSerializer):
@@ -12,7 +13,7 @@ class OperationTypeNameSerializer(BaseNetworkSerializer):
 
     class Meta:
         model = OperationTypeName
-        fields = ['id', 'name', 'code', 'network_id']
+        fields = ['id', 'name', 'code', 'network_id', 'work_type_name_id', 'do_forecast']
 
     
     def is_valid(self, *args, **kwargs):
@@ -28,6 +29,18 @@ class OperationTypeNameSerializer(BaseNetworkSerializer):
             raise MessageError('unique_name_name', params={'name': self.validated_data.get('name')}, lang=self.context['request'].user.lang)
 
         return True
+
+
+class OperationTypeNameFilter(FilterSet):
+
+    no_work_type = BooleanFilter(field_name='work_type_name_id', lookup_expr='isnull')
+
+    class Meta:
+        model = OperationTypeName
+        fields = {
+            'do_forecast': ['exact', ]
+        }
+
 
 class OperationTypeNameViewSet(BaseActiveNamedModelViewSet):
     """
@@ -87,6 +100,8 @@ class OperationTypeNameViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OperationTypeNameSerializer
     pagination_class = LimitOffsetPagination
+    filterset_class = OperationTypeNameFilter
+
     def get_queryset(self):
         return OperationTypeName.objects.filter(
             network_id=self.request.user.network_id,

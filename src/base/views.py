@@ -69,7 +69,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     def get_queryset(self):
         return Employment.objects.filter(
             shop__network_id=self.request.user.network_id
-        )
+        ).order_by('-dt_hired')
 
     def get_serializer_class(self):
         if self.action == 'list':

@@ -4,6 +4,7 @@ from src.forecast.models import (
     PeriodClients, 
     LoadTemplate, 
     OperationTypeRelation,
+    OperationTypeName,
 )
 from src.base.models import Shop
 from src.timetable.models import WorkType
@@ -50,7 +51,7 @@ def check_forecasts(shop):
     Данную функцию следует вызывать перед apply_formeula.
     '''
     forecast_templates = list(OperationTypeRelation.objects.filter(
-        depended__do_forecast=OperationType.FORECAST,
+        depended__operation_type_name__do_forecast=OperationTypeName.FORECAST,
         depended__load_template_id=shop.load_template_id,
     ).values_list('depended__operation_type_name_id', flat=True))
     operation_types = list(OperationType.objects.filter(
@@ -214,8 +215,6 @@ def create_load_template_for_shop(shop_id, network_id):
         OperationTypeTemplate(
             load_template=load_template,
             operation_type_name_id=operation_type.operation_type_name_id,
-            work_type_name_id=operation_type.work_type.work_type_name_id if operation_type.work_type else None,
-            do_forecast=operation_type.do_forecast,
         )
         for operation_type in operation_types
     ]
@@ -240,17 +239,17 @@ def apply_load_template(load_template_id, shop_id, dt_from=None):
         flat=True
     ) # Названия типов операций которые есть в шаблонах
 
-    for operation_type_template in operation_type_templates:
+    for operation_type_template in operation_type_templates.select_related('operation_type_name'):
         work_type = None
         '''
         Если в шаблоне есть тип работ, проверяем
         есть ли он в магазине, и создаём в случае
         необходимости.
         '''
-        if operation_type_template.work_type_name_id:
+        if operation_type_template.operation_type_name.work_type_name_id:
             work_type, _ = WorkType.objects.get_or_create(
                 shop_id=shop_id,
-                work_type_name_id=operation_type_template.work_type_name_id,
+                work_type_name_id=operation_type_template.operation_type_name.work_type_name_id,
             )
         '''
         Создаём или обновляем тип операций в соответсвии с шаблоном.
@@ -263,7 +262,6 @@ def apply_load_template(load_template_id, shop_id, dt_from=None):
                 if operation_type_template.do_forecast != OperationType.FORECAST_NONE\
                 else OperationType.READY,
                 'work_type': work_type,
-                'do_forecast': operation_type_template.do_forecast,
                 'dttm_deleted': None,
             },
         )
@@ -278,7 +276,7 @@ def apply_load_template(load_template_id, shop_id, dt_from=None):
         dttm_deleted=timezone.now(),
     )
     Shop.objects.filter(pk=shop_id).update(load_template_id=load_template_id)
-    if OperationType.objects.filter(do_forecast=OperationType.FORECAST, dttm_deleted__isnull=True).exists() and dt_from:
+    if OperationType.objects.filter(operation_type_name__do_forecast=OperationTypeName.FORECAST, dttm_deleted__isnull=True).exists() and dt_from:
         create_predbills_request_function(shop_id, dt=dt_from)
 
 
@@ -307,13 +305,13 @@ def calculate_shop_load(shop, load_template, dt_from, dt_to, lang='ru'):
         op.operation_type_name_id: op
         for op in OperationType.objects.filter(
             shop=shop, 
-            do_forecast=OperationType.FORECAST_FORMULA,
+            operation_type_name__do_forecast=OperationTypeName.FORECAST_FORMULA,
             work_type__isnull=False,
         )
     }
     operation_type_relations = create_operation_type_relations_dict(shop.load_template_id)
     operation_type_templates = load_template.operation_type_templates.filter(
-        do_forecast=OperationType.FORECAST_FORMULA,
+        operation_type_name__do_forecast=OperationTypeName.FORECAST_FORMULA,
         work_type_name_id__isnull=False,
     )
 
