@@ -111,4 +111,3 @@ class TestApiMethod:
         self.assertEqual(response.json()['code'], 400)
         self.assertResponseCodeEqual(response, 400)
         self.assertEqual(response.json()['data']['error_message'], "[('dt', ['Это поле обязательно.'])]")
-z

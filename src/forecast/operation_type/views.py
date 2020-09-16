@@ -17,7 +17,7 @@ class OperationTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OperationType
-        fields = ['id', 'work_type_id', 'do_forecast', 'operation_type_name', 'code', 'operation_type_name_id', 'shop_id']
+        fields = ['id', 'work_type_id', 'operation_type_name', 'code', 'operation_type_name_id', 'shop_id']
         validators = [
             UniqueTogetherValidator(
                 queryset=OperationType.objects.all(),
@@ -60,7 +60,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
                 "code": '2',
             },
             "work_type_id": 1,
-            "do_forecast": "H"
         },
         ...
     ]
@@ -75,7 +74,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
             "code": '4',
         },
         "work_type_id": 1,
-        "do_forecast": "H"
     }
 
 
@@ -84,7 +82,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
         work_type_id: int, required=True
         operation_type_name_id: int, required=False
         code: str, required=False
-        do_forecast: OperationType do_forecast, required=False
     :return 
         code 201
         {
@@ -95,7 +92,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
                 "code": '4',
             },
             "work_type_id": 1,
-            "do_forecast": "H"
         }
 
 
@@ -104,7 +100,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
         work_type_id: int, required=False
         operation_type_name_id: int, required=False
         code: str, required=False
-        do_forecast: OperationType do_forecast, required=False
     :return {
         "id":6,
         "operation_type_name": {
@@ -113,7 +108,6 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
             "code": '4',
         },
         "work_type_id": 1,
-        "do_forecast": "H"
     }
 
 

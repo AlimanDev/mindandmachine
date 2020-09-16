@@ -9,7 +9,7 @@ class WorkerDayFilter(FilterSet):
 
     def filter_approved(self, queryset, name, value):
         if value:
-            return queryset.filter(worker_day__approve_id__isnull=False)
+            return queryset.filter(is_approved=value)
         else:
             # неподтвержденная версия, это на самом деле последняя версия, а последняя эта та, у которой нет детей
             return queryset.filter(
