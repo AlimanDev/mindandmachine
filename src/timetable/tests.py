@@ -431,6 +431,19 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(len(resp_data), 1)
         self.assertEqual(resp_data[0]['type'], 'S')
 
+    def test_get_worker_day_by_worker__username__in(self):
+        # FIXME: запрос ведь не должен падать без передачи shop_id/shop_code?
+        get_params = {
+            'worker__username__in': self.user2.username,
+            'is_fact': 'true',
+            'is_approved': 'true',
+            'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
+            'dt__lte': self.dt.strftime('%Y-%m-%d'),
+            'by_code': 'true',
+        }
+        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        self.assertEqual(response.status_code, 200)
+
 
 class TestWorkerDayCreateFact(APITestCase):
     USER_USERNAME = "user1"
