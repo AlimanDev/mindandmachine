@@ -8,7 +8,7 @@ from rest_framework import serializers, viewsets, status, permissions
 from rest_framework.validators import UniqueTogetherValidator
 from rest_framework.response import Response
 
-from src.forecast.models import OperationTypeTemplate, OperationTypeRelation, OperationType
+from src.forecast.models import OperationTypeTemplate, OperationTypeRelation, OperationType, OperationTypeName
 from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
 from src.forecast.load_template.utils import create_operation_type_relations_dict
 from src.base.exceptions import FieldError
@@ -21,7 +21,7 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         "reversed_relation": _("Backward dependency already exists."),
         "not_same_template": _("Base and depended demand models cannot have different templates."),
         "error_in_formula": _("Error in formula: {formula}."),
-        "base_not_formula": _("Base model."),
+        "base_not_formula": _("Base model not formula."),
     }
 
     formula = serializers.CharField()
@@ -46,7 +46,7 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         if not super().is_valid(*args, **kwargs):
             return False
         lambda_check = r'^(if|else|\+|-|\*|/|\s|a|[0-9]|=|>|<|\.)*'
-        if self.validated_data['type'] == OperationTypeRelation.TYPE_PREDICTION:
+        if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_PREDICTION:
             self.validated_data['formula'] = 'a'
         if not re.fullmatch(lambda_check, self.validated_data['formula']):
             raise FieldError(self.error_messages["error_in_formula"].format(formula=self.validated_data['formula']), 'formula')
@@ -56,11 +56,11 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
             raise FieldError(self.error_messages["depended_base_same"])
 
         depended = OperationTypeTemplate.objects.get(pk=self.validated_data['depended_id'])
-        base = OperationTypeTemplate.objects.get(pk=self.validated_data['base_id'])
+        base = OperationTypeTemplate.objects.select_related('operation_type_name').get(pk=self.validated_data['base_id'])
         self.validated_data['depended'] = depended
         self.validated_data['base'] = base
 
-        if base.do_forecast != OperationType.FORECAST_FORMULA:
+        if base.operation_type_name.do_forecast != OperationTypeName.FORECAST_FORMULA:
             raise FieldError(self.error_messages["base_not_formula"], 'base')
 
         if (depended.load_template_id != base.load_template_id):
