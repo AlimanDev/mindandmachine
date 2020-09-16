@@ -1,9 +1,10 @@
-from rest_framework import serializers, viewsets, status, permissions
+from rest_framework import serializers, viewsets, status
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from src.forecast.models import OperationTypeTemplate, LoadTemplate
 from src.forecast.operation_type_name.views import OperationTypeNameSerializer
 from rest_framework.validators import UniqueTogetherValidator
+from src.base.permissions import Permission
 
 # Serializers define the API representation.
 class OperationTypeTemplateSerializer(serializers.ModelSerializer):
@@ -38,7 +39,7 @@ class OperationTypeTemplateViewSet(viewsets.ModelViewSet):
     эти изменения для магазинов.
    
     """
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [Permission]
     filterset_class = OperationTypeTemplateFilter
     serializer_class = OperationTypeTemplateSerializer
 

@@ -1,6 +1,6 @@
 from celery import exceptions as celery_exceptions
 
-from rest_framework import serializers, viewsets, permissions
+from rest_framework import serializers, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -18,6 +18,7 @@ from src.conf.djconfig import QOS_DATE_FORMAT
 from src.base.exceptions import FieldError
 from src.base.serializers import BaseNetworkSerializer
 from src.base.models import Shop
+from src.base.permissions import Permission
 
 from django.db.models import Exists, OuterRef, Case, When, CharField, Value
 
@@ -160,7 +161,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
         "load_template_attached_shops": "Cannot delete template as it's used in demand calulations."
 
     }
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [Permission]
     filterset_class = LoadTemplateFilter
     serializer_class = LoadTemplateSerializer
     pagination_class = LimitOffsetPagination
