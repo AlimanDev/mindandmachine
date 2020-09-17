@@ -46,7 +46,6 @@ class Test_auto_worker_exchange(TestCase):
         super().setUp()
 
         self.region = Region.objects.create(
-            id=1,
             name='Москва',
             code=77,
         )
@@ -66,6 +65,7 @@ class Test_auto_worker_exchange(TestCase):
             network=self.network,
             tm_open_dict='{"all":"07:00:00"}',
             tm_close_dict='{"all":"23:00:00"}',
+            region=self.region,
         )
 
         self.shop = Shop.objects.create(

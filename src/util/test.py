@@ -437,6 +437,8 @@ def create_departments_and_users(self):
     Shop._tree_manager.rebuild()
     # supershop
     self.root_shop = Shop.objects.first()
+    self.root_shop.network = self.network
+    self.root_shop.save()
 
     self.settings = ShopSettings.objects.create(
         break_triplets='[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]]',
@@ -478,6 +480,8 @@ def create_departments_and_users(self):
         settings=self.settings,
         network=self.network,
     )
+    self.shop.code = str(self.shop.id)
+    self.shop.save()
     self.shop2 = Shop.objects.create(
         # id=2,
         parent=self.reg_shop1,
