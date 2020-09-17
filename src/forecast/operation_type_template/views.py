@@ -1,19 +1,20 @@
-from rest_framework import serializers, viewsets, status, permissions
+from rest_framework import serializers, viewsets, status
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from src.forecast.models import OperationTypeTemplate, LoadTemplate
 from src.forecast.operation_type_name.views import OperationTypeNameSerializer
 from rest_framework.validators import UniqueTogetherValidator
+from src.base.permissions import Permission
 
 # Serializers define the API representation.
 class OperationTypeTemplateSerializer(serializers.ModelSerializer):
     operation_type_name = OperationTypeNameSerializer(read_only=True)
     operation_type_name_id = serializers.IntegerField(write_only=True)
     load_template_id = serializers.IntegerField()
-    work_type_name_id = serializers.IntegerField(required=False)
+
     class Meta:
         model = OperationTypeTemplate
-        fields = ['id', 'load_template_id', 'operation_type_name_id', 'work_type_name_id', 'do_forecast', 'operation_type_name', 'tm_from', 'tm_to', 'forecast_step']
+        fields = ['id', 'load_template_id', 'operation_type_name_id', 'operation_type_name', 'tm_from', 'tm_to', 'forecast_step']
         validators = [
             UniqueTogetherValidator(
                 queryset=OperationTypeTemplate.objects.all(),
@@ -38,7 +39,7 @@ class OperationTypeTemplateViewSet(viewsets.ModelViewSet):
     эти изменения для магазинов.
    
     """
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [Permission]
     filterset_class = OperationTypeTemplateFilter
     serializer_class = OperationTypeTemplateSerializer
 

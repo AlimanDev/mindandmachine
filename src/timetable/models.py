@@ -63,7 +63,7 @@ class WorkType(AbstractActiveModel):
         unique_together = ['shop', 'work_type_name']
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.work_type_name.name, self.shop.name, self.shop.parent.name, self.id)
+        return '{}, {}, {}, {}'.format(self.work_type_name.name, self.shop.name, self.shop.parent.name if self.shop.parent else '', self.id)
 
     id = models.BigAutoField(primary_key=True)
 
@@ -433,8 +433,8 @@ class WorkerDay(AbstractModel):
     def get_department(self):
         return self.shop
 
-    def save(self, *args, **kwargs):
-        if self.dttm_work_end and self.dttm_work_start and self.shop:
+    def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
+        if self.dttm_work_end and self.dttm_work_start and self.shop and self.shop.settings:
             self.work_hours = self.count_work_hours(json.loads(self.shop.settings.break_triplets), self.dttm_work_start, self.dttm_work_end)
         else:
             self.work_hours = datetime.timedelta(0)

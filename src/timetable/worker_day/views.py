@@ -65,7 +65,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         'na_worker_day_exists': _("Not approved version already exists."),
     }
 
-    permission_classes = [Permission] # временно из-за биржи смен vacancy  [FilteredListPermission]
+    permission_classes = [Permission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
     queryset = WorkerDay.objects.all()

@@ -11,6 +11,7 @@ from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTyp
 from src.base.models import FunctionGroup, Network
 from src.util.models_converter import Converter
 
+
 class TestWorkerDay(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -323,7 +324,6 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(), {'error': ['Нельзя менять подтвержденную версию.']})
 
-
     def test_edit_worker_day(self):
         dt = self.dt + timedelta(days=1)
 
@@ -356,6 +356,38 @@ class TestWorkerDay(APITestCase):
         response = self.client.put(f"{self.url}{plan_id}/", data, format='json')
         self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day_id=plan_id).count(), 2)
 
+    def test_edit_worker_day_with_shop_code_and_username(self):
+        dt = self.dt + timedelta(days=1)
+
+        data = {
+            "shop_code": self.shop.code,
+            "username": self.user2.username,
+            "employment_id": self.employment2.id,
+            "dt": dt,
+            "is_fact": False,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(dt, time(8,0,0)),
+            "dttm_work_end": datetime.combine(dt, time(20,0,0)),
+            "worker_day_details": [{
+                 "work_part": 1.0,
+                 "work_type_id": self.work_type.id}
+            ]
+        }
+
+        # create not approved plan
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        plan_id = response.json()['id']
+        self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day_id=plan_id).count(), 1)
+        data["worker_day_details"] = [{
+            "work_part": 0.5,
+            "work_type_id": self.work_type.id},
+            {
+                "work_part": 0.5,
+                "work_type_id": self.work_type.id}]
+        response = self.client.put(f"{self.url}{plan_id}/", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day_id=plan_id).count(), 2)
 
     def test_delete(self):
         # План подтвержденный
@@ -377,6 +409,40 @@ class TestWorkerDay(APITestCase):
         response = self.client.delete(f'{self.url}{self.worker_day_fact_not_approved.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_not_approved.id).exists())
+
+    def test_S_type_plan_approved_returned_in_tabel_if_fact_approved_is_missing(self):
+        WorkerDay.objects.filter(
+            id=self.worker_day_plan_approved.id,
+        ).update(type=WorkerDay.TYPE_SICK)
+        WorkerDay.objects.filter(
+            id=self.worker_day_fact_approved.id,  # не удаляется, поэтому обновим дату на другой день
+        ).update(parent_worker_day=None, dt=self.dt - timedelta(days=365))
+
+        get_params = {
+            'shop_id': self.shop.id,
+            'limit': 100,
+            'is_tabel': 'true',
+            'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
+            'dt__lte': self.dt.strftime('%Y-%m-%d'),
+        }
+        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        self.assertEqual(response.status_code, 200)
+        resp_data = response.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['type'], 'S')
+
+    def test_get_worker_day_by_worker__username__in(self):
+        # FIXME: запрос ведь не должен падать без передачи shop_id/shop_code?
+        get_params = {
+            'worker__username__in': self.user2.username,
+            'is_fact': 'true',
+            'is_approved': 'true',
+            'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
+            'dt__lte': self.dt.strftime('%Y-%m-%d'),
+            'by_code': 'true',
+        }
+        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        self.assertEqual(response.status_code, 200)
 
 
 class TestWorkerDayCreateFact(APITestCase):
@@ -709,7 +775,7 @@ class TestVacancy(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
 
-        
+
 class TestAditionalFunctions(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -914,4 +980,3 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(len(data), 2)
         self.assertEqual(len(data[str(self.user2.id)]), 3)
         self.assertEqual(len(data[str(self.user3.id)]), 3)
-

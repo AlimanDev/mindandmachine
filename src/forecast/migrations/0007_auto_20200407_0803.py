@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='operationtype',
             name='shop',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='base.Shop'),
+            field=models.ForeignKey(null=True, blank=True, on_delete=django.db.models.deletion.PROTECT, related_name='operation_types', to='base.Shop'),
         ),
         migrations.AddField(
             model_name='operationtype',

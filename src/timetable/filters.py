@@ -2,30 +2,39 @@ from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 from django.db.models import Q
 
+
 class WorkerDayFilter(FilterSet):
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода")
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода')
-    is_approved = BooleanFilter(field_name='worker_day_approve_id', method='filter_approved')
+    is_tabel = BooleanFilter(field_name='worker_day_is_tabel', method='filter_tabel', label="Выгрузка табеля")
 
-    def filter_approved(self, queryset, name, value):
+    def filter_tabel(self, queryset, name, value):
         if value:
-            return queryset.filter(worker_day__approve_id__isnull=False)
-        else:
-            # неподтвержденная версия, это на самом деле последняя версия, а последняя эта та, у которой нет детей
-            return queryset.filter(
-                is_fact=False,
-                child__id__isnull=True
+            query = queryset.filter(
+                Q(is_fact=True, is_approved=True) |
+                Q(Q(is_approved=True) & ~Q(type__in=WorkerDay.TYPES_PAID))
             )
+            worker_days = list(query.order_by('worker_id', 'dt', '-is_fact'))
+            exists = []
+            remove = []
+            for worker_day in worker_days:
+                if (worker_day.worker_id, worker_day.dt) in exists:
+                    remove.append(worker_day.id)
+                else:
+                    exists.append((worker_day.worker_id, worker_day.dt))
+            return query.exclude(id__in=remove)
+
+        return queryset
 
     class Meta:
         model = WorkerDay
         fields = {
             # 'shop_id':['exact'],
-            'worker_id':['in','exact'],
+            'worker_id': ['in', 'exact'],
             'worker__username': ['in', 'exact'],
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
-            'is_fact': ['exact']
+            'is_fact': ['exact'],
         }
 
 

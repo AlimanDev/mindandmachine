@@ -61,6 +61,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         "tt_period_empty": "Not enough demand {period} for work type {work_type}.",
         "tt_user_extra_shifts": "More than one shift are selected for worker {id} {last_name} {first_name} with fixed hours.",
         "tt_server_error": "Fail sending data to server.",
+        "tt_delete_past": "You can't delete timetable in the past.",
     }
     serializer_class = AutoSettingsSerializer
     permission_classes = [Permission]
@@ -633,6 +634,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         ########### Выборки из базы данных ###########
 
         # Спрос
+
+        absenteeism_coef = shop.settings.absenteeism if shop.settings else 0
         periods = PeriodClients.objects.filter(
             operation_type__dttm_deleted__isnull=True,
             operation_type__work_type__shop_id=shop_id,
@@ -644,7 +647,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'dttm_forecast',
             'operation_type__work_type_id',
         ).annotate(
-            clients=Sum(F('value') / period_step * (1.0 + (shop.settings.absenteeism / 100)))
+            clients=Sum(F('value') * (1.0 + (absenteeism_coef / 100)))
         ).values_list(
             'dttm_forecast',
             'operation_type__work_type_id',
@@ -788,7 +791,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         Args:
             method: POST
-            url: /api/timetable/auto_settings/set_timetable
+            url: /rest_api/auto_settings/set_timetable/
             data(str): json data с данными от qos_algo
 
         Raises:
@@ -807,7 +810,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         timetable = ShopMonthStat.objects.get(id=form['timetable_id'])
 
         shop = timetable.shop
-        break_triplets = json.loads(shop.settings.break_triplets)
+        break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
 
         timetable.status = data['timetable_status']
         timetable.status_message = data.get('status_message', False)
@@ -850,8 +853,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         wd_obj.shop=shop
 
                     if WorkerDay.is_type_with_tm_range(wd_obj.type):
-                        wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start'])
-                        wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])
+                        wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
+                        wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
                         wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
                         wd_obj.save()
 
