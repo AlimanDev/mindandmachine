@@ -14,6 +14,7 @@ from src.forecast.models import (
     PeriodClients,
 )
 from src.timetable.models import WorkTypeName, WorkType
+from src.base.models import FunctionGroup
 
 
 class TestOperationTypeRelation(APITestCase):
@@ -27,9 +28,6 @@ class TestOperationTypeRelation(APITestCase):
         self.url = '/rest_api/operation_type_relation/'
 
         create_departments_and_users(self)
-        self.user1.is_superuser = True
-        self.user1.is_staff = True
-        self.user1.save()
         self.operation_type_name1 = OperationTypeName.objects.create(
             name='Кассы',
         )
@@ -49,7 +47,12 @@ class TestOperationTypeRelation(APITestCase):
         self.load_template = LoadTemplate.objects.create(
             name='Test1',
         )
-        
+        self.root_shop.load_template = self.load_template
+        self.root_shop.save()
+        OperationType.objects.create(
+            operation_type_name=self.operation_type_name1,
+            shop=self.root_shop,
+        )
         self.operation_type_template1 = OperationTypeTemplate.objects.create(
             load_template=self.load_template,
             operation_type_name=self.operation_type_name1,
@@ -71,13 +74,19 @@ class TestOperationTypeRelation(APITestCase):
         self.operation_type_relation1 = OperationTypeRelation.objects.create(
             base=self.operation_type_template1,
             depended=self.operation_type_template2,
-            formula='lambda a: a * 2',
+            formula='a * 2',
         )
 
         self.operation_type_relation2 = OperationTypeRelation.objects.create(
             base=self.operation_type_template3,
             depended=self.operation_type_template2,
-            formula='lambda a: a + 2',
+            formula='a + 2',
+        )
+        FunctionGroup.objects.bulk_create(
+            [
+                FunctionGroup(func='OperationTypeRelation', group=self.admin_group, method=m)
+                for m in ['POST', 'PUT', 'DELETE']
+            ]
         )
 
         self.client.force_authenticate(user=self.user1)
@@ -104,7 +113,10 @@ class TestOperationTypeRelation(APITestCase):
                     'id': self.operation_type_name1.id, 
                     'name': 'Кассы', 
                     'code': None
-                }
+                },
+                'tm_from': None,
+                'tm_to': None,
+                'forecast_step': '01:00:00'
             }, 
             'depended': {
                 'id': self.operation_type_template2.id, 
@@ -115,9 +127,13 @@ class TestOperationTypeRelation(APITestCase):
                     'id': self.operation_type_name2.id, 
                     'name': 'Строительные работы', 
                     'code': None
-                }
+                },
+                'tm_from': None,
+                'tm_to': None,
+                'forecast_step': '01:00:00'
             }, 
-            'formula': 'lambda a: a * 2',
+            'formula': 'a * 2',
+            'type': 'F'
         }
         self.assertEqual(response.json(), data)
 
@@ -155,7 +171,10 @@ class TestOperationTypeRelation(APITestCase):
                     'id': self.operation_type_name1.id, 
                     'name': 'Кассы', 
                     'code': None
-                }
+                },
+                'tm_from': None,
+                'tm_to': None,
+                'forecast_step': '01:00:00'
             }, 
             'depended': {
                 'id': op_temp2.id, 
@@ -166,9 +185,13 @@ class TestOperationTypeRelation(APITestCase):
                     'id': self.operation_type_name2.id, 
                     'name': 'Строительные работы', 
                     'code': None
-                }
+                },
+                'tm_from': None,
+                'tm_to': None,
+                'forecast_step': '01:00:00'
             }, 
-            'formula': 'lambda a: a + a * 2'
+            'formula': 'a + a * 2',
+            'type': 'F'
         }
         self.assertEqual(operation_type_relataion, data)
 
@@ -190,7 +213,7 @@ class TestOperationTypeRelation(APITestCase):
         OperationType.objects.all().update(status=OperationType.READY)
         response = self.client.put(f'{self.url}{self.operation_type_relation1.id}/', data, format='json')
         operation_type_relation = response.json()
-        self.assertEqual(operation_type_relation['formula'], 'lambda a: a * 3')
+        self.assertEqual(operation_type_relation['formula'], 'a * 3')
         self.assertEqual(
             OperationType.objects.get(operation_type_name=self.operation_type_name1).status,
             OperationType.UPDATED,

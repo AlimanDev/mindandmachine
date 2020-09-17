@@ -46,7 +46,7 @@ class WFMTokenLoginView(GenericAPIView):
         employment = Employment.objects.filter(
             Q(dt_fired__gte=now_day) | Q(dt_fired__isnull=True),
             user_id=instance.id,
-        ).first()
+        ).order_by('dt_hired').first()
 
         shop_id = employment.shop_id if employment else None
 

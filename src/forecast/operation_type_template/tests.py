@@ -14,6 +14,7 @@ from src.forecast.models import (
     PeriodClients,
 )
 from src.timetable.models import WorkTypeName, WorkType
+from src.base.models import FunctionGroup
 
 
 class TestOperationTypeTemplate(APITestCase):
@@ -58,6 +59,12 @@ class TestOperationTypeTemplate(APITestCase):
             operation_type_name=self.operation_type_name2,
             do_forecast=OperationType.FORECAST_NONE,
         )
+        FunctionGroup.objects.bulk_create(
+            [
+                FunctionGroup(func='OperationTypeTemplate', group=self.admin_group, method=m)
+                for m in ['POST', 'PUT', 'DELETE']
+            ]
+        )
 
         self.client.force_authenticate(user=self.user1)
 
@@ -78,7 +85,10 @@ class TestOperationTypeTemplate(APITestCase):
                 'id': self.operation_type_name1.id, 
                 'name': 'Кассы', 
                 'code': None
-            }
+            },
+            'tm_from': None,
+            'tm_to': None,
+            'forecast_step': '01:00:00'
         }
         self.assertEqual(response.json(), data)
 
@@ -100,7 +110,10 @@ class TestOperationTypeTemplate(APITestCase):
                 'id': self.operation_type_name3.id, 
                 'name': 'Строительные работы2', 
                 'code': None
-            }
+            },
+            'tm_from': None,
+            'tm_to': None,
+            'forecast_step': '01:00:00'
         }
         self.assertEqual(operation_type_template, data)
 
@@ -121,7 +134,10 @@ class TestOperationTypeTemplate(APITestCase):
                 'id': self.operation_type_name1.id, 
                 'name': 'Кассы', 
                 'code': None
-            }
+            },
+            'tm_from': None,
+            'tm_to': None,
+            'forecast_step': '01:00:00'
         }
         self.assertEqual(operation_type_template, data)
 
