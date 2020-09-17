@@ -3,7 +3,7 @@ import json
 from rest_framework.test import APITestCase
 
 from src.base.models import FunctionGroup
-from src.forecast.factories import ReceiptFactory
+from src.forecast.tests.factories import ReceiptFactory
 from src.util.mixins.tests import TestsHelperMixin
 
 

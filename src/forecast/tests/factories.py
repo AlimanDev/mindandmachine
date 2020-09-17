@@ -3,7 +3,7 @@ import random
 
 import factory
 
-from .models import Receipt
+from src.forecast.models import Receipt
 
 
 class ReceiptFactory(factory.django.DjangoModelFactory):

@@ -8,7 +8,7 @@ from src.celery.tasks import (
     aggregate_timeserie_value,
     clean_timeserie_actions,
 )
-from src.forecast.factories import ReceiptFactory
+from src.forecast.tests.factories import ReceiptFactory
 from src.forecast.models import (
     OperationTypeName,
     OperationType,
