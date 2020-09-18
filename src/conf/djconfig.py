@@ -373,3 +373,5 @@ if 'test' in sys.argv:
 
 
     MIGRATION_MODULES = MigrationDisabler()
+
+APPEND_SLASH = False
