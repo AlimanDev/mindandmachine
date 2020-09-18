@@ -10,9 +10,10 @@ import json
 
 class PeriodClientsCreateSerializer(serializers.Serializer):
     data = serializers.JSONField(write_only=True)
+    data_type = serializers.CharField(max_length=128, write_only=True)
 
-# TODO: rewrite with check network
-# TODO: documantation
+
+# TODO: documentation
 class ReceiptViewSet(viewsets.ModelViewSet):
     """
     """
@@ -31,44 +32,66 @@ class ReceiptViewSet(viewsets.ModelViewSet):
             self.kwargs['code'] = self.kwargs['pk']
         return super().get_object()
 
+    @staticmethod
+    def _get_receive_data_info(data_type, settings_values):
+        for receive_data_info in settings_values['receive_data_info']:
+            if receive_data_info['data_type'] == data_type:
+                return receive_data_info
+
+        raise MessageError(code='receive_data_info_not_found')
+
     def create(self, request, *args, **kwargs):
-        data = PeriodClientsCreateSerializer(data=request.data)
-        data.is_valid(raise_exception=True)
-        data = data.validated_data['data']
+        serializer = PeriodClientsCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data['data']
+        data_type = serializer.validated_data['data_type']
+        settings_values = json.loads(self.request.user.network.settings_values)
+        receive_data_info = self._get_receive_data_info(data_type, settings_values)
 
-        shop_dict = {shop.code: shop.id for shop in Shop.objects.filter(code__in=[receipt['КодМагазина'] for receipt in data])}
-        receipt_codes = [receipt['Ссылка'] for receipt in data]
-        receipts = []
-        for receipt in data:
-            if shop_dict.get(receipt['КодМагазина'], '') == '':
-                raise MessageError(code='no_such_shop', params={'key': receipt['КодМагазина']})
-
-            receipts.append(Receipt(
-                shop_id=shop_dict[receipt['КодМагазина']],
-                code=receipt['Ссылка'],
-                dttm=receipt['Дата'],
-                info=json.dumps(receipt),
-            ))
-        if Receipt.objects.filter(code__in=receipt_codes).count():
+        receipt_codes = [receipt[receive_data_info['receipt_code_field_name']] for receipt in data]
+        if Receipt.objects.filter(code__in=receipt_codes).exists():
             raise MessageError(code='multi_object_unique')
 
+        shop_dict = {
+            shop.code: shop.id for shop in
+            Shop.objects.filter(
+                network=self.request.user.network,
+                code__in=[receipt[receive_data_info['shop_code_field_name']] for receipt in data],
+            )
+        }
+        receipts = []
+        for receipt in data:
+            if shop_dict.get(receipt[receive_data_info['shop_code_field_name']], '') == '':
+                raise MessageError(code='no_such_shop', params={'key': receipt[receive_data_info['shop_code_field_name']]})
+
+            receipts.append(Receipt(
+                shop_id=shop_dict[receipt[receive_data_info['shop_code_field_name']]],
+                code=receipt[receive_data_info['receipt_code_field_name']],
+                dttm=receipt[receive_data_info['dttm_field_name']],
+                info=json.dumps(receipt),
+                data_type=data_type,
+            ))
         Receipt.objects.bulk_create(receipts)
+
         return Response(status=status.HTTP_201_CREATED)
 
-
     def update(self, request, *args, **kwargs):
-        data = PeriodClientsCreateSerializer(data=request.data)
-        data.is_valid(raise_exception=True)
-        data = data.validated_data['data']
+        serializer = PeriodClientsCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data['data']
+        data_type = serializer.validated_data['data_type']
+        settings_values = json.loads(self.request.user.network.settings_values)
+        receive_data_info = self._get_receive_data_info(data_type, settings_values)
 
-        shop = Shop.objects.filter(code=data['КодМагазина']).first()
+        shop = Shop.objects.filter(code=data[receive_data_info['shop_code_field_name']]).first()
         if shop is None:
-            raise MessageError(code='no_such_shop', params={'key': data['КодМагазина']})
+            raise MessageError(code='no_such_shop', params={'key': data[receive_data_info['shop_code_field_name']]})
         instance = self.get_object()
-        instance.shop_id=shop.id
-        instance.code=data['Ссылка']
-        instance.dttm=data['Дата']
-        instance.info=json.dumps(data)
+        instance.shop_id = shop.id
+        instance.code = data[receive_data_info['receipt_code_field_name']]
+        instance.dttm = data[receive_data_info['dttm_field_name']]
+        instance.info = json.dumps(data)
+        instance.data_type = data_type
         instance.save()
 
         return Response(data)

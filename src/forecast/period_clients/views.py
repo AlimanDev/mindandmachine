@@ -12,7 +12,7 @@ from rest_framework.decorators import action
 from src.base.models import Shop, Employment, FunctionGroup
 from src.util.models_converter import Converter
 from src.forecast.load_template.utils import apply_reverse_formula # чтобы тесты не падали
-from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util, create_demand, group_bills_and_income
+from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util, create_demand
 from src.util.upload import get_uploaded_file
 import json
 
@@ -176,20 +176,6 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         data.is_valid(raise_exception=True)
         data = data.validated_data['data']
         create_demand(data)
-        return Response(status=status.HTTP_201_CREATED)
-        
-    
-    @action(detail=False, methods=['post'])
-    def set_timeserie(self, request):
-        data = PeriodClientsCreateSerializer(data=request.data)
-        data.is_valid(raise_exception=True)
-        values = data.validated_data['data']
-        data = {}
-        data['values'] = values
-        data['settings'] = json.loads(request.user.network.settings_values)
-        data = group_bills_and_income(data)
-        for _, value in data.items():
-            create_demand(value)
         return Response(status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['put'])

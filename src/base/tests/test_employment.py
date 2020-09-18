@@ -3,12 +3,12 @@ from datetime import timedelta
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from src.base.models import WorkerPosition, FunctionGroup
+from src.base.models import WorkerPosition, FunctionGroup, Employment
 from src.timetable.models import WorkTypeName, EmploymentWorkType
-from src.util.mixins.tests import APITestsHelperMixin
+from src.util.mixins.tests import TestsHelperMixin
 
 
-class TestEmploymentAPI(APITestsHelperMixin, APITestCase):
+class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
@@ -84,3 +84,38 @@ class TestEmploymentAPI(APITestsHelperMixin, APITestCase):
             employment=self.employment2,
             work_type__work_type_name=another_wt_name,
         ).exists())
+
+    def test_put_create_employment(self):
+        """
+        change PUT logic of employment for orteka
+        :return:
+        """
+        FunctionGroup.objects.create(
+            group=self.admin_group,
+            method='PUT',
+            func='Employment',
+            level_up=1,
+            level_down=99,
+        )
+
+        put_data = {
+            'position_id': self.worker_position.id,
+            'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
+            'shop_id': self.shop2.id,
+            'user_id': self.user2.id,
+
+        }
+
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk='not_used'),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertTrue(Employment.objects.filter(
+            shop_id=put_data['shop_id'],
+            dt_hired=put_data['dt_hired'],
+            dt_hired_next=put_data['dt_hired'],
+            user_id=put_data['user_id'],
+            position_id=put_data['position_id'],
+        ).count() == 1)
