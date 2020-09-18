@@ -28,7 +28,7 @@ rest_auth_urls = [
     url(r'^password/change/$', PasswordChangeView.as_view(), name='rest_password_change'),
     url(r'^user/$', AuthUserView.as_view(), name='user'),
     url(r'^allowed_functions/$', FunctionGroupView.as_view({'get': 'list'}), name='user'),
-    url(r'^signin_token/?$', WFMTokenLoginView.as_view(), name='signin_token'),
+    url(r'^signin_token/?$', WFMTokenLoginView.as_view(), kwargs={'version': '0.9'}, name='signin_token'),   # Использует Ортека старый формат
     # url(r'^notification', NotificationViewSet.as_view(), name='notification')
 ]
 
