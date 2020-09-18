@@ -266,6 +266,7 @@ class TestWorkType(APITestCase):
         self.assertEqual(len(data['tt_periods']['real_cashiers']), 72)
         self.assertEqual(len(data['tt_periods']['predict_cashier_needs']), 72)
         self.assertEqual(data['tt_periods']['real_cashiers'][9]['amount'], 1.0)
+        self.assertEqual(data['tt_periods']['real_cashiers'][34]['amount'], 0.0)
 
         get_params['plan_editing'] = True
         response = self.client.get(url, data=get_params)

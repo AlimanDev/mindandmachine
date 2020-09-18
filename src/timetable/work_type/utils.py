@@ -124,6 +124,8 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
             else:
                 exists.append((worker_day.worker_id, worker_day.dt))
         worker_days = worker_days.exclude(id__in=remove)
+    else:
+        worker_days = worker_days.filter(is_approved=True)
 
     worker_days = worker_days.filter(
         type__in=status_list,
