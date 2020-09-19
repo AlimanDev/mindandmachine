@@ -38,7 +38,10 @@ class EfficiencySerializer(serializers.Serializer):
     work_type_ids = serializers.ListField(
         allow_empty=True, child=serializers.IntegerField(), required=False, default=[])
     shop_id = serializers.IntegerField()
-    plan_editing = serializers.BooleanField(default=False, label='График для страницы "план редактируемый"')
+    graph_type = serializers.ChoiceField(
+        default='plan_approved', label='Тип графика',
+        choices=['plan_edit', 'plan_approved'],
+    )
 
     def is_valid(self, *args, **kwargs):
         super(EfficiencySerializer, self).is_valid(*args, **kwargs)

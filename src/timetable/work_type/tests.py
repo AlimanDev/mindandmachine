@@ -12,6 +12,7 @@ from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
 )
+from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
 
 
@@ -242,7 +243,7 @@ class TestWorkType(APITestCase):
         )
         wd2 = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(tomorrow, time(hour=10)),
-            dttm_work_end=datetime.combine(tomorrow, time(hour=19)),
+            dttm_work_end=datetime.combine(tomorrow, time(hour=22)),
             type=WorkerDay.TYPE_WORKDAY,
             dt=tomorrow,
             worker=self.user2,
@@ -258,8 +259,8 @@ class TestWorkType(APITestCase):
 
         get_params = {
             'shop_id': self.shop.id,
-            'from_dt': dt_now,
-            'to_dt': dt_now + timedelta(days=2),
+            'from_dt': Converter.convert_date(dt_now),
+            'to_dt': Converter.convert_date(dt_now + timedelta(days=2)),
         }
         response = self.client.get(url, data=get_params)
         data = response.json()
@@ -267,11 +268,19 @@ class TestWorkType(APITestCase):
         self.assertEqual(len(data['tt_periods']['predict_cashier_needs']), 72)
         self.assertEqual(data['tt_periods']['real_cashiers'][9]['amount'], 1.0)
         self.assertEqual(data['tt_periods']['real_cashiers'][34]['amount'], 0.0)
+        day_stats = data['day_stats']
+        self.assertEqual(day_stats['covering'][Converter.convert_date(dt_now)], 0.1875)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 48.0)
+        self.assertEqual(day_stats['graph_hours'][Converter.convert_date(dt_now)], 9.0)
 
-        get_params['plan_editing'] = True
+        get_params['graph_type'] = 'plan_edit'
         response = self.client.get(url, data=get_params)
         data = response.json()
         self.assertEqual(len(data['tt_periods']['real_cashiers']), 72)
         self.assertEqual(len(data['tt_periods']['predict_cashier_needs']), 72)
         self.assertEqual(data['tt_periods']['real_cashiers'][9]['amount'], 0.0)
         self.assertEqual(data['tt_periods']['real_cashiers'][34]['amount'], 1.0)
+        day_stats = data['day_stats']
+        self.assertEqual(day_stats['covering'][Converter.convert_date(tomorrow)], 0.25)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(tomorrow)], 48.0)
+        self.assertEqual(day_stats['graph_hours'][Converter.convert_date(tomorrow)], 12.0)
