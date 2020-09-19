@@ -144,7 +144,8 @@ def count_daily_stat(data):
         ).annotate(
             dt=TruncDate('dttm_forecast'),
             field=F(field_name)
-        ).values('dt','field'
+        ).values(
+            'dt', 'field'
         ).annotate(value=Sum('value'))
 
         for day in period_clients:

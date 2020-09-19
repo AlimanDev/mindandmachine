@@ -1,15 +1,17 @@
 import datetime
 import json
 
-from django.db import models
-from django.db.models import Subquery, OuterRef, Max
-from django.utils import timezone
 from django.contrib.auth.models import (
     UserManager
 )
+from django.db import models
+from django.db.models import Subquery, OuterRef, Max
+from django.db.models.query import QuerySet
+from django.utils import timezone
 
 from src.base.models import Shop, Employment, User, Event, Network
-from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
+from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, \
+    AbstractActiveModelManager
 
 
 class WorkerManager(UserManager):
@@ -243,6 +245,55 @@ class WorkerConstraint(AbstractModel):
         return self.employment.shop
 
 
+class WorkerDayQuerySet(QuerySet):
+    def get_plan_approved(self):
+        return self.filter(is_fact=False, is_approved=True)
+
+    def get_plan_not_approved(self):
+        return self.filter(is_fact=False, is_approved=False)
+
+    def get_fact_approved(self):
+        return self.filter(is_fact=True, is_approved=True)
+
+    def get_fact_not_approved(self):
+        return self.filter(is_fact=True, is_approved=False)
+
+    def get_plan_edit(self, work_types):
+        q = models.Q(
+            models.Q(is_fact=False),
+            models.Q(worker_day_details__work_type_id__in=work_types.keys()) |
+            models.Q(worker_day_details__work_type__isnull=True)
+        )
+
+        worker_days_ordered = self.filter(q).order_by('is_approved')
+        exists = []
+        remove = []
+        for worker_day in worker_days_ordered:
+            if (worker_day.worker_id, worker_day.dt) in exists:
+                remove.append(worker_day.id)
+            else:
+                exists.append((worker_day.worker_id, worker_day.dt))
+        return self.exclude(id__in=remove)
+
+    def get_fact_edit(self):
+        raise NotImplementedError
+
+    def get_tabel(self):
+        query = self.filter(
+            models.Q(is_fact=True, is_approved=True) |
+            models.Q(models.Q(is_approved=True) & ~models.Q(type__in=WorkerDay.TYPES_PAID))
+        )
+        worker_days = list(query.order_by('worker_id', 'dt', '-is_fact'))
+        exists = []
+        remove = []
+        for worker_day in worker_days:
+            if (worker_day.worker_id, worker_day.dt) in exists:
+                remove.append(worker_day.id)
+            else:
+                exists.append((worker_day.worker_id, worker_day.dt))
+        return query.exclude(id__in=remove)
+
+
 class WorkerDayManager(models.Manager):
     def qos_current_version(self, approved_only=False):
         if approved_only:
@@ -303,7 +354,7 @@ class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
-    
+
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
     TYPE_VACATION = 'V'
@@ -415,7 +466,7 @@ class WorkerDay(AbstractModel):
     canceled = models.BooleanField(default=False)
     is_outsource = models.BooleanField(default=False)
 
-    objects = WorkerDayManager()
+    objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()
 
     @classmethod
     def is_type_with_tm_range(cls, t):
