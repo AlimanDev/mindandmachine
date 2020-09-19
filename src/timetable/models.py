@@ -295,9 +295,6 @@ class WorkerDayQuerySet(QuerySet):
 
 
 class WorkerDayManager(models.Manager):
-    def get_query_set(self):
-        return WorkerDayQuerySet(self.model, using=self._db)
-
     def qos_current_version(self, approved_only=False):
         if approved_only:
             return super().get_queryset().filter(
