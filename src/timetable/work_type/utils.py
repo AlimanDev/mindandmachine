@@ -157,9 +157,8 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
         from_dt + datetime.timedelta(days=day)
         for day in range((to_dt - from_dt).days)
     ]
-    HOURS_IN_DAY = 24
-    graph_arr_daily = graph_arr.reshape(len(dts_for_day_stats), HOURS_IN_DAY)
-    predict_needs_daily = predict_needs.reshape(len(dts_for_day_stats), HOURS_IN_DAY)
+    graph_arr_daily = graph_arr.reshape(len(dts_for_day_stats), period_in_day)
+    predict_needs_daily = predict_needs.reshape(len(dts_for_day_stats), period_in_day)
     for i, dt in enumerate(dts_for_day_stats):
         dt_converted = Converter.convert_date(dt)
 
