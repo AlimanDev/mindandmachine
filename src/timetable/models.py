@@ -260,9 +260,11 @@ class WorkerDayQuerySet(QuerySet):
 
     def get_plan_edit(self, work_types):
         q = models.Q(
-            models.Q(is_fact=False),
-            models.Q(worker_day_details__work_type_id__in=work_types.keys()) |
-            models.Q(worker_day_details__work_type__isnull=True)
+            models.Q(is_fact=False) &
+            (
+                models.Q(worker_day_details__work_type_id__in=work_types.keys()) |
+                models.Q(worker_day_details__work_type__isnull=True)
+            )
         )
 
         worker_days_ordered = self.filter(q).order_by('is_approved')
@@ -273,7 +275,7 @@ class WorkerDayQuerySet(QuerySet):
                 remove.append(worker_day.id)
             else:
                 exists.append((worker_day.worker_id, worker_day.dt))
-        return self.exclude(id__in=remove)
+        return self.filter(is_fact=False).exclude(id__in=remove)
 
     def get_fact_edit(self):
         raise NotImplementedError

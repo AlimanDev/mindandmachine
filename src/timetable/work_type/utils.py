@@ -113,7 +113,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
     qs_for_covering = qs_for_covering.filter(
         type__in=status_list,
         worker_day_details__work_type_id__in=work_types.keys(),
-    ).annotate(work_part=F('worker_day_details__work_part'))
+    ).annotate(work_part=F('worker_day_details__work_part')).distinct()
 
     lambda_index_work_days = lambda x: list(range(
         dttm2index(from_dt, x.dttm_work_start, period_in_day, period_lengths_minutes),
