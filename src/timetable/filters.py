@@ -23,6 +23,7 @@ class WorkerDayFilter(FilterSet):
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
             'is_fact': ['exact'],
+            'type': ['exact'],
         }
 
 
