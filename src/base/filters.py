@@ -63,6 +63,7 @@ class UserFilter(FilterSet):
             'id':['exact', 'in'],
             'tabel_code':['exact', 'in'],
             'username':['exact', 'in'],
+            'last_name':['in',],
             'shop_id': ['exact', 'in'],
             'shop_code': ['exact'],
         }
