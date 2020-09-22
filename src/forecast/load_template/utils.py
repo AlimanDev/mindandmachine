@@ -15,6 +15,7 @@ import datetime
 from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
 from src.base.shop.serializers import ShopSerializer
 from django.db.models import F
+from src.util.models_converter import Converter
 
 
 ########################## Вспомогательные функции ##########################
@@ -386,38 +387,79 @@ def search_related_operation_types(operation_type, operation_type_relations, ope
 
 
 def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
+    shop = Shop.objects.get(id=shop_id)
+    forecast_steps = {
+        datetime.timedelta(hours=1): '1h',
+        datetime.timedelta(minutes=30): '30m',
+        datetime.timedelta(days=1): '1d',
+        datetime.timedelta(minutes=1): '1m',
+    }
+    def get_times(times_shop, time_operation_type, t_from=True):
+        if times_shop.get('all'):
+            time = Converter.convert_time(
+                time_operation_type if (not time_operation_type == None) and \
+                ((times_shop.get('all') < time_operation_type and t_from) or \
+                (times_shop.get('all') > time_operation_type and not t_from)) \
+                else times_shop.get('all')
+            )
+            return {
+                str(i): time
+                for i in range(7)
+            }
+        else:
+            result = {}
+            for k, v in times_shop.items():
+                result[k] = Converter.convert_time(time_operation_type if (not time_operation_type == None) and ((v < time_operation_type and t_from) or (v > time_operation_type and not t_from)) else v)
+            return result
+
     data = {
         'dt_from': dt_from,
         'dt_to': dt_to,
-        'shop': ShopSerializer(Shop.objects.get(id=shop_id)),
+        'shop': ShopSerializer(shop).data,
     }
-    data['opeartion_types'] = OperationTypeTemplateSerializer(OperationTypeTemplate.objects.filter(load_template_id=load_template_id), many=True)
-    data['relations'] = list(OperationTypeRelation.objects.filter(
-        base__load_template_id=load_template_id,
-    ).annotate(
-        base_name=F('base__operation_type_name_id'),
-        depended_name=F('depended__operation_type_name_id'),
-    ).values())
+    relations = {}
+    for rel in OperationTypeRelation.objects.filter(
+            base__load_template_id=load_template_id,
+        ).annotate(
+            base_name=F('base__operation_type_name_id'),
+            depended_name=F('depended__operation_type_name_id'),
+        ).values('type', 'formula', 'depended_name', 'base_name'):
+        key = rel.get('base_name')
+        if not key in relations:
+            relations[key] = {}
+        relations[key][str(rel.get('depended_name'))] = rel
+    data['operation_types'] = [
+        {
+            'operation_type_name': o.operation_type_name_id,
+            'work_type_name': o.operation_type_name.work_type_name_id,
+            'tm_from': get_times(shop.open_times, o.tm_from),
+            'tm_to': get_times(shop.close_times, o.tm_to, t_from=False),
+            'forecast_step': forecast_steps.get(o.forecast_step),
+            'dependences': relations.get(o.operation_type_name_id, [])
+        }
+        for o in OperationTypeTemplate.objects.select_related('operation_type_name').filter(load_template_id=load_template_id)
+    ]
     timeseries = {}
     values = list(PeriodClients.objects.select_related('operation_type').filter(
         operation_type__shop_id=shop_id,
         dttm_forecast__date__gte=dt_from,
         dttm_forecast__date__lte=dt_to,
         type=PeriodClients.FACT_TYPE,
+        operation_type__operation_type_name__operationtypetemplate__load_template_id=load_template_id,
     ).order_by('dttm_forecast'))
     for timeserie in values:
-        key = timeserie.operation_type.operation_type_name_id
+        key = str(timeserie.operation_type.operation_type_name_id)
         if not key in timeseries:
             timeseries[key] = []
         timeseries[key].append(
             {
                 'value': timeserie.value,
-                'dttm': timeserie.dttm_forecast,
+                'dttm': Converter.convert_datetime(timeserie.dttm_forecast),
             }
         )
-    data['timeserie'] = timeserie
-    for o_type in date['opeartion_types']:
-        if o_type['operation_type_name_id'] in timeserie:
+    data['timeserie'] = timeseries
+    for o_type in data['operation_types']:
+        if str(o_type['operation_type_name']) in timeseries.keys():
             o_type['type'] = 'F'
         else:
             o_type['type'] = 'O'
