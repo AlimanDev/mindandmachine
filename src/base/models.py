@@ -518,6 +518,7 @@ class Employment(AbstractActiveModel):
                     EmploymentWorkType(
                         employment_id=self.id,
                         work_type=work_type,
+                        priority=1,
                     ) for work_type in work_types
                 )
         return res
