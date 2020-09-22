@@ -283,16 +283,16 @@ if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
 
 CELERY_QUEUES = {
-    "backend_queue": {
-        "exchange": "backend_queue",
-        "routing_key": "backend_queue",
+    BACKEND_QUEUE: {
+        "exchange": BACKEND_QUEUE,
+        "routing_key": BACKEND_QUEUE,
     }
 }
 
 CELERY_ROUTES = {
     'src.app.tasks.*': {
         'queue': BACKEND_QUEUE,
-        'routing_key': 'backend_queue',
+        'routing_key': BACKEND_QUEUE,
     },
 }
 
