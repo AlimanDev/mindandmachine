@@ -491,11 +491,12 @@ class Employment(AbstractActiveModel):
         if hasattr(self, 'position_code'):
             self.position = WorkerPosition.objects.get(code=self.position_code)
 
+        force_create_work_types = kwargs.pop('force_create_work_types', False)
         is_new = self.pk is None
         position_has_changed = self.position_tracker.has_changed('position')
         res = super().save(*args, **kwargs)
         # при создании трудоустройства или при смене должности проставляем типы работ по умолчанию
-        if is_new or position_has_changed:
+        if force_create_work_types or is_new or position_has_changed:
             from src.timetable.models import EmploymentWorkType, WorkType
             work_type_names = WorkerPosition.default_work_type_names.through.objects.filter(
                 workerposition_id=self.position_id,
