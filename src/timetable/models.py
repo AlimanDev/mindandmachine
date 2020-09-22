@@ -258,16 +258,8 @@ class WorkerDayQuerySet(QuerySet):
     def get_fact_not_approved(self):
         return self.filter(is_fact=True, is_approved=False)
 
-    def get_plan_edit(self, work_types):
-        q = models.Q(
-            models.Q(is_fact=False) &
-            (
-                models.Q(worker_day_details__work_type_id__in=work_types.keys()) |
-                models.Q(worker_day_details__work_type__isnull=True)
-            )
-        )
-
-        worker_days_ordered = self.filter(q).order_by('is_approved')
+    def get_plan_edit(self):
+        worker_days_ordered = self.filter(is_fact=False).order_by('is_approved')
         exists = []
         remove = []
         for worker_day in worker_days_ordered:
