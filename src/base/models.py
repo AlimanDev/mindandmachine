@@ -545,6 +545,7 @@ class FunctionGroup(AbstractModel):
         'AutoSettings_delete_timetable',
         'AuthUserView',
         'Employment',
+        'Employment_auto_timetable',
         'EmploymentWorkType',
         'ExchangeSettings',
         'FunctionGroupView',

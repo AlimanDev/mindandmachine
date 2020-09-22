@@ -102,6 +102,11 @@ class FunctionGroupSerializer(serializers.ModelSerializer):
         fields = ['id', 'group_id', 'func', 'method']
 
 
+class AutoTimetableSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    user_ids = serializers.ListField(child=serializers.IntegerField())
+
+
 class EmploymentListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     user_id = serializers.IntegerField(required=False)
@@ -239,6 +244,14 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 raise ValidationError({'position_id': self.error_messages['required']})
 
         return data
+
+    def update(self, instance, validated_data, *args, **kwargs):
+        if instance.is_visible != validated_data.get('is_visible', True):
+            Employment.objects.filter(
+                shop_id=instance.shop_id, 
+                user_id=instance.user_id
+            ).update(is_visible=validated_data.get('is_visible', True))
+        return super().update(instance, validated_data, *args, **kwargs)
 
 
 class WorkerPositionSerializer(BaseNetworkSerializer):

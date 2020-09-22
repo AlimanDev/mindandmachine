@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from src.base.models import WorkerPosition, FunctionGroup, Employment
+from src.base.models import WorkerPosition, FunctionGroup, Employment, User
 from src.timetable.models import WorkTypeName, EmploymentWorkType
 from src.util.mixins.tests import TestsHelperMixin
 
@@ -119,3 +119,24 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             user_id=put_data['user_id'],
             position_id=put_data['position_id'],
         ).count() == 1)
+
+    def test_auto_timetable(self):
+        FunctionGroup.objects.create(
+            group=self.admin_group,
+            method='POST',
+            func='Employment_auto_timetable',
+            level_up=1,
+            level_down=99,
+        )
+
+        user_ids = list(User.objects.filter(employments__shop=self.shop).values_list('id', flat=True))
+        user_ids = user_ids[1:-2]
+        self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=True).count(), 4)
+        data = {
+            "shop_id": self.shop.id,
+            "user_ids": user_ids,
+        }
+        response = self.client.post('/rest_api/employment/auto_timetable/', data=self.dump_data(data), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=True).count(), 2)
+        self.assertEqual(list(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=True).values_list('user_id', flat=True)), user_ids)

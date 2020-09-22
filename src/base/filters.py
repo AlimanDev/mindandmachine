@@ -4,6 +4,20 @@ from django_filters.rest_framework import FilterSet, DateFilter, NumberFilter, C
 from src.base.models import  Employment, User, Notification, Subscribe
 
 
+class BaseActiveNamedModelFilter(FilterSet):
+    name = CharFilter(field_name='name', lookup_expr='exact')
+    name__in = CharFilter(field_name='name', method='field_in')
+    code = CharFilter(field_name='code', lookup_expr='exact')
+    code__in = CharFilter(field_name='code', method='field_in')
+    id__in = NumberFilter(field_name='id', method='field_in')
+
+    def field_in(self, queryset, name, value):
+        filt = {
+            f'{name}__in': value.split(',')
+        }
+        return queryset.filter(**filt)
+
+
 class EmploymentFilter(FilterSet):
     dt_from = DateFilter(method='gte_or_null')
     dt_to = DateFilter(field_name='dt_hired', lookup_expr='lte', label='Окончание периода')
@@ -22,6 +36,7 @@ class EmploymentFilter(FilterSet):
             'shop_code': ['exact', 'in'],
             'user_id': ['exact', 'in'],
             'username': ['exact', 'in'],
+            'is_visible': ['exact',]
         }
 
 
@@ -30,6 +45,7 @@ class UserFilter(FilterSet):
     shop_id__in = CharFilter(method='shop_id_in')
     shop_code = CharFilter(field_name='employments__shop__code', label='Код магазина')
     shop_code__in = CharFilter(method='shop_code_in')
+    last_name = CharFilter(field_name='last_name', lookup_expr='icontains')
 
     def shop_id_in(self, queryset, name, value):
         return queryset.filter(

@@ -8,6 +8,7 @@ from src.forecast.models import OperationTemplate
 from src.conf.djconfig import QOS_DATE_FORMAT, QOS_TIME_FORMAT
 from src.forecast.operation_template.utils import build_period_clients
 from src.base.views import BaseActiveNamedModelViewSet
+from src.base.filters import BaseActiveNamedModelFilter
 
 
 #TODO добавить в шаблон нагрузки
@@ -33,7 +34,7 @@ class OperationTemplateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Перечисленные дни не соответствуют периоду')
 
 
-class OperationTemplateFilter(FilterSet):
+class OperationTemplateFilter(BaseActiveNamedModelFilter):
     shop_id = NumberFilter(field_name='operation_type__shop_id')
 
     class Meta:
