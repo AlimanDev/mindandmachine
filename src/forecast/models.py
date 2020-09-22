@@ -46,10 +46,8 @@ class LoadTemplate(AbstractModel):
         verbose_name = 'Шаблон нагрузки'
         verbose_name_plural = 'Шаблоны нагрузки'
 
-
     name = models.CharField(max_length=64, unique=True)
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
-
 
     def __str__(self):
         return f'id: {self.id}, name: {self.name}'

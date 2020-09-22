@@ -14,12 +14,14 @@ POSSIBLE_KEYS = [
     'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6',
 ]
 
+
 class TimeZoneField(serializers.ChoiceField):
     def __init__(self, **kwargs):
         super().__init__(pytz.common_timezones + [(None, "")], **kwargs)
 
     def to_representation(self, value):
         return str(six.text_type(super().to_representation(value)))
+
 
 class ShopSerializer(serializers.ModelSerializer):
     parent_id = serializers.IntegerField(required=False)
@@ -33,6 +35,7 @@ class ShopSerializer(serializers.ModelSerializer):
     tm_close_dict = serializers.JSONField(required=False)
     load_template_status = serializers.CharField(read_only=True)
     timezone = TimeZoneField()
+
     class Meta:
         model = Shop
         fields = ['id', 'parent_id', 'parent_code', 'name', 'settings_id', 'tm_open_dict', 'tm_close_dict',
@@ -60,12 +63,13 @@ class ShopSerializer(serializers.ModelSerializer):
             
         if self.validated_data.get('tm_open_dict'):
             validate_time(self.validated_data.get('tm_open_dict'))
-        
         if self.validated_data.get('tm_close_dict'):
             validate_time(self.validated_data.get('tm_close_dict'))
-        
-        self.validated_data['tm_open_dict'] = json.dumps(self.validated_data.get('tm_open_dict'))
-        self.validated_data['tm_close_dict'] = json.dumps(self.validated_data.get('tm_close_dict'))
+
+        if 'tm_open_dict' in self.validated_data:
+            self.validated_data['tm_open_dict'] = json.dumps(self.validated_data.get('tm_open_dict'))
+        if 'tm_close_dict' in self.validated_data:
+            self.validated_data['tm_close_dict'] = json.dumps(self.validated_data.get('tm_close_dict'))
         
         return True
 
