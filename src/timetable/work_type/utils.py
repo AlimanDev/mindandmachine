@@ -59,6 +59,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
         work_types = work_types.filter(id__in=form['work_type_ids'])
         if work_types.count() != len(form['work_type_ids']):
             return 'bad work_type_ids'
+
     work_types = {
         wt.id: wt
         for wt in work_types
@@ -106,7 +107,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
 
     graph_type = form.get('graph_type', 'plan_approved')
     if graph_type == 'plan_edit':
-        qs_for_covering = qs_for_covering.get_plan_edit(work_types=work_types)
+        qs_for_covering = qs_for_covering.get_plan_edit()
     else:
         qs_for_covering = qs_for_covering.get_plan_approved()
 
