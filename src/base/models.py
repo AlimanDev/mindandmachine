@@ -97,7 +97,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     LOAD_TEMPLATE_READY = 'R'
     LOAD_TEMPLATE_ERROR = 'E'
 
-
     LOAD_TEMPLATE_STATUSES = [
         (LOAD_TEMPLATE_PROCESS, 'В процессе'),
         (LOAD_TEMPLATE_READY, 'Готово'),
@@ -184,6 +183,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             return self
         level = self.level - level if self.level > level else 0
         return self.get_ancestors().filter(level=level)[0]
+
     def get_department(self):
         return self
 
@@ -192,7 +192,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         super().__init__(*args, **kwargs)
         if code:
             self.parent = Shop.objects.get(code=code)
-
 
     def __getattribute__(self, attr):
         if attr in ['open_times', 'close_times']:
@@ -251,8 +250,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             elif load_template == None:
                 apply_load_template(self.load_template_id, self.id)
                
-
-
     def get_exchange_settings(self):
         return self.exchange_settings if self.exchange_settings_id\
             else apps.get_model(
@@ -518,6 +515,7 @@ class Employment(AbstractActiveModel):
                     EmploymentWorkType(
                         employment_id=self.id,
                         work_type=work_type,
+                        priority=1,
                     ) for work_type in work_types
                 )
         return res

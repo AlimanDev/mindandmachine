@@ -84,11 +84,13 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         if self.instance and self.instance.is_approved:
             raise ValidationError({"error": "Нельзя менять подтвержденную версию."})
 
-        is_fact = attrs.get('is_fact')
-        if is_fact:
-            attrs['type'] = WorkerDay.TYPE_WORKDAY
-
+        is_fact = attrs['is_fact'] if 'is_fact' in attrs else getattr(self.instance, 'is_fact', None)
         type = attrs['type']
+
+        if is_fact and type not in (WorkerDay.TYPE_WORKDAY, WorkerDay.TYPE_EMPTY):
+            raise ValidationError({
+                "error": "Для фактической неподтвержденной версии можно установить только 'Рабочий день' и 'НД'."
+            })
 
         if not WorkerDay.is_type_with_tm_range(type):
             attrs['dttm_work_start'] = None
