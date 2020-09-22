@@ -432,7 +432,6 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(resp_data[0]['type'], 'S')
 
     def test_get_worker_day_by_worker__username__in(self):
-        # FIXME: запрос ведь не должен падать без передачи shop_id/shop_code?
         get_params = {
             'worker__username__in': self.user2.username,
             'is_fact': 'true',
@@ -442,6 +441,31 @@ class TestWorkerDay(APITestCase):
             'by_code': 'true',
         }
         response = self.client.get('/rest_api/worker_day/', data=get_params)
+        self.assertEqual(response.status_code, 200)
+
+    def test_can_create_and_update_not_approved_fact_only_with_empty_or_workday_type(self):
+        dt = now().date()
+        data = {
+            "shop_code": self.shop.code,
+            "username": self.user2.username,
+            "employment_id": self.employment2.id,
+            "dt": dt,
+            "is_fact": 'true',
+            "type": WorkerDay.TYPE_HOLIDAY,
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, 400)
+
+        data['type'] = WorkerDay.TYPE_EMPTY
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        wd_id = response.json()['id']
+        self.assertEqual(WorkerDay.objects.filter(id=wd_id).count(), 1)
+
+        data['type'] = WorkerDay.TYPE_WORKDAY
+        data['dttm_work_start'] = datetime.combine(dt, time(8, 0, 0))
+        data['dttm_work_end'] = datetime.combine(dt, time(20, 0, 0))
+        response = self.client.put(f"{self.url}{wd_id}/", data, format='json')
         self.assertEqual(response.status_code, 200)
 
 
