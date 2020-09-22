@@ -78,13 +78,17 @@ def add_operations_to_shops(exclude_shops):
             )
 
 
-def import_workload2shops(filepath, serie_type=PeriodClients.LONG_FORECASE_TYPE):
-    df = pd.read_excel(filepath)
+def import_workload2shops(filepath, serie_type=PeriodClients.LONG_FORECASE_TYPE, operation_names_dict=None):
+    df = pd.read_csv(filepath, index_col=0, parse_dates=['dttm'])
 
     if not (('dttm' in df.columns) and ('shop_code' in df.columns)):
         raise ValueError(f'no dttm or shop_code in columns {df.columns}')
 
-    operation_names = set(df.columns) - {'dttm', 'shop_code'}
+    if operation_names_dict:
+        df = df.rename(columns=operation_names_dict)
+        operation_names = operation_names_dict.values()
+    else:
+        operation_names = set(df.columns) - {'dttm', 'shop_code'}
 
     operation_type_names = list(OperationTypeName.objects.filter(name__in=operation_names).select_related('work_type_name'))
 
