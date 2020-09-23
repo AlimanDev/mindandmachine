@@ -65,17 +65,14 @@ class ShopViewSet(BaseActiveNamedModelViewSet):
         only_top = self.request.query_params.get('only_top')
 
         # aa: fixme: refactor code
-        # employments = Employment.objects.get_active(
-        #     network_id=user.network_id,
-        #     user=user).values('shop_id')
-        # shops = Shop.objects.filter(id__in=employments.values('shop_id'))
-        # if not only_top:
-        #     return Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
-        #         network_id=user.network_id,
-        #     )
-        # else:
-        #     return shops
-        return Shop.objects.filter(network_id=user.network_id).order_by('level', 'name')
+        employments = Employment.objects.get_active(
+            network_id=user.network_id,
+            user=user).values('shop_id')
+        shops = Shop.objects.filter(id__in=employments.values('shop_id'))
+        if not only_top:
+            shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
+
+        return shops.filter(network_id=user.network_id).order_by('level', 'name')
 
     @action(detail=False, methods=['get'], serializer_class=ShopStatSerializer)#, permission_classes=[IsAdminOrIsSelf])
     def stat(self, request):
