@@ -264,9 +264,9 @@ class EmploymentWorkTypeSerializer(serializers.ModelSerializer):
         fields = ['id', 'work_type_id', 'employment_id', 'period', 'bills_amount', 'priority', 'duration']
 
 
-class WorkerConstraintListSerializer(serializers.ListSerializer):
+class WorkerConstraintCreateListSerializer(serializers.ListSerializer):
     def create(self, validated_data):
-        employment_id = validated_data[0].get('employment_id')
+        employment_id = self.context.get('view').kwargs.get('employment_pk')
         employment = Employment.objects.get(id=employment_id)
         to_create = []
         ids = []
@@ -285,6 +285,7 @@ class WorkerConstraintListSerializer(serializers.ListSerializer):
             else:
                 constraint = WorkerConstraint(
                     **item,
+                    employment_id=employment_id,
                     worker_id=employment.user_id,
                     shop_id=employment.shop_id,
                 )
@@ -302,12 +303,16 @@ class WorkerConstraintListSerializer(serializers.ListSerializer):
 
 class WorkerConstraintSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(required=False)
-    employment_id = serializers.IntegerField(required=True)
 
     class Meta:
         model = WorkerConstraint
         fields = ['id', 'employment_id', 'weekday', 'is_lite', 'tm']
-        list_serializer_class = WorkerConstraintListSerializer
+        list_serializer_class = WorkerConstraintCreateListSerializer
+        extra_kwargs = {
+            'employment_id': {
+                'read_only': True,
+            }
+        }
 
 
 class WorkerConstraintListSerializer(serializers.Serializer):
