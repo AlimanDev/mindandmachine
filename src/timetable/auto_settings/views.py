@@ -418,6 +418,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             dt__gte=dt_from,
             dt__lte=dt_to,
             **new_worker_days_filter,
+        ).exclude(
+            type=WorkerDay.TYPE_EMPTY,
         ).order_by(
             'dt', 'worker_id'
         ).values(
@@ -438,6 +440,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             worker_id__in=user_ids,
             dt__gte=dt_from - timedelta(days=7),
             dt__lte=dt_from,
+        ).exclude(
+            type=WorkerDay.TYPE_EMPTY,
         ).order_by(
             'dt'
         ).values(
