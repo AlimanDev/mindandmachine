@@ -42,6 +42,14 @@ class TestWorkerConstraint(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(WorkerConstraint.objects.filter(employment=self.employment1).count(), 2)
 
+        resp = self.client.get(self.get_url('WorkerConstraint-list', employment_pk=self.employment1.pk))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.json()), 2)
+
+        resp = self.client.get(self.get_url('WorkerConstraint-list', employment_pk=self.employment2.pk))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.json()), 0)
+
         data.pop()
         resp = self.client.post(
             self.get_url('WorkerConstraint-list', employment_pk=self.employment1.pk),

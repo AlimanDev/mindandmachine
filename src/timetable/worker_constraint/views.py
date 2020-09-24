@@ -14,7 +14,9 @@ class WorkerConstraintViewSet(viewsets.ModelViewSet):
     permission_classes = [EmploymentFilteredListPermission]
     serializer_class = WorkerConstraintSerializer
     filterset_class = WorkerConstraintFilter
-    queryset = WorkerConstraint.objects.all()
+
+    def get_queryset(self):
+        return WorkerConstraint.objects.filter(employment=self.kwargs.get('employment_pk'))
 
     def filter_queryset(self, queryset):
         if self.action == 'list':
