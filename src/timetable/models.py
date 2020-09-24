@@ -757,6 +757,7 @@ class ShopMonthStat(AbstractModel):
     dt = models.DateField()
     status = models.CharField(choices=STATUS, default=NOT_DONE, max_length=1)
     dttm_status_change = models.DateTimeField()
+    is_approved = models.BooleanField(default=False)
 
     # statistics
     fot = models.IntegerField(default=0, blank=True, null=True)
