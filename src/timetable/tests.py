@@ -1,15 +1,15 @@
 from datetime import timedelta, time, datetime, date
 
 from django.utils.timezone import now
-
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.util.test import create_departments_and_users
-
-from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName, WorkerDayCashboxDetails, ShopMonthStat
 from src.base.models import FunctionGroup, Network
+from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName, WorkerDayCashboxDetails, \
+    ShopMonthStat
+from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
+from src.util.test import create_departments_and_users
 
 
 class TestWorkerDay(APITestCase):
@@ -529,14 +529,8 @@ class TestWorkerDayCreateFact(APITestCase):
         self.assertEqual(WorkerDay.objects.get(id=fact_id).parent_worker_day_id, plan_id)
 
 
-class TestAttendanceRecords(APITestCase):
-    USER_USERNAME = "user1"
-    USER_EMAIL = "q@q.q"
-    USER_PASSWORD = "4242"
-
+class TestAttendanceRecords(TestsHelperMixin, APITestCase):
     def setUp(self):
-        super().setUp()
-
         self.url = '/rest_api/worker_day/'
         self.url_approve = '/rest_api/worker_day/approve/'
         self.dt = now().date()
@@ -589,10 +583,9 @@ class TestAttendanceRecords(APITestCase):
             parent_worker_day=self.worker_day_fact_approved
         )
 
-
     def test_attendancerecords_update(self):
-        tm_start=datetime.combine(self.dt, time(6,0,0))
-        tm_end=datetime.combine(self.dt, time(21,0,0))
+        tm_start = datetime.combine(self.dt, time(6, 0, 0))
+        tm_end = datetime.combine(self.dt, time(21, 0, 0))
         AttendanceRecords.objects.create(
             dttm=tm_start,
             type=AttendanceRecords.TYPE_COMING,
@@ -600,15 +593,19 @@ class TestAttendanceRecords(APITestCase):
             user=self.user2
         )
 
-        # wd = WorkerDay.objects.get(
-        #     dt=self.dt,
-        #     is_fact=True,
-        #     is_approved=True,
-        #     dttm_work_start = datetime.combine(self.dt, time(6,0,0)),
-        #     # dttm_work_end = None
-        # )
-        # # self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_start, datetime.combine(self.dt, time(6,0,0)))
+        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_start, tm_start)
+
+        tm_start2 = datetime.combine(self.dt, time(7, 0, 0))
+        AttendanceRecords.objects.create(
+            dttm=tm_start2,
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop,
+            user=self.user2
+        )
+
+        # проверяем, что время начала рабочего дня не перезаписалась
+        self.assertNotEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_start, tm_start2)
+        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_start, tm_start)
 
         AttendanceRecords.objects.create(
             dttm=tm_end,
@@ -625,7 +622,7 @@ class TestAttendanceRecords(APITestCase):
         )
         self.assertFalse(wd.exists())
         AttendanceRecords.objects.create(
-            dttm=datetime.combine(self.dt, time(6,0,0)),
+            dttm=datetime.combine(self.dt, time(6, 0, 0)),
             type=AttendanceRecords.TYPE_COMING,
             shop=self.shop,
             user=self.user3
@@ -635,30 +632,30 @@ class TestAttendanceRecords(APITestCase):
             dt=self.dt,
             is_fact=True,
             is_approved=True,
-            dttm_work_start = datetime.combine(self.dt, time(6,0,0)),
-            dttm_work_end = None,
+            dttm_work_start=datetime.combine(self.dt, time(6, 0, 0)),
+            dttm_work_end=None,
             worker=self.user3
         )
 
         self.assertTrue(wd.exists())
-        wd=wd.first()
+        wd = wd.first()
 
         AttendanceRecords.objects.create(
-            dttm=datetime.combine(self.dt, time(21,0,0)),
+            dttm=datetime.combine(self.dt, time(21, 0, 0)),
             type=AttendanceRecords.TYPE_LEAVING,
             shop=self.shop,
             user=self.user3
         )
-        self.assertEqual(WorkerDay.objects.get(id=wd.id).dttm_work_end, datetime.combine(self.dt, time(21,0,0)))
+        self.assertEqual(WorkerDay.objects.get(id=wd.id).dttm_work_end, datetime.combine(self.dt, time(21, 0, 0)))
 
     def test_attendancerecords_not_approved_fact_create(self):
-        self.worker_day_fact_not_approved.parent_worker_day_id=self.worker_day_fact_approved.parent_worker_day_id
+        self.worker_day_fact_not_approved.parent_worker_day_id = self.worker_day_fact_approved.parent_worker_day_id
         self.worker_day_fact_not_approved.save()
 
         self.worker_day_fact_approved.delete()
 
         AttendanceRecords.objects.create(
-            dttm=datetime.combine(self.dt, time(6,0,0)),
+            dttm=datetime.combine(self.dt, time(6, 0, 0)),
             type=AttendanceRecords.TYPE_COMING,
             shop=self.shop,
             user=self.user2
@@ -668,15 +665,15 @@ class TestAttendanceRecords(APITestCase):
             dt=self.dt,
             is_fact=True,
             is_approved=True,
-            dttm_work_start = datetime.combine(self.dt, time(6,0,0)),
-            dttm_work_end = None,
+            dttm_work_start=datetime.combine(self.dt, time(6, 0, 0)),
+            dttm_work_end=None,
             worker=self.user2
         )
 
         self.assertTrue(wd.exists())
-        wd=wd.first()
-        self.assertEqual(wd.parent_worker_day_id,self.worker_day_plan_approved.id)
-        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).parent_worker_day_id,wd.id)
+        wd = wd.first()
+        self.assertEqual(wd.parent_worker_day_id, self.worker_day_plan_approved.id)
+        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).parent_worker_day_id, wd.id)
 
     def test_attendancerecords_no_fact_create(self):
         self.worker_day_fact_not_approved.delete()
