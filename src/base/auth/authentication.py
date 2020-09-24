@@ -13,3 +13,12 @@ class WFMSessionAuthentication(SessionAuthentication):
     """
     def authenticate_header(self, request):
         return 'Session'
+
+
+
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    """
+    auth class for csrf_exempt. (need for md audit
+    """
+    def enforce_csrf(self, request):
+        return

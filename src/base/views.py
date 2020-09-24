@@ -69,7 +69,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     def get_queryset(self):
         return Employment.objects.filter(
             shop__network_id=self.request.user.network_id
-        )
+        ).order_by('-dt_hired')
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -121,7 +121,8 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         #     return_data = serializer.data
         #     return Response(return_data)
         else:
-            self.perform_create(serializer)
+            serializer.save(dt_hired_next=serializer.validated_data.get('dt_hired'))
+            # self.perform_create(serializer)
             headers = self.get_success_headers(serializer.validated_data)
             return Response(serializer.validated_data, status=status.HTTP_201_CREATED, headers=headers)
 

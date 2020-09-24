@@ -6,7 +6,7 @@ from src.timetable.models import (
     WorkerDayCashboxDetails,
 )
 
-from .tasks import (
+from ..tasks import (
     # update_worker_month_stat,
     allocation_of_time_for_work_on_cashbox,
     release_all_workers,

@@ -65,7 +65,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         'na_worker_day_exists': _("Not approved version already exists."),
     }
 
-    permission_classes = [Permission] # временно из-за биржи смен vacancy  [FilteredListPermission]
+    permission_classes = [Permission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
     queryset = WorkerDay.objects.all()
@@ -227,7 +227,12 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 parent_worker_day=None
             )
             WorkerDay.objects.filter(id__in=parent_ids).delete()
-
+        ShopMonthStat.objects.filter(
+            shop_id=serializer.data['shop_id'], 
+            dt=serializer.data['dt_from'].replace(day=1),
+        ).update(
+            is_approved=True,
+        )
         return Response()
 
     @action(detail=False, methods=['get'], )

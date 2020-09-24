@@ -15,7 +15,7 @@ from src.forecast.models import (
 
 @admin.register(OperationType)
 class OperationTypeAdmin(admin.ModelAdmin):
-    list_display = ('id', 'work_type_name', 'operation_type_name', 'do_forecast', 'period_demand_params', 'shop')
+    list_display = ('id', 'work_type_name', 'operation_type_name', 'period_demand_params', 'shop')
     list_filter = ('shop',)
     search_fields = ('shop', 'name')
 
@@ -74,7 +74,7 @@ class OperationTemplateAdmin(admin.ModelAdmin):
 
 @admin.register(OperationTypeName)
 class OperationTypeNameAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('id', 'name', 'do_forecast', 'work_type_name')
     search_fields = ('name',)
 
 
@@ -86,8 +86,8 @@ class LoadTemplateAdmin(admin.ModelAdmin):
 
 @admin.register(OperationTypeTemplate)
 class OperationTypeTemplateAdmin(admin.ModelAdmin):
-    list_display = ('id', 'operation_type_name', 'work_type_name', 'do_forecast')
-    search_fields = ('operation_type_name__name', 'work_type_name__name')
+    list_display = ('id', 'operation_type_name',)
+    search_fields = ('operation_type_name__name', 'operation_type_name__work_type_name__name')
 
 
 @admin.register(OperationTypeRelation)

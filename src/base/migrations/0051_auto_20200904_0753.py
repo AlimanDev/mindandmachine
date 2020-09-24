@@ -14,7 +14,7 @@ def set_region(apps, schema_editor):
         main(
             (datetime.date.today() - datetime.timedelta(days=365)).strftime('%Y.%m.%d'),
             (datetime.date.today() + datetime.timedelta(days=365)).strftime('%Y.%m.%d'),
-            r.id,
+            region.id,
         )
     Shop.objects.filter(region_id__isnull=True).update(region=region)
     

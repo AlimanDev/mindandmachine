@@ -3,6 +3,7 @@ from rest_framework import permissions
 from rest_framework.exceptions import ValidationError, NotFound
 from django.db.models import ObjectDoesNotExist, Q
 
+
 class Permission(permissions.BasePermission):
     """
     Класс для определения прав доступа к методам апи без привязки к магазину

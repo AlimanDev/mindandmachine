@@ -17,6 +17,7 @@ from src.base.models import (
     Shop,
     ShopSettings,
     User,
+    Network,
 )
 from src.timetable.models import (
     AttendanceRecords,
@@ -376,13 +377,14 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
 def create_departments_and_users(self):
     dt = now().date() - relativedelta(months=1)
-
+    self.network = Network.objects.first()
     self.region, _created = Region.objects.update_or_create(
         id=1,
         defaults=dict(
+            network=self.network,
             name='Москва',
             code='77',
-        )
+        ),
     )
     # admin_group
     self.admin_group = Group.objects.create(name='Администратор')
@@ -435,6 +437,8 @@ def create_departments_and_users(self):
     Shop._tree_manager.rebuild()
     # supershop
     self.root_shop = Shop.objects.first()
+    self.root_shop.network = self.network
+    self.root_shop.save()
 
     self.settings = ShopSettings.objects.create(
         break_triplets='[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]]',
@@ -451,6 +455,7 @@ def create_departments_and_users(self):
         # tm_shop_closes=datetime.time(0, 0, 0),
         region=self.region,
         settings=self.settings,
+        network=self.network,
     )
     self.reg_shop2 = Shop.objects.create(
         # id=12,
@@ -459,7 +464,8 @@ def create_departments_and_users(self):
         tm_open_dict='{"all":"07:00:00"}',
         tm_close_dict='{"all":"00:00:00"}',
         region=self.region,
-        settings=self.settings
+        settings=self.settings,
+        network=self.network,
     )
 
     # shops
@@ -471,8 +477,11 @@ def create_departments_and_users(self):
         tm_open_dict='{"all":"07:00:00"}',
         tm_close_dict='{"all":"00:00:00"}',
         region=self.region,
-        settings=self.settings
+        settings=self.settings,
+        network=self.network,
     )
+    self.shop.code = str(self.shop.id)
+    self.shop.save(update_fields=['code'])
     self.shop2 = Shop.objects.create(
         # id=2,
         parent=self.reg_shop1,
@@ -480,7 +489,8 @@ def create_departments_and_users(self):
         tm_open_dict='{"all":"07:00:00"}',
         tm_close_dict='{"all":"00:00:00"}',
         region=self.region,
-        settings=self.settings
+        settings=self.settings,
+        network=self.network,
     )
 
     self.shop3 = Shop.objects.create(
@@ -490,7 +500,8 @@ def create_departments_and_users(self):
         tm_open_dict='{"all":"07:00:00"}',
         tm_close_dict='{"all":"00:00:00"}',
         region=self.region,
-        settings=self.settings
+        settings=self.settings,
+        network=self.network,
     )
     Shop.objects.rebuild()
 
@@ -501,6 +512,7 @@ def create_departments_and_users(self):
         self.USER_PASSWORD,
         last_name='Васнецов',
         first_name='Иван',
+        network=self.network,
     )
     self.employment1 = Employment.objects.create(
         user=self.user1,
@@ -512,7 +524,9 @@ def create_departments_and_users(self):
         'u2@b.b',
         '4242',
         first_name='Иван2',
-        last_name='Иванов')
+        last_name='Иванов',
+        network=self.network,
+    )
     self.employment2 = Employment.objects.create(
         user=self.user2,
         shop=self.shop,
@@ -526,6 +540,7 @@ def create_departments_and_users(self):
         '4242',
         first_name='Иван3',
         last_name='Сидоров',
+        network=self.network,
     )
     self.employment3 = Employment.objects.create(
         user=self.user3,
@@ -533,7 +548,7 @@ def create_departments_and_users(self):
         auto_timetable=False,
         function_group=self.employee_group,
         dt_hired=dt,
-        salary=150
+        salary=150,
     )
 
     self.user4 = User.objects.create_user(
@@ -542,6 +557,7 @@ def create_departments_and_users(self):
         '4242',
         last_name='Петров',
         first_name='Иван4',
+        network=self.network,
     )
     self.employment4 = Employment.objects.create(
         user=self.user4,
@@ -555,6 +571,7 @@ def create_departments_and_users(self):
         '4242',
         last_name='Васнецов5',
         first_name='Иван5',
+        network=self.network,
     )
     self.employment5 = Employment.objects.create(
         user=self.user5,
@@ -568,6 +585,7 @@ def create_departments_and_users(self):
         '4242',
         last_name='Васнецов6',
         first_name='Иван6',
+        network=self.network,
     )
     self.employment6 = Employment.objects.create(
         user=self.user6,
@@ -581,6 +599,7 @@ def create_departments_and_users(self):
         '4242',
         last_name='Васнецов7',
         first_name='Иван7',
+        network=self.network,
     )
     self.employment7 = Employment.objects.create(
         user=self.user7,

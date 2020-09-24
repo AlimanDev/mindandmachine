@@ -12,7 +12,7 @@ def set_network(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('base', '0047_auto_20200813_1407'),
+        ('base', '0050_auto_20200831_0617'),
         ('timetable', '0029_merge_20200811_0933'),
     ]
 

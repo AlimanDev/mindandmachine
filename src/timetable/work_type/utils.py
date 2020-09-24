@@ -1,29 +1,22 @@
 import datetime
+
 import numpy as np
-from decimal import Decimal
-
-
-from django.db.models import Q, F, Case, When, Sum, Value, IntegerField
-
+from django.db.models import Q, F
 
 from src.base.models import (
-    Employment,
     Shop,
-    ProductionDay,
-)
-from src.timetable.models import (
-    WorkerDay,
-    WorkType,
-    WorkerDayCashboxDetails,
 )
 from src.forecast.models import (
     PeriodClients,
 )
+from src.timetable.models import (
+    WorkerDay,
+    WorkType,
+)
 from src.util.models_converter import Converter
-from src.timetable.utils import wd_stat_count_total, wd_stat_count
 
 
-def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=False):
+def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=False, ):
     def dttm2index(dt_init, dttm, period_in_day, period_lengths_minutes):
         days = (dttm.date() - dt_init).days
         return days * period_in_day + (dttm.hour * 60 + dttm.minute) // period_lengths_minutes
@@ -52,14 +45,12 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
         datetime.datetime.combine(from_dt + datetime.timedelta(days=day), datetime.time(
             hour=period * period_lengths_minutes // 60,
             minute=period * period_lengths_minutes % 60)
-        )
+                                  )
         for day in range((to_dt - from_dt).days)
         for period in range(MINUTES_IN_DAY // period_lengths_minutes)
     ]
 
     predict_needs = np.zeros(len(dttms))
-    fact_needs = np.zeros(len(dttms))
-    init_work = np.zeros(len(dttms))
     finite_work = np.zeros(len(dttms))
 
     # check cashboxes
@@ -68,11 +59,12 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
         work_types = work_types.filter(id__in=form['work_type_ids'])
         if work_types.count() != len(form['work_type_ids']):
             return 'bad work_type_ids'
+
     work_types = {
         wt.id: wt
         for wt in work_types
     }
-    #work_types = group_by(work_types, group_key=lambda x: x.id)
+    # work_types = group_by(work_types, group_key=lambda x: x.id)
     # query selecting PeriodClients
     need_workers = PeriodClients.objects.annotate(
         need_workers=F('value'),
@@ -94,146 +86,116 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
     )
     predict_needs = absenteeism_coef * predict_needs
 
-    fill_array(
-        fact_needs,
-        list(need_workers.filter(type=PeriodClients.FACT_TYPE)),
-        lambda_index_periodclients,
-        lambda_add_periodclients,
-    )
-
     # query selecting cashbox_details
     status_list = list(WorkerDay.TYPES_PAID)
-    wd_details_filter = {}
-    if not consider_vacancies:
-        wd_details_filter['worker_day__worker__isnull'] = False
 
-    cashbox_details = WorkerDayCashboxDetails.objects.filter(
-        Q(worker_day__employment__dt_fired__gte=from_dt) &
-        Q(worker_day__dt__lte=F('worker_day__employment__dt_fired')) |
-        Q(worker_day__employment__dt_fired__isnull=True),
+    base_wd_q = Q(
+        Q(employment__dt_fired__gte=from_dt) &
+        Q(dt__lte=F('employment__dt_fired')) |
+        Q(employment__dt_fired__isnull=True),
 
-        Q(worker_day__employment__dt_hired__lte=to_dt) &
-        Q(worker_day__dt__gte = F('worker_day__employment__dt_hired')) |
-        Q(worker_day__employment__dt_hired__isnull=True),
-
-        worker_day__dt__gte=from_dt,
-        worker_day__dt__lte=to_dt,
-        work_type_id__in=work_types.keys(),
-        worker_day__type__in=status_list,
-        worker_day__is_fact=False,
-        worker_day__is_approved=True,
-        **wd_details_filter,
-    ).select_related('worker_day', 'worker_day__worker')
-
-    lambda_index_work_details = lambda x: list(range(
-            dttm2index(from_dt, x.worker_day.dttm_work_start, period_in_day, period_lengths_minutes),
-            dttm2index(from_dt, x.worker_day.dttm_work_end, period_in_day, period_lengths_minutes),
-        ))
-    lambda_add_work_details = lambda x: x.work_part
-    cashbox_details_list = list(cashbox_details.select_related('worker_day'))
-    fill_array(
-        init_work,
-        cashbox_details_list,
-        lambda_index_work_details,
-        lambda_add_work_details,
-    )
-
-    employments = list(Employment.objects.filter(id__in=cashbox_details.values_list('worker_day__employment')))
-    employment_dict= {e.id: e for e in employments}
-
-    worker_days = WorkerDay.objects.qos_filter_version(1).filter(
+        Q(employment__dt_hired__lte=to_dt) &
+        Q(dt__gte=F('employment__dt_hired')) |
+        Q(employment__dt_hired__isnull=True),
         dt__gte=from_dt,
         dt__lte=to_dt,
-        employment__in=employments,
-        is_fact=False,
-        is_approved=True,
-        # employment__shop_id=shop_id,
-        type=WorkerDay.TYPE_WORKDAY
     )
+    if not consider_vacancies:
+        base_wd_q &= Q(worker__isnull=False)
 
-    hours_stat = wd_stat_count(worker_days, shop)
-    fot = 0
-    norm_work_hours = ProductionDay.objects.filter(
-            dt__month=from_dt.month,
-            dt__year=from_dt.year,
-            type__in=ProductionDay.WORK_TYPES,
-            region_id=shop.region_id,
-        ).annotate(
-            work_hours=Case(
-                When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
-                When(type=ProductionDay.TYPE_SHORT_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_SHORT_WORK])),
-            )
-        ).aggregate(
-            norm_work_hours=Sum('work_hours', output_field=IntegerField())
-        )['norm_work_hours']
+    qs_for_covering = WorkerDay.objects.filter(base_wd_q)
 
-    for row in hours_stat:
-        fot += round(
-            Decimal(row['hours_plan']) *
-            employment_dict[row['employment_id']].salary / Decimal(norm_work_hours)
-        )
+    graph_type = form.get('graph_type', 'plan_approved')
+    if graph_type == 'plan_edit':
+        qs_for_covering = qs_for_covering.get_plan_edit()
+    else:
+        qs_for_covering = qs_for_covering.get_plan_approved()
 
-    finite_workdetails = cashbox_details_list
+    qs_for_covering = qs_for_covering.filter(
+        type__in=status_list,
+        worker_day_details__work_type_id__in=work_types.keys(),
+    ).annotate(work_part=F('worker_day_details__work_part')).distinct()
+
+    lambda_index_work_days = lambda x: list(range(
+        dttm2index(from_dt, x.dttm_work_start, period_in_day, period_lengths_minutes),
+        dttm2index(from_dt, x.dttm_work_end, period_in_day, period_lengths_minutes),
+    ))
+    lambda_add_work_details = lambda x: x.work_part
+    worker_days_list = list(qs_for_covering)
+
+    finite_workdays = worker_days_list
     fill_array(
         finite_work,
-        finite_workdetails,
-        lambda_index_work_details,
+        finite_workdays,
+        lambda_index_work_days,
         lambda_add_work_details,
     )
 
     response = {}
 
+    day_stats = {}
+    graph_arr = finite_work
+
+    # TODO: доделать для факта
+    # if graph_type in ['plan_edit', 'plan_approved']:
+    #     graph_arr = finite_work
+    # else:
+    #     graph_arr = np.zeros(len(dttms))
+    #     qs_for_day_stats = None
+    #     if graph_type == 'fact_approved':
+    #         qs_for_day_stats = WorkerDay.objects.filter(base_wd_q).get_fact_approved()
+    #     elif graph_type == 'fact_edit':
+    #         qs_for_day_stats = WorkerDay.objects.filter(base_wd_q).get_fact_edit()
+    #
+    #     fill_array(
+    #         graph_arr,
+    #         list(qs_for_day_stats),
+    #         lambda_index_work_days,
+    #         lambda x: 1,  # для фактических графиков нету work_details
+    #     )
+
+    dts_for_day_stats = [
+        from_dt + datetime.timedelta(days=day)
+        for day in range((to_dt - from_dt).days)
+    ]
+    graph_arr_daily = graph_arr.reshape(len(dts_for_day_stats), period_in_day)
+    predict_needs_daily = predict_needs.reshape(len(dts_for_day_stats), period_in_day)
+    for i, dt in enumerate(dts_for_day_stats):
+        dt_converted = Converter.convert_date(dt)
+
+        graph_arr_for_dt = graph_arr_daily[i]
+        predict_needs_for_dt = predict_needs_daily[i]
+
+        covering = np.nan_to_num(np.minimum(predict_needs_for_dt, graph_arr_for_dt).sum() / predict_needs_for_dt.sum())
+        deadtime = np.nan_to_num(np.maximum(graph_arr_for_dt - predict_needs_for_dt, 0).sum() / graph_arr_for_dt.sum())
+        predict_hours = predict_needs_for_dt.sum()
+        plan_edit_hours = graph_arr_for_dt.sum()
+
+        day_stats.setdefault('covering', {})[dt_converted] = covering
+        day_stats.setdefault('deadtime', {})[dt_converted] = deadtime
+        day_stats.setdefault('predict_hours', {})[dt_converted] = predict_hours
+        day_stats.setdefault('graph_hours', {})[dt_converted] = plan_edit_hours
+
     if not indicators_only:
         real_cashiers = []
-        real_cashiers_initial = []
-        fact_cashier_needs = []
         predict_cashier_needs = []
         lack_of_cashiers_on_period = []
         for index, dttm in enumerate(dttms):
             dttm_converted = Converter.convert_datetime(dttm)
             real_cashiers.append({'dttm': dttm_converted, 'amount': finite_work[index]})
-            real_cashiers_initial.append({'dttm': dttm_converted,'amount': init_work[index]})
-            fact_cashier_needs.append({'dttm': dttm_converted, 'amount': fact_needs[index]})
             predict_cashier_needs.append({'dttm': dttm_converted, 'amount': predict_needs[index]})
             lack_of_cashiers_on_period.append({
                 'dttm': dttm_converted,
-                'lack_of_cashiers': max(0,  predict_needs[index] - finite_work[index])
+                'lack_of_cashiers': max(0, predict_needs[index] - finite_work[index])
             })
         response = {
             'period_step': period_lengths_minutes,
             'tt_periods': {
                 'real_cashiers': real_cashiers,
-                'real_cashiers_initial': real_cashiers_initial,
                 'predict_cashier_needs': predict_cashier_needs,
-                'fact_cashier_needs': fact_cashier_needs,
             },
+            'day_stats': day_stats,
             'lack_of_cashiers_on_period': lack_of_cashiers_on_period
         }
 
-    # statistics
-    worker_amount = len(set([x.worker_day.worker_id for x in finite_workdetails if x.worker_day]))
-    deadtime_part = round(100 * np.maximum(finite_work - predict_needs, 0).sum() / (finite_work.sum() +1e-8), 1)
-    covering_part = round(100 * np.maximum(predict_needs - finite_work, 0).sum() / (predict_needs.sum() +1e-8), 1)
-    days_diff = (predict_needs - finite_work).reshape(period_in_day, -1).sum(1) / (period_in_day / 3) # in workers
-    need_cashier_amount = np.maximum(days_diff[np.argsort(days_diff)[-1:]], 0).sum() # todo: redo with logic
-
-    revenue = 1000000
-
-    response.update({
-        'indicators': {
-            'deadtime_part': deadtime_part,
-            'cashier_amount': worker_amount,  # len(users_amount_set),
-            'FOT': fot if fot else None,
-            'need_cashier_amount': need_cashier_amount,  # * 1.4
-            'revenue': revenue,
-            'fot_revenue': round(fot / revenue, 2) * 100,
-            # 'change_amount': changed_amount,
-            'covering_part': covering_part,
-
-            'total_need': predict_needs.sum(),
-            'total_go': finite_work.sum(),
-            'total_plan': shop.staff_number * norm_work_hours,
-            'hours_count_fact': wd_stat_count_total(worker_days, shop)['hours_count_fact'],
-        },
-    })
     return response

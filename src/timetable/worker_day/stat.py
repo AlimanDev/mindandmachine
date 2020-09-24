@@ -7,7 +7,8 @@ from django.db.models import (
     Exists, OuterRef, Subquery,
     F, Q,
     Case, When, Value,
-    BooleanField, FloatField)
+    BooleanField, FloatField,
+)
 from django.db.models.functions import Extract, Cast, Coalesce, TruncDate
 
 from src.base.models import Employment, Shop, ProductionDay
@@ -144,7 +145,8 @@ def count_daily_stat(data):
         ).annotate(
             dt=TruncDate('dttm_forecast'),
             field=F(field_name)
-        ).values('dt','field'
+        ).values(
+            'dt', 'field'
         ).annotate(value=Sum('value'))
 
         for day in period_clients:
@@ -183,6 +185,12 @@ def count_worker_stat(data):
         dt__lte=dt_end,
         worker_id__in=worker_dict.keys(),
         type__in=WorkerDay.TYPES_USED,
+    ).exclude(
+        Q(type=WorkerDay.TYPE_WORKDAY) &
+        Q(
+            Q(dttm_work_start__isnull=True) |
+            Q(dttm_work_end__isnull=True)
+        )
     )
     worker_days = list(worker_days.order_by(
         'worker_id',

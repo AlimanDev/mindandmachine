@@ -7,6 +7,7 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from mptt.models import MPTTModel, TreeForeignKey
+from model_utils import FieldTracker
 from django.apps import apps
 from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
 from src.base.exceptions import MessageError
@@ -96,7 +97,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     LOAD_TEMPLATE_READY = 'R'
     LOAD_TEMPLATE_ERROR = 'E'
 
-
     LOAD_TEMPLATE_STATUSES = [
         (LOAD_TEMPLATE_PROCESS, 'В процессе'),
         (LOAD_TEMPLATE_READY, 'Готово'),
@@ -183,6 +183,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             return self
         level = self.level - level if self.level > level else 0
         return self.get_ancestors().filter(level=level)[0]
+
     def get_department(self):
         return self
 
@@ -191,7 +192,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         super().__init__(*args, **kwargs)
         if code:
             self.parent = Shop.objects.get(code=code)
-
 
     def __getattribute__(self, attr):
         if attr in ['open_times', 'close_times']:
@@ -250,8 +250,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             elif load_template == None:
                 apply_load_template(self.load_template_id, self.id)
                
-
-
     def get_exchange_settings(self):
         return self.exchange_settings if self.exchange_settings_id\
             else apps.get_model(
@@ -401,6 +399,11 @@ class WorkerPosition(AbstractActiveNamedModel):
 
     id = models.BigAutoField(primary_key=True)
     group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
+    default_work_type_names = models.ManyToManyField(
+        to='timetable.WorkTypeName',
+        verbose_name='Типы работ по умолчанию',
+        blank=True,
+    )
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
@@ -446,6 +449,8 @@ class Employment(AbstractActiveModel):
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
     is_visible = models.BooleanField(default=True)
 
+    position_tracker = FieldTracker(fields=['position'])
+
     objects = EmploymentManager()
 
     def has_permission(self, permission, method='GET'):
@@ -482,7 +487,38 @@ class Employment(AbstractActiveModel):
             self.user = User.objects.get(username=self.username)
         if hasattr(self, 'position_code'):
             self.position = WorkerPosition.objects.get(code=self.position_code)
-        super().save(*args, **kwargs)
+
+        force_create_work_types = kwargs.pop('force_create_work_types', False)
+        is_new = self.pk is None
+        position_has_changed = self.position_tracker.has_changed('position')
+        res = super().save(*args, **kwargs)
+        # при создании трудоустройства или при смене должности проставляем типы работ по умолчанию
+        if force_create_work_types or is_new or position_has_changed:
+            from src.timetable.models import EmploymentWorkType, WorkType
+            work_type_names = WorkerPosition.default_work_type_names.through.objects.filter(
+                workerposition_id=self.position_id,
+            ).values_list('worktypename', flat=True)
+
+            work_types = []
+            for work_type_name_id in work_type_names:
+                work_type, _wt_created = WorkType.objects.get_or_create(
+                    shop_id=self.shop_id,
+                    work_type_name_id=work_type_name_id,
+                )
+                work_types.append(work_type)
+
+            if work_types or not is_new:
+                EmploymentWorkType.objects.filter(employment_id=self.id).delete()
+
+            if work_types:
+                EmploymentWorkType.objects.bulk_create(
+                    EmploymentWorkType(
+                        employment_id=self.id,
+                        work_type=work_type,
+                        priority=1,
+                    ) for work_type in work_types
+                )
+        return res
 
 
 class FunctionGroup(AbstractModel):
@@ -512,11 +548,16 @@ class FunctionGroup(AbstractModel):
         'ExchangeSettings',
         'FunctionGroupView',
         'FunctionGroupView_functions',
+        'LoadTemplate',
+        'LoadTemplate_apply',
+        'LoadTemplate_calculate',
         'Network',
         'Notification',
         'OperationTemplate',
         'OperationTypeName',
         'OperationType',
+        'OperationTypeRelation',
+        'OperationTypeTemplate',
         'PeriodClients',
         'PeriodClients_indicators',
         'PeriodClients_put',

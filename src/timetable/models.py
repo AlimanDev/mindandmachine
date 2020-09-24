@@ -1,15 +1,17 @@
 import datetime
 import json
 
-from django.db import models
-from django.db.models import Subquery, OuterRef, Max
-from django.utils import timezone
 from django.contrib.auth.models import (
     UserManager
 )
+from django.db import models
+from django.db.models import Subquery, OuterRef, Max
+from django.db.models.query import QuerySet
+from django.utils import timezone
 
 from src.base.models import Shop, Employment, User, Event, Network
-from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, AbstractActiveModelManager
+from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, \
+    AbstractActiveModelManager
 
 
 class WorkerManager(UserManager):
@@ -63,7 +65,7 @@ class WorkType(AbstractActiveModel):
         unique_together = ['shop', 'work_type_name']
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(self.work_type_name.name, self.shop.name, self.shop.parent.name, self.id)
+        return '{}, {}, {}, {}'.format(self.work_type_name.name, self.shop.name, self.shop.parent.name if self.shop.parent else '', self.id)
 
     id = models.BigAutoField(primary_key=True)
 
@@ -243,6 +245,49 @@ class WorkerConstraint(AbstractModel):
         return self.employment.shop
 
 
+class WorkerDayQuerySet(QuerySet):
+    def get_plan_approved(self):
+        return self.filter(is_fact=False, is_approved=True)
+
+    def get_plan_not_approved(self):
+        return self.filter(is_fact=False, is_approved=False)
+
+    def get_fact_approved(self):
+        return self.filter(is_fact=True, is_approved=True)
+
+    def get_fact_not_approved(self):
+        return self.filter(is_fact=True, is_approved=False)
+
+    def get_plan_edit(self):
+        worker_days_ordered = self.filter(is_fact=False).order_by('is_approved')
+        exists = []
+        remove = []
+        for worker_day in worker_days_ordered:
+            if (worker_day.worker_id, worker_day.dt) in exists:
+                remove.append(worker_day.id)
+            else:
+                exists.append((worker_day.worker_id, worker_day.dt))
+        return self.filter(is_fact=False).exclude(id__in=remove)
+
+    def get_fact_edit(self):
+        raise NotImplementedError
+
+    def get_tabel(self):
+        query = self.filter(
+            models.Q(is_fact=True, is_approved=True) |
+            models.Q(models.Q(is_approved=True) & ~models.Q(type__in=WorkerDay.TYPES_PAID))
+        )
+        worker_days = list(query.order_by('worker_id', 'dt', '-is_fact'))
+        exists = []
+        remove = []
+        for worker_day in worker_days:
+            if (worker_day.worker_id, worker_day.dt) in exists:
+                remove.append(worker_day.id)
+            else:
+                exists.append((worker_day.worker_id, worker_day.dt))
+        return query.exclude(id__in=remove)
+
+
 class WorkerDayManager(models.Manager):
     def qos_current_version(self, approved_only=False):
         if approved_only:
@@ -416,7 +461,7 @@ class WorkerDay(AbstractModel):
     canceled = models.BooleanField(default=False)
     is_outsource = models.BooleanField(default=False)
 
-    objects = WorkerDayManager()
+    objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()
 
     @classmethod
     def is_type_with_tm_range(cls, t):
@@ -434,8 +479,8 @@ class WorkerDay(AbstractModel):
     def get_department(self):
         return self.shop
 
-    def save(self, *args, **kwargs):
-        if self.dttm_work_end and self.dttm_work_start and self.shop:
+    def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
+        if self.dttm_work_end and self.dttm_work_start and self.shop and self.shop.settings:
             self.work_hours = self.count_work_hours(json.loads(self.shop.settings.break_triplets), self.dttm_work_start, self.dttm_work_end)
         else:
             self.work_hours = datetime.timedelta(0)
@@ -713,6 +758,7 @@ class ShopMonthStat(AbstractModel):
     dt = models.DateField()
     status = models.CharField(choices=STATUS, default=NOT_DONE, max_length=1)
     dttm_status_change = models.DateTimeField()
+    is_approved = models.BooleanField(default=False)
 
     # statistics
     fot = models.IntegerField(default=0, blank=True, null=True)
@@ -764,7 +810,6 @@ class AttendanceRecords(AbstractModel):
         """
         super(AttendanceRecords, self).save(*args, **kwargs)
 
-
         # Достаем сразу все планы и факты за день
         worker_days = WorkerDay.objects.filter(
             shop=self.shop,
@@ -773,7 +818,7 @@ class AttendanceRecords(AbstractModel):
         )
 
         if len(worker_days) > 4:
-            raise ValueError( f"Worker {self.user} has too many worker days on {self.dttm.date()}")
+            raise ValueError(f"Worker {self.user} has too many worker days on {self.dttm.date()}")
 
         wdays = {
             'fact': {
@@ -797,6 +842,14 @@ class AttendanceRecords(AbstractModel):
         }
 
         if wdays['fact']['approved']:
+            # если это отметка о приходе, то не перезаписываем время начала работы в графике
+            # если время отметки больше, чем время начала работы в существующем графике
+            skip_condition = (self.type == self.TYPE_COMING) and \
+                             wdays['fact']['approved'].dttm_work_start and self.dttm > wdays['fact'][
+                                 'approved'].dttm_work_start
+            if skip_condition:
+                return
+
             setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
             wdays['fact']['approved'].save()
         else:
@@ -810,7 +863,7 @@ class AttendanceRecords(AbstractModel):
             setattr(wd, type2dtfield[self.type], self.dttm)
 
             wd.parent_worker_day = wdays['plan']['approved'] \
-                if   wdays['plan']['approved']\
+                if wdays['plan']['approved'] \
                 else wdays['plan']['not_approved']
 
             wd.save()

@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from src.forecast.models import (
     OperationType,
     PeriodClients,
+    OperationTypeName,
 )
 
 from datetime import time, timedelta, datetime, date
@@ -253,7 +254,7 @@ def create_demand(data):
         dttm_forecast__date__lte=dt_to,
         dttm_forecast__time__gte=min_time,
         dttm_forecast__time__lte=max_time,
-        operation_type__do_forecast=OperationType.FORECAST,
+        operation_type__operation_type_name__do_forecast=OperationTypeName.FORECAST,
         operation_type__in=operation_types_to_delete,
     ).delete()
     
@@ -277,49 +278,3 @@ def create_demand(data):
         )
     PeriodClients.objects.bulk_create(models_list)
     return True
-
-
-def group_bills_and_income(form):
-    result = {}
-    settings = form['settings']
-    for bill in form['values']:
-        shop = bill[settings.get('timeserie_shop_code','КодМагазина')]
-        if not shop in result:
-            result[shop] = {}
-            result[shop]['shop_code'] = shop
-            result[shop]['type'] = 'F'
-            result[shop]['data'] = []
-            result[shop]['temp_data'] = {}
-        dttm = Converter.parse_datetime(bill['Дата'])
-        dttm = Converter.convert_datetime(datetime.combine(dttm.date(), time(dttm.hour)))
-        if not dttm in result[shop]['temp_data']:
-            result[shop]['temp_data'][dttm] = {
-                'bills': 0,
-                'income':0,
-            }
-        result[shop]['temp_data'][dttm]['bills'] += 1
-        result[shop]['temp_data'][dttm]['income'] += float(bill[settings.get('timeserie_income_sum','СуммаДокумента')])
-    for shop, values in result.items():
-        for t, data in values['temp_data'].items():
-            dttm = Converter.parse_datetime(t)
-            dt_from = values.get('dt_from')
-            dt_to = values.get('dt_to')
-            if not dt_from or dt_from > dttm.date():
-                values['dt_from'] = dttm.date()
-            if not dt_to or dt_to < dttm.date():
-                values['dt_to'] = dttm.date()
-            values['data'].append(
-                {
-                    'dttm': t,
-                    'value': data['bills'],
-                    'timeserie_code': settings.get('timeserie_bills_type_code','bills'),
-                }
-            )
-            values['data'].append(
-                {
-                    'dttm': t,
-                    'value': data['income'],
-                    'timeserie_code': settings.get('timeserie_income_type_code','income'),
-                }
-            )
-    return result

@@ -219,7 +219,7 @@ class WorkTypeConverter(Converter):
         return {
             'id': obj.id,
             'name': obj.operation_type_name.name,
-            'do_forecast': obj.do_forecast,
+            'do_forecast': obj.operation_type_name.do_forecast,
             'work_type_id': obj.work_type.id
         }
 

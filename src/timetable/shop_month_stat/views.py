@@ -87,11 +87,15 @@ class ShopMonthStatViewSet(mixins.UpdateModelMixin,
     def status(self, request):
         data = StatusSerializer(data=request.query_params)
         data.is_valid(raise_exception=True)
+        dt = data.validated_data['dt'].replace(day=1)
+        try:
+            shop_stat = ShopMonthStat.objects.get(
+                shop_id=data.validated_data['shop_id'],
+                dt=dt,
+            )
+            res = ShopMonthStatSerializer(shop_stat).data
+        except:
+            res = {'status': None}
 
-        shop_stat = ShopMonthStat.objects.get(
-            shop_id=data.validated_data['shop_id'],
-            dt=data.validated_data['dt'],
-        )
-
-        return Response(ShopMonthStatSerializer(shop_stat).data)
+        return Response(res)
 

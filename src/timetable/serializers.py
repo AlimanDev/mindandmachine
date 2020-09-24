@@ -46,6 +46,8 @@ class WorkerDayListSerializer(serializers.Serializer):
     is_fact = serializers.BooleanField()
     work_hours = serializers.DurationField()
     parent_worker_day_id = serializers.IntegerField()
+    shop_code = serializers.CharField(required=False, read_only=True)
+    user_login = serializers.CharField(required=False, read_only=True)
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):
@@ -69,29 +71,32 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     shop_code = serializers.CharField(required=False)
     user_login = serializers.CharField(required=False, read_only=True)
     username = serializers.CharField(required=False, write_only=True)
+    created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:
         model = WorkerDay
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id',
-                  'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username']
-        read_only_fields =['is_approved', 'work_hours', 'parent_worker_day_id']
+                  'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by']
+        read_only_fields =['work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
 
     def validate(self, attrs):
         if self.instance and self.instance.is_approved:
             raise ValidationError({"error": "Нельзя менять подтвержденную версию."})
 
-        is_fact = attrs.get('is_fact')
-        if is_fact:
-            attrs['type'] = WorkerDay.TYPE_WORKDAY
-
+        is_fact = attrs['is_fact'] if 'is_fact' in attrs else getattr(self.instance, 'is_fact', None)
         type = attrs['type']
+
+        if is_fact and type not in (WorkerDay.TYPE_WORKDAY, WorkerDay.TYPE_EMPTY):
+            raise ValidationError({
+                "error": "Для фактической неподтвержденной версии можно установить только 'Рабочий день' и 'НД'."
+            })
 
         if not WorkerDay.is_type_with_tm_range(type):
             attrs['dttm_work_start'] = None
             attrs['dttm_work_end'] = None
-        elif not ( attrs.get('dttm_work_start') and attrs.get('dttm_work_end')):
+        elif not (attrs.get('dttm_work_start') and attrs.get('dttm_work_end')):
             messages={}
             for k in 'dttm_work_start', 'dttm_work_end':
                 if not attrs.get(k):
@@ -118,7 +123,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
         if not type == WorkerDay.TYPE_WORKDAY or is_fact:
             attrs.pop('worker_day_details', None)
-        elif not ( attrs.get('worker_day_details')):
+        elif not (attrs.get('worker_day_details')):
             raise ValidationError({
                 "worker_day_details": self.error_messages['required']
             })
@@ -126,10 +131,12 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        self.check_other_worker_days(None, validated_data)
+        # self.check_other_worker_days(None, validated_data)
         is_fact = validated_data.get('is_fact')
+        is_approved = validated_data.get('is_approved')
 
-        # Если создаем факт то делаем его потомком подтвержденного факта или плана. Если создаем план - делаем родителем факта и потомком подтвержденного плана
+        # Если создаем факт то делаем его потомком подтвержденного факта или плана.
+        # Если создаем план - делаем родителем факта и потомком подтвержденного плана.
         worker_days = WorkerDay.objects.filter(
             worker_id=validated_data.get('worker_id'),
             dt=validated_data.get('dt'),
@@ -145,28 +152,40 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             approved = 'approved' if w.is_approved else 'not_approved'
             wd[plan_or_fact][approved] = w
 
-        plan_to_bind = wd['plan']['approved'] if wd['plan']['approved'] else wd['plan']['not_approved'] if is_fact else None
-        fact_to_bind = wd['fact']['approved'] if wd['fact']['approved'] else wd['fact']['not_approved'] if not is_fact else None
+        # plan_to_bind = wd['plan']['approved'] if wd['plan']['approved'] else wd['plan']['not_approved'] if is_fact else None
+        # fact_to_bind = wd['fact']['approved'] if wd['fact']['approved'] else wd['fact']['not_approved'] if not is_fact else None
 
         # Привязываем факт к подтвержденному факту или любому плану, план к подтвержденному плану
-        if is_fact and fact_to_bind:
-            validated_data['parent_worker_day_id'] = fact_to_bind.id
-        elif plan_to_bind:
-            validated_data['parent_worker_day_id'] = plan_to_bind.id
-
+        # if is_fact and fact_to_bind:
+        #     validated_data['parent_worker_day_id'] = fact_to_bind.id
+        # elif plan_to_bind:
+        #     validated_data['parent_worker_day_id'] = plan_to_bind.id
 
         details = validated_data.pop('worker_day_details', None)
+        delete_model = None
+        if is_fact:
+            if is_approved:
+                validated_data['parent_worker_day'] = wd['plan']['approved'] or wd['plan']['not_approved']
+                delete_model = wd['fact']['approved']
+            else:
+                validated_data['parent_worker_day'] = wd['fact']['approved'] or wd['plan']['approved'] or wd['plan']['not_approved']
+                delete_model = wd['fact']['not_approved']
+        else:
+            # план
+            if is_approved:
+                delete_model = wd['plan']['approved']
+            else:
+                validated_data['parent_worker_day'] = wd['plan']['approved']
+                delete_model = wd['plan']['not_approved']
 
         worker_day = WorkerDay.objects.create(**validated_data)
+        if delete_model:
+            WorkerDay.objects.filter(parent_worker_day_id=delete_model.id).update(parent_worker_day_id=worker_day.id)
+            delete_model.delete()
 
-        # К созданному плану привязываем факт
-        if not is_fact:
-            if fact_to_bind and fact_to_bind.parent_worker_day_id == None:
-                fact_to_bind.parent_worker_day = worker_day
-                fact_to_bind.save()
-            if details:
-                for wd_detail in details:
-                    WorkerDayCashboxDetails.objects.create(worker_day=worker_day, **wd_detail)
+        if details:
+            for wd_detail in details:
+                WorkerDayCashboxDetails.objects.create(worker_day=worker_day, **wd_detail)
 
         return worker_day
 
