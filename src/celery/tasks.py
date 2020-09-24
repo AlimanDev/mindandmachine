@@ -17,7 +17,7 @@ from src.timetable.vacancy.utils import (
 
 from src.main.demand.utils import create_predbills_request_function
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
-from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
+from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
 
 from src.main.operation_template.utils import build_period_clients
 
@@ -46,12 +46,14 @@ from src.forecast.models import (
 )
 from src.celery.celery import app
 from django.core.mail import EmailMultiAlternatives
-from src.conf.djconfig import EMAIL_HOST_USER
+from src.conf.djconfig import EMAIL_HOST_USER, TIMETABLE_IP
 
 import time as time_in_secs
 
 import pandas as pd
 import json
+from django.core.serializers.json import DjangoJSONEncoder
+import requests
 
 
 
@@ -471,24 +473,34 @@ def upload_vacation_task():
     os.remove(localpath)
 
 
+# @app.task
+# def calculate_shops_load(lang, load_template_id, dt_from, dt_to, shop_id=None):
+#     load_template = LoadTemplate.objects.get(pk=load_template_id)
+#     root_shop = Shop.objects.filter(level=0).first()
+#     shops = [load_template.shops.get(pk=shop_id)] if shop_id else load_template.shops.all()
+#     for shop in shops:
+#         res = calculate_shop_load(shop, load_template, dt_from, dt_to, lang=lang)
+#         if res['error']:
+#             event = Event.objects.create(
+#                 type="load_template_err",
+#                 params={
+#                     'shop': shop,
+#                     'message': Message(lang=lang).get_message(res['code'], params=res.get('params', {})),
+#                 },
+#                 dttm_valid_to=datetime.now() + timedelta(days=2),
+#                 shop=root_shop,
+#             )
+#             create_notifications_for_event(event.id)
 @app.task
 def calculate_shops_load(lang, load_template_id, dt_from, dt_to, shop_id=None):
     load_template = LoadTemplate.objects.get(pk=load_template_id)
-    root_shop = Shop.objects.filter(level=0).first()
     shops = [load_template.shops.get(pk=shop_id)] if shop_id else load_template.shops.all()
+    Shop.objects.filter(id__in=list(map(lambda x: x.id, shops))).update(load_template_status=Shop.LOAD_TEMPLATE_PROCESS)
     for shop in shops:
-        res = calculate_shop_load(shop, load_template, dt_from, dt_to, lang=lang)
-        if res['error']:
-            event = Event.objects.create(
-                type="load_template_err",
-                params={
-                    'shop': shop,
-                    'message': Message(lang=lang).get_message(res['code'], params=res.get('params', {})),
-                },
-                dttm_valid_to=datetime.now() + timedelta(days=2),
-                shop=root_shop,
-            )
-            create_notifications_for_event(event.id)
+        data = prepare_load_template_request(load_template_id, shop.id, dt_from, dt_to)
+        data = json.dumps(data, cls=DjangoJSONEncoder)
+        response = requests.post(f'http://{TIMETABLE_IP}/calculate_shop_load/', json=data)
+
 
 
 @app.task

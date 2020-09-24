@@ -16,6 +16,8 @@ from src.forecast.operation_type_template.views import OperationTypeTemplateSeri
 from src.base.shop.serializers import ShopSerializer
 from django.db.models import F
 from src.util.models_converter import Converter
+from src.conf.djconfig import HOST_IP
+import json
 
 
 ########################## Вспомогательные функции ##########################
@@ -416,6 +418,8 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
         'dt_from': dt_from,
         'dt_to': dt_to,
         'shop': ShopSerializer(shop).data,
+        'IP': HOST_IP,
+        'forecast_params': json.loads(shop.load_template.forecast_params)
     }
     relations = {}
     for rel in OperationTypeRelation.objects.filter(
