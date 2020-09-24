@@ -808,7 +808,6 @@ class AttendanceRecords(AbstractModel):
         """
         super(AttendanceRecords, self).save(*args, **kwargs)
 
-
         # Достаем сразу все планы и факты за день
         worker_days = WorkerDay.objects.filter(
             shop=self.shop,
@@ -817,7 +816,7 @@ class AttendanceRecords(AbstractModel):
         )
 
         if len(worker_days) > 4:
-            raise ValueError( f"Worker {self.user} has too many worker days on {self.dttm.date()}")
+            raise ValueError(f"Worker {self.user} has too many worker days on {self.dttm.date()}")
 
         wdays = {
             'fact': {
@@ -841,6 +840,14 @@ class AttendanceRecords(AbstractModel):
         }
 
         if wdays['fact']['approved']:
+            # если это отметка о приходе, то не перезаписываем время начала работы в графике
+            # если время отметки больше, чем время начала работы в существующем графике
+            skip_condition = (self.type == self.TYPE_COMING) and \
+                             wdays['fact']['approved'].dttm_work_start and self.dttm > wdays['fact'][
+                                 'approved'].dttm_work_start
+            if skip_condition:
+                return
+
             setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
             wdays['fact']['approved'].save()
         else:
@@ -854,7 +861,7 @@ class AttendanceRecords(AbstractModel):
             setattr(wd, type2dtfield[self.type], self.dttm)
 
             wd.parent_worker_day = wdays['plan']['approved'] \
-                if   wdays['plan']['approved']\
+                if wdays['plan']['approved'] \
                 else wdays['plan']['not_approved']
 
             wd.save()
