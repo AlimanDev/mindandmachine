@@ -1,3 +1,5 @@
+import json
+
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -23,21 +25,23 @@ class TestWorkerConstraint(TestsHelperMixin, APITestCase):
             level_down=99,
         )
 
-        data = [
-            {
-                "tm": "09:00:00",
-                "is_lite": False,
-                "weekday": 3,
-            },
-            {
-                "tm": "10:00:00",
-                "is_lite": False,
-                "weekday": 3,
-            },
-        ]
+        data = {
+            'data': [
+                {
+                    "tm": "09:00:00",
+                    "is_lite": False,
+                    "weekday": 3,
+                },
+                {
+                    "tm": "10:00:00",
+                    "is_lite": False,
+                    "weekday": 3,
+                },
+            ]
+        }
         resp = self.client.post(
             self.get_url('WorkerConstraint-list', employment_pk=self.employment1.pk),
-            data=data, format='json',
+            data=json.dumps(data), content_type='application/json',
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(WorkerConstraint.objects.filter(employment=self.employment1).count(), 2)
@@ -50,17 +54,18 @@ class TestWorkerConstraint(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp.json()), 0)
 
-        data.pop()
+        data['data'].pop()
         resp = self.client.post(
             self.get_url('WorkerConstraint-list', employment_pk=self.employment1.pk),
-            data=data, format='json',
+            data=json.dumps(data), content_type='application/json',
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(WorkerConstraint.objects.filter(employment=self.employment1).count(), 1)
 
+        data['data'].pop()
         resp = self.client.post(
             self.get_url('WorkerConstraint-list', employment_pk=self.employment1.pk),
-            data=[], format='json',
+            data=json.dumps(data), content_type='application/json',
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(WorkerConstraint.objects.filter(employment=self.employment1).count(), 0)

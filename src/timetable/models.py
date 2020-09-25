@@ -241,6 +241,7 @@ class WorkerConstraint(AbstractModel):
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
     is_lite = models.BooleanField(default=False)  # True -- если сам сотрудник выставил, False -- если менеджер
     tm = models.TimeField()
+
     def get_department(self):
         return self.employment.shop
 
