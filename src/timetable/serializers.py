@@ -386,9 +386,9 @@ class DuplicateSrializer(serializers.Serializer):
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
-        for key in ['from_worker_id', 'to_worker_id']:
-            if not User.objects.filter(id=self.validated_data[key]).exists():
-                raise ValidationError({key: self.error_messages['not_exist'].format(pk_value=self.validated_data[key])})
+        if not User.objects.filter(id=self.data['to_worker_id']).exists():
+            raise ValidationError({'to_worker_id': self.error_messages['not_exist'].format(pk_value=self.validated_data['to_worker_id'])})
+        return True
 
 
 class DeleteTimetableSerializer(serializers.Serializer):
