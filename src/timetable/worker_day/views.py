@@ -229,7 +229,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             WorkerDay.objects.filter(id__in=parent_ids).delete()
         ShopMonthStat.objects.filter(
             shop_id=serializer.data['shop_id'], 
-            dt=serializer.data['dt_from'].replace(day=1),
+            dt=serializer.validated_data['dt_from'].replace(day=1),
         ).update(
             is_approved=True,
         )
