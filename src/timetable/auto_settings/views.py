@@ -339,7 +339,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         #         operation_type__work_type=work_type,
         #         type=PeriodClients.LONG_FORECASE_TYPE,
         #         dttm_forecast__date__gte=dt_from,
-        #         dttm_forecast__date__lt=dt_to,
+        #         dttm_forecast__date__lte=dt_to,
         #         dttm_forecast__time__gte=shop.tm_shop_opens,
         #         dttm_forecast__time__lt=shop.tm_shop_closes,
         #
@@ -416,8 +416,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         worker_days_db = WorkerDay.objects.get_last_plan(
             worker_id__in=user_ids,
             dt__gte=dt_from,
-            dt__lt=dt_to,
+            dt__lte=dt_to,
             **new_worker_days_filter,
+        ).exclude(
+            type=WorkerDay.TYPE_EMPTY,
         ).order_by(
             'dt', 'worker_id'
         ).values(
@@ -437,7 +439,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         worker_days_db = WorkerDay.objects.get_last_plan(
             worker_id__in=user_ids,
             dt__gte=dt_from - timedelta(days=7),
-            dt__lt=dt_from,
+            dt__lte=dt_from,
+        ).exclude(
+            type=WorkerDay.TYPE_EMPTY,
         ).order_by(
             'dt'
         ).values(
@@ -642,7 +646,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             operation_type__work_type__dttm_deleted__isnull=True,
             type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
-            dttm_forecast__date__lt=dt_to,
+            dttm_forecast__date__lte=dt_to,
         ).values(
             'dttm_forecast',
             'operation_type__work_type_id',
@@ -664,7 +668,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         init_params = json.loads(shop.settings.init_params)
         work_days = list(ProductionDay.objects.filter(
             dt__gte=dt_first,
-            dt__lt=dt_to,
+            dt__lte=dt_to,
             type__in=ProductionDay.WORK_TYPES,
             region_id=shop.region_id,
         ))
@@ -943,7 +947,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         wdays = WorkerDay.objects.filter(
             Q(shop_id=shop_id) | Q(shop_id__isnull=True),
             dt__gte=dt_from,
-            dt__lt=dt_to,
+            dt__lte=dt_to,
             worker_id__in=user_ids,
             is_approved=False,
             # is_vacancy=False,
@@ -970,7 +974,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         wdays = WorkerDay.objects.filter(
             Q(shop_id=shop_id) | Q(shop_id__isnull=True),
             dt__gte=dt_from,
-            dt__lt=dt_to,
+            dt__lte=dt_to,
             worker_id__in=user_ids,
             is_approved=True,
             # is_vacancy=False,
@@ -991,7 +995,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         # work_type_ids = [w.id for w in WorkType.objects.filter(shop_id=shop_id)]
         # WorkerDayCashboxDetails.objects.filter(
         #     dttm_from__date__gte=dt_from,
-        #     dttm_from__date__lt=dt_to,
+        #     dttm_from__date__lte=dt_to,
         #     is_vacancy=True,
         #     work_type_id__in=work_type_ids,
         # ).update(
