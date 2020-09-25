@@ -6,6 +6,7 @@ from rest_framework.test import APITestCase
 from src.base.models import FunctionGroup
 from src.timetable.models import WorkerConstraint
 from src.util.mixins.tests import TestsHelperMixin
+from src.util.models_converter import Converter
 
 
 class TestWorkerConstraint(TestsHelperMixin, APITestCase):
@@ -25,11 +26,21 @@ class TestWorkerConstraint(TestsHelperMixin, APITestCase):
             level_down=99,
         )
 
+        wc = WorkerConstraint.objects.create(
+            shop=self.shop,
+            employment=self.employment1,
+            worker=self.employment1.user,
+            weekday=3,
+            is_lite=True,
+            tm=Converter.parse_time("09:00:00")
+        )
+
         data = {
             'data': [
                 {
+                    "id": wc.id,
                     "tm": "09:00:00",
-                    "is_lite": False,
+                    "is_lite": True,
                     "weekday": 3,
                 },
                 {

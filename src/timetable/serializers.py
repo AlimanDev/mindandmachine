@@ -294,11 +294,12 @@ class WrappedWorkerConstraintSerializer(serializers.Serializer):
         )
         constraint_mapping = {constraint.id: constraint for constraint in constraints}
 
+        wc_serializer = WorkerConstraintSerializer()
         for item in validated_data:
             if item.get('id'):
                 if not constraint_mapping.get(item['id']):
                     raise ValidationError({"error": f"object with id {item['id']} does not exist"})
-                self.child.update(constraint_mapping[item['id']], item)
+                wc_serializer.update(constraint_mapping[item['id']], item)
                 ids.append(item['id'])
             else:
                 constraint = WorkerConstraint(
