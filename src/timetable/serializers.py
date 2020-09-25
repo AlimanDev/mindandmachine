@@ -380,10 +380,9 @@ class DuplicateSrializer(serializers.Serializer):
     default_error_messages = {
          'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")
     }
-    from_worker_id = serializers.IntegerField()
     to_worker_id = serializers.IntegerField()
-    dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
-    is_approved = serializers.BooleanField(default=False)
+    from_workeday_ids = serializers.ListField(child=serializers.IntegerField())
+    to_dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
