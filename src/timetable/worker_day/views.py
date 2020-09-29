@@ -440,7 +440,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         to_worker_id = data['to_worker_id']
 
         main_worker_days = list(WorkerDay.objects.filter(
-            id__in=data['from_workeday_ids'],
+            id__in=data['from_workerday_ids'],
             is_fact=False,
         ))
         main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
