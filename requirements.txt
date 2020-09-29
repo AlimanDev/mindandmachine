@@ -117,3 +117,4 @@ XlsxWriter==1.2.6
 zipp==0.6.0
 django-model-utils==4.0.0
 factory-boy==3.0.1
+drf-nested-routers==0.91

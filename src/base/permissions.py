@@ -94,32 +94,19 @@ class EmploymentFilteredListPermission(Permission):
             # Права для объекта проверятся в has_object_permission
             return True
 
-        if request.method == 'GET':
-            employment_id = request.query_params.get('employment_id')
-            if not employment_id:
-                raise ValidationError("employment_id should be defined")
-        else:
-            if isinstance(request.data, list):
-                employment_id = request.data[0].get('employment_id')
-                for item in request.data:
-                    if item['employment_id'] != employment_id:
-                        raise ValidationError("employment_id must be same for all constraints")
-            else:
-                employment_id = request.data.get('employment_id')
-            # shop_id не меняется, права задаются has_object_permission
-            if not employment_id:
-                return True
+        employment_id = view.kwargs.get('employment_pk')
 
         try:
             employment = Employment.objects.get(id=employment_id)
         except ObjectDoesNotExist:
-            raise NotFound( "Employment does not exist")
+            raise NotFound("Employment does not exist")
 
         department = employment.shop
 
         employments = Employment.objects.get_active(
             employment.user.network_id,
             shop__in=department.get_ancestors(include_self=True, ascending=True),
-            user=request.user)
+            user=request.user,
+        )
 
         return self.check_employment_permission(employments, request, view)
