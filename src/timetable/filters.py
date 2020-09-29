@@ -85,9 +85,9 @@ class EmploymentWorkTypeFilter(FilterSet):
 
 class WorkerConstraintFilter(FilterSet):
     employment_id = NumberFilter(field_name='employment_id')
+
     class Meta:
         model = WorkerConstraint
         fields = {
             'employment_id': ['exact'],
         }
-
