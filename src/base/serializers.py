@@ -51,11 +51,16 @@ class UserListSerializer(serializers.Serializer):
 class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
+    avatar = serializers.SerializerMethodField('get_avatar_url')
 
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
                   'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            return obj.avatar.url
+        return None
 
 
 class AuthUserSerializer(UserSerializer):
