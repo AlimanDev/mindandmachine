@@ -593,15 +593,14 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             # Реализация через фиксированных сотрудников, чтобы не повторять функционал
             elif not employment.auto_timetable:
                 employment.is_fixed_hours = True
-                workers_month_days = worker_day.get(employment.user_id,
-                                                    [])  # Может случиться так что для этого работника еще никаким образом расписание не составлялось
+                # Может случиться так что для этого работника еще никаким образом расписание не составлялось
+                workers_month_days = worker_day.get(employment.user_id, [])
                 workers_month_days.sort(key=lambda wd: wd.dt)
                 workers_month_days_new = []
                 wd_index = 0
                 for dt in dates:
-                    if (workers_month_days[wd_index].dt if \
-                            wd_index < len(
-                                workers_month_days) else None) == dt:  # Если вернется пустой список, нужно исключать ошибку out of range
+                    if (workers_month_days[wd_index].dt if wd_index < len(workers_month_days) else None) == dt:
+                        # Если вернется пустой список, нужно исключать ошибку out of range
                         workers_month_days_new.append(workers_month_days[wd_index])
                         wd_index += 1
                     else:
@@ -847,16 +846,17 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
                     #неподтвержденная версия
                     if False in wdays:
-                        wd_obj=wdays[False]
-                        wd_obj.type=wd['type']
-                        WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
+                        wd_obj = wdays[False]
+                        if wd_obj.created_by_id is None:
+                            wd_obj.type = wd['type']
+                            WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
                     elif True in wdays:
                         wd_obj.parent_worker_day=wdays[True]
 
                     if wd['type'] == WorkerDay.TYPE_WORKDAY:
-                        wd_obj.shop=shop
+                        wd_obj.shop = shop
 
-                    if WorkerDay.is_type_with_tm_range(wd_obj.type):
+                    if WorkerDay.is_type_with_tm_range(wd_obj.type) and (wd_obj.created_by_id is None):
                         wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
                         wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
                         wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
@@ -882,7 +882,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         wd_obj.dttm_work_start = None
                         wd_obj.dttm_work_end = None
                         wd_obj.work_hours = timedelta(hours=0)
-                        wd_obj.shop=None
+                        wd_obj.shop = None
                         wd_obj.save()
 
 
