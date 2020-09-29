@@ -2,7 +2,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 
 from django.db.models import Q, Sum
-from django_filters.rest_framework import FilterSet
+from django_filters.rest_framework import NumberFilter
 
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -13,14 +13,14 @@ from src.base.permissions import Permission
 
 from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
 from src.base.views import BaseActiveNamedModelViewSet
+from src.base.filters import BaseActiveNamedModelFilter
 
 
-class ShopFilter(FilterSet):
+class ShopFilter(BaseActiveNamedModelFilter):
+    id = NumberFilter(field_name='id', lookup_expr='exact')
     class Meta:
         model = Shop
         fields = {
-            'id':['exact', 'in'],
-            'code': ['exact', 'in'],
             'load_template_id': ['exact',],
             'load_template_status': ['exact'],
         }
