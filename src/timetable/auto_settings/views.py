@@ -856,34 +856,35 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     if wd['type'] == WorkerDay.TYPE_WORKDAY:
                         wd_obj.shop = shop
 
-                    if WorkerDay.is_type_with_tm_range(wd_obj.type) and (wd_obj.created_by_id is None):
-                        wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
-                        wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
-                        wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
-                        wd_obj.save()
+                    if wd_obj.created_by_id is None:
+                        if WorkerDay.is_type_with_tm_range(wd_obj.type):
+                            wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
+                            wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
+                            wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
+                            wd_obj.save()
 
-                        wdd_list = []
+                            wdd_list = []
 
-                        for wdd in wd['details']:
-                            wdd_el = WorkerDayCashboxDetails(
-                                worker_day=wd_obj,
-                                work_part=wdd['percent'] / 100,
-                                work_type_id=wdd['work_type_id'],
-                            )
-                            # if wdd['work_type_id'] > 0:
-                            #     wdd_el.work_type_id = wdd['type']
-                            # else:
-                            #     wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
+                            for wdd in wd['details']:
+                                wdd_el = WorkerDayCashboxDetails(
+                                    worker_day=wd_obj,
+                                    work_part=wdd['percent'] / 100,
+                                    work_type_id=wdd['work_type_id'],
+                                )
+                                # if wdd['work_type_id'] > 0:
+                                #     wdd_el.work_type_id = wdd['type']
+                                # else:
+                                #     wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
 
-                            wdd_list.append(wdd_el)
-                        WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
+                                wdd_list.append(wdd_el)
+                            WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
 
-                    else:
-                        wd_obj.dttm_work_start = None
-                        wd_obj.dttm_work_end = None
-                        wd_obj.work_hours = timedelta(hours=0)
-                        wd_obj.shop = None
-                        wd_obj.save()
+                        else:
+                            wd_obj.dttm_work_start = None
+                            wd_obj.dttm_work_end = None
+                            wd_obj.work_hours = timedelta(hours=0)
+                            wd_obj.shop = None
+                            wd_obj.save()
 
 
             for work_type in shop.worktype_set.all():
