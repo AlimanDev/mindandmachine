@@ -34,7 +34,7 @@ class LoadTemplateSerializer(BaseNetworkSerializer):
 
 
 class LoadTemplateSpecSerializer(serializers.Serializer):
-    dt_from = serializers.DateField(format=QOS_DATE_FORMAT, write_only=True)
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT, write_only=True, required=False)
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT, write_only=True, required=False)
     id = serializers.IntegerField(write_only=True)
     shop_id = serializers.IntegerField(write_only=True, required=False)
