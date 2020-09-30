@@ -323,7 +323,7 @@ class WorkerDayManager(models.Manager):
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
             is_fact=False,
-            shop_id=OuterRef('shop_id')
+            # shop_id=OuterRef('shop_id')
         ).values( # for group by
             'dttm_added'
         ).annotate(dt_max=Max('dttm_added')).values('dt_max')[:1]
@@ -346,6 +346,16 @@ class WorkerDayManager(models.Manager):
 
 
 class WorkerDay(AbstractModel):
+    """
+    Ключевая сущность, которая определяет, что делает сотрудник в определенный момент времени (работает, на выходном и тд)
+
+    Что именно делает сотрудник в выбранный день определяет поле type. При этом, если сотрудник работает в этот день, то
+    у него должен быть указан магазин (shop). Во всех остальных случаях shop_id должно быть пустым (aa: fixme WorkerDaySerializer)
+
+
+
+
+    """
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
@@ -453,11 +463,11 @@ class WorkerDay(AbstractModel):
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
 
     comment = models.TextField(null=True, blank=True)
-    parent_worker_day = models.ForeignKey('self', on_delete=models.PROTECT, blank=True, null=True, related_name='child')
+    parent_worker_day = models.ForeignKey('self', on_delete=models.PROTECT, blank=True, null=True, related_name='child') # todo: remove
     work_hours = models.DurationField(default=datetime.timedelta(days=0))
 
     is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
-    is_vacancy = models.BooleanField(default=False)
+    is_vacancy = models.BooleanField(default=False)  # вакансия ли это
     dttm_added = models.DateTimeField(default=timezone.now)
     canceled = models.BooleanField(default=False)
     is_outsource = models.BooleanField(default=False)

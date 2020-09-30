@@ -5,6 +5,7 @@ from src.timetable.models import WorkTypeName
 from src.base.serializers import BaseNetworkSerializer
 from src.base.exceptions import MessageError
 from src.base.views import BaseActiveNamedModelViewSet
+from src.base.filters import BaseActiveNamedModelFilter
 
 
 class WorkTypeNameSerializer(BaseNetworkSerializer):
@@ -56,6 +57,7 @@ class WorkTypeNameViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = WorkTypeNameSerializer
     pagination_class = LimitOffsetPagination
+    filterset_class = BaseActiveNamedModelFilter
 
     def get_queryset(self):
         return WorkTypeName.objects.filter(

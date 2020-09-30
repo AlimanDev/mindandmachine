@@ -28,24 +28,35 @@ class TestOperationTypeRelation(APITestCase):
         self.url = '/rest_api/operation_type_relation/'
 
         create_departments_and_users(self)
-        self.operation_type_name1 = OperationTypeName.objects.create(
-            name='Кассы',
-        )
-        self.operation_type_name2 = OperationTypeName.objects.create(
-            name='Строительные работы',
-        )
-        self.operation_type_name3 = OperationTypeName.objects.create(
-            name='Строительные работы2',
-        )
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
+            network=self.network,
         )
         self.work_type_name2 = WorkTypeName.objects.create(
             name='Кассы2',
+            network=self.network,
+        )
+        self.operation_type_name1 = OperationTypeName.objects.create(
+            name='Кассы',
+            do_forecast=OperationTypeName.FORECAST_FORMULA,
+            work_type_name=self.work_type_name1,
+            network=self.network,
+        )
+        self.operation_type_name2 = OperationTypeName.objects.create(
+            name='Строительные работы',
+            do_forecast=OperationTypeName.FORECAST,
+            network=self.network,
+        )
+        self.operation_type_name3 = OperationTypeName.objects.create(
+            name='Строительные работы2',
+            work_type_name=self.work_type_name2,
+            do_forecast=OperationTypeName.FORECAST_FORMULA,
+            network=self.network,
         )
 
         self.load_template = LoadTemplate.objects.create(
             name='Test1',
+            network=self.network,
         )
         self.root_shop.load_template = self.load_template
         self.root_shop.save()
@@ -55,20 +66,15 @@ class TestOperationTypeRelation(APITestCase):
         )
         self.operation_type_template1 = OperationTypeTemplate.objects.create(
             load_template=self.load_template,
-            operation_type_name=self.operation_type_name1,
-            work_type_name=self.work_type_name1,
-            do_forecast=OperationType.FORECAST_FORMULA,
+            operation_type_name=self.operation_type_name1,           
         )
         self.operation_type_template2 = OperationTypeTemplate.objects.create(
             load_template=self.load_template,
             operation_type_name=self.operation_type_name2,
-            do_forecast=OperationType.FORECAST_NONE,
         )
         self.operation_type_template3 = OperationTypeTemplate.objects.create(
             load_template=self.load_template,
             operation_type_name=self.operation_type_name3,
-            work_type_name=self.work_type_name2,
-            do_forecast=OperationType.FORECAST_FORMULA,
         )
 
         self.operation_type_relation1 = OperationTypeRelation.objects.create(
@@ -107,12 +113,12 @@ class TestOperationTypeRelation(APITestCase):
             'base': {
                 'id': self.operation_type_template1.id, 
                 'load_template_id': self.load_template.id, 
-                'work_type_name_id': self.work_type_name1.id, 
-                'do_forecast': 'F', 
                 'operation_type_name': {
                     'id': self.operation_type_name1.id, 
                     'name': 'Кассы', 
-                    'code': None
+                    'code': None,
+                    'work_type_name_id': self.work_type_name1.id, 
+                    'do_forecast': self.operation_type_name1.do_forecast, 
                 },
                 'tm_from': None,
                 'tm_to': None,
@@ -121,12 +127,12 @@ class TestOperationTypeRelation(APITestCase):
             'depended': {
                 'id': self.operation_type_template2.id, 
                 'load_template_id': self.load_template.id, 
-                'work_type_name_id': None, 
-                'do_forecast': 'N', 
                 'operation_type_name': {
                     'id': self.operation_type_name2.id, 
                     'name': 'Строительные работы', 
-                    'code': None
+                    'code': None,
+                    'work_type_name_id': None, 
+                    'do_forecast': self.operation_type_name2.do_forecast, 
                 },
                 'tm_from': None,
                 'tm_to': None,
@@ -144,13 +150,10 @@ class TestOperationTypeRelation(APITestCase):
         op_temp1 = OperationTypeTemplate.objects.create(
             load_template=load_template,
             operation_type_name=self.operation_type_name1,
-            work_type_name=self.work_type_name1,
-            do_forecast=OperationType.FORECAST_FORMULA,
         )
         op_temp2 = OperationTypeTemplate.objects.create(
             load_template=load_template,
             operation_type_name=self.operation_type_name2,
-            do_forecast=OperationType.FORECAST_NONE,
         )
         data = {
             'base_id': op_temp1.id,
@@ -165,12 +168,12 @@ class TestOperationTypeRelation(APITestCase):
             'base': {
                 'id': op_temp1.id, 
                 'load_template_id': load_template.id, 
-                'work_type_name_id': self.work_type_name1.id, 
-                'do_forecast': 'F', 
                 'operation_type_name': {
                     'id': self.operation_type_name1.id, 
                     'name': 'Кассы', 
-                    'code': None
+                    'code': None,
+                    'work_type_name_id': self.work_type_name1.id, 
+                    'do_forecast': self.operation_type_name1.do_forecast, 
                 },
                 'tm_from': None,
                 'tm_to': None,
@@ -179,12 +182,12 @@ class TestOperationTypeRelation(APITestCase):
             'depended': {
                 'id': op_temp2.id, 
                 'load_template_id': load_template.id, 
-                'work_type_name_id': None, 
-                'do_forecast': 'N', 
                 'operation_type_name': {
                     'id': self.operation_type_name2.id, 
                     'name': 'Строительные работы', 
-                    'code': None
+                    'code': None,
+                    'work_type_name_id': None, 
+                    'do_forecast': self.operation_type_name2.do_forecast, 
                 },
                 'tm_from': None,
                 'tm_to': None,

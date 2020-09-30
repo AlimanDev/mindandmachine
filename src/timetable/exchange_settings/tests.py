@@ -23,8 +23,8 @@ class TestExchangeSettings(APITestCase):
         self.url = '/rest_api/exchange_settings/'
 
         create_departments_and_users(self)
-        self.exchange_serttings1 = ExchangeSettings.objects.create()
-        self.exchange_serttings2 = ExchangeSettings.objects.create()
+        self.exchange_serttings1 = ExchangeSettings.objects.create(network=self.network)
+        self.exchange_serttings2 = ExchangeSettings.objects.create(network=self.network)
 
         
         FunctionGroup.objects.create(
@@ -74,7 +74,7 @@ class TestExchangeSettings(APITestCase):
             'working_shift_min_hours': '04:00:00', 
             'working_shift_max_hours': '12:00:00', 
             'automatic_worker_select_tree_level': 1, 
-            'network': None, 
+            'network': self.network.id, 
             'exclude_positions': []
         }
         self.assertEqual(response.json(), data)
@@ -132,7 +132,7 @@ class TestExchangeSettings(APITestCase):
             'working_shift_min_hours': '04:00:00', 
             'working_shift_max_hours': '12:00:00', 
             'automatic_worker_select_tree_level': 1, 
-            'network': None, 
+            'network': self.network.id, 
             'exclude_positions': []
         }
         self.assertEqual(response.json(), data)
