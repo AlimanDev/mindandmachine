@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
-
-REBUILD_TIMETABLE_MIN_DELTA = 2
+from django.conf import settings
 
 
 def time2int(tm, minute_step=15, start_h=6):
@@ -23,7 +22,7 @@ def time2int(tm, minute_step=15, start_h=6):
 
 def set_timetable_date_from(year, month):
     date_from = datetime(year=year, month=month, day=1).date()
-    date_min = datetime.now().date() + timedelta(days=REBUILD_TIMETABLE_MIN_DELTA)
+    date_min = datetime.now().date() + timedelta(days=settings.REBUILD_TIMETABLE_MIN_DELTA)
     date_mon_begin = datetime(year=date_min.year, month=date_min.month, day=1).date()
 
     if date_from < date_mon_begin:

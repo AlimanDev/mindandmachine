@@ -375,3 +375,5 @@ if 'test' in sys.argv:
     MIGRATION_MODULES = MigrationDisabler()
 
 APPEND_SLASH = False
+
+REBUILD_TIMETABLE_MIN_DELTA = 2
