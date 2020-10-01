@@ -869,7 +869,8 @@ class AttendanceRecords(AbstractModel):
                 worker=self.user,
                 dt=self.dttm.date(),
                 is_fact=True,
-                is_approved=True
+                is_approved=True,
+                type=WorkerDay.TYPE_WORKDAY,
             )
             setattr(wd, type2dtfield[self.type], self.dttm)
 

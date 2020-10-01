@@ -2,11 +2,71 @@
 
 from django.db import migrations, models
 import django.db.models.deletion
+import json
 
 
 def approve_worker_days(apps, schema_editor):
     WorkerDay = apps.get_model('timetable', 'WorkerDay')
     WorkerDay.objects.all().update(is_approved=True)
+
+def create_fact(apps, schema_editor):
+    WorkerDay = apps.get_model('timetable', 'WorkerDay')
+    WorkerDayCashboxDetails = apps.get_model('timetable', 'WorkerDayCashboxDetails')
+    wds = list(WorkerDay.objects.values(
+        'worker_id',
+        'employment_id', 
+        'dt', 
+        'dttm_work_start',
+        'dttm_work_end',
+        'shop_id',
+    ).filter(
+        type='W'
+    ).annotate(
+        coming=models.Min('worker__attendancerecords__dttm', filter=models.Q(
+            worker__attendancerecords__shop=models.F('shop'),
+            worker__attendancerecords__dttm__date=models.F('dt'),
+            worker__attendancerecords__type='C',
+        )),
+        leaving=models.Max('worker__attendancerecords__dttm', filter=models.Q(
+            worker__attendancerecords__shop=models.F('shop'),
+            worker__attendancerecords__dttm__date=models.F('dt'),
+            worker__attendancerecords__type='L')),
+    ).filter(leaving__isnull=False, coming__isnull=False).order_by('worker_id', 'dt'))
+
+    WorkerDay.objects.bulk_create(
+        [
+            WorkerDay(
+                worker_id=w.get('worker_id'), 
+                dt=w.get('dt'), 
+                type='W', 
+                employment_id=w.get('employment_id'), 
+                dttm_work_start=w.get('coming'), 
+                dttm_work_end=w.get('leaving'),
+                is_fact=True,
+                is_approved=True,
+                shop_id=w.get('shop_id'),
+            )
+            for w in wds
+        ]
+    )
+
+
+def count_work_hours(break_triplets, dttm_work_start, dttm_work_end):
+    work_hours = (dttm_work_end - dttm_work_start).total_seconds() / 60
+    for break_triplet in break_triplets:
+        if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
+            work_hours = work_hours - sum(break_triplet[2])
+            break
+    return datetime.timedelta(minutes=work_hours)
+
+def work_hours_worker_day(apps, schema_editor):
+    WorkerDay = apps.get_model('timetable', 'WorkerDay')
+    worker_days = WorkerDay.objects.filter(type__in=['W', 'T', 'Q'], dttm_work_start__isnull=False, dttm_work_end__isnull=False).select_related('shop')
+    for worker_day in worker_days:
+        break_triplets = json.loads(worker_day.shop.break_triplets)
+        worker_day.work_hours = count_work_hours(break_triplets, worker_day.dttm_work_start, worker_day.dttm_work_end)
+    WorkerDay.objects.bulk_update(worker_days, ['work_hours'])
+
 
 
 class Migration(migrations.Migration):
@@ -38,4 +98,7 @@ class Migration(migrations.Migration):
         migrations.DeleteModel(
             name='WorkerDayApprove',
         ),
+        migrations.RunPython(approve_worker_days),
+        migrations.RunPython(create_fact),
+        migrations.RunPython(work_hours_worker_day),
     ]
