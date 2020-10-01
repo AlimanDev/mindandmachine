@@ -277,6 +277,8 @@ CELERY_TASK_DEFAULT_QUEUE = BACKEND_QUEUE
 # for change celery configs must be before (for BACKEND_QUEUE)
 # todo: do normal parameters changer
 
+APPEND_SLASH = False
+REBUILD_TIMETABLE_MIN_DELTA = 2
 
 
 if is_config_exists('djconfig_local.py'):
@@ -373,5 +375,3 @@ if 'test' in sys.argv:
 
 
     MIGRATION_MODULES = MigrationDisabler()
-
-APPEND_SLASH = False
