@@ -246,7 +246,7 @@ MEDIA_URL = '/_i/media/'
 
 SESSION_COOKIE_SECURE = True
 
-DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
+#DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
 
 QOS_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S" #'%H:%M:%S %d.%m.%Y'
 QOS_DATE_FORMAT = '%Y-%m-%d'
