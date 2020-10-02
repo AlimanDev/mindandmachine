@@ -96,6 +96,7 @@ def upload_timetable_util(form, timetable_file):
             'first_name': names[1] if len(names) > 1 else '',
             'last_name': names[0],
             'middle_name': names[2] if len(names) > 2 else None,
+            'network_id': form.get('network_id'),
         }
         user = None
         if UPLOAD_TT_MATCH_EMPLOYMENT:
@@ -142,7 +143,7 @@ def upload_timetable_util(form, timetable_file):
                         user.update(tabel_code=tabel_code,)
                     user = user.first()
                 else:
-                    user_data['username'] = str(time.time() * 1000000)[:-2],
+                    user_data['username'] = str(time.time() * 1000000)[:-2]
                     if number_cond:
                         user_data['tabel_code'] = tabel_code
                     user = User.objects.create(**user_data)

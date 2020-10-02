@@ -675,6 +675,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         data = UploadTimetableSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         data.validated_data['lang'] = request.user.lang
+        data.validated_data['network_id'] = request.user.network_id
         return upload_timetable_util(data.validated_data, file)
 
     
