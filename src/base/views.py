@@ -281,3 +281,5 @@ class GroupViewSet(BaseActiveNamedModelViewSet):
         return Group.objects.filter(
             network_id=self.request.user.network_id,
         )
+
+
