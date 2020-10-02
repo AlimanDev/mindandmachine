@@ -260,15 +260,17 @@ class WorkerDayQuerySet(QuerySet):
         return self.filter(is_fact=True, is_approved=False)
 
     def get_plan_edit(self):
-        worker_days_ordered = self.filter(is_fact=False).order_by('is_approved')
-        exists = []
-        remove = []
-        for worker_day in worker_days_ordered:
-            if (worker_day.worker_id, worker_day.dt) in exists:
-                remove.append(worker_day.id)
-            else:
-                exists.append((worker_day.worker_id, worker_day.dt))
-        return self.filter(is_fact=False).exclude(id__in=remove)
+        ordered_subq = WorkerDay.objects.filter(
+            dt=OuterRef('dt'),
+            worker_id=OuterRef('worker_id'),
+            is_fact=False,
+        ).order_by(
+            'is_approved',
+        ).values_list('id')[:1]
+        return self.filter(
+            is_fact=False,
+            id=Subquery(ordered_subq),
+        )
 
     def get_fact_edit(self):
         raise NotImplementedError
