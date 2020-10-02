@@ -38,7 +38,7 @@ from src.util.models_converter import (
 from src.timetable.worker_day.stat import CalendarPaidDays
 from rest_framework.exceptions import ValidationError, AuthenticationFailed
 from rest_framework.authentication import BaseAuthentication
-REBUILD_TIMETABLE_MIN_DELTA = 2
+
 
 class TokenAuthentication(BaseAuthentication):
     def authenticate(self, request):
@@ -261,10 +261,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         dt_from = form['dt_from']
         dt_to = form['dt_to']
 
-        dt_min = datetime.now().date() + timedelta(days=REBUILD_TIMETABLE_MIN_DELTA)
+        dt_min = datetime.now().date() + timedelta(days=settings.REBUILD_TIMETABLE_MIN_DELTA)
 
         if dt_from < dt_min:
-            raise ValidationError(self.error_messages["tt_create_past"].format(num=REBUILD_TIMETABLE_MIN_DELTA))
+            raise ValidationError(self.error_messages["tt_create_past"].format(num=settings.REBUILD_TIMETABLE_MIN_DELTA))
 
         dt_first = dt_from.replace(day=1)
 
@@ -916,7 +916,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         dt_from = form['dt_from']
         dt_to = form['dt_to']
 
-        dt_min = datetime.now().date() + timedelta(days=REBUILD_TIMETABLE_MIN_DELTA)
+        dt_min = datetime.now().date() + timedelta(days=settings.REBUILD_TIMETABLE_MIN_DELTA)
 
         if dt_from < dt_min:
             raise ValidationError(self.error_messages["tt_delete_past"])
