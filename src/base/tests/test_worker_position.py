@@ -44,7 +44,6 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
             'name': 'test_name',
             'network_id': self.network.id,
             'code': 'test_code',
-            'default_work_type_names': [self.wt_name.id, self.wt_name2.id],
         }
 
         resp = self.client.post(
@@ -52,8 +51,6 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(
             WorkerPosition.objects.filter(dttm_deleted__isnull=True).count(), self.worker_positions_count + 1)
-        resp_data = resp.json()
-        self.assertEqual(len(resp_data['default_work_type_names']), 2)
 
     def test_retrieve(self):
         resp = self.client.get(self.get_url('WorkerPosition-detail', pk=self.worker_position.id))
@@ -72,7 +69,6 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
             'name': 'test_name',
             'network_id': self.network.id,
             'code': 'test_code',
-            'default_work_type_names': [self.wt_name.id],
         }
         resp = self.client.put(
             path=self.get_url('WorkerPosition-detail', pk=self.worker_position.id),
@@ -80,8 +76,6 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 200)
-        resp_data = resp.json()
-        self.assertEqual(len(resp_data['default_work_type_names']), 1)
 
     def test_delete(self):
         FunctionGroup.objects.create(
