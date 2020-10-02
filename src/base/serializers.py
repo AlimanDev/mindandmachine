@@ -262,7 +262,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
 class WorkerPositionSerializer(BaseNetworkSerializer):
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name', 'network_id', 'code', 'default_work_type_names']
+        fields = ['id', 'name', 'network_id', 'code']
 
 
 class EventSerializer(serializers.ModelSerializer):
