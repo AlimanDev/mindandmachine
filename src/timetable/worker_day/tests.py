@@ -23,6 +23,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         cls.dt = now().date()
         cls.worker_stat_url = '/rest_api/worker_day/worker_stat/'
+        cls.url_approve = '/rest_api/worker_day/approve/'
         cls.daily_stat_url = '/rest_api/worker_day/daily_stat/'
         cls.work_type_name = WorkTypeName.objects.create(name='Магазин')
         cls.work_type = WorkType.objects.create(
@@ -299,6 +300,78 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.assertEqual(response.json()[dt2_str], dt2_json)
         self.assertEqual(response.json()[dt3_str], dt3_json)
         self.assertEqual(response.json()[dt4_str], dt4_json)
+
+
+    def test_approve(self):
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt + timedelta(days=4),
+            'is_fact': False,
+        }
+
+        wds_not_changable = [
+            self.create_worker_day(type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt - timedelta(days=1)),
+            self.create_worker_day(type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt + timedelta(days=5)),
+            self.create_worker_day(type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt + timedelta(days=2), is_fact=True),
+            self.create_worker_day(shop=self.shop2, dt=self.dt),
+            self.create_worker_day(shop=self.shop2, dt=self.dt + timedelta(days=3)),
+            self.create_worker_day(type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt + timedelta(days=2), is_fact=True, is_approved=True),
+        ]
+
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        for wd in wds_not_changable:
+            wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
+            self.assertIsNotNone(wd_from_db)
+            self.assertEqual(wd_from_db.is_approved, wd.is_approved)
+            self.assertEqual(wd_from_db.is_fact, wd.is_fact)
+
+        wds4delete = [
+            self.create_worker_day(type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt + timedelta(days=1), is_approved=True),
+            self.create_worker_day(type=WorkerDay.TYPE_VACATION, shop=self.shop, dt=self.dt + timedelta(days=2), is_approved=True),
+            self.create_worker_day(type=WorkerDay.TYPE_VACATION, shop=self.shop, dt=self.dt + timedelta(days=4), is_approved=True),
+        ]
+        wds_not_changable.append(
+            self.create_worker_day(
+                type=WorkerDay.TYPE_VACATION,
+                shop=self.shop,
+                dt=self.dt + timedelta(days=4),
+                is_approved=True,
+                is_fact=True,
+                parent_worker_day=wds4delete[-1],
+            ),
+        )
+
+        wds4updating = [
+            self.create_worker_day(type=WorkerDay.TYPE_SICK, shop=self.shop, dt=self.dt + timedelta(days=1)),
+            self.create_worker_day(type=WorkerDay.TYPE_SICK, shop=self.shop, dt=self.dt + timedelta(days=2)),
+            self.create_worker_day(type=WorkerDay.TYPE_VACATION, shop=self.shop, dt=self.dt + timedelta(days=4)),
+        ]
+
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(response.status_code, 200)
+        for wd in wds_not_changable:
+            wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
+            self.assertIsNotNone(wd_from_db)
+            self.assertEqual(wd_from_db.is_approved, wd.is_approved)
+            self.assertEqual(wd_from_db.is_fact, wd.is_fact)
+
+        for wd in wds4delete:
+            wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
+            self.assertIsNone(wd_from_db)
+
+        for wd in wds4updating:
+            wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
+            self.assertEqual(wd_from_db.is_approved, True)
+
+
+
+
+
+
+
 
 
 class TestUploadDownload(APITestCase):
