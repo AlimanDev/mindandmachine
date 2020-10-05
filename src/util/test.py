@@ -391,11 +391,12 @@ def create_departments_and_users(self):
     FunctionGroup.objects.bulk_create([
         FunctionGroup(
             group=self.admin_group,
+            method=method,
             func=func,
             level_up=1,
             level_down=99,
             # access_type=FunctionGroup.TYPE_ALL
-        ) for func in FunctionGroup.FUNCS
+        ) for func in FunctionGroup.FUNCS for method in FunctionGroup.METHODS
     ])
 
     # # central office

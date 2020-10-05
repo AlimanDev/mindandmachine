@@ -272,6 +272,19 @@ class WorkerDayQuerySet(QuerySet):
             id=Subquery(ordered_subq),
         )
 
+    def get_approved4change(self, is_fact):
+        ordered_subq = WorkerDay.objects.filter(
+            dt=OuterRef('dt'),
+            worker_id=OuterRef('worker_id'),
+            is_fact=is_fact,
+        ).order_by(
+            'is_approved', '-id', # сортировка по id -- если вдруг будет несколько approved версий (вдруг), то удаляем более раннюю
+        ).values_list('id')[1:]
+        return self.filter(
+            is_fact=is_fact,
+            id__in=Subquery(ordered_subq),
+        )
+
     def get_fact_edit(self):
         raise NotImplementedError
 
@@ -465,7 +478,7 @@ class WorkerDay(AbstractModel):
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
 
     comment = models.TextField(null=True, blank=True)
-    parent_worker_day = models.ForeignKey('self', on_delete=models.PROTECT, blank=True, null=True, related_name='child') # todo: remove
+    parent_worker_day = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child') # todo: remove
     work_hours = models.DurationField(default=datetime.timedelta(days=0))
 
     is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
