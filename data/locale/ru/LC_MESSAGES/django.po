@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-10-05 04:29+0000\n"
+"POT-Creation-Date: 2020-10-05 07:36+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -32,6 +32,10 @@ msgstr "Нет такого пользователя"
 #: src/base/auth/views.py:40 src/base/auth/views.py:108
 msgid "Unable to log in with provided credentials."
 msgstr "Невозможно войти с предоставленными учетными данными."
+
+#: src/base/permissions.py:72
+msgid "shop_id should be defined"
+msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
 #: src/base/serializers.py:76
 msgid "Passwords are mismatched."
@@ -63,7 +67,7 @@ msgstr "Есть {amount} магазинов с кодом: {code}."
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
 
-#: src/forecast/load_template/views.py:161
+#: src/forecast/load_template/views.py:162
 #, fuzzy
 #| msgid "Cannot delete template as it's used in demand calulations."
 msgid "Cannot delete template as it's used in demand calculations."
