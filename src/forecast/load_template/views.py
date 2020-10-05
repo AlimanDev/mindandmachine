@@ -21,6 +21,7 @@ from src.base.models import Shop
 from src.base.permissions import Permission
 
 from django.db.models import Exists, OuterRef, Case, When, CharField, Value
+from django.utils.translation import gettext_lazy as _
 
 
 # Serializers define the API representation.
@@ -158,7 +159,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
 
     """
     error_messages = {
-        "load_template_attached_shops": "Cannot delete template as it's used in demand calulations."
+        "load_template_attached_shops": _("Cannot delete template as it's used in demand calculations.")
 
     }
     permission_classes = [Permission]

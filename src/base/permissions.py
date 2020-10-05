@@ -1,7 +1,9 @@
-from src.base.models import Employment, Shop
+from django.db.models import ObjectDoesNotExist
+from django.utils.translation import gettext_lazy as _
 from rest_framework import permissions
 from rest_framework.exceptions import ValidationError, NotFound
-from django.db.models import ObjectDoesNotExist, Q
+
+from src.base.models import Employment, Shop
 
 
 class Permission(permissions.BasePermission):
@@ -67,7 +69,7 @@ class FilteredListPermission(Permission):
             shop_id = request.query_params.get('shop_id')
             shop_code = request.query_params.get('shop_code')
             if not shop_id and not shop_code:
-                raise ValidationError("shop_id should be defined")
+                raise ValidationError(_("shop_id should be defined"))
         else:
             shop_id = request.data.get('shop_id')
             # shop_id не меняется, права задаются has_object_permission

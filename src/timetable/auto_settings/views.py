@@ -6,7 +6,7 @@ from django.conf import settings
 from django.db.models import F, Count, Sum, Q
 from django.db.models.functions import Coalesce, Extract
 from django.core.serializers.json import DjangoJSONEncoder
-
+from django.utils.translation import gettext_lazy as _
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -54,14 +54,14 @@ class TokenAuthentication(BaseAuthentication):
         return (user, None)
 
 class AutoSettingsViewSet(viewsets.ViewSet):
-    error_messages={
-        "tt_create_past": "Timetable should be built at least from {num} day from now.",
-        "tt_exists": "Timetable already exists.",
-        "tt_users_without_spec": "No work type set for users: {users}.",
-        "tt_period_empty": "Not enough demand {period} for work type {work_type}.",
-        "tt_user_extra_shifts": "More than one shift are selected for worker {id} {last_name} {first_name} with fixed hours.",
-        "tt_server_error": "Fail sending data to server.",
-        "tt_delete_past": "You can't delete timetable in the past.",
+    error_messages = {
+        "tt_create_past": _("Timetable should be built at least from {num} day from now."),
+        "tt_exists": _("Timetable already exists."),
+        "tt_users_without_spec": _("No work type set for users: {users}."),
+        "tt_period_empty": _("Not enough demand {period} for work type {work_type}."),
+        "tt_user_extra_shifts": _("More than one shift are selected for worker {id} {last_name} {first_name} with fixed hours."),
+        "tt_server_error": _("Fail sending data to server."),
+        "tt_delete_past": _("You can't delete timetable in the past."),
     }
     serializer_class = AutoSettingsSerializer
     permission_classes = [Permission]
