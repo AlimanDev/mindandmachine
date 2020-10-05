@@ -96,12 +96,16 @@ def upload_timetable_util(form, timetable_file):
             'first_name': names[1] if len(names) > 1 else '',
             'last_name': names[0],
             'middle_name': names[2] if len(names) > 2 else None,
+            'network_id': form.get('network_id'),
         }
         user = None
         if UPLOAD_TT_MATCH_EMPLOYMENT:
             employment = Employment.objects.filter(tabel_code=tabel_code, shop=shop)
             if number_cond and employment.exists():
                 user = employment.first().user
+                if user.last_name != names[0]:
+                    error_users.append(f"У сотрудника на строке {index} с табельным номером {tabel_code} в системе фамилия {user.last_name}, а в файле {names[0]}.") #Change error
+                    continue
                 user.first_name = names[1] if len(names) > 1 else ''
                 user.last_name = names[0]
                 user.middle_name = names[2] if len(names) > 2 else None
@@ -139,7 +143,7 @@ def upload_timetable_util(form, timetable_file):
                         user.update(tabel_code=tabel_code,)
                     user = user.first()
                 else:
-                    user_data['username'] = str(time.time() * 1000000)[:-2],
+                    user_data['username'] = str(time.time() * 1000000)[:-2]
                     if number_cond:
                         user_data['tabel_code'] = tabel_code
                     user = User.objects.create(**user_data)
@@ -234,28 +238,20 @@ def upload_timetable_util(form, timetable_file):
             except:
                 raise MessageError(code='xlsx_undefined_cell', lang=form.get('lang', 'ru'), params={'user': user, 'dt': dt, 'value': str(data[i + 3])})
 
-            wd_query_set = list(WorkerDay.objects.filter(dt=dt, worker=user).order_by('-id'))
-            WorkerDayCashboxDetails.objects.filter(
-                worker_day__in=wd_query_set,
-            ).delete()
-            for wd in wd_query_set:  # потому что могут быть родители у wd
-                wd.delete()
-            new_wd, created = WorkerDay.objects.filter(Q(shop_id=shop_id)|Q(shop__isnull=True)).update_or_create(
+            WorkerDay.objects.filter(dt=dt, worker=user, is_fact=False, is_approved=False).delete()
+          
+            new_wd = WorkerDay.objects.create(
                 worker=user,
                 shop_id=shop_id,
                 dt=dt,
                 is_fact=False,
                 is_approved=False,
-                defaults={
-                    'employment':employment,
-                    'dttm_work_start':dttm_work_start,
-                    'dttm_work_end':dttm_work_end,
-                    'type':type_of_work,
-                }
+                employment=employment,
+                dttm_work_start=dttm_work_start,
+                dttm_work_end=dttm_work_end,
+                type=type_of_work,
             )
             if type_of_work == WorkerDay.TYPE_WORKDAY:
-                if not created:
-                    WorkerDayCashboxDetails.filter(worker_day=new_wd).delete()
                 WorkerDayCashboxDetails.objects.create(
                     worker_day=new_wd,
                     work_type=work_type,
