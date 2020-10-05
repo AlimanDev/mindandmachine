@@ -23,23 +23,16 @@ from django.db.models import Q
 from src.base.exceptions import MessageError
 from src.util.models_converter import Converter
 
-
-def upload_demand_util(demand_file, shop_id, lang='ru'):
-    try:
-        df = pd.read_excel(demand_file)
-    except KeyError:
-        raise MessageError(code='xlsx_no_active_list', lang=lang)
-
+def upload_demand_util_v1(df, shop_id, lang):
     df = df[df.columns[:3]]
-    #df['Время'] = pd.to_datetime(df['Время'])
-
 
     work_types = df['Тип работ'].unique()
 
     op_types = {
-        op.work_type.work_type_name.name:op
-        for op in OperationType.objects.select_related('work_type__work_type_name').filter(
-            work_type__work_type_name__name__in=work_types,
+        op.operation_type_name.name:op
+        for op in OperationType.objects.select_related('operation_type_name').filter(
+            operation_type_name__name__in=work_types,
+            shop_id=shop_id,
         )
     }
 
@@ -52,8 +45,8 @@ def upload_demand_util(demand_file, shop_id, lang='ru'):
         work_type_df = df[df['Тип работ'] == work_type]
         dttms = list(work_type_df['Время'])
         period_clients_to_delete_ids += list(PeriodClients.objects.filter(
-            operation_type__work_type__shop_id=shop_id,
-            operation_type__work_type__work_type_name__name=work_type,
+            operation_type__shop_id=shop_id,
+            operation_type__operation_type_name__name=work_type,
             dttm_forecast__in=dttms,
             type=PeriodClients.LONG_FORECASE_TYPE,
         ).values_list('id', flat=True))
@@ -71,6 +64,53 @@ def upload_demand_util(demand_file, shop_id, lang='ru'):
     PeriodClients.objects.bulk_create(period_clients)
 
     return Response()
+
+
+def upload_demand_util_v2(new_workload, shop_id, lang):
+    dttm_min = new_workload.dttm.min()
+    dttm_max = new_workload.dttm.max()
+    op_types = {
+        op.operation_type_name.name:op
+        for op in OperationType.objects.select_related('operation_type_name').filter(
+            operation_type_name__name__in=set(new_workload.columns) - {'dttm'},
+            shop_id=shop_id,
+        )
+    }
+    period_clients = []
+    for worktype in set(new_workload.columns) - {'dttm'}:
+        operation = op_types.get(worktype)
+        if not operation:
+            raise MessageError(code='xlsx_undefined_work_type', lang=lang, params={'work_type': work_type})
+        period_clients += [
+            PeriodClients(
+                dttm_forecast=row['dttm'],
+                operation_type=operation,
+                type=PeriodClients.LONG_FORECASE_TYPE,
+                value=row[worktype]
+
+            ) for _, row in new_workload[['dttm', worktype]].iterrows()
+        ]
+    PeriodClients.objects.filter(
+        dttm_forecast__gte=dttm_min,
+        dttm_forecast__lte=dttm_max,
+        operation_type__in=op_types.values(),
+        type=PeriodClients.LONG_FORECASE_TYPE
+    ).delete()
+    PeriodClients.objects.bulk_create(period_clients)
+    return Response()
+
+
+def upload_demand_util(demand_file, shop_id, lang='ru'):
+    try:
+        df = pd.read_excel(demand_file)
+    except KeyError:
+        raise MessageError(code='xlsx_no_active_list', lang=lang)
+
+    if 'dttm' in df.columns:
+        return upload_demand_util_v2(df, shop_id, lang)
+    
+    return upload_demand_util_v1(df, shop_id, lang)
+
 
 @xlsx_method
 def download_demand_xlsx_util(request, workbook, form):
