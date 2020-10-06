@@ -35,6 +35,13 @@ TIMETABLE_IP = "127.0.0.1:5000"
 SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
 MDAUDIT_AUTHTOKEN_SALT = 'DLKAXGKFPP57B2NEQ4NLB2TLDT3QR20I7QKAGE8I'
 
+URV_STAT_EMAILS = None # {'network_code': ['email@example.com', 'email2@example.com']}
+
+URV_STAT_SEND_HOUR = 1
+URV_STAT_SEND_MINUTE = 0
+URV_STAT_SHOP_LEVEL = 2
+URV_STAT_SEND_TODAY_HOUR = 3
+URV_STAT_SEND_TODAY_MINUTE = 0
 
 DEBUG = True
 
@@ -363,6 +370,16 @@ CELERY_BEAT_SCHEDULE = {
     'task-delete-old=receipts': {
         'task': 'src.celery.tasks.clean_timeserie_actions',
         'schedule': crontab(hour=1, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-send-urv-stat': {
+        'task': 'src.celery.tasks.send_urv_stat',
+        'schedule': crontab(hour=URV_STAT_SEND_HOUR, minute=URV_STAT_SEND_MINUTE),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-send-urv-stat-today': {
+        'task': 'src.celery.tasks.send_urv_stat_today',
+        'schedule': crontab(hour=URV_STAT_SEND_TODAY_HOUR, minute=URV_STAT_SEND_TODAY_MINUTE),
         'options': {'queue': BACKEND_QUEUE}
     },
 }
