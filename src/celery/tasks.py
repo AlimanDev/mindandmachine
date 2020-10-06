@@ -680,7 +680,7 @@ def send_urv_stat():
             subject=f'Отчёт УРВ {dt}',
             body=f'Отчёт УРВ {dt}',
             from_email=EMAIL_HOST_USER,
-            to=URV_STAT_EMAILS,
+            to=emails,
         )
         msg.attach_file(title)
         os.remove(title)
@@ -702,7 +702,7 @@ def send_urv_stat_today():
             subject=f'Отчёт УРВ {dt}',
             body=f'Отчёт УРВ {dt}',
             from_email=EMAIL_HOST_USER,
-            to=URV_STAT_EMAILS,
+            to=emails,
         )      
         msg.attach_file(title)
         os.remove(title)    
