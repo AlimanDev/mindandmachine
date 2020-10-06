@@ -279,7 +279,7 @@ def download_timetable_util(request, workbook, form):
         shop=shop,
     ).order_by('position_id', 'user__last_name', 'user__first_name', 'user__middle_name', 'tabel_code', 'id')
 
-    breaktimes = json.loads(shop.settings.break_triplets)
+    breaktimes = shop.settings.breaks.breaks
     breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
     workdays = WorkerDay.objects.select_related('worker', 'shop').filter(

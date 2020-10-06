@@ -11,6 +11,7 @@ from src.base.models import (
     Region,
     ProductionDay,
     Network,
+    Break,
 )
 
 @admin.register(Network)
@@ -94,3 +95,8 @@ class EmploymentAdmin(admin.ModelAdmin):
 class ProductionDayAdmin(admin.ModelAdmin):
     list_display = ('dt', 'type')
 
+
+@admin.register(Break)
+class BreakAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)

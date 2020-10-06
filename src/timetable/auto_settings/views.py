@@ -15,7 +15,7 @@ from src.celery.tasks import create_shop_vacancies_and_notify, cancel_shop_vacan
 from src.base.permissions import Permission
 
 from src.forecast.models import PeriodClients
-from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings
+from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings, WorkerPosition
 from src.timetable.models import (
     ShopMonthStat,
     WorkType,
@@ -681,7 +681,11 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         init_params['n_working_days_optimal'] = len(work_days)
 
         ##################################################################
-
+        breaks = {
+            str(w.id): w.breaks.breaks
+            for w in WorkerPostion.objects.filter(netword_id=shop.network_id)
+        }
+        breaks['default'] = shop.settings.breaks.breaks
         data = {
             'IP': settings.HOST_IP,
             'timetable_id': tt.id,
@@ -760,7 +764,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 'min_add_coef': shop.mean_queue_length,
                 'cost_weights': json.loads(shop.settings.cost_weights),
                 'method_params': method_params,
-                'breaks_triplets': json.loads(shop.settings.break_triplets),
+                'breaks_triplets': breaks,
                 'init_params': init_params,
             },
         }
@@ -813,7 +817,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         timetable = ShopMonthStat.objects.get(id=form['timetable_id'])
 
         shop = timetable.shop
-        break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
+        # break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
 
         timetable.status = data['timetable_status']
         timetable.status_message = data.get('status_message', False)
@@ -860,7 +864,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         if WorkerDay.is_type_with_tm_range(wd_obj.type):
                             wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
                             wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
-                            wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
+                            # wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
                             wd_obj.save()
 
                             wdd_list = []

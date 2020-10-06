@@ -43,6 +43,32 @@ class Region(AbstractActiveNamedModel):
         verbose_name_plural = 'Регионы'
 
 
+class Break(AbstractActiveNamedModel):
+    class Meta(AbstractActiveNamedModel.Meta):
+        verbose_name = 'Перерыв'
+        verbose_name_plural = 'Перерывы'
+    value = models.CharField(max_length=1024, default='[]')
+
+    def __getattribute__(self, attr):
+        if attr in ['breaks']:
+            try:
+                return super().__getattribute__(attr)
+            except:
+                try:
+                    self.__setattr__(attr, json.loads(self.value))
+                except:
+                    return []
+        return super().__getattribute__(attr)
+
+    @staticmethod
+    def clean_value(value):
+        return json.dumps(value)
+
+    def save(self, *args, **kwargs):
+        self.value = self.clean_value(self.breaks)
+        super().save(*args, **kwargs)
+      
+
 class ShopSettings(AbstractActiveNamedModel):
 
     class Meta(AbstractActiveNamedModel.Meta):
@@ -60,7 +86,7 @@ class ShopSettings(AbstractActiveNamedModel):
     method_params = models.CharField(max_length=4096, default='[]')
     cost_weights = models.CharField(max_length=4096, default='{}')
     init_params = models.CharField(max_length=2048, default='{"n_working_days_optimal": 20}')
-    break_triplets = models.CharField(max_length=1024, default='[]')
+    breaks = models.ForeignKey(Break, on_delete=models.PROTECT)
 
     # added on 21.12.2018
     idle = models.SmallIntegerField(default=0)  # percents
@@ -404,6 +430,7 @@ class WorkerPosition(AbstractActiveNamedModel):
         verbose_name='Типы работ по умолчанию',
         blank=True,
     )
+    breaks = models.ForeignKey(Break, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
@@ -543,6 +570,7 @@ class FunctionGroup(AbstractModel):
         'AutoSettings_set_timetable',
         'AutoSettings_delete_timetable',
         'AuthUserView',
+        'Break',
         'Employment',
         'Employment_auto_timetable',
         'EmploymentWorkType',

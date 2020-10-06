@@ -2,7 +2,6 @@ import json
 
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup
 from src.forecast.tests.factories import ReceiptFactory
 from src.util.mixins.tests import TestsHelperMixin
 
@@ -89,13 +88,6 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 201)
 
     def test_update_receipt(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='Receipt',
-            level_up=1,
-            level_down=99,
-        )
 
         receipt = ReceiptFactory(
             shop=self.shop,
@@ -109,13 +101,6 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
 
     def test_update_receipt_when_shop_with_spaces(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='Receipt',
-            level_up=1,
-            level_down=99,
-        )
 
         receipt = ReceiptFactory(
             shop=self.shop,

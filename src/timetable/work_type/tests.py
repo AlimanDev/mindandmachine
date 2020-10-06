@@ -4,7 +4,6 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from etc.scripts.fill_calendar import main
-from src.base.models import FunctionGroup
 from src.forecast.models import OperationType, PeriodClients, OperationTypeName
 from src.timetable.models import (
     WorkTypeName,
@@ -43,27 +42,6 @@ class TestWorkType(APITestCase):
         )
         cls.work_type_name4 = WorkTypeName.objects.create(
             name='тип_кассы_4',
-        )
-        FunctionGroup.objects.create(
-            group=cls.admin_group,
-            method='POST',
-            func='WorkType',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=cls.admin_group,
-            method='PUT',
-            func='WorkType',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=cls.admin_group,
-            method='DELETE',
-            func='WorkType',
-            level_up=1,
-            level_down=99,
         )
 
     def setUp(self) -> None:

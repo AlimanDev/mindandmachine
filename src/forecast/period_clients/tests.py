@@ -22,7 +22,6 @@ from rest_framework.test import APITestCase
 
 from src.util.test import create_departments_and_users
 
-from src.base.models import FunctionGroup
 import pandas, io
 
 
@@ -38,34 +37,6 @@ class TestDemand(APITestCase):
         self.url = '/rest_api/period_clients/'
 
         create_departments_and_users(self)
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='PeriodClients',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='PeriodClients_put',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='DELETE',
-            func='PeriodClients_delete',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='PeriodClients_upload',
-            level_up=1,
-            level_down=99,
-        )
 
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',

@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from src.base.models import WorkerPosition, FunctionGroup, Employment, User
+from src.base.models import WorkerPosition, Employment, User
 from src.timetable.models import WorkTypeName, EmploymentWorkType
 from src.util.mixins.tests import TestsHelperMixin
 
@@ -36,13 +36,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         return resp
 
     def test_work_types_added_on_employment_creation(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='Employment',
-            level_up=1,
-            level_down=99,
-        )
 
         resp = self._create_employment()
         self.assertEqual(resp.status_code, 201)
@@ -54,13 +47,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             ).exists())
 
     def test_work_types_updated_on_position_change(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='Employment',
-            level_up=1,
-            level_down=99,
-        )
 
         another_worker_position = WorkerPosition.objects.create(
             name='Заместитель директора магазина',
@@ -90,13 +76,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         change PUT logic of employment for orteka
         :return:
         """
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='Employment',
-            level_up=1,
-            level_down=99,
-        )
 
         put_data = {
             'position_id': self.worker_position.id,
@@ -121,13 +100,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         ).count() == 1)
 
     def test_auto_timetable(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='Employment_auto_timetable',
-            level_up=1,
-            level_down=99,
-        )
 
         user_ids = list(User.objects.filter(employments__shop=self.shop).values_list('id', flat=True))
         user_ids = user_ids[1:-2]

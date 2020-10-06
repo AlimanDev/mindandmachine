@@ -14,7 +14,6 @@ from src.forecast.models import (
     PeriodClients,
 )
 from src.timetable.models import WorkTypeName, WorkType
-from src.base.models import FunctionGroup
 
 
 class TestOperationTypeRelation(APITestCase):
@@ -87,12 +86,6 @@ class TestOperationTypeRelation(APITestCase):
             base=self.operation_type_template3,
             depended=self.operation_type_template2,
             formula='a + 2',
-        )
-        FunctionGroup.objects.bulk_create(
-            [
-                FunctionGroup(func='OperationTypeRelation', group=self.admin_group, method=m)
-                for m in ['POST', 'PUT', 'DELETE']
-            ]
         )
 
         self.client.force_authenticate(user=self.user1)
@@ -209,7 +202,7 @@ class TestOperationTypeRelation(APITestCase):
             {
                 'id': self.load_template.id,
                 'shop_id': self.shop.id,
-                'dt_from': datetime.now().date(),
+                'dt_from': None,
             }, 
             format='json',
         )
@@ -228,7 +221,7 @@ class TestOperationTypeRelation(APITestCase):
             {
                 'id': self.load_template.id,
                 'shop_id': self.shop.id,
-                'dt_from': datetime.now().date(),
+                'dt_from': None,
             }, 
             format='json',
         )

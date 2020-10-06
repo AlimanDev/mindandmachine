@@ -6,7 +6,6 @@ from src.util.test import create_departments_and_users
 from src.util.models_converter import Converter
 from src.forecast.models import OperationTypeName, OperationType, OperationTemplate
 from src.timetable.models import WorkTypeName, WorkType
-from src.base.models import FunctionGroup
 
 
 class TestOperationTemplate(APITestCase):
@@ -86,27 +85,6 @@ class TestOperationTemplate(APITestCase):
             value=3.25
         )
 
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='OperationTemplate',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='OperationTemplate',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='DELETE',
-            func='OperationTemplate',
-            level_up=1,
-            level_down=99,
-        )
 
         self.client.force_authenticate(user=self.user1)
 

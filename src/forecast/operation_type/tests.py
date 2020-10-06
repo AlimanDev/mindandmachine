@@ -8,7 +8,6 @@ from src.util.test import create_departments_and_users
 
 from src.forecast.models import OperationTypeName, OperationType
 from src.timetable.models import WorkTypeName, WorkType
-from src.base.models import FunctionGroup
 
 
 class TestOperationType(APITestCase):
@@ -56,27 +55,6 @@ class TestOperationType(APITestCase):
             shop=self.work_type2.shop,
         )
         
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='OperationType',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='OperationType',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='DELETE',
-            func='OperationType',
-            level_up=1,
-            level_down=99,
-        )
 
         self.client.force_authenticate(user=self.user1)
 
