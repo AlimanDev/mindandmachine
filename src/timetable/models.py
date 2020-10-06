@@ -1,6 +1,7 @@
 import datetime
 import json
 
+from django.conf import settings
 from django.contrib.auth.models import (
     UserManager
 )
@@ -367,9 +368,6 @@ class WorkerDay(AbstractModel):
     Что именно делает сотрудник в выбранный день определяет поле type. При этом, если сотрудник работает в этот день, то
     у него должен быть указан магазин (shop). Во всех остальных случаях shop_id должно быть пустым (aa: fixme WorkerDaySerializer)
 
-
-
-
     """
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
@@ -510,7 +508,12 @@ class WorkerDay(AbstractModel):
             self.work_hours = self.count_work_hours(json.loads(self.shop.settings.break_triplets), self.dttm_work_start, self.dttm_work_end)
         else:
             self.work_hours = datetime.timedelta(0)
-        super().save(*args, **kwargs)
+
+        if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and self.is_vacancy and self.worker and self.shop:
+            from src.celery.tasks import create_mda_user_to_shop_relation
+            create_mda_user_to_shop_relation.delay(username=self.worker.username, shop_code=self.shop.code)
+
+        return super().save(*args, **kwargs)
 
 
 class WorkerDayCashboxDetailsManager(models.Manager):

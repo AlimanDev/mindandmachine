@@ -1,33 +1,21 @@
-from datetime import date, timedelta, datetime
+import json
+import logging
 import os
-from src.base.message import Message
-from django.db.models import Avg, Q
-from django.utils.timezone import now
+import time as time_in_secs
+from datetime import date, timedelta, datetime
+
+import pandas as pd
+import requests
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
+from django.db.models import Q
+from django.utils.timezone import now
+from src.main.demand.utils import create_predbills_request_function
+from src.main.operation_template.utils import build_period_clients
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
-from src.timetable.vacancy.utils import (
-    search_candidates,
-    cancel_vacancy,
-    confirm_vacancy,
-    create_vacancies_and_notify,
-    cancel_vacancies,
-    workers_exchange,
-)
-
-from src.main.demand.utils import create_predbills_request_function
-from src.timetable.work_type.utils import get_efficiency as get_shop_stats
-from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
-
-from src.main.operation_template.utils import build_period_clients
-
-from src.timetable.models import (
-    WorkType,
-    WorkerDayCashboxDetails,
-    EmploymentWorkType,
-    ShopMonthStat,
-    ExchangeSettings,
-)
+from src.base.message import Message
 from src.base.models import (
     Shop,
     User,
@@ -36,6 +24,9 @@ from src.base.models import (
     Event,
     Network,
 )
+from src.celery.celery import app
+from src.conf.djconfig import EMAIL_HOST_USER
+from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
 from src.forecast.models import (
     OperationTemplate,
     LoadTemplate,
@@ -44,15 +35,19 @@ from src.forecast.models import (
     OperationType,
     OperationTypeName
 )
-from src.celery.celery import app
-from django.core.mail import EmailMultiAlternatives
-from src.conf.djconfig import EMAIL_HOST_USER
-
-import time as time_in_secs
-
-import pandas as pd
-import json
-
+from src.timetable.models import (
+    WorkType,
+    WorkerDayCashboxDetails,
+    EmploymentWorkType,
+    ShopMonthStat,
+    ExchangeSettings,
+)
+from src.timetable.vacancy.utils import (
+    create_vacancies_and_notify,
+    cancel_vacancies,
+    workers_exchange,
+)
+from src.timetable.work_type.utils import get_efficiency as get_shop_stats
 
 
 @app.task
@@ -663,3 +658,18 @@ def clean_timeserie_actions():
                     ).select_related('shop')
                     for operation_type in operations_type:
                         Receipt.objects.filter(shop=operation_type.shop, dttm__lt=dttm_for_delete).delete()
+
+
+@app.task
+def create_mda_user_to_shop_relation(username, shop_code):
+    logger = logging.getLogger('django.request')
+    resp = requests.post(
+        url=settings.MDA_PUBLIC_API_HOST + '/api/public/v1/mindandmachine/userToShop/',
+        json={'login': username, 'sap': shop_code},
+        headers={'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN},
+        timeout=(3, 5),
+    )
+    try:
+        resp.raise_for_status()
+    except requests.RequestException:
+        logger.exception(resp.text)
