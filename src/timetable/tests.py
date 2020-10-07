@@ -82,15 +82,6 @@ class TestWorkerDay(APITestCase):
             parent_worker_day=self.worker_day_fact_approved
         )
 
-        FunctionGroup.objects.bulk_create([
-            FunctionGroup(group=self.admin_group,
-                method=method,
-                func=func,
-                level_up=1,
-                level_down=99,
-            )  for method in ['POST','PUT','DELETE'] for func in ['WorkerDay', 'WorkerDay_approve']
-            ])
-
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):
