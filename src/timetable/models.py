@@ -790,7 +790,7 @@ class ShopMonthStat(AbstractModel):
 
     # statistics
     fot = models.IntegerField(default=0, blank=True, null=True)
-    lack = models.SmallIntegerField(default=0, blank=True, null=True)
+    lack = models.SmallIntegerField(default=0, blank=True, null=True)  # хранится покрытие, TODO: переименовать поле
     idle = models.SmallIntegerField(default=0, blank=True, null=True)
     workers_amount = models.IntegerField(default=0, blank=True, null=True)
     revenue = models.IntegerField(default=0, blank=True, null=True)

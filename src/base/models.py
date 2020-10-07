@@ -1,18 +1,20 @@
 import datetime
 import json
-from timezone_field import TimeZoneField
 
-from django.db import models
+from django.apps import apps
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
-from mptt.models import MPTTModel, TreeForeignKey
-from model_utils import FieldTracker
-from django.apps import apps
-from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
-from src.base.exceptions import MessageError
-from src.conf.djconfig import QOS_TIME_FORMAT
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import models
+from django.db.models import Case, When, Sum, Value, IntegerField
+from model_utils import FieldTracker
+from mptt.models import MPTTModel, TreeForeignKey
+from timezone_field import TimeZoneField
+
+from src.base.exceptions import MessageError
+from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
+from src.conf.djconfig import QOS_TIME_FORMAT
 
 
 class Network(AbstractActiveModel):
@@ -21,7 +23,7 @@ class Network(AbstractActiveModel):
         verbose_name_plural = 'Сети магазинов'
 
     logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
-    url = models.CharField(blank=True,null=True,max_length=255)
+    url = models.CharField(blank=True, null=True, max_length=255)
     primary_color = models.CharField(max_length=7, blank=True)
     secondary_color = models.CharField(max_length=7, blank=True)
     name = models.CharField(max_length=128, unique=True)
@@ -70,7 +72,6 @@ class Break(AbstractActiveNamedModel):
       
 
 class ShopSettings(AbstractActiveNamedModel):
-
     class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Настройки автосоставления'
         verbose_name_plural = 'Настройки автосоставления'
@@ -145,7 +146,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     )
 
     code = models.CharField(max_length=64, null=True, blank=True)
-    #From supershop
+    # From supershop
     address = models.CharField(max_length=256, blank=True, null=True)
     type = models.CharField(max_length=1, choices=DEPARTMENT_TYPES, default=TYPE_SHOP)
 
@@ -201,7 +202,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         if self.id == shop.id:
             return 0
         if self.is_ancestor_of(shop) or self.is_descendant_of(shop):
-                return shop.level - self.level
+            return shop.level - self.level
         return None
 
     def get_ancestor_by_level_distance(self, level):
@@ -253,7 +254,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             raise MessageError(code='time_shop_differerent_keys')
         if open_times.get('all') and len(open_times) != 1:
             raise MessageError(code='time_shop_all_or_days')
-        
+
         for key in open_times.keys():
             close_hour = close_times[key].hour if close_times[key].hour != 0 else 24
             if open_times[key].hour > close_hour:
@@ -275,17 +276,16 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 apply_load_template(new_template, self.id)
             elif load_template == None:
                 apply_load_template(self.load_template_id, self.id)
-               
+
     def get_exchange_settings(self):
-        return self.exchange_settings if self.exchange_settings_id\
+        return self.exchange_settings if self.exchange_settings_id \
             else apps.get_model(
-                'timetable', 
+                'timetable',
                 'ExchangeSettings',
             ).objects.filter(
                 network_id=self.network_id,
                 shops__isnull=True,
             ).first()
-
 
 
 class EmploymentManager(models.Manager):
@@ -303,7 +303,7 @@ class EmploymentManager(models.Manager):
             models.Q(dt_hired__lte=dt_to) | models.Q(dt_hired__isnull=True),
             models.Q(dt_fired__gte=dt_from) | models.Q(dt_fired__isnull=True),
             shop__network_id=network_id,
-            user__network_id = network_id
+            user__network_id=network_id
         ).filter(*args, **kwargs)
 
 
@@ -328,10 +328,10 @@ class ProductionDay(AbstractModel):
     день из производственного календаря короч.
 
     """
+
     class Meta(object):
         verbose_name = 'День производственного календаря'
         unique_together = ('dt', 'region')
-
 
     TYPE_WORK = 'W'
     TYPE_HOLIDAY = 'H'
@@ -368,9 +368,26 @@ class ProductionDay(AbstractModel):
 
         return '(dt {}, type {}, id {})'.format(self.dt, self.type, self.id)
 
+    @classmethod
+    def get_norm_work_hours(cls, region_id, month, year):
+        norm_work_hours = ProductionDay.objects.filter(
+            dt__month=month,
+            dt__year=year,
+            type__in=ProductionDay.WORK_TYPES,
+            region_id=region_id,
+        ).annotate(
+            work_hours=Case(
+                When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
+                When(type=ProductionDay.TYPE_SHORT_WORK,
+                     then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_SHORT_WORK])),
+            )
+        ).aggregate(
+            norm_work_hours=Sum('work_hours', output_field=IntegerField())
+        )['norm_work_hours']
+        return norm_work_hours
+
 
 class User(DjangoAbstractUser, AbstractModel):
-
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
@@ -419,6 +436,7 @@ class WorkerPosition(AbstractActiveNamedModel):
     """
     Describe employee's position
     """
+
     class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Должность сотрудника'
         verbose_name_plural = 'Должности сотрудников'
@@ -440,7 +458,6 @@ class WorkerPosition(AbstractActiveNamedModel):
 
 
 class Employment(AbstractActiveModel):
-
     class Meta:
         verbose_name = 'Трудоустройство'
         verbose_name_plural = 'Трудоустройства'
@@ -551,7 +568,7 @@ class Employment(AbstractActiveModel):
 class FunctionGroup(AbstractModel):
     class Meta:
         verbose_name = 'Доступ к функциям'
-        unique_together = (('func', 'group', 'method'), )
+        unique_together = (('func', 'group', 'method'),)
 
     TYPE_SELF = 'S'
     TYPE_SHOP = 'TS'
@@ -650,7 +667,6 @@ class FunctionGroup(AbstractModel):
         'get_notifications2',
         'set_notifications_read',
 
-
         'get_worker_day',
         'delete_worker_day',
         'request_worker_day',
@@ -697,10 +713,9 @@ class FunctionGroup(AbstractModel):
         'get_workers_to_exchange',
         'exchange_workers_day',
 
-        #algo callbacks
+        # algo callbacks
         'set_demand',
         'set_pred_bills',
-
 
         'get_operation_templates',
         'create_operation_template',
@@ -752,7 +767,7 @@ class FunctionGroup(AbstractModel):
     dttm_modified = models.DateTimeField(blank=True, null=True)
     group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name='allowed_functions', blank=True, null=True)
     func = models.CharField(max_length=128, choices=FUNCS_TUPLE)
-    method = models.CharField(max_length=6, choices=((m,m) for m in METHODS), default='GET')
+    method = models.CharField(max_length=6, choices=((m, m) for m in METHODS), default='GET')
     access_type = models.CharField(choices=TYPES, max_length=32)
     level_up = models.IntegerField(default=0)
     level_down = models.IntegerField(default=100)
@@ -801,7 +816,7 @@ class Notification(AbstractModel):
     def __str__(self):
         return '{}, {}, {}, id: {}'.format(
             self.worker,
-            self.event ,
+            self.event,
             self.dttm_added,
             # self.text[:60],
             self.id
@@ -812,4 +827,3 @@ class Notification(AbstractModel):
 
     is_read = models.BooleanField(default=False)
     event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True)
-

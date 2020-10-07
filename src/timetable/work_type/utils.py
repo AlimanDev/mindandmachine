@@ -5,6 +5,8 @@ from django.db.models import Q, F
 
 from src.base.models import (
     Shop,
+    ProductionDay,
+    Employment,
 )
 from src.forecast.models import (
     PeriodClients,
@@ -16,7 +18,7 @@ from src.timetable.models import (
 from src.util.models_converter import Converter
 
 
-def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=False, ):
+def get_efficiency(shop_id, form, consider_vacancies=False,):
     def dttm2index(dt_init, dttm, period_in_day, period_lengths_minutes):
         days = (dttm.date() - dt_init).days
         return days * period_in_day + (dttm.hour * 60 + dttm.minute) // period_lengths_minutes
@@ -64,8 +66,7 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
         wt.id: wt
         for wt in work_types
     }
-    # work_types = group_by(work_types, group_key=lambda x: x.id)
-    # query selecting PeriodClients
+
     need_workers = PeriodClients.objects.annotate(
         need_workers=F('value'),
     ).select_related('operation_type').filter(
@@ -133,50 +134,33 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
 
     response = {}
 
-    day_stats = {}
-    graph_arr = finite_work
+    if form.get('efficiency', True):
+        day_stats = {}
+        graph_arr = finite_work
 
-    # TODO: доделать для факта
-    # if graph_type in ['plan_edit', 'plan_approved']:
-    #     graph_arr = finite_work
-    # else:
-    #     graph_arr = np.zeros(len(dttms))
-    #     qs_for_day_stats = None
-    #     if graph_type == 'fact_approved':
-    #         qs_for_day_stats = WorkerDay.objects.filter(base_wd_q).get_fact_approved()
-    #     elif graph_type == 'fact_edit':
-    #         qs_for_day_stats = WorkerDay.objects.filter(base_wd_q).get_fact_edit()
-    #
-    #     fill_array(
-    #         graph_arr,
-    #         list(qs_for_day_stats),
-    #         lambda_index_work_days,
-    #         lambda x: 1,  # для фактических графиков нету work_details
-    #     )
+        dts_for_day_stats = [
+            from_dt + datetime.timedelta(days=day)
+            for day in range((to_dt - from_dt).days)
+        ]
 
-    dts_for_day_stats = [
-        from_dt + datetime.timedelta(days=day)
-        for day in range((to_dt - from_dt).days)
-    ]
-    graph_arr_daily = graph_arr.reshape(len(dts_for_day_stats), period_in_day)
-    predict_needs_daily = predict_needs.reshape(len(dts_for_day_stats), period_in_day)
-    for i, dt in enumerate(dts_for_day_stats):
-        dt_converted = Converter.convert_date(dt)
+        graph_arr_daily = graph_arr.reshape(len(dts_for_day_stats), period_in_day)
+        predict_needs_daily = predict_needs.reshape(len(dts_for_day_stats), period_in_day)
+        for i, dt in enumerate(dts_for_day_stats):
+            dt_converted = Converter.convert_date(dt)
 
-        graph_arr_for_dt = graph_arr_daily[i]
-        predict_needs_for_dt = predict_needs_daily[i]
+            graph_arr_for_dt = graph_arr_daily[i]
+            predict_needs_for_dt = predict_needs_daily[i]
 
-        covering = np.nan_to_num(np.minimum(predict_needs_for_dt, graph_arr_for_dt).sum() / predict_needs_for_dt.sum())
-        deadtime = np.nan_to_num(np.maximum(graph_arr_for_dt - predict_needs_for_dt, 0).sum() / graph_arr_for_dt.sum())
-        predict_hours = predict_needs_for_dt.sum()
-        plan_edit_hours = graph_arr_for_dt.sum()
+            covering = np.nan_to_num(np.minimum(predict_needs_for_dt, graph_arr_for_dt).sum() / predict_needs_for_dt.sum())
+            deadtime = np.nan_to_num(np.maximum(graph_arr_for_dt - predict_needs_for_dt, 0).sum() / graph_arr_for_dt.sum())
+            predict_hours = predict_needs_for_dt.sum()
+            graph_hours = graph_arr_for_dt.sum()
 
-        day_stats.setdefault('covering', {})[dt_converted] = covering
-        day_stats.setdefault('deadtime', {})[dt_converted] = deadtime
-        day_stats.setdefault('predict_hours', {})[dt_converted] = predict_hours
-        day_stats.setdefault('graph_hours', {})[dt_converted] = plan_edit_hours
+            day_stats.setdefault('covering', {})[dt_converted] = covering
+            day_stats.setdefault('deadtime', {})[dt_converted] = deadtime
+            day_stats.setdefault('predict_hours', {})[dt_converted] = predict_hours
+            day_stats.setdefault('graph_hours', {})[dt_converted] = graph_hours
 
-    if not indicators_only:
         real_cashiers = []
         predict_cashier_needs = []
         lack_of_cashiers_on_period = []
@@ -188,7 +172,8 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
                 'dttm': dttm_converted,
                 'lack_of_cashiers': max(0, predict_needs[index] - finite_work[index])
             })
-        response = {
+
+        response.update({
             'period_step': period_lengths_minutes,
             'tt_periods': {
                 'real_cashiers': real_cashiers,
@@ -196,6 +181,28 @@ def get_efficiency(shop_id, form, indicators_only=False, consider_vacancies=Fals
             },
             'day_stats': day_stats,
             'lack_of_cashiers_on_period': lack_of_cashiers_on_period
-        }
+        })
+
+    if form.get('indicators', False):
+        norm_work_hours = ProductionDay.get_norm_work_hours(shop.region_id, from_dt.month, from_dt.year)
+
+        # TODO: если сотрудник уволен раньше to_dt, то будет некорректное значение?
+        active_empls_norm_work_hours = sum(Employment.objects.filter(
+            Q(dt_hired__lte=to_dt) | Q(dt_hired__isnull=True),
+            Q(dt_fired__gte=from_dt) | Q(dt_fired__isnull=True),
+            shop=shop,
+        ).values_list('norm_work_hours', flat=True)) / 100
+        # ФОТ считаем пока как: часы производственные календарь * кол-во сотрудников в штате с учетом их ставок.
+        fot = norm_work_hours * active_empls_norm_work_hours
+        covering = round(100 * np.nan_to_num(np.minimum(predict_needs, finite_work).sum() / predict_needs.sum()), 1)
+        deadtime = round(100 * np.nan_to_num(np.maximum(finite_work - predict_needs, 0).sum() / (finite_work.sum())), 1)
+
+        response.update({
+            'indicators': {
+                'deadtime': deadtime,
+                'covering': covering,
+                'fot': fot,
+            },
+        })
 
     return response
