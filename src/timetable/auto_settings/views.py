@@ -676,7 +676,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 ProductionDay.WORK_NORM_HOURS[wd.type]
                 for wd in work_days
             ]
-        )  # норма рабочего времени за оставшийся период период (за месяц)
+        ) * (dt_to - dt_from + timedelta(days=1)).days / len(work_days) # норма рабочего времени за оставшийся период период (за месяц)
         work_hours = shop.settings.fot if shop.settings.fot else work_hours  # fixme: tmp, special for 585
         init_params['n_working_days_optimal'] = len(work_days)
 
