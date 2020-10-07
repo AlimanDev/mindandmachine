@@ -389,16 +389,14 @@ def update_shop_stats(dt=None):
             form=dict(
                 from_dt=month_stat.dt,
                 to_dt=month_stat.dt + relativedelta(months=1, days=-1),
-                work_type_ids=[]
+                work_type_ids=[],
+                indicators=True,
+                efficiency=False,
             ),
-            indicators_only=True
         )['indicators']
-        month_stat.idle = stats['deadtime_part']
-        month_stat.fot = stats['FOT']
-        month_stat.workers_amount = stats['cashier_amount']
-        month_stat.revenue = stats['revenue']
-        month_stat.lack = stats['covering_part']
-        month_stat.fot_revenue = stats['fot_revenue']
+        month_stat.idle = stats['deadtime']
+        month_stat.fot = stats['fot']
+        month_stat.lack = stats['covering']  # на самом деле покрытие
         month_stat.save()
 
 
