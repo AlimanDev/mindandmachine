@@ -280,6 +280,8 @@ CELERY_TASK_DEFAULT_QUEUE = BACKEND_QUEUE
 APPEND_SLASH = False
 REBUILD_TIMETABLE_MIN_DELTA = 2
 
+# например, для Ортеки для отображения в отчете нужны показатели только по продавцам-кассирам
+UPDATE_SHOP_STATS_WORK_TYPES_CODES = None
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
