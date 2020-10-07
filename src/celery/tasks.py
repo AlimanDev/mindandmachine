@@ -672,4 +672,4 @@ def create_mda_user_to_shop_relation(username, shop_code):
     try:
         resp.raise_for_status()
     except requests.RequestException:
-        logger.exception(resp.text)
+        logger.exception(f'text:{resp.text}, headers: {resp.headers}')
