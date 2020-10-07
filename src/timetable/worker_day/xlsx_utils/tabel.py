@@ -675,7 +675,7 @@ class Tabel_xlsx(Xlsx_base):
 
     @staticmethod
     def change_for_inspection(month_norm_hours, workdays):
-        break_triplets = json.loads(workdays[0].shop.break_triplets)
+        break_triplets = json.loads(workdays[0].shop.settings.breaks.breaks)
         result = {}
         for workday in workdays:
             key = workday.worker_id
