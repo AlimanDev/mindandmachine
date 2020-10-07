@@ -281,7 +281,7 @@ def download_timetable_util(request, workbook, form):
     users = employments.values_list('user_id', flat=True)
 
     breaktimes = {
-        w.id: w.breaks.breaks
+        w.id: w.breaks.breaks if w.breaks else shop.settings.breaks.breaks
         for w in WorkerPosition.objects.filter(network_id=shop.network_id)
     }
     breaktimes['default'] = shop.settings.breaks.breaks
@@ -375,7 +375,7 @@ def download_tabel_util(request, workbook, form):
         working_hours[wd['worker_id']][wd['dt']] = wd['hours_fact']
 
     breaktimes = {
-        w.id: w.breaks.breaks
+        w.id: w.breaks.breaks if w.breaks else shop.settings.breaks.breaks
         for w in WorkerPosition.objects.filter(network_id=shop.network_id)
     }
     breaktimes['default'] = shop.settings.breaks.breaks
