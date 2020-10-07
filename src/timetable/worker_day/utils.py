@@ -282,7 +282,7 @@ def download_timetable_util(request, workbook, form):
 
     breaktimes = {
         w.id: w.breaks.breaks
-        for w in WorkerPosition.objects.filter(netword_id=shop.network_id)
+        for w in WorkerPosition.objects.filter(network_id=shop.network_id)
     }
     breaktimes['default'] = shop.settings.breaks.breaks
     # breaktimes = shop.settings.breaks.breaks
@@ -376,7 +376,7 @@ def download_tabel_util(request, workbook, form):
 
     breaktimes = {
         w.id: w.breaks.breaks
-        for w in WorkerPosition.objects.filter(netword_id=shop.network_id)
+        for w in WorkerPosition.objects.filter(network_id=shop.network_id)
     }
     breaktimes['default'] = shop.settings.breaks.breaks
     # breaktimes = json.loads(shop.settings.break_triplets)

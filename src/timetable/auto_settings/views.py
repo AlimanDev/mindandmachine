@@ -683,7 +683,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         ##################################################################
         breaks = {
             str(w.id): w.breaks.breaks
-            for w in WorkerPostion.objects.filter(netword_id=shop.network_id)
+            for w in WorkerPosition.objects.filter(network_id=shop.network_id)
         }
         breaks['default'] = shop.settings.breaks.breaks
         data = {
