@@ -5,8 +5,14 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from src.base.models import FunctionGroup, Network
-from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName, WorkerDayCashboxDetails, \
-    ShopMonthStat
+from src.timetable.models import (
+    WorkerDay, 
+    AttendanceRecords, 
+    WorkType, 
+    WorkTypeName, 
+    WorkerDayCashboxDetails,
+    ShopMonthStat,
+)
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
@@ -25,7 +31,7 @@ class TestWorkerDay(APITestCase):
         self.dt = now().date()
 
         create_departments_and_users(self)
-        self.work_type_name = WorkTypeName.objects.create(name='Магазин')
+        self.work_type_name = WorkTypeName.objects.create(name='Магазин', network=self.network)
         self.work_type = WorkType.objects.create(
             work_type_name=self.work_type_name,
             shop=self.shop)
@@ -636,10 +642,6 @@ class TestWorkerDayCreateFact(APITestCase):
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         plan_id = response.json()['id']
-        parent_id = response.json()['parent_worker_day_id']
-        self.assertEqual(parent_id, None)
-
-        self.assertEqual(WorkerDay.objects.get(id=fact_id).parent_worker_day_id, plan_id)
 
 
 class TestAttendanceRecords(TestsHelperMixin, APITestCase):
@@ -921,11 +923,11 @@ class TestAditionalFunctions(APITestCase):
 
         self.url = '/rest_api/worker_day/'
         create_departments_and_users(self)
-        self.work_type_name = WorkTypeName.objects.create(name='Магазин')
+        self.work_type_name = WorkTypeName.objects.create(name='Магазин', network=self.network)
         self.work_type = WorkType.objects.create(
             work_type_name=self.work_type_name,
             shop=self.shop)
-        ExchangeSettings.objects.create()
+        ExchangeSettings.objects.create(network=self.network)
         FunctionGroup.objects.bulk_create([
             FunctionGroup(group=self.admin_group,
                           method=method,

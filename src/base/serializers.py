@@ -51,11 +51,16 @@ class UserListSerializer(serializers.Serializer):
 class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
+    avatar = serializers.SerializerMethodField('get_avatar_url')
 
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
                   'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            return obj.avatar.url
+        return None
 
 
 class AuthUserSerializer(UserSerializer):
@@ -100,6 +105,11 @@ class FunctionGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = FunctionGroup
         fields = ['id', 'group_id', 'func', 'method']
+
+
+class AutoTimetableSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    user_ids = serializers.ListField(child=serializers.IntegerField())
 
 
 class EmploymentListSerializer(serializers.Serializer):
@@ -240,11 +250,19 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
         return data
 
+    def update(self, instance, validated_data, *args, **kwargs):
+        if instance.is_visible != validated_data.get('is_visible', True):
+            Employment.objects.filter(
+                shop_id=instance.shop_id, 
+                user_id=instance.user_id
+            ).update(is_visible=validated_data.get('is_visible', True))
+        return super().update(instance, validated_data, *args, **kwargs)
+
 
 class WorkerPositionSerializer(BaseNetworkSerializer):
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name', 'network_id', 'code', 'default_work_type_names']
+        fields = ['id', 'name', 'network_id', 'code']
 
 
 class EventSerializer(serializers.ModelSerializer):

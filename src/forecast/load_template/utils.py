@@ -258,9 +258,7 @@ def apply_load_template(load_template_id, shop_id, dt_from=None):
             shop_id=shop_id,
             operation_type_name_id=operation_type_template.operation_type_name_id,
             defaults={
-                'status': OperationType.UPDATED \
-                if operation_type_template.do_forecast != OperationType.FORECAST_NONE\
-                else OperationType.READY,
+                'status': OperationType.UPDATED,
                 'work_type': work_type,
                 'dttm_deleted': None,
             },

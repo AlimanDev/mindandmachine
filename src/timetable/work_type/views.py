@@ -42,6 +42,8 @@ class EfficiencySerializer(serializers.Serializer):
         default='plan_approved', label='Тип графика',
         choices=['plan_edit', 'plan_approved'],
     )
+    efficiency = serializers.BooleanField(default=True)
+    indicators = serializers.BooleanField(default=False)
 
     def is_valid(self, *args, **kwargs):
         super(EfficiencySerializer, self).is_valid(*args, **kwargs)

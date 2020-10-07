@@ -183,58 +183,27 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             shop_id=serializer.data['shop_id'],
         ).values_list('user_id', flat=True)
 
-        wdays_to_approve = WorkerDay.objects.filter(
-            Q(shop_id=serializer.data['shop_id']) | Q(shop__isnull=True, worker_id__in=user_ids),
+        approve_condition = Q(shop_id=serializer.data['shop_id']) | Q(shop__isnull=True, worker_id__in=user_ids)
+        approve_condition &= Q(
             dt__lte=serializer.data['dt_to'],
             dt__gte=serializer.data['dt_from'],
+        )
+
+        WorkerDay.objects.get_approved4change(is_fact=serializer.data['is_fact']).filter(approve_condition).delete()
+        WorkerDay.objects.filter(
+            approve_condition,
             is_fact=serializer.data['is_fact'],
             is_approved=False,
-        ).select_related('parent_worker_day')
+        ).update(is_approved=True)
 
-        # Факт
-        if serializer.data['is_fact']:
-            parent_ids = list(WorkerDay.objects.filter(
-                child__in=wdays_to_approve,
-                is_fact=serializer.data['is_fact'],
-                is_approved=True
-            ).values_list('id', flat=True))
-
-            parent_approved_worker_days_subq = WorkerDay.objects.filter(
-                child=OuterRef('pk'),
-                is_fact=serializer.data['is_fact'],
-                is_approved=True
-            ).values('parent_worker_day_id')
-
-            wdays_to_approve.update(
-                is_approved=True,
-                parent_worker_day_id=Subquery(parent_approved_worker_days_subq),
-            )
-            WorkerDay.objects.filter(id__in=parent_ids).delete()
-        # План
-        else:
-            parent_ids = list(WorkerDay.objects.filter(
-                child__in=wdays_to_approve
-            ).values_list('id', flat=True))
-
-            WorkerDay.objects.filter(
-                parent_worker_day_id__in=wdays_to_approve.values('parent_worker_day_id'),
-                is_fact=True
+        # если план, то отмечаем, что график подтвержден
+        if not serializer.data['is_fact']:
+            ShopMonthStat.objects.filter(
+                shop_id=serializer.data['shop_id'],
+                dt=serializer.validated_data['dt_from'].replace(day=1),
             ).update(
-                parent_worker_day_id=Subquery(
-                    wdays_to_approve.filter(parent_worker_day_id=OuterRef('parent_worker_day_id')).values('id'))
-            )
-
-            wdays_to_approve.update(
                 is_approved=True,
-                parent_worker_day=None
             )
-            WorkerDay.objects.filter(id__in=parent_ids).delete()
-        ShopMonthStat.objects.filter(
-            shop_id=serializer.data['shop_id'], 
-            dt=serializer.validated_data['dt_from'].replace(day=1),
-        ).update(
-            is_approved=True,
-        )
         return Response()
 
     @action(detail=False, methods=['get'], )
@@ -677,6 +646,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         data = UploadTimetableSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         data.validated_data['lang'] = request.user.lang
+        data.validated_data['network_id'] = request.user.network_id
         return upload_timetable_util(data.validated_data, file)
 
     

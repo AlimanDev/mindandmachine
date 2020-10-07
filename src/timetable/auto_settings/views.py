@@ -6,7 +6,7 @@ from django.conf import settings
 from django.db.models import F, Count, Sum, Q
 from django.db.models.functions import Coalesce, Extract
 from django.core.serializers.json import DjangoJSONEncoder
-
+from django.utils.translation import gettext_lazy as _
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -38,7 +38,7 @@ from src.util.models_converter import (
 from src.timetable.worker_day.stat import CalendarPaidDays
 from rest_framework.exceptions import ValidationError, AuthenticationFailed
 from rest_framework.authentication import BaseAuthentication
-REBUILD_TIMETABLE_MIN_DELTA = 2
+
 
 class TokenAuthentication(BaseAuthentication):
     def authenticate(self, request):
@@ -54,14 +54,14 @@ class TokenAuthentication(BaseAuthentication):
         return (user, None)
 
 class AutoSettingsViewSet(viewsets.ViewSet):
-    error_messages={
-        "tt_create_past": "Timetable should be built at least from {num} day from now.",
-        "tt_exists": "Timetable already exists.",
-        "tt_users_without_spec": "No work type set for users: {users}.",
-        "tt_period_empty": "Not enough demand {period} for work type {work_type}.",
-        "tt_user_extra_shifts": "More than one shift are selected for worker {id} {last_name} {first_name} with fixed hours.",
-        "tt_server_error": "Fail sending data to server.",
-        "tt_delete_past": "You can't delete timetable in the past.",
+    error_messages = {
+        "tt_create_past": _("Timetable should be built at least from {num} day from now."),
+        "tt_exists": _("Timetable already exists."),
+        "tt_users_without_spec": _("No work type set for users: {users}."),
+        "tt_period_empty": _("Not enough demand {period} for work type {work_type}."),
+        "tt_user_extra_shifts": _("More than one shift are selected for worker {id} {last_name} {first_name} with fixed hours."),
+        "tt_server_error": _("Fail sending data to server."),
+        "tt_delete_past": _("You can't delete timetable in the past."),
     }
     serializer_class = AutoSettingsSerializer
     permission_classes = [Permission]
@@ -261,10 +261,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         dt_from = form['dt_from']
         dt_to = form['dt_to']
 
-        dt_min = datetime.now().date() + timedelta(days=REBUILD_TIMETABLE_MIN_DELTA)
+        dt_min = datetime.now().date() + timedelta(days=settings.REBUILD_TIMETABLE_MIN_DELTA)
 
         if dt_from < dt_min:
-            raise ValidationError(self.error_messages["tt_create_past"].format(num=REBUILD_TIMETABLE_MIN_DELTA))
+            raise ValidationError(self.error_messages["tt_create_past"].format(num=settings.REBUILD_TIMETABLE_MIN_DELTA))
 
         dt_first = dt_from.replace(day=1)
 
@@ -593,15 +593,14 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             # Реализация через фиксированных сотрудников, чтобы не повторять функционал
             elif not employment.auto_timetable:
                 employment.is_fixed_hours = True
-                workers_month_days = worker_day.get(employment.user_id,
-                                                    [])  # Может случиться так что для этого работника еще никаким образом расписание не составлялось
+                # Может случиться так что для этого работника еще никаким образом расписание не составлялось
+                workers_month_days = worker_day.get(employment.user_id, [])
                 workers_month_days.sort(key=lambda wd: wd.dt)
                 workers_month_days_new = []
                 wd_index = 0
                 for dt in dates:
-                    if (workers_month_days[wd_index].dt if \
-                            wd_index < len(
-                                workers_month_days) else None) == dt:  # Если вернется пустой список, нужно исключать ошибку out of range
+                    if (workers_month_days[wd_index].dt if wd_index < len(workers_month_days) else None) == dt:
+                        # Если вернется пустой список, нужно исключать ошибку out of range
                         workers_month_days_new.append(workers_month_days[wd_index])
                         wd_index += 1
                     else:
@@ -847,43 +846,45 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
                     #неподтвержденная версия
                     if False in wdays:
-                        wd_obj=wdays[False]
-                        wd_obj.type=wd['type']
-                        WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
+                        wd_obj = wdays[False]
+                        if wd_obj.created_by_id is None:
+                            wd_obj.type = wd['type']
+                            WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
                     elif True in wdays:
                         wd_obj.parent_worker_day=wdays[True]
 
                     if wd['type'] == WorkerDay.TYPE_WORKDAY:
-                        wd_obj.shop=shop
+                        wd_obj.shop = shop
 
-                    if WorkerDay.is_type_with_tm_range(wd_obj.type):
-                        wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
-                        wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
-                        wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
-                        wd_obj.save()
+                    if wd_obj.created_by_id is None:
+                        if WorkerDay.is_type_with_tm_range(wd_obj.type):
+                            wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
+                            wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
+                            wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
+                            wd_obj.save()
 
-                        wdd_list = []
+                            wdd_list = []
 
-                        for wdd in wd['details']:
-                            wdd_el = WorkerDayCashboxDetails(
-                                worker_day=wd_obj,
-                                work_part=wdd['percent'] / 100,
-                                work_type_id=wdd['work_type_id'],
-                            )
-                            # if wdd['work_type_id'] > 0:
-                            #     wdd_el.work_type_id = wdd['type']
-                            # else:
-                            #     wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
+                            for wdd in wd['details']:
+                                wdd_el = WorkerDayCashboxDetails(
+                                    worker_day=wd_obj,
+                                    work_part=wdd['percent'] / 100,
+                                    work_type_id=wdd['work_type_id'],
+                                )
+                                # if wdd['work_type_id'] > 0:
+                                #     wdd_el.work_type_id = wdd['type']
+                                # else:
+                                #     wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
 
-                            wdd_list.append(wdd_el)
-                        WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
+                                wdd_list.append(wdd_el)
+                            WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
 
-                    else:
-                        wd_obj.dttm_work_start = None
-                        wd_obj.dttm_work_end = None
-                        wd_obj.work_hours = timedelta(hours=0)
-                        wd_obj.shop=None
-                        wd_obj.save()
+                        else:
+                            wd_obj.dttm_work_start = None
+                            wd_obj.dttm_work_end = None
+                            wd_obj.work_hours = timedelta(hours=0)
+                            wd_obj.shop = None
+                            wd_obj.save()
 
 
             for work_type in shop.worktype_set.all():
@@ -915,7 +916,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         dt_from = form['dt_from']
         dt_to = form['dt_to']
 
-        dt_min = datetime.now().date() + timedelta(days=REBUILD_TIMETABLE_MIN_DELTA)
+        dt_min = datetime.now().date() + timedelta(days=settings.REBUILD_TIMETABLE_MIN_DELTA)
 
         if dt_from < dt_min:
             raise ValidationError(self.error_messages["tt_delete_past"])

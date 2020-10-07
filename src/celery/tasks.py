@@ -3,9 +3,9 @@ import os
 from src.base.message import Message
 from django.db.models import Avg, Q
 from django.utils.timezone import now
+from django.conf import settings
 from dateutil.relativedelta import relativedelta
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
-
 from src.timetable.vacancy.utils import (
     search_candidates,
     cancel_vacancy,
@@ -383,21 +383,26 @@ def update_shop_stats(dt=None):
     for month_stat in month_stats:
         if month_stat.status not in [ShopMonthStat.READY, ShopMonthStat.NOT_DONE]:
             continue
+
+        if settings.UPDATE_SHOP_STATS_WORK_TYPES_CODES:
+            work_type_ids = list(month_stat.shop.worktype_set.filter(
+                work_type_name__code__in=settings.UPDATE_SHOP_STATS_WORK_TYPES_CODES,
+            ).values_list('id', flat=True))
+        else:
+            work_type_ids = []
         stats = get_shop_stats(
             shop_id=month_stat.shop_id,
             form=dict(
                 from_dt=month_stat.dt,
                 to_dt=month_stat.dt + relativedelta(months=1, days=-1),
-                work_type_ids=[]
+                work_type_ids=work_type_ids,
+                indicators=True,
+                efficiency=False,
             ),
-            indicators_only=True
         )['indicators']
-        month_stat.idle = stats['deadtime_part']
-        month_stat.fot = stats['FOT']
-        month_stat.workers_amount = stats['cashier_amount']
-        month_stat.revenue = stats['revenue']
-        month_stat.lack = stats['covering_part']
-        month_stat.fot_revenue = stats['fot_revenue']
+        month_stat.idle = stats['deadtime']
+        month_stat.fot = stats['fot']
+        month_stat.lack = stats['covering']  # на самом деле покрытие
         month_stat.save()
 
 

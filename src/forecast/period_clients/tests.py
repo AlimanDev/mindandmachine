@@ -91,12 +91,14 @@ class TestDemand(APITestCase):
         self.date = datetime.now().date() + timedelta(days=1)
         op_type_name = OperationTypeName.objects.create(
             name='O_TYPE',
+            do_forecast=OperationTypeName.FORECAST,
         )
         op_type_name2 = OperationTypeName.objects.create(
             name='O_TYPE2',
         )
         op_type_name3 = OperationTypeName.objects.create(
             name='O_TYPE3',
+            do_forecast=OperationTypeName.FORECAST,
         )
         op_type_name4 = OperationTypeName.objects.create(
             name='O_TYPE4',
@@ -107,7 +109,6 @@ class TestDemand(APITestCase):
         self.o_type_1 = OperationType.objects.create(
             work_type=self.work_type1,
             operation_type_name=op_type_name,
-            do_forecast=OperationType.FORECAST,
             shop=self.work_type1.shop,
             )
         self.o_type_2 = OperationType.objects.create(
@@ -118,7 +119,6 @@ class TestDemand(APITestCase):
         self.o_type_3 = OperationType.objects.create(
             work_type=self.work_type3,
             operation_type_name=op_type_name3,
-            do_forecast=OperationType.FORECAST,
             shop=self.work_type3.shop,
             )
         self.o_type_4 = OperationType.objects.create(
@@ -281,25 +281,25 @@ class TestDemand(APITestCase):
         correct_data = [
             {
                 'dttm_forecast': datetime(2019, 9, 1, 10, 0), 
-                'value': 2.1225757598877, 
+                'value': 2.1225757598876953, 
                 'operation_type_id': self.o_type_5.id, 
                 'type': 'L'
             }, 
             {
                 'dttm_forecast': datetime(2019, 9, 1, 10, 30), 
-                'value': 2.23460102081299, 
+                'value': 2.2346010208129883, 
                 'operation_type_id': self.o_type_5.id, 
                 'type': 'L'
             }, 
             {
                 'dttm_forecast': datetime(2019, 9, 1, 11, 0), 
-                'value': 2.19596290588379, 
+                'value': 2.195962905883789, 
                 'operation_type_id': self.o_type_5.id, 
                 'type': 'L'
             }, 
             {
                 'dttm_forecast': datetime(2019, 9, 1, 11, 30), 
-                'value': 2.30798816680908, 
+                'value': 2.307988166809082, 
                 'operation_type_id': self.o_type_5.id, 
                 'type': 'L'
             }
@@ -324,25 +324,25 @@ class TestDemand(APITestCase):
         correct_data = [
             {
                 'dttm_forecast': datetime(2019, 9, 1, 10, 0), 
-                'value': 2.1225757598877, 
+                'value': 2.1225757598876953, 
                 'operation_type_id': self.o_type_5.id, 
                 'type': 'F'
             }, 
             {
                 'dttm_forecast': datetime(2019, 9, 1, 10, 30), 
-                'value': 2.23460102081299, 
+                'value': 2.2346010208129883, 
                 'operation_type_id': self.o_type_5.id, 
                 'type': 'F'
             }, 
             {
                 'dttm_forecast': datetime(2019, 9, 1, 11, 0), 
-                'value': 2.19596290588379, 
+                'value': 2.195962905883789, 
                 'operation_type_id': self.o_type_5.id, 
                 'type': 'F'
             }, 
             {
                 'dttm_forecast': datetime(2019, 9, 1, 11, 30), 
-                'value': 2.30798816680908, 
+                'value': 2.307988166809082, 
                 'operation_type_id': self.o_type_5.id, 
                 'type': 'F'
             }
