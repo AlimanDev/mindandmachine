@@ -318,12 +318,13 @@ class Tabel_xlsx(Xlsx_base):
         cell_format = dict(self.day_type)
         n_workdays = len(workdays)
         for row_shift, employment in enumerate(employments):
+            current_triplet = triplets.get(employment.position_id, triplets['default'])
             for day in range(len(self.prod_days)):
 
                 if (it < n_workdays) and (workdays[it].employment_id == employment.id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
                     if wd.type == WorkerDay.TYPE_WORKDAY:
-                        total_h, night_h = self._count_time(wd.dttm_work_start.time(), wd.dttm_work_end.time(), (0, 0), triplets)
+                        total_h, night_h = self._count_time(wd.dttm_work_start.time(), wd.dttm_work_end.time(), (0, 0), current_triplet)
                         if night_h == 'all':  # night_work
                             wd.type = 'night_work'
                         if (type(night_h) != str) and (night_h > 0):
@@ -332,7 +333,7 @@ class Tabel_xlsx(Xlsx_base):
                             text = str(total_h)
 
                     elif wd.type == WorkerDay.TYPE_HOLIDAY_WORK:
-                        total_h = ceil(self._time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), triplets))
+                        total_h = ceil(self._time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), current_triplet))
                         text = 'В{}'.format(total_h)
 
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
@@ -365,7 +366,7 @@ class Tabel_xlsx(Xlsx_base):
                 user_working_hours = working_hours.get(employment.user_id, {}).get(dt, 0)
                 user_working_hours = user_working_hours if user_working_hours else 0
                 breaktime = 0
-                for triplet in triplets:
+                for triplet in current_triplet:
                     if triplet[0] <= user_working_hours and triplet[1] >= user_working_hours:
                         breaktime = triplet[2]
                 self.worksheet.write(

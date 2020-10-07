@@ -279,8 +279,13 @@ def download_timetable_util(request, workbook, form):
         shop=shop,
     ).order_by('position_id', 'user__last_name', 'user__first_name', 'user__middle_name', 'tabel_code', 'id')
 
-    breaktimes = shop.settings.breaks.breaks
-    breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
+    breaktimes = {
+        w.id: w.breaks.breaks
+        for w in WorkerPostion.objects.filter(netword_id=shop.network_id)
+    }
+    breaktimes['default'] = shop.settings.breaks.breaks
+    # breaktimes = shop.settings.breaks.breaks
+    # breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
     workdays = WorkerDay.objects.select_related('worker', 'shop').filter(
         Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True),
@@ -368,8 +373,13 @@ def download_tabel_util(request, workbook, form):
             working_hours[wd['worker_id']] = {}
         working_hours[wd['worker_id']][wd['dt']] = wd['hours_fact']
 
-    breaktimes = json.loads(shop.settings.break_triplets)
-    breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
+    breaktimes = {
+        w.id: w.breaks.breaks
+        for w in WorkerPostion.objects.filter(netword_id=shop.network_id)
+    }
+    breaktimes['default'] = shop.settings.breaks.breaks
+    # breaktimes = json.loads(shop.settings.break_triplets)
+    # breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
     if form.get('inspection_version', False):
         tabel.change_for_inspection(tabel.prod_month.get('norm_work_hours', 0), workdays)
