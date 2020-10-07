@@ -5,7 +5,8 @@ from django.contrib.auth.models import (
     UserManager
 )
 from django.db import models
-from django.db.models import Subquery, OuterRef, Max
+from django.db.models import Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField
+from django.db.models.functions import Extract, Coalesce, Cast, Ceil
 from django.db.models.query import QuerySet
 from django.utils import timezone
 
@@ -30,9 +31,9 @@ class WorkTypeManager(AbstractActiveModelManager):
         """
 
         return self.filter(
-            models.Q(dttm_added__date__lte=dt_from) | models.Q(dttm_added__isnull=True)
+            Q(dttm_added__date__lte=dt_from) | Q(dttm_added__isnull=True)
         ).filter(
-            models.Q(dttm_deleted__date__gte=dt_to) | models.Q(dttm_deleted__isnull=True)
+            Q(dttm_deleted__date__gte=dt_to) | Q(dttm_deleted__isnull=True)
         ).filter(*args, **kwargs)
     
     def qos_delete(self, *args, **kwargs):
@@ -168,9 +169,9 @@ class CashboxManager(models.Manager):
         """
 
         return self.filter(
-            models.Q(dttm_added__date__lte=dt_from) | models.Q(dttm_added__isnull=True)
+            Q(dttm_added__date__lte=dt_from) | Q(dttm_added__isnull=True)
         ).filter(
-            models.Q(dttm_deleted__date__gt=dt_to) | models.Q(dttm_deleted__isnull=True)
+            Q(dttm_deleted__date__gt=dt_to) | Q(dttm_deleted__isnull=True)
         ).filter(*args, **kwargs)
 
 
@@ -273,27 +274,77 @@ class WorkerDayQuerySet(QuerySet):
     def get_fact_edit(self):
         raise NotImplementedError
 
-    def get_tabel(self):
-        query = self.filter(
-            models.Q(is_fact=True, is_approved=True) |
-            models.Q(models.Q(is_approved=True) & ~models.Q(type__in=WorkerDay.TYPES_PAID))
+    def get_tabel(self, shop_id):
+        ordered_subq = WorkerDay.objects.filter(
+            Q(
+                Q(is_fact=True, is_approved=True) |
+                Q(
+                    Q(is_fact=False, is_approved=True) &
+                    ~Q(type__in=WorkerDay.TYPES_PAID)
+                )
+            ),
+            dt=OuterRef('dt'),
+            worker_id=OuterRef('worker_id'),
+        ).order_by(
+            '-is_fact',
+        ).values_list('id')[:1]
+        qs = self.filter(id=Subquery(ordered_subq))
+
+        break_triplets = []
+        if shop_id:
+            shop = Shop.objects.get(id=shop_id)
+            if shop.settings:
+                break_triplets = json.loads(shop.settings.break_triplets)
+        break_triplets = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), break_triplets))
+        breaktime = Value(0, output_field=FloatField())
+        if break_triplets:
+            whens = [
+                When(Q(tabel_work_hours_0__gte=break_triplet[0], tabel_work_hours_0__lte=break_triplet[1]),
+                     then=break_triplet[2])
+                for break_triplet in break_triplets]
+            breaktime = Case(*whens, output_field=FloatField())
+
+        allowed_to_be_late_by = datetime.timedelta(minutes=15)  # TODO: вынести настройки в бд
+        allowed_to_departure_earlier_for = datetime.timedelta(minutes=15)
+
+        plan_approved_wdays_subq = WorkerDay.objects.filter(
+            dt=OuterRef('dt'),
+            worker_id=OuterRef('worker_id'),
+            is_fact=False,
+            is_approved=True,
+            type__in=WorkerDay.TYPES_PAID,
+        ).order_by('-id')
+        qs = qs.annotate(
+            plan_dttm_work_start=Subquery(plan_approved_wdays_subq.values('dttm_work_start')[:1]),
+            plan_dttm_work_end=Subquery(plan_approved_wdays_subq.values('dttm_work_end')[:1]),
+            tabel_dttm_work_start=Case(
+                When(plan_dttm_work_start__lt=F('dttm_work_start') - allowed_to_be_late_by, then=F('dttm_work_start')),
+                default=F('plan_dttm_work_start'), output_field=DateTimeField()
+            ),
+            tabel_dttm_work_end=Case(
+                When(plan_dttm_work_end__gt=F('dttm_work_end') + allowed_to_departure_earlier_for,
+                     then=F('dttm_work_end')),
+                default=F('plan_dttm_work_end'), output_field=DateTimeField()
+            ),
+            tabel_work_hours_0=Cast(
+                Extract(
+                    Coalesce(
+                        F('tabel_dttm_work_end') - F('tabel_dttm_work_start'),
+                        datetime.timedelta(hours=0)
+                    ), 'epoch'
+                ) / 3600,
+                FloatField(),
+            ),
+            tabel_work_hours=Ceil(F('tabel_work_hours_0') - breaktime),
         )
-        worker_days = list(query.order_by('worker_id', 'dt', '-is_fact'))
-        exists = []
-        remove = []
-        for worker_day in worker_days:
-            if (worker_day.worker_id, worker_day.dt) in exists:
-                remove.append(worker_day.id)
-            else:
-                exists.append((worker_day.worker_id, worker_day.dt))
-        return query.exclude(id__in=remove)
+        return qs
 
 
 class WorkerDayManager(models.Manager):
     def qos_current_version(self, approved_only=False):
         if approved_only:
             return super().get_queryset().filter(
-                models.Q(child__id__isnull=True) | models.Q(child__worker_day_approve=False),
+                Q(child__id__isnull=True) | Q(child__worker_day_approve=False),
                 worker_day_approve=True,
             )
         else:
@@ -635,9 +686,9 @@ class Event(AbstractModel):
                 is_updated = False
                 update_condition = user_worker_day.type != WorkerDay.TYPE_WORKDAY or \
                                    WorkerDayCashboxDetails.objects.filter(
-                                       models.Q(dttm_from__gte=vacancy.dttm_from, dttm_from__lt=vacancy.dttm_to) |
-                                       models.Q(dttm_to__gt=vacancy.dttm_from, dttm_to__lte=vacancy.dttm_to) |
-                                       models.Q(dttm_from__lte=vacancy.dttm_from, dttm_to__gte=vacancy.dttm_to),
+                                       Q(dttm_from__gte=vacancy.dttm_from, dttm_from__lt=vacancy.dttm_to) |
+                                       Q(dttm_to__gt=vacancy.dttm_from, dttm_to__lte=vacancy.dttm_to) |
+                                       Q(dttm_from__lte=vacancy.dttm_from, dttm_to__gte=vacancy.dttm_to),
                                        worker_day_id=user_worker_day.id,
                                        dttm_deleted__isnull=True,
                                    ).count() == 0

@@ -114,7 +114,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             raise FieldError(self.error_messages['cannot_delete'])
         super().perform_destroy(worker_day)
 
-
     def list(self, request):
         if request.query_params.get('hours_details', False):
             data = []
@@ -135,7 +134,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             night_edges = [Converter.parse_time(t) for t in json.loads(request.user.network.settings_values).get('nigth_edges', night_edges)]
 
             for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')):
-                wd_dict = WorkerDayListSerializer(worker_day).data
+                wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 if WorkerDay.is_type_with_tm_range(worker_day.type):
                     wd_dict['work_hours'] = worker_day.work_hours.seconds / 3600
                     wd_dict['work_hours_details'] = {}
@@ -165,7 +164,10 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                     wd_dict['work_hours'] = 0.0
                 data.append(wd_dict)
         else:
-            data = WorkerDayListSerializer(self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')), many=True).data
+            data = WorkerDayListSerializer(
+                self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')),
+                many=True, context=self.get_serializer_context()
+            ).data
         return Response(data)
 
 
