@@ -4,7 +4,7 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup, Network
+from src.base.models import FunctionGroup, Network, TabelSettings, ShopTabelSettings
 from src.timetable.models import (
     WorkerDay, 
     AttendanceRecords, 
@@ -83,6 +83,15 @@ class TestWorkerDay(APITestCase):
         )
 
         self.client.force_authenticate(user=self.user1)
+        TabelSettings.objects.filter(code='default').update(
+            allowed_interval_for_late_arrival=timedelta(minutes=15),
+            allowed_interval_for_early_departure=timedelta(minutes=15),
+        )
+
+        try:
+            del self.shop.tabel_settings
+        except AttributeError:
+            pass
 
     def test_get_list(self):
         dt = Converter.convert_date(self.dt)
@@ -540,6 +549,32 @@ class TestWorkerDay(APITestCase):
             expected_end=plan_dttm_work_end,
             expected_hours=10.0,
         )
+
+    def test_can_override_tabel_settings_for_shop(self):
+        tabel_settings = TabelSettings.objects.create(
+            allowed_interval_for_late_arrival=timedelta(seconds=0),
+            allowed_interval_for_early_departure=timedelta(seconds=0),
+        )
+        ShopTabelSettings.objects.create(
+            tabel_settings=tabel_settings,
+            shop=self.shop,
+        )
+
+        plan_dttm_work_start = datetime.combine(self.dt, time(10, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt, time(21, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(9, 0, 0))
+        fact_dttm_work_end = datetime.combine(self.dt, time(20, 53, 0))
+
+        self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=plan_dttm_work_start,
+            expected_end=fact_dttm_work_end,
+            expected_hours=10.0,
+        )
+
 
     def test_get_worker_day_by_worker__username__in(self):
         get_params = {

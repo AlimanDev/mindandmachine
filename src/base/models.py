@@ -1,13 +1,13 @@
 import datetime
 import json
-
 from django.apps import apps
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.db.models import Case, When, Sum, Value, IntegerField
+from django.utils.functional import cached_property
+from django.db.models import Case, When, Sum, Value, IntegerField, Q
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
 from timezone_field import TimeZoneField
@@ -85,6 +85,23 @@ class ShopSettings(AbstractActiveNamedModel):
 
     def get_department(self):
         return None
+
+
+class TabelSettings(AbstractActiveNamedModel):
+    allowed_interval_for_late_arrival = models.DurationField(verbose_name='Допустимый интервал для опоздания')
+    allowed_interval_for_early_departure = models.DurationField(verbose_name='Допустимый интервал для раннего ухода')
+
+    class Meta:
+        verbose_name = 'Настройка табеля'
+        verbose_name_plural = 'Настройки табеля'
+
+
+class ShopTabelSettings(models.Model):
+    shop = models.ForeignKey('base.Shop', on_delete=models.CASCADE)
+    tabel_settings = models.ForeignKey('base.TabelSettings', on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('shop', 'tabel_settings')
 
 
 # на самом деле это отдел
@@ -260,6 +277,13 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 network_id=self.network_id,
                 shops__isnull=True,
             ).first()
+
+    @cached_property
+    def tabel_settings(self):
+        return TabelSettings.objects.filter(
+            Q(id=ShopTabelSettings.objects.filter(shop=self).values_list('tabel_settings', flat=True)[0]) |
+            Q(code='default'),
+        ).order_by('id').last()
 
 
 class EmploymentManager(models.Manager):

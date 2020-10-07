@@ -35,7 +35,7 @@ class WorkTypeManager(AbstractActiveModelManager):
         ).filter(
             Q(dttm_deleted__date__gte=dt_to) | Q(dttm_deleted__isnull=True)
         ).filter(*args, **kwargs)
-    
+
     def qos_delete(self, *args, **kwargs):
         for obj in self.filter(*args, **kwargs):
             obj.delete()
@@ -96,14 +96,14 @@ class WorkType(AbstractActiveModel):
         if hasattr(self, 'code'):
             self.work_type_name = WorkTypeName.objects.get(code=self.code)
         super(WorkType, self).save(*args, **kwargs)
-        
+
     def get_department(self):
         return self.shop
 
     def delete(self):
         if Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True).exists():
             raise models.ProtectedError('There is cashboxes with such work_type', Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True))
-        
+
         super(WorkType, self).delete()
         # self.dttm_deleted = datetime.datetime.now()
         # self.save()
@@ -306,10 +306,9 @@ class WorkerDayQuerySet(QuerySet):
         qs = self.filter(id=Subquery(ordered_subq))
 
         break_triplets = []
-        if shop_id:
-            shop = Shop.objects.get(id=shop_id)
-            if shop.settings:
-                break_triplets = json.loads(shop.settings.break_triplets)
+        shop = Shop.objects.get(id=shop_id)
+        if shop.settings:
+            break_triplets = json.loads(shop.settings.break_triplets)
         break_triplets = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), break_triplets))
         breaktime = Value(0, output_field=FloatField())
         if break_triplets:
@@ -318,9 +317,6 @@ class WorkerDayQuerySet(QuerySet):
                      then=break_triplet[2])
                 for break_triplet in break_triplets]
             breaktime = Case(*whens, output_field=FloatField())
-
-        allowed_to_be_late_by = datetime.timedelta(minutes=15)  # TODO: вынести настройки в бд
-        allowed_to_departure_earlier_for = datetime.timedelta(minutes=15)
 
         plan_approved_wdays_subq = WorkerDay.objects.filter(
             dt=OuterRef('dt'),
@@ -333,11 +329,14 @@ class WorkerDayQuerySet(QuerySet):
             plan_dttm_work_start=Subquery(plan_approved_wdays_subq.values('dttm_work_start')[:1]),
             plan_dttm_work_end=Subquery(plan_approved_wdays_subq.values('dttm_work_end')[:1]),
             tabel_dttm_work_start=Case(
-                When(plan_dttm_work_start__lt=F('dttm_work_start') - allowed_to_be_late_by, then=F('dttm_work_start')),
+                When(plan_dttm_work_start__lt=F(
+                    'dttm_work_start') - shop.tabel_settings.allowed_interval_for_late_arrival,
+                     then=F('dttm_work_start')),
                 default=F('plan_dttm_work_start'), output_field=DateTimeField()
             ),
             tabel_dttm_work_end=Case(
-                When(plan_dttm_work_end__gt=F('dttm_work_end') + allowed_to_departure_earlier_for,
+                When(plan_dttm_work_end__gt=F(
+                    'dttm_work_end') + shop.tabel_settings.allowed_interval_for_early_departure,
                      then=F('dttm_work_end')),
                 default=F('plan_dttm_work_end'), output_field=DateTimeField()
             ),
@@ -426,7 +425,7 @@ class WorkerDay(AbstractModel):
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
         index_together = [('dt', 'worker')]
-    
+
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
     TYPE_VACATION = 'V'
@@ -552,7 +551,7 @@ class WorkerDay(AbstractModel):
                 work_hours = work_hours - sum(break_triplet[2])
                 break
         return datetime.timedelta(minutes=work_hours)
-    
+
     def get_department(self):
         return self.shop
 

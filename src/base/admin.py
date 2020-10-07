@@ -1,7 +1,7 @@
 from django.contrib import admin
+
 from src.base.models import (
     Employment,
-    Network,
     User,
     Shop,
     ShopSettings,
@@ -11,11 +11,15 @@ from src.base.models import (
     Region,
     ProductionDay,
     Network,
+    TabelSettings,
+    ShopTabelSettings,
 )
+
 
 @admin.register(Network)
 class NetworkAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'code', 'logo')
+
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):
@@ -32,6 +36,7 @@ class WorkerPositionAdmin(admin.ModelAdmin):
 class QsUserAdmin(admin.ModelAdmin):
     list_display = ('first_name', 'last_name', 'shop_name', 'id')
     search_fields = ('first_name', 'last_name', 'id')
+
     # list_filter = ('employment__shop', )
 
     # list_display = ('first_name', 'last_name', 'employment__shop__title', 'parent_title', 'work_type_name', 'id')
@@ -47,12 +52,14 @@ class QsUserAdmin(admin.ModelAdmin):
     def shop_name(instance: User):
         res = ', '.join(i.shop.name for i in instance.employments.all().select_related('shop'))
         return res
+
     '''
     @staticmethod
     def work_type_name(instance: User):
         cashboxinfo_set = instance.workercashboxinfo_set.all().select_related('work_type')
         return ' '.join(['"{}"'.format(cbi.work_type.name) for cbi in cashboxinfo_set])
     '''
+
 
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
@@ -66,7 +73,7 @@ class ShopAdmin(admin.ModelAdmin):
 
 @admin.register(ShopSettings)
 class ShopSettingsAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name' )
+    list_display = ('id', 'name')
     search_fields = ('id', 'name')
 
 
@@ -94,3 +101,15 @@ class EmploymentAdmin(admin.ModelAdmin):
 class ProductionDayAdmin(admin.ModelAdmin):
     list_display = ('dt', 'type')
 
+
+class ShopTabelSettingsInline(admin.TabularInline):
+    raw_id_fields = ('shop',)
+    model = ShopTabelSettings
+
+
+@admin.register(TabelSettings)
+class TabelSettingsAdmin(admin.ModelAdmin):
+    list_display = ('name', 'code', 'allowed_interval_for_late_arrival', 'allowed_interval_for_late_arrival')
+    inlines = (
+        ShopTabelSettingsInline,
+    )
