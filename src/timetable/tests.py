@@ -961,37 +961,52 @@ class TestAditionalFunctions(APITestCase):
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 8)
 
-    def test_duplicate_approved(self):
+    def test_duplicate_full(self):
         dt_from = date.today()
-        data = {
-            'from_worker_id': self.user2.id,
-            'to_worker_id': self.user3.id,
-            'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
-            'is_approved': True,
-        }
         self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
         self.create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
-        url = f'{self.url}duplicate/'
-        response = self.client.post(url, data, format='json')
-        self.assertEqual(len(response.json()), 5)
-
-    def test_duplicate_not_approved(self):
-        dt_from = date.today()
         data = {
-            'from_worker_id': self.user2.id,
+            'from_workerday_ids': list(WorkerDay.objects.filter(worker=self.user2).values_list('id', flat=True)),
             'to_worker_id': self.user3.id,
-            'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
-            'is_approved': False,
+            'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
         }
-        self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
-        wds = self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
-        self.create_worker_days(self.employment2, dt_from, 5, 16, 20, False)
-        self.create_worker_days(self.employment3, dt_from, 4, 10, 21, False, wds=wds)
-        self.create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 5)
+        self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False).count(), 5)
+
+
+    def test_duplicate_less(self):
+        dt_from = date.today()
+        self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
+        self.create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
+        data = {
+            'from_workerday_ids': list(WorkerDay.objects.filter(worker=self.user2).values_list('id', flat=True)),
+            'to_worker_id': self.user3.id,
+            'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
+        }
+        url = f'{self.url}duplicate/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(len(response.json()), 4)
+        self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False).count(), 5)
+
+
+    def test_duplicate_more(self):
+        dt_from = date.today()
+        self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
+        self.create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
+        data = {
+            'from_workerday_ids': list(WorkerDay.objects.filter(worker=self.user2).values_list('id', flat=True)),
+            'to_worker_id': self.user3.id,
+            'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(8)],
+        }
+        url = f'{self.url}duplicate/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(len(response.json()), 8)
+        self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False).count(), 8)
 
     def test_change_list(self):
         dt_from = date.today()
