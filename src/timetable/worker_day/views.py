@@ -269,9 +269,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         data = paginator.paginate_queryset(queryset, request)
         data = VacancySerializer(data, many=True)
 
-
         return paginator.get_paginated_response(data.data)
-
 
     @action(detail=True, methods=['post'])
     def confirm_vacancy(self, request, pk=None):
@@ -282,13 +280,12 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         status_code = result['status_code']
         result = message.get_message(result['code'])
 
-        return Response({'result':result}, status=status_code)
+        return Response({'result': result}, status=status_code)
 
-    
     @action(detail=True, methods=['post'])
     def approve_vacancy(self, request, pk=None):
         vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True, is_approved=False).first()
-        if vacancy == None:
+        if vacancy is None:
             raise MessageError(code='no_vacancy_or_approved', lang=request.user.lang)
         vacancy.is_approved = True
         parent = vacancy.parent_worker_day
@@ -298,18 +295,17 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             parent.delete()
         return Response(WorkerDaySerializer(vacancy).data)
 
-
     @action(detail=True, methods=['get'])
     def editable_vacancy(self, request, pk=None):
         vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True).first()
-        if vacancy == None:
+        if vacancy is None:
             raise MessageError(code='no_vacancy', lang=request.user.lang)
         if not vacancy.is_approved:
             return Response(WorkerDaySerializer(vacancy).data)
         if vacancy.worker_id:
             raise MessageError(code='cant_edit_vacancy', lang=request.user.lang)
         editable_vacancy = WorkerDay.objects.filter(parent_worker_day=vacancy).first()
-        if editable_vacancy == None:
+        if editable_vacancy is None:
             editable_vacancy = WorkerDay.objects.create(
                 shop_id=vacancy.shop_id,
                 dt=vacancy.dt,
@@ -332,7 +328,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 for d in WorkerDayCashboxDetails.objects.filter(worker_day=vacancy)
             ])
         return Response(WorkerDaySerializer(editable_vacancy).data)
-
 
     @action(detail=False, methods=['post'])
     def change_list(self, request):
@@ -431,7 +426,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response(response, status=200)
 
-
     @action(detail=False, methods=['post'])
     def duplicate(self, request):
         data = DuplicateSrializer(data=request.data, context={'request': request})
@@ -506,7 +500,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         for work_type in work_types:
             cancel_vacancies(work_type.shop_id, work_type.id)
         return Response(WorkerDaySerializer(created_wds, many=True).data)
-
 
     @action(detail=False, methods=['post'])
     def delete_timetable(self, request):
@@ -597,7 +590,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 cancel_vacancy(worker_day.id)
         return Response()
 
-
     @action(detail=False, methods=['post'])
     def exchange(self, request):
         new_wds = []
@@ -663,7 +655,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response(WorkerDaySerializer(new_wds, many=True).data)
 
-
     @action(detail=False, methods=['post'])
     @get_uploaded_file
     def upload(self, request, file):
@@ -672,13 +663,11 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         data.validated_data['lang'] = request.user.lang
         return upload_timetable_util(data.validated_data, file)
 
-    
     @action(detail=False, methods=['get'])
     def download_timetable(self, request):
         data = DownloadSerializer(data=request.query_params)
         data.is_valid(raise_exception=True)
         return download_timetable_util(request, data.validated_data)
-
 
     @action(detail=False, methods=['get'])
     def download_tabel(self, request):

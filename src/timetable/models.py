@@ -241,24 +241,25 @@ class WorkerConstraint(AbstractModel):
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
     is_lite = models.BooleanField(default=False)  # True -- если сам сотрудник выставил, False -- если менеджер
     tm = models.TimeField()
+
     def get_department(self):
         return self.employment.shop
 
 
 class WorkerDayQuerySet(QuerySet):
-    def get_plan_approved(self):
-        return self.filter(is_fact=False, is_approved=True)
+    def get_plan_approved(self, **kwargs):
+        return self.filter(is_fact=False, is_approved=True, **kwargs)
 
-    def get_plan_not_approved(self):
-        return self.filter(is_fact=False, is_approved=False)
+    def get_plan_not_approved(self, **kwargs):
+        return self.filter(is_fact=False, is_approved=False, **kwargs)
 
-    def get_fact_approved(self):
-        return self.filter(is_fact=True, is_approved=True)
+    def get_fact_approved(self, **kwargs):
+        return self.filter(is_fact=True, is_approved=True, **kwargs)
 
-    def get_fact_not_approved(self):
-        return self.filter(is_fact=True, is_approved=False)
+    def get_fact_not_approved(self, **kwargs):
+        return self.filter(is_fact=True, is_approved=False, **kwargs)
 
-    def get_plan_edit(self):
+    def get_plan_edit(self, **kwargs):
         worker_days_ordered = self.filter(is_fact=False).order_by('is_approved')
         exists = []
         remove = []
@@ -267,12 +268,12 @@ class WorkerDayQuerySet(QuerySet):
                 remove.append(worker_day.id)
             else:
                 exists.append((worker_day.worker_id, worker_day.dt))
-        return self.filter(is_fact=False).exclude(id__in=remove)
+        return self.filter(is_fact=False, **kwargs).exclude(id__in=remove)
 
-    def get_fact_edit(self):
+    def get_fact_edit(self, **kwargs):
         raise NotImplementedError
 
-    def get_tabel(self):
+    def get_tabel(self, **kwargs):
         query = self.filter(
             models.Q(is_fact=True, is_approved=True) |
             models.Q(models.Q(is_approved=True) & ~models.Q(type__in=WorkerDay.TYPES_PAID))
@@ -285,7 +286,7 @@ class WorkerDayQuerySet(QuerySet):
                 remove.append(worker_day.id)
             else:
                 exists.append((worker_day.worker_id, worker_day.dt))
-        return query.exclude(id__in=remove)
+        return query.filter(**kwargs).exclude(id__in=remove)
 
 
 class WorkerDayManager(models.Manager):

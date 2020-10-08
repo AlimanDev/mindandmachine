@@ -8,7 +8,7 @@ class Permission(permissions.BasePermission):
     """
     Класс для определения прав доступа к методам апи без привязки к магазину
     """
-    actions ={
+    actions = {
         'list': 'GET',
         'create': 'POST',
         'retrieve': 'GET',
