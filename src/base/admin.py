@@ -88,6 +88,7 @@ class EmploymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop', 'user')
     list_filter = ('shop', 'user')
     search_fields = ('user__first_name', 'user__last_name', 'shop__name', 'shop__parent__name')
+    raw_id_fields = ('shop', 'user', 'position')
 
 
 @admin.register(ProductionDay)
