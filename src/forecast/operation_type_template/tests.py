@@ -64,12 +64,6 @@ class TestOperationTypeTemplate(APITestCase):
             load_template=self.load_template,
             operation_type_name=self.operation_type_name2,
         )
-        FunctionGroup.objects.bulk_create(
-            [
-                FunctionGroup(func='OperationTypeTemplate', group=self.admin_group, method=m)
-                for m in ['POST', 'PUT', 'DELETE']
-            ]
-        )
 
         self.client.force_authenticate(user=self.user1)
 

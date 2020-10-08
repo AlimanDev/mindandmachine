@@ -32,14 +32,6 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(len(resp.json()), self.worker_positions_count)
 
     def test_create(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='WorkerPosition',
-            level_up=1,
-            level_down=99,
-        )
-
         data = {
             'name': 'test_name',
             'network_id': self.network.id,
@@ -57,14 +49,6 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
 
     def test_put(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='WorkerPosition',
-            level_up=1,
-            level_down=99,
-        )
-
         put_data = {
             'name': 'test_name',
             'network_id': self.network.id,
@@ -78,14 +62,6 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
 
     def test_delete(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='DELETE',
-            func='WorkerPosition',
-            level_up=1,
-            level_down=99,
-        )
-
         resp = self.client.delete(path=self.get_url('WorkerPosition-detail', pk=self.worker_position.id))
         self.assertEqual(resp.status_code, 204)
         self.assertEqual(

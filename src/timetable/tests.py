@@ -84,15 +84,6 @@ class TestWorkerDay(APITestCase):
             parent_worker_day=self.worker_day_fact_approved
         )
 
-        FunctionGroup.objects.bulk_create([
-            FunctionGroup(group=self.admin_group,
-                method=method,
-                func=func,
-                level_up=1,
-                level_down=99,
-            )  for method in ['POST','PUT','DELETE'] for func in ['WorkerDay', 'WorkerDay_approve']
-            ])
-
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):
@@ -496,14 +487,6 @@ class TestWorkerDayCreateFact(APITestCase):
             work_type_name=self.work_type_name,
             shop=self.shop)
 
-        FunctionGroup.objects.bulk_create([
-            FunctionGroup(group=self.admin_group,
-                          method=method,
-                          func=func,
-                          level_up=1,
-                          level_down=99,
-                          ) for method in ['POST', 'PUT', 'DELETE'] for func in ['WorkerDay', 'WorkerDayApprove']
-        ])
         self.client.force_authenticate(user=self.user1)
 
     def test_create_fact(self):
@@ -762,14 +745,6 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.client.force_authenticate(user=self.user1)
 
     def test_create_vacancy(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='WorkerDay',
-            level_up=0,
-            level_down=99,
-        )
-
         data = {
             'id': None,
             'dt': Converter.convert_date(self.dt_now),
@@ -873,16 +848,6 @@ class TestAditionalFunctions(APITestCase):
             work_type_name=self.work_type_name,
             shop=self.shop)
         ExchangeSettings.objects.create(network=self.network)
-        FunctionGroup.objects.bulk_create([
-            FunctionGroup(group=self.admin_group,
-                          method=method,
-                          func=func,
-                          level_up=1,
-                          level_down=99,
-                          ) for method in ['POST', 'PUT', 'DELETE']
-            for func in
-            ['WorkerDay_change_list', 'WorkerDay_duplicate', 'WorkerDay_delete_timetable', 'WorkerDay_exchange']
-        ])
         self.client.force_authenticate(user=self.user1)
 
     def create_holidays(self, employment, dt_from, count, approved, wds={}):

@@ -60,12 +60,6 @@ class TestLoadTemplate(APITestCase):
             load_template=self.load_template,
             operation_type_name=self.operation_type_name2,
         )
-        FunctionGroup.objects.bulk_create(
-            [
-                FunctionGroup(func='LoadTemplate', group=self.admin_group, method=m)
-                for m in ['POST', 'PUT', 'DELETE']
-            ]
-        )
 
         self.client.force_authenticate(user=self.user1)
 
@@ -170,11 +164,6 @@ class TestLoadTemplate(APITestCase):
         self.assertEqual(load_template, data)
 
     def test_apply_template(self):
-        FunctionGroup.objects.create(
-            func='LoadTemplate_apply', 
-            group=self.admin_group, 
-            method='POST'
-        )
         data = {
             'id': self.load_template.id,
             'shop_id': self.shop.id,
@@ -184,18 +173,9 @@ class TestLoadTemplate(APITestCase):
 
         self.assertEqual(OperationType.objects.filter(shop=self.shop).count(), 2)
         self.assertEqual(WorkType.objects.filter(shop=self.shop).count(), 1)
+
     @skip('Функционал будет перенесён на алгоритмы')
     def test_calculate(self):
-        FunctionGroup.objects.create(
-            func='LoadTemplate_apply', 
-            group=self.admin_group, 
-            method='POST'
-        )
-        FunctionGroup.objects.create(
-            func='LoadTemplate_calculate', 
-            group=self.admin_group, 
-            method='POST'
-        )
         self.shop.forecast_step_minutes = time(1)
         self.shop.save()
         OperationTypeRelation.objects.create(

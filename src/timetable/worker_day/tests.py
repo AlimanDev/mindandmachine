@@ -382,13 +382,6 @@ class TestUploadDownload(APITestCase):
     def setUp(self):
         super().setUp()
         create_departments_and_users(self)
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='WorkerDay_upload',
-            level_up=1,
-            level_down=99,
-        )
         WorkerPosition.objects.bulk_create(
             [
                 WorkerPosition(

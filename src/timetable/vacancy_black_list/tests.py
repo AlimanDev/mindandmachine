@@ -36,32 +36,6 @@ class TestVacancyBlackList(APITestCase):
             symbol='4321',
         )
 
-
-        
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='VacancyBlackList',
-            level_up=1,
-            level_down=99,
-        )
-
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='VacancyBlackList',
-            level_up=1,
-            level_down=99,
-        )
-
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='DELETE',
-            func='VacancyBlackList',
-            level_up=1,
-            level_down=99,
-        )
-
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):

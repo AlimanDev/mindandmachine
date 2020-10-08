@@ -56,28 +56,6 @@ class TestOperationType(APITestCase):
             shop=self.work_type2.shop,
         )
         
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='OperationType',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='OperationType',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='DELETE',
-            func='OperationType',
-            level_up=1,
-            level_down=99,
-        )
-
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):

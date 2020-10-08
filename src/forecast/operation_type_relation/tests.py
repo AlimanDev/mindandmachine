@@ -88,12 +88,6 @@ class TestOperationTypeRelation(APITestCase):
             depended=self.operation_type_template2,
             formula='a + 2',
         )
-        FunctionGroup.objects.bulk_create(
-            [
-                FunctionGroup(func='OperationTypeRelation', group=self.admin_group, method=m)
-                for m in ['POST', 'PUT', 'DELETE']
-            ]
-        )
 
         self.client.force_authenticate(user=self.user1)
 
