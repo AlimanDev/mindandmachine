@@ -27,8 +27,9 @@ from src.base.serializers import (
     EmploymentListSerializer,
     UserListSerializer,
     GroupSerializer,
+    AutoTimetableSerializer,
 )
-from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter
+from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter, BaseActiveNamedModelFilter
 from src.base.models import (
     Employment,
     FunctionGroup,
@@ -76,6 +77,18 @@ class EmploymentViewSet(UpdateorCreateViewSet):
             return EmploymentListSerializer
         else:
             return EmploymentSerializer
+
+
+    @action(detail=False, methods=['post',])
+    def auto_timetable(self, request):
+        data = AutoTimetableSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        employments = Employment.objects.get_active(request.user.network_id, shop_id=data.get('shop_id'))
+        employments.update(auto_timetable=False)
+        employments.filter(user_id__in=data.get('user_ids')).update(auto_timetable=True)
+        return Response()
+
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
@@ -201,6 +214,7 @@ class WorkerPositionViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [Permission]
     serializer_class = WorkerPositionSerializer
     pagination_class = LimitOffsetPagination
+    filterset_class = BaseActiveNamedModelFilter
 
     def get_queryset(self):
         return WorkerPosition.objects.filter(
@@ -242,6 +256,7 @@ class ShopSettingsViewSet(BaseActiveNamedModelViewSet):
     pagination_class = LimitOffsetPagination
     permission_classes = [Permission]
     serializer_class = ShopSettingsSerializer
+    filterset_class = BaseActiveNamedModelFilter
 
     def get_queryset(self):
         user = self.request.user
@@ -260,8 +275,11 @@ class GroupViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [Permission]
     serializer_class = GroupSerializer
     pagination_class = LimitOffsetPagination
+    filterset_class = BaseActiveNamedModelFilter
     
     def get_queryset(self):
         return Group.objects.filter(
             network_id=self.request.user.network_id,
         )
+
+

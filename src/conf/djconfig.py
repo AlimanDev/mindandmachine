@@ -246,7 +246,8 @@ MEDIA_URL = '/_i/media/'
 
 SESSION_COOKIE_SECURE = True
 
-DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
+
+# DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
 
 QOS_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S" #'%H:%M:%S %d.%m.%Y'
 QOS_DATE_FORMAT = '%Y-%m-%d'
@@ -277,7 +278,11 @@ CELERY_TASK_DEFAULT_QUEUE = BACKEND_QUEUE
 # for change celery configs must be before (for BACKEND_QUEUE)
 # todo: do normal parameters changer
 
+APPEND_SLASH = False
+REBUILD_TIMETABLE_MIN_DELTA = 2
 
+# например, для Ортеки для отображения в отчете нужны показатели только по продавцам-кассирам
+UPDATE_SHOP_STATS_WORK_TYPES_CODES = None
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
@@ -373,5 +378,3 @@ if 'test' in sys.argv:
 
 
     MIGRATION_MODULES = MigrationDisabler()
-
-APPEND_SLASH = False

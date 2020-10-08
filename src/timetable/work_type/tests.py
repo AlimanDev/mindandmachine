@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, time
 
+from dateutil.relativedelta import relativedelta
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -43,27 +44,6 @@ class TestWorkType(APITestCase):
         )
         cls.work_type_name4 = WorkTypeName.objects.create(
             name='тип_кассы_4',
-        )
-        FunctionGroup.objects.create(
-            group=cls.admin_group,
-            method='POST',
-            func='WorkType',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=cls.admin_group,
-            method='PUT',
-            func='WorkType',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=cls.admin_group,
-            method='DELETE',
-            func='WorkType',
-            level_up=1,
-            level_down=99,
         )
 
     def setUp(self) -> None:
@@ -196,6 +176,7 @@ class TestWorkType(APITestCase):
         dt_now = datetime.now().date()
         tomorrow = dt_now + timedelta(days=1)
         after_tomorrow = dt_now + timedelta(days=2)
+        after_after_tomorrow = dt_now + timedelta(days=3)
 
         main('2019.1.1', (datetime.now() + timedelta(days=365)).strftime('%Y.%m.%d'), region_id=1)
         op_name = OperationTypeName.objects.create(
@@ -339,3 +320,37 @@ class TestWorkType(APITestCase):
         self.assertEqual(day_stats['covering'][Converter.convert_date(after_tomorrow)], 0.5)
         self.assertEqual(day_stats['predict_hours'][Converter.convert_date(after_tomorrow)], 24.0)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(after_tomorrow)], 12.0)
+
+        wd5 = WorkerDay.objects.create(
+            dttm_work_start=datetime.combine(after_after_tomorrow, time(hour=10)),
+            dttm_work_end=datetime.combine(after_after_tomorrow, time(hour=22)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=after_after_tomorrow,
+            worker=self.user2,
+            is_approved=True,
+            is_fact=False,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=wd5,
+            work_type=self.work_type1,
+        )
+        for j in range(10, 18):
+            PeriodClients.objects.create(
+                value=1,
+                operation_type=op_type,
+                dttm_forecast=datetime.combine(after_after_tomorrow, time(j)),
+            )
+
+        del get_params['graph_type']
+        del get_params['work_type_ids']
+        get_params['indicators'] = 'true'
+        get_params['efficiency'] = 'false'
+        get_params['from_dt'] = Converter.convert_date(dt_now.replace(day=1))
+        get_params['to_dt'] = Converter.convert_date(dt_now.replace(day=1) + relativedelta(months=1, days=-1))
+        response = self.client.get(url, data=get_params)
+        resp_data = response.json()
+        self.assertIn('indicators', resp_data)
+        self.assertNotIn('day_stats', resp_data)
+        self.assertEqual(resp_data['indicators']['fot'], 880.0)
+        self.assertEqual(resp_data['indicators']['covering'], 9.8)
+        self.assertEqual(resp_data['indicators']['deadtime'], 15.4)

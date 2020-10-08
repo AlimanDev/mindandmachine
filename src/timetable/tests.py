@@ -7,8 +7,14 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from src.base.models import FunctionGroup, Network
-from src.timetable.models import WorkerDay, AttendanceRecords, WorkType, WorkTypeName, WorkerDayCashboxDetails, \
-    ShopMonthStat
+from src.timetable.models import (
+    WorkerDay,
+    AttendanceRecords,
+    WorkType,
+    WorkTypeName,
+    WorkerDayCashboxDetails,
+    ShopMonthStat,
+)
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
@@ -27,7 +33,7 @@ class TestWorkerDay(APITestCase):
         self.dt = now().date()
 
         create_departments_and_users(self)
-        self.work_type_name = WorkTypeName.objects.create(name='Магазин')
+        self.work_type_name = WorkTypeName.objects.create(name='Магазин', network=self.network)
         self.work_type = WorkType.objects.create(
             work_type_name=self.work_type_name,
             shop=self.shop)
@@ -526,20 +532,10 @@ class TestWorkerDayCreateFact(APITestCase):
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         plan_id = response.json()['id']
-        parent_id = response.json()['parent_worker_day_id']
-        self.assertEqual(parent_id, None)
-
-        self.assertEqual(WorkerDay.objects.get(id=fact_id).parent_worker_day_id, plan_id)
 
 
-class TestAttendanceRecords(APITestCase):
-    USER_USERNAME = "user1"
-    USER_EMAIL = "q@q.q"
-    USER_PASSWORD = "4242"
-
+class TestAttendanceRecords(TestsHelperMixin, APITestCase):
     def setUp(self):
-        super().setUp()
-
         self.url = '/rest_api/worker_day/'
         self.url_approve = '/rest_api/worker_day/approve/'
         self.dt = now().date()
@@ -602,16 +598,19 @@ class TestAttendanceRecords(APITestCase):
             user=self.user2
         )
 
-        # wd = WorkerDay.objects.get(
-        #     dt=self.dt,
-        #     is_fact=True,
-        #     is_approved=True,
-        #     dttm_work_start = datetime.combine(self.dt, time(6,0,0)),
-        #     # dttm_work_end = None
-        # )
-        # # self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_start,
-                         datetime.combine(self.dt, time(6, 0, 0)))
+        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_start, tm_start)
+
+        tm_start2 = datetime.combine(self.dt, time(7, 0, 0))
+        AttendanceRecords.objects.create(
+            dttm=tm_start2,
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop,
+            user=self.user2
+        )
+
+        # проверяем, что время начала рабочего дня не перезаписалась
+        self.assertNotEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_start, tm_start2)
+        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_start, tm_start)
 
         AttendanceRecords.objects.create(
             dttm=tm_end,
@@ -869,11 +868,11 @@ class TestAditionalFunctions(APITestCase):
 
         self.url = '/rest_api/worker_day/'
         create_departments_and_users(self)
-        self.work_type_name = WorkTypeName.objects.create(name='Магазин')
+        self.work_type_name = WorkTypeName.objects.create(name='Магазин', network=self.network)
         self.work_type = WorkType.objects.create(
             work_type_name=self.work_type_name,
             shop=self.shop)
-        ExchangeSettings.objects.create()
+        ExchangeSettings.objects.create(network=self.network)
         FunctionGroup.objects.bulk_create([
             FunctionGroup(group=self.admin_group,
                           method=method,

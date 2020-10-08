@@ -1,14 +1,14 @@
 from django.conf.urls import url, include
-
-from rest_framework import routers
+from rest_auth.views import LoginView
 from rest_auth.views import (
     LogoutView,
     PasswordChangeView
 )
-from rest_auth.views import LoginView
+from rest_framework_nested import routers
+
 from src.base.auth.views import WFMTokenLoginView
 from src.base.shop.views import ShopViewSet
-from src.base.views import(
+from src.base.views import (
     EmploymentViewSet,
     UserViewSet,
     FunctionGroupView,
@@ -20,7 +20,6 @@ from src.base.views import(
     NetworkViewSet,
     GroupViewSet,
 )
-
 
 rest_auth_urls = [
     url(r'^login/$', LoginView.as_view(), name='rest_login'),
@@ -45,7 +44,7 @@ router.register(r'network', NetworkViewSet, basename='Network')
 router.register(r'function_group', FunctionGroupView, basename='FunctionGroupView')
 router.register(r'group', GroupViewSet, basename='Group')
 
-
+employment_nested_router = routers.NestedSimpleRouter(router, r'employment', lookup='employment')
 
 # Wire up our API using automatic URL routing.
 # Additionally, we include login URLs for the browsable API.

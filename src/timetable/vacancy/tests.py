@@ -130,6 +130,7 @@ class TestAutoWorkerExchange(TestCase):
         cls.work_type_name = WorkTypeName.objects.create(
             name='Кассы',
             code='',
+            network=cls.network,
         )
 
         cls.work_type1 = WorkType.objects.create(
@@ -145,6 +146,8 @@ class TestAutoWorkerExchange(TestCase):
         cls.operation_type_name = OperationTypeName.objects.create(
             name='',
             code='',
+            network=cls.network,
+            do_forecast=OperationTypeName.FORECAST,
         )
 
         cls.operation_type = OperationType.objects.create(
@@ -271,7 +274,7 @@ class TestAutoWorkerExchange(TestCase):
         self.create_vacancy(9, 20, self.work_type1)
         self.create_vacancy(9, 20, self.work_type1)
 
-        self.create_period_clients(30, self.operation_type)
+        self.create_period_clients(1, self.operation_type)
 
         vacancies = WorkerDay.objects.filter(is_vacancy=True)
         self.assertEqual(vacancies.count(), 2)
@@ -282,7 +285,7 @@ class TestAutoWorkerExchange(TestCase):
 
     # Нужны 3 вакансии -> у нас 0 -> создаём 3
     def test_create_vacancies_and_notify(self):
-        self.create_period_clients(90, self.operation_type)
+        self.create_period_clients(3, self.operation_type)
 
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 0)
@@ -301,7 +304,7 @@ class TestAutoWorkerExchange(TestCase):
         self.create_vacancy(9, 20, self.work_type1)
         self.create_vacancy(9, 20, self.work_type1)
 
-        self.create_period_clients(90, self.operation_type)
+        self.create_period_clients(3, self.operation_type)
 
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 2)
@@ -318,7 +321,7 @@ class TestAutoWorkerExchange(TestCase):
     def test_create_vacancies_and_notify3(self):
         self.create_vacancy(12, 17, self.work_type1)
 
-        self.create_period_clients(30, self.operation_type)
+        self.create_period_clients(1, self.operation_type)
 
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 1)
@@ -342,7 +345,7 @@ class TestAutoWorkerExchange(TestCase):
         self.create_vacancy(9, 14, self.work_type1)
         self.create_vacancy(16, 21, self.work_type1)
 
-        self.create_period_clients(30, self.operation_type)
+        self.create_period_clients(1, self.operation_type)
 
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 2)
@@ -366,7 +369,7 @@ class TestAutoWorkerExchange(TestCase):
         self.create_vacancy(9, 15, self.work_type1)
         self.create_vacancy(16, 21, self.work_type1)
 
-        self.create_period_clients(30, self.operation_type)
+        self.create_period_clients(1, self.operation_type)
 
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 2)
@@ -381,8 +384,8 @@ class TestAutoWorkerExchange(TestCase):
             self.dt_now = self.dt_now + datetime.timedelta(days=1)
         self.create_worker_day()
 
-        self.create_period_clients(30, self.operation_type)
-        self.create_period_clients(90, self.operation_type2)
+        self.create_period_clients(1, self.operation_type)
+        self.create_period_clients(3, self.operation_type2)
 
         vacancy = self.create_vacancy(9, 21, self.work_type1)
         Event.objects.create(
@@ -407,7 +410,7 @@ class TestAutoWorkerExchange(TestCase):
         self.create_worker_day()
 
         self.create_period_clients(0, self.operation_type)
-        self.create_period_clients(120, self.operation_type2)
+        self.create_period_clients(4, self.operation_type2)
 
         vacancy = self.create_vacancy(9, 21, self.work_type1)
         Event.objects.create(
