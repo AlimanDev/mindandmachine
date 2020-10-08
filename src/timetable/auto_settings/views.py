@@ -544,7 +544,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             prev_data[key].append(worker_d)
 
         employment_stat_dict = count_prev_paid_days(dt_from - timedelta(days=1), employments, shop.region_id)
-        # month_stat = count_work_month_stats(shop, dt_first, dt_from, Employment.objects.filter(user_id__in=user_ids))
+        month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_from=dt_from)
 
         ##################################################################
 
@@ -676,7 +676,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 ProductionDay.WORK_NORM_HOURS[wd.type]
                 for wd in work_days
             ]
-        )  # норма рабочего времени за оставшийся период период (за месяц)
+        ) * (dt_to - dt_from).days / len(work_days) # норма рабочего времени за оставшийся период период (за месяц)
         work_hours = shop.settings.fot if shop.settings.fot else work_hours  # fixme: tmp, special for 585
         init_params['n_working_days_optimal'] = len(work_days)
 
@@ -743,8 +743,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     'prev_data': WorkerDayConverter.convert(prev_data.get(e.user_id, []), out_array=True),
                     'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),
                     'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),
-                    'norm_work_amount': (work_hours - employment_stat_dict[e.id]['paid_hours'] -
-                                         employment_stat_dict[e.id]['vacations'] * ProductionDay.WORK_NORM_HOURS[
+                    'norm_work_amount': (work_hours - month_stat[e.id]['paid_hours'] -
+                                         month_stat[e.id]['vacations'] * ProductionDay.WORK_NORM_HOURS[
                                              ProductionDay.TYPE_WORK]
                                          ) * e.norm_work_hours / 100,
                     'required_coupled_hol_in_hol': employment_stat_dict[e.id].get('required_coupled_hol_in_hol', 0),
@@ -816,7 +816,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
 
         timetable.status = data['timetable_status']
-        timetable.status_message = data.get('status_message', False)
+        timetable.status_message = data.get('status_message', '')[:256]
         timetable.save()
         if timetable.status != ShopMonthStat.READY and timetable.status_message:
             return Response(timetable.status_message)

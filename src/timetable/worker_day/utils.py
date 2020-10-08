@@ -277,20 +277,21 @@ def download_timetable_util(request, workbook, form):
         dt_from=timetable.prod_days[0].dt,
         dt_to=timetable.prod_days[-1].dt,
         shop=shop,
-    ).order_by('position_id', 'user__last_name', 'user__first_name', 'user__middle_name', 'tabel_code', 'id')
+    ).order_by('user__last_name', 'user__first_name', 'user__middle_name', 'user_id')
+    users = employments.values_list('user_id', flat=True)
 
     breaktimes = json.loads(shop.settings.break_triplets)
     breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
     workdays = WorkerDay.objects.select_related('worker', 'shop').filter(
-        Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True),
-        Q(dt__gte=F('employment__dt_hired')) & Q(dt__gte=timetable.prod_days[0].dt),
-        employment__in=employments,
+        Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
+        (Q(dt__gte=F('employment__dt_hired')) | Q(employment__isnull=True)) & Q(dt__gte=timetable.prod_days[0].dt),
+        worker__in=users,
         dt__lte=timetable.prod_days[-1].dt,
         is_approved=form['is_approved'],
         is_fact=False,
     ).order_by(
-        'employment__position_id', 'worker__last_name', 'worker__first_name', 'worker__middle_name', 'employment__tabel_code', 'employment__id', 'dt')
+        'worker__last_name', 'worker__first_name', 'worker__middle_name', 'worker_id', 'dt')
 
     if form.get('inspection_version', False):
         timetable.change_for_inspection(timetable.prod_month.get('norm_work_hours', 0), workdays)
