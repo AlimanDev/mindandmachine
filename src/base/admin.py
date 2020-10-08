@@ -30,8 +30,8 @@ class WorkerPositionAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class QsUserAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'shop_name', 'id')
-    search_fields = ('first_name', 'last_name', 'id')
+    list_display = ('first_name', 'last_name', 'shop_name', 'id', 'username',)
+    search_fields = ('first_name', 'last_name', 'id', 'username',)
     # list_filter = ('employment__shop', )
 
     # list_display = ('first_name', 'last_name', 'employment__shop__title', 'parent_title', 'work_type_name', 'id')
