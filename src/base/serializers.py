@@ -264,6 +264,14 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
         model = WorkerPosition
         fields = ['id', 'name', 'network_id', 'code']
 
+    def __init__(self, *args, **kwargs):
+        super(WorkerPositionSerializer, self).__init__(*args, **kwargs)
+        self.fields['code'].validators.append(
+            UniqueValidator(
+                WorkerPosition.objects.filter(network=self.context.get('request').user.network)
+            )
+        )
+
 
 class EventSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField()
