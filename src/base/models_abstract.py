@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 
+
 class AbstractModelManager(models.Manager):
     pass
 
@@ -11,6 +12,8 @@ class AbstractModel(models.Model):
     Базовая абстрактная модель. От нее должны быть наследованы все сущности (модели)
 
     """
+    dttm_modified = models.DateTimeField(auto_now=True)
+
     class Meta:
         abstract = True
 
@@ -83,4 +86,3 @@ class AbstractActiveNamedModel(AbstractActiveModel):
 
     def __str__(self):
         return f'name: {self.name}, code: {self.code}'
-

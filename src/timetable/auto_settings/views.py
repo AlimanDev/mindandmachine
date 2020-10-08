@@ -847,7 +847,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     #неподтвержденная версия
                     if False in wdays:
                         wd_obj = wdays[False]
-                        if wd_obj.created_by_id is None or wd_obj.type = WorkerDay.TYPE_EMPTY:
+                        if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
                             wd_obj.type = wd['type']
                             WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
                     elif True in wdays:
@@ -856,7 +856,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     if wd['type'] == WorkerDay.TYPE_WORKDAY:
                         wd_obj.shop = shop
 
-                    if wd_obj.created_by_id is None or wd_obj.type = WorkerDay.TYPE_EMPTY:
+                    if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
                         if WorkerDay.is_type_with_tm_range(wd_obj.type):
                             wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
                             wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
