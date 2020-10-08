@@ -441,7 +441,7 @@ def create_departments_and_users(self):
     self.root_shop.network = self.network
     self.root_shop.save()
 
-    self.settings = ShopSettings.objects.create(
+    self.shop_settings = ShopSettings.objects.create(
         break_triplets='[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]]',
     )
     # shops
@@ -455,7 +455,7 @@ def create_departments_and_users(self):
         # tm_shop_opens=datetime.time(7, 0, 0),
         # tm_shop_closes=datetime.time(0, 0, 0),
         region=self.region,
-        settings=self.settings,
+        settings=self.shop_settings,
         network=self.network,
     )
     self.reg_shop2 = Shop.objects.create(
@@ -465,7 +465,7 @@ def create_departments_and_users(self):
         tm_open_dict='{"all":"07:00:00"}',
         tm_close_dict='{"all":"00:00:00"}',
         region=self.region,
-        settings=self.settings,
+        settings=self.shop_settings,
         network=self.network,
     )
 
@@ -478,7 +478,7 @@ def create_departments_and_users(self):
         tm_open_dict='{"all":"07:00:00"}',
         tm_close_dict='{"all":"00:00:00"}',
         region=self.region,
-        settings=self.settings,
+        settings=self.shop_settings,
         network=self.network,
     )
     self.shop.code = str(self.shop.id)
@@ -490,7 +490,7 @@ def create_departments_and_users(self):
         tm_open_dict='{"all":"07:00:00"}',
         tm_close_dict='{"all":"00:00:00"}',
         region=self.region,
-        settings=self.settings,
+        settings=self.shop_settings,
         network=self.network,
     )
 
@@ -501,7 +501,7 @@ def create_departments_and_users(self):
         tm_open_dict='{"all":"07:00:00"}',
         tm_close_dict='{"all":"00:00:00"}',
         region=self.region,
-        settings=self.settings,
+        settings=self.shop_settings,
         network=self.network,
     )
     Shop.objects.rebuild()

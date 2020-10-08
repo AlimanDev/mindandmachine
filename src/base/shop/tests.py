@@ -101,7 +101,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             "timezone": 'Europe/Moscow',
             'restricted_end_times': '[]',
             'restricted_start_times': '[]',
-            'settings_id': self.settings.id,
+            'settings_id': self.shop_settings.id,
             'forecast_step_minutes': '00:30:00',
         }
         # response = self.client.post(self.url, data, format='json')
@@ -141,7 +141,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             "timezone": 'Europe/Berlin',
             'restricted_end_times': '[]',
             'restricted_start_times': '[]',
-            'settings_id': self.settings.id,
+            'settings_id': self.shop_settings.id,
             'forecast_step_minutes': '00:30:00',
         }
         # response = self.client.put(self.shop_url, data, format='json')
@@ -181,7 +181,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'id': self.shop.id,
             'restricted_start_times': '["12:00"]',
             'restricted_end_times': '["20:40"]',
-            'settings_id': self.settings.id,
+            'settings_id': self.shop_settings.id,
             'load_template_id': self.load_template.id,
             'name': 'Имя магазина',
             'timezone': 'Europe/Moscow',
