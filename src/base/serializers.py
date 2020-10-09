@@ -108,8 +108,8 @@ class FunctionGroupSerializer(serializers.ModelSerializer):
 
 
 class AutoTimetableSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
     auto_timetable = serializers.BooleanField()
+    employment_ids = serializers.ListField(child=serializers.IntegerField())
 
 
 class EmploymentListSerializer(serializers.Serializer):

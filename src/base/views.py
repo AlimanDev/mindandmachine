@@ -84,7 +84,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         data = AutoTimetableSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         data = data.validated_data
-        employment = Employment.objects.filter(id=data.get('id')).update(auto_timetable=data.get('auto_timetable'))
+        Employment.objects.filter(id__in=data.get('employment_ids')).update(auto_timetable=data.get('auto_timetable'))
         return Response()
 
 
