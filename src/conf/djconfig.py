@@ -35,7 +35,17 @@ TIMETABLE_IP = "127.0.0.1:5000"
 SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
 MDAUDIT_AUTHTOKEN_SALT = 'DLKAXGKFPP57B2NEQ4NLB2TLDT3QR20I7QKAGE8I'
 
-URV_STAT_EMAILS = None # {'network_code': ['email@example.com', 'email2@example.com']}
+'''
+Переменная хранящая почты для рассылки отчетов по УРВ. Если None то отчеты не рассылаются
+Формат
+{
+    'network_code': [
+        'email@example.com', 
+        'email2@example.com'
+    ]
+}
+'''
+URV_STAT_EMAILS = None
 
 URV_STAT_SEND_HOUR = 1
 URV_STAT_SEND_MINUTE = 0

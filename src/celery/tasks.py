@@ -52,7 +52,7 @@ import time as time_in_secs
 
 import pandas as pd
 import json
-from etc.scripts.create_urv_stat import main as create_urv
+from src.util.urv.create_urv_stat import main as create_urv
 from src.conf.djconfig import URV_STAT_EMAILS, URV_STAT_SHOP_LEVEL
 
 
