@@ -816,7 +816,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
 
         timetable.status = data['timetable_status']
-        timetable.status_message = data.get('status_message', '')[:256]
+        timetable.status_message = (data.get('status_message') or '')[:256]
         timetable.save()
         if timetable.status != ShopMonthStat.READY and timetable.status_message:
             return Response(timetable.status_message)
