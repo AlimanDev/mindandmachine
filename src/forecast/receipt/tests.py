@@ -89,14 +89,6 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 201)
 
     def test_update_receipt(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='Receipt',
-            level_up=1,
-            level_down=99,
-        )
-
         receipt = ReceiptFactory(
             shop=self.shop,
             info=self.dump_data({}),
@@ -109,14 +101,6 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
 
     def test_update_receipt_when_shop_with_spaces(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='Receipt',
-            level_up=1,
-            level_down=99,
-        )
-
         receipt = ReceiptFactory(
             shop=self.shop,
             info=self.dump_data({}),

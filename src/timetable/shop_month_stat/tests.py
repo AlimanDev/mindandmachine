@@ -27,14 +27,6 @@ class TestShopMonthStat(APITestCase):
             shop_id=self.shop.id,
         )
         
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='ShopMonthStat',
-            level_up=1,
-            level_down=99,
-        )
-
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):

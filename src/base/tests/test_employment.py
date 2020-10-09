@@ -36,14 +36,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         return resp
 
     def test_work_types_added_on_employment_creation(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='Employment',
-            level_up=1,
-            level_down=99,
-        )
-
         resp = self._create_employment()
         self.assertEqual(resp.status_code, 201)
         resp_data = resp.json()
@@ -54,14 +46,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             ).exists())
 
     def test_work_types_updated_on_position_change(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='Employment',
-            level_up=1,
-            level_down=99,
-        )
-
         another_worker_position = WorkerPosition.objects.create(
             name='Заместитель директора магазина',
             network=self.network,
@@ -90,13 +74,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         change PUT logic of employment for orteka
         :return:
         """
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='Employment',
-            level_up=1,
-            level_down=99,
-        )
 
         put_data = {
             'position_id': self.worker_position.id,
@@ -121,16 +98,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         ).count() == 1)
 
     def test_auto_timetable(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='Employment_auto_timetable',
-            level_up=1,
-            level_down=99,
-        )
-
         employment_ids = list(Employment.objects.filter(shop=self.shop).values_list('id', flat=True))
         employment_ids = employment_ids[1:-2]
+
         self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=True).count(), 4)
         data = {
             "employment_ids": employment_ids,
