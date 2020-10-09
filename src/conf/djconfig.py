@@ -52,6 +52,9 @@ URV_STAT_SEND_MINUTE = 0
 URV_STAT_SHOP_LEVEL = 2
 URV_STAT_SEND_TODAY_HOUR = 3
 URV_STAT_SEND_TODAY_MINUTE = 0
+MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE = False  # отправлять ли запрос по связке юзера и магазина при сохранении workerday
+MDA_PUBLIC_API_HOST = 'https://example.com'
+MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
 
 DEBUG = True
 
@@ -263,7 +266,8 @@ MEDIA_URL = '/_i/media/'
 
 SESSION_COOKIE_SECURE = True
 
-DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
+
+# DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
 
 QOS_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S" #'%H:%M:%S %d.%m.%Y'
 QOS_DATE_FORMAT = '%Y-%m-%d'
@@ -296,6 +300,8 @@ BACKEND_QUEUE = 'backend_queue'
 APPEND_SLASH = False
 REBUILD_TIMETABLE_MIN_DELTA = 2
 
+# например, для Ортеки для отображения в отчете нужны показатели только по продавцам-кассирам
+UPDATE_SHOP_STATS_WORK_TYPES_CODES = None
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

@@ -342,7 +342,6 @@ class Receipt(AbstractModel):
     code = models.UUIDField()
     dttm = models.DateTimeField(verbose_name='Дата и время события')
     dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_modified = models.DateTimeField(auto_now=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True)
     info = models.TextField()
     data_type = models.CharField(max_length=128, verbose_name='Тип данных', null=True, blank=True)

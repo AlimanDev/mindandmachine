@@ -25,13 +25,13 @@ class RegionAdmin(admin.ModelAdmin):
 @admin.register(WorkerPosition)
 class WorkerPositionAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
-    search_fields = ('name',)
+    search_fields = ('name', 'code')
 
 
 @admin.register(User)
 class QsUserAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'shop_name', 'id')
-    search_fields = ('first_name', 'last_name', 'id')
+    list_display = ('first_name', 'last_name', 'shop_name', 'id', 'username',)
+    search_fields = ('first_name', 'last_name', 'id', 'username',)
     # list_filter = ('employment__shop', )
 
     # list_display = ('first_name', 'last_name', 'employment__shop__title', 'parent_title', 'work_type_name', 'id')
@@ -57,7 +57,7 @@ class QsUserAdmin(admin.ModelAdmin):
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
     list_display = ('name', 'parent_title', 'id')
-    search_fields = ('name', 'parent__name', 'id')
+    search_fields = ('name', 'parent__name', 'id', 'code')
 
     @staticmethod
     def parent_title(instance: Shop):
@@ -87,7 +87,8 @@ class FunctionGroupAdmin(admin.ModelAdmin):
 class EmploymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop', 'user')
     list_filter = ('shop', 'user')
-    search_fields = ('user__first_name', 'user__last_name', 'shop__name', 'shop__parent__name')
+    search_fields = ('user__first_name', 'user__last_name', 'shop__name', 'shop__parent__name', 'tabel_code')
+    raw_id_fields = ('shop', 'user', 'position')
 
 
 @admin.register(ProductionDay)
