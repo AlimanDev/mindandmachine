@@ -4,7 +4,7 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup, Network, TabelSettings, ShopTabelSettings
+from src.base.models import FunctionGroup, Network
 from src.timetable.models import (
     WorkerDay, 
     AttendanceRecords, 
@@ -83,15 +83,9 @@ class TestWorkerDay(APITestCase):
         )
 
         self.client.force_authenticate(user=self.user1)
-        TabelSettings.objects.filter(code='default').update(
-            allowed_interval_for_late_arrival=timedelta(minutes=15),
-            allowed_interval_for_early_departure=timedelta(minutes=15),
-        )
-
-        try:
-            del self.shop.tabel_settings
-        except AttributeError:
-            pass
+        self.network.allowed_interval_for_late_arrival = timedelta(minutes=15)
+        self.network.allowed_interval_for_early_departure = timedelta(minutes=15)
+        self.network.save()
 
     def test_get_list(self):
         dt = Converter.convert_date(self.dt)
@@ -551,13 +545,9 @@ class TestWorkerDay(APITestCase):
         )
 
     def test_can_override_tabel_settings_for_shop(self):
-        tabel_settings = TabelSettings.objects.create(
+        Network.objects.filter(id=self.network.id).update(
             allowed_interval_for_late_arrival=timedelta(seconds=0),
             allowed_interval_for_early_departure=timedelta(seconds=0),
-        )
-        ShopTabelSettings.objects.create(
-            tabel_settings=tabel_settings,
-            shop=self.shop,
         )
 
         plan_dttm_work_start = datetime.combine(self.dt, time(10, 0, 0))

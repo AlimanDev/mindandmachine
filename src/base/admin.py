@@ -11,8 +11,6 @@ from src.base.models import (
     Region,
     ProductionDay,
     Network,
-    TabelSettings,
-    ShopTabelSettings,
 )
 
 
@@ -100,16 +98,3 @@ class EmploymentAdmin(admin.ModelAdmin):
 @admin.register(ProductionDay)
 class ProductionDayAdmin(admin.ModelAdmin):
     list_display = ('dt', 'type')
-
-
-class ShopTabelSettingsInline(admin.TabularInline):
-    raw_id_fields = ('shop',)
-    model = ShopTabelSettings
-
-
-@admin.register(TabelSettings)
-class TabelSettingsAdmin(admin.ModelAdmin):
-    list_display = ('name', 'code', 'allowed_interval_for_late_arrival', 'allowed_interval_for_late_arrival')
-    inlines = (
-        ShopTabelSettingsInline,
-    )

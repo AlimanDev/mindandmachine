@@ -31,6 +31,10 @@ class Network(AbstractActiveModel):
     # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
     need_symbol_for_vacancy = models.BooleanField(default=False)
     settings_values = models.TextField(default='{}')  # настройки для сети. Cейчас есть настройки для приемки чеков + ночные смены
+    allowed_interval_for_late_arrival = models.DurationField(
+        verbose_name='Допустимый интервал для опоздания', default=datetime.timedelta(seconds=0))
+    allowed_interval_for_early_departure = models.DurationField(
+        verbose_name='Допустимый интервал для раннего ухода', default=datetime.timedelta(seconds=0))
 
     def get_department(self):
         return None
@@ -85,23 +89,6 @@ class ShopSettings(AbstractActiveNamedModel):
 
     def get_department(self):
         return None
-
-
-class TabelSettings(AbstractActiveNamedModel):
-    allowed_interval_for_late_arrival = models.DurationField(verbose_name='Допустимый интервал для опоздания')
-    allowed_interval_for_early_departure = models.DurationField(verbose_name='Допустимый интервал для раннего ухода')
-
-    class Meta:
-        verbose_name = 'Настройка табеля'
-        verbose_name_plural = 'Настройки табеля'
-
-
-class ShopTabelSettings(models.Model):
-    shop = models.ForeignKey('base.Shop', on_delete=models.CASCADE)
-    tabel_settings = models.ForeignKey('base.TabelSettings', on_delete=models.CASCADE)
-
-    class Meta:
-        unique_together = ('shop', 'tabel_settings')
 
 
 # на самом деле это отдел
@@ -277,13 +264,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 network_id=self.network_id,
                 shops__isnull=True,
             ).first()
-
-    @cached_property
-    def tabel_settings(self):
-        return TabelSettings.objects.filter(
-            Q(id=ShopTabelSettings.objects.filter(shop=self).values_list('tabel_settings', flat=True)[0]) |
-            Q(code='default'),
-        ).order_by('id').last()
 
 
 class EmploymentManager(models.Manager):

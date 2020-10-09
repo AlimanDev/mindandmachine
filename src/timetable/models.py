@@ -330,13 +330,13 @@ class WorkerDayQuerySet(QuerySet):
             plan_dttm_work_end=Subquery(plan_approved_wdays_subq.values('dttm_work_end')[:1]),
             tabel_dttm_work_start=Case(
                 When(plan_dttm_work_start__lt=F(
-                    'dttm_work_start') - shop.tabel_settings.allowed_interval_for_late_arrival,
+                    'dttm_work_start') - shop.network.allowed_interval_for_late_arrival,
                      then=F('dttm_work_start')),
                 default=F('plan_dttm_work_start'), output_field=DateTimeField()
             ),
             tabel_dttm_work_end=Case(
                 When(plan_dttm_work_end__gt=F(
-                    'dttm_work_end') + shop.tabel_settings.allowed_interval_for_early_departure,
+                    'dttm_work_end') + shop.network.allowed_interval_for_early_departure,
                      then=F('dttm_work_end')),
                 default=F('plan_dttm_work_end'), output_field=DateTimeField()
             ),
