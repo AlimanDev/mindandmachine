@@ -35,9 +35,6 @@ class TestVacancyBlackList(APITestCase):
             symbol='4321',
         )
 
-
-        
-
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):

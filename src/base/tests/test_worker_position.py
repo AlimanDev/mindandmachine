@@ -13,9 +13,15 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
             [
                 WorkerPosition(
                     name=name,
+                    code=code,
                     network=cls.network,
                 )
-                for name in ['Директор магазина', 'Продавец', 'Продавец-кассир', 'ЗДМ']
+                for name, code in [
+                    ('Директор магазина', 'director'),
+                    ('Продавец', 'seller'),
+                    ('Продавец-кассир', 'seller2'),
+                    ('ЗДМ', 'director2'),
+                ]
             ]
         )
         cls.worker_position = WorkerPosition.objects.last()
@@ -44,6 +50,12 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(
             WorkerPosition.objects.filter(dttm_deleted__isnull=True).count(), self.worker_positions_count + 1)
+
+        # проверка, что нельзя создать еще одну позицию с таким же кодом
+        resp = self.client.post(
+            self.get_url('WorkerPosition-list'), data=self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json()['code'], ['Это поле должно быть уникально.'])
 
     def test_retrieve(self):
         resp = self.client.get(self.get_url('WorkerPosition-detail', pk=self.worker_position.id))

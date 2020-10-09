@@ -108,8 +108,8 @@ class FunctionGroupSerializer(serializers.ModelSerializer):
 
 
 class AutoTimetableSerializer(serializers.Serializer):
-    shop_id = serializers.IntegerField()
-    user_ids = serializers.ListField(child=serializers.IntegerField())
+    auto_timetable = serializers.BooleanField()
+    employment_ids = serializers.ListField(child=serializers.IntegerField())
 
 
 class EmploymentListSerializer(serializers.Serializer):
@@ -263,6 +263,14 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
     class Meta:
         model = WorkerPosition
         fields = ['id', 'name', 'network_id', 'code', 'breaks_id']
+
+    def __init__(self, *args, **kwargs):
+        super(WorkerPositionSerializer, self).__init__(*args, **kwargs)
+        self.fields['code'].validators.append(
+            UniqueValidator(
+                WorkerPosition.objects.filter(network=self.context.get('request').user.network)
+            )
+        )
 
 
 class EventSerializer(serializers.ModelSerializer):

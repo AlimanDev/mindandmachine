@@ -172,6 +172,7 @@ class TestLoadTemplate(APITestCase):
 
         self.assertEqual(OperationType.objects.filter(shop=self.shop).count(), 2)
         self.assertEqual(WorkType.objects.filter(shop=self.shop).count(), 1)
+
     @skip('Функционал будет перенесён на алгоритмы')
     def test_calculate(self):
         self.shop.forecast_step_minutes = time(1)

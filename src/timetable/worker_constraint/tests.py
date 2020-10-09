@@ -17,8 +17,6 @@ class TestWorkerConstraint(TestsHelperMixin, APITestCase):
         self.client.force_authenticate(user=self.user1)
 
     def test_create_and_update_employment_constraints(self):
-
-
         wc = WorkerConstraint.objects.create(
             shop=self.shop,
             employment=self.employment1,

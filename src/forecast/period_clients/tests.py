@@ -522,10 +522,8 @@ class TestDemand(APITestCase):
             response.json()
         )
 
-
     # Сервер для обработки алгоритма недоступен.
     def test_upload_demand(self):
-
         file = open('etc/scripts/demand.xlsx', 'rb')
         response = self.client.post(f'{self.url}upload/', {'shop_id': 1, 'file': file})
         file.close()

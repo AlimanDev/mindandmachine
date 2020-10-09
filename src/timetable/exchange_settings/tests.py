@@ -25,8 +25,6 @@ class TestExchangeSettings(APITestCase):
         self.exchange_serttings1 = ExchangeSettings.objects.create(network=self.network)
         self.exchange_serttings2 = ExchangeSettings.objects.create(network=self.network)
 
-        
-
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):
