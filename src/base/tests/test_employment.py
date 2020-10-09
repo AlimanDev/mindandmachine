@@ -129,14 +129,14 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             level_down=99,
         )
 
-        user_ids = list(User.objects.filter(employments__shop=self.shop).values_list('id', flat=True))
-        user_ids = user_ids[1:-2]
+        employment_ids = list(Employment.objects.filter(shop=self.shop).values_list('id', flat=True))
+        employment_ids = employment_ids[1:-2]
         self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=True).count(), 4)
         data = {
-            "shop_id": self.shop.id,
-            "user_ids": user_ids,
+            "employment_ids": employment_ids,
+            "auto_timetable": False,
         }
         response = self.client.post('/rest_api/employment/auto_timetable/', data=self.dump_data(data), content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=True).count(), 2)
-        self.assertEqual(list(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=True).values_list('user_id', flat=True)), user_ids)
+        self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).count(), 2)
+        self.assertEqual(list(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).values_list('id', flat=True)), employment_ids)
