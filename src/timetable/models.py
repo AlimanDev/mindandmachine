@@ -248,19 +248,19 @@ class WorkerConstraint(AbstractModel):
 
 
 class WorkerDayQuerySet(QuerySet):
-    def get_plan_approved(self):
-        return self.filter(is_fact=False, is_approved=True)
+    def get_plan_approved(self, **kwargs):
+        return self.filter(is_fact=False, is_approved=True, **kwargs)
 
-    def get_plan_not_approved(self):
-        return self.filter(is_fact=False, is_approved=False)
+    def get_plan_not_approved(self, **kwargs):
+        return self.filter(is_fact=False, is_approved=False, **kwargs)
 
-    def get_fact_approved(self):
-        return self.filter(is_fact=True, is_approved=True)
+    def get_fact_approved(self, **kwargs):
+        return self.filter(is_fact=True, is_approved=True, **kwargs)
 
-    def get_fact_not_approved(self):
-        return self.filter(is_fact=True, is_approved=False)
+    def get_fact_not_approved(self, **kwargs):
+        return self.filter(is_fact=True, is_approved=False, **kwargs)
 
-    def get_plan_edit(self):
+    def get_plan_edit(self, **kwargs):
         ordered_subq = WorkerDay.objects.filter(
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
@@ -269,6 +269,7 @@ class WorkerDayQuerySet(QuerySet):
             'is_approved',
         ).values_list('id')[:1]
         return self.filter(
+            **kwargs,
             is_fact=False,
             id=Subquery(ordered_subq),
         )
@@ -286,10 +287,10 @@ class WorkerDayQuerySet(QuerySet):
             id__in=Subquery(ordered_subq),
         )
 
-    def get_fact_edit(self):
+    def get_fact_edit(self, **kwargs):
         raise NotImplementedError
 
-    def get_tabel(self):
+    def get_tabel(self, **kwargs):
         query = self.filter(
             models.Q(is_fact=True, is_approved=True) |
             models.Q(models.Q(is_approved=True) & ~models.Q(type__in=WorkerDay.TYPES_PAID))
@@ -302,7 +303,7 @@ class WorkerDayQuerySet(QuerySet):
                 remove.append(worker_day.id)
             else:
                 exists.append((worker_day.worker_id, worker_day.dt))
-        return query.exclude(id__in=remove)
+        return query.filter(**kwargs).exclude(id__in=remove)
 
 
 class WorkerDayManager(models.Manager):
@@ -373,7 +374,7 @@ class WorkerDay(AbstractModel):
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
         index_together = [('dt', 'worker')]
-    
+
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
     TYPE_VACATION = 'V'

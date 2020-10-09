@@ -38,34 +38,6 @@ class TestDemand(APITestCase):
         self.url = '/rest_api/period_clients/'
 
         create_departments_and_users(self)
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='PeriodClients',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='PeriodClients_put',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='DELETE',
-            func='PeriodClients_delete',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='PeriodClients_upload',
-            level_up=1,
-            level_down=99,
-        )
 
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
@@ -551,10 +523,8 @@ class TestDemand(APITestCase):
             response.json()
         )
 
-
     # Сервер для обработки алгоритма недоступен.
     def test_upload_demand(self):
-
         file = open('etc/scripts/demand.xlsx', 'rb')
         response = self.client.post(f'{self.url}upload/', {'shop_id': 1, 'file': file})
         file.close()

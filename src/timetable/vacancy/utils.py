@@ -23,23 +23,28 @@ Note:
         }
 """
 
-#TODO разобраться с Event
+import json
+# TODO разобраться с Event
 from datetime import timedelta, datetime, time
-from django.conf import settings
+
 import pandas
+from dateutil.relativedelta import relativedelta
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
+from django.db import transaction
 from django.db.models import Q, Exists, OuterRef, Sum, Subquery, DurationField
 from django.utils.timezone import now
-import json
-from src.conf.djconfig import (
-    QOS_DATETIME_FORMAT,
-    EMAIL_HOST_USER,
-)
+
 from src.base.models import (
     Employment,
     User,
     Shop,
     Event,
     Notification,
+)
+from src.conf.djconfig import (
+    QOS_DATETIME_FORMAT,
+    EMAIL_HOST_USER,
 )
 from src.timetable.models import (
     ExchangeSettings,
@@ -51,9 +56,7 @@ from src.timetable.models import (
     VacancyBlackList,
 )
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
-from src.util.models_converter import Converter
-from django.core.mail import EmailMultiAlternatives
-from dateutil.relativedelta import relativedelta
+from src.util.emails import send_email
 
 
 def create_event_and_notify(workers, **kwargs):
@@ -446,165 +449,114 @@ def cancel_vacancy(vacancy_id):
 def confirm_vacancy(vacancy_id, user, exchange=False):
     """
     :param vacancy_id:
-    :param user:
+    :param user: сотрудник, откликнувшийся на вакансию
+    :param exchange:
     """
-    vacancy = WorkerDay.objects.filter(
-        id=vacancy_id,
-        is_vacancy=True,
-        worker__isnull=True,
-    ).first()
-    res = {
-        'status_code': 200,
-    }
-    if not vacancy:
-        res['code'] = 'no_vacancy'
-        res['status_code'] = 404
-        return res
-    
-    vacancy_shop = vacancy.shop
+    with transaction.atomic():
+        vacancy = WorkerDay.objects.get_plan_approved(
+            id=vacancy_id,
+            is_vacancy=True,
+            worker__isnull=True,
+        ).select_for_update().first()
+        res = {
+            'status_code': 200,
+        }
+        if not vacancy:
+            res['code'] = 'no_vacancy'
+            res['status_code'] = 404
+            return res
 
-    if user.black_list_symbol is None and vacancy_shop.network.need_symbol_for_vacancy:
-        res['code'] = 'need_symbol_for_vacancy'
-        res['status_code'] = 400
-        return res
+        vacancy_shop = vacancy.shop
 
+        if user.black_list_symbol is None and vacancy_shop.network.need_symbol_for_vacancy:
+            res['code'] = 'need_symbol_for_vacancy'
+            res['status_code'] = 400
+            return res
 
-    shops_for_black_list = vacancy_shop.get_ancestors(include_self=True)
+        shops_for_black_list = vacancy_shop.get_ancestors(include_self=True)
 
-    
-    if VacancyBlackList.objects.filter(symbol=user.black_list_symbol, shop__in=shops_for_black_list).exists():
-        res['code'] = 'cant_apply_vacancy'
-        res['status_code'] = 400
-        return res
+        if VacancyBlackList.objects.filter(symbol=user.black_list_symbol, shop__in=shops_for_black_list).exists():
+            res['code'] = 'cant_apply_vacancy'
+            res['status_code'] = 400
+            return res
 
-    user_worker_day = WorkerDay.objects.select_related('shop', 'employment').filter(
-        worker=user,
-        dt=vacancy.dt,
-        is_approved=True,
-        is_fact=False,
-    ).first()
+        user_worker_day = WorkerDay.objects.get_plan_approved(
+            worker=user,
+            dt=vacancy.dt,
+        ).select_related('shop', 'employment__shop').first()
 
-    if user_worker_day and vacancy:
+        # нельзя откликнуться на вакансию если для сотрудника не составлен график на этот день
+        if not user_worker_day:
+            res['code'] = 'no_timetable'
+            res['status_code'] = 400
+            return res
+
+        # сотрудник из другой сети не может принять вакансию если это не аутсорс вакансия
         if not vacancy.is_outsource and user_worker_day.employment.shop.network_id != vacancy_shop.network_id:
             res['code'] = 'cant_apply_vacancy'
             res['status_code'] = 400
             return res
-        is_updated = False
-        update_condition = user_worker_day.type != WorkerDay.TYPE_WORKDAY or \
-        (user_worker_day.employment.shop_id == vacancy_shop.id and \
-        (user_worker_day.dttm_work_start >= vacancy.dttm_work_end or user_worker_day.dttm_work_end <= vacancy.dttm_work_start)) or \
-        (user_worker_day.shop != vacancy_shop and vacancy_shop.id == user_worker_day.employment.shop_id)
+
+        # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни  # TODO: правильно?
+        update_condition = user_worker_day.type not in WorkerDay.TYPES_PAID
         if user_worker_day.employment.shop_id != vacancy_shop.id and not exchange:
             try:
                 tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
-            except:
+            except ShopMonthStat.DoesNotExist:
                 res['code'] = 'no_timetable'
                 res['status_code'] = 400
                 return res
-            if tt.dt.month != tt.dttm_status_change.date().month and\
-                (datetime.now().date() - tt.dttm_status_change.date()).days <= 2\
-                or tt.status != ShopMonthStat.READY:
+
+            cond = tt.dt.month != tt.dttm_status_change.date().month and \
+                (datetime.now().date() - tt.dttm_status_change.date()).days <= 2 \
+                or tt.status != ShopMonthStat.READY
+
+            if cond:
                 update_condition = False
-        # todo: actually should be transaction (check condition and update)
-        # todo: add time for go between shops
+
         if update_condition or exchange:
-            if not user_worker_day.dttm_work_start:
-                dttm_work_start = vacancy.dttm_work_start
-            else:
-                dttm_work_start = vacancy.dttm_work_start \
-                        if user_worker_day.dttm_work_start > vacancy.dttm_work_start else user_worker_day.dttm_work_start
-            if not user_worker_day.dttm_work_end:
-                dttm_work_end = vacancy.dttm_work_start
-            else:
-                dttm_work_end = vacancy.dttm_work_end \
-                        if user_worker_day.dttm_work_end > vacancy.dttm_work_end else user_worker_day.dttm_work_end
-            worker_day, created = WorkerDay.objects.update_or_create(
-                dt=vacancy.dt,
-                worker_id=user_worker_day.worker_id,
-                is_approved=False,
-                is_fact=False,
-                defaults={
-                    'dttm_work_start': dttm_work_start,
-                    'dttm_work_end': dttm_work_end,
-                    'shop_id': vacancy.shop_id,
-                    'type': WorkerDay.TYPE_WORKDAY,
-                    'employment': user_worker_day.employment,
-                    'parent_worker_day': user_worker_day,
-                    'is_vacancy': True,
-                }
-            )
-            WorkerDayCashboxDetails.objects.filter(worker_day=worker_day).delete()
-            prev_details = list(WorkerDayCashboxDetails.objects.filter(worker_day=user_worker_day))
-            new_details = list(WorkerDayCashboxDetails.objects.filter(worker_day=vacancy))
-            if not (user_worker_day.type in WorkerDay.TYPES_PAID):
-                WorkerDayCashboxDetails.objects.bulk_create(
-                    [
-                        WorkerDayCashboxDetails(
-                            worker_day=worker_day,
-                            work_type_id=detail.work_type_id,
-                            work_part=detail.work_part,
-                        )
-                        for detail in new_details
-                    ]
+            vacancy.worker = user
+            vacancy.employment = user_worker_day.employment
+            vacancy.save(update_fields=('worker', 'employment'))
+
+            if user_worker_day.is_vacancy and user_worker_day.shop and user_worker_day.shop.email:
+                work_types = list(user_worker_day.work_types.all().values_list('work_type_name__name', flat=True))
+                work_types = ', '.join(work_types)
+
+                send_email(
+                    template_name='emails/employee_canceled_vacancy.html',
+                    to=user_worker_day.shop.email,
+                    subject='Изменение в графике выхода сотрудников',
+                    context=dict(
+                        shop=user_worker_day.shop,
+                        user=user,
+                        work_types=work_types,
+                        dttm_work_start=user_worker_day.dttm_work_start,
+                        dttm_work_end=user_worker_day.dttm_work_end,
+                        dt=user_worker_day.dt,
+                        domain=settings.DOMAIN,
+                    ),
                 )
-            else:
-                percent_from_new_time = float(user_worker_day.work_hours.seconds) / worker_day.work_hours.seconds
-                WorkerDayCashboxDetails.objects.bulk_create(
-                    [
-                        WorkerDayCashboxDetails(
-                            worker_day=worker_day,
-                            work_type_id=detail.work_type_id,
-                            work_part=detail.work_part * percent_from_new_time,
-                        )
-                        for detail in prev_details
-                    ]
+            if vacancy_shop.email:
+                send_email(
+                    template_name='emails/employee_assigned_to_vacancy.html',
+                    to=vacancy_shop.email,
+                    subject='Изменение в графике выхода сотрудников',
+                    context=dict(
+                        shop=vacancy.shop,
+                        user=user,
+                        dt=vacancy.dt,
+                        domain=settings.DOMAIN,
+                    ),
                 )
-                WorkerDayCashboxDetails.objects.bulk_create(
-                    [
-                        WorkerDayCashboxDetails(
-                            worker_day=worker_day,
-                            work_type_id=detail.work_type_id,
-                            work_part=detail.work_part * (1.0 - percent_from_new_time),
-                        )
-                        for detail in new_details
-                    ]
-                )
-                if user_worker_day.is_vacancy and user_worker_day.shop and user_worker_day.shop.email:
-                    work_types = list(user_worker_day.work_types.all().values_list('work_type_name__name', flat=True))
-                    work_types = ', '.join(work_types)
-                    message = f'Это автоматическое уведомление для {user_worker_day.shop.name} об изменениях в графике:\n\n' + \
-                            f'Сотрудник {user.last_name} {user.first_name} ' + \
-                            f'отмененил вакансию на типах работ {work_types}, ' +\
-                            f'с {user_worker_day.dttm_work_start} по {user_worker_day.dttm_work_end}, дата {user_worker_day.dt}.\n\n' +\
-                            f'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
-                    msg = EmailMultiAlternatives(
-                        subject='Изменение в графике выхода сотрудников',
-                        body=message,
-                        from_email=EMAIL_HOST_USER,
-                        to=[user_worker_day.shop.email,],
-                    )
-                    msg.send()
-                if vacancy_shop.email:
-                    message = f'Это автоматическое уведомление для {vacancy_shop.name} об изменениях в графике:\n\n' + \
-                            f'Сотрудник {user.last_name} {user.first_name} ' + \
-                            f'назначен на вакансию на {vacancy.dt}.\n\n' + \
-                            f'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
-                    msg = EmailMultiAlternatives(
-                        subject='Изменение в графике выхода сотрудников',
-                        body=message,
-                        from_email=EMAIL_HOST_USER,
-                        to=[vacancy_shop.email,],
-                    )
-                    msg.send()
+
             Event.objects.filter(worker_day=vacancy).delete()
-            vacancy.delete()
+            user_worker_day.delete()
             res['code'] = 'vacancy_success'
         else:
             res['code'] = 'cant_apply_vacancy'
             res['status_code'] = 400
-    else:
-        res['code'] = 'no_timetable'
-        res['status_code'] = 400
+
     return res
 
 
@@ -897,12 +849,12 @@ def holiday_workers_exchange():
 
 
 def worker_shift_elongation():
-    '''
+    """
     Функция для расширения смен в магазинах
     Смотрит на два дня вперед с сегодняшнего дня
     Проходится по всем вакансиям всех не удалённых магазинов
     Выполняет функцию рпасширения смены для каждой вакансии
-    '''
+    """
     exchange_settings_network = {
         e.network_id: e
         for e in ExchangeSettings.objects.filter(shops__isnull=True)
