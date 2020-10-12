@@ -817,6 +817,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         timetable = ShopMonthStat.objects.get(id=form['timetable_id'])
 
         shop = timetable.shop
+        employments = {
+            e.user_id: e
+            for e in Employment.objects.get_active(shop.network_id)
+        }
         # break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
 
         timetable.status = data['timetable_status']
@@ -859,6 +863,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
                     if wd['type'] == WorkerDay.TYPE_WORKDAY:
                         wd_obj.shop = shop
+                        wd_obj.employment = employments.get(uid)
 
                     if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
                         if WorkerDay.is_type_with_tm_range(wd_obj.type):
@@ -888,6 +893,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                             wd_obj.dttm_work_end = None
                             wd_obj.work_hours = timedelta(hours=0)
                             wd_obj.shop = None
+                            wd_obj.employment = None
                             wd_obj.save()
 
 
