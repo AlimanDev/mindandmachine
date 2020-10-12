@@ -578,7 +578,7 @@ class Employment(AbstractActiveModel):
                     list(map(lambda x: (x[0], x[1], sum(x[2])), self.shop.settings.breaks.breaks))
                 }
             breaktime_plan = Value(0, output_field=FloatField())
-            if len(breaks.values()[0]):
+            if len(list(breaks.values())[0]):
                 whens = [
                     When(
                         Q(hours_plan_0__gte=break_triplet[0], hours_plan_0__lte=break_triplet[1]) & 
