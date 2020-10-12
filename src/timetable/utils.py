@@ -27,7 +27,8 @@ def wd_stat_count(worker_days, shop):
                 (Q(employment__position__breaks_id=break_id) | (Q(employment__position__breaks__isnull=True) & Q(employment__shop__settings__breaks_id=break_id))),
                 then=break_triplet[2]
             )
-            for break_id, break_triplet in break_triplets.items()
+            for break_id, breaks in break_triplets.items()
+            for break_triplet in breaks
         ]
         breaktime_plan = Case(*whens, output_field=FloatField())
         whens = [
@@ -35,7 +36,8 @@ def wd_stat_count(worker_days, shop):
                 Q(hours_fact_0__gte=break_triplet[0], hours_fact_0__lte=break_triplet[1]) & 
                 (Q(employment__position__breaks_id=break_id) | (Q(employment__position__breaks__isnull=True) & Q(employment__shop__settings__breaks_id=break_id))),
                 then = break_triplet[2])
-            for break_id, break_triplet in break_triplets.items()
+            for break_id, breaks in break_triplets.items()
+            for break_triplet in breaks
         ]
         breaktime_fact = Case(*whens, output_field=FloatField())
 

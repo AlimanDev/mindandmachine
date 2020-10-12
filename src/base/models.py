@@ -562,6 +562,45 @@ class Employment(AbstractActiveModel):
                         priority=1,
                     ) for work_type in work_types
                 )
+        # при смене должности пересчитываем рабочие часы в будущем
+        if position_has_changed:
+            from django.apps import apps
+            from django.db.models import When, Case, Q, F, FloatField, DurationField, Value
+            from django.db.models.functions import Cast, Ceil
+            if self.position.breaks:
+                breaks = {
+                    self.position.breaks_id: 
+                    list(map(lambda x: (x[0], x[1], sum(x[2])), self.position.breaks.breaks))
+                }
+            else:
+                breaks = {
+                    self.shop.settings.breaks_id: 
+                    list(map(lambda x: (x[0], x[1], sum(x[2])), self.shop.settings.breaks.breaks))
+                }
+            breaktime_plan = Value(0, output_field=FloatField())
+            if len(breaks.values()[0]):
+                whens = [
+                    When(
+                        Q(hours_plan_0__gte=break_triplet[0], hours_plan_0__lte=break_triplet[1]) & 
+                        (Q(employment__position__breaks_id=break_id) | 
+                        (Q(employment__position__breaks__isnull=True) & Q(employment__shop__settings__breaks_id=break_id))),
+                        then=break_triplet[2]
+                    )
+                    for break_id, breaks in break_triplets.items()
+                    for break_triplet in breaks
+                ]
+                breaktime_plan = Case(*whens, output_field=FloatField())
+            WorkerDay = apps.get_model('timetable', 'WorkerDay')
+            dt = datetime.date.today()
+            WorkerDay.objects.filter(
+                employment_id=self.id,
+                is_fact=False,
+                dt__gt=dt,
+            ).annotate(
+                hours_plan_0=Cast(Extract(F('dttm_work_end') - F('dttm_work_start'), 'epoch'), FloatField()),
+                hours_plan=Ceil(F('hours_plan_0') - breaktime_plan)
+            ).update(work_hours=Cast(F('hours_plan'), DurationField()))
+
         return res
 
 
