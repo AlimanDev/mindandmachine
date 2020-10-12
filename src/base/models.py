@@ -270,7 +270,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             load_template = self.load_template_id
             self.load_template_id = new_template
         super().save(*args, **kwargs)
-        if self.load_template_id:
+        if False: # self.load_template_id:  # aa: todo: fixme: delete tmp False
             from src.forecast.load_template.utils import apply_load_template
             if load_template != None and load_template != new_template:
                 apply_load_template(new_template, self.id)

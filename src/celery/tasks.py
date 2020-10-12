@@ -35,6 +35,8 @@ from src.forecast.models import (
     OperationType,
     OperationTypeName
 )
+from src.util.urv.create_urv_stat import main as create_urv
+from src.conf.djconfig import URV_STAT_EMAILS, URV_STAT_SHOP_LEVEL
 from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
@@ -666,6 +668,48 @@ def clean_timeserie_actions():
                     for operation_type in operations_type:
                         Receipt.objects.filter(shop=operation_type.shop, dttm__lt=dttm_for_delete).delete()
 
+@app.task
+def send_urv_stat():
+    if not URV_STAT_EMAILS:
+        return
+    dt = date.today() - timedelta(days=1)
+    title = f'URV_{dt}.xlsx'
+
+    for network_code, emails in URV_STAT_EMAILS.items():
+        create_urv(dt, dt, title=title, shop_level=URV_STAT_SHOP_LEVEL, network_id=Network.objects.get(code=network_code).id)
+        msg = EmailMultiAlternatives(
+            subject=f'Отчёт УРВ {dt}',
+            body=f'Отчёт УРВ {dt}',
+            from_email=EMAIL_HOST_USER,
+            to=emails,
+        )
+        msg.attach_file(title)
+        os.remove(title)
+        result = msg.send()
+
+    return
+
+
+@app.task
+def send_urv_stat_today():
+    if not URV_STAT_EMAILS:
+        return
+    dt = date.today()
+    title = f'URV_today_{dt}.xlsx'
+
+    for network_code, emails in URV_STAT_EMAILS.items():
+        create_urv(dt, dt, title=title, shop_level=URV_STAT_SHOP_LEVEL, comming_only=True, network_id=Network.objects.get(code=network_code).id)
+        msg = EmailMultiAlternatives(
+            subject=f'Отчёт УРВ {dt}',
+            body=f'Отчёт УРВ {dt}',
+            from_email=EMAIL_HOST_USER,
+            to=emails,
+        )      
+        msg.attach_file(title)
+        os.remove(title)    
+        result = msg.send()
+
+    return
 
 @app.task
 def create_mda_user_to_shop_relation(username, shop_code):

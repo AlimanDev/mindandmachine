@@ -34,6 +34,24 @@ TIMETABLE_IP = "127.0.0.1:5000"
 
 SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
 MDAUDIT_AUTHTOKEN_SALT = 'DLKAXGKFPP57B2NEQ4NLB2TLDT3QR20I7QKAGE8I'
+
+'''
+Переменная хранящая почты для рассылки отчетов по УРВ. Если None то отчеты не рассылаются
+Формат
+{
+    'network_code': [
+        'email@example.com', 
+        'email2@example.com'
+    ]
+}
+'''
+URV_STAT_EMAILS = None
+
+URV_STAT_SEND_HOUR = 1
+URV_STAT_SEND_MINUTE = 0
+URV_STAT_SHOP_LEVEL = 2
+URV_STAT_SEND_TODAY_HOUR = 3
+URV_STAT_SEND_TODAY_MINUTE = 0
 MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE = False  # отправлять ли запрос по связке юзера и магазина при сохранении workerday
 MDA_PUBLIC_API_HOST = 'https://example.com'
 MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
@@ -275,7 +293,6 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERYD_CONCURRENCY = 2
 CELERYD_PREFETCH_MULTIPLIER = 1
 BACKEND_QUEUE = 'backend_queue'
-CELERY_TASK_DEFAULT_QUEUE = BACKEND_QUEUE
 
 # for change celery configs must be before (for BACKEND_QUEUE)
 # todo: do normal parameters changer
@@ -288,6 +305,8 @@ UPDATE_SHOP_STATS_WORK_TYPES_CODES = None
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
+
+CELERY_TASK_DEFAULT_QUEUE = BACKEND_QUEUE
 
 CELERY_QUEUES = {
     BACKEND_QUEUE: {
@@ -368,6 +387,16 @@ CELERY_BEAT_SCHEDULE = {
     'task-delete-old=receipts': {
         'task': 'src.celery.tasks.clean_timeserie_actions',
         'schedule': crontab(hour=1, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-send-urv-stat': {
+        'task': 'src.celery.tasks.send_urv_stat',
+        'schedule': crontab(hour=URV_STAT_SEND_HOUR, minute=URV_STAT_SEND_MINUTE),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-send-urv-stat-today': {
+        'task': 'src.celery.tasks.send_urv_stat_today',
+        'schedule': crontab(hour=URV_STAT_SEND_TODAY_HOUR, minute=URV_STAT_SEND_TODAY_MINUTE),
         'options': {'queue': BACKEND_QUEUE}
     },
 }

@@ -544,7 +544,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             prev_data[key].append(worker_d)
 
         employment_stat_dict = count_prev_paid_days(dt_from - timedelta(days=1), employments, shop.region_id)
-        month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_from=dt_from)
+        month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_start=dt_from)
 
         ##################################################################
 
@@ -824,7 +824,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         # break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
 
         timetable.status = data['timetable_status']
-        timetable.status_message = data.get('status_message', '')[:256]
+        timetable.status_message = (data.get('status_message') or '')[:256]
         timetable.save()
         if timetable.status != ShopMonthStat.READY and timetable.status_message:
             return Response(timetable.status_message)
