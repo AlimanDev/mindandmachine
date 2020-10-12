@@ -565,20 +565,26 @@ class Employment(AbstractActiveModel):
         # при смене должности пересчитываем рабочие часы в будущем
         if position_has_changed:
             from django.apps import apps
-            from django.db.models import When, Case, Q, F, FloatField, DurationField, Value
-            from django.db.models.functions import Cast, Ceil, Extract
+            from django.db.models import When, Case, Q, F, DurationField, Value, Subquery, OuterRef
+            from django.db.models.functions import Cast
             if self.position.breaks:
-                breaks = {
-                    self.position.breaks_id: 
-                    list(map(lambda x: (x[0], x[1], sum(x[2])), self.position.breaks.breaks))
-                }
+                break_id = self.position.breaks_id
+                breaks = self.position.breaks.breaks
             else:
-                breaks = {
-                    self.shop.settings.breaks_id: 
-                    list(map(lambda x: (x[0], x[1], sum(x[2])), self.shop.settings.breaks.breaks))
-                }
-            breaktime_plan = Value(0, output_field=FloatField())
-            if len(list(breaks.values())[0]):
+                break_id = self.shop.settings.breaks_id
+                breaks = self.shop.settings.breaks.breaks
+            breaks = list(
+                map(
+                    lambda x: (
+                        datetime.timedelta(seconds=x[0] * 60), 
+                        datetime.timedelta(seconds=x[1] * 60), 
+                        datetime.timedelta(seconds=sum(x[2]) * 60)
+                    ), 
+                    breaks
+                )
+            )
+            breaktime_plan = Value(datetime.timedelta(0), output_field=DurationField())
+            if len(breaks):
                 whens = [
                     When(
                         Q(hours_plan_0__gte=break_triplet[0], hours_plan_0__lte=break_triplet[1]) & 
@@ -586,20 +592,23 @@ class Employment(AbstractActiveModel):
                         (Q(employment__position__breaks__isnull=True) & Q(employment__shop__settings__breaks_id=break_id))),
                         then=break_triplet[2]
                     )
-                    for break_id, break_triplets in breaks.items()
-                    for break_triplet in break_triplets
+                    for break_triplet in breaks
                 ]
-                breaktime_plan = Case(*whens, output_field=FloatField())
+                breaktime_plan = Case(*whens, output_field=DurationField())
             WorkerDay = apps.get_model('timetable', 'WorkerDay')
             dt = datetime.date.today()
             WorkerDay.objects.filter(
                 employment_id=self.id,
                 is_fact=False,
                 dt__gt=dt,
-            ).annotate(
-                hours_plan_0=Cast(Extract(F('dttm_work_end') - F('dttm_work_start'), 'epoch'), FloatField()),
-                hours_plan=Ceil(F('hours_plan_0') - breaktime_plan)
-            ).update(work_hours=Cast(F('hours_plan'), DurationField()))
+            ).update(
+                work_hours=Subquery(
+                    WorkerDay.objects.filter(pk=OuterRef('pk')).annotate(
+                        hours_plan_0=Cast(F('dttm_work_end') - F('dttm_work_start'), DurationField()),
+                        hours_plan=Cast(F('hours_plan_0') - breaktime_plan, DurationField()),
+                    ).values('hours_plan')[:1]
+                )
+            )
 
         return res
 
