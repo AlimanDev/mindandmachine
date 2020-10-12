@@ -566,7 +566,7 @@ class Employment(AbstractActiveModel):
         if position_has_changed:
             from django.apps import apps
             from django.db.models import When, Case, Q, F, FloatField, DurationField, Value
-            from django.db.models.functions import Cast, Ceil
+            from django.db.models.functions import Cast, Ceil, Extract
             if self.position.breaks:
                 breaks = {
                     self.position.breaks_id: 
