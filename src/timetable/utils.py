@@ -11,7 +11,7 @@ from src.timetable.models import (
 )
 from src.base.models import Break
 
-
+#depricated
 def wd_stat_count(worker_days, shop):
     # break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
     break_triplets = {

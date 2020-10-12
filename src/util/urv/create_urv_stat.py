@@ -10,6 +10,7 @@ COLOR_GREEN = '#00FF00'
 COLOR_RED = '#FF0000'
 COLOR_YELLOW = '#FFFF00'
 COLOR_HEADER = '#CBF2E0'
+#FIXME wd_stat_count не совсем правильная функция, заменить на более актуальную
 def main(dt_from, dt_to, title=None, shop_codes=None, shop_level=2, comming_only=False, network_id=None):
     SHOP = 0
     DATE = 1
