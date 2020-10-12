@@ -53,7 +53,9 @@ class TestExchangeSettings(APITestCase):
             'network': self.network.id, 
             'exclude_positions': []
         }
-        self.assertEqual(response.json(), data)
+        resp = response.json()
+        resp.pop('dttm_modified')
+        self.assertEqual(resp, data)
 
     
     def test_create(self):
@@ -82,7 +84,9 @@ class TestExchangeSettings(APITestCase):
             'network': None, 
             'exclude_positions': []
         }
-        self.assertEqual(response.json(), data)
+        resp = response.json()
+        resp.pop('dttm_modified')
+        self.assertEqual(resp, data)
 
 
     def test_update(self):
@@ -111,7 +115,9 @@ class TestExchangeSettings(APITestCase):
             'network': self.network.id, 
             'exclude_positions': []
         }
-        self.assertEqual(response.json(), data)
+        resp = response.json()
+        resp.pop('dttm_modified')
+        self.assertEqual(resp, data)
 
 
     def test_delete(self):
