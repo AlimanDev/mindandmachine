@@ -586,8 +586,8 @@ class Employment(AbstractActiveModel):
                         (Q(employment__position__breaks__isnull=True) & Q(employment__shop__settings__breaks_id=break_id))),
                         then=break_triplet[2]
                     )
-                    for break_id, breaks in break_triplets.items()
-                    for break_triplet in breaks
+                    for break_id, break_triplets in breaks.items()
+                    for break_triplet in break_triplets
                 ]
                 breaktime_plan = Case(*whens, output_field=FloatField())
             WorkerDay = apps.get_model('timetable', 'WorkerDay')
