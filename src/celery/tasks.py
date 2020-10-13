@@ -378,8 +378,8 @@ def update_shop_stats(dt=None):
         )
         month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt))
     for month_stat in month_stats:
-        if month_stat.status not in [ShopMonthStat.READY, ShopMonthStat.NOT_DONE]:
-            continue
+        # if month_stat.status not in [ShopMonthStat.READY, ShopMonthStat.NOT_DONE]:
+        #     continue
 
         if settings.UPDATE_SHOP_STATS_WORK_TYPES_CODES:
             work_type_ids = list(month_stat.shop.worktype_set.filter(
