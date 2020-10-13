@@ -2,6 +2,8 @@ import pandas as pd
 from src.base.models import Shop
 from src.forecast.models import OperationType, OperationTypeName, PeriodClients
 from src.timetable.models import WorkType, WorkTypeName
+from django.db.models import Q
+from django.utils import timezone
 
 
 shop_types = [
@@ -38,7 +40,53 @@ shop_types = [
             '22-01', '238-1', '246-1', '267-1', '28-02', '290-1', '3-001',
             '324-1', '351-1', '362-1', '9-001'
         ],  # высокая конверсия
+        [
+            '169-1', '148-1', '322-1', '337-1', '263-1', '29-02', '176-1',
+            '136-1', '10-03', '241-1', '147-1', '6-002', '262-1', '331-1',
+            '338-1', '326-1',
+        ],  # без счетчиков
     ]
+
+
+def cut_hours(dt_from, dt_to):
+    total = 0
+    total_changed = 0
+    for shop in Shop.objects.all():
+        if shop.open_times and shop.close_times:
+            curr_date = dt_from
+            updated = False
+            while curr_date <= dt_to:
+                open_time = shop.open_times.get(str(curr_date.weekday())) or shop.open_times.get('all')
+                close_time = shop.close_times.get(str(curr_date.weekday())) or shop.close_times.get('all')
+                if (open_time and close_time) or (open_time is None and close_time is None):
+                    if (open_time is None and close_time is None):
+                        open_time = timezone.datetime(2020, 1, 1, 6).time()
+                        close_time = timezone.datetime(2020, 1, 1, 6).time()
+
+                    vals = PeriodClients.objects.filter(
+                        Q(dttm_forecast__time__gte=close_time) | Q(dttm_forecast__time__lt=open_time),
+                        dttm_forecast__date=curr_date,
+                        type=PeriodClients.LONG_FORECASE_TYPE,
+                        operation_type__shop=shop,
+                        value__gt=0
+                    ).update(
+                        value=0
+                    )
+                    curr_date += timezone.timedelta(days=1)
+
+                    if vals:
+                        # print(vals, shop, curr_date)
+                        total_changed += vals
+                        updated=True
+                else:
+                    print('bad work hours', shop)
+                    curr_date = dt_to + timezone.timedelta(days=1)
+
+            if updated:
+                print(shop, shop.open_times, shop.close_times)
+                total += 1
+
+    print('total changed', total, total_changed)
 
 
 def export_shops(to_file):
@@ -49,7 +97,7 @@ def export_shops(to_file):
             'code': shop.code,
             'start_time': min(shop.open_times.values()),
             'end_time': max(shop.close_times.values()),
-            'shop_type': 0 if shop.code in shop_types[0] else 1 if shop.code in shop_types[1] else 2
+            'shop_type': 0 if shop.code in shop_types[0] else 1 if shop.code in shop_types[1] else 2 if shop.code in shop_types[2] else 3
         })
 
     df = pd.DataFrame(data)
