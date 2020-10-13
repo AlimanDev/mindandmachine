@@ -440,6 +440,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             worker_id__in=user_ids,
             dt__gte=dt_from - timedelta(days=7),
             dt__lte=dt_from,
+            **new_worker_days_filter,
         ).exclude(
             type=WorkerDay.TYPE_EMPTY,
         ).order_by(
@@ -1029,6 +1030,7 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None):
         Q(
           Q(user__worker_day__type__in=WorkerDay.TYPES_PAID)|
           Q(user__worker_day__type=WorkerDay.TYPE_VACATION),
+        #   Q(dt_fired__isnull=False) & Q(user__worker_day__dt__lte=F('dt_fired')) | Q(dt_fired__isnull=True), #чтобы не попали рабочие дни после увольнения
           user__worker_day__dt__gte=dt_start,
           user__worker_day__dt__lt=dt_end,
           user__worker_day__is_fact=False,

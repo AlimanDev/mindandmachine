@@ -342,13 +342,13 @@ class WorkerDayManager(models.Manager):
             is_fact=False,
             # shop_id=OuterRef('shop_id')
         ).values( # for group by
-            'dttm_added'
-        ).annotate(dt_max=Max('dttm_added')).values('dt_max')[:1]
+            'dttm_modified'
+        ).annotate(dt_max=Max('dttm_modified')).values('dt_max')[:1]
         return super().get_queryset().filter(
             *args,
             **kwargs,
             is_fact=False,
-            dttm_added=Subquery(max_dt_subq),
+            dttm_modified=Subquery(max_dt_subq),
         )
 
     @staticmethod
