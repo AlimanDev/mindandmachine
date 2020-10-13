@@ -9,23 +9,36 @@ from src.timetable.models import (
     AttendanceRecords,
     WorkerDay
 )
+from src.base.models import Break
 
-
+#depricated
 def wd_stat_count(worker_days, shop):
-    break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
-    break_triplets = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), break_triplets))
+    # break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
+    break_triplets = {
+        b.id: list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), b.breaks))
+        for b in Break.objects.filter(network_id=shop.network_id)
+    }
     breaktime_plan = Value(0, output_field=FloatField())
     breaktime_fact = Value(0, output_field=FloatField())
     if break_triplets:
         whens = [
-            When(Q(hours_plan_0__gte=break_triplet[0], hours_plan_0__lte=break_triplet[1]),
-                      then = break_triplet[2])
-            for break_triplet in break_triplets]
+            When(
+                Q(hours_plan_0__gte=break_triplet[0], hours_plan_0__lte=break_triplet[1]) & 
+                (Q(employment__position__breaks_id=break_id) | (Q(employment__position__breaks__isnull=True) & Q(employment__shop__settings__breaks_id=break_id))),
+                then=break_triplet[2]
+            )
+            for break_id, breaks in break_triplets.items()
+            for break_triplet in breaks
+        ]
         breaktime_plan = Case(*whens, output_field=FloatField())
         whens = [
-            When(Q(hours_fact_0__gte=break_triplet[0], hours_fact_0__lte=break_triplet[1]),
-                      then = break_triplet[2])
-            for break_triplet in break_triplets]
+            When(
+                Q(hours_fact_0__gte=break_triplet[0], hours_fact_0__lte=break_triplet[1]) & 
+                (Q(employment__position__breaks_id=break_id) | (Q(employment__position__breaks__isnull=True) & Q(employment__shop__settings__breaks_id=break_id))),
+                then = break_triplet[2])
+            for break_id, breaks in break_triplets.items()
+            for break_triplet in breaks
+        ]
         breaktime_fact = Case(*whens, output_field=FloatField())
 
     return worker_days.filter(

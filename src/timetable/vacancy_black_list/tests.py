@@ -7,7 +7,6 @@ from rest_framework.test import APITestCase
 from src.util.test import create_departments_and_users
 
 from src.timetable.models import VacancyBlackList, WorkerDay, WorkerDayCashboxDetails, WorkType, WorkTypeName
-from src.base.models import FunctionGroup
 from src.util.models_converter import Converter
 from src.timetable.vacancy.utils import confirm_vacancy
 

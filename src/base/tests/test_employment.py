@@ -1,10 +1,10 @@
-from datetime import timedelta
+from datetime import timedelta, date, datetime, time
 
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from src.base.models import WorkerPosition, FunctionGroup, Employment, User
-from src.timetable.models import WorkTypeName, EmploymentWorkType
+from src.base.models import WorkerPosition, Employment, User, Break
+from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -36,6 +36,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         return resp
 
     def test_work_types_added_on_employment_creation(self):
+
         resp = self._create_employment()
         self.assertEqual(resp.status_code, 201)
         resp_data = resp.json()
@@ -46,6 +47,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             ).exists())
 
     def test_work_types_updated_on_position_change(self):
+
         another_worker_position = WorkerPosition.objects.create(
             name='Заместитель директора магазина',
             network=self.network,
@@ -110,3 +112,41 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).count(), 2)
         self.assertEqual(list(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).values_list('id', flat=True)), employment_ids)
+
+
+    def test_work_hours_change_on_update_position(self):
+        dt = date.today()
+        break1 = Break.objects.create(
+            name='break1',
+            network=self.network,
+            value='[[0, 1440, [30, 30]]]',
+        )
+        break2 = Break.objects.create(
+            name='break2',
+            network=self.network,
+            value='[[0, 1440, [30]]]',
+        )
+        self.worker_position.breaks = break1
+        self.worker_position.save()
+        another_worker_position = WorkerPosition.objects.create(
+            name='Заместитель директора магазина',
+            network=self.network,
+            breaks=break2,
+        )
+        resp = self._create_employment().json()
+        for i in range(3):
+            WorkerDay.objects.create(
+                employment_id=resp['id'],
+                worker=self.user2,
+                dttm_work_start=datetime.combine(dt + timedelta(i), time(10)),
+                dttm_work_end=datetime.combine(dt + timedelta(i), time(20)),
+                shop=self.shop,
+                dt=dt + timedelta(i),
+            )
+        self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt).work_hours, timedelta(hours=9))
+        self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours, timedelta(hours=9))
+        emp = Employment.objects.get(pk=resp['id'])
+        emp.position = another_worker_position
+        emp.save()
+        self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt).work_hours, timedelta(hours=9))
+        self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours, timedelta(hours=9, minutes=30))

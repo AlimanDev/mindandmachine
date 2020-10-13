@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.db.models import Q
 
-from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop, Group
+from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop, Group, Break
 from src.base.message import Message
 from src.base.fields import CurrentUserNetwork, UserworkShop
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
@@ -262,7 +262,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
 class WorkerPositionSerializer(BaseNetworkSerializer):
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name', 'network_id', 'code']
+        fields = ['id', 'name', 'network_id', 'code', 'breaks_id']
 
     def __init__(self, *args, **kwargs):
         super(WorkerPositionSerializer, self).__init__(*args, **kwargs)
@@ -321,6 +321,7 @@ class ShopSettingsSerializer(serializers.ModelSerializer):
                   'queue_length',
                   'max_work_hours_7days',
                   'network_id',
+                  'breaks_id',
                   ]
 
 
@@ -337,3 +338,14 @@ class GroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
         fields = ['id', 'name', 'code', 'network_id']
+
+
+class BreakSerializer(BaseNetworkSerializer):
+    class Meta:
+        model = Break
+        fields = ['id', 'name', 'network_id', 'value']
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['value'] = instance.breaks
+        return data

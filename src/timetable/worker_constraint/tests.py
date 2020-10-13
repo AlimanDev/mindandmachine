@@ -3,7 +3,6 @@ import json
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup
 from src.timetable.models import WorkerConstraint
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter

@@ -5,7 +5,6 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from etc.scripts.fill_calendar import main
-from src.base.models import FunctionGroup
 from src.forecast.models import OperationType, PeriodClients, OperationTypeName
 from src.timetable.models import (
     WorkTypeName,

@@ -28,6 +28,7 @@ from src.base.serializers import (
     UserListSerializer,
     GroupSerializer,
     AutoTimetableSerializer,
+    BreakSerializer,
 )
 from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter, BaseActiveNamedModelFilter
 from src.base.models import (
@@ -40,6 +41,7 @@ from src.base.models import (
     WorkerPosition,
     User,
     Group,
+    Break,
 )
 
 from src.base.filters import UserFilter
@@ -281,3 +283,12 @@ class GroupViewSet(BaseActiveNamedModelViewSet):
         )
 
 
+class BreakViewSet(BaseActiveNamedModelViewSet):
+    permission_classes = [Permission]
+    serializer_class = BreakSerializer
+    filterset_class = BaseActiveNamedModelFilter
+
+    def get_queryset(self):
+        return Break.objects.filter(
+            network_id=self.request.user.network_id,
+        )
