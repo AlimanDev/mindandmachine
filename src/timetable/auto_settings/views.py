@@ -817,19 +817,32 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         timetable = ShopMonthStat.objects.get(id=form['timetable_id'])
 
         shop = timetable.shop
-        employments = {
-            e.user_id: e
-            for e in Employment.objects.get_active(shop.network_id)
-        }
         # break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
-
         timetable.status = data['timetable_status']
         timetable.status_message = (data.get('status_message') or '')[:256]
         timetable.save()
         if timetable.status != ShopMonthStat.READY and timetable.status_message:
             return Response(timetable.status_message)
 
+
+
         if data['users']:
+            dt_from = date.max
+            dt_to = date.min
+            for wd in list(data['users'].values())[0]['workdays']:
+                dt = Converter.parse_date(wd['dt'])
+                dt_from = dt if dt < dt_from else dt_from
+                dt_to = dt if dt > dt_to else dt_to
+
+            employments = {
+                e.user_id: e
+                for e in Employment.objects.get_active(
+                    shop.network_id,
+                    dt_from=dt_from,
+                    dt_to=dt_to,
+                    shop=shop,
+                )
+            }
             for uid, v in data['users'].items():
                 uid = int(uid)
                 for wd in v['workdays']:
