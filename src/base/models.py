@@ -254,11 +254,12 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             raise MessageError(code='time_shop_differerent_keys')
         if open_times.get('all') and len(open_times) != 1:
             raise MessageError(code='time_shop_all_or_days')
-
-        for key in open_times.keys():
-            close_hour = close_times[key].hour if close_times[key].hour != 0 else 24
-            if open_times[key].hour > close_hour:
-                raise MessageError(code='time_shop_incorrect_time_start_end')
+        
+        #TODO fix
+        # for key in open_times.keys():
+        #     close_hour = close_times[key].hour if close_times[key].hour != 0 else 24
+        #     if open_times[key].hour > close_hour:
+        #         raise MessageError(code='time_shop_incorrect_time_start_end')
         self.tm_open_dict = self.clean_time_dict(self.open_times)
         self.tm_close_dict = self.clean_time_dict(self.close_times)
         if hasattr(self, 'parent_code'):
