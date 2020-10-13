@@ -8,7 +8,6 @@ from src.util.test import create_departments_and_users
 
 from src.forecast.models import OperationTypeName, OperationType
 from src.timetable.models import WorkTypeName, WorkType
-from src.base.models import FunctionGroup
 
 
 class TestOperationType(APITestCase):
@@ -56,6 +55,7 @@ class TestOperationType(APITestCase):
             shop=self.work_type2.shop,
         )
         
+
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):

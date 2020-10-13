@@ -12,6 +12,7 @@ from src.base.models import (
     Event,
     ShopSettings,
     Network,
+    Break,
 )
 from src.timetable.models import (
     WorkType,
@@ -50,14 +51,15 @@ class TestAutoWorkerExchange(TestCase):
 
         fill_calendar.main('2018.1.1', (datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y.%m.%d'),
                            region_id=1)
-        cls.shop_settings = ShopSettings.objects.create()
 
         cls.network = Network.objects.create(
             primary_color='#BDF82',
             secondary_color='#390AC',
         )
+        cls.breaks = Break.objects.create(network=cls.network, name='Default')
+        cls.shop_settings = ShopSettings.objects.create(breaks=cls.breaks)
         Shop.objects.all().update(network=cls.network)
-
+        
         cls.root_shop = Shop.objects.create(
             name='SuperShop1',
             settings=cls.shop_settings,

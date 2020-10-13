@@ -14,7 +14,6 @@ from src.forecast.models import (
     PeriodClients,
 )
 from src.timetable.models import WorkTypeName, WorkType
-from src.base.models import FunctionGroup
 
 
 class TestOperationTypeRelation(APITestCase):
@@ -203,7 +202,7 @@ class TestOperationTypeRelation(APITestCase):
             {
                 'id': self.load_template.id,
                 'shop_id': self.shop.id,
-                'dt_from': datetime.now().date(),
+                'dt_from': None,
             }, 
             format='json',
         )
@@ -222,7 +221,7 @@ class TestOperationTypeRelation(APITestCase):
             {
                 'id': self.load_template.id,
                 'shop_id': self.shop.id,
-                'dt_from': datetime.now().date(),
+                'dt_from': None,
             }, 
             format='json',
         )
