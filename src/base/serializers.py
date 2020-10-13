@@ -171,9 +171,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
         if self.instance:
             # Нельзя обновить пользователя по коду
             attrs['user_id'] = self.instance.user_id
-            # shop_id = self.instance.user_id
         else:
-
             if not attrs.get('user_id'):
                 user = attrs.pop('user')
                 users = list(User.objects.filter(username=user['username'], network_id=self.context['request'].user.network_id))
@@ -181,17 +179,6 @@ class EmploymentSerializer(serializers.ModelSerializer):
                     attrs['user_id'] = users[0].id
                 else:
                     self.fail('no_user', amount=len(users), username=user['username'])
-            #
-            # if not attrs.get('shop_id'):
-            #     shop = attrs.pop('shop')
-            #     shops = list(Shop.objects.filter(code=shop['code'], network_id=self.context['request'].user.network_id))
-            #     if len(shops) == 1:
-            #         attrs['shop_id'] = shops[0].id
-            #     else:
-            #         self.fail('no_shop', amount=len(shops), code=shop['code'])
-            #
-            # user_id = attrs['user_id']
-            # shop_id = attrs['shop_id']
 
         if (attrs.get('shop_id') is None) and ('code' in attrs.get('position', {})):
             position = attrs.pop('position', None)
@@ -209,18 +196,6 @@ class EmploymentSerializer(serializers.ModelSerializer):
             else:
                 self.fail('no_shop', amount=len(shops), code=shop['code'])
 
-        # employments = Employment.objects.filter(
-        #     Q(dt_fired__isnull=True) | Q(dt_fired__gte=attrs.get('dt_hired')),
-        #     user_id=user_id,
-        #     shop_id=shop_id,
-        # )
-        # if attrs.get('dt_fired'):
-        #     employments=employments.filter(dt_hired__lte=attrs['dt_fired'])
-        # if self.instance:
-        #     employments = employments.exclude(id=self.instance.id)
-        # if employments:
-        #     e = employments.first()
-        #     self.fail('emp_check_dates',dt_hired=e.dt_hired,dt_fired=e.dt_fired)
         return attrs
 
     def __init__(self, *args, **kwargs):

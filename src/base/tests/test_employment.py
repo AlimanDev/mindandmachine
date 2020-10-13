@@ -14,6 +14,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         cls.create_departments_and_users()
         cls.worker_position = WorkerPosition.objects.create(
             name='Директор магазина',
+            code='director',
             network=cls.network,
         )
         cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code')
@@ -80,7 +81,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
             'shop_id': self.shop2.id,
             'user_id': self.user2.id,
-
         }
 
         resp = self.client.put(
@@ -92,9 +92,52 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertTrue(Employment.objects.filter(
             shop_id=put_data['shop_id'],
             dt_hired=put_data['dt_hired'],
-            dt_hired_next=put_data['dt_hired'],
             user_id=put_data['user_id'],
             position_id=put_data['position_id'],
+        ).count() == 1)
+
+    def test_put_by_code(self):
+        self.shop2.code = str(self.shop2.id)
+        self.shop2.save()
+        self.user2.username = str(self.user2)
+        self.user2.save()
+
+        put_data = {
+            'position_code': self.worker_position.code,
+            'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
+            'dt_fired': (timezone.now() + timedelta(days=300)).strftime('%Y-%m-%d'),
+            'shop_code': self.shop2.code,
+            'username': self.user2.username,
+            'by_code': True,
+        }
+
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk='not_used'),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 201)  # created
+        self.assertTrue(Employment.objects.filter(
+            shop_id=self.shop2.id,
+            dt_hired=put_data['dt_hired'],
+            dt_fired=put_data['dt_fired'],
+            user_id=self.user2.id,
+            position_id=self.worker_position.id,
+        ).count() == 1)
+
+        put_data['dt_fired'] = timezone.now().strftime('%Y-%m-%d')
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk='not_used'),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)  # updated
+        self.assertTrue(Employment.objects.filter(
+            shop_id=self.shop2.id,
+            dt_hired=put_data['dt_hired'],
+            dt_fired=put_data['dt_fired'],
+            user_id=self.user2.id,
+            position_id=self.worker_position.id,
         ).count() == 1)
 
     def test_auto_timetable(self):

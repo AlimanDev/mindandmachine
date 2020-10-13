@@ -66,7 +66,6 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     filterset_class = EmploymentFilter
     get_object_field = 'tabel_code'
 
-
     def get_queryset(self):
         return Employment.objects.filter(
             shop__network_id=self.request.user.network_id
@@ -78,7 +77,6 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         else:
             return EmploymentSerializer
 
-
     @action(detail=False, methods=['post',])
     def auto_timetable(self, request):
         data = AutoTimetableSerializer(data=request.data)
@@ -87,55 +85,34 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         Employment.objects.filter(id__in=data.get('employment_ids')).update(auto_timetable=data.get('auto_timetable'))
         return Response()
 
-
     def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
-        serializer = self.get_serializer(data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
+        if 'by_code' in request.data:
+            partial = kwargs.pop('partial', False)
+            serializer = self.get_serializer(data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
 
-        fired_filter = Q(dt_fired__isnull=True)
-        if serializer.validated_data.get('dt_hired'):
-            fired_filter = fired_filter | Q(dt_fired__gte=serializer.validated_data.get('dt_hired'))
+            # Может быть несколько записей с одинаковым dt_hired.
+            # Подстрахуемся, исключив те, у которых dt_hired=dt_fired.
+            if serializer.validated_data['dt_hired'] == serializer.validated_data['dt_fired']:
+                return Response({})
 
-        employment = Employment.objects.filter(
-            fired_filter,
-            user_id=serializer.validated_data['user_id'],
-            shop_id=serializer.validated_data['shop_id'],
-        ).order_by('dt_fired', 'dt_hired').last()
+            employment = Employment.objects.filter(
+                dt_hired=serializer.validated_data['dt_hired'],
+                user_id=serializer.validated_data['user_id'],
+                shop_id=serializer.validated_data['shop_id'],
+                position_id=serializer.validated_data['position_id'],
+            ).order_by('dt_fired', 'dt_hired').last()
 
-        month_ago = timezone.now().date() - timezone.timedelta(days=31)
-        if employment:
-            # updating
-            # специфическая логика с cond_for_not_updating так как не поддерживаем несколько трудоустройств
-            # fixme
-            # cond_for_not_updating = employment.dt_fired and serializer.validated_data.get('dt_fired') and \
-            #                         (employment.dt_fired > serializer.validated_data.get('dt_fired')) and \
-            #                         (employment.position_id != serializer.validated_data.get('position_id'))
-            cond_for_not_updating = (employment.dt_hired_next and (employment.dt_hired_next > serializer.validated_data.get('dt_hired')))
-            # cond_for_not_updating |= employment.dt_hired_next and serializer.validated_data.get('dt_fired') and \
-            #                          (employment.dt_hired_next >= serializer.validated_data.get('dt_fired'))
-
-            if cond_for_not_updating:
-                # в этом кейсе ничего не надо обновлять -- трудоустройства накладываются друг на друга и в базе актуальные данные итоговые
-                return_data = {}
-            else:
-                # опять же специфическая логика не все поля обновляем, а еще есть поле dt_hired_next
-                employment.dt_hired_next = serializer.validated_data.pop('dt_hired')
+            if employment:
                 serializer.instance = employment
-                self.perform_update(serializer)
-                return_data = serializer.data
-            return Response(return_data)
+                response_code = status.HTTP_200_OK
+            else:
+                response_code = status.HTTP_201_CREATED
 
-        # elif employment:
-        #     serializer.instance = employment
-        #     self.perform_update(serializer)
-        #     return_data = serializer.data
-        #     return Response(return_data)
-        else:
-            serializer.save(dt_hired_next=serializer.validated_data.get('dt_hired'))
-            # self.perform_create(serializer)
-            headers = self.get_success_headers(serializer.validated_data)
-            return Response(serializer.validated_data, status=status.HTTP_201_CREATED, headers=headers)
+            serializer.save()
+            return Response(serializer.data, status=response_code)
+
+        return super(EmploymentViewSet, self).update(request, *args, **kwargs)
 
 
 class UserViewSet(BaseActiveNamedModelViewSet):
