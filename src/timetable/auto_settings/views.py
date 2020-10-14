@@ -1093,7 +1093,7 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None, is_appro
             employment_stat_dict[employment.id]['paid_days'] = prev_info[employment.id]['paid_days']
             employment_stat_dict[employment.id]['paid_hours'] = prev_info[employment.id]['paid_hours']
             employment_stat_dict[employment.id]['vacations'] = prev_info[employment.id]['vacations']
-            employment_stat_dict[employment.id]['vacations'] = prev_info[employment.id]['no_data']
+            employment_stat_dict[employment.id]['no_data'] = prev_info[employment.id]['no_data']
 
 
     return employment_stat_dict
