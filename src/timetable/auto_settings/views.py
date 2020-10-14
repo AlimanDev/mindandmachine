@@ -546,7 +546,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         employment_stat_dict = count_prev_paid_days(dt_from - timedelta(days=1), employments, shop.region_id)
         month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_start=dt_from, is_approved=form['use_not_approved'])
-        month_stat_prev = count_prev_paid_days(dt_from - timedelta(days=1), employments, shop.region_id, dt_start=dt_first, is_approved=form['use_not_approved'])
+        month_stat_prev = count_prev_paid_days(dt_from, employments, shop.region_id, dt_start=dt_first, is_approved=form['use_not_approved'])
 
         ##################################################################
 
@@ -1056,7 +1056,7 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None, is_appro
     prev_info = list(Employment.objects.filter(
         Q(
           Q(user__worker_day__type__in=WorkerDay.TYPES_PAID)|
-          Q(user__worker_day__type=WorkerDay.TYPE_VACATION),
+          Q(user__worker_day__type__in=[WorkerDay.TYPE_SELF_VACATION, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK, WorkerDay.TYPE_EMPTY]),
           Q(dt_fired__isnull=False) & Q(user__worker_day__dt__lte=F('dt_fired')) | Q(dt_fired__isnull=True), #чтобы не попали рабочие дни после увольнения
           user__worker_day__dt__gte=dt_start,
           user__worker_day__dt__lt=dt_end,
