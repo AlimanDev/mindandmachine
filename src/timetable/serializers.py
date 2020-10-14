@@ -403,16 +403,15 @@ class DuplicateSrializer(serializers.Serializer):
     default_error_messages = {
         'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")
     }
-    from_worker_id = serializers.IntegerField()
     to_worker_id = serializers.IntegerField()
-    dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
-    is_approved = serializers.BooleanField(default=False)
+    from_workerday_ids = serializers.ListField(child=serializers.IntegerField())
+    to_dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
-        for key in ['from_worker_id', 'to_worker_id']:
-            if not User.objects.filter(id=self.validated_data[key]).exists():
-                raise ValidationError({key: self.error_messages['not_exist'].format(pk_value=self.validated_data[key])})
+        if not User.objects.filter(id=self.data['to_worker_id']).exists():
+            raise ValidationError({'to_worker_id': self.error_messages['not_exist'].format(pk_value=self.validated_data['to_worker_id'])})
+        return True
 
 
 class DeleteTimetableSerializer(serializers.Serializer):

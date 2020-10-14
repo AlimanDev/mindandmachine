@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import Shop, FunctionGroup, ShopSettings
+from src.base.models import Shop, ShopSettings
 from src.forecast.tests.factories import LoadTemplateFactory
 from src.timetable.models import ShopMonthStat
 from src.util.mixins.tests import TestsHelperMixin
@@ -101,19 +101,11 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             "timezone": 'Europe/Moscow',
             'restricted_end_times': '[]',
             'restricted_start_times': '[]',
-            'settings_id': self.settings.id,
+            'settings_id': self.shop_settings.id,
             'forecast_step_minutes': '00:30:00',
         }
         # response = self.client.post(self.url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='Shop',
-            level_up=1,
-            level_down=99,
-        )
 
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -141,19 +133,11 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             "timezone": 'Europe/Berlin',
             'restricted_end_times': '[]',
             'restricted_start_times': '[]',
-            'settings_id': self.settings.id,
+            'settings_id': self.shop_settings.id,
             'forecast_step_minutes': '00:30:00',
         }
         # response = self.client.put(self.shop_url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='Shop',
-            level_up=1,
-            level_down=99,
-        )
 
         response = self.client.put(self.shop_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -168,20 +152,11 @@ class TestDepartment(TestsHelperMixin, APITestCase):
     def test_update_without_tm_open_close_dict_dont_clean_it(self):
         prev_tm_open_dict_val = self.shop.tm_open_dict
         prev_tm_close_dict_val = self.shop.tm_close_dict
-
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='Shop',
-            level_up=1,
-            level_down=99,
-        )
-
         data = {
             'id': self.shop.id,
             'restricted_start_times': '["12:00"]',
             'restricted_end_times': '["20:40"]',
-            'settings_id': self.settings.id,
+            'settings_id': self.shop_settings.id,
             'load_template_id': self.load_template.id,
             'name': 'Имя магазина',
             'timezone': 'Europe/Moscow',

@@ -14,7 +14,6 @@ from src.forecast.models import (
     PeriodClients,
 )
 from src.timetable.models import WorkTypeName, WorkType
-from src.base.models import FunctionGroup
 
 
 class TestOperationTypeTemplate(APITestCase):
@@ -63,12 +62,6 @@ class TestOperationTypeTemplate(APITestCase):
         self.operation_type_template2 = OperationTypeTemplate.objects.create(
             load_template=self.load_template,
             operation_type_name=self.operation_type_name2,
-        )
-        FunctionGroup.objects.bulk_create(
-            [
-                FunctionGroup(func='OperationTypeTemplate', group=self.admin_group, method=m)
-                for m in ['POST', 'PUT', 'DELETE']
-            ]
         )
 
         self.client.force_authenticate(user=self.user1)

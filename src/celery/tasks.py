@@ -1,33 +1,21 @@
-from datetime import date, timedelta, datetime
+import json
+import logging
 import os
-from src.base.message import Message
-from django.db.models import Avg, Q
-from django.utils.timezone import now
-from django.conf import settings
+import time as time_in_secs
+from datetime import date, timedelta, datetime
+
+import pandas as pd
+import requests
 from dateutil.relativedelta import relativedelta
-from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
-from src.timetable.vacancy.utils import (
-    search_candidates,
-    cancel_vacancy,
-    confirm_vacancy,
-    create_vacancies_and_notify,
-    cancel_vacancies,
-    workers_exchange,
-)
-
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
+from django.db.models import Q
+from django.utils.timezone import now
 from src.main.demand.utils import create_predbills_request_function
-from src.timetable.work_type.utils import get_efficiency as get_shop_stats
-from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
-
 from src.main.operation_template.utils import build_period_clients
+from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
-from src.timetable.models import (
-    WorkType,
-    WorkerDayCashboxDetails,
-    EmploymentWorkType,
-    ShopMonthStat,
-    ExchangeSettings,
-)
+from src.base.message import Message
 from src.base.models import (
     Shop,
     User,
@@ -36,6 +24,9 @@ from src.base.models import (
     Event,
     Network,
 )
+from src.celery.celery import app
+from src.conf.djconfig import EMAIL_HOST_USER
+from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
 from src.forecast.models import (
     OperationTemplate,
     LoadTemplate,
@@ -44,15 +35,21 @@ from src.forecast.models import (
     OperationType,
     OperationTypeName
 )
-from src.celery.celery import app
-from django.core.mail import EmailMultiAlternatives
-from src.conf.djconfig import EMAIL_HOST_USER
-
-import time as time_in_secs
-
-import pandas as pd
-import json
-
+from src.util.urv.create_urv_stat import main as create_urv
+from src.conf.djconfig import URV_STAT_EMAILS, URV_STAT_SHOP_LEVEL
+from src.timetable.models import (
+    WorkType,
+    WorkerDayCashboxDetails,
+    EmploymentWorkType,
+    ShopMonthStat,
+    ExchangeSettings,
+)
+from src.timetable.vacancy.utils import (
+    create_vacancies_and_notify,
+    cancel_vacancies,
+    workers_exchange,
+)
+from src.timetable.work_type.utils import get_efficiency as get_shop_stats
 
 
 @app.task
@@ -381,8 +378,8 @@ def update_shop_stats(dt=None):
         )
         month_stats = list(ShopMonthStat.objects.filter(shop__in=shops, shop__child__isnull=True, dt=dt))
     for month_stat in month_stats:
-        if month_stat.status not in [ShopMonthStat.READY, ShopMonthStat.NOT_DONE]:
-            continue
+        # if month_stat.status not in [ShopMonthStat.READY, ShopMonthStat.NOT_DONE]:
+        #     continue
 
         if settings.UPDATE_SHOP_STATS_WORK_TYPES_CODES:
             work_type_ids = list(month_stat.shop.worktype_set.filter(
@@ -670,3 +667,60 @@ def clean_timeserie_actions():
                     ).select_related('shop')
                     for operation_type in operations_type:
                         Receipt.objects.filter(shop=operation_type.shop, dttm__lt=dttm_for_delete).delete()
+
+@app.task
+def send_urv_stat():
+    if not URV_STAT_EMAILS:
+        return
+    dt = date.today() - timedelta(days=1)
+    title = f'URV_{dt}.xlsx'
+
+    for network_code, emails in URV_STAT_EMAILS.items():
+        create_urv(dt, dt, title=title, shop_level=URV_STAT_SHOP_LEVEL, network_id=Network.objects.get(code=network_code).id)
+        msg = EmailMultiAlternatives(
+            subject=f'Отчёт УРВ {dt}',
+            body=f'Отчёт УРВ {dt}',
+            from_email=EMAIL_HOST_USER,
+            to=emails,
+        )
+        msg.attach_file(title)
+        os.remove(title)
+        result = msg.send()
+
+    return
+
+
+@app.task
+def send_urv_stat_today():
+    if not URV_STAT_EMAILS:
+        return
+    dt = date.today()
+    title = f'URV_today_{dt}.xlsx'
+
+    for network_code, emails in URV_STAT_EMAILS.items():
+        create_urv(dt, dt, title=title, shop_level=URV_STAT_SHOP_LEVEL, comming_only=True, network_id=Network.objects.get(code=network_code).id)
+        msg = EmailMultiAlternatives(
+            subject=f'Отчёт УРВ {dt}',
+            body=f'Отчёт УРВ {dt}',
+            from_email=EMAIL_HOST_USER,
+            to=emails,
+        )      
+        msg.attach_file(title)
+        os.remove(title)    
+        result = msg.send()
+
+    return
+
+@app.task
+def create_mda_user_to_shop_relation(username, shop_code):
+    logger = logging.getLogger('django.request')
+    resp = requests.post(
+        url=settings.MDA_PUBLIC_API_HOST + '/api/public/v1/mindandmachine/userToShop/',
+        json={'login': username, 'sap': shop_code},
+        headers={'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN},
+        timeout=(3, 5),
+    )
+    try:
+        resp.raise_for_status()
+    except requests.RequestException:
+        logger.exception(f'text:{resp.text}, headers: {resp.headers}')

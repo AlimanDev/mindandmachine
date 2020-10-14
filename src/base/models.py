@@ -49,6 +49,32 @@ class Region(AbstractActiveNamedModel):
         verbose_name_plural = 'Регионы'
 
 
+class Break(AbstractActiveNamedModel):
+    class Meta(AbstractActiveNamedModel.Meta):
+        verbose_name = 'Перерыв'
+        verbose_name_plural = 'Перерывы'
+    value = models.CharField(max_length=1024, default='[]')
+
+    def __getattribute__(self, attr):
+        if attr in ['breaks']:
+            try:
+                return super().__getattribute__(attr)
+            except:
+                try:
+                    self.__setattr__(attr, json.loads(self.value))
+                except:
+                    return []
+        return super().__getattribute__(attr)
+
+    @staticmethod
+    def clean_value(value):
+        return json.dumps(value)
+
+    def save(self, *args, **kwargs):
+        self.value = self.clean_value(self.breaks)
+        super().save(*args, **kwargs)
+      
+
 class ShopSettings(AbstractActiveNamedModel):
     class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Настройки автосоставления'
@@ -65,7 +91,7 @@ class ShopSettings(AbstractActiveNamedModel):
     method_params = models.CharField(max_length=4096, default='[]')
     cost_weights = models.CharField(max_length=4096, default='{}')
     init_params = models.CharField(max_length=2048, default='{"n_working_days_optimal": 20}')
-    break_triplets = models.CharField(max_length=1024, default='[]')
+    breaks = models.ForeignKey(Break, on_delete=models.PROTECT)
 
     # added on 21.12.2018
     idle = models.SmallIntegerField(default=0)  # percents
@@ -248,7 +274,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             load_template = self.load_template_id
             self.load_template_id = new_template
         super().save(*args, **kwargs)
-        if self.load_template_id:
+        if False: # self.load_template_id:  # aa: todo: fixme: delete tmp False
             from src.forecast.load_template.utils import apply_load_template
             if load_template != None and load_template != new_template:
                 apply_load_template(new_template, self.id)
@@ -426,6 +452,7 @@ class WorkerPosition(AbstractActiveNamedModel):
         verbose_name='Типы работ по умолчанию',
         blank=True,
     )
+    breaks = models.ForeignKey(Break, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
@@ -539,6 +566,54 @@ class Employment(AbstractActiveModel):
                         priority=1,
                     ) for work_type in work_types
                 )
+        # при смене должности пересчитываем рабочие часы в будущем
+        if position_has_changed:
+            from django.apps import apps
+            from django.db.models import When, Case, Q, F, DurationField, Value, Subquery, OuterRef
+            from django.db.models.functions import Cast
+            if self.position.breaks:
+                break_id = self.position.breaks_id
+                breaks = self.position.breaks.breaks
+            else:
+                break_id = self.shop.settings.breaks_id
+                breaks = self.shop.settings.breaks.breaks
+            breaks = list(
+                map(
+                    lambda x: (
+                        datetime.timedelta(seconds=x[0] * 60), 
+                        datetime.timedelta(seconds=x[1] * 60), 
+                        datetime.timedelta(seconds=sum(x[2]) * 60)
+                    ), 
+                    breaks
+                )
+            )
+            breaktime_plan = Value(datetime.timedelta(0), output_field=DurationField())
+            if len(breaks):
+                whens = [
+                    When(
+                        Q(hours_plan_0__gte=break_triplet[0], hours_plan_0__lte=break_triplet[1]) & 
+                        (Q(employment__position__breaks_id=break_id) | 
+                        (Q(employment__position__breaks__isnull=True) & Q(employment__shop__settings__breaks_id=break_id))),
+                        then=break_triplet[2]
+                    )
+                    for break_triplet in breaks
+                ]
+                breaktime_plan = Case(*whens, output_field=DurationField())
+            WorkerDay = apps.get_model('timetable', 'WorkerDay')
+            dt = datetime.date.today()
+            WorkerDay.objects.filter(
+                employment_id=self.id,
+                is_fact=False,
+                dt__gt=dt,
+            ).update(
+                work_hours=Subquery(
+                    WorkerDay.objects.filter(pk=OuterRef('pk')).annotate(
+                        hours_plan_0=Cast(F('dttm_work_end') - F('dttm_work_start'), DurationField()),
+                        hours_plan=Cast(F('hours_plan_0') - breaktime_plan, DurationField()),
+                    ).values('hours_plan')[:1]
+                )
+            )
+
         return res
 
 
@@ -564,6 +639,7 @@ class FunctionGroup(AbstractModel):
         'AutoSettings_set_timetable',
         'AutoSettings_delete_timetable',
         'AuthUserView',
+        'Break',
         'Employment',
         'Employment_auto_timetable',
         'EmploymentWorkType',

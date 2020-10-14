@@ -1,6 +1,7 @@
 import datetime
 import json
 
+from django.conf import settings
 from django.contrib.auth.models import (
     UserManager
 )
@@ -248,19 +249,19 @@ class WorkerConstraint(AbstractModel):
 
 
 class WorkerDayQuerySet(QuerySet):
-    def get_plan_approved(self):
-        return self.filter(is_fact=False, is_approved=True)
+    def get_plan_approved(self, **kwargs):
+        return self.filter(is_fact=False, is_approved=True, **kwargs)
 
-    def get_plan_not_approved(self):
-        return self.filter(is_fact=False, is_approved=False)
+    def get_plan_not_approved(self, **kwargs):
+        return self.filter(is_fact=False, is_approved=False, **kwargs)
 
-    def get_fact_approved(self):
-        return self.filter(is_fact=True, is_approved=True)
+    def get_fact_approved(self, **kwargs):
+        return self.filter(is_fact=True, is_approved=True, **kwargs)
 
-    def get_fact_not_approved(self):
-        return self.filter(is_fact=True, is_approved=False)
+    def get_fact_not_approved(self, **kwargs):
+        return self.filter(is_fact=True, is_approved=False, **kwargs)
 
-    def get_plan_edit(self):
+    def get_plan_edit(self, **kwargs):
         ordered_subq = WorkerDay.objects.filter(
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
@@ -269,6 +270,7 @@ class WorkerDayQuerySet(QuerySet):
             'is_approved',
         ).values_list('id')[:1]
         return self.filter(
+            **kwargs,
             is_fact=False,
             id=Subquery(ordered_subq),
         )
@@ -286,10 +288,10 @@ class WorkerDayQuerySet(QuerySet):
             id__in=Subquery(ordered_subq),
         )
 
-    def get_fact_edit(self):
+    def get_fact_edit(self, **kwargs):
         raise NotImplementedError
 
-    def get_tabel(self, shop_id):
+    def get_tabel(self, shop_id, **kwargs):
         ordered_subq = WorkerDay.objects.filter(
             Q(
                 Q(is_fact=True, is_approved=True) |
@@ -351,7 +353,7 @@ class WorkerDayQuerySet(QuerySet):
             ),
             tabel_work_hours=Ceil(F('tabel_work_hours_0') - breaktime),
         )
-        return qs
+        return qs.filter(**kwargs)
 
 
 class WorkerDayManager(models.Manager):
@@ -416,9 +418,6 @@ class WorkerDay(AbstractModel):
 
     Что именно делает сотрудник в выбранный день определяет поле type. При этом, если сотрудник работает в этот день, то
     у него должен быть указан магазин (shop). Во всех остальных случаях shop_id должно быть пустым (aa: fixme WorkerDaySerializer)
-
-
-
 
     """
     class Meta:
@@ -556,11 +555,18 @@ class WorkerDay(AbstractModel):
         return self.shop
 
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
-        if self.dttm_work_end and self.dttm_work_start and self.shop and self.shop.settings:
-            self.work_hours = self.count_work_hours(json.loads(self.shop.settings.break_triplets), self.dttm_work_start, self.dttm_work_end)
+        position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
+        if self.dttm_work_end and self.dttm_work_start and self.shop and (self.shop.settings or position_break_triplet_cond):
+            breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks
+            self.work_hours = self.count_work_hours(breaks, self.dttm_work_start, self.dttm_work_end)
         else:
             self.work_hours = datetime.timedelta(0)
-        super().save(*args, **kwargs)
+
+        if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and self.is_vacancy and self.worker and self.shop:
+            from src.celery.tasks import create_mda_user_to_shop_relation
+            create_mda_user_to_shop_relation.delay(username=self.worker.username, shop_code=self.shop.code)
+
+        return super().save(*args, **kwargs)
 
 
 class WorkerDayCashboxDetailsManager(models.Manager):

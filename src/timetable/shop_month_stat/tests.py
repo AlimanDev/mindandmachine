@@ -7,7 +7,6 @@ from rest_framework.test import APITestCase
 from src.util.test import create_departments_and_users
 
 from src.timetable.models import ShopMonthStat
-from src.base.models import FunctionGroup
 from src.util.models_converter import Converter
 
 class TestShopMonthStat(APITestCase):
@@ -27,14 +26,6 @@ class TestShopMonthStat(APITestCase):
             shop_id=self.shop.id,
         )
         
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='ShopMonthStat',
-            level_up=1,
-            level_down=99,
-        )
-
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):
