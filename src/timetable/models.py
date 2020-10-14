@@ -340,6 +340,7 @@ class WorkerDayManager(models.Manager):
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
             is_fact=False,
+            **kwargs,
             # shop_id=OuterRef('shop_id')
         ).values( # for group by
             'dttm_modified'
