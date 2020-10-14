@@ -310,7 +310,7 @@ class WorkerDayQuerySet(QuerySet):
         break_triplets = []
         shop = Shop.objects.get(id=shop_id)
         if shop.settings:
-            break_triplets = json.loads(shop.settings.break_triplets)
+            break_triplets = json.loads(shop.settings.breaks.value)
         break_triplets = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), break_triplets))
         breaktime = Value(0, output_field=FloatField())
         if break_triplets:
@@ -342,15 +342,11 @@ class WorkerDayQuerySet(QuerySet):
                      then=F('dttm_work_end')),
                 default=F('plan_dttm_work_end'), output_field=DateTimeField()
             ),
-            tabel_work_hours_0=Cast(
-                Extract(
-                    Coalesce(
-                        F('tabel_dttm_work_end') - F('tabel_dttm_work_start'),
-                        datetime.timedelta(hours=0)
-                    ), 'epoch'
-                ) / 3600,
-                FloatField(),
+            tabel_work_hours_interval=Coalesce(
+                F('tabel_dttm_work_end') - F('tabel_dttm_work_start'),
+                datetime.timedelta(hours=0)
             ),
+            tabel_work_hours_0=Cast(Extract(F('tabel_work_hours_interval'), 'epoch') / 3600, FloatField()),
             tabel_work_hours=Ceil(F('tabel_work_hours_0') - breaktime),
         )
         return qs.filter(**kwargs)

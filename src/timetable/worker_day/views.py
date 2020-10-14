@@ -116,6 +116,8 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
     def list(self, request):
         if request.query_params.get('hours_details', False):
+            is_tabel = request.query_params.get('is_tabel', False)
+
             data = []
             def _time_to_float(t):
                 return t.hour + t.minute / 60 + t.second / 60
@@ -136,27 +138,33 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 if WorkerDay.is_type_with_tm_range(worker_day.type):
-                    wd_dict['work_hours'] = worker_day.work_hours.seconds / 3600
+                    work_seconds = (
+                        worker_day.tabel_work_hours_interval.seconds if is_tabel else worker_day.work_hours.seconds)
+                    work_start = (worker_day.tabel_dttm_work_start if is_tabel else worker_day.dttm_work_start)
+                    work_end = (worker_day.tabel_dttm_work_end if is_tabel else worker_day.dttm_work_end)
+
+                    wd_dict['work_hours'] = work_seconds / 3600
                     wd_dict['work_hours_details'] = {}
                     if worker_day.dt in celebration_dates:
                         wd_dict['work_hours_details']['H'] = wd_dict['work_hours']
                     else:
-                        if worker_day.dttm_work_end.time() <= night_edges[0] and worker_day.dttm_work_start.date() == worker_day.dttm_work_end.date():
+                        # TODO: тут как-то надо учитывать время перерывов?
+                        if worker_day.dttm_work_end.time() <= night_edges[0] and work_start.date() == work_end.date():
                             wd_dict['work_hours_details']['D'] = wd_dict['work_hours']
                             data.append(wd_dict)
                             continue
-                        if worker_day.dttm_work_start.time() >= night_edges[0] and worker_day.dttm_work_end.time() <= night_edges[1]:
+                        if work_start.time() >= night_edges[0] and work_end.time() <= night_edges[1]:
                             wd_dict['work_hours_details']['N'] = wd_dict['work_hours']
                             data.append(wd_dict)
                             continue
                         tm_start = _time_to_float(night_edges[0])
-                        if worker_day.dttm_work_end.time() <= night_edges[1]:
-                            tm_end = _time_to_float(worker_day.dttm_work_end.time())
+                        if work_end.time() <= night_edges[1]:
+                            tm_end = _time_to_float(work_end.time())
                         else:
                             tm_end = _time_to_float(night_edges[1])
                         
                         night_hours = tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)
-                        total = (worker_day.dttm_work_end - worker_day.dttm_work_start).seconds / 3600
+                        total = (work_end - work_start).seconds / 3600
                         break_time = total - wd_dict['work_hours']
                         wd_dict['work_hours_details']['D'] = total - night_hours - break_time / 2
                         wd_dict['work_hours_details']['N'] = night_hours - break_time / 2

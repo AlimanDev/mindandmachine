@@ -434,7 +434,8 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(len(resp_data), 1)
         self.assertEqual(resp_data[0]['type'], 'S')
 
-    def _test_tabel(self, plan_start, plan_end, fact_start, fact_end, expected_start, expected_end, expected_hours):
+    def _test_tabel(self, plan_start, plan_end, fact_start, fact_end, expected_start, expected_end, expected_hours,
+                    extra_get_params=None):
         plan_dttm_work_start = plan_start
         plan_dttm_work_end = plan_end
         WorkerDay.objects.filter(
@@ -458,6 +459,7 @@ class TestWorkerDay(APITestCase):
             'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
             'dt__lte': self.dt.strftime('%Y-%m-%d'),
         }
+        get_params.update(extra_get_params or {})
         response = self.client.get('/rest_api/worker_day/', data=get_params)
         self.assertEqual(response.status_code, 200)
         resp_data = response.json()
@@ -466,6 +468,7 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(resp_data[0]['dttm_work_start'], Converter.convert_datetime(expected_start))
         self.assertEqual(resp_data[0]['dttm_work_end'], Converter.convert_datetime(expected_end))
         self.assertEqual(resp_data[0]['work_hours'], expected_hours)
+        return resp_data
 
     def test_tabel_early_arrival_and_late_departure(self):
         plan_dttm_work_start = datetime.combine(self.dt, time(12, 0, 0))
@@ -547,7 +550,7 @@ class TestWorkerDay(APITestCase):
             expected_hours=10.0,
         )
 
-    def test_can_override_tabel_settings_for_shop(self):
+    def test_can_override_tabel_settings(self):
         Network.objects.filter(id=self.network.id).update(
             allowed_interval_for_late_arrival=timedelta(seconds=0),
             allowed_interval_for_early_departure=timedelta(seconds=0),
@@ -568,6 +571,26 @@ class TestWorkerDay(APITestCase):
             expected_hours=10.0,
         )
 
+    def test_get_hours_details_for_tabel(self):
+        plan_dttm_work_start = datetime.combine(self.dt, time(11, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt, time(22, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(10, 0, 0))
+        fact_dttm_work_end = datetime.combine(self.dt, time(20, 0, 0))
+
+        resp_data = self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=plan_dttm_work_start,
+            expected_end=fact_dttm_work_end,
+            expected_hours=8.0,  # почему не учитывается время перерыва?
+            extra_get_params=dict(
+                hours_details=True,
+            )
+        )
+
+        self.assertIn('work_hours_details', resp_data)
 
     def test_get_worker_day_by_worker__username__in(self):
         get_params = {
