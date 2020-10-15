@@ -507,11 +507,7 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
                 res['status_code'] = 400
                 return res
 
-            cond = tt.dt.month != tt.dttm_status_change.date().month and \
-                (datetime.now().date() - tt.dttm_status_change.date()).days <= 2 \
-                or tt.status != ShopMonthStat.READY
-
-            if cond:
+            if not tt.is_approved:  # todo: добавить задержку на отклик для других магазинов
                 update_condition = False
 
         if update_condition or exchange:
