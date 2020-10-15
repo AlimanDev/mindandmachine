@@ -1,9 +1,10 @@
+import uuid
 from datetime import timedelta, date, datetime, time
 
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from src.base.models import WorkerPosition, Employment, User, Break
+from src.base.models import WorkerPosition, Employment, Break
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
 from src.util.mixins.tests import TestsHelperMixin
 
@@ -101,7 +102,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     def test_put_by_code(self):
         self.shop2.code = str(self.shop2.id)
         self.shop2.save()
-        self.user2.username = str(self.user2)
+        self.user2.username = f'u-{self.user2.id}'
         self.user2.save()
 
         put_data = {
@@ -113,13 +114,15 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'by_code': True,
         }
 
+        empl_code = f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}'
         resp = self.client.put(
-            path=self.get_url('Employment-detail', pk='not_used'),
+            path=self.get_url('Employment-detail', pk=empl_code),
             data=self.dump_data(put_data),
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 201)  # created
         self.assertTrue(Employment.objects.filter(
+            code=empl_code,
             shop_id=self.shop2.id,
             dt_hired=put_data['dt_hired'],
             dt_fired=put_data['dt_fired'],
@@ -129,12 +132,13 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
 
         put_data['dt_fired'] = timezone.now().strftime('%Y-%m-%d')
         resp = self.client.put(
-            path=self.get_url('Employment-detail', pk='not_used'),
+            path=self.get_url('Employment-detail', pk=empl_code),
             data=self.dump_data(put_data),
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 200)  # updated
         self.assertTrue(Employment.objects.filter(
+            code=empl_code,
             shop_id=self.shop2.id,
             dt_hired=put_data['dt_hired'],
             dt_fired=put_data['dt_fired'],
