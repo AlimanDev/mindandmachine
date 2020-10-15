@@ -105,16 +105,17 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.user2.username = f'u-{self.user2.id}'
         self.user2.save()
 
+        empl_code = f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}'
         put_data = {
             'position_code': self.worker_position.code,
             'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
             'dt_fired': (timezone.now() + timedelta(days=300)).strftime('%Y-%m-%d'),
             'shop_code': self.shop2.code,
             'username': self.user2.username,
+            'code': empl_code,
             'by_code': True,
         }
 
-        empl_code = f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}'
         resp = self.client.put(
             path=self.get_url('Employment-detail', pk=empl_code),
             data=self.dump_data(put_data),

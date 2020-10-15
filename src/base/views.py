@@ -67,12 +67,6 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
 
-    def perform_create(self, serializer):
-        if getattr(self.request, 'by_code', False):
-            serializer.save(code=self.kwargs.get('pk'))
-        else:
-            serializer.save()
-
     def get_queryset(self):
         return Employment.objects.filter(
             shop__network_id=self.request.user.network_id
