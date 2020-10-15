@@ -545,7 +545,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             prev_data[key].append(worker_d)
 
         employment_stat_dict = count_prev_paid_days(dt_from - timedelta(days=1), employments, shop.region_id)
-        month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_start=dt_first, is_approved=not form['use_not_approved'])
+        month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_start=dt_from, is_approved=not form['use_not_approved'])
         month_stat_prev = count_prev_paid_days(dt_from, employments, shop.region_id, dt_start=dt_first, is_approved=not form['use_not_approved'])
 
         ##################################################################
@@ -684,7 +684,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         for e in employments:
             fot = work_hours * e.norm_work_hours / 100
-            fot = fot * (init_params['n_working_days_optimal'] - month_stat[e.id]['vacations']) / init_params['n_working_days_optimal']
+            fot = fot * (init_params['n_working_days_optimal'] - (month_stat[e.id]['vacations'] + month_stat_prev[e.id]['vacations'])) / init_params['n_working_days_optimal']
             employment_stat_dict[e.id]['norm_work_amount'] = (fot - month_stat_prev[e.id]['paid_hours']) * (init_params['n_working_days_optimal'] - month_stat_prev[e.id]['no_data']) / init_params['n_working_days_optimal']
 
 
