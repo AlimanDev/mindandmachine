@@ -461,11 +461,16 @@ class Employment(AbstractActiveModel):
     class Meta:
         verbose_name = 'Трудоустройство'
         verbose_name_plural = 'Трудоустройства'
+        unique_together = (
+            ('code', 'network'),
+        )
 
     def __str__(self):
         return '{}, {}, {}'.format(self.id, self.shop, self.user)
 
     id = models.BigAutoField(primary_key=True)
+    code = models.CharField(max_length=128, null=True, blank=True)
+    network = models.ForeignKey('base.Network', on_delete=models.PROTECT, null=True)
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="employments")
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name="employments")
     function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)

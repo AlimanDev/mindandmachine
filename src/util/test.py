@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from contextlib import contextmanager
 from typing import TypeVar
 
@@ -7,8 +8,8 @@ from django.db import connection
 from django.test import TestCase
 from django.utils.timezone import now
 from requests import Response
-from etc.scripts import fill_calendar
 
+from etc.scripts import fill_calendar
 from src.base.models import (
     Employment,
     FunctionGroup,
@@ -19,6 +20,11 @@ from src.base.models import (
     User,
     Network,
     Break,
+)
+from src.forecast.models import (
+    OperationType,
+    PeriodClients,
+    OperationTypeName,
 )
 from src.timetable.models import (
     AttendanceRecords,
@@ -31,11 +37,6 @@ from src.timetable.models import (
     WorkTypeName,
     WorkerDay,
     UserWeekdaySlot
-)
-from src.forecast.models import (
-    OperationType,
-    PeriodClients,
-    OperationTypeName,
 )
 
 
@@ -523,6 +524,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment1 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user1.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user1,
         shop=self.root_shop,
         function_group=self.admin_group,
@@ -536,6 +539,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment2 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user2,
         shop=self.shop,
         function_group=self.employee_group,
@@ -551,6 +556,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment3 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user3.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user3,
         shop=self.shop,
         auto_timetable=False,
@@ -568,6 +575,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment4 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user4.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user4,
         shop=self.shop,
         function_group=self.admin_group,
@@ -582,6 +591,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment5 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user5.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user5,
         shop=self.reg_shop1,
         function_group=self.chief_group,
@@ -596,6 +607,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment6 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user6.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user6,
         shop=self.shop,
         function_group=self.chief_group,
@@ -610,6 +623,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment7 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user7.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user7,
         shop=self.shop,
         function_group=self.employee_group,
