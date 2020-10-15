@@ -162,7 +162,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
                   'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
                   'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
                   'dt_new_week_availability_from', 'user', 'is_visible',  'worker_constraints', 'work_types',
-                  'shop_code', 'position_code', 'username', 'code'
+                  'shop_code', 'position_code', 'username'
         ]
         create_only_fields = ['user_id', 'shop_id', 'shop', 'tabel_code', 'user']
         read_only_fields = ['user']

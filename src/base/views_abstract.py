@@ -4,14 +4,12 @@ from django.http.response import Http404
 
 
 class BaseActiveNamedModelViewSet(ModelViewSet):
-    """
+    '''
     Класс переопределяющий get_object() для возможности
     получения сущности по коду либо иному полю, указанному
     в свойстве get_object_field
-    """
-
+    '''
     get_object_field = 'code'
-
     def get_object(self):
         if self.request.method == 'GET':
             by_code = self.request.query_params.get('by_code', False)
@@ -20,7 +18,6 @@ class BaseActiveNamedModelViewSet(ModelViewSet):
         if by_code:
             self.lookup_field = self.get_object_field
             self.kwargs[self.get_object_field] = self.kwargs['pk']
-        self.request.by_code = by_code
         return super().get_object()
 
 
