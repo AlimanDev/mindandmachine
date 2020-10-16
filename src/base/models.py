@@ -1,13 +1,14 @@
 import datetime
 import json
+
 from django.apps import apps
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.utils.functional import cached_property
-from django.db.models import Case, When, Sum, Value, IntegerField, Q
+from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef
+from django.db.models.query import QuerySet
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
 from timezone_field import TimeZoneField
@@ -35,6 +36,7 @@ class Network(AbstractActiveModel):
         verbose_name='Допустимый интервал для опоздания', default=datetime.timedelta(seconds=0))
     allowed_interval_for_early_departure = models.DurationField(
         verbose_name='Допустимый интервал для раннего ухода', default=datetime.timedelta(seconds=0))
+    okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name='Код по ОКПО')
 
     def get_department(self):
         return None
@@ -435,6 +437,16 @@ class User(DjangoAbstractUser, AbstractModel):
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     black_list_symbol = models.CharField(max_length=128, null=True, blank=True)
 
+    def get_short_fio(self):
+        """
+        :return: Фамилия с инициалами
+        """
+        short_fio = f'{self.last_name} {self.first_name[0].upper()}.'
+        if self.middle_name:
+            short_fio += f'{self.middle_name[0].upper()}.'
+
+        return short_fio
+
 
 class WorkerPosition(AbstractActiveNamedModel):
     """
@@ -459,6 +471,14 @@ class WorkerPosition(AbstractActiveNamedModel):
 
     def get_department(self):
         return None
+
+
+class EmploymentQuerySet(QuerySet):
+    def last_hired(self):
+        last_hired_subq = self.filter(user_id=OuterRef('user_id')).order_by('-dt_hired').values('id')[:1]
+        return self.filter(
+            id=Subquery(last_hired_subq)
+        )
 
 
 class Employment(AbstractActiveModel):
@@ -499,7 +519,7 @@ class Employment(AbstractActiveModel):
 
     position_tracker = FieldTracker(fields=['position'])
 
-    objects = EmploymentManager()
+    objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
 
     def has_permission(self, permission, method='GET'):
         group = self.function_group or (self.position.group if self.position else None)

@@ -303,6 +303,20 @@ REBUILD_TIMETABLE_MIN_DELTA = 2
 # например, для Ортеки для отображения в отчете нужны показатели только по продавцам-кассирам
 UPDATE_SHOP_STATS_WORK_TYPES_CODES = None
 
+# docker volume create jod_converter_conf
+# docker run \
+# 	--memory 512m \
+# 	--name jod-converter \
+# 	-v jod_converter_conf:/etc/app \
+# 	--rm \
+# 	-p 8030:8080 \
+#   -d \
+# 	eugenmayer/kontextwork-converter:production
+JOD_CONVERTER_URL = 'http://localhost:8030'
+
+# docker run --rm -p 3000:3000 thecodingmachine/gotenberg:6
+GOTENBERG_URL = 'http://localhost:3000'
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
 

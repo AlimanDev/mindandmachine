@@ -7,7 +7,7 @@ from django.contrib.auth.models import (
 )
 from django.db import models
 from django.db.models import Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField
-from django.db.models.functions import Extract, Coalesce, Cast, Ceil
+from django.db.models.functions import Extract, Coalesce, Cast, Ceil, Abs
 from django.db.models.query import QuerySet
 from django.utils import timezone
 
@@ -347,7 +347,7 @@ class WorkerDayQuerySet(QuerySet):
                 datetime.timedelta(hours=0)
             ),
             tabel_work_hours_0=Cast(Extract(F('tabel_work_hours_interval'), 'epoch') / 3600, FloatField()),
-            tabel_work_hours=Ceil(F('tabel_work_hours_0') - breaktime),
+            tabel_work_hours=Abs(Ceil(F('tabel_work_hours_0') - breaktime)),
         )
         return qs.filter(**kwargs)
 
