@@ -8,7 +8,7 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 
 from src.base.filters import BaseActiveNamedModelFilter
-from src.base.models import Employment, Shop
+from src.base.models import Employment, Shop, Region
 from src.base.permissions import Permission
 from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
 from src.base.views_abstract import UpdateorCreateViewSet
@@ -53,6 +53,9 @@ class ShopViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
+
+    def perform_create(self, serializer):
+        serializer.save(region=Region.objects.first())  # TODO: переделать на получение региона по коду в api???
 
     def get_queryset(self):
         """
