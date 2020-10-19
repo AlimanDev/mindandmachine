@@ -799,6 +799,7 @@ class ShopMonthStat(AbstractModel):
     workers_amount = models.IntegerField(default=0, blank=True, null=True)
     revenue = models.IntegerField(default=0, blank=True, null=True)
     fot_revenue = models.IntegerField(default=0, blank=True, null=True)
+    predict_needs = models.IntegerField(default=0, blank=True, null=True, verbose_name='Количество часов по нагрузке')
 
     task_id = models.CharField(max_length=256, null=True, blank=True)
 

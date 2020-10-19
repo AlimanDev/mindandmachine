@@ -202,6 +202,7 @@ def get_efficiency(shop_id, form, consider_vacancies=False,):
                 'deadtime': deadtime,
                 'covering': covering,
                 'fot': fot,
+                'predict_needs': predict_needs.sum(),
             },
         })
 
