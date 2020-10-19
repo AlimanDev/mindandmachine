@@ -122,14 +122,16 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 201)  # created
-        self.assertTrue(Employment.objects.filter(
+        e = Employment.objects.filter(
             code=empl_code,
             shop_id=self.shop2.id,
             dt_hired=put_data['dt_hired'],
             dt_fired=put_data['dt_fired'],
             user_id=self.user2.id,
-            position_id=self.worker_position.id,
-        ).count() == 1)
+            position_id=self.worker_position.id
+        ).first()
+        self.assertIsNotNone(e)
+        self.assertEqual(e.network, self.user2.network)
 
         put_data['dt_fired'] = timezone.now().strftime('%Y-%m-%d')
         resp = self.client.put(
@@ -138,14 +140,16 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 200)  # updated
-        self.assertTrue(Employment.objects.filter(
+        e = Employment.objects.filter(
             code=empl_code,
             shop_id=self.shop2.id,
             dt_hired=put_data['dt_hired'],
             dt_fired=put_data['dt_fired'],
             user_id=self.user2.id,
             position_id=self.worker_position.id,
-        ).count() == 1)
+        ).first()
+        self.assertIsNotNone(e)
+        self.assertEqual(e.network, self.user2.network)
 
     def test_auto_timetable(self):
         employment_ids = list(Employment.objects.filter(shop=self.shop).values_list('id', flat=True))
