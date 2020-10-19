@@ -1,4 +1,12 @@
-from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter, DateFilter, TimeFilter, CharFilter
+from django_filters.rest_framework import (
+    FilterSet,
+    BooleanFilter,
+    NumberFilter,
+    DateFilter,
+    TimeFilter,
+    CharFilter,
+    OrderingFilter,
+)
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 from django.db.models import Q
 
@@ -47,6 +55,7 @@ class VacancyFilter(FilterSet):
     shift_length_max = TimeFilter(field_name='work_hours', lookup_expr='lte')
     shop_id = CharFilter(field_name='shop_id', method='filter_include_outsource')
     work_type_name = CharFilter(field_name='work_types', method='filter_by_name')
+    ordering = OrderingFilter(fields=('dt', 'id', 'dttm_work_start', 'dttm_work_end'))
 
     def filter_include_outsource(self, queryset, name, value):
         if value:
@@ -67,9 +76,9 @@ class VacancyFilter(FilterSet):
     class Meta:
         model = WorkerDay
         fields = {
-            'work_types__id':['exact', 'in'],
-            'is_approved': ['exact',],
-            'is_outsource': ['exact',],
+            'work_types__id': ['exact', 'in'],
+            'is_approved': ['exact', ],
+            'is_outsource': ['exact', ],
         }
 
 
