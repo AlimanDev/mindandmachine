@@ -7,6 +7,8 @@ from openpyxl import load_workbook
 
 from src.base.models import Shop, Network
 
+
+# !!! не все магазины грузятся с верным расписанием (где то 10-15 косячно) !!!
 LOAD_SHOP_SCHEDULE_PATTERN = re.compile(
     r'(?P<when>пн-вс|будни|выходные|пн-пт|сб-вс|вс-чт|пт-сб|сб|вс):?(?P<open>\d{1,2}[:.]\d{2})-(?P<close>\d{1,2}[:.]\d{2})')
 
