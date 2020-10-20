@@ -32,9 +32,9 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
 
         form = filterset.form.cleaned_data
 
-        dt = form.get('dt') #| request.data.get('dt')
-        dt_from = form.get('dt_from')# | request.data.get('dt_from')
-        dt_to = form.get('dt_to') #| request.data.get('dt_to')
+        dt = form.get('dt')  # | request.data.get('dt')
+        dt_from = form.get('dt__gte')  # | request.data.get('dt_from')
+        dt_to = form.get('dt__lte')  # | request.data.get('dt_to')
         worker_id__in=form.get('worker_id__in')
         worker__username__in=form.get('worker__username__in')
 

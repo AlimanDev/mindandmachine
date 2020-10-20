@@ -12,6 +12,7 @@ from src.base.models import (
     Event,
     ShopSettings,
     Network,
+    Break,
 )
 from src.timetable.models import (
     WorkType,
@@ -30,94 +31,94 @@ from src.forecast.models import (
 )
 from etc.scripts import fill_calendar
 from src.timetable.vacancy.utils import (
-    create_vacancies_and_notify, 
-    cancel_vacancies, 
-    workers_exchange, 
+    create_vacancies_and_notify,
+    cancel_vacancies,
+    workers_exchange,
     holiday_workers_exchange,
     worker_shift_elongation,
     confirm_vacancy,
 )
 
 
-class Test_auto_worker_exchange(TestCase):
-    dt_now = now().date()
-
-    def setUp(self):
-        super().setUp()
-
-        self.region = Region.objects.create(
+class TestAutoWorkerExchange(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.dt_now = now().date()
+        cls.region = Region.objects.create(
             name='Москва',
             code=77,
         )
 
-        fill_calendar.main('2018.1.1', (datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y.%m.%d'), region_id=1)
-        self.shop_settings = ShopSettings.objects.create()
+        fill_calendar.main('2018.1.1', (datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y.%m.%d'),
+                           region_id=1)
 
-        self.network = Network.objects.create(
+        cls.network = Network.objects.create(
             primary_color='#BDF82',
             secondary_color='#390AC',
         )
-        Shop.objects.all().update(network=self.network)
+        cls.breaks = Break.objects.create(network=cls.network, name='Default')
+        cls.shop_settings = ShopSettings.objects.create(breaks=cls.breaks)
+        Shop.objects.all().update(network=cls.network)
         
-        self.root_shop = Shop.objects.create(
+        cls.root_shop = Shop.objects.create(
             name='SuperShop1',
-            settings=self.shop_settings,
-            network=self.network,
+            settings=cls.shop_settings,
+            network=cls.network,
             tm_open_dict='{"all":"07:00:00"}',
             tm_close_dict='{"all":"23:00:00"}',
-            region=self.region,
+            region=cls.region,
         )
 
-        self.shop = Shop.objects.create(
-            parent=self.root_shop,
+        cls.shop = Shop.objects.create(
+            parent=cls.root_shop,
             name='Shop1',
-            region=self.region,
-            settings=self.shop_settings,
-            network=self.network,
+            region=cls.region,
+            settings=cls.shop_settings,
+            network=cls.network,
             tm_open_dict='{"all":"07:00:00"}',
             tm_close_dict='{"all":"23:00:00"}',
         )
 
-        self.shop2 = Shop.objects.create(
-            parent=self.root_shop,
+        cls.shop2 = Shop.objects.create(
+            parent=cls.root_shop,
             name='Shop2',
-            region=self.region,
-            settings=self.shop_settings,
-            network=self.network,
+            region=cls.region,
+            settings=cls.shop_settings,
+            network=cls.network,
             tm_open_dict='{"all":"07:00:00"}',
             tm_close_dict='{"all":"23:00:00"}',
         )
-        
-        self.shop.exchange_shops.add(self.shop)
-        self.shop.exchange_shops.add(self.shop2)
 
-        self.shop3 = Shop.objects.create(
-            parent=self.root_shop,
+        cls.shop.exchange_shops.add(cls.shop)
+        cls.shop.exchange_shops.add(cls.shop2)
+
+        cls.shop3 = Shop.objects.create(
+            parent=cls.root_shop,
             name='Shop3',
-            region=self.region,
-            settings=self.shop_settings,
-            network=self.network,
+            region=cls.region,
+            settings=cls.shop_settings,
+            network=cls.network,
             tm_open_dict='{"all":"07:00:00"}',
             tm_close_dict='{"all":"23:00:00"}',
         )
 
-        self.shop.exchange_shops.add(self.shop3)
+        cls.shop.exchange_shops.add(cls.shop3)
 
-        self.shop4 = Shop.objects.create(
-            parent=self.root_shop,
+        cls.shop4 = Shop.objects.create(
+            parent=cls.root_shop,
             name='Shop4',
-            region=self.region,
-            settings=self.shop_settings,
-            network=self.network,
+            region=cls.region,
+            settings=cls.shop_settings,
+            network=cls.network,
             tm_open_dict='{"all":"07:00:00"}',
             tm_close_dict='{"all":"23:00:00"}',
         )
 
-        shops = [self.shop, self.shop2, self.shop3, self.shop4]
+        shops = [cls.shop, cls.shop2, cls.shop3, cls.shop4]
         for shop in shops:
-            self.shop2.exchange_shops.add(shop)
+            cls.shop2.exchange_shops.add(shop)
         dt = datetime.date.today()
-        self.timetables = ShopMonthStat.objects.bulk_create(
+        cls.timetables = ShopMonthStat.objects.bulk_create(
             [
                 ShopMonthStat(
                     shop=shop,
@@ -128,41 +129,40 @@ class Test_auto_worker_exchange(TestCase):
             ]
         )
 
-        self.work_type_name = WorkTypeName.objects.create(
+        cls.work_type_name = WorkTypeName.objects.create(
             name='Кассы',
             code='',
+            network=cls.network,
         )
 
-        self.work_type1 = WorkType.objects.create(
-            shop=self.shop,
-            work_type_name=self.work_type_name,
+        cls.work_type1 = WorkType.objects.create(
+            shop=cls.shop,
+            work_type_name=cls.work_type_name,
         )
 
-        self.work_type2 = WorkType.objects.create(
-            shop=self.shop2,
-            work_type_name=self.work_type_name,
+        cls.work_type2 = WorkType.objects.create(
+            shop=cls.shop2,
+            work_type_name=cls.work_type_name,
         )
 
-
-        self.operation_type_name = OperationTypeName.objects.create(
+        cls.operation_type_name = OperationTypeName.objects.create(
             name='',
             code='',
+            network=cls.network,
+            do_forecast=OperationTypeName.FORECAST,
         )
 
-        self.operation_type = OperationType.objects.create(
-            operation_type_name=self.operation_type_name,
-            work_type=self.work_type1,
-            do_forecast=OperationType.FORECAST
+        cls.operation_type = OperationType.objects.create(
+            operation_type_name=cls.operation_type_name,
+            work_type=cls.work_type1,
         )
 
-        self.operation_type2 = OperationType.objects.create(
-            operation_type_name=self.operation_type_name,
-            work_type=self.work_type2,
-            do_forecast=OperationType.FORECAST
+        cls.operation_type2 = OperationType.objects.create(
+            operation_type_name=cls.operation_type_name,
+            work_type=cls.work_type2,
         )
 
-
-        self.exchange_settings = ExchangeSettings.objects.create(
+        cls.exchange_settings = ExchangeSettings.objects.create(
             automatic_check_lack_timegap=datetime.timedelta(days=1),
             automatic_check_lack=True,
             automatic_exchange=True,
@@ -170,7 +170,7 @@ class Test_auto_worker_exchange(TestCase):
             automatic_delete_vacancy_lack_max=0.5,
             automatic_worker_select_overflow_min=0.6,
             automatic_worker_select_timegap=datetime.timedelta(hours=4),
-            network = self.network,
+            network=cls.network,
         )
 
     def create_vacancy(self, tm_from, tm_to, work_type):
@@ -206,14 +206,14 @@ class Test_auto_worker_exchange(TestCase):
 
     def create_users(self, quantity):
         for number in range(1, quantity + 1):
-            user=User.objects.create_user(
+            user = User.objects.create_user(
                 username='User{}'.format(number),
                 email='test{}@test.ru'.format(number),
                 last_name='Имя{}'.format(number),
                 first_name='Фамилия{}'.format(number)
             )
             emp = Employment.objects.create(
-                shop = self.shop2,
+                shop=self.shop2,
                 user=user,
                 dt_hired=self.dt_now - datetime.timedelta(days=1),
             )
@@ -221,7 +221,6 @@ class Test_auto_worker_exchange(TestCase):
                 employment=emp,
                 work_type=self.work_type2,
             )
-
 
     def create_worker_day(self):
         for employment in Employment.objects.all():
@@ -277,7 +276,7 @@ class Test_auto_worker_exchange(TestCase):
         self.create_vacancy(9, 20, self.work_type1)
         self.create_vacancy(9, 20, self.work_type1)
 
-        self.create_period_clients(30, self.operation_type)
+        self.create_period_clients(1, self.operation_type)
 
         vacancies = WorkerDay.objects.filter(is_vacancy=True)
         self.assertEqual(vacancies.count(), 2)
@@ -288,7 +287,7 @@ class Test_auto_worker_exchange(TestCase):
 
     # Нужны 3 вакансии -> у нас 0 -> создаём 3
     def test_create_vacancies_and_notify(self):
-        self.create_period_clients(90, self.operation_type)
+        self.create_period_clients(3, self.operation_type)
 
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 0)
@@ -307,7 +306,7 @@ class Test_auto_worker_exchange(TestCase):
         self.create_vacancy(9, 20, self.work_type1)
         self.create_vacancy(9, 20, self.work_type1)
 
-        self.create_period_clients(90, self.operation_type)
+        self.create_period_clients(3, self.operation_type)
 
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 2)
@@ -324,22 +323,22 @@ class Test_auto_worker_exchange(TestCase):
     def test_create_vacancies_and_notify3(self):
         self.create_vacancy(12, 17, self.work_type1)
 
-        self.create_period_clients(30, self.operation_type)
+        self.create_period_clients(1, self.operation_type)
 
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 1)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         vacancies = WorkerDay.objects.filter(is_vacancy=True).order_by('dttm_work_start')
         self.assertEqual(
-            [vacancies[0].dttm_work_start.time(), vacancies[0].dttm_work_end.time()], 
+            [vacancies[0].dttm_work_start.time(), vacancies[0].dttm_work_end.time()],
             [datetime.time(9, 0), datetime.time(13, 0)]
         )
         self.assertEqual(
-            [vacancies[1].dttm_work_start.time(), vacancies[1].dttm_work_end.time()], 
+            [vacancies[1].dttm_work_start.time(), vacancies[1].dttm_work_end.time()],
             [datetime.time(12, 0), datetime.time(17, 0)]
         )
         self.assertEqual(
-            [vacancies[2].dttm_work_start.time(), vacancies[2].dttm_work_end.time()], 
+            [vacancies[2].dttm_work_start.time(), vacancies[2].dttm_work_end.time()],
             [datetime.time(17, 0), datetime.time(21, 0)]
         )
 
@@ -348,22 +347,22 @@ class Test_auto_worker_exchange(TestCase):
         self.create_vacancy(9, 14, self.work_type1)
         self.create_vacancy(16, 21, self.work_type1)
 
-        self.create_period_clients(30, self.operation_type)
+        self.create_period_clients(1, self.operation_type)
 
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 2)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         vacancies = WorkerDay.objects.filter(is_vacancy=True).order_by('dttm_work_start')
         self.assertEqual(
-            [vacancies[0].dttm_work_start.time(), vacancies[0].dttm_work_end.time()], 
+            [vacancies[0].dttm_work_start.time(), vacancies[0].dttm_work_end.time()],
             [datetime.time(9, 0), datetime.time(14, 0)]
         )
         self.assertEqual(
-            [vacancies[1].dttm_work_start.time(), vacancies[1].dttm_work_end.time()], 
+            [vacancies[1].dttm_work_start.time(), vacancies[1].dttm_work_end.time()],
             [datetime.time(14, 0), datetime.time(18, 0)]
         )
         self.assertEqual(
-            [vacancies[2].dttm_work_start.time(), vacancies[2].dttm_work_end.time()], 
+            [vacancies[2].dttm_work_start.time(), vacancies[2].dttm_work_end.time()],
             [datetime.time(16, 0), datetime.time(21, 0)]
         )
 
@@ -372,7 +371,7 @@ class Test_auto_worker_exchange(TestCase):
         self.create_vacancy(9, 15, self.work_type1)
         self.create_vacancy(16, 21, self.work_type1)
 
-        self.create_period_clients(30, self.operation_type)
+        self.create_period_clients(1, self.operation_type)
 
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 2)
@@ -387,8 +386,8 @@ class Test_auto_worker_exchange(TestCase):
             self.dt_now = self.dt_now + datetime.timedelta(days=1)
         self.create_worker_day()
 
-        self.create_period_clients(30, self.operation_type)
-        self.create_period_clients(90, self.operation_type2)
+        self.create_period_clients(1, self.operation_type)
+        self.create_period_clients(3, self.operation_type2)
 
         vacancy = self.create_vacancy(9, 21, self.work_type1)
         Event.objects.create(
@@ -407,16 +406,15 @@ class Test_auto_worker_exchange(TestCase):
         self.assertEqual(len(worker_days), 5)
         self.assertIsNotNone(worker_days.filter(is_vacancy=True).first().worker_id)
 
-
     # Предикшн в 4 человека -> 4 человека в работе -> никого не перекидывает.
     def test_workers_hard_exchange2(self):
         self.create_users(4)
         self.create_worker_day()
 
         self.create_period_clients(0, self.operation_type)
-        self.create_period_clients(120, self.operation_type2)
+        self.create_period_clients(4, self.operation_type2)
 
-        vacancy=self.create_vacancy(9, 21, self.work_type1)
+        vacancy = self.create_vacancy(9, 21, self.work_type1)
         Event.objects.create(
             type='vacancy',
             shop=self.shop,
@@ -431,7 +429,6 @@ class Test_auto_worker_exchange(TestCase):
         worker_days = WorkerDay.objects.all()
         self.assertEqual(len(worker_days), 5)
         self.assertIsNone(worker_days.filter(is_vacancy=True).first().worker_id)
-
 
     def test_workers_hard_exchange_holidays_3days(self):
         self.create_users(1)
@@ -448,7 +445,6 @@ class Test_auto_worker_exchange(TestCase):
         holiday_workers_exchange()
 
         self.assertIsNotNone(WorkerDay.objects.filter(employment=employment, is_vacancy=True).first())
-
 
     def test_workers_hard_exchange_holidays_2days_first(self):
         self.create_users(2)
@@ -474,7 +470,6 @@ class Test_auto_worker_exchange(TestCase):
         holiday_workers_exchange()
         vacancy = WorkerDay.objects.get(is_vacancy=True)
         self.assertEqual(vacancy.employment, employment2)
-
 
     def test_workers_hard_exchange_holidays_2days_last(self):
         self.create_users(3)
@@ -510,7 +505,6 @@ class Test_auto_worker_exchange(TestCase):
         vacancy = WorkerDay.objects.get(is_vacancy=True)
         self.assertEqual(vacancy.employment, employment2)
 
-
     def test_workers_hard_exchange_holidays_1day(self):
         self.create_users(3)
         self.dt_now = self.dt_now + datetime.timedelta(days=8)
@@ -542,7 +536,6 @@ class Test_auto_worker_exchange(TestCase):
         vacancy = WorkerDay.objects.get(is_vacancy=True)
         self.assertEqual(vacancy.employment, employment2)
 
-
     def test_worker_exchange_cant_apply_vacancy(self):
         self.create_users(1)
         user = User.objects.first()
@@ -556,7 +549,6 @@ class Test_auto_worker_exchange(TestCase):
         )
         result = confirm_vacancy(vacancy.id, user)
         self.assertEqual(result, {'status_code': 400, 'code': 'cant_apply_vacancy'})
-
 
     def test_worker_exchange_change_vacancy_to_own_shop_vacancy(self):
         self.create_users(1)
@@ -574,11 +566,10 @@ class Test_auto_worker_exchange(TestCase):
         result = confirm_vacancy(vacancy.id, user)
         self.assertEqual(result, {'status_code': 200, 'code': 'vacancy_success'})
 
-
     def test_shift_elongation(self):
         self.create_users(1)
         user = User.objects.first()
-        vacancy = self.create_vacancy(9, 21, self.work_type2)
+        self.create_vacancy(9, 21, self.work_type2)
         self.create_worker_days(Employment.objects.get(user=user), self.dt_now, 1, 10, 18)
         worker_shift_elongation()
         wd = WorkerDay.objects.get(worker=user, is_approved=False)

@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.db.models import Q
 
-from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop, Group
+from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop, Group, Break
 from src.base.message import Message
 from src.base.fields import CurrentUserNetwork, UserworkShop
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
@@ -51,11 +51,16 @@ class UserListSerializer(serializers.Serializer):
 class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
+    avatar = serializers.SerializerMethodField('get_avatar_url')
 
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
                   'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            return obj.avatar.url
+        return None
 
 
 class AuthUserSerializer(UserSerializer):
@@ -100,6 +105,11 @@ class FunctionGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = FunctionGroup
         fields = ['id', 'group_id', 'func', 'method']
+
+
+class AutoTimetableSerializer(serializers.Serializer):
+    auto_timetable = serializers.BooleanField()
+    employment_ids = serializers.ListField(child=serializers.IntegerField())
 
 
 class EmploymentListSerializer(serializers.Serializer):
@@ -161,9 +171,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
         if self.instance:
             # Нельзя обновить пользователя по коду
             attrs['user_id'] = self.instance.user_id
-            # shop_id = self.instance.user_id
         else:
-
             if not attrs.get('user_id'):
                 user = attrs.pop('user')
                 users = list(User.objects.filter(username=user['username'], network_id=self.context['request'].user.network_id))
@@ -171,17 +179,6 @@ class EmploymentSerializer(serializers.ModelSerializer):
                     attrs['user_id'] = users[0].id
                 else:
                     self.fail('no_user', amount=len(users), username=user['username'])
-            #
-            # if not attrs.get('shop_id'):
-            #     shop = attrs.pop('shop')
-            #     shops = list(Shop.objects.filter(code=shop['code'], network_id=self.context['request'].user.network_id))
-            #     if len(shops) == 1:
-            #         attrs['shop_id'] = shops[0].id
-            #     else:
-            #         self.fail('no_shop', amount=len(shops), code=shop['code'])
-            #
-            # user_id = attrs['user_id']
-            # shop_id = attrs['shop_id']
 
         if (attrs.get('shop_id') is None) and ('code' in attrs.get('position', {})):
             position = attrs.pop('position', None)
@@ -199,18 +196,6 @@ class EmploymentSerializer(serializers.ModelSerializer):
             else:
                 self.fail('no_shop', amount=len(shops), code=shop['code'])
 
-        # employments = Employment.objects.filter(
-        #     Q(dt_fired__isnull=True) | Q(dt_fired__gte=attrs.get('dt_hired')),
-        #     user_id=user_id,
-        #     shop_id=shop_id,
-        # )
-        # if attrs.get('dt_fired'):
-        #     employments=employments.filter(dt_hired__lte=attrs['dt_fired'])
-        # if self.instance:
-        #     employments = employments.exclude(id=self.instance.id)
-        # if employments:
-        #     e = employments.first()
-        #     self.fail('emp_check_dates',dt_hired=e.dt_hired,dt_fired=e.dt_fired)
         return attrs
 
     def __init__(self, *args, **kwargs):
@@ -240,11 +225,27 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
         return data
 
+    def update(self, instance, validated_data, *args, **kwargs):
+        if instance.is_visible != validated_data.get('is_visible', True):
+            Employment.objects.filter(
+                shop_id=instance.shop_id, 
+                user_id=instance.user_id
+            ).update(is_visible=validated_data.get('is_visible', True))
+        return super().update(instance, validated_data, *args, **kwargs)
+
 
 class WorkerPositionSerializer(BaseNetworkSerializer):
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name', 'network_id', 'code', 'default_work_type_names']
+        fields = ['id', 'name', 'network_id', 'code', 'breaks_id']
+
+    def __init__(self, *args, **kwargs):
+        super(WorkerPositionSerializer, self).__init__(*args, **kwargs)
+        self.fields['code'].validators.append(
+            UniqueValidator(
+                WorkerPosition.objects.filter(network=self.context.get('request').user.network)
+            )
+        )
 
 
 class EventSerializer(serializers.ModelSerializer):
@@ -295,6 +296,7 @@ class ShopSettingsSerializer(serializers.ModelSerializer):
                   'queue_length',
                   'max_work_hours_7days',
                   'network_id',
+                  'breaks_id',
                   ]
 
 
@@ -311,3 +313,14 @@ class GroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
         fields = ['id', 'name', 'code', 'network_id']
+
+
+class BreakSerializer(BaseNetworkSerializer):
+    class Meta:
+        model = Break
+        fields = ['id', 'name', 'network_id', 'value']
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['value'] = instance.breaks
+        return data

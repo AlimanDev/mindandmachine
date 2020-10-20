@@ -2,7 +2,6 @@ import json
 
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup
 from src.forecast.tests.factories import ReceiptFactory
 from src.util.mixins.tests import TestsHelperMixin
 
@@ -89,13 +88,6 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 201)
 
     def test_update_receipt(self):
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='Receipt',
-            level_up=1,
-            level_down=99,
-        )
 
         receipt = ReceiptFactory(
             shop=self.shop,
@@ -107,3 +99,28 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
             data=self.dump_data({'data': self._get_data(), 'data_type': 'Чек'}), content_type='application/json',
         )
         self.assertEqual(resp.status_code, 200)
+
+    def test_update_receipt_when_shop_with_spaces(self):
+
+        receipt = ReceiptFactory(
+            shop=self.shop,
+            info=self.dump_data({}),
+            data_type='Чек',
+        )
+        data = self._get_data()
+        data['КодМагазина'] = data['КодМагазина'] + '   '
+        resp = self.client.put(
+            path=self.get_url('Receipt-detail', pk=receipt.pk),
+            data=self.dump_data({'data': data, 'data_type': 'Чек'}), content_type='application/json',
+        )
+        self.print_resp(resp)
+        self.assertEqual(resp.status_code, 200)
+
+    def test_create_receipt_when_shop_with_spaces(self):
+        data = self._get_data()
+        data['КодМагазина'] = data['КодМагазина'] + '   '
+        resp = self.client.post(
+            path=self.get_url('Receipt-list'),
+            data=self.dump_data({'data': [data], 'data_type': 'Чек'}), content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 201)

@@ -31,11 +31,19 @@ class WorkTypeSerializer(serializers.ModelSerializer):
             self.initial_data['work_type_name_id'] = WorkTypeName.objects.get(code=self.initial_data.get('code')).id
         super().is_valid(*args, **kwargs)
 
+
 class EfficiencySerializer(serializers.Serializer):
     from_dt = serializers.DateField(format=QOS_DATE_FORMAT)
     to_dt = serializers.DateField(format=QOS_DATE_FORMAT)
-    work_type_ids = serializers.ListField(allow_empty=True, child=serializers.IntegerField(), required=False, default=[])
+    work_type_ids = serializers.ListField(
+        allow_empty=True, child=serializers.IntegerField(), required=False, default=[])
     shop_id = serializers.IntegerField()
+    graph_type = serializers.ChoiceField(
+        default='plan_approved', label='Тип графика',
+        choices=['plan_edit', 'plan_approved'],
+    )
+    efficiency = serializers.BooleanField(default=True)
+    indicators = serializers.BooleanField(default=False)
 
     def is_valid(self, *args, **kwargs):
         super(EfficiencySerializer, self).is_valid(*args, **kwargs)

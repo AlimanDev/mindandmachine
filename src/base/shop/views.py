@@ -2,7 +2,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 
 from django.db.models import Q, Sum
-from django_filters.rest_framework import FilterSet
+from django_filters.rest_framework import NumberFilter
 
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -13,14 +13,14 @@ from src.base.permissions import Permission
 
 from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
 from src.base.views import BaseActiveNamedModelViewSet
+from src.base.filters import BaseActiveNamedModelFilter
 
 
-class ShopFilter(FilterSet):
+class ShopFilter(BaseActiveNamedModelFilter):
+    id = NumberFilter(field_name='id', lookup_expr='exact')
     class Meta:
         model = Shop
         fields = {
-            'id':['exact', 'in'],
-            'code': ['exact', 'in'],
             'load_template_id': ['exact',],
             'load_template_status': ['exact'],
         }
@@ -70,11 +70,8 @@ class ShopViewSet(BaseActiveNamedModelViewSet):
         #     user=user).values('shop_id')
         # shops = Shop.objects.filter(id__in=employments.values('shop_id'))
         # if not only_top:
-        #     return Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
-        #         network_id=user.network_id,
-        #     )
-        # else:
-        #     return shops
+        #     shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
+
         return Shop.objects.filter(network_id=user.network_id).order_by('level', 'name')
 
     @action(detail=False, methods=['get'], serializer_class=ShopStatSerializer)#, permission_classes=[IsAdminOrIsSelf])
@@ -116,9 +113,20 @@ class ShopViewSet(BaseActiveNamedModelViewSet):
         :param request:
         :return:
         """
+        user = self.request.user
+        only_top = self.request.query_params.get('only_top')
+
+        # aa: fixme: refactor code
+        employments = Employment.objects.get_active(
+            network_id=user.network_id,
+            user=user).values('shop_id')
 
         shops = self.filter_queryset(self.get_queryset())
         level = 0
+        shops = shops.filter(id__in=employments.values('shop_id'))
+        if not only_top:
+            shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
+
         tree = []
         parent_indexes = {}
         for shop in shops:

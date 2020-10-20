@@ -35,15 +35,6 @@ class TestAutoSettings(APITestCase):
             work_type_name=self.work_type_name2,
             shop=self.shop)
 
-        FunctionGroup.objects.bulk_create([
-            FunctionGroup(group=self.admin_group,
-                method=method,
-                func=func,
-                level_up=1,
-                level_down=99,
-            )  for method in ['POST'] for func in ['AutoSettings_set_timetable']
-            ])
-
         self.client.force_authenticate(user=self.user1)
 
 

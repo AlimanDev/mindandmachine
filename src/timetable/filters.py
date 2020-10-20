@@ -4,25 +4,13 @@ from django.db.models import Q
 
 
 class WorkerDayFilter(FilterSet):
-    dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода")
-    dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода')
+    dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода")  # aa: fixme: delete
+    dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода') # aa: fixme: delete
     is_tabel = BooleanFilter(field_name='worker_day_is_tabel', method='filter_tabel', label="Выгрузка табеля")
 
     def filter_tabel(self, queryset, name, value):
         if value:
-            query = queryset.filter(
-                Q(is_fact=True, is_approved=True) |
-                Q(Q(is_approved=True) & ~Q(type__in=WorkerDay.TYPES_PAID))
-            )
-            worker_days = list(query.order_by('worker_id', 'dt', '-is_fact'))
-            exists = []
-            remove = []
-            for worker_day in worker_days:
-                if (worker_day.worker_id, worker_day.dt) in exists:
-                    remove.append(worker_day.id)
-                else:
-                    exists.append((worker_day.worker_id, worker_day.dt))
-            return query.exclude(id__in=remove)
+            return queryset.get_tabel()
 
         return queryset
 
@@ -35,6 +23,7 @@ class WorkerDayFilter(FilterSet):
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
             'is_fact': ['exact'],
+            'type': ['exact'],
         }
 
 
@@ -56,7 +45,7 @@ class VacancyFilter(FilterSet):
     is_vacant = BooleanFilter(field_name='worker', lookup_expr='isnull')
     shift_length_min = TimeFilter(field_name='work_hours', lookup_expr='gte')
     shift_length_max = TimeFilter(field_name='work_hours', lookup_expr='lte')
-    shop = CharFilter(field_name='shop_id', method='filter_include_outsource')
+    shop_id = CharFilter(field_name='shop_id', method='filter_include_outsource')
     work_type_name = CharFilter(field_name='work_types', method='filter_by_name')
 
     def filter_include_outsource(self, queryset, name, value):
@@ -96,9 +85,9 @@ class EmploymentWorkTypeFilter(FilterSet):
 
 class WorkerConstraintFilter(FilterSet):
     employment_id = NumberFilter(field_name='employment_id')
+
     class Meta:
         model = WorkerConstraint
         fields = {
             'employment_id': ['exact'],
         }
-

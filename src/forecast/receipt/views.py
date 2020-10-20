@@ -48,6 +48,10 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         settings_values = json.loads(self.request.user.network.settings_values)
         receive_data_info = self._get_receive_data_info(data_type, settings_values)
 
+        for receipt in data:
+            receipt[receive_data_info['shop_code_field_name']] = \
+                receipt[receive_data_info['shop_code_field_name']].strip()
+
         receipt_codes = [receipt[receive_data_info['receipt_code_field_name']] for receipt in data]
         if Receipt.objects.filter(code__in=receipt_codes).exists():
             raise MessageError(code='multi_object_unique')
@@ -83,6 +87,7 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         settings_values = json.loads(self.request.user.network.settings_values)
         receive_data_info = self._get_receive_data_info(data_type, settings_values)
 
+        data[receive_data_info['shop_code_field_name']] = data[receive_data_info['shop_code_field_name']].strip()
         shop = Shop.objects.filter(code=data[receive_data_info['shop_code_field_name']]).first()
         if shop is None:
             raise MessageError(code='no_such_shop', params={'key': data[receive_data_info['shop_code_field_name']]})

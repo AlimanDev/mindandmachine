@@ -96,12 +96,16 @@ def upload_timetable_util(form, timetable_file):
             'first_name': names[1] if len(names) > 1 else '',
             'last_name': names[0],
             'middle_name': names[2] if len(names) > 2 else None,
+            'network_id': form.get('network_id'),
         }
         user = None
         if UPLOAD_TT_MATCH_EMPLOYMENT:
             employment = Employment.objects.filter(tabel_code=tabel_code, shop=shop)
             if number_cond and employment.exists():
                 user = employment.first().user
+                if user.last_name != names[0]:
+                    error_users.append(f"У сотрудника на строке {index} с табельным номером {tabel_code} в системе фамилия {user.last_name}, а в файле {names[0]}.") #Change error
+                    continue
                 user.first_name = names[1] if len(names) > 1 else ''
                 user.last_name = names[0]
                 user.middle_name = names[2] if len(names) > 2 else None
@@ -139,7 +143,7 @@ def upload_timetable_util(form, timetable_file):
                         user.update(tabel_code=tabel_code,)
                     user = user.first()
                 else:
-                    user_data['username'] = str(time.time() * 1000000)[:-2],
+                    user_data['username'] = str(time.time() * 1000000)[:-2]
                     if number_cond:
                         user_data['tabel_code'] = tabel_code
                     user = User.objects.create(**user_data)
@@ -234,28 +238,20 @@ def upload_timetable_util(form, timetable_file):
             except:
                 raise MessageError(code='xlsx_undefined_cell', lang=form.get('lang', 'ru'), params={'user': user, 'dt': dt, 'value': str(data[i + 3])})
 
-            wd_query_set = list(WorkerDay.objects.filter(dt=dt, worker=user).order_by('-id'))
-            WorkerDayCashboxDetails.objects.filter(
-                worker_day__in=wd_query_set,
-            ).delete()
-            for wd in wd_query_set:  # потому что могут быть родители у wd
-                wd.delete()
-            new_wd, created = WorkerDay.objects.filter(Q(shop_id=shop_id)|Q(shop__isnull=True)).update_or_create(
+            WorkerDay.objects.filter(dt=dt, worker=user, is_fact=False, is_approved=False).delete()
+          
+            new_wd = WorkerDay.objects.create(
                 worker=user,
                 shop_id=shop_id,
                 dt=dt,
                 is_fact=False,
                 is_approved=False,
-                defaults={
-                    'employment':employment,
-                    'dttm_work_start':dttm_work_start,
-                    'dttm_work_end':dttm_work_end,
-                    'type':type_of_work,
-                }
+                employment=employment,
+                dttm_work_start=dttm_work_start,
+                dttm_work_end=dttm_work_end,
+                type=type_of_work,
             )
             if type_of_work == WorkerDay.TYPE_WORKDAY:
-                if not created:
-                    WorkerDayCashboxDetails.filter(worker_day=new_wd).delete()
                 WorkerDayCashboxDetails.objects.create(
                     worker_day=new_wd,
                     work_type=work_type,
@@ -281,20 +277,27 @@ def download_timetable_util(request, workbook, form):
         dt_from=timetable.prod_days[0].dt,
         dt_to=timetable.prod_days[-1].dt,
         shop=shop,
-    ).order_by('position_id', 'user__last_name', 'user__first_name', 'user__middle_name', 'tabel_code', 'id')
+    ).order_by('user__last_name', 'user__first_name', 'user__middle_name', 'user_id')
+    users = employments.values_list('user_id', flat=True)
 
-    breaktimes = json.loads(shop.settings.break_triplets)
-    breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
+    default_breaks = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), shop.settings.breaks.breaks))
+    breaktimes = {
+        w.id: list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), w.breaks.breaks)) if w.breaks else default_breaks
+        for w in WorkerPosition.objects.filter(network_id=shop.network_id)
+    }
+    breaktimes['default'] = default_breaks
+    # breaktimes = shop.settings.breaks.breaks
+    # breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
     workdays = WorkerDay.objects.select_related('worker', 'shop').filter(
-        Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True),
-        Q(dt__gte=F('employment__dt_hired')) & Q(dt__gte=timetable.prod_days[0].dt),
-        employment__in=employments,
+        Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
+        (Q(dt__gte=F('employment__dt_hired')) | Q(employment__isnull=True)) & Q(dt__gte=timetable.prod_days[0].dt),
+        worker__in=users,
         dt__lte=timetable.prod_days[-1].dt,
         is_approved=form['is_approved'],
         is_fact=False,
     ).order_by(
-        'employment__position_id', 'worker__last_name', 'worker__first_name', 'worker__middle_name', 'employment__tabel_code', 'employment__id', 'dt')
+        'worker__last_name', 'worker__first_name', 'worker__middle_name', 'worker_id', 'dt')
 
     if form.get('inspection_version', False):
         timetable.change_for_inspection(timetable.prod_month.get('norm_work_hours', 0), workdays)
@@ -372,8 +375,14 @@ def download_tabel_util(request, workbook, form):
             working_hours[wd['worker_id']] = {}
         working_hours[wd['worker_id']][wd['dt']] = wd['hours_fact']
 
-    breaktimes = json.loads(shop.settings.break_triplets)
-    breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
+    default_breaks = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), shop.settings.breaks.breaks))
+    breaktimes = {
+        w.id: list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), w.breaks.breaks)) if w.breaks else default_breaks
+        for w in WorkerPosition.objects.filter(network_id=shop.network_id)
+    }
+    breaktimes['default'] = default_breaks
+    # breaktimes = json.loads(shop.settings.break_triplets)
+    # breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
     if form.get('inspection_version', False):
         tabel.change_for_inspection(tabel.prod_month.get('norm_work_hours', 0), workdays)

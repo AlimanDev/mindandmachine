@@ -46,11 +46,9 @@ class LoadTemplate(AbstractModel):
         verbose_name = 'Шаблон нагрузки'
         verbose_name_plural = 'Шаблоны нагрузки'
 
-
     name = models.CharField(max_length=64, unique=True)
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     forecast_params = models.TextField(default='{}')
-
 
     def __str__(self):
         return f'id: {self.id}, name: {self.name}'
@@ -292,15 +290,16 @@ class PeriodClients(AbstractModel):
         (SHORT_FORECAST_TYPE, 'Short'),
         (FACT_TYPE, 'Fact'),
     )
+
     class Meta(object):
         verbose_name = 'Значение операций'
+        index_together = [('dttm_forecast', 'operation_type')]
     
-
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
     id = models.BigAutoField(primary_key=True)
-    dttm_forecast = models.DateTimeField(db_index=True)
+    dttm_forecast = models.DateTimeField()
     type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
     operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT)
     value = models.FloatField(default=0)
@@ -344,7 +343,6 @@ class Receipt(AbstractModel):
     code = models.UUIDField()
     dttm = models.DateTimeField(verbose_name='Дата и время события')
     dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_modified = models.DateTimeField(auto_now=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True)
     info = models.TextField()
     data_type = models.CharField(max_length=128, verbose_name='Тип данных', null=True, blank=True)

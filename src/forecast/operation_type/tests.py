@@ -8,7 +8,6 @@ from src.util.test import create_departments_and_users
 
 from src.forecast.models import OperationTypeName, OperationType
 from src.timetable.models import WorkTypeName, WorkType
-from src.base.models import FunctionGroup
 
 
 class TestOperationType(APITestCase):
@@ -24,6 +23,7 @@ class TestOperationType(APITestCase):
         create_departments_and_users(self)
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
+            network=self.network,
         )
         self.work_type1 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
         self.work_type2 = WorkType.objects.create(shop=self.shop2, work_type_name=self.work_type_name1)
@@ -31,13 +31,17 @@ class TestOperationType(APITestCase):
 
         self.operation_type_name1 = OperationTypeName.objects.create(
             name='продажа',
+            do_forecast=OperationTypeName.FORECAST,
+            network=self.network,
         )
         self.operation_type_name2 = OperationTypeName.objects.create(
             name='продажа2',
+            network=self.network,
         )
         self.operation_type_name3 = OperationTypeName.objects.create(
             name='продажа3',
             code='3',
+            network=self.network,
         )
 
         self.operation_type = OperationType.objects.create(
@@ -51,27 +55,6 @@ class TestOperationType(APITestCase):
             shop=self.work_type2.shop,
         )
         
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='OperationType',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='OperationType',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='DELETE',
-            func='OperationType',
-            level_up=1,
-            level_down=99,
-        )
 
         self.client.force_authenticate(user=self.user1)
 
@@ -89,10 +72,11 @@ class TestOperationType(APITestCase):
                 'id': self.operation_type_name1.id,
                 'name': self.operation_type_name1.name,
                 'code': self.operation_type_name1.code,
+                'do_forecast': OperationTypeName.FORECAST, 
+                'work_type_name_id': self.operation_type_name1.work_type_name_id,
             },
             'shop_id': self.operation_type.shop_id,
             'work_type_id': self.work_type1.id, 
-            'do_forecast': OperationType.FORECAST, 
         }
         data['id'] = response.json()['id']
         self.assertEqual(response.json(), data)
@@ -101,7 +85,6 @@ class TestOperationType(APITestCase):
         data = {
             'code': self.operation_type_name3.code,
             'work_type_id': self.work_type3.id, 
-            'do_forecast': OperationType.FORECAST,
             'shop_id': self.shop3.id,
         }
         response = self.client.post(self.url, data, format='json')
@@ -112,6 +95,8 @@ class TestOperationType(APITestCase):
             'id': self.operation_type_name3.id,
             'code': self.operation_type_name3.code,
             'name': self.operation_type_name3.name,
+            'do_forecast': self.operation_type_name3.do_forecast,
+            'work_type_name_id': self.operation_type_name3.work_type_name_id,
         }
         data.pop('code')
         self.assertEqual(operation_type, data)
@@ -120,7 +105,6 @@ class TestOperationType(APITestCase):
         data = {
             'operation_type_name_id': self.operation_type_name3.id,
             'work_type_id': self.work_type3.id, 
-            'do_forecast': OperationType.FORECAST,
             'shop_id': self.shop3.id, 
         }
         response = self.client.post(self.url, data, format='json')
@@ -131,6 +115,8 @@ class TestOperationType(APITestCase):
             'id': self.operation_type_name3.id,
             'code': self.operation_type_name3.code,
             'name': self.operation_type_name3.name,
+            'do_forecast': self.operation_type_name3.do_forecast,
+            'work_type_name_id': self.operation_type_name3.work_type_name_id,
         }
         data.pop('operation_type_name_id')
         self.assertEqual(operation_type, data)
@@ -144,12 +130,13 @@ class TestOperationType(APITestCase):
         data = {
             'id': self.operation_type.id, 
             'work_type_id': self.work_type1.id, 
-            'do_forecast': OperationType.FORECAST,
             'shop_id': self.operation_type.shop_id,
             'operation_type_name': {
                 'id': self.operation_type_name3.id,
                 'name': self.operation_type_name3.name,
                 'code': self.operation_type_name3.code,
+                'do_forecast': self.operation_type_name3.do_forecast,
+                'work_type_name_id': self.operation_type_name3.work_type_name_id,
             },
         }
         self.assertEqual(operation_type, data)
@@ -163,12 +150,13 @@ class TestOperationType(APITestCase):
         data = {
             'id': self.operation_type.id, 
             'work_type_id': self.work_type1.id, 
-            'do_forecast': OperationType.FORECAST,
             'shop_id': self.operation_type.shop_id,
             'operation_type_name': {
                 'id': self.operation_type_name3.id,
                 'name': self.operation_type_name3.name,
                 'code': self.operation_type_name3.code,
+                'do_forecast': self.operation_type_name3.do_forecast,
+                'work_type_name_id': self.operation_type_name3.work_type_name_id,
             },
         }
         self.assertEqual(operation_type, data)

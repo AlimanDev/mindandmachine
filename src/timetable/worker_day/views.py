@@ -181,53 +181,27 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             shop_id=serializer.data['shop_id'],
         ).values_list('user_id', flat=True)
 
-        wdays_to_approve = WorkerDay.objects.filter(
-            Q(shop_id=serializer.data['shop_id']) | Q(shop__isnull=True, worker_id__in=user_ids),
+        approve_condition = Q(shop_id=serializer.data['shop_id']) | Q(shop__isnull=True, worker_id__in=user_ids)
+        approve_condition &= Q(
             dt__lte=serializer.data['dt_to'],
             dt__gte=serializer.data['dt_from'],
+        )
+
+        WorkerDay.objects.get_approved4change(is_fact=serializer.data['is_fact']).filter(approve_condition).delete()
+        WorkerDay.objects.filter(
+            approve_condition,
             is_fact=serializer.data['is_fact'],
             is_approved=False,
-        ).select_related('parent_worker_day')
+        ).update(is_approved=True)
 
-        # Факт
-        if serializer.data['is_fact']:
-            parent_ids = list(WorkerDay.objects.filter(
-                child__in=wdays_to_approve,
-                is_fact=serializer.data['is_fact'],
-                is_approved=True
-            ).values_list('id', flat=True))
-
-            parent_approved_worker_days_subq = WorkerDay.objects.filter(
-                child=OuterRef('pk'),
-                is_fact=serializer.data['is_fact'],
-                is_approved=True
-            ).values('parent_worker_day_id')
-
-            wdays_to_approve.update(
-                is_approved=True,
-                parent_worker_day_id=Subquery(parent_approved_worker_days_subq),
-            )
-            WorkerDay.objects.filter(id__in=parent_ids).delete()
-        # План
-        else:
-            parent_ids = list(WorkerDay.objects.filter(
-                child__in=wdays_to_approve
-            ).values_list('id', flat=True))
-
-            WorkerDay.objects.filter(
-                parent_worker_day_id__in=wdays_to_approve.values('parent_worker_day_id'),
-                is_fact=True
+        # если план, то отмечаем, что график подтвержден
+        if not serializer.data['is_fact']:
+            ShopMonthStat.objects.filter(
+                shop_id=serializer.data['shop_id'],
+                dt=serializer.validated_data['dt_from'].replace(day=1),
             ).update(
-                parent_worker_day_id=Subquery(
-                    wdays_to_approve.filter(parent_worker_day_id=OuterRef('parent_worker_day_id')).values('id'))
-            )
-
-            wdays_to_approve.update(
                 is_approved=True,
-                parent_worker_day=None
             )
-            WorkerDay.objects.filter(id__in=parent_ids).delete()
-
         return Response()
 
     @action(detail=False, methods=['get'], )
@@ -269,9 +243,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         data = paginator.paginate_queryset(queryset, request)
         data = VacancySerializer(data, many=True)
 
-
         return paginator.get_paginated_response(data.data)
-
 
     @action(detail=True, methods=['post'])
     def confirm_vacancy(self, request, pk=None):
@@ -282,13 +254,12 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         status_code = result['status_code']
         result = message.get_message(result['code'])
 
-        return Response({'result':result}, status=status_code)
+        return Response({'result': result}, status=status_code)
 
-    
     @action(detail=True, methods=['post'])
     def approve_vacancy(self, request, pk=None):
         vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True, is_approved=False).first()
-        if vacancy == None:
+        if vacancy is None:
             raise MessageError(code='no_vacancy_or_approved', lang=request.user.lang)
         vacancy.is_approved = True
         parent = vacancy.parent_worker_day
@@ -298,18 +269,17 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             parent.delete()
         return Response(WorkerDaySerializer(vacancy).data)
 
-
     @action(detail=True, methods=['get'])
     def editable_vacancy(self, request, pk=None):
         vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True).first()
-        if vacancy == None:
+        if vacancy is None:
             raise MessageError(code='no_vacancy', lang=request.user.lang)
         if not vacancy.is_approved:
             return Response(WorkerDaySerializer(vacancy).data)
         if vacancy.worker_id:
             raise MessageError(code='cant_edit_vacancy', lang=request.user.lang)
         editable_vacancy = WorkerDay.objects.filter(parent_worker_day=vacancy).first()
-        if editable_vacancy == None:
+        if editable_vacancy is None:
             editable_vacancy = WorkerDay.objects.create(
                 shop_id=vacancy.shop_id,
                 dt=vacancy.dt,
@@ -332,7 +302,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 for d in WorkerDayCashboxDetails.objects.filter(worker_day=vacancy)
             ])
         return Response(WorkerDaySerializer(editable_vacancy).data)
-
 
     @action(detail=False, methods=['post'])
     def change_list(self, request):
@@ -431,24 +400,20 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response(response, status=200)
 
-
     @action(detail=False, methods=['post'])
     def duplicate(self, request):
         data = DuplicateSrializer(data=request.data, context={'request': request})
         data.is_valid(raise_exception=True)
         data = data.validated_data
-        from_worker_id = data['from_worker_id']
         to_worker_id = data['to_worker_id']
 
         main_worker_days = list(WorkerDay.objects.filter(
-            worker_id=from_worker_id,
-            dt__in=data['dates'],
-            is_approved=data['is_approved'],
+            id__in=data['from_workerday_ids'],
             is_fact=False,
         ))
-        main_worker_days_details_set = WorkerDayCashboxDetails.objects.filter(
+        main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
             worker_day__in=main_worker_days,
-        )
+        ).select_related('work_type'))
 
         main_worker_days_details = {}
         for detail in main_worker_days_details_set:
@@ -459,30 +424,27 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         trainee_worker_days = WorkerDay.objects.filter(
             worker_id=to_worker_id,
-            dt__in=data['dates'],
+            dt__in=data['to_dates'],
             is_approved=False,
             is_fact=False,
         )
-        list_trainee_worker_days = list(trainee_worker_days)
-        parent_wds = {
-            x.dt: x.parent_worker_day_id
-            for x in list_trainee_worker_days
-        }
         trainee_worker_days.delete()
 
         created_wds = []
         wdcds_list_to_create = []
-        for blank_day in main_worker_days:
+        length_main_wds = len(main_worker_days)
+        for i, dt in enumerate(data['to_dates']):
+            i = i % length_main_wds
+            blank_day = main_worker_days[i]
             new_wd = WorkerDay.objects.create(
                 worker_id=to_worker_id,
-                dt=blank_day.dt,
+                dt=dt,
                 shop_id=blank_day.shop_id,
                 work_hours=blank_day.work_hours,
                 type=blank_day.type,
                 dttm_work_start=blank_day.dttm_work_start,
                 dttm_work_end=blank_day.dttm_work_end,
                 is_approved=False,
-                parent_worker_day_id=parent_wds.get(blank_day.dt, None),
                 is_fact=False,
             )
             created_wds.append(new_wd)
@@ -491,7 +453,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 wdcds_list_to_create.append(
                     WorkerDayCashboxDetails(
                         worker_day=new_wd,
-                        work_type=new_wdcd.work_type,
+                        work_type_id=new_wdcd.work_type_id,
                         work_part=new_wdcd.work_part,
                     )
                 )
@@ -499,14 +461,13 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
 
         work_types = [
-            wdcds.work_type
-            for wdcds in main_worker_days_details_set.select_related('work_type')
+            (wdcds.work_type.shop_id, wdcds.work_type_id)
+            for wdcds in main_worker_days_details_set
         ]
 
-        for work_type in work_types:
-            cancel_vacancies(work_type.shop_id, work_type.id)
+        for shop_id, work_type in set(work_types):
+            cancel_vacancies(shop_id, work_type)
         return Response(WorkerDaySerializer(created_wds, many=True).data)
-
 
     @action(detail=False, methods=['post'])
     def delete_timetable(self, request):
@@ -597,7 +558,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 cancel_vacancy(worker_day.id)
         return Response()
 
-
     @action(detail=False, methods=['post'])
     def exchange(self, request):
         new_wds = []
@@ -663,22 +623,20 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response(WorkerDaySerializer(new_wds, many=True).data)
 
-
     @action(detail=False, methods=['post'])
     @get_uploaded_file
     def upload(self, request, file):
         data = UploadTimetableSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         data.validated_data['lang'] = request.user.lang
+        data.validated_data['network_id'] = request.user.network_id
         return upload_timetable_util(data.validated_data, file)
 
-    
     @action(detail=False, methods=['get'])
     def download_timetable(self, request):
         data = DownloadSerializer(data=request.query_params)
         data.is_valid(raise_exception=True)
         return download_timetable_util(request, data.validated_data)
-
 
     @action(detail=False, methods=['get'])
     def download_tabel(self, request):

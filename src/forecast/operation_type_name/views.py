@@ -4,7 +4,8 @@ from src.forecast.models import OperationTypeName
 from src.base.serializers import BaseNetworkSerializer
 from src.base.exceptions import MessageError
 from src.base.views import BaseActiveNamedModelViewSet
-from django_filters.rest_framework import FilterSet, BooleanFilter
+from django_filters.rest_framework import BooleanFilter
+from src.base.filters import BaseActiveNamedModelFilter
 
 
 class OperationTypeNameSerializer(BaseNetworkSerializer):
@@ -31,7 +32,7 @@ class OperationTypeNameSerializer(BaseNetworkSerializer):
         return True
 
 
-class OperationTypeNameFilter(FilterSet):
+class OperationTypeNameFilter(BaseActiveNamedModelFilter):
 
     no_work_type = BooleanFilter(field_name='work_type_name_id', lookup_expr='isnull')
 

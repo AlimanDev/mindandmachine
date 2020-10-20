@@ -14,7 +14,6 @@ from src.forecast.models import (
     PeriodClients,
 )
 from src.timetable.models import WorkTypeName, WorkType
-from src.base.models import FunctionGroup
 
 
 class TestLoadTemplate(APITestCase):
@@ -31,36 +30,34 @@ class TestLoadTemplate(APITestCase):
         self.user1.is_superuser = True
         self.user1.is_staff = True
         self.user1.save()
+        self.work_type_name1 = WorkTypeName.objects.create(
+            name='Кассы',
+            network=self.network,
+        )
         self.operation_type_name1 = OperationTypeName.objects.create(
             name='Кассы',
+            do_forecast=OperationTypeName.FORECAST_FORMULA,
+            work_type_name=self.work_type_name1,
+            network=self.network,
         )
         self.operation_type_name2 = OperationTypeName.objects.create(
             name='Строительные работы',
-        )
-        self.work_type_name1 = WorkTypeName.objects.create(
-            name='Кассы',
+            do_forecast=OperationTypeName.FORECAST,
+            network=self.network,
         )
 
         self.load_template = LoadTemplate.objects.create(
             name='Test1',
+            network=self.network,
         )
         
         self.operation_type_template1 = OperationTypeTemplate.objects.create(
             load_template=self.load_template,
             operation_type_name=self.operation_type_name1,
-            work_type_name=self.work_type_name1,
-            do_forecast=OperationType.FORECAST_FORMULA,
         )
         self.operation_type_template2 = OperationTypeTemplate.objects.create(
             load_template=self.load_template,
             operation_type_name=self.operation_type_name2,
-            do_forecast=OperationType.FORECAST_NONE,
-        )
-        FunctionGroup.objects.bulk_create(
-            [
-                FunctionGroup(func='LoadTemplate', group=self.admin_group, method=m)
-                for m in ['POST', 'PUT', 'DELETE']
-            ]
         )
 
         self.client.force_authenticate(user=self.user1)
@@ -68,6 +65,7 @@ class TestLoadTemplate(APITestCase):
     def test_get_list(self):
         LoadTemplate.objects.create(
             name='Test2',
+            network=self.network,
         )
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -84,12 +82,12 @@ class TestLoadTemplate(APITestCase):
                 {
                     'id': self.operation_type_template1.id, 
                     'load_template_id': self.load_template.id, 
-                    'work_type_name_id': self.work_type_name1.id, 
-                    'do_forecast': 'F', 
                     'operation_type_name': {
                         'id': self.operation_type_name1.id, 
                         'name': 'Кассы', 
-                        'code': None
+                        'code': None,
+                        'do_forecast': self.operation_type_name1.do_forecast,
+                        'work_type_name_id': self.work_type_name1.id, 
                     },
                     'tm_from': None, 
                     'tm_to': None, 
@@ -98,12 +96,12 @@ class TestLoadTemplate(APITestCase):
                 {
                     'id': self.operation_type_template2.id, 
                     'load_template_id': self.load_template.id, 
-                    'work_type_name_id': None, 
-                    'do_forecast': 'N', 
                     'operation_type_name': {
                         'id': self.operation_type_name2.id, 
                         'name': 'Строительные работы', 
-                        'code': None
+                        'code': None,
+                        'work_type_name_id': None, 
+                        'do_forecast': self.operation_type_name2.do_forecast, 
                     },
                     'tm_from': None, 
                     'tm_to': None, 
@@ -136,12 +134,12 @@ class TestLoadTemplate(APITestCase):
             {
                 'id': self.operation_type_template1.id, 
                 'load_template_id': self.load_template.id, 
-                'work_type_name_id': self.work_type_name1.id, 
-                'do_forecast': 'F', 
                 'operation_type_name': {
                     'id': self.operation_type_name1.id, 
                     'name': 'Кассы', 
-                    'code': None
+                    'code': None,
+                    'do_forecast': self.operation_type_name1.do_forecast,
+                    'work_type_name_id': self.work_type_name1.id, 
                 },
                 'tm_from': None, 
                 'tm_to': None, 
@@ -150,12 +148,12 @@ class TestLoadTemplate(APITestCase):
             {
                 'id': self.operation_type_template2.id, 
                 'load_template_id': self.load_template.id, 
-                'work_type_name_id': None, 
-                'do_forecast': 'N', 
                 'operation_type_name': {
                     'id': self.operation_type_name2.id, 
                     'name': 'Строительные работы', 
-                    'code': None
+                    'code': None,
+                    'work_type_name_id': None, 
+                    'do_forecast': self.operation_type_name2.do_forecast, 
                 },
                 'tm_from': None, 
                 'tm_to': None, 
@@ -165,33 +163,18 @@ class TestLoadTemplate(APITestCase):
         self.assertEqual(load_template, data)
 
     def test_apply_template(self):
-        FunctionGroup.objects.create(
-            func='LoadTemplate_apply', 
-            group=self.admin_group, 
-            method='POST'
-        )
         data = {
             'id': self.load_template.id,
             'shop_id': self.shop.id,
-            'dt_from': datetime.now().date(),
         }
         response = self.client.post(f'{self.url}apply/', data, format='json')
         self.assertEqual(response.status_code, 200)
 
         self.assertEqual(OperationType.objects.filter(shop=self.shop).count(), 2)
         self.assertEqual(WorkType.objects.filter(shop=self.shop).count(), 1)
+
     @skip('Функционал будет перенесён на алгоритмы')
     def test_calculate(self):
-        FunctionGroup.objects.create(
-            func='LoadTemplate_apply', 
-            group=self.admin_group, 
-            method='POST'
-        )
-        FunctionGroup.objects.create(
-            func='LoadTemplate_calculate', 
-            group=self.admin_group, 
-            method='POST'
-        )
         self.shop.forecast_step_minutes = time(1)
         self.shop.save()
         OperationTypeRelation.objects.create(

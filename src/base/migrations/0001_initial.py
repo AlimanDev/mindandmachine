@@ -30,11 +30,6 @@ def create_shop_tree(apps, schema_editor):
 def create_region(apps, schema_editor):
     Region = apps.get_model('base', 'Region')
     r = Region.objects.create(name='Регион', code=77)
-    main(
-        (datetime.date.today() - datetime.timedelta(days=365)).strftime('%Y.%m.%d'),
-        (datetime.date.today() + datetime.timedelta(days=365)).strftime('%Y.%m.%d'),
-        r.id,
-    )
 
 
 class Migration(migrations.Migration):

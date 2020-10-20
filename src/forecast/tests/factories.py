@@ -3,7 +3,7 @@ import random
 
 import factory
 
-from src.forecast.models import Receipt
+from src.forecast.models import Receipt, LoadTemplate
 
 
 class ReceiptFactory(factory.django.DjangoModelFactory):
@@ -13,3 +13,10 @@ class ReceiptFactory(factory.django.DjangoModelFactory):
 
     class Meta:
         model = Receipt
+
+
+class LoadTemplateFactory(factory.django.DjangoModelFactory):
+    name = factory.Faker('text', max_nb_chars=50)
+
+    class Meta:
+        model = LoadTemplate

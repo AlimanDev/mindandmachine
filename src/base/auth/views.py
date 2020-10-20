@@ -10,6 +10,7 @@ from django.db.models import Q
 from hashlib import md5
 
 from src.base.exceptions import FieldError
+from src.base.auth.authentication import CsrfExemptSessionAuthentication
 from django.conf import settings
 from src.base.models import (
     User,
@@ -40,6 +41,7 @@ class WFMTokenLoginView(GenericAPIView):
     }
 
     serializer_class = WFMTokenUserSerializer
+    authentication_classes = (CsrfExemptSessionAuthentication, )
 
     def construct_response(self, instance, version='1.0'):
         now_day = timezone.now().date()

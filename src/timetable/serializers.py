@@ -1,14 +1,12 @@
 from django.utils.translation import gettext_lazy as _
-
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from src.conf.djconfig import QOS_DATE_FORMAT
-from src.util.models_converter import Converter
-
 from src.base.models import Employment, User, Shop
 from src.base.shop.serializers import ShopSerializer
+from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, EmploymentWorkType, WorkerConstraint
+from src.util.models_converter import Converter
 
 
 class WorkerDayApproveSerializer(serializers.Serializer):
@@ -20,6 +18,7 @@ class WorkerDayApproveSerializer(serializers.Serializer):
 
 class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
     work_type_id = serializers.IntegerField(required=False)
+
     class Meta:
         model = WorkerDayCashboxDetails
         fields = ['id', 'work_type_id', 'work_part']
@@ -71,35 +70,39 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     shop_code = serializers.CharField(required=False)
     user_login = serializers.CharField(required=False, read_only=True)
     username = serializers.CharField(required=False, write_only=True)
+    created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:
         model = WorkerDay
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
-                  'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours','parent_worker_day_id',
-                  'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username']
-        read_only_fields =['work_hours', 'parent_worker_day_id']
+                  'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
+                  'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by']
+        read_only_fields = ['work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
 
     def validate(self, attrs):
         if self.instance and self.instance.is_approved:
             raise ValidationError({"error": "Нельзя менять подтвержденную версию."})
 
-        is_fact = attrs.get('is_fact')
-        if is_fact:
-            attrs['type'] = WorkerDay.TYPE_WORKDAY
-
+        is_fact = attrs['is_fact'] if 'is_fact' in attrs else getattr(self.instance, 'is_fact', None)
         type = attrs['type']
+
+        if is_fact and type not in (WorkerDay.TYPE_WORKDAY, WorkerDay.TYPE_EMPTY):
+            raise ValidationError({
+                "error": "Для фактической неподтвержденной версии можно установить только 'Рабочий день' и 'НД'."
+            })
 
         if not WorkerDay.is_type_with_tm_range(type):
             attrs['dttm_work_start'] = None
             attrs['dttm_work_end'] = None
         elif not (attrs.get('dttm_work_start') and attrs.get('dttm_work_end')):
-            messages={}
+            messages = {}
             for k in 'dttm_work_start', 'dttm_work_end':
                 if not attrs.get(k):
                     messages[k] = self.error_messages['required']
             raise ValidationError(messages)
-        elif attrs['dttm_work_start'] > attrs['dttm_work_end'] or attrs['dt'] != attrs['dttm_work_start'].date() or attrs['dt'] != attrs['dttm_work_start'].date():
+        elif attrs['dttm_work_start'] > attrs['dttm_work_end'] or attrs['dt'] != attrs['dttm_work_start'].date() or \
+                attrs['dt'] != attrs['dttm_work_start'].date():
             self.fail('check_dates')
 
         if (attrs.get('shop_id') is None) and ('shop_code' in attrs):
@@ -165,7 +168,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 validated_data['parent_worker_day'] = wd['plan']['approved'] or wd['plan']['not_approved']
                 delete_model = wd['fact']['approved']
             else:
-                validated_data['parent_worker_day'] = wd['fact']['approved'] or wd['plan']['approved'] or wd['plan']['not_approved']
+                validated_data['parent_worker_day'] = wd['fact']['approved'] or wd['plan']['approved'] or wd['plan'][
+                    'not_approved']
                 delete_model = wd['fact']['not_approved']
         else:
             # план
@@ -217,7 +221,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
         if parent_worker_day_id:
             worker_days = worker_days.exclude(id=parent_worker_day_id)
-        
+
         if validated_data.get('is_vacancy') and validated_data.get('worker_id') == None:
             worker_days = None
 
@@ -262,9 +266,25 @@ class EmploymentWorkTypeSerializer(serializers.ModelSerializer):
         fields = ['id', 'work_type_id', 'employment_id', 'period', 'bills_amount', 'priority', 'duration']
 
 
-class WorkerConstraintListSerializer(serializers.ListSerializer):
+class WorkerConstraintSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False)
+
+    class Meta:
+        model = WorkerConstraint
+        fields = ['id', 'employment_id', 'weekday', 'is_lite', 'tm']
+        extra_kwargs = {
+            'employment_id': {
+                'read_only': True,
+            }
+        }
+
+
+class WrappedWorkerConstraintSerializer(serializers.Serializer):
+    data = WorkerConstraintSerializer(many=True, )
+
     def create(self, validated_data):
-        employment_id = validated_data[0].get('employment_id')
+        validated_data = validated_data.get('data')
+        employment_id = self.context.get('view').kwargs.get('employment_pk')
         employment = Employment.objects.get(id=employment_id)
         to_create = []
         ids = []
@@ -274,15 +294,17 @@ class WorkerConstraintListSerializer(serializers.ListSerializer):
         )
         constraint_mapping = {constraint.id: constraint for constraint in constraints}
 
+        wc_serializer = WorkerConstraintSerializer()
         for item in validated_data:
             if item.get('id'):
                 if not constraint_mapping.get(item['id']):
                     raise ValidationError({"error": f"object with id {item['id']} does not exist"})
-                self.child.update(constraint_mapping[item['id']], item)
+                wc_serializer.update(constraint_mapping[item['id']], item)
                 ids.append(item['id'])
             else:
                 constraint = WorkerConstraint(
                     **item,
+                    employment_id=employment_id,
                     worker_id=employment.user_id,
                     shop_id=employment.shop_id,
                 )
@@ -295,17 +317,7 @@ class WorkerConstraintListSerializer(serializers.ListSerializer):
         ).delete()
 
         WorkerConstraint.objects.bulk_create(to_create)
-        return WorkerConstraint.objects.filter(employment_id=employment_id)
-
-
-class WorkerConstraintSerializer(serializers.ModelSerializer):
-    id = serializers.IntegerField(required=False)
-    employment_id = serializers.IntegerField(required=True)
-
-    class Meta:
-        model = WorkerConstraint
-        fields = ['id', 'employment_id', 'weekday', 'is_lite', 'tm']
-        list_serializer_class = WorkerConstraintListSerializer
+        return {'data': WorkerConstraint.objects.filter(employment_id=employment_id)}
 
 
 class WorkerConstraintListSerializer(serializers.Serializer):
@@ -337,12 +349,12 @@ class VacancySerializer(serializers.Serializer):
             return obj.worker.avatar.url
         return None
 
-        
+
 class AutoSettingsSerializer(serializers.Serializer):
-    shop_id=serializers.IntegerField()
-    dt_from=serializers.DateField()
-    dt_to=serializers.DateField()
-    is_remaking=serializers.BooleanField(default=False)
+    shop_id = serializers.IntegerField()
+    dt_from = serializers.DateField()
+    dt_to = serializers.DateField()
+    is_remaking = serializers.BooleanField(default=False)
     use_not_approved = serializers.BooleanField(default=False)
 
 
@@ -356,7 +368,6 @@ class ListChangeSrializer(serializers.Serializer):
     tm_work_end = serializers.TimeField(required=False)
     work_type = serializers.IntegerField(required=False)
     comment = serializers.CharField(max_length=128, required=False)
-
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
@@ -376,18 +387,17 @@ class ListChangeSrializer(serializers.Serializer):
 
 class DuplicateSrializer(serializers.Serializer):
     default_error_messages = {
-         'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")
+        'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")
     }
-    from_worker_id = serializers.IntegerField()
     to_worker_id = serializers.IntegerField()
-    dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
-    is_approved = serializers.BooleanField(default=False)
+    from_workerday_ids = serializers.ListField(child=serializers.IntegerField())
+    to_dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
-        for key in ['from_worker_id', 'to_worker_id']:
-            if not User.objects.filter(id=self.validated_data[key]).exists():
-                raise ValidationError({key: self.error_messages['not_exist'].format(pk_value=self.validated_data[key])})
+        if not User.objects.filter(id=self.data['to_worker_id']).exists():
+            raise ValidationError({'to_worker_id': self.error_messages['not_exist'].format(pk_value=self.validated_data['to_worker_id'])})
+        return True
 
 
 class DeleteTimetableSerializer(serializers.Serializer):
@@ -401,12 +411,12 @@ class DeleteTimetableSerializer(serializers.Serializer):
     types = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     delete_all = serializers.BooleanField(default=False)
     except_created_by = serializers.BooleanField(default=True)
-    
+
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
         dt_from = self.validated_data.get('dt_from')
         dt_to = self.validated_data.get('dt_to')
-        
+
         if not self.validated_data.get('delete_all') and not dt_to:
             raise ValidationError({'dt_to': self.error_messages['required']})
 
@@ -416,7 +426,7 @@ class DeleteTimetableSerializer(serializers.Serializer):
 
 class ExchangeSerializer(serializers.Serializer):
     default_error_messages = {
-         'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")
+        'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")
     }
 
     worker1_id = serializers.IntegerField()
@@ -440,4 +450,4 @@ class DownloadSerializer(serializers.Serializer):
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     is_approved = serializers.BooleanField(default=True)
     inspection_version = serializers.BooleanField(default=False)
-    shop_id=serializers.IntegerField()
+    shop_id = serializers.IntegerField()

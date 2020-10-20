@@ -7,7 +7,6 @@ from rest_framework.test import APITestCase
 from src.util.test import create_departments_and_users
 
 from src.timetable.models import ExchangeSettings
-from src.base.models import FunctionGroup
 from src.forecast.models import OperationType, PeriodClients, OperationTypeName
 from etc.scripts.fill_calendar import main
 
@@ -23,31 +22,8 @@ class TestExchangeSettings(APITestCase):
         self.url = '/rest_api/exchange_settings/'
 
         create_departments_and_users(self)
-        self.exchange_serttings1 = ExchangeSettings.objects.create()
-        self.exchange_serttings2 = ExchangeSettings.objects.create()
-
-        
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='POST',
-            func='ExchangeSettings',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='PUT',
-            func='ExchangeSettings',
-            level_up=1,
-            level_down=99,
-        )
-        FunctionGroup.objects.create(
-            group=self.admin_group,
-            method='DELETE',
-            func='ExchangeSettings',
-            level_up=1,
-            level_down=99,
-        )
+        self.exchange_serttings1 = ExchangeSettings.objects.create(network=self.network)
+        self.exchange_serttings2 = ExchangeSettings.objects.create(network=self.network)
 
         self.client.force_authenticate(user=self.user1)
 
@@ -74,10 +50,12 @@ class TestExchangeSettings(APITestCase):
             'working_shift_min_hours': '04:00:00', 
             'working_shift_max_hours': '12:00:00', 
             'automatic_worker_select_tree_level': 1, 
-            'network': None, 
+            'network': self.network.id, 
             'exclude_positions': []
         }
-        self.assertEqual(response.json(), data)
+        resp = response.json()
+        resp.pop('dttm_modified')
+        self.assertEqual(resp, data)
 
     
     def test_create(self):
@@ -106,7 +84,9 @@ class TestExchangeSettings(APITestCase):
             'network': None, 
             'exclude_positions': []
         }
-        self.assertEqual(response.json(), data)
+        resp = response.json()
+        resp.pop('dttm_modified')
+        self.assertEqual(resp, data)
 
 
     def test_update(self):
@@ -132,10 +112,12 @@ class TestExchangeSettings(APITestCase):
             'working_shift_min_hours': '04:00:00', 
             'working_shift_max_hours': '12:00:00', 
             'automatic_worker_select_tree_level': 1, 
-            'network': None, 
+            'network': self.network.id, 
             'exclude_positions': []
         }
-        self.assertEqual(response.json(), data)
+        resp = response.json()
+        resp.pop('dttm_modified')
+        self.assertEqual(resp, data)
 
 
     def test_delete(self):

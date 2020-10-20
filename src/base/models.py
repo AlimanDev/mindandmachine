@@ -1,18 +1,20 @@
 import datetime
 import json
-from timezone_field import TimeZoneField
 
-from django.db import models
+from django.apps import apps
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
-from mptt.models import MPTTModel, TreeForeignKey
-from model_utils import FieldTracker
-from django.apps import apps
-from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
-from src.base.exceptions import MessageError
-from src.conf.djconfig import QOS_TIME_FORMAT
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import models
+from django.db.models import Case, When, Sum, Value, IntegerField
+from model_utils import FieldTracker
+from mptt.models import MPTTModel, TreeForeignKey
+from timezone_field import TimeZoneField
+
+from src.base.exceptions import MessageError
+from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
+from src.conf.djconfig import QOS_TIME_FORMAT
 
 
 class Network(AbstractActiveModel):
@@ -21,7 +23,7 @@ class Network(AbstractActiveModel):
         verbose_name_plural = 'Сети магазинов'
 
     logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
-    url = models.CharField(blank=True,null=True,max_length=255)
+    url = models.CharField(blank=True, null=True, max_length=255)
     primary_color = models.CharField(max_length=7, blank=True)
     secondary_color = models.CharField(max_length=7, blank=True)
     name = models.CharField(max_length=128, unique=True)
@@ -43,8 +45,33 @@ class Region(AbstractActiveNamedModel):
         verbose_name_plural = 'Регионы'
 
 
-class ShopSettings(AbstractActiveNamedModel):
+class Break(AbstractActiveNamedModel):
+    class Meta(AbstractActiveNamedModel.Meta):
+        verbose_name = 'Перерыв'
+        verbose_name_plural = 'Перерывы'
+    value = models.CharField(max_length=1024, default='[]')
 
+    def __getattribute__(self, attr):
+        if attr in ['breaks']:
+            try:
+                return super().__getattribute__(attr)
+            except:
+                try:
+                    self.__setattr__(attr, json.loads(self.value))
+                except:
+                    return []
+        return super().__getattribute__(attr)
+
+    @staticmethod
+    def clean_value(value):
+        return json.dumps(value)
+
+    def save(self, *args, **kwargs):
+        self.value = self.clean_value(self.breaks)
+        super().save(*args, **kwargs)
+      
+
+class ShopSettings(AbstractActiveNamedModel):
     class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Настройки автосоставления'
         verbose_name_plural = 'Настройки автосоставления'
@@ -60,7 +87,7 @@ class ShopSettings(AbstractActiveNamedModel):
     method_params = models.CharField(max_length=4096, default='[]')
     cost_weights = models.CharField(max_length=4096, default='{}')
     init_params = models.CharField(max_length=2048, default='{"n_working_days_optimal": 20}')
-    break_triplets = models.CharField(max_length=1024, default='[]')
+    breaks = models.ForeignKey(Break, on_delete=models.PROTECT)
 
     # added on 21.12.2018
     idle = models.SmallIntegerField(default=0)  # percents
@@ -97,7 +124,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     LOAD_TEMPLATE_READY = 'R'
     LOAD_TEMPLATE_ERROR = 'E'
 
-
     LOAD_TEMPLATE_STATUSES = [
         (LOAD_TEMPLATE_PROCESS, 'В процессе'),
         (LOAD_TEMPLATE_READY, 'Готово'),
@@ -120,7 +146,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     )
 
     code = models.CharField(max_length=64, null=True, blank=True)
-    #From supershop
+    # From supershop
     address = models.CharField(max_length=256, blank=True, null=True)
     type = models.CharField(max_length=1, choices=DEPARTMENT_TYPES, default=TYPE_SHOP)
 
@@ -176,7 +202,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         if self.id == shop.id:
             return 0
         if self.is_ancestor_of(shop) or self.is_descendant_of(shop):
-                return shop.level - self.level
+            return shop.level - self.level
         return None
 
     def get_ancestor_by_level_distance(self, level):
@@ -184,6 +210,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             return self
         level = self.level - level if self.level > level else 0
         return self.get_ancestors().filter(level=level)[0]
+
     def get_department(self):
         return self
 
@@ -192,7 +219,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         super().__init__(*args, **kwargs)
         if code:
             self.parent = Shop.objects.get(code=code)
-
 
     def __getattribute__(self, attr):
         if attr in ['open_times', 'close_times']:
@@ -228,7 +254,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             raise MessageError(code='time_shop_differerent_keys')
         if open_times.get('all') and len(open_times) != 1:
             raise MessageError(code='time_shop_all_or_days')
-        
+
         for key in open_times.keys():
             close_hour = close_times[key].hour if close_times[key].hour != 0 else 24
             if open_times[key].hour > close_hour:
@@ -244,25 +270,22 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             load_template = self.load_template_id
             self.load_template_id = new_template
         super().save(*args, **kwargs)
-        if self.load_template_id:
+        if False: # self.load_template_id:  # aa: todo: fixme: delete tmp False
             from src.forecast.load_template.utils import apply_load_template
             if load_template != None and load_template != new_template:
                 apply_load_template(new_template, self.id)
             elif load_template == None:
                 apply_load_template(self.load_template_id, self.id)
-               
-
 
     def get_exchange_settings(self):
-        return self.exchange_settings if self.exchange_settings_id\
+        return self.exchange_settings if self.exchange_settings_id \
             else apps.get_model(
-                'timetable', 
+                'timetable',
                 'ExchangeSettings',
             ).objects.filter(
                 network_id=self.network_id,
                 shops__isnull=True,
             ).first()
-
 
 
 class EmploymentManager(models.Manager):
@@ -280,7 +303,7 @@ class EmploymentManager(models.Manager):
             models.Q(dt_hired__lte=dt_to) | models.Q(dt_hired__isnull=True),
             models.Q(dt_fired__gte=dt_from) | models.Q(dt_fired__isnull=True),
             shop__network_id=network_id,
-            user__network_id = network_id
+            user__network_id=network_id
         ).filter(*args, **kwargs)
 
 
@@ -305,10 +328,10 @@ class ProductionDay(AbstractModel):
     день из производственного календаря короч.
 
     """
+
     class Meta(object):
         verbose_name = 'День производственного календаря'
         unique_together = ('dt', 'region')
-
 
     TYPE_WORK = 'W'
     TYPE_HOLIDAY = 'H'
@@ -345,9 +368,26 @@ class ProductionDay(AbstractModel):
 
         return '(dt {}, type {}, id {})'.format(self.dt, self.type, self.id)
 
+    @classmethod
+    def get_norm_work_hours(cls, region_id, month, year):
+        norm_work_hours = ProductionDay.objects.filter(
+            dt__month=month,
+            dt__year=year,
+            type__in=ProductionDay.WORK_TYPES,
+            region_id=region_id,
+        ).annotate(
+            work_hours=Case(
+                When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
+                When(type=ProductionDay.TYPE_SHORT_WORK,
+                     then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_SHORT_WORK])),
+            )
+        ).aggregate(
+            norm_work_hours=Sum('work_hours', output_field=IntegerField())
+        )['norm_work_hours']
+        return norm_work_hours
+
 
 class User(DjangoAbstractUser, AbstractModel):
-
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
@@ -396,6 +436,7 @@ class WorkerPosition(AbstractActiveNamedModel):
     """
     Describe employee's position
     """
+
     class Meta(AbstractActiveNamedModel.Meta):
         verbose_name = 'Должность сотрудника'
         verbose_name_plural = 'Должности сотрудников'
@@ -407,6 +448,7 @@ class WorkerPosition(AbstractActiveNamedModel):
         verbose_name='Типы работ по умолчанию',
         blank=True,
     )
+    breaks = models.ForeignKey(Break, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
@@ -416,15 +458,19 @@ class WorkerPosition(AbstractActiveNamedModel):
 
 
 class Employment(AbstractActiveModel):
-
     class Meta:
         verbose_name = 'Трудоустройство'
         verbose_name_plural = 'Трудоустройства'
+        unique_together = (
+            ('code', 'network'),
+        )
 
     def __str__(self):
         return '{}, {}, {}'.format(self.id, self.shop, self.user)
 
     id = models.BigAutoField(primary_key=True)
+    code = models.CharField(max_length=128, null=True, blank=True)
+    network = models.ForeignKey('base.Network', on_delete=models.PROTECT, null=True)
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="employments")
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name="employments")
     function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
@@ -491,11 +537,12 @@ class Employment(AbstractActiveModel):
         if hasattr(self, 'position_code'):
             self.position = WorkerPosition.objects.get(code=self.position_code)
 
+        force_create_work_types = kwargs.pop('force_create_work_types', False)
         is_new = self.pk is None
         position_has_changed = self.position_tracker.has_changed('position')
         res = super().save(*args, **kwargs)
         # при создании трудоустройства или при смене должности проставляем типы работ по умолчанию
-        if is_new or position_has_changed:
+        if force_create_work_types or is_new or position_has_changed:
             from src.timetable.models import EmploymentWorkType, WorkType
             work_type_names = WorkerPosition.default_work_type_names.through.objects.filter(
                 workerposition_id=self.position_id,
@@ -517,15 +564,64 @@ class Employment(AbstractActiveModel):
                     EmploymentWorkType(
                         employment_id=self.id,
                         work_type=work_type,
+                        priority=1,
                     ) for work_type in work_types
                 )
+        # при смене должности пересчитываем рабочие часы в будущем
+        if position_has_changed:
+            from django.apps import apps
+            from django.db.models import When, Case, Q, F, DurationField, Value, Subquery, OuterRef
+            from django.db.models.functions import Cast
+            if self.position.breaks:
+                break_id = self.position.breaks_id
+                breaks = self.position.breaks.breaks
+            else:
+                break_id = self.shop.settings.breaks_id
+                breaks = self.shop.settings.breaks.breaks
+            breaks = list(
+                map(
+                    lambda x: (
+                        datetime.timedelta(seconds=x[0] * 60), 
+                        datetime.timedelta(seconds=x[1] * 60), 
+                        datetime.timedelta(seconds=sum(x[2]) * 60)
+                    ), 
+                    breaks
+                )
+            )
+            breaktime_plan = Value(datetime.timedelta(0), output_field=DurationField())
+            if len(breaks):
+                whens = [
+                    When(
+                        Q(hours_plan_0__gte=break_triplet[0], hours_plan_0__lte=break_triplet[1]) & 
+                        (Q(employment__position__breaks_id=break_id) | 
+                        (Q(employment__position__breaks__isnull=True) & Q(employment__shop__settings__breaks_id=break_id))),
+                        then=break_triplet[2]
+                    )
+                    for break_triplet in breaks
+                ]
+                breaktime_plan = Case(*whens, output_field=DurationField())
+            WorkerDay = apps.get_model('timetable', 'WorkerDay')
+            dt = datetime.date.today()
+            WorkerDay.objects.filter(
+                employment_id=self.id,
+                is_fact=False,
+                dt__gt=dt,
+            ).update(
+                work_hours=Subquery(
+                    WorkerDay.objects.filter(pk=OuterRef('pk')).annotate(
+                        hours_plan_0=Cast(F('dttm_work_end') - F('dttm_work_start'), DurationField()),
+                        hours_plan=Cast(F('hours_plan_0') - breaktime_plan, DurationField()),
+                    ).values('hours_plan')[:1]
+                )
+            )
+
         return res
 
 
 class FunctionGroup(AbstractModel):
     class Meta:
         verbose_name = 'Доступ к функциям'
-        unique_together = (('func', 'group', 'method'), )
+        unique_together = (('func', 'group', 'method'),)
 
     TYPE_SELF = 'S'
     TYPE_SHOP = 'TS'
@@ -544,7 +640,9 @@ class FunctionGroup(AbstractModel):
         'AutoSettings_set_timetable',
         'AutoSettings_delete_timetable',
         'AuthUserView',
+        'Break',
         'Employment',
+        'Employment_auto_timetable',
         'EmploymentWorkType',
         'ExchangeSettings',
         'FunctionGroupView',
@@ -622,7 +720,6 @@ class FunctionGroup(AbstractModel):
         'get_notifications2',
         'set_notifications_read',
 
-
         'get_worker_day',
         'delete_worker_day',
         'request_worker_day',
@@ -669,10 +766,9 @@ class FunctionGroup(AbstractModel):
         'get_workers_to_exchange',
         'exchange_workers_day',
 
-        #algo callbacks
+        # algo callbacks
         'set_demand',
         'set_pred_bills',
-
 
         'get_operation_templates',
         'create_operation_template',
@@ -724,7 +820,7 @@ class FunctionGroup(AbstractModel):
     dttm_modified = models.DateTimeField(blank=True, null=True)
     group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name='allowed_functions', blank=True, null=True)
     func = models.CharField(max_length=128, choices=FUNCS_TUPLE)
-    method = models.CharField(max_length=6, choices=((m,m) for m in METHODS), default='GET')
+    method = models.CharField(max_length=6, choices=((m, m) for m in METHODS), default='GET')
     access_type = models.CharField(choices=TYPES, max_length=32)
     level_up = models.IntegerField(default=0)
     level_down = models.IntegerField(default=100)
@@ -773,7 +869,7 @@ class Notification(AbstractModel):
     def __str__(self):
         return '{}, {}, {}, id: {}'.format(
             self.worker,
-            self.event ,
+            self.event,
             self.dttm_added,
             # self.text[:60],
             self.id
@@ -784,4 +880,3 @@ class Notification(AbstractModel):
 
     is_read = models.BooleanField(default=False)
     event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True)
-

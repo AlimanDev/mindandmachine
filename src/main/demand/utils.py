@@ -14,6 +14,7 @@ from src.base.models import (
 from src.forecast.models import (
     PeriodClients,
     OperationType,
+    OperationTypeName
 )
 from src.util.models_converter import Converter
 from django.core.exceptions import EmptyResultSet
@@ -99,7 +100,7 @@ def create_predbills_request_function(shop_id, dt=None):
 
     period_clients = PeriodClients.objects.select_related('operation_type__work_type__shop').filter(
         operation_type__shop_id=shop_id,
-        operation_type__do_forecast=OperationType.FORECAST,
+        operation_type__operation_type_name__do_forecast=OperationTypeName.FORECAST,
         operation_type__dttm_deleted__isnull=True,
         type=PeriodClients.FACT_TYPE,
         dttm_forecast__date__gt=dt - relativedelta(years=YEARS_TO_COLLECT),
