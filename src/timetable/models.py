@@ -885,6 +885,28 @@ class AttendanceRecords(AbstractModel):
             setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
             wdays['fact']['approved'].save()
         else:
+            if self.type == self.TYPE_LEAVING:
+                prev_fa_wd = WorkerDay.objects.filter(
+                    shop=self.shop,
+                    worker=self.user,
+                    dt__lt=self.dttm.date(),
+                    is_fact=True,
+                    is_approved=True,
+                ).order_by('dt').last()
+
+                # Если предыдущая смена не закрыта.
+                if prev_fa_wd and prev_fa_wd.dttm_work_start and prev_fa_wd.dttm_work_end is None:
+                    close_prev_work_shift_cond = (
+                         self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
+                    # Если с момента открытия предыдущей смены прошло менее MAX_WORK_SHIFT_SECONDS,
+                    # то закрываем предыдущую смену.
+                    if close_prev_work_shift_cond:
+                        setattr(prev_fa_wd, type2dtfield[self.type], self.dttm)
+                        prev_fa_wd.save()
+                        return
+                    elif settings.MDA_SKIP_LEAVING_TICK:
+                        return
+
             wd = WorkerDay(
                 shop=self.shop,
                 worker=self.user,

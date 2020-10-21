@@ -591,7 +591,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             user=self.user2
         )
 
-        # проверяем, что время начала рабочего дня не перезаписалась
+        # проверяем, что время начала рабочего дня не перезаписалось
         self.assertNotEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_start, tm_start2)
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).dttm_work_start, tm_start)
 
@@ -668,17 +668,16 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.worker_day_fact_approved.delete()
 
         AttendanceRecords.objects.create(
-            dttm=datetime.combine(self.dt, time(6, 0, 0)),
+            dttm=datetime.combine(self.dt, time(20, 0, 0)),
             type=AttendanceRecords.TYPE_COMING,
             shop=self.shop,
             user=self.user2
         )
-        #
         wd = WorkerDay.objects.filter(
             dt=self.dt,
             is_fact=True,
             is_approved=True,
-            dttm_work_start=datetime.combine(self.dt, time(6, 0, 0)),
+            dttm_work_start=datetime.combine(self.dt, time(20, 0, 0)),
             dttm_work_end=None,
             worker=self.user2
         )
@@ -686,6 +685,34 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertTrue(wd.exists())
         wd = wd.first()
         self.assertEqual(wd.parent_worker_day_id, self.worker_day_plan_approved.id)
+
+        ar = AttendanceRecords.objects.create(
+            dttm=datetime.combine(self.dt + timedelta(days=1), time(6, 0, 0)),
+            type=AttendanceRecords.TYPE_LEAVING,
+            shop=self.shop,
+            user=self.user2
+        )
+        wd.refresh_from_db()
+        self.assertEqual(wd.dttm_work_end, ar.dttm)
+
+        wd.dttm_work_end = None
+        wd.save()
+        ar2 = AttendanceRecords.objects.create(
+            dttm=datetime.combine(self.dt + timedelta(days=3), time(20, 0, 0)),
+            type=AttendanceRecords.TYPE_LEAVING,
+            shop=self.shop,
+            user=self.user2
+        )
+
+        new_wd = WorkerDay.objects.filter(
+            dt=self.dt + timedelta(days=3),
+            is_fact=True,
+            is_approved=True,
+            dttm_work_start=None,
+            dttm_work_end=ar2.dttm,
+            worker=self.user2
+        )
+        self.assertTrue(new_wd.exists())
 
 
 class TestVacancy(TestsHelperMixin, APITestCase):

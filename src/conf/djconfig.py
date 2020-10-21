@@ -303,6 +303,12 @@ REBUILD_TIMETABLE_MIN_DELTA = 2
 # например, для Ортеки для отображения в отчете нужны показатели только по продавцам-кассирам
 UPDATE_SHOP_STATS_WORK_TYPES_CODES = None
 
+MAX_WORK_SHIFT_SECONDS = 60 * 60 * 16  # максимальная длина смены (в секундах)
+
+# пропускать создание отметки об уходе,
+# если с момент открытия предыдущей незакрытой смены прошло более MAX_WORK_SHIFT_SECONDS
+MDA_SKIP_LEAVING_TICK = False
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
 
