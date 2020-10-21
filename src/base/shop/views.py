@@ -1,19 +1,17 @@
 import datetime
-from dateutil.relativedelta import relativedelta
 
+from dateutil.relativedelta import relativedelta
 from django.db.models import Q, Sum
 from django_filters.rest_framework import NumberFilter
-
 from rest_framework.decorators import action
-from rest_framework.response import Response
 from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.response import Response
 
-from src.base.models import Employment, Shop
-from src.base.permissions import Permission
-
-from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
-from src.base.views import BaseActiveNamedModelViewSet
 from src.base.filters import BaseActiveNamedModelFilter
+from src.base.models import Employment, Shop, Region
+from src.base.permissions import Permission
+from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
+from src.base.views_abstract import UpdateorCreateViewSet
 
 
 class ShopFilter(BaseActiveNamedModelFilter):
@@ -26,7 +24,7 @@ class ShopFilter(BaseActiveNamedModelFilter):
         }
 
 
-class ShopViewSet(BaseActiveNamedModelViewSet):
+class ShopViewSet(UpdateorCreateViewSet):
     """
     GET /rest_api/department/?id__in=6,7
     :return [{"id":6, ...},{"id":7, ...}]
@@ -55,6 +53,9 @@ class ShopViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [Permission]
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
+
+    def perform_create(self, serializer):
+        serializer.save(region=Region.objects.first())  # TODO: переделать на получение региона по коду в api???
 
     def get_queryset(self):
         """
