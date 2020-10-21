@@ -514,7 +514,11 @@ class WorkerDay(AbstractModel):
 
         if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and self.is_vacancy and self.worker and self.shop:
             from src.celery.tasks import create_mda_user_to_shop_relation
-            create_mda_user_to_shop_relation.delay(username=self.worker.username, shop_code=self.shop.code)
+            create_mda_user_to_shop_relation.delay(
+                username=self.worker.username,
+                shop_code=self.shop.code,
+                debug_info={'wd_id': self.id},
+            )
 
         return super().save(*args, **kwargs)
 

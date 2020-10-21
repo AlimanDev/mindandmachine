@@ -711,8 +711,9 @@ def send_urv_stat_today():
 
     return
 
+
 @app.task
-def create_mda_user_to_shop_relation(username, shop_code):
+def create_mda_user_to_shop_relation(username, shop_code, debug_info=None):
     logger = logging.getLogger('django.request')
     resp = requests.post(
         url=settings.MDA_PUBLIC_API_HOST + '/api/public/v1/mindandmachine/userToShop/',
@@ -723,4 +724,4 @@ def create_mda_user_to_shop_relation(username, shop_code):
     try:
         resp.raise_for_status()
     except requests.RequestException:
-        logger.exception(f'text:{resp.text}, headers: {resp.headers}')
+        logger.exception(f'text:{resp.text}, headers: {resp.headers}, debug_info: {debug_info}')
