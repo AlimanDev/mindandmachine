@@ -465,3 +465,10 @@ class DownloadSerializer(serializers.Serializer):
     is_approved = serializers.BooleanField(default=True)
     inspection_version = serializers.BooleanField(default=False)
     shop_id = serializers.IntegerField()
+
+
+class DownloadTabelSerializer(serializers.Serializer):
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
+    shop_id = serializers.IntegerField()
+    convert_to = serializers.ChoiceField(required=False, choices=['pdf', 'xlsx'], default='xlsx')

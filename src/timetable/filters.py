@@ -10,7 +10,7 @@ class WorkerDayFilter(FilterSet):
 
     def filter_tabel(self, queryset, name, value):
         if value:
-            return queryset.get_tabel(shop_id=self.request.query_params.get('shop_id'))
+            return queryset.get_tabel(network=self.request.user.network)
 
         return queryset
 
