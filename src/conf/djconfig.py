@@ -87,6 +87,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'src.base.auth.authentication.WFMSessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
     ]
 }
 OLD_PASSWORD_FIELD_ENABLED=True
@@ -415,3 +418,6 @@ if 'test' in sys.argv:
 
 
     MIGRATION_MODULES = MigrationDisabler()
+
+if DEBUG:
+    REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'].append('rest_framework.renderers.BrowsableAPIRenderer')
