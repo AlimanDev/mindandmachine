@@ -55,6 +55,7 @@ class BaseTabelDataGetter:
         return self.wd_type_mapper.get_tabel_type(wd_type)
 
     def _get_tabel_wdays_qs(self):
+        # TODO: переделать на получение рабочих дней через work_type
         active_shop_employments_for_period = Employment.objects.get_active(
             network_id=self.network.id,
             dt_from=self.dt_from,

@@ -338,24 +338,6 @@ class WorkerDayQuerySet(QuerySet):
             tabel_total_work_seconds=Cast(Extract(F('tabel_work_interval'), 'epoch'), FloatField()),
             tabel_breaktime_seconds=WorkerDay.get_breaktime(
                 network_id=network.id, break_calc_field_name='tabel_total_work_seconds'),  # TODO: для обучений тоже учитывать перерывы?
-            tabel_night_start_edge_time=Value(night_edges[0], output_field=TimeField()),
-            tabel_night_work_seconds=Case(
-                When(
-                    Q(tabel_dttm_work_end_time__lte=night_edges[0]) &
-                    Q(tabel_dttm_work_start_date=F('tabel_dttm_work_end_date')),
-                    then=0,
-                ),
-                When(
-                    Q(tabel_dttm_work_start_time__gte=Value(night_edges[0], output_field=TimeField())) &
-                    Q(tabel_dttm_work_end_time__lte=Value(night_edges[1], output_field=TimeField())),
-                    then=F('tabel_total_work_seconds'),
-                ),
-                When(
-                    Q(tabel_night_start_edge_time__gt=F('tabel_dttm_work_end_time')),
-                    then=Extract(F('tabel_night_start_edge_time') - F('tabel_dttm_work_start_time'), 'epoch', output_field=FloatField())
-                ),
-                default=0,  # TODO: доделать
-            ),
             tabel_work_hours=Cast(Greatest(
                 F('tabel_total_work_seconds') - F('tabel_breaktime_seconds'), 0, output_field=FloatField()
             ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=1)),
@@ -584,8 +566,14 @@ class WorkerDay(AbstractModel):
             whens = [
                 When(
                     Q(**{f'{break_calc_field_name}__gte': break_triplet[0]}, **{f'{break_calc_field_name}__lte': break_triplet[1]}) &
-                    (Q(employment__position__breaks_id=break_id) | (Q(employment__position__breaks__isnull=True) & Q(
-                        employment__shop__settings__breaks_id=break_id))),
+                    (
+                        Q(employment__position__breaks_id=break_id) |
+                        (
+                            Q(employment__position__breaks__isnull=True) &
+                            Q(employment__shop__settings__breaks_id=break_id)
+                        ) |
+                        (Q(employment__isnull=True) & Q(shop__settings__breaks_id=break_id))
+                    ),
                     then=break_triplet[2]
                 )
                 for break_id, breaks in break_triplets.items()
