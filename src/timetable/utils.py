@@ -15,7 +15,7 @@ from src.base.models import Break
 def wd_stat_count(worker_days, shop):
     # break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
     break_triplets = {
-        b.id: list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), b.breaks))
+        b.id: list(map(lambda x: (x[0] / 60, x[1] / 60, 0), b.breaks))
         for b in Break.objects.filter(network_id=shop.network_id)
     }
     breaktime_plan = Value(0, output_field=FloatField())
@@ -68,8 +68,8 @@ def wd_stat_count(worker_days, shop):
                     timedelta(hours=0)),
                 'epoch') / 3600,
             FloatField()),
-        hours_fact=Ceil(F('hours_fact_0') - breaktime_fact),
-        hours_plan=Ceil(F('hours_plan_0') - breaktime_plan)
+        hours_fact=F('hours_fact_0') - breaktime_fact,
+        hours_plan=F('hours_plan_0') - breaktime_plan
     )
 
 

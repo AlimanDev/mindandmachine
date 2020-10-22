@@ -21,10 +21,45 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         cls.settings = ShopSettings.objects.first()
         cls.load_template = LoadTemplateFactory(network=cls.network)
 
+        cls.root_shop.code = "main"
+        cls.root_shop.save(update_fields=('code',))
+
         cls.shop_url = f'{cls.url}{cls.shop.id}/'
 
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
+
+    @staticmethod
+    def _get_shop_data():
+        return {
+            "address": "Воронежская обл, г Воронеж, пр-кт Революции, д 48",
+            "by_code": True,
+            "code": "383-1",
+            "dt_closed": "3001-01-01",
+            "dt_opened": "2020-08-17",
+            "name": "ООО \"НИКАМЕД\" ОРТЕКА  Воронеж Революции 48",
+            "parent_code": "main",
+            "timezone": "Europe/Moscow",
+            "tm_close_dict": {
+                "all": "00:00:00"
+            },
+            "tm_open_dict": {
+                "all": "00:00:00"
+            }
+        }
+
+    def test_create_department(self):
+        resp = self.client.post(self.url, data=self.dump_data(self._get_shop_data()), content_type='application/json')
+        self.assertEqual(resp.status_code, 201)
+
+    def test_create_and_update_department_with_put_by_code(self):
+        shop_data = self._get_shop_data()
+        put_url = f'{self.url}{shop_data["code"]}/'
+        resp = self.client.put(put_url, data=self.dump_data(shop_data), content_type='application/json')
+        self.assertEqual(resp.status_code, 201)
+
+        resp = self.client.put(put_url, data=self.dump_data(shop_data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
 
     def test_get_list(self):
         # Админ
