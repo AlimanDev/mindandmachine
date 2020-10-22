@@ -350,7 +350,6 @@ def create_pred_bills():
     print('создал спрос на месяц')
 
 
-
 @app.task
 def update_shop_stats(dt=None):
     if not dt:
@@ -400,6 +399,7 @@ def update_shop_stats(dt=None):
         month_stat.idle = stats['deadtime']
         month_stat.fot = stats['fot']
         month_stat.lack = stats['covering']  # на самом деле покрытие
+        month_stat.predict_needs = stats['predict_needs']
         month_stat.save()
 
 
@@ -711,8 +711,9 @@ def send_urv_stat_today():
 
     return
 
+
 @app.task
-def create_mda_user_to_shop_relation(username, shop_code):
+def create_mda_user_to_shop_relation(username, shop_code, debug_info=None):
     logger = logging.getLogger('django.request')
     resp = requests.post(
         url=settings.MDA_PUBLIC_API_HOST + '/api/public/v1/mindandmachine/userToShop/',
@@ -723,4 +724,4 @@ def create_mda_user_to_shop_relation(username, shop_code):
     try:
         resp.raise_for_status()
     except requests.RequestException:
-        logger.exception(f'text:{resp.text}, headers: {resp.headers}')
+        logger.exception(f'text:{resp.text}, headers: {resp.headers}, debug_info: {debug_info}')

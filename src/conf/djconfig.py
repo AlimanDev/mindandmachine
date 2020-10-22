@@ -87,6 +87,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'src.base.auth.authentication.WFMSessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
     ]
 }
 OLD_PASSWORD_FIELD_ENABLED=True
@@ -303,6 +306,12 @@ REBUILD_TIMETABLE_MIN_DELTA = 2
 # например, для Ортеки для отображения в отчете нужны показатели только по продавцам-кассирам
 UPDATE_SHOP_STATS_WORK_TYPES_CODES = None
 
+MAX_WORK_SHIFT_SECONDS = 60 * 60 * 16  # максимальная длина смены (в секундах)
+
+# пропускать создание отметки об уходе,
+# если с момент открытия предыдущей незакрытой смены прошло более MAX_WORK_SHIFT_SECONDS
+MDA_SKIP_LEAVING_TICK = False
+
 # docker volume create jod_converter_conf
 # docker run \
 # 	--memory 512m \
@@ -423,3 +432,6 @@ if 'test' in sys.argv:
 
 
     MIGRATION_MODULES = MigrationDisabler()
+
+if DEBUG:
+    REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'].append('rest_framework.renderers.BrowsableAPIRenderer')

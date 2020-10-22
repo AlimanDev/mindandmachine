@@ -612,11 +612,23 @@ class WorkerDay(AbstractModel):
         else:
             self.work_hours = datetime.timedelta(0)
 
+        is_new = self.id is None
+
+        res = super().save(*args, **kwargs)
+
         if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and self.is_vacancy and self.worker and self.shop:
             from src.celery.tasks import create_mda_user_to_shop_relation
-            create_mda_user_to_shop_relation.delay(username=self.worker.username, shop_code=self.shop.code)
+            create_mda_user_to_shop_relation.delay(
+                username=self.worker.username,
+                shop_code=self.shop.code,
+                debug_info={
+                    'wd_id': self.id,
+                    'approved': self.is_approved,
+                    'is_new': is_new,
+                },
+            )
 
-        return super().save(*args, **kwargs)
+        return res
 
 
 class WorkerDayCashboxDetailsManager(models.Manager):
@@ -899,6 +911,7 @@ class ShopMonthStat(AbstractModel):
     workers_amount = models.IntegerField(default=0, blank=True, null=True)
     revenue = models.IntegerField(default=0, blank=True, null=True)
     fot_revenue = models.IntegerField(default=0, blank=True, null=True)
+    predict_needs = models.IntegerField(default=0, blank=True, null=True, verbose_name='Количество часов по нагрузке')
 
     task_id = models.CharField(max_length=256, null=True, blank=True)
 
@@ -985,6 +998,28 @@ class AttendanceRecords(AbstractModel):
             setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
             wdays['fact']['approved'].save()
         else:
+            if self.type == self.TYPE_LEAVING:
+                prev_fa_wd = WorkerDay.objects.filter(
+                    shop=self.shop,
+                    worker=self.user,
+                    dt__lt=self.dttm.date(),
+                    is_fact=True,
+                    is_approved=True,
+                ).order_by('dt').last()
+
+                # Если предыдущая смена не закрыта.
+                if prev_fa_wd and prev_fa_wd.dttm_work_start and prev_fa_wd.dttm_work_end is None:
+                    close_prev_work_shift_cond = (
+                         self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
+                    # Если с момента открытия предыдущей смены прошло менее MAX_WORK_SHIFT_SECONDS,
+                    # то закрываем предыдущую смену.
+                    if close_prev_work_shift_cond:
+                        setattr(prev_fa_wd, type2dtfield[self.type], self.dttm)
+                        prev_fa_wd.save()
+                        return
+                    elif settings.MDA_SKIP_LEAVING_TICK:
+                        return
+
             wd = WorkerDay(
                 shop=self.shop,
                 worker=self.user,

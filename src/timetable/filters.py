@@ -1,4 +1,12 @@
-from django_filters.rest_framework import FilterSet, BooleanFilter, NumberFilter, DateFilter, TimeFilter, CharFilter
+from django_filters.rest_framework import (
+    FilterSet,
+    BooleanFilter,
+    NumberFilter,
+    DateFilter,
+    TimeFilter,
+    CharFilter,
+    OrderingFilter,
+)
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 from django.db.models import Q
 
@@ -39,7 +47,31 @@ class WorkerDayStatFilter(FilterSet):
         }
 
 
-class VacancyFilter(FilterSet):
+class FilterSetWithInitial(FilterSet):
+    """
+    Класс, которые позволяет задавать дефолтные значения для фильтров через initial
+
+    Note:
+        взято отсюда:
+        https://django-filter.readthedocs.io/en/master/guide/tips.html#using-initial-values-as-defaults
+    """
+    def __init__(self, data=None, *args, **kwargs):
+        # if filterset is bound, use initial values as defaults
+        if data is not None:
+            # get a mutable copy of the QueryDict
+            data = data.copy()
+
+            for name, f in self.base_filters.items():
+                initial = f.extra.get('initial')
+
+                # filter param is either missing or empty, use initial as default
+                if not data.get(name) and initial:
+                    data[name] = initial
+
+        super().__init__(data, *args, **kwargs)
+
+
+class VacancyFilter(FilterSetWithInitial):
     dt_from = DateFilter(field_name='dt', lookup_expr='gte')
     dt_to = DateFilter(field_name='dt', lookup_expr='lte')
     is_vacant = BooleanFilter(field_name='worker', lookup_expr='isnull')
@@ -47,6 +79,7 @@ class VacancyFilter(FilterSet):
     shift_length_max = TimeFilter(field_name='work_hours', lookup_expr='lte')
     shop_id = CharFilter(field_name='shop_id', method='filter_include_outsource')
     work_type_name = CharFilter(field_name='work_types', method='filter_by_name')
+    ordering = OrderingFilter(fields=('dt', 'id', 'dttm_work_start', 'dttm_work_end'), initial='dttm_work_start')
 
     def filter_include_outsource(self, queryset, name, value):
         if value:
@@ -67,9 +100,9 @@ class VacancyFilter(FilterSet):
     class Meta:
         model = WorkerDay
         fields = {
-            'work_types__id':['exact', 'in'],
-            'is_approved': ['exact',],
-            'is_outsource': ['exact',],
+            'work_types__id': ['exact', 'in'],
+            'is_approved': ['exact', ],
+            'is_outsource': ['exact', ],
         }
 
 
