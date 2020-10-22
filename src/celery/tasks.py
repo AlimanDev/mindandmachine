@@ -350,7 +350,6 @@ def create_pred_bills():
     print('создал спрос на месяц')
 
 
-
 @app.task
 def update_shop_stats(dt=None):
     if not dt:
@@ -400,6 +399,7 @@ def update_shop_stats(dt=None):
         month_stat.idle = stats['deadtime']
         month_stat.fot = stats['fot']
         month_stat.lack = stats['covering']  # на самом деле покрытие
+        month_stat.predict_needs = stats['predict_needs']
         month_stat.save()
 
 
