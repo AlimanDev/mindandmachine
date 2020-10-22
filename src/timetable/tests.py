@@ -786,6 +786,27 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             self._test_vacancy_ordering(ordering_field, desc=False)
             self._test_vacancy_ordering(ordering_field, desc=True)
 
+    def test_default_vacancy_ordering_is_dttm_work_start_asc(self):
+        WorkerDay.objects.filter(id=self.vacancy.id).update(
+            dttm_work_start=datetime.combine(self.dt_now, time(hour=11, minute=30)))
+        WorkerDay.objects.filter(id=self.vacancy2.id).update(
+            dttm_work_start=datetime.combine(self.dt_now, time(hour=12, minute=30)))
+
+        resp = self.client.get(f'{self.url}?shop_id={self.shop.id}&limit=100')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.json()['results']), 2)
+        self.assertEqual(resp.json()['results'][0]['id'], self.vacancy.id)
+
+        WorkerDay.objects.filter(id=self.vacancy.id).update(
+            dttm_work_start=datetime.combine(self.dt_now, time(hour=12, minute=30)))
+        WorkerDay.objects.filter(id=self.vacancy2.id).update(
+            dttm_work_start=datetime.combine(self.dt_now, time(hour=11, minute=30)))
+
+        resp = self.client.get(f'{self.url}?shop_id={self.shop.id}&limit=100')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.json()['results']), 2)
+        self.assertEqual(resp.json()['results'][0]['id'], self.vacancy2.id)
+
     def test_get_list(self):
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&limit=100')
         self.assertEqual(response.status_code, 200)
