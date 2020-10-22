@@ -512,11 +512,23 @@ class WorkerDay(AbstractModel):
         else:
             self.work_hours = datetime.timedelta(0)
 
+        is_new = self.id is None
+
+        res = super().save(*args, **kwargs)
+
         if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and self.is_vacancy and self.worker and self.shop:
             from src.celery.tasks import create_mda_user_to_shop_relation
-            create_mda_user_to_shop_relation.delay(username=self.worker.username, shop_code=self.shop.code)
+            create_mda_user_to_shop_relation.delay(
+                username=self.worker.username,
+                shop_code=self.shop.code,
+                debug_info={
+                    'wd_id': self.id,
+                    'approved': self.is_approved,
+                    'is_new': is_new,
+                },
+            )
 
-        return super().save(*args, **kwargs)
+        return res
 
 
 class WorkerDayCashboxDetailsManager(models.Manager):
