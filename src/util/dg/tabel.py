@@ -55,28 +55,30 @@ class BaseTabelDataGetter:
         return self.wd_type_mapper.get_tabel_type(wd_type)
 
     def _get_tabel_wdays_qs(self):
-        # TODO: переделать на получение рабочих дней через work_type
-        active_shop_employments_for_period = Employment.objects.get_active(
-            network_id=self.network.id,
-            dt_from=self.dt_from,
-            dt_to=self.dt_to,
-            shop=self.shop,
-        )
-
         tabel_wdays = WorkerDay.objects.get_tabel(
             network=self.shop.network,
         ).filter(
-            Q(is_vacancy=True, shop=self.shop, type=WorkerDay.TYPE_WORKDAY) |
-            Q(employment__in=active_shop_employments_for_period, shop=self.shop, type__in=WorkerDay.TYPES_TABEL_HOURS) |
-            Q(~Q(type__in=WorkerDay.TYPES_PAID), employment__in=active_shop_employments_for_period),
-            Q(dt__lte=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True),
-            Q(dt__gte=F('employment__dt_hired')),
+            Q(
+                type=WorkerDay.TYPE_WORKDAY,
+                worker_day_details__work_type__shop=self.shop,
+            ) |
+            Q(
+                type=WorkerDay.TYPE_QUALIFICATION,
+                shop=self.shop,
+            ) |
+            Q(
+                ~Q(type__in=WorkerDay.TYPES_TABEL_HOURS),
+                Q(
+                    Q(dt__lte=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True),
+                    Q(dt__gte=F('employment__dt_hired')),
+                    employment__shop=self.shop,
+                ),
+            ),
             dt__gte=self.dt_from,
             dt__lte=self.dt_to,
         )
 
-        tabel_wdays.filter(worker__tabel_code='')
-        return tabel_wdays
+        return tabel_wdays.select_related('worker', 'shop').order_by('worker__last_name', 'worker__first_name', 'dt')
 
     def get_data(self):
         raise NotImplementedError
