@@ -152,7 +152,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
                         night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
                         total_seconds = (work_end - work_start).total_seconds()
-                        break_time_seconds = worker_day.tabel_breaktime_seconds
+                        break_time_seconds = worker_day.tabel_breaktime_seconds or 0
 
                         wd_dict['work_hours_details']['D'] = round(
                             (total_seconds - night_seconds - break_time_seconds / 2) / 3600, 1)

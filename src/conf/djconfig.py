@@ -317,14 +317,14 @@ MDA_SKIP_LEAVING_TICK = False
 # 	--memory 512m \
 # 	--name jod-converter \
 # 	-v jod_converter_conf:/etc/app \
-# 	--rm \
+# 	--restart unless-stopped \
 # 	-p 8030:8080 \
 #   -d \
 # 	eugenmayer/kontextwork-converter:production
 JOD_CONVERTER_URL = 'http://localhost:8030'
 
-# docker run --rm -p 3000:3000 thecodingmachine/gotenberg:6
-GOTENBERG_URL = 'http://localhost:3000'
+# docker run --restart unless-stopped -p 3001:3000 -d thecodingmachine/gotenberg:6
+GOTENBERG_URL = 'http://localhost:3001'
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
