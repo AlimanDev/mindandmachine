@@ -305,7 +305,7 @@ def create_demand(data):
         if period_demand_value.get('timeserie_code', False):
             operation_type = operation_codes.get(period_demand_value.get('timeserie_code'))
         elif period_demand_value.get('timeserie_name', False):
-            operation_type = operation_names.get(period_demand_value.get('timeserie_name'))
+            operation_type = operation_names.get(int(period_demand_value.get('timeserie_name')))
         elif period_demand_value.get('timeserie_id', False):
             operation_type = operation_ids.get(period_demand_value.get('timeserie_id'))
         models_list.append(

@@ -429,6 +429,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
         key = rel.get('base_name')
         if not key in relations:
             relations[key] = {}
+        rel['formula'] = f'lambda a: {rel["formula"]}'
         relations[key][str(rel.get('depended_name'))] = rel
     data['operation_types'] = [
         {
@@ -437,7 +438,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             'tm_from': get_times(shop.open_times, o.tm_from),
             'tm_to': get_times(shop.close_times, o.tm_to, t_from=False),
             'forecast_step': forecast_steps.get(o.forecast_step),
-            'dependences': relations.get(o.operation_type_name_id, [])
+            'dependences': relations.get(o.operation_type_name_id, {})
         }
         for o in OperationTypeTemplate.objects.select_related('operation_type_name').filter(load_template_id=load_template_id)
     ]

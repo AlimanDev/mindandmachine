@@ -502,7 +502,7 @@ def calculate_shops_load(lang, load_template_id, dt_from, dt_to, shop_id=None):
     for shop in shops:
         data = prepare_load_template_request(load_template_id, shop.id, dt_from, dt_to)
         data = json.dumps(data, cls=DjangoJSONEncoder)
-        response = requests.post(f'http://{TIMETABLE_IP}/calculate_shop_load/', json=data)
+        response = requests.post(f'http://{TIMETABLE_IP}/calculate_shop_load/', data=data)
 
 
 
