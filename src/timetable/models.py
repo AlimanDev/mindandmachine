@@ -293,24 +293,14 @@ class WorkerDayQuerySet(QuerySet):
         raise NotImplementedError
 
     def get_tabel(self, network, **kwargs):
-        ordered_subq = WorkerDay.objects.filter(
-            is_approved=True,
-            dt=OuterRef('dt'),
-            worker_id=OuterRef('worker_id'),
-        ).order_by(
-            'is_fact',
-        ).values_list('id')[:1]
-        qs = self.filter(
-            id=Subquery(ordered_subq)
-        )
-
-        night_edges = network.night_edges
+        qs = self.filter(is_fact=False, is_approved=True)
         fact_approved_wdays_subq = WorkerDay.objects.filter(
+            Q(type=WorkerDay.TYPE_WORKDAY, shop_id=OuterRef('shop_id')) | Q(type=WorkerDay.TYPE_QUALIFICATION),
+            # type=OuterRef('type'),  нужно? обучения в факт. графике должны заноситься как обучения или как рд?
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
             is_fact=True,
             is_approved=True,
-            type__in=WorkerDay.TYPES_TABEL_HOURS,
         ).order_by('-id')
         qs = qs.annotate(
             plan_dttm_work_start=F('dttm_work_start'),
