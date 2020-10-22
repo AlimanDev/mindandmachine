@@ -164,7 +164,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
                   'dt_new_week_availability_from', 'user', 'is_visible',  'worker_constraints', 'work_types',
                   'shop_code', 'position_code', 'username', 'code'
         ]
-        create_only_fields = ['user_id', 'shop_id', 'shop', 'tabel_code', 'user']
+        create_only_fields = ['user_id', 'tabel_code', 'user']
         read_only_fields = ['user']
 
     def validate(self, attrs):
