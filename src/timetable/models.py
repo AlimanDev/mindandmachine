@@ -6,12 +6,13 @@ from django.contrib.auth.models import (
     UserManager
 )
 from django.db import models
-from django.db.models import Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField
-from django.db.models.functions import Extract, Coalesce, Cast, Ceil
+from django.db.models import Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField, DateField, \
+    TimeField, DecimalField
+from django.db.models.functions import Extract, Coalesce, Cast, Round, Greatest
 from django.db.models.query import QuerySet
 from django.utils import timezone
 
-from src.base.models import Shop, Employment, User, Event, Network
+from src.base.models import Shop, Employment, User, Event, Network, Break
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, \
     AbstractActiveModelManager
 
@@ -291,64 +292,83 @@ class WorkerDayQuerySet(QuerySet):
     def get_fact_edit(self, **kwargs):
         raise NotImplementedError
 
-    def get_tabel(self, shop_id, **kwargs):
+    def get_tabel(self, network, **kwargs):
         ordered_subq = WorkerDay.objects.filter(
-            Q(
-                Q(is_fact=True, is_approved=True) |
-                Q(
-                    Q(is_fact=False, is_approved=True) &
-                    ~Q(type__in=WorkerDay.TYPES_PAID)
-                )
-            ),
+            is_approved=True,
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
         ).order_by(
-            '-is_fact',
+            'is_fact',
         ).values_list('id')[:1]
-        qs = self.filter(id=Subquery(ordered_subq))
+        qs = self.filter(
+            id=Subquery(ordered_subq)
+        )
 
-        break_triplets = []
-        shop = Shop.objects.get(id=shop_id)
-        if shop.settings:
-            break_triplets = json.loads(shop.settings.breaks.value)
-        break_triplets = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), break_triplets))
-        breaktime = Value(0, output_field=FloatField())
-        if break_triplets:
-            whens = [
-                When(Q(tabel_work_hours_0__gte=break_triplet[0], tabel_work_hours_0__lte=break_triplet[1]),
-                     then=break_triplet[2])
-                for break_triplet in break_triplets]
-            breaktime = Case(*whens, output_field=FloatField())
-
-        plan_approved_wdays_subq = WorkerDay.objects.filter(
+        night_edges = network.night_edges
+        fact_approved_wdays_subq = WorkerDay.objects.filter(
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
-            is_fact=False,
+            is_fact=True,
             is_approved=True,
-            type__in=WorkerDay.TYPES_PAID,
+            type__in=WorkerDay.TYPES_TABEL_HOURS,
         ).order_by('-id')
         qs = qs.annotate(
-            plan_dttm_work_start=Subquery(plan_approved_wdays_subq.values('dttm_work_start')[:1]),
-            plan_dttm_work_end=Subquery(plan_approved_wdays_subq.values('dttm_work_end')[:1]),
+            plan_dttm_work_start=F('dttm_work_start'),
+            plan_dttm_work_end=F('dttm_work_end'),
+            fact_dttm_work_start=Subquery(fact_approved_wdays_subq.values('dttm_work_start')[:1]),
+            fact_dttm_work_end=Subquery(fact_approved_wdays_subq.values('dttm_work_end')[:1]),
             tabel_dttm_work_start=Case(
-                When(plan_dttm_work_start__lt=F(
-                    'dttm_work_start') - shop.network.allowed_interval_for_late_arrival,
-                     then=F('dttm_work_start')),
+                When(plan_dttm_work_start__lt=F('fact_dttm_work_start') - network.allowed_interval_for_late_arrival,
+                     then=F('fact_dttm_work_start')),
                 default=F('plan_dttm_work_start'), output_field=DateTimeField()
             ),
+            tabel_dttm_work_start_time=Cast(F('tabel_dttm_work_start'), output_field=TimeField()),
+            tabel_dttm_work_start_date=Cast(F('tabel_dttm_work_start'), output_field=DateField()),
             tabel_dttm_work_end=Case(
-                When(plan_dttm_work_end__gt=F(
-                    'dttm_work_end') + shop.network.allowed_interval_for_early_departure,
-                     then=F('dttm_work_end')),
+                When(plan_dttm_work_end__gt=F('fact_dttm_work_end') + network.allowed_interval_for_early_departure,
+                     then=F('fact_dttm_work_end')),
                 default=F('plan_dttm_work_end'), output_field=DateTimeField()
             ),
-            tabel_work_hours_interval=Coalesce(
+            tabel_dttm_work_end_time=Cast(F('tabel_dttm_work_end'), output_field=TimeField()),
+            tabel_dttm_work_end_date=Cast(F('tabel_dttm_work_end'), output_field=DateField()),
+            tabel_work_interval=Coalesce(
                 F('tabel_dttm_work_end') - F('tabel_dttm_work_start'),
                 datetime.timedelta(hours=0)
             ),
-            tabel_work_hours_0=Cast(Extract(F('tabel_work_hours_interval'), 'epoch') / 3600, FloatField()),
-            tabel_work_hours=Ceil(F('tabel_work_hours_0') - breaktime),
+            tabel_total_work_seconds=Cast(Extract(F('tabel_work_interval'), 'epoch'), FloatField()),
+            tabel_breaktime_seconds=WorkerDay.get_breaktime(
+                network_id=network.id, break_calc_field_name='tabel_total_work_seconds'),  # TODO: для обучений тоже учитывать перерывы?
+            tabel_night_start_edge_time=Value(night_edges[0], output_field=TimeField()),
+            tabel_night_work_seconds=Case(
+                When(
+                    Q(tabel_dttm_work_end_time__lte=night_edges[0]) &
+                    Q(tabel_dttm_work_start_date=F('tabel_dttm_work_end_date')),
+                    then=0,
+                ),
+                When(
+                    Q(tabel_dttm_work_start_time__gte=Value(night_edges[0], output_field=TimeField())) &
+                    Q(tabel_dttm_work_end_time__lte=Value(night_edges[1], output_field=TimeField())),
+                    then=F('tabel_total_work_seconds'),
+                ),
+                When(
+                    Q(tabel_night_start_edge_time__gt=F('tabel_dttm_work_end_time')),
+                    then=Extract(F('tabel_night_start_edge_time') - F('tabel_dttm_work_start_time'), 'epoch', output_field=FloatField())
+                ),
+                default=0,  # TODO: доделать
+            ),
+            tabel_work_hours=Cast(Greatest(
+                F('tabel_total_work_seconds') - F('tabel_breaktime_seconds'), 0, output_field=FloatField()
+            ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=1)),
         )
+
+        qs = qs.filter(
+            Q(
+                type__in=WorkerDay.TYPES_TABEL_HOURS,
+                fact_dttm_work_start__isnull=False,
+                fact_dttm_work_end__isnull=False,
+            ) | ~Q(type__in=WorkerDay.TYPES_TABEL_HOURS),
+        )
+
         return qs.filter(**kwargs)
 
 
@@ -491,6 +511,12 @@ class WorkerDay(AbstractModel):
         TYPE_TRAIN_VACATION,
     ]
 
+    # типы, для которых в табеле необходимо проставлять часы
+    TYPES_TABEL_HOURS = (
+        TYPE_WORKDAY,
+        TYPE_QUALIFICATION,
+    )
+
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
             self.worker.last_name if self.worker else 'No worker',
@@ -549,6 +575,34 @@ class WorkerDay(AbstractModel):
 
     def get_department(self):
         return self.shop
+
+    @classmethod
+    def get_breaktime(cls, network_id, break_calc_field_name):
+        break_triplets = Break.get_break_triplets(network_id=network_id)
+        breaktime = Value(0, output_field=FloatField())
+        if break_triplets:
+            whens = [
+                When(
+                    Q(**{f'{break_calc_field_name}__gte': break_triplet[0]}, **{f'{break_calc_field_name}__lte': break_triplet[1]}) &
+                    (Q(employment__position__breaks_id=break_id) | (Q(employment__position__breaks__isnull=True) & Q(
+                        employment__shop__settings__breaks_id=break_id))),
+                    then=break_triplet[2]
+                )
+                for break_id, breaks in break_triplets.items()
+                for break_triplet in breaks
+            ]
+            breaktime = Case(*whens, output_field=FloatField())
+
+        return breaktime
+
+    @property
+    def dt_as_str(self):
+        from src.util.models_converter import Converter
+        return Converter.convert_date(self.dt)
+
+    @property
+    def type_name(self):
+        return self.get_type_display()
 
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks

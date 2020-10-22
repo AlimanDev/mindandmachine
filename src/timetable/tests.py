@@ -572,25 +572,26 @@ class TestWorkerDay(APITestCase):
         )
 
     def test_get_hours_details_for_tabel(self):
-        plan_dttm_work_start = datetime.combine(self.dt, time(11, 0, 0))
-        plan_dttm_work_end = datetime.combine(self.dt, time(22, 0, 0))
-        fact_dttm_work_start = datetime.combine(self.dt, time(10, 0, 0))
-        fact_dttm_work_end = datetime.combine(self.dt, time(20, 0, 0))
+        plan_dttm_work_start = datetime.combine(self.dt, time(16, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt + timedelta(days=1), time(3, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(16, 40, 0))
+        fact_dttm_work_end = datetime.combine(self.dt + timedelta(days=1), time(3, 20, 0))
 
         resp_data = self._test_tabel(
             plan_start=plan_dttm_work_start,
             plan_end=plan_dttm_work_end,
             fact_start=fact_dttm_work_start,
             fact_end=fact_dttm_work_end,
-            expected_start=plan_dttm_work_start,
-            expected_end=fact_dttm_work_end,
-            expected_hours=8.0,  # почему не учитывается время перерыва?
+            expected_start=fact_dttm_work_start,
+            expected_end=plan_dttm_work_end,
+            expected_hours=9.1,
             extra_get_params=dict(
                 hours_details=True,
             )
         )
 
-        self.assertIn('work_hours_details', resp_data)
+        self.assertIn('work_hours_details', resp_data[0])
+        self.assertDictEqual({'D': 4.7, 'N': 4.4}, resp_data[0]['work_hours_details'])
 
     def test_get_worker_day_by_worker__username__in(self):
         get_params = {
