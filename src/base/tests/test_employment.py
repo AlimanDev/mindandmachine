@@ -154,14 +154,16 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.shop3.code = str(self.shop3.id)
         self.shop3.save()
         put_data['shop_code'] = self.shop3.code
+        put_data['tabel_code'] = 'new_tabel_code'
         resp = self.client.put(
             path=self.get_url('Employment-detail', pk=empl_code),
             data=self.dump_data(put_data),
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 200)  # updated
-        e.refresh_from_db(fields=['shop_id'])
+        e.refresh_from_db(fields=['shop', 'tabel_code'])
         self.assertEqual(e.shop.id, self.shop3.id)
+        self.assertEqual(e.tabel_code, 'new_tabel_code')
 
     def test_auto_timetable(self):
         employment_ids = list(Employment.objects.filter(shop=self.shop).values_list('id', flat=True))
