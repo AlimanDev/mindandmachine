@@ -531,7 +531,7 @@ class TestWorkerDay(APITestCase):
             fact_end=fact_dttm_work_end,
             expected_start=plan_dttm_work_start,
             expected_end=fact_dttm_work_end,
-            expected_hours=9.0,
+            expected_hours=8.8,
         )
 
     def test_tabel_allowed_early_departure(self):
@@ -547,7 +547,7 @@ class TestWorkerDay(APITestCase):
             fact_end=fact_dttm_work_end,
             expected_start=plan_dttm_work_start,
             expected_end=plan_dttm_work_end,
-            expected_hours=10.0,
+            expected_hours=9.8,
         )
 
     def test_can_override_tabel_settings(self):
@@ -555,6 +555,7 @@ class TestWorkerDay(APITestCase):
             allowed_interval_for_late_arrival=timedelta(seconds=0),
             allowed_interval_for_early_departure=timedelta(seconds=0),
         )
+        self.network.refresh_from_db()
 
         plan_dttm_work_start = datetime.combine(self.dt, time(10, 0, 0))
         plan_dttm_work_end = datetime.combine(self.dt, time(21, 0, 0))
@@ -568,7 +569,7 @@ class TestWorkerDay(APITestCase):
             fact_end=fact_dttm_work_end,
             expected_start=plan_dttm_work_start,
             expected_end=fact_dttm_work_end,
-            expected_hours=10.0,
+            expected_hours=9.6,
         )
 
     def test_get_hours_details_for_tabel(self):
