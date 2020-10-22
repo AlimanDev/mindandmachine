@@ -6,11 +6,13 @@ from django.contrib.auth.models import (
     UserManager
 )
 from django.db import models
-from django.db.models import Subquery, OuterRef, Max
+from django.db.models import Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField, DateField, \
+    TimeField, DecimalField
+from django.db.models.functions import Extract, Coalesce, Cast, Round, Greatest
 from django.db.models.query import QuerySet
 from django.utils import timezone
 
-from src.base.models import Shop, Employment, User, Event, Network
+from src.base.models import Shop, Employment, User, Event, Network, Break
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, \
     AbstractActiveModelManager
 
@@ -31,11 +33,11 @@ class WorkTypeManager(AbstractActiveModelManager):
         """
 
         return self.filter(
-            models.Q(dttm_added__date__lte=dt_from) | models.Q(dttm_added__isnull=True)
+            Q(dttm_added__date__lte=dt_from) | Q(dttm_added__isnull=True)
         ).filter(
-            models.Q(dttm_deleted__date__gte=dt_to) | models.Q(dttm_deleted__isnull=True)
+            Q(dttm_deleted__date__gte=dt_to) | Q(dttm_deleted__isnull=True)
         ).filter(*args, **kwargs)
-    
+
     def qos_delete(self, *args, **kwargs):
         for obj in self.filter(*args, **kwargs):
             obj.delete()
@@ -96,14 +98,14 @@ class WorkType(AbstractActiveModel):
         if hasattr(self, 'code'):
             self.work_type_name = WorkTypeName.objects.get(code=self.code)
         super(WorkType, self).save(*args, **kwargs)
-        
+
     def get_department(self):
         return self.shop
 
     def delete(self):
         if Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True).exists():
             raise models.ProtectedError('There is cashboxes with such work_type', Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True))
-        
+
         super(WorkType, self).delete()
         # self.dttm_deleted = datetime.datetime.now()
         # self.save()
@@ -169,9 +171,9 @@ class CashboxManager(models.Manager):
         """
 
         return self.filter(
-            models.Q(dttm_added__date__lte=dt_from) | models.Q(dttm_added__isnull=True)
+            Q(dttm_added__date__lte=dt_from) | Q(dttm_added__isnull=True)
         ).filter(
-            models.Q(dttm_deleted__date__gt=dt_to) | models.Q(dttm_deleted__isnull=True)
+            Q(dttm_deleted__date__gt=dt_to) | Q(dttm_deleted__isnull=True)
         ).filter(*args, **kwargs)
 
 
@@ -290,27 +292,63 @@ class WorkerDayQuerySet(QuerySet):
     def get_fact_edit(self, **kwargs):
         raise NotImplementedError
 
-    def get_tabel(self, **kwargs):
-        query = self.filter(
-            models.Q(is_fact=True, is_approved=True) |
-            models.Q(models.Q(is_approved=True) & ~models.Q(type__in=WorkerDay.TYPES_PAID))
+    def get_tabel(self, network, **kwargs):
+        qs = self.filter(is_fact=False, is_approved=True)
+        fact_approved_wdays_subq = WorkerDay.objects.filter(
+            Q(type=WorkerDay.TYPE_WORKDAY, shop_id=OuterRef('shop_id')) | Q(type=WorkerDay.TYPE_QUALIFICATION),
+            # type=OuterRef('type'),  нужно? обучения в факт. графике должны заноситься как обучения или как рд?
+            dt=OuterRef('dt'),
+            worker_id=OuterRef('worker_id'),
+            is_fact=True,
+            is_approved=True,
+        ).order_by('-id')
+        qs = qs.annotate(
+            plan_dttm_work_start=F('dttm_work_start'),
+            plan_dttm_work_end=F('dttm_work_end'),
+            fact_dttm_work_start=Subquery(fact_approved_wdays_subq.values('dttm_work_start')[:1]),
+            fact_dttm_work_end=Subquery(fact_approved_wdays_subq.values('dttm_work_end')[:1]),
+            tabel_dttm_work_start=Case(
+                When(plan_dttm_work_start__lt=F('fact_dttm_work_start') - network.allowed_interval_for_late_arrival,
+                     then=F('fact_dttm_work_start')),
+                default=F('plan_dttm_work_start'), output_field=DateTimeField()
+            ),
+            tabel_dttm_work_start_time=Cast(F('tabel_dttm_work_start'), output_field=TimeField()),
+            tabel_dttm_work_start_date=Cast(F('tabel_dttm_work_start'), output_field=DateField()),
+            tabel_dttm_work_end=Case(
+                When(plan_dttm_work_end__gt=F('fact_dttm_work_end') + network.allowed_interval_for_early_departure,
+                     then=F('fact_dttm_work_end')),
+                default=F('plan_dttm_work_end'), output_field=DateTimeField()
+            ),
+            tabel_dttm_work_end_time=Cast(F('tabel_dttm_work_end'), output_field=TimeField()),
+            tabel_dttm_work_end_date=Cast(F('tabel_dttm_work_end'), output_field=DateField()),
+            tabel_work_interval=Coalesce(
+                F('tabel_dttm_work_end') - F('tabel_dttm_work_start'),
+                datetime.timedelta(hours=0)
+            ),
+            tabel_total_work_seconds=Cast(Extract(F('tabel_work_interval'), 'epoch'), FloatField()),
+            tabel_breaktime_seconds=WorkerDay.get_breaktime(
+                network_id=network.id, break_calc_field_name='tabel_total_work_seconds'),  # TODO: для обучений тоже учитывать перерывы?
+            tabel_work_hours=Cast(Greatest(
+                F('tabel_total_work_seconds') - F('tabel_breaktime_seconds'), 0, output_field=FloatField()
+            ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=1)),
         )
-        worker_days = list(query.order_by('worker_id', 'dt', '-is_fact'))
-        exists = []
-        remove = []
-        for worker_day in worker_days:
-            if (worker_day.worker_id, worker_day.dt) in exists:
-                remove.append(worker_day.id)
-            else:
-                exists.append((worker_day.worker_id, worker_day.dt))
-        return query.filter(**kwargs).exclude(id__in=remove)
+
+        qs = qs.filter(
+            Q(
+                type__in=WorkerDay.TYPES_TABEL_HOURS,
+                fact_dttm_work_start__isnull=False,
+                fact_dttm_work_end__isnull=False,
+            ) | ~Q(type__in=WorkerDay.TYPES_TABEL_HOURS),
+        )
+
+        return qs.filter(**kwargs)
 
 
 class WorkerDayManager(models.Manager):
     def qos_current_version(self, approved_only=False):
         if approved_only:
             return super().get_queryset().filter(
-                models.Q(child__id__isnull=True) | models.Q(child__worker_day_approve=False),
+                Q(child__id__isnull=True) | Q(child__worker_day_approve=False),
                 worker_day_approve=True,
             )
         else:
@@ -445,6 +483,12 @@ class WorkerDay(AbstractModel):
         TYPE_TRAIN_VACATION,
     ]
 
+    # типы, для которых в табеле необходимо проставлять часы
+    TYPES_TABEL_HOURS = (
+        TYPE_WORKDAY,
+        TYPE_QUALIFICATION,
+    )
+
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
             self.worker.last_name if self.worker else 'No worker',
@@ -500,9 +544,43 @@ class WorkerDay(AbstractModel):
                 work_hours = work_hours - sum(break_triplet[2])
                 break
         return datetime.timedelta(minutes=work_hours)
-    
+
     def get_department(self):
         return self.shop
+
+    @classmethod
+    def get_breaktime(cls, network_id, break_calc_field_name):
+        break_triplets = Break.get_break_triplets(network_id=network_id)
+        breaktime = Value(0, output_field=FloatField())
+        if break_triplets:
+            whens = [
+                When(
+                    Q(**{f'{break_calc_field_name}__gte': break_triplet[0]}, **{f'{break_calc_field_name}__lte': break_triplet[1]}) &
+                    (
+                        Q(employment__position__breaks_id=break_id) |
+                        (
+                            Q(employment__position__breaks__isnull=True) &
+                            Q(employment__shop__settings__breaks_id=break_id)
+                        ) |
+                        (Q(employment__isnull=True) & Q(shop__settings__breaks_id=break_id))
+                    ),
+                    then=break_triplet[2]
+                )
+                for break_id, breaks in break_triplets.items()
+                for break_triplet in breaks
+            ]
+            breaktime = Case(*whens, output_field=FloatField())
+
+        return breaktime
+
+    @property
+    def dt_as_str(self):
+        from src.util.models_converter import Converter
+        return Converter.convert_date(self.dt)
+
+    @property
+    def type_name(self):
+        return self.get_type_display()
 
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
@@ -678,9 +756,9 @@ class Event(AbstractModel):
                 is_updated = False
                 update_condition = user_worker_day.type != WorkerDay.TYPE_WORKDAY or \
                                    WorkerDayCashboxDetails.objects.filter(
-                                       models.Q(dttm_from__gte=vacancy.dttm_from, dttm_from__lt=vacancy.dttm_to) |
-                                       models.Q(dttm_to__gt=vacancy.dttm_from, dttm_to__lte=vacancy.dttm_to) |
-                                       models.Q(dttm_from__lte=vacancy.dttm_from, dttm_to__gte=vacancy.dttm_to),
+                                       Q(dttm_from__gte=vacancy.dttm_from, dttm_from__lt=vacancy.dttm_to) |
+                                       Q(dttm_to__gt=vacancy.dttm_from, dttm_to__lte=vacancy.dttm_to) |
+                                       Q(dttm_from__lte=vacancy.dttm_from, dttm_to__gte=vacancy.dttm_to),
                                        worker_day_id=user_worker_day.id,
                                        dttm_deleted__isnull=True,
                                    ).count() == 0

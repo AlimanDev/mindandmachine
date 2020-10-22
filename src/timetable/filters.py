@@ -14,11 +14,11 @@ from django.db.models import Q
 class WorkerDayFilter(FilterSet):
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода")  # aa: fixme: delete
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода') # aa: fixme: delete
-    is_tabel = BooleanFilter(field_name='worker_day_is_tabel', method='filter_tabel', label="Выгрузка табеля")
+    is_tabel = BooleanFilter(method='filter_tabel', label="Выгрузка табеля")
 
     def filter_tabel(self, queryset, name, value):
         if value:
-            return queryset.get_tabel()
+            return queryset.get_tabel(network=self.request.user.network)
 
         return queryset
 

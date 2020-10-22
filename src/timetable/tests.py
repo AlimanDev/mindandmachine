@@ -67,8 +67,8 @@ class TestWorkerDay(APITestCase):
             dt=self.dt,
             is_fact=True,
             type=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(self.dt, time(8, 12, 23)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 2, 1)),
+            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(20, 30, 0)),
             is_approved=True,
             parent_worker_day=self.worker_day_plan_approved,
         )
@@ -85,6 +85,9 @@ class TestWorkerDay(APITestCase):
         )
 
         self.client.force_authenticate(user=self.user1)
+        self.network.allowed_interval_for_late_arrival = timedelta(minutes=15)
+        self.network.allowed_interval_for_early_departure = timedelta(minutes=15)
+        self.network.save()
 
     def test_get_list(self):
         dt = Converter.convert_date(self.dt)
@@ -430,6 +433,166 @@ class TestWorkerDay(APITestCase):
         resp_data = response.json()
         self.assertEqual(len(resp_data), 1)
         self.assertEqual(resp_data[0]['type'], 'S')
+
+    def _test_tabel(self, plan_start, plan_end, fact_start, fact_end, expected_start, expected_end, expected_hours,
+                    extra_get_params=None):
+        plan_dttm_work_start = plan_start
+        plan_dttm_work_end = plan_end
+        WorkerDay.objects.filter(
+            id=self.worker_day_plan_approved.id,
+        ).update(
+            dttm_work_start=plan_dttm_work_start,
+            dttm_work_end=plan_dttm_work_end,
+        )
+        fact_dttm_work_start = fact_start
+        fact_dttm_work_end = fact_end
+        WorkerDay.objects.filter(
+            id=self.worker_day_fact_approved.id,
+        ).update(
+            dttm_work_start=fact_dttm_work_start,
+            dttm_work_end=fact_dttm_work_end,
+        )
+        get_params = {
+            'shop_id': self.shop.id,
+            'limit': 100,
+            'is_tabel': 'true',
+            'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
+            'dt__lte': self.dt.strftime('%Y-%m-%d'),
+        }
+        get_params.update(extra_get_params or {})
+        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        self.assertEqual(response.status_code, 200)
+        resp_data = response.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['type'], 'W')
+        self.assertEqual(resp_data[0]['dttm_work_start'], Converter.convert_datetime(expected_start))
+        self.assertEqual(resp_data[0]['dttm_work_end'], Converter.convert_datetime(expected_end))
+        self.assertEqual(resp_data[0]['work_hours'], expected_hours)
+        return resp_data
+
+    def test_tabel_early_arrival_and_late_departure(self):
+        plan_dttm_work_start = datetime.combine(self.dt, time(12, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt, time(20, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(11, 0, 0))
+        fact_dttm_work_end = datetime.combine(self.dt, time(22, 0, 0))
+
+        self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=plan_dttm_work_start,
+            expected_end=plan_dttm_work_end,
+            expected_hours=7.0,
+        )
+
+    def test_tabel_late_arrival_and_late_departure(self):
+        plan_dttm_work_start = datetime.combine(self.dt, time(9, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt, time(20, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(11, 0, 0))
+        fact_dttm_work_end = datetime.combine(self.dt, time(22, 0, 0))
+
+        self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=fact_dttm_work_start,
+            expected_end=plan_dttm_work_end,
+            expected_hours=8.0,
+        )
+
+    def test_tabel_early_arrival_and_early_departure(self):
+        plan_dttm_work_start = datetime.combine(self.dt, time(11, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt, time(22, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(10, 0, 0))
+        fact_dttm_work_end = datetime.combine(self.dt, time(20, 0, 0))
+
+        self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=plan_dttm_work_start,
+            expected_end=fact_dttm_work_end,
+            expected_hours=8.0,
+        )
+
+    def test_tabel_allowed_late_arrival(self):
+        plan_dttm_work_start = datetime.combine(self.dt, time(10, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt, time(22, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(10, 7, 0))
+        fact_dttm_work_end = datetime.combine(self.dt, time(20, 0, 0))
+
+        self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=plan_dttm_work_start,
+            expected_end=fact_dttm_work_end,
+            expected_hours=8.8,
+        )
+
+    def test_tabel_allowed_early_departure(self):
+        plan_dttm_work_start = datetime.combine(self.dt, time(10, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt, time(21, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(9, 0, 0))
+        fact_dttm_work_end = datetime.combine(self.dt, time(20, 53, 0))
+
+        self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=plan_dttm_work_start,
+            expected_end=plan_dttm_work_end,
+            expected_hours=9.8,
+        )
+
+    def test_can_override_tabel_settings(self):
+        Network.objects.filter(id=self.network.id).update(
+            allowed_interval_for_late_arrival=timedelta(seconds=0),
+            allowed_interval_for_early_departure=timedelta(seconds=0),
+        )
+        self.network.refresh_from_db()
+
+        plan_dttm_work_start = datetime.combine(self.dt, time(10, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt, time(21, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(9, 0, 0))
+        fact_dttm_work_end = datetime.combine(self.dt, time(20, 53, 0))
+
+        self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=plan_dttm_work_start,
+            expected_end=fact_dttm_work_end,
+            expected_hours=9.6,
+        )
+
+    def test_get_hours_details_for_tabel(self):
+        plan_dttm_work_start = datetime.combine(self.dt, time(16, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt + timedelta(days=1), time(3, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(16, 40, 0))
+        fact_dttm_work_end = datetime.combine(self.dt + timedelta(days=1), time(3, 20, 0))
+
+        resp_data = self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=fact_dttm_work_start,
+            expected_end=plan_dttm_work_end,
+            expected_hours=9.1,
+            extra_get_params=dict(
+                hours_details=True,
+            )
+        )
+
+        self.assertIn('work_hours_details', resp_data[0])
+        self.assertDictEqual({'D': 4.7, 'N': 4.4}, resp_data[0]['work_hours_details'])
 
     def test_get_worker_day_by_worker__username__in(self):
         get_params = {

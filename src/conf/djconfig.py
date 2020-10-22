@@ -312,6 +312,20 @@ MAX_WORK_SHIFT_SECONDS = 60 * 60 * 16  # максимальная длина с�
 # если с момент открытия предыдущей незакрытой смены прошло более MAX_WORK_SHIFT_SECONDS
 MDA_SKIP_LEAVING_TICK = False
 
+# docker volume create jod_converter_conf
+# docker run \
+# 	--memory 512m \
+# 	--name jod-converter \
+# 	-v jod_converter_conf:/etc/app \
+# 	--restart unless-stopped \
+# 	-p 8030:8080 \
+#   -d \
+# 	eugenmayer/kontextwork-converter:production
+JOD_CONVERTER_URL = 'http://localhost:8030'
+
+# docker run --restart unless-stopped -p 3001:3000 -d thecodingmachine/gotenberg:6
+GOTENBERG_URL = 'http://localhost:3001'
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
 

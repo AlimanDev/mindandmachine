@@ -1,7 +1,7 @@
 from django.contrib import admin
+
 from src.base.models import (
     Employment,
-    Network,
     User,
     Shop,
     ShopSettings,
@@ -14,9 +14,11 @@ from src.base.models import (
     Break,
 )
 
+
 @admin.register(Network)
 class NetworkAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'code', 'logo')
+
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):
@@ -48,12 +50,14 @@ class QsUserAdmin(admin.ModelAdmin):
     def shop_name(instance: User):
         res = ', '.join(i.shop.name for i in instance.employments.all().select_related('shop'))
         return res
+
     '''
     @staticmethod
     def work_type_name(instance: User):
         cashboxinfo_set = instance.workercashboxinfo_set.all().select_related('work_type')
         return ' '.join(['"{}"'.format(cbi.work_type.name) for cbi in cashboxinfo_set])
     '''
+
 
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
@@ -67,7 +71,7 @@ class ShopAdmin(admin.ModelAdmin):
 
 @admin.register(ShopSettings)
 class ShopSettingsAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name' )
+    list_display = ('id', 'name')
     search_fields = ('id', 'name')
 
 

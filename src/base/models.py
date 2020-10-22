@@ -7,7 +7,9 @@ from django.contrib.auth.models import (
 )
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.db.models import Case, When, Sum, Value, IntegerField
+from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef
+from django.db.models.query import QuerySet
+from django.utils.functional import cached_property
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
 from timezone_field import TimeZoneField
@@ -31,9 +33,22 @@ class Network(AbstractActiveModel):
     # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
     need_symbol_for_vacancy = models.BooleanField(default=False)
     settings_values = models.TextField(default='{}')  # настройки для сети. Cейчас есть настройки для приемки чеков + ночные смены
+    allowed_interval_for_late_arrival = models.DurationField(
+        verbose_name='Допустимый интервал для опоздания', default=datetime.timedelta(seconds=0))
+    allowed_interval_for_early_departure = models.DurationField(
+        verbose_name='Допустимый интервал для раннего ухода', default=datetime.timedelta(seconds=0))
+    okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name='Код по ОКПО')
 
     def get_department(self):
         return None
+
+    @cached_property
+    def night_edges(self):
+        default_night_edges = (
+            '22:00:00',
+            '06:00:00',
+        )
+        return json.loads(self.settings_values).get('night_edges', default_night_edges)
 
     def __str__(self):
         return f'name: {self.name}, code: {self.code}'
@@ -62,13 +77,20 @@ class Break(AbstractActiveNamedModel):
                     return []
         return super().__getattribute__(attr)
 
+    @classmethod
+    def get_break_triplets(cls, network_id):
+        return {
+            b.id: list(map(lambda x: (x[0] * 60, x[1] * 60, sum(x[2]) * 60), b.breaks))
+            for b in cls.objects.filter(network_id=network_id)
+        }
+
     @staticmethod
     def clean_value(value):
         return json.dumps(value)
 
     def save(self, *args, **kwargs):
         self.value = self.clean_value(self.breaks)
-        super().save(*args, **kwargs)
+        return super().save(*args, **kwargs)
       
 
 class ShopSettings(AbstractActiveNamedModel):
@@ -431,6 +453,20 @@ class User(DjangoAbstractUser, AbstractModel):
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     black_list_symbol = models.CharField(max_length=128, null=True, blank=True)
 
+    def get_short_fio(self):
+        """
+        :return: Фамилия с инициалами
+        """
+        short_fio = f'{self.last_name} {self.first_name[0].upper()}.'
+        if self.middle_name:
+            short_fio += f'{self.middle_name[0].upper()}.'
+
+        return short_fio
+
+    @property
+    def short_fio(self):
+        return self.get_short_fio()
+
 
 class WorkerPosition(AbstractActiveNamedModel):
     """
@@ -455,6 +491,14 @@ class WorkerPosition(AbstractActiveNamedModel):
 
     def get_department(self):
         return None
+
+
+class EmploymentQuerySet(QuerySet):
+    def last_hired(self):
+        last_hired_subq = self.filter(user_id=OuterRef('user_id')).order_by('-dt_hired').values('id')[:1]
+        return self.filter(
+            id=Subquery(last_hired_subq)
+        )
 
 
 class Employment(AbstractActiveModel):
@@ -500,7 +544,7 @@ class Employment(AbstractActiveModel):
 
     position_tracker = FieldTracker(fields=['position'])
 
-    objects = EmploymentManager()
+    objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
 
     def has_permission(self, permission, method='GET'):
         group = self.function_group or (self.position.group if self.position else None)
@@ -513,6 +557,13 @@ class Employment(AbstractActiveModel):
 
     def get_department(self):
         return self.shop
+
+    def get_short_fio_and_position(self):
+        short_fio_and_position = f'{self.user.get_short_fio()}'
+        if self.position and self.position.name:
+            short_fio_and_position += f', {self.position.name}'
+
+        return short_fio_and_position
 
     def __init__(self, *args, **kwargs):
         shop_code = kwargs.pop('shop_code', None)

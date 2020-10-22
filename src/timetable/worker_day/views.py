@@ -1,25 +1,34 @@
-import requests
 import json
-import datetime
+
+import requests
 from dateutil.relativedelta import relativedelta
-from django.utils.translation import gettext_lazy as _
-
 from django.conf import settings
-from django.db.models import OuterRef, Subquery, Q, F, IntegerField
+from django.db.models import OuterRef, Subquery, Q, F
+from django.http import HttpResponse
 from django.utils import timezone
+from django.utils.encoding import escape_uri_path
+from django.utils.translation import gettext_lazy as _
 from django_filters import utils
-
 from rest_framework import viewsets
-from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.response import Response
+from src.main.timetable.auto_settings.utils import set_timetable_date_from
 
-from src.base.permissions import FilteredListPermission, Permission
 from src.base.exceptions import FieldError
-from src.base.models import Employment, Shop, User
+from src.base.exceptions import MessageError
 from src.base.message import Message
-
+from src.base.models import Employment, Shop, User, ProductionDay
+from src.base.permissions import Permission
+from src.timetable.backends import MultiShopsFilterBackend
+from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
+from src.timetable.models import (
+    WorkerDay,
+    WorkerDayCashboxDetails,
+    WorkType,
+    ShopMonthStat,
+)
 from src.timetable.serializers import (
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
@@ -32,29 +41,14 @@ from src.timetable.serializers import (
     UploadTimetableSerializer,
     DownloadSerializer,
     WorkerDayListSerializer,
+    DownloadTabelSerializer,
 )
-
-from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
-from src.timetable.models import (
-    WorkerDay,
-    WorkerDayCashboxDetails,
-    WorkType,
-    ShopMonthStat,
-)
-
 from src.timetable.vacancy.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy, confirm_vacancy
-from src.main.timetable.auto_settings.utils import set_timetable_date_from
-
-from src.base.models import Employment, Shop, User, ProductionDay
-from src.base.message import Message
-from src.base.exceptions import MessageError
-from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
-from src.timetable.worker_day.utils import download_tabel_util, download_timetable_util, upload_timetable_util
-
-from src.main.timetable.auto_settings.utils import set_timetable_date_from
-from src.util.upload import get_uploaded_file
+from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util
+from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
+from src.util.upload import get_uploaded_file
 
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
@@ -114,9 +108,9 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             raise FieldError(self.error_messages['cannot_delete'])
         super().perform_destroy(worker_day)
 
-
     def list(self, request):
-        if request.query_params.get('hours_details', False):
+        is_tabel = request.query_params.get('is_tabel', False)
+        if request.query_params.get('hours_details', False) and is_tabel:
             data = []
             def _time_to_float(t):
                 return t.hour + t.minute / 60 + t.second / 60
@@ -128,44 +122,49 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             if request.query_params.get('dt__lte', False):
                 prod_day_filter['dt__lte'] = request.query_params.get('dt__lte', False)
             celebration_dates = ProductionDay.objects.filter(**prod_day_filter).values_list('dt', flat=True)
-            night_edges = (
-                '22:00:00',
-                '06:00:00',
-            )
-            night_edges = [Converter.parse_time(t) for t in json.loads(request.user.network.settings_values).get('nigth_edges', night_edges)]
 
-            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')):
-                wd_dict = WorkerDayListSerializer(worker_day).data
+            night_edges = [Converter.parse_time(t) for t in request.user.network.night_edges]
+            for worker_day in self.filter_queryset(
+                    self.get_queryset().prefetch_related('worker_day_details')).get_tabel(self.request.user.network):
+                wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 if WorkerDay.is_type_with_tm_range(worker_day.type):
-                    wd_dict['work_hours'] = worker_day.work_hours.seconds / 3600
+                    work_start = (worker_day.tabel_dttm_work_start if is_tabel else worker_day.dttm_work_start)
+                    work_end = (worker_day.tabel_dttm_work_end if is_tabel else worker_day.dttm_work_end)
+
+                    wd_dict['work_hours'] = worker_day.tabel_work_hours
                     wd_dict['work_hours_details'] = {}
                     if worker_day.dt in celebration_dates:
                         wd_dict['work_hours_details']['H'] = wd_dict['work_hours']
                     else:
-                        if worker_day.dttm_work_end.time() <= night_edges[0] and worker_day.dttm_work_start.date() == worker_day.dttm_work_end.date():
+                        if work_end.time() <= night_edges[0] and work_start.date() == work_end.date():
                             wd_dict['work_hours_details']['D'] = wd_dict['work_hours']
                             data.append(wd_dict)
                             continue
-                        if worker_day.dttm_work_start.time() >= night_edges[0] and worker_day.dttm_work_end.time() <= night_edges[1]:
+                        if work_start.time() >= night_edges[0] and work_end.time() <= night_edges[1]:
                             wd_dict['work_hours_details']['N'] = wd_dict['work_hours']
                             data.append(wd_dict)
                             continue
                         tm_start = _time_to_float(night_edges[0])
-                        if worker_day.dttm_work_end.time() <= night_edges[1]:
-                            tm_end = _time_to_float(worker_day.dttm_work_end.time())
+                        if work_end.time() <= night_edges[1]:
+                            tm_end = _time_to_float(work_end.time())
                         else:
                             tm_end = _time_to_float(night_edges[1])
-                        
-                        night_hours = tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)
-                        total = (worker_day.dttm_work_end - worker_day.dttm_work_start).seconds / 3600
-                        break_time = total - wd_dict['work_hours']
-                        wd_dict['work_hours_details']['D'] = total - night_hours - break_time / 2
-                        wd_dict['work_hours_details']['N'] = night_hours - break_time / 2
+
+                        night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
+                        total_seconds = (work_end - work_start).total_seconds()
+                        break_time_seconds = worker_day.tabel_breaktime_seconds or 0
+
+                        wd_dict['work_hours_details']['D'] = round(
+                            (total_seconds - night_seconds - break_time_seconds / 2) / 3600, 1)
+                        wd_dict['work_hours_details']['N'] = round((night_seconds - break_time_seconds / 2) / 3600, 1)
                 else:
                     wd_dict['work_hours'] = 0.0
                 data.append(wd_dict)
         else:
-            data = WorkerDayListSerializer(self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')), many=True).data
+            data = WorkerDayListSerializer(
+                self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')),
+                many=True, context=self.get_serializer_context()
+            ).data
         return Response(data)
 
 
@@ -640,6 +639,16 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def download_tabel(self, request):
-        data = DownloadSerializer(data=request.query_params)
-        data.is_valid(raise_exception=True)
-        return download_tabel_util(request, data.validated_data)
+        serializer = DownloadTabelSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        shop = Shop.objects.get(id=serializer.validated_data.get('shop_id'))
+        dt_from = serializer.validated_data.get('dt_from')
+        dt_to = serializer.validated_data.get('dt_to')
+        convert_to = serializer.validated_data.get('convert_to')
+        response = HttpResponse(
+            get_tabel_generator_cls()(shop, dt_from, dt_to).generate(convert_to=convert_to),
+            content_type='application/octet-stream',
+        )
+        filename = f'Табель_для_подразделения_{shop.code}_от_{timezone.now().strftime("%Y-%m-%d")}.{convert_to}'
+        response['Content-Disposition'] = f'attachment; filename={escape_uri_path(filename)}'
+        return response

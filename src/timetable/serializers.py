@@ -43,10 +43,24 @@ class WorkerDayListSerializer(serializers.Serializer):
     is_approved = serializers.BooleanField()
     worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True)
     is_fact = serializers.BooleanField()
-    work_hours = serializers.DurationField()
+    work_hours = serializers.SerializerMethodField()
     parent_worker_day_id = serializers.IntegerField()
     shop_code = serializers.CharField(required=False, read_only=True)
     user_login = serializers.CharField(required=False, read_only=True)
+
+    def __init__(self, *args, **kwargs):
+        super(WorkerDayListSerializer, self).__init__(*args, **kwargs)
+        if self.context.get('request').query_params.get('is_tabel'):
+            self.fields['dttm_work_start'].source = 'tabel_dttm_work_start'
+            self.fields['dttm_work_start'].source_attrs = ['tabel_dttm_work_start']
+            self.fields['dttm_work_end'].source = 'tabel_dttm_work_end'
+            self.fields['dttm_work_end'].source_attrs = ['tabel_dttm_work_end']
+
+    def get_work_hours(self, obj):
+        if self.context.get('request').query_params.get('is_tabel'):
+            return getattr(obj, 'tabel_work_hours', obj.work_hours)
+
+        return obj.work_hours
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):
@@ -451,3 +465,10 @@ class DownloadSerializer(serializers.Serializer):
     is_approved = serializers.BooleanField(default=True)
     inspection_version = serializers.BooleanField(default=False)
     shop_id = serializers.IntegerField()
+
+
+class DownloadTabelSerializer(serializers.Serializer):
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
+    shop_id = serializers.IntegerField()
+    convert_to = serializers.ChoiceField(required=False, choices=['pdf', 'xlsx'], default='xlsx')
