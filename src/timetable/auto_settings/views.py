@@ -875,6 +875,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         wd_obj = wdays[False]
                         if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
                             wd_obj.type = wd['type']
+                            wd_obj.created_by_id = None
                             WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
                     elif True in wdays:
                         wd_obj.parent_worker_day=wdays[True]
