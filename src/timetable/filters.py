@@ -1,3 +1,7 @@
+import datetime
+
+from dateutil.relativedelta import relativedelta
+from django.db.models import Q
 from django_filters.rest_framework import (
     FilterSet,
     BooleanFilter,
@@ -7,8 +11,8 @@ from django_filters.rest_framework import (
     CharFilter,
     OrderingFilter,
 )
+
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
-from django.db.models import Q
 
 
 class WorkerDayFilter(FilterSet):
@@ -66,14 +70,17 @@ class FilterSetWithInitial(FilterSet):
 
                 # filter param is either missing or empty, use initial as default
                 if not data.get(name) and initial:
+                    if callable(initial):
+                        initial = initial()
                     data[name] = initial
 
         super().__init__(data, *args, **kwargs)
 
 
 class VacancyFilter(FilterSetWithInitial):
-    dt_from = DateFilter(field_name='dt', lookup_expr='gte')
-    dt_to = DateFilter(field_name='dt', lookup_expr='lte')
+    dt_from = DateFilter(field_name='dt', lookup_expr='gte', initial=datetime.datetime.today)
+    dt_to = DateFilter(
+        field_name='dt', lookup_expr='lte', initial=lambda: datetime.datetime.today() + relativedelta(months=1))
     is_vacant = BooleanFilter(field_name='worker', lookup_expr='isnull')
     shift_length_min = TimeFilter(field_name='work_hours', lookup_expr='gte')
     shift_length_max = TimeFilter(field_name='work_hours', lookup_expr='lte')
