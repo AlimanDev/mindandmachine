@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='shopmonthstat',
             name='predict_needs',
-            field=models.IntegerField(blank=True, default=0, null=True),
+            field=models.IntegerField(blank=True, default=0, null=True, verbose_name='Количество часов по нагрузке'),
         ),
     ]
