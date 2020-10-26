@@ -374,19 +374,24 @@ class WorkerDayManager(models.Manager):
         последнюю версию за каждый день.
         """
         super().get_queryset()
+        subq_kwargs = kwargs.copy()
+        subq_kwargs.pop('dt', None)
+        subq_kwargs.pop('worker_id', None)
+        subq_kwargs.pop('is_fact', None)
         max_dt_subq = WorkerDay.objects.filter(
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
             is_fact=False,
+            **subq_kwargs,
             # shop_id=OuterRef('shop_id')
         ).values( # for group by
-            'dttm_added'
-        ).annotate(dt_max=Max('dttm_added')).values('dt_max')[:1]
+            'dttm_modified'
+        ).annotate(dt_max=Max('dttm_modified')).values('dt_max')[:1]
         return super().get_queryset().filter(
             *args,
             **kwargs,
             is_fact=False,
-            dttm_added=Subquery(max_dt_subq),
+            dttm_modified=Subquery(max_dt_subq),
         )
 
     @staticmethod

@@ -440,6 +440,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             worker_id__in=user_ids,
             dt__gte=dt_from - timedelta(days=7),
             dt__lte=dt_from,
+            **new_worker_days_filter,
         ).exclude(
             type=WorkerDay.TYPE_EMPTY,
         ).order_by(
@@ -544,7 +545,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             prev_data[key].append(worker_d)
 
         employment_stat_dict = count_prev_paid_days(dt_from - timedelta(days=1), employments, shop.region_id)
-        month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_start=dt_from)
+        month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_start=dt_from, is_approved=not form['use_not_approved'])
+        month_stat_prev = count_prev_paid_days(dt_from, employments, shop.region_id, dt_start=dt_first, is_approved=not form['use_not_approved'])
 
         ##################################################################
 
@@ -680,6 +682,12 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         work_hours = shop.settings.fot if shop.settings.fot else work_hours  # fixme: tmp, special for 585
         init_params['n_working_days_optimal'] = len(work_days)
 
+        for e in employments:
+            fot = work_hours * e.norm_work_hours / 100
+            fot = fot * (init_params['n_working_days_optimal'] - (month_stat[e.id]['vacations'] + month_stat_prev[e.id]['vacations'])) / init_params['n_working_days_optimal']
+            employment_stat_dict[e.id]['norm_work_amount'] = (fot - month_stat_prev[e.id]['paid_hours']) * (init_params['n_working_days_optimal'] - month_stat_prev[e.id]['no_data']) / init_params['n_working_days_optimal']
+
+
         ##################################################################
         breaks = {
             str(w.id): w.breaks.breaks if w.breaks else shop.settings.breaks.breaks
@@ -747,10 +755,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     'prev_data': WorkerDayConverter.convert(prev_data.get(e.user_id, []), out_array=True),
                     'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),
                     'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),
-                    'norm_work_amount': (work_hours - month_stat[e.id]['paid_hours'] -
-                                         month_stat[e.id]['vacations'] * ProductionDay.WORK_NORM_HOURS[
-                                             ProductionDay.TYPE_WORK]
-                                         ) * e.norm_work_hours / 100,
+                    'norm_work_amount': employment_stat_dict[e.id]['norm_work_amount'],
                     'required_coupled_hol_in_hol': employment_stat_dict[e.id].get('required_coupled_hol_in_hol', 0),
                     'min_shift_len': e.shift_hours_length_min if e.shift_hours_length_min else 0,
                     'max_shift_len': e.shift_hours_length_max if e.shift_hours_length_max else 24,
@@ -870,6 +875,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         wd_obj = wdays[False]
                         if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
                             wd_obj.type = wd['type']
+                            wd_obj.created_by_id = None
                             WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
                     elif True in wdays:
                         wd_obj.parent_worker_day=wdays[True]
@@ -1029,7 +1035,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         return Response()
 
-def count_prev_paid_days(dt_end, employments, region_id, dt_start=None):
+def count_prev_paid_days(dt_end, employments, region_id, dt_start=None, is_approved=True):
     """
     Функция для подсчета разница между нормальным количеством отработанных дней и часов и фактическими
 
@@ -1050,18 +1056,21 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None):
 
     prev_info = list(Employment.objects.filter(
         Q(
-          Q(user__worker_day__type__in=WorkerDay.TYPES_PAID)|
-          Q(user__worker_day__type=WorkerDay.TYPE_VACATION),
+        #   Q(user__worker_day__type__in=WorkerDay.TYPES_PAID)|
+        #   Q(user__worker_day__type__in=[WorkerDay.TYPE_SELF_VACATION, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK, WorkerDay.TYPE_EMPTY]),
+          Q(dt_fired__isnull=False) & Q(user__worker_day__dt__lte=F('dt_fired')) | Q(dt_fired__isnull=True), #чтобы не попали рабочие дни после увольнения
           user__worker_day__dt__gte=dt_start,
           user__worker_day__dt__lt=dt_end,
           user__worker_day__is_fact=False,
-          user__worker_day__is_approved=True) |
+          user__worker_day__is_approved=is_approved) |
         Q(user__worker_day=None),  # for doing left join
         id__in=ids,
     ).values('id').annotate(
         paid_days=Coalesce(Count('user__worker_day', filter=Q(user__worker_day__type__in=WorkerDay.TYPES_PAID)), 0),
         paid_hours=Coalesce(Sum(Extract(F('user__worker_day__work_hours'),'epoch') / 3600, filter=Q(user__worker_day__type__in=WorkerDay.TYPES_PAID)), 0),
-        vacations=Coalesce(Count('user__worker_day', filter=Q(user__worker_day__type=WorkerDay.TYPE_SELF_VACATION)), 0),
+        vacations=Coalesce(Count('user__worker_day', filter=Q(user__worker_day__type__in=[WorkerDay.TYPE_SELF_VACATION, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK])), 0),
+        no_data=Coalesce(Count('user__worker_day', filter=Q(user__worker_day__type=WorkerDay.TYPE_EMPTY)), 0),
+        all_days=Coalesce(Count('user__worker_day'), 0),
     ).order_by('id'))
     prev_info = {e['id']: e for e in prev_info}
     employment_stat_dict = {}
@@ -1077,6 +1086,7 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None):
             'paid_days': 0,
             'paid_hours': 0,
             'vacations': 0,
+            'no_data': (dt_end - dt_start).days,
         }
 
         if prev_info.get(employment.id, None):
@@ -1085,6 +1095,7 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None):
             employment_stat_dict[employment.id]['paid_days'] = prev_info[employment.id]['paid_days']
             employment_stat_dict[employment.id]['paid_hours'] = prev_info[employment.id]['paid_hours']
             employment_stat_dict[employment.id]['vacations'] = prev_info[employment.id]['vacations']
+            employment_stat_dict[employment.id]['no_data'] = prev_info[employment.id]['no_data'] + ((dt_end - dt_start).days - prev_info[employment.id]['all_days'])
 
 
     return employment_stat_dict
