@@ -741,7 +741,7 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
     """
     shop = Shop.objects.get(id=shop_id)
     exchange_settings = shop.get_exchange_settings()
-    if not exchange_settings.automatic_check_lack:
+    if not exchange_settings or not exchange_settings.automatic_check_lack:
         return
 
     if dt_from is None:

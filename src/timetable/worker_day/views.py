@@ -1,3 +1,4 @@
+import datetime
 import json
 
 import requests
@@ -441,8 +442,8 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 shop_id=blank_day.shop_id,
                 work_hours=blank_day.work_hours,
                 type=blank_day.type,
-                dttm_work_start=blank_day.dttm_work_start,
-                dttm_work_end=blank_day.dttm_work_end,
+                dttm_work_start=datetime.datetime.combine(dt, blank_day.dttm_work_start.timetz()),
+                dttm_work_end=datetime.datetime.combine(dt, blank_day.dttm_work_end.timetz()),
                 is_approved=False,
                 is_fact=False,
             )
