@@ -1270,6 +1270,21 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(len(response.json()), 8)
         self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False).count(), 8)
 
+    def test_duplicate_day_without_time(self):
+        dt_from = date.today()
+        dt_from2 = dt_from + timedelta(days=10)
+        self.create_holidays(self.employment2, dt_from, 1, False)
+
+        data = {
+            'from_workerday_ids': list(WorkerDay.objects.filter(worker=self.user2).values_list('id', flat=True)),
+            'to_worker_id': self.user3.id,
+            'to_dates': [Converter.convert_date(dt_from2 + timedelta(i)) for i in range(8)],
+        }
+        url = f'{self.url}duplicate/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(len(response.json()), 8)
+        self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False).count(), 8)
+
     def test_change_list(self):
         dt_from = date.today()
         data = {

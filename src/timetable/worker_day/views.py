@@ -442,8 +442,10 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 shop_id=blank_day.shop_id,
                 work_hours=blank_day.work_hours,
                 type=blank_day.type,
-                dttm_work_start=datetime.datetime.combine(dt, blank_day.dttm_work_start.timetz()),
-                dttm_work_end=datetime.datetime.combine(dt, blank_day.dttm_work_end.timetz()),
+                dttm_work_start=datetime.datetime.combine(
+                    dt, blank_day.dttm_work_start.timetz()) if blank_day.dttm_work_start else None,
+                dttm_work_end=datetime.datetime.combine(
+                    dt, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
                 is_approved=False,
                 is_fact=False,
             )
