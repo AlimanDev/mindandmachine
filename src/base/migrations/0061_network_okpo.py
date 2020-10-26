@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='network',
             name='okpo',
-            field=models.CharField(blank=True, max_length=15, null=True),
+            field=models.CharField(blank=True, max_length=15, null=True, verbose_name='Код по ОКПО'),
         ),
     ]
