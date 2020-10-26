@@ -348,7 +348,6 @@ class VacancySerializer(serializers.Serializer):
     last_name = serializers.CharField()
     worker_id = serializers.IntegerField()
     worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True, required=False)
-    shop = ShopSerializer()
     is_fact = serializers.BooleanField()
     is_approved = serializers.BooleanField()
     dttm_work_start = serializers.DateTimeField(default=None)
@@ -357,6 +356,10 @@ class VacancySerializer(serializers.Serializer):
     is_outsource = serializers.BooleanField()
     avatar = serializers.SerializerMethodField('get_avatar_url')
     worker_shop = serializers.IntegerField(required=False, default=None)
+
+    def __init__(self, *args, **kwargs):
+        super(VacancySerializer, self).__init__(*args, **kwargs)
+        self.fields['shop'] = ShopSerializer(context=self.context)
 
     def get_avatar_url(self, obj):
         if obj.worker_id and obj.worker.avatar:
