@@ -241,7 +241,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             ),
         )
         data = paginator.paginate_queryset(queryset, request)
-        data = VacancySerializer(data, many=True)
+        data = VacancySerializer(data, many=True, context=self.get_serializer_context())
 
         return paginator.get_paginated_response(data.data)
 

@@ -32,19 +32,31 @@ class TestDepartment(TestsHelperMixin, APITestCase):
     @staticmethod
     def _get_shop_data():
         return {
-            "address": "Воронежская обл, г Воронеж, пр-кт Революции, д 48",
+            "address": "ул. Кибальчича, д. 2. корп. 1",
             "by_code": True,
-            "code": "383-1",
+            "code": "3-001",
             "dt_closed": "3001-01-01",
-            "dt_opened": "2020-08-17",
-            "name": "ООО \"НИКАМЕД\" ОРТЕКА  Воронеж Революции 48",
+            "dt_opened": "2016-09-27",
+            "name": "ООО \"НИКАМЕД\" ОРТЕКА  ВДНХ",
             "parent_code": "main",
             "timezone": "Europe/Moscow",
             "tm_close_dict": {
-                "all": "00:00:00"
+                "d0": "21:00:00",
+                "d1": "21:00:00",
+                "d2": "21:00:00",
+                "d3": "21:00:00",
+                "d4": "21:00:00",
+                "d5": "21:00:00",
+                "d6": "21:00:00"
             },
             "tm_open_dict": {
-                "all": "00:00:00"
+                "d0": "09:00:00",
+                "d1": "09:00:00",
+                "d2": "09:00:00",
+                "d3": "09:00:00",
+                "d4": "09:00:00",
+                "d5": "09:00:00",
+                "d6": "09:00:00"
             }
         }
 
@@ -60,6 +72,19 @@ class TestDepartment(TestsHelperMixin, APITestCase):
 
         resp = self.client.put(put_url, data=self.dump_data(shop_data), content_type='application/json')
         self.assertEqual(resp.status_code, 200)
+
+        resp = self.client.put(put_url, data=self.dump_data(shop_data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+
+        self.assertEqual(Shop.objects.filter(code=shop_data["code"]).count(), 1)
+
+    def test_cant_create_multiple_shops_with_the_same_code(self):
+        shop_data = self._get_shop_data()
+        resp = self.client.post(self.url, data=self.dump_data(shop_data), content_type='application/json')
+        self.assertEqual(resp.status_code, 201)
+
+        resp = self.client.post(self.url, data=self.dump_data(shop_data), content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
 
     def test_get_list(self):
         # Админ
