@@ -448,6 +448,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                     dt, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
                 is_approved=False,
                 is_fact=False,
+                created_by=request.user,
             )
             created_wds.append(new_wd)
             new_wdcds = main_worker_days_details.get(blank_day.id, [])
