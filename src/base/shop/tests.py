@@ -209,6 +209,23 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['load_template_status'] = 'R'
         self.assertEqual(shop, data)
 
+    def test_cant_save_with_invalid_restricted_times(self):
+        data = {
+            'id': self.shop.id,
+            'restricted_start_times': '[false, ""]',
+            'restricted_end_times': '[false]',
+            'settings_id': self.shop_settings.id,
+            'load_template_id': self.load_template.id,
+            'name': 'Имя магазина',
+            'timezone': 'Europe/Moscow',
+        }
+
+        resp = self.client.put(self.shop_url, data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        resp_data = resp.json()
+        self.assertIn('restricted_start_times', resp_data)
+        self.assertIn('restricted_end_times', resp_data)
+
     def test_update_without_tm_open_close_dict_dont_clean_it(self):
         prev_tm_open_dict_val = self.shop.tm_open_dict
         prev_tm_close_dict_val = self.shop.tm_close_dict
