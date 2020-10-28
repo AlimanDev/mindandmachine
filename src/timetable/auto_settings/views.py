@@ -987,18 +987,19 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         WorkerDayCashboxDetails.objects.filter(
             worker_day__in=wdays,
         ).delete()
+        wdays.delete()
 
-        wdays.filter(
-            parent_worker_day__isnull=True
-        ).delete()
+        # wdays.filter(
+        #     parent_worker_day__isnull=True
+        # ).delete()
 
-        wdays.update(
-            dttm_work_start=None,
-            dttm_work_end=None,
-            #worker_id=None, TODO: ???
-            type=WorkerDay.TYPE_EMPTY
+        # wdays.update(
+        #     dttm_work_start=None,
+        #     dttm_work_end=None,
+        #     #worker_id=None, TODO: ???
+        #     type=WorkerDay.TYPE_EMPTY
 
-        )
+        # )
 
         # approved
         wdays = WorkerDay.objects.filter(
