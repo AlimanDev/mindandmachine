@@ -301,7 +301,6 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.assertEqual(response.json()[dt3_str], dt3_json)
         self.assertEqual(response.json()[dt4_str], dt4_json)
 
-
     def test_approve(self):
         data = {
             'shop_id': self.shop.id,
