@@ -498,7 +498,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         # Ограничения сотрудников
         constraints = {}
         for worker_constraint in list(WorkerConstraint.objects.select_related('employment').filter(
-                employment__shop_id=shop_id)):
+                employment__in=employments)):
             key = worker_constraint.worker_id
             if key not in constraints:
                 constraints[key] = []
@@ -522,6 +522,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         worker_cashbox_info = {}
         for worker_cashbox_inf in list \
                     (EmploymentWorkType.objects.select_related('employment').filter(work_type_id__in=need_work_types,
+                                                                                    employment__in=employments,
                                                                                     is_active=True)):
             key = worker_cashbox_inf.employment.user_id
             if key not in worker_cashbox_info:
