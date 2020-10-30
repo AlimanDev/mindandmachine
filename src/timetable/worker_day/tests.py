@@ -366,13 +366,6 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             self.assertEqual(wd_from_db.is_approved, True)
 
 
-
-
-
-
-
-
-
 class TestUploadDownload(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"

@@ -1,5 +1,6 @@
 import datetime
 import json
+from itertools import groupby
 
 import requests
 from dateutil.relativedelta import relativedelta
@@ -191,11 +192,12 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             is_fact=serializer.data['is_fact'],
         ).filter(approve_condition)
 
-        worker_dt_pairs_list = list(wdays_to_approve.values_list('dt', 'worker_id').distinct())
+        worker_dt_pairs_list = list(
+            wdays_to_approve.values_list('worker_id', 'dt').order_by('worker_id', 'dt').distinct())
         if worker_dt_pairs_list:
             worker_days_q = Q()
-            for dt, worker_id in worker_dt_pairs_list:
-                worker_days_q |= Q(dt=dt, worker_id=worker_id)
+            for worker_id, dates_grouper in groupby(worker_dt_pairs_list, key=lambda i: i[0]):
+                worker_days_q |= Q(worker_id=worker_id, dt__in=[i[1] for i in list(dates_grouper)])
             WorkerDay.objects.filter(
                 worker_days_q, is_fact=serializer.data['is_fact'],
             ).exclude(
