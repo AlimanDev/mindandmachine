@@ -126,7 +126,7 @@ class EmploymentListSerializer(serializers.Serializer):
     min_time_btw_shifts = serializers.IntegerField()
     shift_hours_length_min = serializers.IntegerField()
     shift_hours_length_max = serializers.IntegerField()
-    auto_timetable = serializers.BooleanField()
+    auto_timetable = serializers.BooleanField(default=True)
     tabel_code = serializers.CharField()
     is_ready_for_overworkings = serializers.BooleanField()
     dt_new_week_availability_from = serializers.DateField()
