@@ -85,8 +85,8 @@ INSTALLED_APPS = [
 REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.BasicAuthentication',
         'src.base.auth.authentication.WFMSessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
     ]
 }
 OLD_PASSWORD_FIELD_ENABLED=True
