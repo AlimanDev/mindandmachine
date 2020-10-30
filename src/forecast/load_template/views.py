@@ -159,8 +159,8 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
 
     """
     error_messages = {
-        "load_template_attached_shops": _("Cannot delete template as it's used in demand calculations.")
-
+        "load_template_attached_shops": _("Cannot delete template as it's used in demand calculations."),
+        "required": _("This field ins required")
     }
     permission_classes = [Permission]
     filterset_class = LoadTemplateFilter
