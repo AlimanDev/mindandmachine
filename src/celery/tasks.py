@@ -28,7 +28,7 @@ from src.base.models import (
     Network,
 )
 from src.celery.celery import app
-from src.conf.djconfig import EMAIL_HOST_USER, TIMETABLE_IP
+from src.conf.djconfig import EMAIL_HOST_USER, TIMETABLE_IP, QOS_DATETIME_FORMAT
 from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
 from src.forecast.models import (
     OperationTemplate,
@@ -496,6 +496,10 @@ def upload_vacation_task():
 #             create_notifications_for_event(event.id)
 @app.task
 def calculate_shops_load(lang, load_template_id, dt_from, dt_to, shop_id=None):
+    if type(dt_from) == str:
+        dt_from = datetime.strptime(dt_from, QOS_DATETIME_FORMAT).date()
+    if type(dt_to) == str:
+        dt_to = datetime.strptime(dt_to, QOS_DATETIME_FORMAT).date()
     load_template = LoadTemplate.objects.get(pk=load_template_id)
     shops = [load_template.shops.get(pk=shop_id)] if shop_id else load_template.shops.all()
     Shop.objects.filter(id__in=list(map(lambda x: x.id, shops))).update(load_template_status=Shop.LOAD_TEMPLATE_PROCESS)
@@ -508,6 +512,8 @@ def calculate_shops_load(lang, load_template_id, dt_from, dt_to, shop_id=None):
 
 @app.task
 def apply_load_template_to_shops(load_template_id, dt_from, shop_id=None):
+    if type(dt_from) == str:
+        dt_from = datetime.strptime(dt_from, QOS_DATETIME_FORMAT).date()
     load_template = LoadTemplate.objects.get(pk=load_template_id)
     shops = [Shop.objects.get(pk=shop_id)] if shop_id else load_template.shops.all()
     for shop in shops:
