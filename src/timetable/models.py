@@ -292,7 +292,7 @@ class WorkerDayQuerySet(QuerySet):
     def get_fact_edit(self, **kwargs):
         raise NotImplementedError
 
-    def get_tabel(self, network, **kwargs):
+    def get_tabel(self, network, fact_only=True, **kwargs):
         qs = self.filter(is_fact=False, is_approved=True)
         fact_approved_wdays_subq = WorkerDay.objects.filter(
             Q(type=WorkerDay.TYPE_WORKDAY, shop_id=OuterRef('shop_id')) | Q(type=WorkerDay.TYPE_QUALIFICATION),
@@ -308,19 +308,17 @@ class WorkerDayQuerySet(QuerySet):
             fact_dttm_work_start=Subquery(fact_approved_wdays_subq.values('dttm_work_start')[:1]),
             fact_dttm_work_end=Subquery(fact_approved_wdays_subq.values('dttm_work_end')[:1]),
             tabel_dttm_work_start=Case(
+                When(fact_dttm_work_start__isnull=True, then=F('fact_dttm_work_start')),
                 When(plan_dttm_work_start__lt=F('fact_dttm_work_start') - network.allowed_interval_for_late_arrival,
                      then=F('fact_dttm_work_start')),
                 default=F('plan_dttm_work_start'), output_field=DateTimeField()
             ),
-            tabel_dttm_work_start_time=Cast(F('tabel_dttm_work_start'), output_field=TimeField()),
-            tabel_dttm_work_start_date=Cast(F('tabel_dttm_work_start'), output_field=DateField()),
             tabel_dttm_work_end=Case(
+                When(fact_dttm_work_end__isnull=True, then=F('fact_dttm_work_end')),
                 When(plan_dttm_work_end__gt=F('fact_dttm_work_end') + network.allowed_interval_for_early_departure,
                      then=F('fact_dttm_work_end')),
                 default=F('plan_dttm_work_end'), output_field=DateTimeField()
             ),
-            tabel_dttm_work_end_time=Cast(F('tabel_dttm_work_end'), output_field=TimeField()),
-            tabel_dttm_work_end_date=Cast(F('tabel_dttm_work_end'), output_field=DateField()),
             tabel_work_interval=Coalesce(
                 F('tabel_dttm_work_end') - F('tabel_dttm_work_start'),
                 datetime.timedelta(hours=0)
@@ -333,13 +331,27 @@ class WorkerDayQuerySet(QuerySet):
             ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=1)),
         )
 
-        qs = qs.filter(
-            Q(
-                type__in=WorkerDay.TYPES_TABEL_HOURS,
-                fact_dttm_work_start__isnull=False,
-                fact_dttm_work_end__isnull=False,
-            ) | ~Q(type__in=WorkerDay.TYPES_TABEL_HOURS),
-        )
+        if fact_only:
+            qs = qs.filter(
+                Q(
+                    type__in=WorkerDay.TYPES_TABEL_HOURS,
+                    fact_dttm_work_start__isnull=False,
+                    fact_dttm_work_end__isnull=False,
+                ) | ~Q(type__in=WorkerDay.TYPES_TABEL_HOURS),
+            )
+        else:
+            qs = qs.annotate(
+                plan_work_interval=Coalesce(
+                    F('plan_dttm_work_end') - F('plan_dttm_work_start'),
+                    datetime.timedelta(hours=0)
+                ),
+                plan_total_work_seconds=Cast(Extract(F('plan_work_interval'), 'epoch'), FloatField()),
+                plan_breaktime_seconds=WorkerDay.get_breaktime(
+                    network_id=network.id, break_calc_field_name='plan_total_work_seconds'),
+                plan_work_hours=Cast(Greatest(
+                    F('plan_total_work_seconds') - F('plan_breaktime_seconds'), 0, output_field=FloatField()
+                ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=1)),
+            )
 
         return qs.filter(**kwargs)
 

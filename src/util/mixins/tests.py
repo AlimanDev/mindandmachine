@@ -1,7 +1,7 @@
 import json
 from calendar import Calendar
 from django.urls import reverse
-from src.timetable.models import WorkerDay
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
 from src.util.test import create_departments_and_users
 from datetime import datetime, timedelta, time, date
 from src.base.models import Employment
@@ -28,7 +28,7 @@ class TestsHelperMixin:
         return json.dumps(data)
 
     @classmethod
-    def _generate_plan_and_fact_worker_days_for_shop_employments(cls, shop, dt_from, dt_to):
+    def _generate_plan_and_fact_worker_days_for_shop_employments(cls, shop, work_type, dt_from, dt_to):
         assert dt_from.year == dt_to.year and dt_from.month == dt_to.month
 
         year = dt_from.year
@@ -57,10 +57,14 @@ class TestsHelperMixin:
                     kwargs['dttm_work_start'] = datetime.combine(day, plan_start_time)
                     kwargs['dttm_work_end'] = datetime.combine(day, plan_end_time)
 
-                WorkerDay.objects.create(**kwargs)
+                wd = WorkerDay.objects.create(**kwargs)
+                WorkerDayCashboxDetails.objects.create(
+                    worker_day=wd,
+                    work_type=work_type,
+                )
 
                 if is_workday:
-                    is_absenteeism = random.randint(1, 100) == 1  # прогул
+                    is_absenteeism = random.randint(1, 100) < 10  # прогул
                     if not is_absenteeism:
                         signs = [1, -1]
                         start_delta_sign = random.choice(signs)
