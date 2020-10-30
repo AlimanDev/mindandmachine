@@ -301,7 +301,6 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.assertEqual(response.json()[dt3_str], dt3_json)
         self.assertEqual(response.json()[dt4_str], dt4_json)
 
-
     def test_approve(self):
         data = {
             'shop_id': self.shop.id,
@@ -365,13 +364,6 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         for wd in wds4updating:
             wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
             self.assertEqual(wd_from_db.is_approved, True)
-
-
-
-
-
-
-
 
 
 class TestUploadDownload(APITestCase):

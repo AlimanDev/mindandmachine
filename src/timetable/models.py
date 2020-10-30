@@ -263,30 +263,21 @@ class WorkerDayQuerySet(QuerySet):
         return self.filter(is_fact=True, is_approved=False, **kwargs)
 
     def get_plan_edit(self, **kwargs):
+        return self.get_last_unapproved(is_fact=False, **kwargs)
+
+    def get_last_unapproved(self, is_fact, **kwargs):
         ordered_subq = WorkerDay.objects.filter(
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
-            is_fact=False,
+            is_fact=is_fact,
         ).order_by(
             'is_approved',
+            '-id',  # сортировка по id если вдруг будет несколько appr/unappr версий, то удаляем более ранние
         ).values_list('id')[:1]
         return self.filter(
             **kwargs,
-            is_fact=False,
+            is_fact=is_fact,
             id=Subquery(ordered_subq),
-        )
-
-    def get_approved4change(self, is_fact):
-        ordered_subq = WorkerDay.objects.filter(
-            dt=OuterRef('dt'),
-            worker_id=OuterRef('worker_id'),
-            is_fact=is_fact,
-        ).order_by(
-            'is_approved', '-id', # сортировка по id -- если вдруг будет несколько approved версий (вдруг), то удаляем более раннюю
-        ).values_list('id')[1:]
-        return self.filter(
-            is_fact=is_fact,
-            id__in=Subquery(ordered_subq),
         )
 
     def get_fact_edit(self, **kwargs):
