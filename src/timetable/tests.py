@@ -531,7 +531,7 @@ class TestWorkerDay(APITestCase):
             fact_end=fact_dttm_work_end,
             expected_start=plan_dttm_work_start,
             expected_end=fact_dttm_work_end,
-            expected_hours=8.8,
+            expected_hours=8.75,
         )
 
     def test_tabel_allowed_early_departure(self):
@@ -547,7 +547,7 @@ class TestWorkerDay(APITestCase):
             fact_end=fact_dttm_work_end,
             expected_start=plan_dttm_work_start,
             expected_end=plan_dttm_work_end,
-            expected_hours=9.8,
+            expected_hours=9.75,
         )
 
     def test_can_override_tabel_settings(self):
@@ -569,7 +569,7 @@ class TestWorkerDay(APITestCase):
             fact_end=fact_dttm_work_end,
             expected_start=plan_dttm_work_start,
             expected_end=fact_dttm_work_end,
-            expected_hours=9.6,
+            expected_hours=9.63,
         )
 
     def test_get_hours_details_for_tabel(self):
@@ -585,7 +585,7 @@ class TestWorkerDay(APITestCase):
             fact_end=fact_dttm_work_end,
             expected_start=fact_dttm_work_start,
             expected_end=plan_dttm_work_end,
-            expected_hours=9.1,
+            expected_hours=9.08,
             extra_get_params=dict(
                 hours_details=True,
             )

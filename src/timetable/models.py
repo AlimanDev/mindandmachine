@@ -319,7 +319,7 @@ class WorkerDayQuerySet(QuerySet):
                 network_id=network.id, break_calc_field_name='tabel_total_work_seconds'),  # TODO: для обучений тоже учитывать перерывы?
             tabel_work_hours=Cast(Greatest(
                 F('tabel_total_work_seconds') - F('tabel_breaktime_seconds'), 0, output_field=FloatField()
-            ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=1)),
+            ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=2)),
         )
 
         if fact_only:
@@ -341,7 +341,7 @@ class WorkerDayQuerySet(QuerySet):
                     network_id=network.id, break_calc_field_name='plan_total_work_seconds'),
                 plan_work_hours=Cast(Greatest(
                     F('plan_total_work_seconds') - F('plan_breaktime_seconds'), 0, output_field=FloatField()
-                ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=1)),
+                ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=2)),
             )
 
         return qs.filter(**kwargs)
