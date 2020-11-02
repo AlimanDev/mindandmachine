@@ -287,7 +287,7 @@ class WorkerDayQuerySet(QuerySet):
         qs = self.filter(is_fact=False, is_approved=True)
         fact_approved_wdays_subq = WorkerDay.objects.filter(
             Q(type=WorkerDay.TYPE_WORKDAY, shop_id=OuterRef('shop_id')) | Q(type=WorkerDay.TYPE_QUALIFICATION),
-            # type=OuterRef('type'),  нужно? обучения в факт. графике должны заноситься как обучения или как рд?
+            # type=OuterRef('type'),  нужно? обучения и командировки в факт. графике должны заноситься как обучения или как рд?
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
             is_fact=True,
@@ -325,10 +325,10 @@ class WorkerDayQuerySet(QuerySet):
         if fact_only:
             qs = qs.filter(
                 Q(
-                    type__in=WorkerDay.TYPES_TABEL_HOURS,
+                    type__in=WorkerDay.TYPES_WITH_TM_RANGE,
                     fact_dttm_work_start__isnull=False,
                     fact_dttm_work_end__isnull=False,
-                ) | ~Q(type__in=WorkerDay.TYPES_TABEL_HOURS),
+                ) | ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
             )
         else:
             qs = qs.annotate(
@@ -491,10 +491,10 @@ class WorkerDay(AbstractModel):
         TYPE_TRAIN_VACATION,
     ]
 
-    # типы, для которых в табеле необходимо проставлять часы
-    TYPES_TABEL_HOURS = (
+    TYPES_WITH_TM_RANGE = (
         TYPE_WORKDAY,
         TYPE_QUALIFICATION,
+        TYPE_BUSINESS_TRIP,
     )
 
     def __str__(self):
@@ -542,7 +542,7 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def is_type_with_tm_range(cls, t):
-        return t in (cls.TYPE_WORKDAY, cls.TYPE_BUSINESS_TRIP, cls.TYPE_QUALIFICATION)
+        return t in cls.TYPES_WITH_TM_RANGE
 
     @staticmethod
     def count_work_hours(break_triplets, dttm_work_start, dttm_work_end):
