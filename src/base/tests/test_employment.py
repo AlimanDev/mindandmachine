@@ -208,6 +208,12 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 shop=self.shop,
                 dt=dt + timedelta(i),
             )
+        for i in range(2):
+            WorkerDay.objects.create(
+                employment_id=resp['id'],
+                worker=self.user2,
+                dt=dt + timedelta(i + 3),
+            )
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt).work_hours, timedelta(hours=9))
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours, timedelta(hours=9))
         emp = Employment.objects.get(pk=resp['id'])
