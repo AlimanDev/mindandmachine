@@ -36,7 +36,8 @@ from src.timetable.models import (
     WorkType,
     WorkTypeName,
     WorkerDay,
-    UserWeekdaySlot
+    UserWeekdaySlot,
+    WorkerDayPermission,
 )
 
 
@@ -400,6 +401,7 @@ def create_departments_and_users(self):
             # access_type=FunctionGroup.TYPE_ALL
         ) for func in FunctionGroup.FUNCS for method in FunctionGroup.METHODS
     ])
+    self.admin_group.worker_day_permissions.set(WorkerDayPermission.objects.all())
 
     # # central office
     # self.hq_group = Group.objects.create(name='ЦО')
@@ -424,6 +426,9 @@ def create_departments_and_users(self):
             # access_type=FunctionGroup.TYPE_SUPERSHOP
         ) for func in FunctionGroup.FUNCS
     ])
+    self.chief_group.worker_day_permissions.set(WorkerDayPermission.objects.filter(
+        action__in=[WorkerDayPermission.CREATE, WorkerDayPermission.UPDATE, WorkerDayPermission.DELETE]
+    ))
 
     # employee
     self.employee_group = Group.objects.create(name='Сотрудник')

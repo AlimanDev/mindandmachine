@@ -1,4 +1,5 @@
 from django.contrib import admin
+
 from src.timetable.models import (
     Cashbox,
     EmploymentWorkType,
@@ -21,7 +22,7 @@ from src.timetable.models import (
 class SlotAdmin(admin.ModelAdmin):
     list_display = ('name', 'work_type_name', 'shop_title', 'parent_title', 'tm_start', 'tm_end', 'id')
     search_fields = ('name', 'shop__title', 'shop__parent__title', 'id')
-    list_filter = ('shop', )
+    list_filter = ('shop',)
 
     @staticmethod
     def shop_title(instance: Slot):
@@ -41,9 +42,9 @@ class SlotAdmin(admin.ModelAdmin):
 class UserWeekDaySlotAdmin(admin.ModelAdmin):
     list_display = ('worker_first_name', 'worker_last_name', 'shop_title', 'parent_title', 'slot_name',
                     'weekday', 'id')
-    search_fields = ('worker__first_name','worker__last_name', 'slot__shop__title', 'slot__shop__parent__title',
+    search_fields = ('worker__first_name', 'worker__last_name', 'slot__shop__title', 'slot__shop__parent__title',
                      'slot__name', 'id')
-    list_filter = ('slot__shop', )
+    list_filter = ('slot__shop',)
 
     @staticmethod
     def worker_first_name(instance: UserWeekdaySlot):
@@ -70,7 +71,7 @@ class UserWeekDaySlotAdmin(admin.ModelAdmin):
 class CashboxAdmin(admin.ModelAdmin):
     list_display = ('type_name', 'shop_title', 'parent_title', 'id', 'name')
     search_fields = ('type__name', 'type__shop__title', 'type__shop__parent__title', 'id')
-    list_filter = ('type__shop', )
+    list_filter = ('type__shop',)
 
     @staticmethod
     def type_name(instance: Cashbox):
@@ -83,7 +84,6 @@ class CashboxAdmin(admin.ModelAdmin):
     @staticmethod
     def parent_title(instance: Cashbox):
         return instance.type.shop.parent_title()
-
 
 
 @admin.register(EmploymentWorkType)
@@ -129,7 +129,6 @@ class WorkerDayAdmin(admin.ModelAdmin):
     @staticmethod
     def shop_title(instance: WorkerDay):
         return instance.shop.name if instance.shop else ''
-
 
     @staticmethod
     def parent_title(instance: ShopMonthStat):
@@ -206,7 +205,7 @@ class WorkerDayChangeRequestAdmin(admin.ModelAdmin):
 
 @admin.register(AttendanceRecords)
 class AttendanceRecordsAdmin(admin.ModelAdmin):
-    list_display = ['id', 'dttm', 'type',]
+    list_display = ('id', 'dttm', 'type',)
     list_filter = ('type', 'verified', 'type')
 
 

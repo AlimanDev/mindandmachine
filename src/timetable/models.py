@@ -1076,6 +1076,70 @@ class VacancyBlackList(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
     symbol = models.CharField(max_length=128)
 
-
     def get_department(self):
         return self.shop
+
+
+class WorkerDayPermission(AbstractModel):
+    PLAN = 'P'
+    FACT = 'F'
+
+    GRAPH_TYPES = (
+        (PLAN, 'План'),
+        (FACT, 'Факт'),
+    )
+
+    CREATE_OR_UPDATE = 'CU'
+    DELETE = 'D'
+    APPROVE = 'A'
+
+    ACTIONS = (
+        (CREATE_OR_UPDATE, 'Создание/Редактирование'),
+        (DELETE, 'Удаление'),
+        (APPROVE, 'Подтверждение'),
+    )
+
+    action = models.CharField(choices=ACTIONS, max_length=2, verbose_name='Действие')
+    graph_type = models.CharField(choices=GRAPH_TYPES, max_length=1, verbose_name='Тип графика')
+    wd_type = models.CharField(choices=WorkerDay.TYPES, max_length=2, verbose_name='Тип дня')
+
+    class Meta:
+        verbose_name = 'Разрешение для рабочего дня'
+        verbose_name_plural = 'Разрешения для рабочего дня'
+        unique_together = ('action', 'graph_type', 'wd_type')
+        ordering = ('action', 'graph_type', 'wd_type')
+
+    def __str__(self):
+        return f'{self.get_action_display()} {self.get_graph_type_display()} {self.get_wd_type_display()}'
+
+
+class GroupWorkerDayPermission(AbstractModel):
+    group = models.ForeignKey('base.Group', on_delete=models.CASCADE, verbose_name='Группа доступа')
+    worker_day_permission = models.ForeignKey(
+        'timetable.WorkerDayPermission', on_delete=models.CASCADE, verbose_name='Разрешение для рабочего дня')
+    limit_days_in_past = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Ограничение на дни в прошлом',
+        help_text='Если null - нет ограничений, если n - можно выполнять действие только n последних дней',
+    )
+    limit_days_in_future = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Ограничение на дни в будущем',
+        help_text='Если null - нет ограничений, если n - можно выполнять действие только n будущих дней',
+    )
+
+    class Meta:
+        verbose_name = 'Разрешение группы для рабочего дня'
+        verbose_name_plural = 'Разрешения группы для рабочего дня'
+        unique_together = ('group', 'worker_day_permission',)
+
+    def __str__(self):
+        return f'{self.group.name} {self.worker_day_permission}'
+
+    @classmethod
+    def has_permission(cls, user, wd, action):
+        return cls.objects.filter(
+            group__in=user.get_group_ids(wd.worker.network, wd.shop),
+            group__worker_day_permission__graph_type=WorkerDayPermission.FACT if \
+                wd.is_fact else WorkerDayPermission.PLAN,
+            group__worker_day_permission__wd_type=wd.type,
+            group__worker_day_permission__action=action,
+        ).exists()

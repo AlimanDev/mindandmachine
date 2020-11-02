@@ -11,6 +11,7 @@ from src.timetable.work_type.views import WorkTypeViewSet
 from src.timetable.work_type_name.views import WorkTypeNameViewSet
 from src.timetable.worker_constraint.views import WorkerConstraintViewSet
 from src.timetable.worker_day.views import WorkerDayViewSet
+from src.timetable.worker_day_permissions.views import WorkerDayPermissionViewSet
 
 router = routers.DefaultRouter()
 router.register(r'worker_day', WorkerDayViewSet, basename='WorkerDay')
@@ -21,6 +22,11 @@ router.register(r'shop_month_stat', ShopMonthStatViewSet, basename='ShopMonthSta
 router.register(r'auto_settings', AutoSettingsViewSet, basename='AutoSettings')
 router.register(r'exchange_settings', ExchangeSettingsViewSet, basename='ExchangeSettings')
 router.register(r'vacancy_black_list', VacancyBlackListViewSet, basename='VacancyBlackList')
+router.register(
+    r'worker_day_permissions',
+    WorkerDayPermissionViewSet,
+    basename='WorkerDayPermission',
+)
 
 employment_nested_router.register(r'worker_constraint', WorkerConstraintViewSet, basename='WorkerConstraint')
 

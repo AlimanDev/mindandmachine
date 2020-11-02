@@ -12,7 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import utils
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 from src.main.timetable.auto_settings.utils import set_timetable_date_from
@@ -29,6 +29,8 @@ from src.timetable.models import (
     WorkerDayCashboxDetails,
     WorkType,
     ShopMonthStat,
+    WorkerDayPermission,
+    GroupWorkerDayPermission,
 )
 from src.timetable.serializers import (
     WorkerDaySerializer,
@@ -74,6 +76,12 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             )
         return self.queryset
 
+    def perform_create(self, serializer):
+        if not GroupWorkerDayPermission.has_permission(
+                self.request.user, serializer.instance, WorkerDayPermission.CREATE_OR_UPDATE):
+            raise PermissionDenied()
+        super().perform_create(serializer)
+
     # тут переопределяется update а не perform_update потому что надо в Response вернуть
     # не тот объект, который был изначально
     def update(self, request, *args, **kwargs):
@@ -81,6 +89,9 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
+
+        if not GroupWorkerDayPermission.has_permission(request.user, instance, WorkerDayPermission.CREATE_OR_UPDATE):
+            raise PermissionDenied()
 
         if instance.is_approved:
             if instance.child.filter(is_fact=instance.is_fact):
@@ -167,7 +178,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 many=True, context=self.get_serializer_context()
             ).data
         return Response(data)
-
 
     @action(detail=False, methods=['post'])
     def approve(self, request):

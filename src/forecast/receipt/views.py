@@ -18,6 +18,7 @@ class ReceiptViewSet(viewsets.ModelViewSet):
     """
     """
     permission_classes = [FilteredListPermission]
+    serializer_class = PeriodClientsCreateSerializer
 
     def get_queryset(self):
         return self.filter_queryset(Receipt.objects.all())

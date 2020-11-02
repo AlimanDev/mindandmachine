@@ -7,7 +7,8 @@ from django.contrib.auth.models import (
 )
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef
+from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
+from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from django.utils.functional import cached_property
 from model_utils import FieldTracker
@@ -91,7 +92,7 @@ class Break(AbstractActiveNamedModel):
     def save(self, *args, **kwargs):
         self.value = self.clean_value(self.breaks)
         return super().save(*args, **kwargs)
-      
+
 
 class ShopSettings(AbstractActiveNamedModel):
     class Meta(AbstractActiveNamedModel.Meta):
@@ -467,6 +468,17 @@ class User(DjangoAbstractUser, AbstractModel):
     @property
     def short_fio(self):
         return self.get_short_fio()
+
+    def get_active_employments(self, network, shop=None):
+        kwargs = {'network_id': network.id}
+        if shop:
+            kwargs['shop__in'] = shop.get_ancestors(include_self=True)
+        return self.employments.get_active(**kwargs)
+
+    def get_group_ids(self, network, shop=None):
+        return self.get_active_employments(network, shop).annotate(
+            group_id=Coalesce(F('function_group_id'), F('position__group_id')),
+        ).values_list('group_id', flat=True)
 
 
 class WorkerPosition(AbstractActiveNamedModel):
