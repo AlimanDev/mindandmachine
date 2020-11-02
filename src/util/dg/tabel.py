@@ -54,9 +54,10 @@ class BaseTabelDataGetter:
     def _get_tabel_type(self, wd_type):
         return self.wd_type_mapper.get_tabel_type(wd_type)
 
-    def _get_tabel_wdays_qs(self):
+    def _get_tabel_wdays_qs(self, fact_only=True):
         tabel_wdays = WorkerDay.objects.get_tabel(
             network=self.shop.network,
+            fact_only=fact_only,
         ).filter(
             Q(
                 type=WorkerDay.TYPE_WORKDAY,
@@ -67,7 +68,7 @@ class BaseTabelDataGetter:
                 shop=self.shop,
             ) |
             Q(
-                ~Q(type__in=WorkerDay.TYPES_TABEL_HOURS),
+                ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
                 Q(
                     Q(dt__lte=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True),
                     Q(dt__gte=F('employment__dt_hired')),
@@ -154,9 +155,9 @@ class T13TabelDataGetter(BaseTabelDataGetter):
 
 class MtsTabelDataGetter(BaseTabelDataGetter):
     def get_data(self):
-        tabel_wdays = self._get_tabel_wdays_qs()
+        tabel_wdays = self._get_tabel_wdays_qs(fact_only=False)
         tabel_wdays = tabel_wdays.filter(
-            type__in=WorkerDay.TYPES_TABEL_HOURS,
+            type__in=WorkerDay.TYPES_WITH_TM_RANGE,
         )
         return {'tabel_wdays': tabel_wdays.select_related('worker', 'shop')}
 

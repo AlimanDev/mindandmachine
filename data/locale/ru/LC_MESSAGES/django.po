@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-10-05 07:36+0000\n"
+"POT-Creation-Date: 2020-10-27 16:53+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -51,13 +51,13 @@ msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:142 src/timetable/serializers.py:57
+#: src/base/serializers.py:142 src/timetable/serializers.py:71
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
-#: src/base/serializers.py:143 src/timetable/serializers.py:58
+#: src/base/serializers.py:143 src/timetable/serializers.py:72
 #, python-brace-format
 msgid "There is {amount} models of shop with code: {code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
@@ -66,6 +66,11 @@ msgstr "Есть {amount} магазинов с кодом: {code}."
 #, python-brace-format
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
+
+#: src/base/shop/serializers.py:32
+#, python-brace-format
+msgid "Invalid time format. Format should be {format}"
+msgstr "Неверный формат времени. Должен быть {format}"
 
 #: src/forecast/load_template/views.py:162
 #, fuzzy
@@ -137,17 +142,17 @@ msgstr "Ошибка отправки данных на сервер."
 msgid "You can't delete timetable in the past."
 msgstr "Вы не можете удалить расписание в прошлом."
 
-#: src/timetable/serializers.py:54 src/timetable/serializers.py:406
+#: src/timetable/serializers.py:68 src/timetable/serializers.py:422
 #, fuzzy
 #| msgid "Date start should be less then date end."
 msgid "Date start should be less then date end"
 msgstr "Дата начала должна быть меньше чем дата окончания."
 
-#: src/timetable/serializers.py:55
+#: src/timetable/serializers.py:69
 msgid "Worker day already exist."
 msgstr "У сотрудника уже существует рабочий день."
 
-#: src/timetable/serializers.py:56
+#: src/timetable/serializers.py:70
 #, fuzzy, python-brace-format
 #| msgid ""
 #| "Worker day intercepts with another: {shop_name}, {work_start} - "
@@ -158,28 +163,28 @@ msgstr ""
 "Рабочий день пересекается с другим рабочим днем: {shop_name}, {work_start} - "
 "{work_end}"
 
-#: src/timetable/serializers.py:363
+#: src/timetable/serializers.py:380
 msgid "Wrong dates format."
 msgstr "Неправильный формат дат."
 
-#: src/timetable/serializers.py:390 src/timetable/serializers.py:430
+#: src/timetable/serializers.py:407 src/timetable/serializers.py:446
 #, python-brace-format
 msgid "Invalid pk \"{pk_value}\" - object does not exist."
 msgstr "Недопустимый первичный ключ \"{pk_value}\" - объект не существует."
 
-#: src/timetable/worker_day/views.py:62
+#: src/timetable/worker_day/views.py:57
 msgid "Worker days mismatch."
 msgstr "Рабочие дни сотрудников не совпадают."
 
-#: src/timetable/worker_day/views.py:63
+#: src/timetable/worker_day/views.py:58
 msgid "Workers don't have timetable."
 msgstr "Отсутствует расписание у сотрудников."
 
-#: src/timetable/worker_day/views.py:64
+#: src/timetable/worker_day/views.py:59
 msgid "Cannot_delete approved version."
 msgstr "Нельзя удалить подтвержденную версию."
 
-#: src/timetable/worker_day/views.py:65
+#: src/timetable/worker_day/views.py:60
 msgid "Not approved version already exists."
 msgstr "У расписания уже есть неподтвержденная версия."
 

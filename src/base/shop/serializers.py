@@ -1,7 +1,9 @@
+import datetime
 import json
 
 import pytz
 from django.utils import six
+from django.utils.translation import ugettext_lazy as _
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
@@ -25,6 +27,21 @@ class TimeZoneField(serializers.ChoiceField):
         return str(six.text_type(super().to_representation(value)))
 
 
+class RestrictedTimeValidator:
+    error_messages = {
+        'invalid_time_format': _('Invalid time format. Format should be {format}'),
+    }
+    format = '%H:%M'
+
+    def __call__(self, value):
+        restricted_times = json.loads(value)
+        for time_str in restricted_times:
+            try:
+                datetime.datetime.strptime(time_str, self.format)
+            except (ValueError, TypeError):
+                raise serializers.ValidationError(self.error_messages['invalid_time_format'].format(format=self.format))
+
+
 class ShopSerializer(serializers.ModelSerializer):
     parent_id = serializers.IntegerField(required=False)
     parent_code = serializers.CharField(required=False)
@@ -44,6 +61,14 @@ class ShopSerializer(serializers.ModelSerializer):
                   'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id',
                   'network_id', 'restricted_start_times', 'restricted_end_times', 'exchange_settings_id',
                   'load_template_id', 'area', 'forecast_step_minutes', 'load_template_status']
+        extra_kwargs = {
+            'restricted_start_times': {
+                'validators': [RestrictedTimeValidator()]
+            },
+            'restricted_end_times': {
+                'validators': [RestrictedTimeValidator()]
+            },
+        }
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

@@ -101,9 +101,10 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         is_fact = attrs['is_fact'] if 'is_fact' in attrs else getattr(self.instance, 'is_fact', None)
         type = attrs['type']
 
-        if is_fact and type not in (WorkerDay.TYPE_WORKDAY, WorkerDay.TYPE_EMPTY):
+        if is_fact and type not in WorkerDay.TYPES_WITH_TM_RANGE + (WorkerDay.TYPE_EMPTY,):
             raise ValidationError({
-                "error": "Для фактической неподтвержденной версии можно установить только 'Рабочий день' и 'НД'."
+                "error": "Для фактической неподтвержденной версии можно установить только 'Рабочий день',"
+                         " 'Обучение', 'Командировка' и 'НД'."
             })
 
         if not WorkerDay.is_type_with_tm_range(type):

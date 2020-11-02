@@ -263,40 +263,31 @@ class WorkerDayQuerySet(QuerySet):
         return self.filter(is_fact=True, is_approved=False, **kwargs)
 
     def get_plan_edit(self, **kwargs):
+        return self.get_last_unapproved(is_fact=False, **kwargs)
+
+    def get_last_unapproved(self, is_fact, **kwargs):
         ordered_subq = WorkerDay.objects.filter(
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
-            is_fact=False,
+            is_fact=is_fact,
         ).order_by(
             'is_approved',
+            '-id',  # сортировка по id если вдруг будет несколько appr/unappr версий, то удаляем более ранние
         ).values_list('id')[:1]
         return self.filter(
             **kwargs,
-            is_fact=False,
+            is_fact=is_fact,
             id=Subquery(ordered_subq),
-        )
-
-    def get_approved4change(self, is_fact):
-        ordered_subq = WorkerDay.objects.filter(
-            dt=OuterRef('dt'),
-            worker_id=OuterRef('worker_id'),
-            is_fact=is_fact,
-        ).order_by(
-            'is_approved', '-id', # сортировка по id -- если вдруг будет несколько approved версий (вдруг), то удаляем более раннюю
-        ).values_list('id')[1:]
-        return self.filter(
-            is_fact=is_fact,
-            id__in=Subquery(ordered_subq),
         )
 
     def get_fact_edit(self, **kwargs):
         raise NotImplementedError
 
-    def get_tabel(self, network, **kwargs):
+    def get_tabel(self, network, fact_only=True, **kwargs):
         qs = self.filter(is_fact=False, is_approved=True)
         fact_approved_wdays_subq = WorkerDay.objects.filter(
             Q(type=WorkerDay.TYPE_WORKDAY, shop_id=OuterRef('shop_id')) | Q(type=WorkerDay.TYPE_QUALIFICATION),
-            # type=OuterRef('type'),  нужно? обучения в факт. графике должны заноситься как обучения или как рд?
+            # type=OuterRef('type'),  нужно? обучения и командировки в факт. графике должны заноситься как обучения или как рд?
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
             is_fact=True,
@@ -308,19 +299,17 @@ class WorkerDayQuerySet(QuerySet):
             fact_dttm_work_start=Subquery(fact_approved_wdays_subq.values('dttm_work_start')[:1]),
             fact_dttm_work_end=Subquery(fact_approved_wdays_subq.values('dttm_work_end')[:1]),
             tabel_dttm_work_start=Case(
+                When(fact_dttm_work_start__isnull=True, then=F('fact_dttm_work_start')),
                 When(plan_dttm_work_start__lt=F('fact_dttm_work_start') - network.allowed_interval_for_late_arrival,
                      then=F('fact_dttm_work_start')),
                 default=F('plan_dttm_work_start'), output_field=DateTimeField()
             ),
-            tabel_dttm_work_start_time=Cast(F('tabel_dttm_work_start'), output_field=TimeField()),
-            tabel_dttm_work_start_date=Cast(F('tabel_dttm_work_start'), output_field=DateField()),
             tabel_dttm_work_end=Case(
+                When(fact_dttm_work_end__isnull=True, then=F('fact_dttm_work_end')),
                 When(plan_dttm_work_end__gt=F('fact_dttm_work_end') + network.allowed_interval_for_early_departure,
                      then=F('fact_dttm_work_end')),
                 default=F('plan_dttm_work_end'), output_field=DateTimeField()
             ),
-            tabel_dttm_work_end_time=Cast(F('tabel_dttm_work_end'), output_field=TimeField()),
-            tabel_dttm_work_end_date=Cast(F('tabel_dttm_work_end'), output_field=DateField()),
             tabel_work_interval=Coalesce(
                 F('tabel_dttm_work_end') - F('tabel_dttm_work_start'),
                 datetime.timedelta(hours=0)
@@ -330,16 +319,30 @@ class WorkerDayQuerySet(QuerySet):
                 network_id=network.id, break_calc_field_name='tabel_total_work_seconds'),  # TODO: для обучений тоже учитывать перерывы?
             tabel_work_hours=Cast(Greatest(
                 F('tabel_total_work_seconds') - F('tabel_breaktime_seconds'), 0, output_field=FloatField()
-            ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=1)),
+            ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=2)),
         )
 
-        qs = qs.filter(
-            Q(
-                type__in=WorkerDay.TYPES_TABEL_HOURS,
-                fact_dttm_work_start__isnull=False,
-                fact_dttm_work_end__isnull=False,
-            ) | ~Q(type__in=WorkerDay.TYPES_TABEL_HOURS),
-        )
+        if fact_only:
+            qs = qs.filter(
+                Q(
+                    type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                    fact_dttm_work_start__isnull=False,
+                    fact_dttm_work_end__isnull=False,
+                ) | ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+            )
+        else:
+            qs = qs.annotate(
+                plan_work_interval=Coalesce(
+                    F('plan_dttm_work_end') - F('plan_dttm_work_start'),
+                    datetime.timedelta(hours=0)
+                ),
+                plan_total_work_seconds=Cast(Extract(F('plan_work_interval'), 'epoch'), FloatField()),
+                plan_breaktime_seconds=WorkerDay.get_breaktime(
+                    network_id=network.id, break_calc_field_name='plan_total_work_seconds'),
+                plan_work_hours=Cast(Greatest(
+                    F('plan_total_work_seconds') - F('plan_breaktime_seconds'), 0, output_field=FloatField()
+                ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=2)),
+            )
 
         return qs.filter(**kwargs)
 
@@ -488,10 +491,10 @@ class WorkerDay(AbstractModel):
         TYPE_TRAIN_VACATION,
     ]
 
-    # типы, для которых в табеле необходимо проставлять часы
-    TYPES_TABEL_HOURS = (
+    TYPES_WITH_TM_RANGE = (
         TYPE_WORKDAY,
         TYPE_QUALIFICATION,
+        TYPE_BUSINESS_TRIP,
     )
 
     def __str__(self):
@@ -539,7 +542,7 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def is_type_with_tm_range(cls, t):
-        return t in (cls.TYPE_WORKDAY, cls.TYPE_BUSINESS_TRIP, cls.TYPE_QUALIFICATION)
+        return t in cls.TYPES_WITH_TM_RANGE
 
     @staticmethod
     def count_work_hours(break_triplets, dttm_work_start, dttm_work_end):

@@ -426,9 +426,6 @@ class User(DjangoAbstractUser, AbstractModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def get_fio(self):
-        return self.last_name + ' ' + self.first_name
-
     id = models.BigAutoField(primary_key=True)
     middle_name = models.CharField(max_length=64, blank=True, null=True)
 
@@ -455,6 +452,15 @@ class User(DjangoAbstractUser, AbstractModel):
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     black_list_symbol = models.CharField(max_length=128, null=True, blank=True)
 
+    def get_fio(self):
+        """
+        :return: Фамилия Имя Отчество (если есть)
+        """
+        fio = f'{self.last_name} {self.first_name}'
+        if self.middle_name:
+            fio += f' {self.middle_name}'
+        return fio
+
     def get_short_fio(self):
         """
         :return: Фамилия с инициалами
@@ -462,12 +468,15 @@ class User(DjangoAbstractUser, AbstractModel):
         short_fio = f'{self.last_name} {self.first_name[0].upper()}.'
         if self.middle_name:
             short_fio += f'{self.middle_name[0].upper()}.'
-
         return short_fio
 
     @property
     def short_fio(self):
         return self.get_short_fio()
+
+    @property
+    def fio(self):
+        return self.get_fio()
 
     def get_active_employments(self, network, shop=None):
         kwargs = {'network_id': network.id}
