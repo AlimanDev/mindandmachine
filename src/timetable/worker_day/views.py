@@ -129,7 +129,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             for worker_day in self.filter_queryset(
                     self.get_queryset().prefetch_related('worker_day_details')).get_tabel(self.request.user.network):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
-                if WorkerDay.is_type_with_tm_range(worker_day.type):
+                if worker_day.type in WorkerDay.TYPES_WITH_TM_RANGE:
                     work_start = (worker_day.tabel_dttm_work_start if is_tabel else worker_day.dttm_work_start)
                     work_end = (worker_day.tabel_dttm_work_end if is_tabel else worker_day.dttm_work_end)
 
