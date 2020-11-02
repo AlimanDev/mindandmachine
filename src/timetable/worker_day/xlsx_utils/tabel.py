@@ -675,8 +675,9 @@ class Tabel_xlsx(Xlsx_base):
 
     @staticmethod
     def change_for_inspection(month_norm_hours, workdays):
+        from collections import OrderedDict
         break_triplets = json.loads(workdays[0].shop.settings.breaks.breaks)
-        result = {}
+        result = OrderedDict()
         for workday in workdays:
             key = workday.worker_id
             if key not in result:
