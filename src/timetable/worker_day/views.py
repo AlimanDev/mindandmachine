@@ -218,9 +218,13 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             is_fact=serializer.data['is_fact'],
             is_approved=False,
         )
-
-        wdays_to_approve = WorkerDay.objects.get_last_unapproved(
+        
+        wdays_to_approve = WorkerDay.objects.get_last_ordered(
             is_fact=serializer.data['is_fact'],
+            order_by=[
+                'is_approved',
+                '-id',
+            ]
         ).filter(approve_condition)
 
         worker_dt_pairs_list = list(
