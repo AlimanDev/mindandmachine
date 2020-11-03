@@ -279,9 +279,9 @@ class WorkerDayQuerySet(QuerySet):
             is_fact=is_fact,
         ).order_by(*order_by).values_list('id')[:1]
         return self.filter(
-            **kwargs,
             is_fact=is_fact,
             id=Subquery(ordered_subq),
+            **kwargs,
         )
 
     def get_fact_edit(self, **kwargs):

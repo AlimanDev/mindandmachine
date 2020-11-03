@@ -202,12 +202,13 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             wd_types_grouped_by_limit.setdefault((limit_days_in_past, limit_days_in_future), []).append(wd_type)
         wd_types_q = Q()
         for (limit_days_in_past, limit_days_in_future), wd_types in wd_types_grouped_by_limit.items():
-            q = Q(type=wd_types)
-            today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
-            if limit_days_in_past:
-                q &= Q(dt__gte=today - datetime.timedelta(days=limit_days_in_past))
-            if limit_days_in_future:
-                q &= Q(dt__lte=today + datetime.timedelta(days=limit_days_in_past))
+            q = Q(type__in=wd_types)
+            if limit_days_in_past or limit_days_in_future:
+                today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
+                if limit_days_in_past:
+                    q &= Q(dt__gte=today - datetime.timedelta(days=limit_days_in_past))
+                if limit_days_in_future:
+                    q &= Q(dt__lte=today + datetime.timedelta(days=limit_days_in_past))
             wd_types_q |= q
 
         approve_condition = Q(
@@ -218,7 +219,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             is_fact=serializer.data['is_fact'],
             is_approved=False,
         )
-        
+
         wdays_to_approve = WorkerDay.objects.get_last_ordered(
             is_fact=serializer.data['is_fact'],
             order_by=[
