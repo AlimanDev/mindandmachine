@@ -64,16 +64,28 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
     permission_classes = [Permission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
-    queryset = WorkerDay.objects.all()
     filter_backends = [MultiShopsFilterBackend]
 
     def get_queryset(self):
+        queryset = WorkerDay.objects.all()
+
         if self.request.query_params.get('by_code', False):
-            return WorkerDay.objects.all().annotate(
+            return queryset.annotate(
                 shop_code=F('shop__code'),
                 user_login=F('worker__username'),
             )
-        return self.queryset
+
+        if self.action == 'list':
+            # временно, пока не решим проблему коллизий дней
+            ordered_subq = queryset.filter(
+                dt=OuterRef('dt'),
+                worker_id=OuterRef('worker_id'),
+                is_fact=OuterRef('is_fact'),
+                is_approved=OuterRef('is_approved'),
+            ).order_by('-is_vacancy', '-id').values_list('id')[:1]
+            queryset = queryset.filter(id=Subquery(ordered_subq))
+
+        return queryset
 
     # тут переопределяется update а не perform_update потому что надо в Response вернуть
     # не тот объект, который был изначально
