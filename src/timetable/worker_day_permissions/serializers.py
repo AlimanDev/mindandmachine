@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from src.base.models import Shop
-from src.timetable.models import WorkerDayPermission
+from src.timetable.models import WorkerDayPermission, GroupWorkerDayPermission
 
 
 class WorkerDayPermissionSerializer(serializers.ModelSerializer):
@@ -14,7 +14,19 @@ class WorkerDayPermissionSerializer(serializers.ModelSerializer):
         )
 
 
-class WorkerDayPermissionCurrentUserQueryStringSerializer(serializers.Serializer):
+class GroupWorkerDayPermissionSerializer(serializers.ModelSerializer):
+    worker_day_permission = WorkerDayPermissionSerializer()
+
+    class Meta:
+        model = GroupWorkerDayPermission
+        fields = (
+            'worker_day_permission',
+            'limit_days_in_past',
+            'limit_days_in_future',
+        )
+
+
+class WorkerDayPermissionQueryStringSerializer(serializers.Serializer):
     action = serializers.ChoiceField(
         choices=WorkerDayPermission.ACTIONS, required=False, allow_null=False, allow_blank=False)
     graph_type = serializers.ChoiceField(

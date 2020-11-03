@@ -17,24 +17,26 @@ class TestWorkerDayPermissions(TestsHelperMixin, APITestCase):
         if extra_data:
             data.update(extra_data)
         resp = self.client.get(
-            path=self.get_url('WorkerDayPermission-for-current-user'),
+            path=self.get_url('worker_day_permissions'),
             data=data,
         )
         return resp
 
-    def test_get_worker_day_permissions_for_current_user_and_shop(self):
+    def test_get_worker_day_permissions(self):
         resp = self._get_wd_perms()
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(len(resp.json()), 80)
+        self.assertEqual(len(resp.json()), 60)
 
-    def test_get_worker_day_permissions_filter_by_action(self):
-        resp = self._get_wd_perms(extra_data={'action': WorkerDayPermission.CREATE})
+    def test_filter_worker_day_permissions_by_action(self):
+        resp = self._get_wd_perms(extra_data={'action': WorkerDayPermission.CREATE_OR_UPDATE})
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(all(wdp['action'] == WorkerDayPermission.CREATE for wdp in resp.json()))
+        self.assertTrue(
+            all(wdp['worker_day_permission']['action'] == WorkerDayPermission.CREATE_OR_UPDATE for wdp in resp.json()))
         self.assertEqual(len(resp.json()), len(WorkerDay.TYPES_USED) * len(WorkerDayPermission.GRAPH_TYPES))
 
-    def test_get_worker_day_permissions_filter_by_graph_type(self):
+    def test_filter_worker_day_permissions_by_graph_type(self):
         resp = self._get_wd_perms(extra_data={'graph_type': WorkerDayPermission.FACT})
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(all(wdp['graph_type'] == WorkerDayPermission.FACT for wdp in resp.json()))
+        self.assertTrue(
+            all(wdp['worker_day_permission']['graph_type'] == WorkerDayPermission.FACT for wdp in resp.json()))
         self.assertEqual(len(resp.json()), len(WorkerDay.TYPES_USED) * len(WorkerDayPermission.ACTIONS))

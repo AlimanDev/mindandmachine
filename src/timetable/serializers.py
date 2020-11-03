@@ -14,6 +14,7 @@ class WorkerDayApproveSerializer(serializers.Serializer):
     is_fact = serializers.BooleanField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
+    wd_types = serializers.ListField(child=serializers.ChoiceField(choices=WorkerDay.TYPES), required=True)
 
 
 class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):

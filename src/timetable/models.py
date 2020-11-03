@@ -266,7 +266,7 @@ class WorkerDayQuerySet(QuerySet):
         return self.get_last_unapproved(is_fact=False, **kwargs)
 
     def get_last_unapproved(self, is_fact, **kwargs):
-        ordered_subq = WorkerDay.objects.filter(
+        ordered_subq = self.filter(
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
             is_fact=is_fact,
@@ -1138,11 +1138,15 @@ class GroupWorkerDayPermission(AbstractModel):
         return f'{self.group.name} {self.worker_day_permission}'
 
     @classmethod
-    def has_permission(cls, user, wd, action):
+    def has_permission(cls, user, action, graph_type, wd_type, wd_dt_str):
+        wd_dt = datetime.datetime.strptime(wd_dt_str, settings.QOS_DATE_FORMAT).date()
+        # FIXME-devx: будет временной лаг из-за того, что USE_TZ=False, откуда брать таймзону? - из shop?
+        today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
         return cls.objects.filter(
-            group__in=user.get_group_ids(wd.worker.network, wd.shop),
-            group__worker_day_permission__graph_type=WorkerDayPermission.FACT if \
-                wd.is_fact else WorkerDayPermission.PLAN,
-            group__worker_day_permission__wd_type=wd.type,
-            group__worker_day_permission__action=action,
+            Q(limit_days_in_past__isnull=True) | Q(limit_days_in_past__gte=(today - wd_dt).days),
+            Q(limit_days_in_future__isnull=True) | Q(limit_days_in_future__gte=(wd_dt - today).days),
+            group__in=user.get_group_ids(user.network),  # добавить shop ?
+            worker_day_permission__action=action,
+            worker_day_permission__graph_type=graph_type,
+            worker_day_permission__wd_type=wd_type,
         ).exists()

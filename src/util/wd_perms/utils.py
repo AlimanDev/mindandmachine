@@ -45,14 +45,15 @@ class EmptyPreset(WdPermsPreset):
 
 class AdminPreset(WdPermsPreset):
     wd_perms = (
-        (ALL, ALL, ALL, None, None),
+        (ALL, [WorkerDayPermission.PLAN], ALL, None, None),
+        (ALL, [WorkerDayPermission.FACT], WorkerDay.TYPES_WITH_TM_RANGE + (WorkerDay.TYPE_EMPTY,), None, None),
     )
 
 
 class URSOrtekaPreset(WdPermsPreset):
     wd_perms = (
         (ALL, [WorkerDayPermission.PLAN], ALL, None, None),
-        (ALL, [WorkerDayPermission.FACT], WorkerDay.TYPES_TABEL_HOURS + (WorkerDay.TYPE_EMPTY,), None, None),
+        (ALL, [WorkerDayPermission.FACT], WorkerDay.TYPES_WITH_TM_RANGE + (WorkerDay.TYPE_EMPTY,), None, None),
     )
 
 
@@ -73,7 +74,7 @@ class DirectorOrtekaPreset(WdPermsPreset):
         (
             [WorkerDayPermission.CREATE_OR_UPDATE, WorkerDayPermission.DELETE],
             [WorkerDayPermission.FACT],
-            WorkerDay.TYPES_TABEL_HOURS + (WorkerDay.TYPE_EMPTY,),
+            WorkerDay.TYPES_WITH_TM_RANGE + (WorkerDay.TYPE_EMPTY,),
             3, 0
         ),
     )

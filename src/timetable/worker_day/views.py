@@ -22,7 +22,7 @@ from src.base.exceptions import FieldError
 from src.base.exceptions import MessageError
 from src.base.message import Message
 from src.base.models import Employment, Shop, User, ProductionDay
-from src.base.permissions import Permission
+from src.base.permissions import WdPermission
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
@@ -63,7 +63,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         'na_worker_day_exists': _("Not approved version already exists."),
     }
 
-    permission_classes = [Permission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
+    permission_classes = [WdPermission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
     queryset = WorkerDay.objects.all()
@@ -77,12 +77,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             )
         return self.queryset
 
-    def perform_create(self, serializer):
-        if not GroupWorkerDayPermission.has_permission(
-                self.request.user, serializer.instance, WorkerDayPermission.CREATE_OR_UPDATE):
-            raise PermissionDenied()
-        super().perform_create(serializer)
-
     # тут переопределяется update а не perform_update потому что надо в Response вернуть
     # не тот объект, который был изначально
     def update(self, request, *args, **kwargs):
@@ -90,9 +84,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-
-        if not GroupWorkerDayPermission.has_permission(request.user, instance, WorkerDayPermission.CREATE_OR_UPDATE):
-            raise PermissionDenied()
 
         if instance.is_approved:
             if instance.child.filter(is_fact=instance.is_fact):
@@ -185,6 +176,20 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         kwargs = {'context': self.get_serializer_context()}
         serializer = WorkerDayApproveSerializer(data=request.data, **kwargs)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data['wd_types']:
+            raise PermissionDenied()
+
+        wd_perms = GroupWorkerDayPermission.objects.filter(
+            group__in=request.user.get_group_ids(
+                request.user.network, Shop.objects.get(id=serializer.validated_data['shop_id'])),
+            worker_day_permission__action=WorkerDayPermission.APPROVE,
+            worker_day_permission__wd_type__in=serializer.validated_data.get('wd_types'),
+        ).select_related('worker_day_permission').values_list(
+            'worker_day_permission__wd_type', 'limit_days_in_past', 'limit_days_in_future',
+        ).distinct()
+        if not wd_perms:
+            raise PermissionDenied()
+
         user_ids = Employment.objects.get_active(
             Shop.objects.get(id=serializer.data['shop_id']).network_id,
             dt_from=serializer.data['dt_from'],
@@ -192,13 +197,28 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             shop_id=serializer.data['shop_id'],
         ).values_list('user_id', flat=True)
 
+        wd_types_grouped_by_limit = {}
+        for wd_type, limit_days_in_past, limit_days_in_future in wd_perms:
+            wd_types_grouped_by_limit.setdefault((limit_days_in_past, limit_days_in_future), []).append(wd_type)
+        wd_types_q = Q()
+        for (limit_days_in_past, limit_days_in_future), wd_types in wd_types_grouped_by_limit.items():
+            q = Q(type=wd_types)
+            today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
+            if limit_days_in_past:
+                q &= Q(dt__gte=today - datetime.timedelta(days=limit_days_in_past))
+            if limit_days_in_future:
+                q &= Q(dt__lte=today + datetime.timedelta(days=limit_days_in_past))
+            wd_types_q |= q
+
         approve_condition = Q(
+            wd_types_q,
             Q(shop_id=serializer.data['shop_id']) | Q(shop__isnull=True, worker_id__in=user_ids),
             dt__lte=serializer.data['dt_to'],
             dt__gte=serializer.data['dt_from'],
             is_fact=serializer.data['is_fact'],
             is_approved=False,
         )
+
         wdays_to_approve = WorkerDay.objects.get_last_unapproved(
             is_fact=serializer.data['is_fact'],
         ).filter(approve_condition)
