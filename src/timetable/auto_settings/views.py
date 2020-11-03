@@ -643,11 +643,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         max_shop_time = max(list(shop.close_times.values()))
         min_shop_time = min(list(shop.open_times.values()))
-        if max_shop_time == min_shop_time:
-            if max_shop_time.hour == 0:
-                max_shop_time = max_shop_time.replace(hour=23, minute=59)
-            else:
-                max_shop_time = max_shop_time.replace(minute=59, hour=max_shop_time.hour-1)
+        time_filter = {}
+        if max_shop_time != min_shop_time:
+            time_filter['dttm_forecast__time__gte'] = min_shop_time if min_shop_time < max_shop_time else max_shop_time
+            time_filter['dttm_forecast__time__lte'] = max_shop_time if min_shop_time < max_shop_time else min_shop_time
 
         absenteeism_coef = shop.settings.absenteeism if shop.settings else 0
         periods = PeriodClients.objects.filter(
@@ -657,8 +656,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lte=dt_to,
-            dttm_forecast__time__gte=min_shop_time,
-            dttm_forecast__time__lte=max_shop_time,
+            **time_filter,
         ).values(
             'dttm_forecast',
             'operation_type__work_type_id',
