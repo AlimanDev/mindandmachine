@@ -81,7 +81,7 @@ class DirectorOrtekaPreset(WdPermsPreset):
 
 
 WD_PERMS_PRESETS = (
-    ('Пустой', 'empty', EmptyPreset),
+    ('Пустой', 'empty', EmptyPreset),  # Для удаления всех пермишнов
     ('Админ', 'admin', AdminPreset),
     ('УРС (Ортека)', 'urs_orteka', URSOrtekaPreset),
     ('Директор (Ортека)', 'dir_orteka', DirectorOrtekaPreset),
@@ -90,7 +90,7 @@ WD_PERMS_PRESETS = (
 
 class WdPermsHelper:
     @classmethod
-    def get_set_preset_func(cls, preset, short_description):
+    def _get_set_preset_func(cls, preset, short_description):
         def set_preset_func(modeladmin, request, queryset):
             try:
                 for role in queryset:
@@ -111,7 +111,7 @@ class WdPermsHelper:
             action_alias = f'set_{preset_alias}_wd_perms_preset'
             short_description = f'Активировать пресет "{preset_name}"'
             actions[action_alias] = (
-                cls.get_set_preset_func(preset, preset_name),
+                cls._get_set_preset_func(preset, preset_name),
                 action_alias,
                 short_description,
             )
