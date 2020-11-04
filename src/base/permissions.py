@@ -4,7 +4,7 @@ from rest_framework import permissions
 from rest_framework.exceptions import ValidationError, NotFound
 
 from src.base.models import Employment, Shop
-from src.timetable.models import WorkerDayPermission, GroupWorkerDayPermission
+from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
 
 
 class Permission(permissions.BasePermission):
@@ -63,18 +63,26 @@ class WdPermission(Permission):
 
         view_action = view.action.lower()
         if view_action in ['create', 'update']:
-            action = WorkerDayPermission.CREATE_OR_UPDATE
-        elif view_action in ['delete']:
-            action = WorkerDayPermission.DELETE
-        else:
-            return has_permission
-        return GroupWorkerDayPermission.has_permission(
-            user=request.user,
-            action=action,
-            graph_type=WorkerDayPermission.FACT if request.data.get('is_fact') else WorkerDayPermission.PLAN,
-            wd_type=request.data.get('type'),
-            wd_dt_str=request.data.get('dt'),
-        )
+            return GroupWorkerDayPermission.has_permission(
+                user=request.user,
+                action=WorkerDayPermission.CREATE_OR_UPDATE,
+                graph_type=WorkerDayPermission.FACT if request.data.get('is_fact') else WorkerDayPermission.PLAN,
+                wd_type=request.data.get('type'),
+                wd_dt=request.data.get('dt'),
+            )
+        elif view_action == 'destroy':
+            wd_dict = WorkerDay.objects.filter(id=view.kwargs['pk']).values('type', 'dt', 'is_fact').first()
+            if not wd_dict:
+                return False
+            return GroupWorkerDayPermission.has_permission(
+                user=request.user,
+                action=WorkerDayPermission.DELETE,
+                graph_type=WorkerDayPermission.FACT if wd_dict.get('is_fact') else WorkerDayPermission.PLAN,
+                wd_type=wd_dict.get('type'),
+                wd_dt=wd_dict.get('dt'),
+            )
+
+        return has_permission
 
 
 class FilteredListPermission(Permission):

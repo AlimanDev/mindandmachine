@@ -10,7 +10,7 @@ from .serializers import (
 )
 
 
-class WorkerDayPermissionsAPIView(RetrieveModelMixin, GenericAPIView):
+class WorkerDayPermissionsAPIView(GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = GroupWorkerDayPermissionSerializer
 
@@ -26,7 +26,7 @@ class WorkerDayPermissionsAPIView(RetrieveModelMixin, GenericAPIView):
                 "action": "A",
                 "graph_type": "F",
                 "wd_type": "W"
-            },
+            }
             ...
         ]
         """

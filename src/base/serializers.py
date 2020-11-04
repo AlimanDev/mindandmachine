@@ -48,6 +48,7 @@ class UserListSerializer(serializers.Serializer):
             return obj.avatar.url
         return None
 
+
 class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
     network_id = serializers.HiddenField(default=CurrentUserNetwork())

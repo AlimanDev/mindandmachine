@@ -1142,8 +1142,9 @@ class GroupWorkerDayPermission(AbstractModel):
         return f'{self.group.name} {self.worker_day_permission}'
 
     @classmethod
-    def has_permission(cls, user, action, graph_type, wd_type, wd_dt_str):
-        wd_dt = datetime.datetime.strptime(wd_dt_str, settings.QOS_DATE_FORMAT).date()
+    def has_permission(cls, user, action, graph_type, wd_type, wd_dt):
+        if isinstance(wd_dt, str):
+            wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
         # FIXME-devx: будет временной лаг из-за того, что USE_TZ=False, откуда брать таймзону? - из shop?
         today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
         return cls.objects.filter(

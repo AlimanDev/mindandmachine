@@ -14,6 +14,8 @@ from src.timetable.models import (
     WorkTypeName,
     WorkerDayCashboxDetails,
     ShopMonthStat,
+    WorkerDayPermission,
+    GroupWorkerDayPermission,
 )
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
@@ -630,7 +632,73 @@ class TestWorkerDay(APITestCase):
         data['dttm_work_start'] = datetime.combine(dt, time(8, 0, 0))
         data['dttm_work_end'] = datetime.combine(dt, time(20, 0, 0))
         response = self.client.put(f"{self.url}{wd_id}/", data, format='json')
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def _test_wd_perm(self, url, method, action, graph_type=None, wd_type=None):
+        assert method == 'delete' or (graph_type and wd_type)
+        GroupWorkerDayPermission.objects.all().delete()
+
+        dt = self.dt + timedelta(days=1)
+        if method == 'delete':
+            data = None
+        else:
+            data = {
+                "shop_id": self.shop.id,
+                "worker_id": self.user2.id,
+                "employment_id": self.employment2.id,
+                "dt": dt,
+                "is_fact": True if graph_type == WorkerDayPermission.FACT else False,
+                "type": wd_type,
+            }
+            if wd_type == WorkerDay.TYPE_WORKDAY:
+                data.update({
+                    "dttm_work_start": datetime.combine(dt, time(8, 0, 0)),
+                    "dttm_work_end": datetime.combine(dt, time(20, 0, 0)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                })
+
+        response = getattr(self.client, method)(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=action,
+                graph_type=graph_type,
+                wd_type=wd_type,
+            )
+        )
+        response = getattr(self.client, method)(url, data, format='json')
+        method_to_status_mapping = {
+            'post': status.HTTP_201_CREATED,
+            'put': status.HTTP_200_OK,
+            'delete': status.HTTP_204_NO_CONTENT,
+        }
+        self.assertEqual(response.status_code, method_to_status_mapping.get(method))
+
+    def test_worker_day_permissions(self):
+        # create
+        self._test_wd_perm(
+            self.url, 'post', WorkerDayPermission.CREATE_OR_UPDATE, WorkerDayPermission.PLAN, WorkerDay.TYPE_WORKDAY)
+        wd = WorkerDay.objects.last()
+
+        # update
+        self._test_wd_perm(
+            f"{self.url}{wd.id}/", 'put',
+            WorkerDayPermission.CREATE_OR_UPDATE, WorkerDayPermission.PLAN, WorkerDay.TYPE_HOLIDAY,
+        )
+        wd.refresh_from_db()
+        self.assertEqual(wd.type, WorkerDay.TYPE_HOLIDAY)
+
+        # delete
+        self._test_wd_perm(
+            f"{self.url}{wd.id}/", 'delete',
+            WorkerDayPermission.DELETE,
+            WorkerDayPermission.PLAN,
+            wd.type,
+        )
 
 
 class TestWorkerDayCreateFact(APITestCase):
