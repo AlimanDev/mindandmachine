@@ -160,6 +160,10 @@ class TestWorkerDay(APITestCase):
 
     # Последовательное создание и подтверждение P1 -> A1 -> P2 -> F1 -> A2 -> F2
     def test_create_and_approve(self):
+        GroupWorkerDayPermission.objects.filter(
+            group=self.admin_group,
+            worker_day_permission__action=WorkerDayPermission.APPROVE,
+        ).delete()
         dt = self.dt + timedelta(days=1)
 
         data = {
@@ -222,10 +226,24 @@ class TestWorkerDay(APITestCase):
             'dt_from': dt,
             'dt_to': dt + timedelta(days=2),
             'is_fact': False,
+            'wd_types': WorkerDay.TYPES_USED,
         }
 
         response = self.client.post(self.url_approve, data_approve, format='json')
+        # если нету ни одного разрешения для action=approve, то ответ -- 403
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.APPROVE,
+                graph_type=WorkerDayPermission.PLAN,
+                wd_type=WorkerDay.TYPE_HOLIDAY,
+            ),
+        )
+        response = self.client.post(self.url_approve, data_approve, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
         self.assertEqual(WorkerDay.objects.get(id=plan_id).is_approved, True)
         self.assertEqual(WorkerDay.objects.get(id=fact_id).is_approved, False)
 
@@ -234,9 +252,22 @@ class TestWorkerDay(APITestCase):
 
         response = self.client.post(self.url_approve, data_approve, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        fact = WorkerDay.objects.get(id=fact_id)
+        self.assertEqual(fact.is_approved, False)
+
+        GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.APPROVE,
+                graph_type=WorkerDayPermission.FACT,
+                wd_type=fact.type,
+            ),
+        )
+        response = self.client.post(self.url_approve, data_approve, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(WorkerDay.objects.get(id=fact_id).is_approved, True)
 
-        # edit approved plan
+        # create approved plan
         data['is_fact'] = False
         response = self.client.post(f"{self.url}", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -246,10 +277,10 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(response.json()['parent_worker_day_id'], plan_id)
         self.assertEqual(response.json()['type'], data['type'])
 
-        # edit approved plan again
-        response = self.client.post(f"{self.url}", data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день."})
+        # # create approved plan again
+        # response = self.client.post(f"{self.url}", data, format='json')
+        # self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день."})
 
         # edit approved fact
         data['dttm_work_start'] = Converter.convert_datetime(datetime.combine(dt, time(8, 8, 0)))
@@ -267,10 +298,10 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(res['dttm_work_start'], data['dttm_work_start'])
         self.assertEqual(res['dttm_work_end'], data['dttm_work_end'])
 
-        # edit approved fact again
-        response = self.client.post(f"{self.url}", data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день."})
+        # # create approved fact again
+        # response = self.client.post(f"{self.url}", data, format='json')
+        # self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день."})
 
     def test_empty_params(self):
         data = {
