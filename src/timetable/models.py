@@ -478,6 +478,7 @@ class WorkerDay(AbstractModel):
         TYPE_HOLIDAY,
         TYPE_WORKDAY,
         TYPE_VACATION,
+        TYPE_SELF_VACATION,
         TYPE_SICK,
         TYPE_QUALIFICATION,
         TYPE_ABSENSE,
