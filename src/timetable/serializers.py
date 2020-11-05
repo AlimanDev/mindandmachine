@@ -174,7 +174,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 is_fact=validated_data.get('is_fact'),
             ).delete()
         details = validated_data.pop('worker_day_details', None)
-        if not validated_data.get('is_vacancy') and validated_data.get('worker_id') and validated_data.get('shop_id'):
+        if validated_data.get('type') == WorkerDay.TYPE_WORKDAY and not validated_data.get('is_vacancy') \
+                and validated_data.get('worker_id') and validated_data.get('shop_id'):
             worker_has_active_empl_in_shop = Employment.objects.get_active(
                 network_id=self.context['request'].user.network_id,
                 dt_from=validated_data.get('dt'),
