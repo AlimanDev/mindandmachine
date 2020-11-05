@@ -865,7 +865,6 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     )
 
                     wdays = {w.is_approved: w for w in WorkerDay.objects.filter(
-                        Q(shop=shop) | Q(shop__isnull=True),
                         is_fact=False,
                         worker_id=uid,
                         dt=dt,
