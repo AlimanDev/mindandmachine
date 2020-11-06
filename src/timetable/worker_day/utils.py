@@ -290,7 +290,6 @@ def download_timetable_util(request, workbook, form):
     # breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
 
     workdays = WorkerDay.objects.select_related('worker', 'shop').filter(
-        Q(shop=shop, type__in=WorkerDay.TYPES_WITH_TM_RANGE) | ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
         Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
         (Q(dt__gte=F('employment__dt_hired')) | Q(employment__isnull=True)) & Q(dt__gte=timetable.prod_days[0].dt),
         worker__in=users,
@@ -299,6 +298,15 @@ def download_timetable_util(request, workbook, form):
         is_fact=False,
     ).order_by(
         'worker__last_name', 'worker__first_name', 'worker__middle_name', 'worker_id', 'dt')
+
+    workdays = workdays.get_last_ordered(
+        is_fact=False,
+        order_by=[
+            '-is_approved' if form['is_approved'] else 'is_approved',
+            '-is_vacancy',
+            '-id',
+        ]
+    )
 
     if form.get('inspection_version', False):
         timetable.change_for_inspection(timetable.prod_month.get('norm_work_hours', 0), workdays)
