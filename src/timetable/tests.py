@@ -877,6 +877,26 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         )
         self.assertTrue(new_wd.exists())
 
+    def test_set_workday_type_for_existing_empty_types(self):
+        WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).update(
+            type=WorkerDay.TYPE_EMPTY,
+            dttm_work_start=None,
+            dttm_work_end=None,
+        )
+
+        tm_start = datetime.combine(self.dt, time(6, 0, 0))
+        AttendanceRecords.objects.create(
+            dttm=tm_start,
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop,
+            user=self.user2
+        )
+
+        fact = WorkerDay.objects.get(id=self.worker_day_fact_approved.id)
+        self.assertEqual(fact.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(fact.dttm_work_start, tm_start)
+        self.assertEqual(fact.dttm_work_end, None)
+
 
 class TestVacancy(TestsHelperMixin, APITestCase):
     @classmethod
