@@ -646,7 +646,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         time_filter = {}
         if max_shop_time != min_shop_time:
             time_filter['dttm_forecast__time__gte'] = min_shop_time if min_shop_time < max_shop_time else max_shop_time
-            time_filter['dttm_forecast__time__lte'] = max_shop_time if min_shop_time < max_shop_time else min_shop_time
+            time_filter['dttm_forecast__time__lt'] = max_shop_time if min_shop_time < max_shop_time else min_shop_time
 
         absenteeism_coef = shop.settings.absenteeism if shop.settings else 0
         periods = PeriodClients.objects.filter(
