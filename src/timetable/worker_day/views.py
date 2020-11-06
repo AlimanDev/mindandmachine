@@ -289,11 +289,13 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         if vacancy is None:
             raise MessageError(code='no_vacancy_or_approved', lang=request.user.lang)
         vacancy.is_approved = True
-        parent = vacancy.parent_worker_day
-        vacancy.parent_worker_day = None
         vacancy.save()
-        if parent:
-            parent.delete()
+        if vacancy.worker_id:
+            WorkerDay.objects.filter(
+                dt=vacancy.dt,
+                worker_id=vacancy.worker_id,
+                is_fact=False,
+            ).exclude(id=vacancy.id).delete()
         return Response(WorkerDaySerializer(vacancy).data)
 
     @action(detail=True, methods=['get'])
