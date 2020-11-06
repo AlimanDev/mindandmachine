@@ -987,6 +987,7 @@ class AttendanceRecords(AbstractModel):
                 return
 
             setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
+            setattr(wdays['fact']['approved'], 'type', WorkerDay.TYPE_WORKDAY)
             wdays['fact']['approved'].save()
         else:
             if self.type == self.TYPE_LEAVING:
