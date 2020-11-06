@@ -441,8 +441,8 @@ class WorkerDay(AbstractModel):
     TYPE_HOLIDAY_WORK = 'HW'
     TYPE_REAL_ABSENCE = 'RA'
     TYPE_EXTRA_VACATION = 'EV'
-    TYPE_TRAIN_VACATION = 'TV'
-    TYPE_SELF_VACATION = 'SV'
+    TYPE_STUDY_VACATION = 'SV'
+    TYPE_SELF_VACATION = 'TV'  # TV, а не SV, потому что так написали в документации
     TYPE_SELF_VACATION_TRUE = 'ST'
     TYPE_GOVERNMENT = 'G'
     TYPE_HOLIDAY_SPECIAL = 'HS'
@@ -465,7 +465,7 @@ class WorkerDay(AbstractModel):
         (TYPE_HOLIDAY_WORK, 'Работа в выходной день'),
         (TYPE_REAL_ABSENCE, 'Прогул на основании акта'),
         (TYPE_EXTRA_VACATION, 'Доп. отпуск'),
-        (TYPE_TRAIN_VACATION, 'Учебный отпуск'),
+        (TYPE_STUDY_VACATION, 'Учебный отпуск'),
         (TYPE_SELF_VACATION, 'Отпуск за свой счёт'),
         (TYPE_SELF_VACATION_TRUE, 'Отпуск за свой счёт по уважительной причине'),
         (TYPE_GOVERNMENT, 'Гос. обязанности'),
@@ -478,6 +478,7 @@ class WorkerDay(AbstractModel):
         TYPE_HOLIDAY,
         TYPE_WORKDAY,
         TYPE_VACATION,
+        TYPE_SELF_VACATION,
         TYPE_SICK,
         TYPE_QUALIFICATION,
         TYPE_ABSENSE,
@@ -492,7 +493,7 @@ class WorkerDay(AbstractModel):
         TYPE_BUSINESS_TRIP,
         TYPE_HOLIDAY_WORK,
         TYPE_EXTRA_VACATION,
-        TYPE_TRAIN_VACATION,
+        TYPE_STUDY_VACATION,
     ]
 
     TYPES_WITH_TM_RANGE = (
