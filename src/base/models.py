@@ -2,6 +2,7 @@ import datetime
 import json
 
 from django.apps import apps
+from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
@@ -208,6 +209,10 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True, blank=True)
 
+    latitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Широта')
+    longitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Долгота')
+    director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
+
     def __str__(self):
         return '{}, {}, {}'.format(
             self.name,
@@ -310,6 +315,13 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 shops__isnull=True,
             ).first()
 
+    def get_tz_offset(self):
+        if self.timezone:
+            offset = int(self.timezone.utcoffset(datetime.datetime.now()).seconds / 3600)
+        else:
+            offset = settings.CLIENT_TIMEZONE
+
+        return offset
 
 class EmploymentManager(models.Manager):
     def get_active(self, network_id, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):

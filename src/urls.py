@@ -35,6 +35,7 @@ api_urlpatterns = [
     path('timetable/', include(timetable_urls)),
     path('upload/', include(upload_urls)),
     path('urv/', include(urv_urls)),
+    path('v1/', include('src.recognition.urls')),  # time attendance api urls
 ]
 
 
