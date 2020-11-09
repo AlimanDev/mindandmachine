@@ -279,6 +279,18 @@ class OperationTemplate(AbstractActiveNamedModel):
         return self.operation_type.work_type.shop
 
 
+class PeriodClientsManager(models.Manager):
+    def shop_times_filter(self, shop, *args, **kwargs):
+        max_shop_time = max(list(shop.close_times.values()))
+        min_shop_time = min(list(shop.open_times.values()))
+        time_filter = {}
+        if max_shop_time != min_shop_time:
+            time_filter['dttm_forecast__time__gte'] = min_shop_time if min_shop_time < max_shop_time else max_shop_time
+            time_filter['dttm_forecast__time__lt'] = max_shop_time if min_shop_time < max_shop_time else min_shop_time
+        kwargs = kwargs.update(time_filter)
+        return self.filter(*args, **kwargs)
+
+
 class PeriodClients(AbstractModel):
     LONG_FORECASE_TYPE = 'L'
     SHORT_FORECAST_TYPE = 'S'
@@ -302,6 +314,7 @@ class PeriodClients(AbstractModel):
     type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
     operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT)
     value = models.FloatField(default=0)
+    objects = PeriodClientsManager()
 
 
 class PeriodDemandChangeLog(AbstractModel):
