@@ -1009,8 +1009,9 @@ class AttendanceRecords(AbstractModel):
                         setattr(prev_fa_wd, type2dtfield[self.type], self.dttm)
                         prev_fa_wd.save()
                         return
-                    elif settings.MDA_SKIP_LEAVING_TICK:
-                        return
+
+                if settings.MDA_SKIP_LEAVING_TICK:
+                    return
 
             wd = WorkerDay(
                 shop=self.shop,
