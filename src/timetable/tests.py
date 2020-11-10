@@ -925,8 +925,9 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             dttm_work_start=None,
             dttm_work_end=ar2.dttm,
             worker=self.user2
-        )
-        self.assertTrue(new_wd.exists())
+        ).first()
+        self.assertIsNotNone(new_wd)
+        self.assertTrue(new_wd.employment.id, self.employment2.id)
 
     def test_set_workday_type_for_existing_empty_types(self):
         WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).update(

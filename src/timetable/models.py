@@ -1013,25 +1013,24 @@ class AttendanceRecords(AbstractModel):
                 if settings.MDA_SKIP_LEAVING_TICK:
                     return
 
+            dt = self.dttm.date()
+            active_user_empl = Employment.objects.get_active(
+                self.user.network_id, dt_from=dt, dt_to=dt, user=self.user, shop=self.shop).last()
+            if not active_user_empl:
+                active_user_empl = Employment.objects.get_active(
+                    self.user.network_id, dt_from=dt, dt_to=dt, user=self.user).last()
+
             wd = WorkerDay(
                 shop=self.shop,
                 worker=self.user,
+                employment=active_user_empl,
                 dt=self.dttm.date(),
                 is_fact=True,
                 is_approved=True,
                 type=WorkerDay.TYPE_WORKDAY,
             )
             setattr(wd, type2dtfield[self.type], self.dttm)
-
-            wd.parent_worker_day = wdays['plan']['approved'] \
-                if wdays['plan']['approved'] \
-                else wdays['plan']['not_approved']
-
             wd.save()
-
-            if wdays['fact']['not_approved']:
-                wdays['fact']['not_approved'].parent_worker_day = wd
-                wdays['fact']['not_approved'].save()
 
 
 class ExchangeSettings(AbstractModel):
