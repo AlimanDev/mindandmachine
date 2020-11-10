@@ -246,10 +246,18 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         return self
 
     def __init__(self, *args, **kwargs):
-        code = kwargs.pop('parent_code', None)
+        parent_code = kwargs.pop('parent_code', None)
         super().__init__(*args, **kwargs)
-        if code:
-            self.parent = Shop.objects.get(code=code)
+        if parent_code:
+            self.parent = Shop.objects.get(code=parent_code)
+
+    @property
+    def director_code(self):
+        return getattr(self.director, 'tabel_code', None)
+
+    @director_code.setter
+    def director_code(self, val):
+        self.director = User.objects.filter(username=val).first()
 
     def __getattribute__(self, attr):
         if attr in ['open_times', 'close_times']:

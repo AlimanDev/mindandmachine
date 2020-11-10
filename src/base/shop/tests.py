@@ -148,7 +148,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
 
     def test_create(self):
         data = {
-            "parent_id": self.root_shop.id,
+            "parent_code": self.root_shop.code,
             "name": 'Region Shop3',
             "tm_open_dict": {"all": "07:00:00"},
             "tm_close_dict": {"all": "23:00:00"},
@@ -163,6 +163,8 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'restricted_start_times': '[]',
             'settings_id': self.shop_settings.id,
             'forecast_step_minutes': '00:30:00',
+            'is_active': True,
+            'director_code': self.user2.username
         }
         # response = self.client.post(self.url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -171,11 +173,16 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         shop = response.json()
         data['id'] = shop['id']
+        data['parent_id'] = self.root_shop.id
+        data.pop('parent_code')
+        data['director_id'] = self.user2.id
         data['area'] = 0.0
         data['dt_closed'] = None
         data['load_template_id'] = None
         data['load_template_status'] = 'R'
         data['exchange_settings_id'] = None
+        data['latitude'] = None
+        data['longitude'] = None
         self.assertDictEqual(shop, data)
 
     def test_update(self):
@@ -195,6 +202,10 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'restricted_start_times': '[]',
             'settings_id': self.shop_settings.id,
             'forecast_step_minutes': '00:30:00',
+            'is_active': False,
+            'latitude': '52.229675',
+            'longitude': '21.012228',
+            'director_code': 'nonexistent'
         }
         # response = self.client.put(self.shop_url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -203,11 +214,14 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         shop = response.json()
         data['id'] = shop['id']
+        data['director_id'] = None
+        data['director_code'] = None
         data['area'] = 0.0
         data['load_template_id'] = None
         data['exchange_settings_id'] = None
         data['load_template_status'] = 'R'
         self.assertEqual(shop, data)
+        self.assertIsNotNone(Shop.objects.get(id=shop['id']).dttm_deleted)
 
     def test_cant_save_with_invalid_restricted_times(self):
         data = {

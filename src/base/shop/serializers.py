@@ -54,13 +54,16 @@ class ShopSerializer(serializers.ModelSerializer):
     tm_close_dict = serializers.JSONField(required=False)
     load_template_status = serializers.CharField(read_only=True)
     timezone = TimeZoneField()
+    is_active = serializers.BooleanField(required=False, default=True)
+    director_code = serializers.CharField(required=False)
 
     class Meta:
         model = Shop
         fields = ['id', 'parent_id', 'parent_code', 'name', 'settings_id', 'tm_open_dict', 'tm_close_dict',
                   'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id',
                   'network_id', 'restricted_start_times', 'restricted_end_times', 'exchange_settings_id',
-                  'load_template_id', 'area', 'forecast_step_minutes', 'load_template_status']
+                  'load_template_id', 'area', 'forecast_step_minutes', 'load_template_status', 'is_active',
+                  'director_code', 'latitude', 'longitude', 'director_id']
         extra_kwargs = {
             'restricted_start_times': {
                 'validators': [RestrictedTimeValidator()]
