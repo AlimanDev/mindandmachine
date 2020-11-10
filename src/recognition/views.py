@@ -1,11 +1,12 @@
 import io
 import logging
-from datetime import timedelta, datetime
+from datetime import timedelta
 from uuid import UUID
 
 import xlsxwriter
 from django.conf import settings
 from django.http.response import HttpResponse
+from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
 from requests.exceptions import HTTPError
@@ -37,7 +38,6 @@ from src.timetable.models import (
     AttendanceRecords,
     WorkerDay,
     Employment,
-    Shop,
 )
 
 logger = logging.getLogger('django')
@@ -85,23 +85,70 @@ class TickPointAuthToken(ObtainAuthToken):
         })
 
 
+class TickViewStrategy:
+    def __init__(self, view):
+        self.view = view
+
+
+class UserAuthTickViewStrategy(TickViewStrategy):
+    def get_serializer_class(self):
+        return PostTickSerializer_user
+
+    def filter_qs(self, queryset):
+        user = self.view.request.user
+        queryset = queryset.filter(
+            user_id=user.id,
+        )
+        return queryset
+
+    def get_user_id_and_tick_point(self, data):
+        user_id = self.view.request.user.id
+        shop = data['shop_code']
+        tick_point = TickPoint.objects.filter(shop=shop, dttm_deleted__isnull=True).first()
+        if tick_point is None:
+            tick_point = TickPoint.objects.create(title=f'autocreate tickpoint {shop.id}', shop=shop)
+
+        return user_id, tick_point
+
+
+class TickPointAuthTickViewStrategy(TickViewStrategy):
+    def get_serializer_class(self):
+        return PostTickSerializer_point
+
+    def filter_qs(self, queryset):
+        tick_point = self.view.request.user
+        queryset = queryset.filter(
+            tick_point_id=tick_point.id,
+        )
+        return queryset
+
+    def get_user_id_and_tick_point(self, data):
+        tick_point = self.view.request.user
+        user_id = data['user_id']
+        return user_id, tick_point
+
+
 class TickViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     basename = ''
 
     def get_authenticators(self):
-        if settings.USER_TOKEN_AUTH:
-            return [TokenAuthentication()]
-        else:
-            return [TickPointTokenAuthentication()]
+        return [TokenAuthentication(), TickPointTokenAuthentication()]
+
+    @cached_property
+    def strategy(self):
+        # может быть есть более явный признак получения стратегии?
+        if 'shop_code' in self.request.data:
+            return UserAuthTickViewStrategy(self)
+        elif 'user_id' in self.request.data:
+            return TickPointAuthTickViewStrategy(self)
+
+        raise NotImplementedError
 
     def get_serializer_class(self):
-        if self.request.method=='POST':
-            if settings.USER_TOKEN_AUTH:
-                return PostTickSerializer_user
-            else:
-                return PostTickSerializer_point
+        if self.request.method == 'POST':
+            return self.strategy.get_serializer_class()
         else:
             return TickSerializer
 
@@ -118,21 +165,10 @@ class TickViewSet(viewsets.ModelViewSet):
             dttm__lte=dttm_to,
             dttm_deleted__isnull=True
         )
-        if settings.USER_TOKEN_AUTH:
-            user = self.request.user
-            queryset = queryset.filter(
-                user_id=user.id,
-            )
-        else:
-            tick_point = self.request.user
-            queryset = queryset.filter(
-                tick_point_id=tick_point.id,
-            )
-
-
+        queryset = self.strategy.filter_qs(queryset=queryset)
         return queryset
 
-    def create(self, request):
+    def create(self, request, **kwargs):
         """
             POST /api/v1/ticks
             params:
@@ -142,25 +178,11 @@ class TickViewSet(viewsets.ModelViewSet):
             Загружает фотографию сотрудника, распознает и сохраняет в Tick и AttendanceRecords
         """
         serializer_class = self.get_serializer_class()
-        serializer = serializer_class(data=request.data)
+        serializer = serializer_class(data=request.data, context=self.get_serializer_context())
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data
-
-        if settings.USER_TOKEN_AUTH:
-            user_id = request.user.id
-            try:
-                shop = Shop.objects.get(code=data['shop_code'])
-            except Shop.DoesNotExist:
-                return Response({"error": f"Магазин с кодом {data['shop_code']} не существует"}, 404)
-
-            tick_point = TickPoint.objects.filter(shop=shop, dttm_deleted__isnull=True).first()
-            if tick_point is None:
-                tick_point = TickPoint.objects.create(title=f'autocreate tickpoint {shop.id}', shop=shop)
-        else:
-            tick_point = request.user
-            user_id=data['user_id']
-
+        user_id, tick_point = self.strategy.get_user_id_and_tick_point(data)
         check_time = now() + timedelta(hours=tick_point.shop.get_tz_offset())
 
         is_front = False
@@ -216,18 +238,14 @@ class TickPhotoViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     basename = ''
-
     serializer_class = TickPhotoSerializer
 
     def get_authenticators(self):
         if self.action_map.get(self.request.method.lower()) == 'download':
             return [SessionAuthentication()]
-        if settings.USER_TOKEN_AUTH:
-            return [TokenAuthentication()]
-        else:
-            return [TickPointTokenAuthentication()]
+        return [TokenAuthentication(), TickPointTokenAuthentication()]
 
-    def create(self, request):
+    def create(self, request, **kwargs):
         """
             POST /api/v1/tick_photos
             params:
@@ -317,7 +335,6 @@ class TickPhotoViewSet(viewsets.ModelViewSet):
             )
         return Response(TickPhotoSerializer(tick_photo).data)
 
-
     @action(detail=False, methods=['get'])
     def download(self, request):
         if not request.user.is_superuser:
@@ -352,7 +369,6 @@ class TickPhotoViewSet(viewsets.ModelViewSet):
             worksheet.write(row, 4, tick.verified_score)
             worksheet.write(row, 5, tick.dttm.strftime('%Y-%m-%dT%H:%M:%S'))
             row += 1
-
 
         workbook.close()
         output.seek(0)

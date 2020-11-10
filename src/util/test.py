@@ -5,6 +5,8 @@ from typing import TypeVar
 
 from dateutil.relativedelta import relativedelta
 from django.db import connection
+from django.db.models import Value, F, CharField
+from django.db.models.functions import Concat
 from django.test import TestCase
 from django.utils.timezone import now
 from requests import Response
@@ -629,6 +631,7 @@ def create_departments_and_users(self):
         shop=self.shop,
         function_group=self.employee_group,
     )
+    Shop.objects.all().update(code=Concat(Value('code-', output_field=CharField()), F('id')), network=self.network)
 
 # def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
 #     CameraCashboxStat.objects.create(

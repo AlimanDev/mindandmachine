@@ -1,16 +1,33 @@
 import json
+import random
 from calendar import Calendar
+from datetime import datetime, timedelta, time
+
 from django.urls import reverse
+
+from src.base.models import Employment
+from src.recognition.utils import generate_user_token
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
 from src.util.test import create_departments_and_users
-from datetime import datetime, timedelta, time, date
-from src.base.models import Employment
-import random
+
 
 class TestsHelperMixin:
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
+
+    def _set_authorization_token(self, login):
+        response = self.client.post(
+            path=reverse('time_attendance_auth'),
+            data=json.dumps({
+                'username': login,
+                'token': generate_user_token(login),
+            }),
+            content_type='application/json'
+        )
+
+        token = response.json()['token']
+        self.client.defaults['HTTP_AUTHORIZATION'] = 'Token %s' % token
 
     @classmethod
     def create_departments_and_users(cls):

@@ -12,5 +12,5 @@ router.register(r'tick_photos', TickPhotoViewSet, basename='TickPhoto')
 urlpatterns = [
     url(r'^', include(router.urls)),
     url(r'^token-auth/', TickPointAuthToken.as_view()),
-    url(r'^auth/', HashSigninAuthToken.as_view())
+    url(r'^auth/', HashSigninAuthToken.as_view(), name='time_attendance_auth')
 ]

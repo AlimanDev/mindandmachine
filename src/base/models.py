@@ -39,6 +39,10 @@ class Network(AbstractActiveModel):
     allowed_interval_for_early_departure = models.DurationField(
         verbose_name='Допустимый интервал для раннего ухода', default=datetime.timedelta(seconds=0))
     okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name='Код по ОКПО')
+    allowed_geo_distance_km = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        verbose_name='Разрешенная дистанция до магазина при создании отметок (км)',
+    )
 
     def get_department(self):
         return None

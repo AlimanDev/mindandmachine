@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-11-05 17:00+0000\n"
+"POT-Creation-Date: 2020-11-10 09:45+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -30,6 +30,7 @@ msgid "There is no such user"
 msgstr "Нет такого пользователя"
 
 #: src/base/auth/views.py:40 src/base/auth/views.py:108
+#: src/recognition/serializers.py:30
 msgid "Unable to log in with provided credentials."
 msgstr "Невозможно войти с предоставленными учетными данными."
 
@@ -106,6 +107,27 @@ msgstr "Ошибка в формуле: {formula}"
 msgid "Base model not formula."
 msgstr "У базовой модели тип расчета должен быть формула"
 
+#: src/recognition/models.py:112
+msgid "Key"
+msgstr "Ключ"
+
+#: src/recognition/models.py:117
+msgid "Created"
+msgstr "Создан"
+
+#: src/recognition/serializers.py:33
+msgid "Must include \"username\" and \"password\"."
+msgstr "Должен включать \"username\" и \"password\"."
+
+#: src/recognition/serializers.py:110
+#, python-brace-format
+msgid ""
+"The distance to the department should not exceed {allowed_distance_km} km "
+"({distance_now_km} km now)"
+msgstr ""
+"Дистанция до магазина не должна превышать {allowed_distance_km} км (сейчас "
+"{distance_now_km} км)"
+
 #: src/timetable/auto_settings/views.py:58
 #, python-brace-format
 msgid "Timetable should be built at least from {num} day from now."
@@ -142,7 +164,7 @@ msgstr "Ошибка отправки данных на сервер."
 msgid "You can't delete timetable in the past."
 msgstr "Вы не можете удалить расписание в прошлом."
 
-#: src/timetable/serializers.py:74 src/timetable/serializers.py:396
+#: src/timetable/serializers.py:74 src/timetable/serializers.py:391
 #, fuzzy
 #| msgid "Date start should be less then date end."
 msgid "Date start should be less then date end"
@@ -171,11 +193,11 @@ msgstr "Магазин в типе работ и в рабочем дне дол
 msgid "User in employment and in worker day must match."
 msgstr "Сотрудник в трудоустройстве и в рабочем дне должны совпадать."
 
-#: src/timetable/serializers.py:354
+#: src/timetable/serializers.py:349
 msgid "Wrong dates format."
 msgstr "Неправильный формат дат."
 
-#: src/timetable/serializers.py:381 src/timetable/serializers.py:420
+#: src/timetable/serializers.py:376 src/timetable/serializers.py:415
 #, python-brace-format
 msgid "Invalid pk \"{pk_value}\" - object does not exist."
 msgstr "Недопустимый первичный ключ \"{pk_value}\" - объект не существует."
@@ -231,14 +253,8 @@ msgstr "У расписания уже есть неподтвержденная
 #~ msgid "Auth Token"
 #~ msgstr "Токен аутентификации"
 
-#~ msgid "Key"
-#~ msgstr "Ключ"
-
 #~ msgid "User"
 #~ msgstr "Пользователь"
-
-#~ msgid "Created"
-#~ msgstr "Создан"
 
 #~ msgid "Token"
 #~ msgstr "Токен"
@@ -254,9 +270,6 @@ msgstr "У расписания уже есть неподтвержденная
 
 #~ msgid "User account is disabled."
 #~ msgstr "Учетная запись пользователя отключена."
-
-#~ msgid "Must include \"username\" and \"password\"."
-#~ msgstr "Должен включать \"username\" и \"password\"."
 
 #~ msgid "A server error occurred."
 #~ msgstr "Произошла ошибка сервера."
