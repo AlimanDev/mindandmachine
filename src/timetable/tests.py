@@ -873,9 +873,6 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         )
 
         self.assertTrue(wd.exists())
-        wd = wd.first()
-        self.assertEqual(wd.parent_worker_day_id, self.worker_day_plan_approved.id)
-        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).parent_worker_day_id, wd.id)
 
     def test_attendancerecords_no_fact_create(self):
         self.worker_day_fact_not_approved.delete()
@@ -898,7 +895,6 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
 
         self.assertTrue(wd.exists())
         wd = wd.first()
-        self.assertEqual(wd.parent_worker_day_id, self.worker_day_plan_approved.id)
 
         ar = AttendanceRecords.objects.create(
             dttm=datetime.combine(self.dt + timedelta(days=1), time(6, 0, 0)),
