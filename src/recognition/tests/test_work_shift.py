@@ -20,7 +20,6 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         cls.dt_str = cls.today.strftime('%Y-%m-%d')
 
     def setUp(self):
-        self.shop2.refresh_from_db()
         self._set_authorization_token(self.user2.username)
 
     def _test_work_shift(self, dt, username, expected_start=None, expected_end=None, expected_shop_code=None):

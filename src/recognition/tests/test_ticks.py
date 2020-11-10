@@ -13,7 +13,6 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         cls.create_departments_and_users()
 
     def setUp(self):
-        self.shop2.refresh_from_db()
         self._set_authorization_token(self.user2.username)
 
     def test_create_tick(self):

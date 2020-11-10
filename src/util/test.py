@@ -491,8 +491,6 @@ def create_departments_and_users(self):
         settings=self.shop_settings,
         network=self.network,
     )
-    self.shop.code = str(self.shop.id)
-    self.shop.save(update_fields=['code'])
     self.shop2 = Shop.objects.create(
         # id=2,
         parent=self.reg_shop1,
@@ -633,6 +631,8 @@ def create_departments_and_users(self):
     )
     Shop.objects.all().update(code=Concat(Value('code-', output_field=CharField()), F('id')), network=self.network)
     User.objects.all().update(tabel_code=F('username'))
+    for s in [self.root_shop, self.shop, self.shop2, self.shop3, self.reg_shop1, self.reg_shop2]:
+        s.refresh_from_db()
 
 # def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
 #     CameraCashboxStat.objects.create(
