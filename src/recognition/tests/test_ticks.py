@@ -6,7 +6,7 @@ from src.recognition.models import Tick
 from src.util.mixins.tests import TestsHelperMixin
 
 
-@override_settings(USER_TOKEN_AUTH=True, TRUST_TICK_REQUEST=True)
+@override_settings(TRUST_TICK_REQUEST=True)
 class TestTicksViewSet(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):

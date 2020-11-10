@@ -49,10 +49,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
 
     def get_authenticators(self):
-        if settings.USER_TOKEN_AUTH:
-            return [TokenAuthentication()]
-        else:
-            return [TickPointTokenAuthentication()]
+        return [TokenAuthentication(), TickPointTokenAuthentication()]
 
     # filterset_class = WorkerDayFilterSet
     def get_queryset(self):
@@ -103,7 +100,8 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['get'])
     def work_shift(self, request, *args, **kwargs):
-        query_params_serializer = WorkShiftSerializer(data=self.request.query_params)
+        query_params_serializer = WorkShiftSerializer(
+            data=self.request.query_params, context=self.get_serializer_context())
         query_params_serializer.is_valid(raise_exception=True)
         work_shift = WorkerDay.objects.filter(
             **query_params_serializer.validated_data,

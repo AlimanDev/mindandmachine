@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, Shop, User
 
@@ -65,6 +66,12 @@ class WorkShiftSerializer(serializers.ModelSerializer):
     # переопределение нужно, чтобы возвращать время в реальном utc
     dttm_work_start = serializers.SerializerMethodField()
     dttm_work_end = serializers.SerializerMethodField()
+
+    def validate(self, attrs):
+        if attrs['worker'].id != self.context['request'].user.id:
+            raise PermissionDenied()
+
+        return attrs
 
     def get_dttm_work_start(self, wd):
         return (wd.dttm_work_start - timedelta(

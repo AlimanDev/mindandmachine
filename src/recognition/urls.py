@@ -5,7 +5,7 @@ from src.recognition.views import TickViewSet, TickPhotoViewSet, TickPointAuthTo
 from src.recognition.wfm.views import WorkerDayViewSet
 
 router = routers.DefaultRouter()
-router.register(r'worker_days', WorkerDayViewSet, basename='WorkerDayDetails')
+router.register(r'worker_days', WorkerDayViewSet, basename='TimeAttendanceWorkerDay')
 router.register(r'ticks', TickViewSet, basename='Tick')
 router.register(r'tick_photos', TickPhotoViewSet, basename='TickPhoto')
 

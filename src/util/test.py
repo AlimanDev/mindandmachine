@@ -632,6 +632,7 @@ def create_departments_and_users(self):
         function_group=self.employee_group,
     )
     Shop.objects.all().update(code=Concat(Value('code-', output_field=CharField()), F('id')), network=self.network)
+    User.objects.all().update(tabel_code=F('username'))
 
 # def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
 #     CameraCashboxStat.objects.create(
