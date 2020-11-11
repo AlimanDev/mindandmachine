@@ -53,6 +53,7 @@ URV_STAT_SHOP_LEVEL = 2
 URV_STAT_SEND_TODAY_HOUR = 3
 URV_STAT_SEND_TODAY_MINUTE = 0
 MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE = False  # отправлять ли запрос по связке юзера и магазина при сохранении workerday
+MDA_SYNC_USER_TO_SHOP_DAILY = False  # запускать таск, который будет отправлять все связки на текущий день
 MDA_PUBLIC_API_HOST = 'https://example.com'
 MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
 
@@ -423,6 +424,13 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
 }
+
+if MDA_SYNC_USER_TO_SHOP_DAILY:
+    CELERY_BEAT_SCHEDULE['task-sync-mda-user-to-shop-relation'] = {
+        'task': 'src.celery.tasks.sync_mda_user_to_shop_relation',
+        'schedule': crontab(hour=1, minute=30),
+        'options': {'queue': BACKEND_QUEUE}
+    }
 
 if 'test' in sys.argv:
     # Disable migrations in test, fill the schema directly

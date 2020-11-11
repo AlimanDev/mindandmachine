@@ -10,10 +10,8 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.timezone import now
-from src.main.demand.utils import create_predbills_request_function
-from src.main.operation_template.utils import build_period_clients
-from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
 from src.base.message import Message
 from src.base.models import (
@@ -26,6 +24,7 @@ from src.base.models import (
 )
 from src.celery.celery import app
 from src.conf.djconfig import EMAIL_HOST_USER
+from src.conf.djconfig import URV_STAT_EMAILS, URV_STAT_SHOP_LEVEL
 from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
 from src.forecast.models import (
     OperationTemplate,
@@ -35,14 +34,16 @@ from src.forecast.models import (
     OperationType,
     OperationTypeName
 )
-from src.util.urv.create_urv_stat import main as create_urv
-from src.conf.djconfig import URV_STAT_EMAILS, URV_STAT_SHOP_LEVEL
+from src.main.demand.utils import create_predbills_request_function
+from src.main.operation_template.utils import build_period_clients
+from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
     EmploymentWorkType,
     ShopMonthStat,
     ExchangeSettings,
+    WorkerDay,
 )
 from src.timetable.vacancy.utils import (
     create_vacancies_and_notify,
@@ -50,6 +51,7 @@ from src.timetable.vacancy.utils import (
     workers_exchange,
 )
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
+from src.util.urv.create_urv_stat import main as create_urv
 
 
 @app.task
@@ -725,3 +727,18 @@ def create_mda_user_to_shop_relation(username, shop_code, debug_info=None):
         resp.raise_for_status()
     except requests.RequestException:
         logger.exception(f'text:{resp.text}, headers: {resp.headers}, debug_info: {debug_info}')
+
+
+@app.task
+def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
+    dt = dt or timezone.now().today()
+    wdays = WorkerDay.objects.filter(
+        Q(is_vacancy=True) | Q(type=WorkerDay.TYPE_QUALIFICATION),
+        is_fact=False, is_approved=True,
+        shop__isnull=False, worker__isnull=False,
+        dt=dt,
+    ).values('worker__username', 'shop__code').distinct()
+    for wd in wdays:
+        create_mda_user_to_shop_relation(username=wd['worker__username'], shop_code=wd['shop__code'])
+        if delay_sec:
+            time_in_secs.sleep(delay_sec)
