@@ -1152,6 +1152,28 @@ class TestVacancy(TestsHelperMixin, APITestCase):
 
         self.assertFalse(WorkerDay.objects.filter(id=pawd.id).exists())
 
+    def test_approve_vacancy(self):
+        WorkerDay.objects.filter(id=self.vacancy.id).update(worker_id=None, is_approved=False)
+        wd = WorkerDay.objects.create(
+            shop=self.shop,
+            worker=self.user2,
+            employment=self.employment2,
+            type=WorkerDay.TYPE_HOLIDAY,
+            dt=self.dt_now,
+            is_approved=True,
+        )
+
+        resp = self.client.post(f'/rest_api/worker_day/{self.vacancy.id}/approve_vacancy/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(WorkerDay.objects.filter(id=wd.id).exists())
+
+        WorkerDay.objects.filter(id=self.vacancy.id).update(worker=wd.worker, is_approved=False)
+
+        resp = self.client.post(f'/rest_api/worker_day/{self.vacancy.id}/approve_vacancy/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertFalse(WorkerDay.objects.filter(id=wd.id).exists())
+        self.assertTrue(WorkerDay.objects.filter(id=self.vacancy.id).exists())
+
 
 class TestAditionalFunctions(APITestCase):
     USER_USERNAME = "user1"
