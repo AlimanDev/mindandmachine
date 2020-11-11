@@ -294,7 +294,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             WorkerDay.objects.filter(
                 dt=vacancy.dt,
                 worker_id=vacancy.worker_id,
-                is_fact=False,
+                is_fact=vacancy.is_fact,
                 is_approved=True,
             ).exclude(id=vacancy.id).delete()
         return Response(WorkerDaySerializer(vacancy).data)
