@@ -120,3 +120,6 @@ factory-boy==3.0.1
 drf-nested-routers==0.91
 relatorio==0.9.2
 geopy==2.0.0
+django-admin-list-filter-dropdown==1.0.2
+django-admin-rangefilter==0.5.0
+django-admin-numeric-filter==0.1.5
