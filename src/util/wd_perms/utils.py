@@ -21,7 +21,7 @@ class WdPermsPreset:
             if graph_types == ALL:
                 graph_types = [i[0] for i in WorkerDayPermission.GRAPH_TYPES]
             if wd_types == ALL:
-                wd_types = [i[0] for i in WorkerDay.TYPES_USED]
+                wd_types = [i for i in WorkerDay.TYPES_USED]
 
             group_wd_perms.extend([GroupWorkerDayPermission(
                 group=group,
