@@ -312,7 +312,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
 
 class EmploymentManager(models.Manager):
-    def get_active(self, network_id, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):
+    def get_active(self, network_id, dt_from=None, dt_to=None, *args, **kwargs):
         """
         hired earlier then dt_from, hired later then dt_to
         :paramShop dt_from:
@@ -321,6 +321,9 @@ class EmploymentManager(models.Manager):
         :param kwargs:
         :return:
         """
+        today = datetime.date.today()
+        dt_from = dt_from or today
+        dt_to = dt_to or today
 
         return self.filter(
             models.Q(dt_hired__lte=dt_to) | models.Q(dt_hired__isnull=True),
