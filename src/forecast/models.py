@@ -298,7 +298,12 @@ class PeriodClientsManager(models.Manager):
         if weekday and not shop.open_times.get('all', False):
             filt = models.Q()
             for k, v in shop.open_times.items():
-                filt |= (models.Q(dttm_forecast__week_day=weekdays_db[int(k)]) & (models.Q(dttm_forecast__time__gte=v) | models.Q(dttm_forecast__time__lt=shop.close_times[k])))
+                tm_start = v
+                tm_end = shop.close_times[k]
+                if tm_start < tm_end:
+                    filt |= (models.Q(dttm_forecast__week_day=weekdays_db[int(k)]) & (models.Q(dttm_forecast__time__gte=tm_start) & models.Q(dttm_forecast__time__lt=tm_end)))
+                elif tm_start > tm_end:
+                    filt |= (models.Q(dttm_forecast__week_day=weekdays_db[int(k)]) & (models.Q(dttm_forecast__time__gte=tm_start) | models.Q(dttm_forecast__time__lt=tm_end)))
             return self.filter(filt, *args, **kwargs)
         else:
             max_shop_time = max(list(shop.close_times.values()))
