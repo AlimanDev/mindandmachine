@@ -167,6 +167,14 @@ class EmploymentSerializer(serializers.ModelSerializer):
         ]
         create_only_fields = ['user_id', 'user']
         read_only_fields = ['user']
+        extra_kwargs = {
+            'auto_timetable': {
+                'default': True,
+            },
+            'is_visible': {
+                'default': True,
+            },
+        }
 
     def validate(self, attrs):
         if self.instance:

@@ -731,6 +731,57 @@ class TestWorkerDay(APITestCase):
             wd.type,
         )
 
+    def test_cant_create_worker_day_with_shop_mismatch(self):
+        dt = self.dt + timedelta(days=1)
+
+        shop2_work_type = WorkType.objects.create(
+            work_type_name=self.work_type_name,
+            shop=self.shop2,
+        )
+
+        data = {
+            "shop_id": self.shop.id,
+            "worker_id": self.user2.id,
+            "employment_id": self.employment2.id,
+            "dt": dt,
+            "is_fact": False,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(dt, time(8, 0, 0)),
+            "dttm_work_end": datetime.combine(dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": shop2_work_type.id}
+            ]
+        }
+
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.json()['worker_day_details'][0], 'Магазин в типе работ и в рабочем дне должен совпадать.')
+
+    def test_cant_create_worker_day_with_worker_mismatch(self):
+        dt = self.dt + timedelta(days=1)
+
+        data = {
+            "shop_id": self.shop.id,
+            "worker_id": self.user2.id,
+            "employment_id": self.employment3.id,
+            "dt": dt,
+            "is_fact": False,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(dt, time(8, 0, 0)),
+            "dttm_work_end": datetime.combine(dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.json()['employment'][0], 'Сотрудник в трудоустройстве и в рабочем дне должны совпадать.')
+
 
 class TestWorkerDayCreateFact(APITestCase):
     USER_USERNAME = "user1"
@@ -977,6 +1028,26 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         )
         self.assertTrue(new_wd.exists())
 
+    def test_set_workday_type_for_existing_empty_types(self):
+        WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).update(
+            type=WorkerDay.TYPE_EMPTY,
+            dttm_work_start=None,
+            dttm_work_end=None,
+        )
+
+        tm_start = datetime.combine(self.dt, time(6, 0, 0))
+        AttendanceRecords.objects.create(
+            dttm=tm_start,
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop,
+            user=self.user2
+        )
+
+        fact = WorkerDay.objects.get(id=self.worker_day_fact_approved.id)
+        self.assertEqual(fact.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(fact.dttm_work_start, tm_start)
+        self.assertEqual(fact.dttm_work_end, None)
+
 
 class TestVacancy(TestsHelperMixin, APITestCase):
     @classmethod
@@ -1180,6 +1251,28 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(mail.outbox[0].subject, 'Изменение в графике выхода сотрудников')
 
         self.assertFalse(WorkerDay.objects.filter(id=pawd.id).exists())
+
+    def test_approve_vacancy(self):
+        WorkerDay.objects.filter(id=self.vacancy.id).update(worker_id=None, is_approved=False)
+        wd = WorkerDay.objects.create(
+            shop=self.shop,
+            worker=self.user2,
+            employment=self.employment2,
+            type=WorkerDay.TYPE_HOLIDAY,
+            dt=self.dt_now,
+            is_approved=True,
+        )
+
+        resp = self.client.post(f'/rest_api/worker_day/{self.vacancy.id}/approve_vacancy/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(WorkerDay.objects.filter(id=wd.id).exists())
+
+        WorkerDay.objects.filter(id=self.vacancy.id).update(worker=wd.worker, is_approved=False)
+
+        resp = self.client.post(f'/rest_api/worker_day/{self.vacancy.id}/approve_vacancy/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertFalse(WorkerDay.objects.filter(id=wd.id).exists())
+        self.assertTrue(WorkerDay.objects.filter(id=self.vacancy.id).exists())
 
 
 class TestAditionalFunctions(APITestCase):

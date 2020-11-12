@@ -644,7 +644,7 @@ class Employment(AbstractActiveModel):
         if position_has_changed:
             from django.apps import apps
             from django.db.models import When, Case, Q, F, DurationField, Value, Subquery, OuterRef
-            from django.db.models.functions import Cast
+            from django.db.models.functions import Cast, Coalesce
             if self.position.breaks:
                 break_id = self.position.breaks_id
                 breaks = self.position.breaks.breaks
@@ -680,12 +680,12 @@ class Employment(AbstractActiveModel):
                 is_fact=False,
                 dt__gt=dt,
             ).update(
-                work_hours=Subquery(
+                work_hours=Coalesce(Subquery(
                     WorkerDay.objects.filter(pk=OuterRef('pk')).annotate(
                         hours_plan_0=Cast(F('dttm_work_end') - F('dttm_work_start'), DurationField()),
                         hours_plan=Cast(F('hours_plan_0') - breaktime_plan, DurationField()),
                     ).values('hours_plan')[:1]
-                )
+                ), datetime.timedelta(0))
             )
 
         return res
