@@ -164,7 +164,8 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'settings_id': self.shop_settings.id,
             'forecast_step_minutes': '00:30:00',
             'is_active': True,
-            'director_code': self.user2.username
+            'director_code': self.user2.username,
+            'distance': None,
         }
         # response = self.client.post(self.url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -183,6 +184,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['exchange_settings_id'] = None
         data['latitude'] = None
         data['longitude'] = None
+        data['distance'] = None
         self.assertDictEqual(shop, data)
 
     def test_update(self):
@@ -205,7 +207,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'is_active': False,
             'latitude': '52.229675',
             'longitude': '21.012228',
-            'director_code': 'nonexistent'
+            'director_code': 'nonexistent',
         }
         # response = self.client.put(self.shop_url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -219,6 +221,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['area'] = 0.0
         data['load_template_id'] = None
         data['exchange_settings_id'] = None
+        data['distance'] = None
         data['load_template_status'] = 'R'
         self.assertEqual(shop, data)
         self.assertIsNotNone(Shop.objects.get(id=shop['id']).dttm_deleted)
@@ -301,3 +304,22 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'lack_curr': 10.0}]
 
         self.assertEqual(response.json(), data)
+
+    def test_get_shops_with_distance(self):
+        self.shop.latitude = 51.229675
+        self.shop.longitude = 21.012228
+        self.shop.save()
+        self.shop2.latitude = 52.129675
+        self.shop2.longitude = 22.412228
+        self.shop2.save()
+        response = self.client.get(
+            self.url,
+            data={'id__in': f'{self.shop.id},{self.shop2.id},{self.shop3.id}'},
+            **{'X-LAT': 52.229675, 'X-LON': 21.012228}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        shops = sorted(response.json(), key=lambda i: i['id'])
+        self.assertEqual(len(shops), 3)
+        self.assertEqual(shops[0]['distance'], 111.26)
+        self.assertEqual(shops[1]['distance'], 96.41)
+        self.assertEqual(shops[2]['distance'], None)

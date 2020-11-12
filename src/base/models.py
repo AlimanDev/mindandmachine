@@ -257,7 +257,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     @director_code.setter
     def director_code(self, val):
-        self.director = User.objects.filter(username=val).first()
+        self.director = User.objects.filter(tabel_code=val).first()
 
     def __getattribute__(self, attr):
         if attr in ['open_times', 'close_times']:

@@ -15,6 +15,7 @@ from rest_framework import (
     exceptions,
     permissions
 )
+from src.base.auth.authentication import WFMSessionAuthentication
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
@@ -134,7 +135,7 @@ class TickViewSet(viewsets.ModelViewSet):
     basename = ''
 
     def get_authenticators(self):
-        return [TokenAuthentication(), TickPointTokenAuthentication()]
+        return [TokenAuthentication(), TickPointTokenAuthentication(), WFMSessionAuthentication()]
 
     @cached_property
     def strategy(self):
@@ -241,9 +242,7 @@ class TickPhotoViewSet(viewsets.ModelViewSet):
     serializer_class = TickPhotoSerializer
 
     def get_authenticators(self):
-        if self.action_map.get(self.request.method.lower()) == 'download':
-            return [SessionAuthentication()]
-        return [TokenAuthentication(), TickPointTokenAuthentication()]
+        return [TokenAuthentication(), TickPointTokenAuthentication(), WFMSessionAuthentication()]
 
     def create(self, request, **kwargs):
         """

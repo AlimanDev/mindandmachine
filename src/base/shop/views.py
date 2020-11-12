@@ -16,6 +16,7 @@ from src.base.views_abstract import UpdateorCreateViewSet
 
 class ShopFilter(BaseActiveNamedModelFilter):
     id = NumberFilter(field_name='id', lookup_expr='exact')
+
     class Meta:
         model = Shop
         fields = {
