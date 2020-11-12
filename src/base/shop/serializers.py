@@ -53,7 +53,7 @@ class ShopSerializer(serializers.ModelSerializer):
     tm_open_dict = serializers.JSONField(required=False)
     tm_close_dict = serializers.JSONField(required=False)
     load_template_status = serializers.CharField(read_only=True)
-    timezone = TimeZoneField()
+    timezone = TimeZoneField(required=False)
     is_active = serializers.BooleanField(required=False, default=True)
     director_code = serializers.CharField(required=False)
 
