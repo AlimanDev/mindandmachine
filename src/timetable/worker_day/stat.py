@@ -138,8 +138,7 @@ def count_daily_stat(data):
     ]
     shop = Shop.objects.get(pk=shop_id)
     for (metric_name, field_name, cond) in q:
-        period_clients = PeriodClients.objects.shop_times_filter(
-            shop,
+        period_clients = PeriodClients.objects.filter(
             cond,
             dttm_forecast__date__gte=dt_start,
             dttm_forecast__date__lte=dt_end,

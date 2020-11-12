@@ -280,14 +280,34 @@ class OperationTemplate(AbstractActiveNamedModel):
 
 
 class PeriodClientsManager(models.Manager):
-    def shop_times_filter(self, shop, *args, **kwargs):
-        max_shop_time = max(list(shop.close_times.values()))
-        min_shop_time = min(list(shop.open_times.values()))
-        time_filter = {}
-        if max_shop_time != min_shop_time:
-            time_filter['dttm_forecast__time__gte'] = min_shop_time if min_shop_time < max_shop_time else max_shop_time
-            time_filter['dttm_forecast__time__lt'] = max_shop_time if min_shop_time < max_shop_time else min_shop_time
-        kwargs.update(time_filter)
+    def shop_times_filter(self, shop, *args, weekday=False, **kwargs):
+        '''
+        param:
+        shop - Shop object
+        weekday - bool - смотреть по дням недели
+        '''
+        weekdays_db = {
+            0: 2,
+            1: 3,
+            2: 4,
+            3: 5,
+            4: 6,
+            5: 7,
+            6: 1,
+        }
+        if weekday and not shop.open_times.get('all', False):
+            filt = Q()
+            for k, v in shop.open_times.items():
+                filt |= Q(dttm_forecast__week_day=weekdays_db[k]) & (Q(dttm_forecast__time__gte=v) | Q(dttm_forecast__time__lt=shop.close_times[k]))
+            return self.filter(filt, *args, **kwargs)
+        else:
+            max_shop_time = max(list(shop.close_times.values()))
+            min_shop_time = min(list(shop.open_times.values()))
+            time_filter = {}
+            if max_shop_time != min_shop_time:
+                time_filter['dttm_forecast__time__gte'] = min_shop_time if min_shop_time < max_shop_time else max_shop_time
+                time_filter['dttm_forecast__time__lt'] = max_shop_time if min_shop_time < max_shop_time else min_shop_time
+            kwargs.update(time_filter)
         return self.filter(*args, **kwargs)
 
 
