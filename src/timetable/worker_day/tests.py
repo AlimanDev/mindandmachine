@@ -363,7 +363,10 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         for wd in wds4updating:
             wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
+            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, worker_id=wd.worker_id, is_approved=False).first()
             self.assertEqual(wd_from_db.is_approved, True)
+            self.assertIsNotNone(wd_from_db_not_approved)
+            self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
 
 
 class TestUploadDownload(APITestCase):
@@ -400,7 +403,8 @@ class TestUploadDownload(APITestCase):
         self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file})
         file.close()
         response = self.client.get(
-            f'{self.url}download_tabel/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
+            f'{self.url}download_tabel/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False&dt_to=2020-04-30')
+        print(response.content)
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[1]][1], 'ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ АПРЕЛЬ  2020г.')
@@ -415,6 +419,6 @@ class TestUploadDownload(APITestCase):
             f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1')
-        self.assertEqual(tabel[tabel.columns[1]][9], 'Иванов Иван Иванович')
-        self.assertEqual(tabel[tabel.columns[29]][12], 'В')
+        self.assertEqual(tabel[tabel.columns[1]][1], 'Магазин: Shop1')
+        self.assertEqual(tabel[tabel.columns[1]][13], 'Иванов Иван Иванович')
+        self.assertEqual(tabel[tabel.columns[29]][16], 'В')
