@@ -15,12 +15,13 @@ from rest_framework import (
     exceptions,
     permissions
 )
-from src.base.auth.authentication import WFMSessionAuthentication
-from rest_framework.authentication import TokenAuthentication, SessionAuthentication
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from src.base.auth.authentication import WFMSessionAuthentication
+from src.base.models import User
 from src.recognition.api.recognition import Recognition
 from src.recognition.authentication import TickPointTokenAuthentication
 from src.recognition.models import Tick, TickPhoto, TickPoint, UserConnecter, TickPointToken
@@ -135,14 +136,13 @@ class TickViewSet(viewsets.ModelViewSet):
     basename = ''
 
     def get_authenticators(self):
-        return [TokenAuthentication(), TickPointTokenAuthentication(), WFMSessionAuthentication()]
+        return [TickPointTokenAuthentication(raise_auth_exc=False), WFMSessionAuthentication(), TokenAuthentication()]
 
     @cached_property
     def strategy(self):
-        # может быть есть более явный признак получения стратегии?
-        if 'shop_code' in self.request.data:
+        if isinstance(self.request.user, User):
             return UserAuthTickViewStrategy(self)
-        elif 'user_id' in self.request.data:
+        elif isinstance(self.request.user, TickPoint):
             return TickPointAuthTickViewStrategy(self)
 
         raise NotImplementedError
@@ -242,7 +242,7 @@ class TickPhotoViewSet(viewsets.ModelViewSet):
     serializer_class = TickPhotoSerializer
 
     def get_authenticators(self):
-        return [TokenAuthentication(), TickPointTokenAuthentication(), WFMSessionAuthentication()]
+        return [TickPointTokenAuthentication(raise_auth_exc=False), WFMSessionAuthentication(), TokenAuthentication()]
 
     def create(self, request, **kwargs):
         """

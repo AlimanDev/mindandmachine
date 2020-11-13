@@ -1,6 +1,7 @@
 from datetime import timedelta, time, datetime, date
 
 from django.core import mail
+from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework import status
@@ -731,6 +732,7 @@ class TestWorkerDayCreateFact(APITestCase):
         plan_id = response.json()['id']
 
 
+@override_settings(TRUST_TICK_REQUEST=True)
 class TestAttendanceRecords(TestsHelperMixin, APITestCase):
     def setUp(self):
         self.url = '/rest_api/worker_day/'
@@ -874,6 +876,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
 
         self.assertTrue(wd.exists())
 
+    @override_settings(MDA_SKIP_LEAVING_TICK=False)
     def test_attendancerecords_no_fact_create(self):
         self.worker_day_fact_not_approved.delete()
         self.worker_day_fact_approved.delete()

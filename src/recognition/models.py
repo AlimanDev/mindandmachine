@@ -6,6 +6,7 @@ from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy
 
+from src.base.models_abstract import AbstractActiveModel, AbstractActiveNamedModel
 from src.timetable.models import User, Shop
 
 
@@ -15,16 +16,7 @@ def user_directory_path(instance, filename):
     return 'user_photo/{}/{}.{}'.format(date, uuid.uuid4().hex, ext)
 
 
-class Base(models.Model):
-    class Meta:
-        abstract = True
-
-    dttm_added = models.DateTimeField(default=now)
-    dttm_deleted = models.DateTimeField(null=True, blank=True)
-    changed_by = models.IntegerField(null=True)
-
-
-class UserConnecter(Base):
+class UserConnecter(AbstractActiveModel):
     class Meta(object):
         verbose_name = 'Сопоставление пользователей'
         verbose_name_plural = 'Сопоставления пользователей'
@@ -33,7 +25,7 @@ class UserConnecter(Base):
     partner_id = models.IntegerField(null=False)
 
 
-class TickPoint(Base):
+class TickPoint(AbstractActiveNamedModel):
     class Meta(object):
         verbose_name = 'Точка отметки'
         verbose_name_plural = 'Точки отметок'
@@ -44,7 +36,8 @@ class TickPoint(Base):
     is_authenticated = True
 
     id = models.AutoField(primary_key=True)
-    title = models.CharField(max_length=64)
+    name = models.CharField(max_length=128, null=True, blank=True)
+    title = models.CharField(max_length=64)  # TODO: перенести title в name, сделать name обяз., удалить title
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)
     key = models.UUIDField(default=uuid.uuid4, unique=True)
     is_active = models.BooleanField(default=True)
@@ -53,7 +46,7 @@ class TickPoint(Base):
         return "{} {}".format(self.id, self.title)
 
 
-class Tick(Base):
+class Tick(AbstractActiveModel):
     class Meta(object):
         verbose_name = 'Отметка'
         verbose_name_plural = 'Отметки'
@@ -82,7 +75,7 @@ class Tick(Base):
     is_front = models.BooleanField(default=False)
 
 
-class TickPhoto(Base):
+class TickPhoto(AbstractActiveModel):
     class Meta(object):
         verbose_name = 'Фотографии отметок'
         verbose_name_plural = 'Фотографии отметок'

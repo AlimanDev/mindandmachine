@@ -49,7 +49,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
 
     def get_authenticators(self):
-        return [TokenAuthentication(), TickPointTokenAuthentication()]
+        return [TickPointTokenAuthentication(raise_auth_exc=False), TokenAuthentication()]
 
     # filterset_class = WorkerDayFilterSet
     def get_queryset(self):

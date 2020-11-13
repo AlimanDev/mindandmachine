@@ -1,3 +1,4 @@
+import geopy.distance
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
@@ -97,7 +98,6 @@ class PostTickSerializer_user(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if self.context['request'].user.network.allowed_geo_distance_km:
-            import geopy.distance
             distance = geopy.distance.distance(
                 (attrs['lat'], attrs['lon']),
                 (attrs['shop_code'].latitude, attrs['shop_code'].longitude),
