@@ -10,6 +10,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef
 from django.db.models.query import QuerySet
+from django.shortcuts import get_object_or_404
 from django.utils.functional import cached_property
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
@@ -249,7 +250,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         parent_code = kwargs.pop('parent_code', None)
         super().__init__(*args, **kwargs)
         if parent_code:
-            self.parent = Shop.objects.get(code=parent_code)
+            self.parent = get_object_or_404(Shop, code=parent_code)
 
     @property
     def director_code(self):
@@ -302,7 +303,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         self.tm_open_dict = self.clean_time_dict(self.open_times)
         self.tm_close_dict = self.clean_time_dict(self.close_times)
         if hasattr(self, 'parent_code'):
-            self.parent = Shop.objects.get(code=self.parent_code)
+            self.parent = get_object_or_404(Shop, code=self.parent_code)
         load_template = None
         if self.load_template_id and self.id:
             new_template = self.load_template_id

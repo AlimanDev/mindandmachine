@@ -226,6 +226,31 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(shop, data)
         self.assertIsNotNone(Shop.objects.get(id=shop['id']).dttm_deleted)
 
+    def test_404_resp_for_unexistent_parent_code(self):
+        data = {
+            "parent_code": 'nonexistent',
+            "name": 'Title 2',
+            "tm_open_dict": {"all": "07:00:00"},
+            "tm_close_dict": {"all": "23:00:00"},
+            "region_id": self.region.id,
+            "code": "10",
+            "address": 'address',
+            "type": Shop.TYPE_REGION,
+            "dt_opened": '2019-01-01',
+            "dt_closed": "2020-01-01",
+            "timezone": 'Europe/Berlin',
+            'restricted_end_times': '[]',
+            'restricted_start_times': '[]',
+            'settings_id': self.shop_settings.id,
+            'forecast_step_minutes': '00:30:00',
+            'is_active': False,
+            'latitude': '52.229675',
+            'longitude': '21.012228',
+            'director_code': 'nonexistent',
+        }
+        response = self.client.put(self.shop_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_cant_save_with_invalid_restricted_times(self):
         data = {
             'id': self.shop.id,
