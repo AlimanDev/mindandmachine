@@ -74,7 +74,7 @@ class ShopViewSet(UpdateorCreateViewSet):
         # if not only_top:
         #     shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
 
-        return Shop.objects.filter(network_id=user.network_id)
+        return Shop.objects.filter(network_id=user.network_id).order_by('level', 'name')
 
     @action(detail=False, methods=['get'], serializer_class=ShopStatSerializer)#, permission_classes=[IsAdminOrIsSelf])
     def stat(self, request):
