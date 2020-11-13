@@ -49,10 +49,13 @@ USERS_WITH_SCHEDULE_ONLY = getattr(settings, 'USERS_WITH_SCHEDULE_ONLY', True)
 
 
 class HashSigninAuthToken(ObtainAuthToken):
+    authentication_classes = ()
     serializer_class = HashSigninSerializer
 
 
 class TickPointAuthToken(ObtainAuthToken):
+    authentication_classes = ()
+
     def post(self, request, *args, **kwargs):
         """
         POST /api/v1/token-auth/
