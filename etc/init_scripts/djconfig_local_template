@@ -32,6 +32,6 @@ STATIC_ROOT = '/var/www/servers/%s/'
 
 QOS_DEV_MODE_ENABLED = True
 
-HOST = '127.0.0.1:%s' # dev
+HOST = 'http://127.0.0.1:%s' # dev
 TIMETABLE_IP = "127.0.0.1:%s"
 
