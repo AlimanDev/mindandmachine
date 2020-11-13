@@ -693,7 +693,7 @@ def create_timetable(request, form):
     ##################################################################
 
     data = {
-        'IP': settings.HOST_IP,
+        'IP': settings.HOST,
         'timetable_id': tt.id,
         'forecast_step_minutes': shop.forecast_step_minutes.minute,
         'work_types': list(work_types.values()),

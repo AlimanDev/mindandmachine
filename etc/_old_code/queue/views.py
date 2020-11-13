@@ -243,7 +243,7 @@ def process_forecast(request, form):
             })
 
         aggregation_dict = {
-            'IP': settings.HOST_IP,
+            'IP': settings.HOST,
             'algo_params': {
                 'days_info': Converter.convert(day_info, ProductionDay, fields=['id', 'dt', 'type', 'is_celebration'], out_array=True),
                 'dt_from': Converter.convert_date(dt_now),
