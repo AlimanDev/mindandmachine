@@ -397,6 +397,7 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 150)
 
+    #TODO падает
     def test_download_tabel(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
         file = open('etc/scripts/timetable.xlsx', 'rb')
@@ -404,7 +405,6 @@ class TestUploadDownload(APITestCase):
         file.close()
         response = self.client.get(
             f'{self.url}download_tabel/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False&dt_to=2020-04-30')
-        print(response.content)
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[1]][1], 'ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ АПРЕЛЬ  2020г.')
