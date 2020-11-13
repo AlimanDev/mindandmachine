@@ -696,7 +696,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         }
         breaks['default'] = shop.settings.breaks.breaks
         data = {
-            'IP': settings.HOST_IP,
+            'IP': settings.HOST,
             'timetable_id': tt.id,
             'forecast_step_minutes': shop.forecast_step_minutes.minute,
             'work_types': list(work_types.values()),
