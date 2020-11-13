@@ -136,7 +136,7 @@ class TickViewSet(viewsets.ModelViewSet):
     basename = ''
 
     def get_authenticators(self):
-        return [TickPointTokenAuthentication(raise_auth_exc=False), WFMSessionAuthentication(), TokenAuthentication()]
+        return [TickPointTokenAuthentication(raise_auth_exc=False), TokenAuthentication()]
 
     @cached_property
     def strategy(self):
@@ -242,7 +242,7 @@ class TickPhotoViewSet(viewsets.ModelViewSet):
     serializer_class = TickPhotoSerializer
 
     def get_authenticators(self):
-        return [TickPointTokenAuthentication(raise_auth_exc=False), WFMSessionAuthentication(), TokenAuthentication()]
+        return [TickPointTokenAuthentication(raise_auth_exc=False), TokenAuthentication()]
 
     def create(self, request, **kwargs):
         """
