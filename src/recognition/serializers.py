@@ -5,7 +5,7 @@ from rest_framework import serializers
 from src.base.models import Shop
 from src.recognition.models import TickPoint, Tick, TickPhoto
 from src.timetable.models import User as WFMUser
-from .utils import generate_user_token
+from src.util.utils import generate_user_token
 
 
 class HashSigninSerializer(serializers.Serializer):

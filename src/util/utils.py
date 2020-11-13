@@ -1,6 +1,7 @@
 import json
 import sys
 from functools import wraps
+from hashlib import md5
 
 from django.conf import settings
 from django.contrib.auth import authenticate, login
@@ -9,10 +10,10 @@ from django.core.exceptions import (
     ObjectDoesNotExist,
     MultipleObjectsReturned,
 )
-from django.http import HttpResponse
-from django.views.debug import ExceptionReporter
-from django.utils.timezone import now
 from django.core.serializers.json import DjangoJSONEncoder
+from django.http import HttpResponse
+from django.utils.timezone import now
+from django.views.debug import ExceptionReporter
 
 from src.base.models import (
     Employment,
@@ -321,3 +322,9 @@ def test_algo_server_connection():
         return True
     else:
         return JsonResponse.algo_internal_error('Что-то не так при подключении к серверу с алгоритмом')
+
+
+def generate_user_token(login):
+    salt = settings.MDAUDIT_AUTHTOKEN_SALT
+    dt = now().date().strftime("%Y%m%d")
+    return md5(f"{login}:{dt}:{salt}".encode()).hexdigest()

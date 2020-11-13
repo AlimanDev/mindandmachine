@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, time
 from django.urls import reverse
 
 from src.base.models import Employment
-from src.recognition.utils import generate_user_token
+from src.util.utils import generate_user_token
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
 from src.util.test import create_departments_and_users
 
