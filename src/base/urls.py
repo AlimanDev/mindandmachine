@@ -28,7 +28,8 @@ rest_auth_urls = [
     url(r'^password/change/$', PasswordChangeView.as_view(), name='rest_password_change'),
     url(r'^user/$', AuthUserView.as_view(), name='user'),
     url(r'^allowed_functions/$', FunctionGroupView.as_view({'get': 'list'}), name='user'),
-    url(r'^signin_token/?$', WFMTokenLoginView.as_view(), kwargs={'version': '0.9'}, name='signin_token'),   # Использует Ортека старый формат
+    url(r'^signin_token/?$', WFMTokenLoginView.as_view(), kwargs={'version': '0.9'}, name='signin_token'),
+    # Использует Ортека старый формат
     # url(r'^notification', NotificationViewSet.as_view(), name='notification')
 ]
 
@@ -51,7 +52,7 @@ employment_nested_router = routers.NestedSimpleRouter(router, r'employment', loo
 # Wire up our API using automatic URL routing.
 # Additionally, we include login URLs for the browsable API.
 urlpatterns = [
-    url(r'^auth/', include((rest_auth_urls,'auth'),namespace='auth')),
+    url(r'^auth/', include((rest_auth_urls, 'auth'), namespace='auth')),
     url(r'^', include(router.urls)),
     url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
 ]

@@ -130,7 +130,7 @@ def create_predbills_request_function(shop_id, dt=None):
         return JsonResponse.internal_error(error_message)
 
     aggregation_dict = {
-        'IP': settings.HOST_IP,
+        'IP': settings.HOST,
         'algo_params': {
             'days_info': Converter.convert(day_info, ProductionDay, fields=['id', 'dt', 'type', 'is_celebration'], out_array=True),
             'dt_from': Converter.convert_date(dt),

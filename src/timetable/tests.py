@@ -1,6 +1,7 @@
 from datetime import timedelta, time, datetime, date
 
 from django.core import mail
+from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework import status
@@ -731,6 +732,7 @@ class TestWorkerDayCreateFact(APITestCase):
         plan_id = response.json()['id']
 
 
+@override_settings(TRUST_TICK_REQUEST=True)
 class TestAttendanceRecords(TestsHelperMixin, APITestCase):
     def setUp(self):
         self.url = '/rest_api/worker_day/'
@@ -873,10 +875,8 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         )
 
         self.assertTrue(wd.exists())
-        wd = wd.first()
-        self.assertEqual(wd.parent_worker_day_id, self.worker_day_plan_approved.id)
-        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).parent_worker_day_id, wd.id)
 
+    @override_settings(MDA_SKIP_LEAVING_TICK=False)
     def test_attendancerecords_no_fact_create(self):
         self.worker_day_fact_not_approved.delete()
         self.worker_day_fact_approved.delete()
@@ -898,7 +898,6 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
 
         self.assertTrue(wd.exists())
         wd = wd.first()
-        self.assertEqual(wd.parent_worker_day_id, self.worker_day_plan_approved.id)
 
         ar = AttendanceRecords.objects.create(
             dttm=datetime.combine(self.dt + timedelta(days=1), time(6, 0, 0)),
@@ -925,8 +924,9 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             dttm_work_start=None,
             dttm_work_end=ar2.dttm,
             worker=self.user2
-        )
-        self.assertTrue(new_wd.exists())
+        ).first()
+        self.assertIsNotNone(new_wd)
+        self.assertTrue(new_wd.employment.id, self.employment2.id)
 
     def test_set_workday_type_for_existing_empty_types(self):
         WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).update(

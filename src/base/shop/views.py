@@ -16,6 +16,7 @@ from src.base.views_abstract import UpdateorCreateViewSet
 
 class ShopFilter(BaseActiveNamedModelFilter):
     id = NumberFilter(field_name='id', lookup_expr='exact')
+
     class Meta:
         model = Shop
         fields = {
@@ -120,7 +121,8 @@ class ShopViewSet(UpdateorCreateViewSet):
         # aa: fixme: refactor code
         employments = Employment.objects.get_active(
             network_id=user.network_id,
-            user=user).values('shop_id')
+            user=user
+        ).values('shop_id')
 
         shops = self.filter_queryset(self.get_queryset())
         level = 0
