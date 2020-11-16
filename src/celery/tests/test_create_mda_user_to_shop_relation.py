@@ -1,10 +1,11 @@
-from datetime import time, datetime
+from datetime import time, datetime, timedelta
 from unittest import mock
 
 from django.test import TestCase
 from django.utils import timezone
 
-from src.timetable.models import WorkerDay
+from src.celery.tasks import sync_mda_user_to_shop_relation
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkTypeName, WorkType
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -20,9 +21,17 @@ class TestCreateMDAUserToShopRelation(TestsHelperMixin, TestCase):
             dt=cls.dt_now,
             type=WorkerDay.TYPE_WORKDAY,
             shop=cls.shop,
-            dttm_work_start=datetime.combine(cls.dt_now, time(hour=9)),
-            dttm_work_end=datetime.combine(cls.dt_now, time(8, 0, 0)),
+            dttm_work_start=datetime.combine(cls.dt_now, time(9, 0, 0)),
+            dttm_work_end=datetime.combine(cls.dt_now, time(18, 0, 0)),
             is_vacancy=True,
+            is_fact=False, is_approved=True,
+        )
+        cls.work_type_name1 = WorkTypeName.objects.create(name='Тест')
+        cls.work_type1 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name1)
+        WorkerDayCashboxDetails.objects.create(
+            work_type=cls.work_type1,
+            worker_day=cls.wd,
+            work_part=1,
         )
 
     def test_create_mda_user_to_shop_rel_called_with_enabled_setting(self, _requests_post):
@@ -43,3 +52,79 @@ class TestCreateMDAUserToShopRelation(TestsHelperMixin, TestCase):
             self.wd.save()
 
         _requests_post.assert_not_called()
+
+    def _test_sync_task(self, _requests_post, called_times):
+        _requests_post.reset_mock()
+        sync_mda_user_to_shop_relation()
+        self.assertEqual(_requests_post.call_count, called_times)
+
+    def test_sync_task(self, _requests_post):
+        WorkerDay.objects.filter(id=self.wd.id).update(dt=self.dt_now)
+        self._test_sync_task(_requests_post, 1)
+
+        WorkerDay.objects.filter(id=self.wd.id).update(dt=self.dt_now + timedelta(days=1))
+        self._test_sync_task(_requests_post, 0)
+
+        WorkerDay.objects.filter(id=self.wd.id).update(dt=self.dt_now - timedelta(days=1))
+        self._test_sync_task(_requests_post, 0)
+
+        # обучение факт подтв.
+        WorkerDay.objects.create(
+            worker=self.user2,
+            employment=self.employment2,
+            dt=self.dt_now,
+            type=WorkerDay.TYPE_QUALIFICATION,
+            shop=self.shop2,
+            dttm_work_start=datetime.combine(self.dt_now, time(9, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt_now, time(18, 0, 0)),
+            is_vacancy=False,
+            is_fact=True, is_approved=True,
+        )
+        self._test_sync_task(_requests_post, 0)
+
+        # обучение в опред. магазине
+        WorkerDay.objects.create(
+            worker=self.user3,
+            employment=self.employment3,
+            dt=self.dt_now,
+            type=WorkerDay.TYPE_QUALIFICATION,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt_now, time(9, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt_now, time(18, 0, 0)),
+            is_vacancy=False,
+            is_fact=False, is_approved=True,
+        )
+        self._test_sync_task(_requests_post, 1)
+
+        # обучение без магазина
+        WorkerDay.objects.create(
+            worker=self.user4,
+            employment=self.employment4,
+            dt=self.dt_now,
+            type=WorkerDay.TYPE_QUALIFICATION,
+            shop=None,
+            dttm_work_start=datetime.combine(self.dt_now, time(hour=9)),
+            dttm_work_end=datetime.combine(self.dt_now, time(8, 0, 0)),
+            is_vacancy=False,
+            is_fact=False, is_approved=True,
+        )
+        self._test_sync_task(_requests_post, 1)
+
+        # простой рабочий день
+        wd = WorkerDay.objects.create(
+            worker=self.user5,
+            employment=self.employment5,
+            dt=self.dt_now,
+            type=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt_now, time(hour=9)),
+            dttm_work_end=datetime.combine(self.dt_now, time(8, 0, 0)),
+            is_vacancy=False,
+            is_fact=False, is_approved=True,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            work_type=self.work_type1,
+            worker_day=wd,
+            work_part=1,
+        )
+        self._test_sync_task(_requests_post, 1)

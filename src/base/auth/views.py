@@ -1,22 +1,19 @@
 
+from django.contrib.auth import login
+from django.db.models import Q
+from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+from rest_framework import serializers
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
-from django.contrib.auth import login
-from rest_framework import serializers
 
-from django.utils.translation import gettext_lazy as _
-from django.utils import timezone
-from django.db.models import Q
-from hashlib import md5
-
-from src.base.exceptions import FieldError
 from src.base.auth.authentication import CsrfExemptSessionAuthentication
-from django.conf import settings
+from src.base.exceptions import FieldError
 from src.base.models import (
     User,
-    Shop,
     Employment,
 )
+from src.util.utils import generate_user_token
 
 
 class WFMTokenUserSerializer(serializers.Serializer):
@@ -85,18 +82,13 @@ class WFMTokenLoginView(GenericAPIView):
         return user
 
     def post(self, request, *args, **kwargs):
-        def get_token(login):
-            salt=settings.MDAUDIT_AUTHTOKEN_SALT
-            dt = timezone.now().date().strftime("%Y%m%d")
-            return md5(f"{login}:{dt}:{salt}".encode()).hexdigest()
-
         self.request = request
         self.serializer = self.get_serializer(data=self.request.data, context={'request': request})
 
         if not request.user.is_authenticated:
             self.serializer.is_valid(raise_exception=True)
 
-            token = get_token(self.serializer.data['username'])
+            token = generate_user_token(self.serializer.data['username'])
             user = None
 
             if token == self.serializer.data['token']:

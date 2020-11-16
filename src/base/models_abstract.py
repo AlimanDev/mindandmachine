@@ -59,6 +59,19 @@ class AbstractActiveModel(AbstractModel):
 
         return self
 
+    @property
+    def is_active(self):
+        return not bool(self.dttm_deleted)
+
+    @is_active.setter
+    def is_active(self, val):
+        if val:
+            if self.dttm_deleted:
+                self.dttm_deleted = None
+        else:
+            if not self.dttm_deleted:
+                self.dttm_deleted = timezone.now()
+
     # dttm_modified = models.DateTimeField(null=True, blank=True)
     # changed_by = models.IntegerField(null=True, blank=True)  # вообще на User ссылка
 

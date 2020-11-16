@@ -9,7 +9,7 @@ class BaseActiveNamedModelFilter(FilterSet):
     name__in = CharFilter(field_name='name', method='field_in')
     code = CharFilter(field_name='code', lookup_expr='exact')
     code__in = CharFilter(field_name='code', method='field_in')
-    id__in = NumberFilter(field_name='id', method='field_in')
+    id__in = CharFilter(field_name='id', method='field_in')
 
     def field_in(self, queryset, name, value):
         filt = {
