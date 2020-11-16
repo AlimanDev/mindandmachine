@@ -287,15 +287,6 @@ class PeriodClientsManager(models.Manager):
         weekday - bool - смотреть по дням недели
         https://docs.djangoproject.com/en/3.0/ref/models/querysets/#week-day
         '''
-        weekdays_db = {
-            0: 2,
-            1: 3,
-            2: 4,
-            3: 5,
-            4: 6,
-            5: 7,
-            6: 1,
-        }
         if weekday and not shop.open_times.get('all', False):
             filt = models.Q()
             for k, v in shop.open_times.items():
