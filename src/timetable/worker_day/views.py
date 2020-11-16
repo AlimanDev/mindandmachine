@@ -61,6 +61,11 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         "no_timetable": _("Workers don't have timetable."),
         'cannot_delete': _("Cannot_delete approved version."),
         'na_worker_day_exists': _("Not approved version already exists."),
+        'no_perm_to_approve_wd_types': _('У вас нет прав на подтверждение типа дня "{wd_type_str}"'),
+        'approve_days_interval_restriction': _('У вас нет прав на подтверждения типа дня "{wd_type_str}" '
+                                               'в выбранные даты. '
+                                               'Необходимо изменить интервал для подтверждения. '
+                                               'Разрешенный интевал для подтверждения: {dt_interval}'),
     }
 
     permission_classes = [WdPermission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
@@ -195,12 +200,40 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             group__in=request.user.get_group_ids(
                 request.user.network, Shop.objects.get(id=serializer.validated_data['shop_id'])),
             worker_day_permission__action=WorkerDayPermission.APPROVE,
-            worker_day_permission__wd_type__in=serializer.validated_data.get('wd_types'),
+            worker_day_permission__graph_type=WorkerDayPermission.FACT if
+                serializer.validated_data['is_fact'] else WorkerDayPermission.PLAN,
         ).select_related('worker_day_permission').values_list(
             'worker_day_permission__wd_type', 'limit_days_in_past', 'limit_days_in_future',
         ).distinct()
-        if not wd_perms:
-            raise PermissionDenied()
+        wd_perms_dict = {wdp[0]: wdp for wdp in wd_perms}
+
+        today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
+        for wd_type in serializer.validated_data.get('wd_types'):
+            wdp = wd_perms_dict.get(wd_type)
+            wd_type_display_str = dict(WorkerDay.TYPES)[wd_type]
+            if wdp is None:
+                raise PermissionDenied(
+                    self.error_messages['no_perm_to_approve_wd_types'].format(wd_type_str=wd_type_display_str))
+
+            limit_days_in_past = wdp[1]
+            limit_days_in_future = wdp[2]
+            date_limit_in_past = None
+            date_limit_in_future = None
+            if limit_days_in_past is not None:
+                date_limit_in_past = today - datetime.timedelta(days=limit_days_in_past)
+            if limit_days_in_future is not None:
+                date_limit_in_future = today + datetime.timedelta(days=limit_days_in_future)
+            if date_limit_in_past or date_limit_in_future:
+                if (date_limit_in_past and serializer.validated_data.get('dt_from') < date_limit_in_past) or \
+                        (date_limit_in_future and serializer.validated_data.get('dt_to') > date_limit_in_future):
+                    dt_interval = f'с {Converter.convert_date(date_limit_in_past) or "..."} ' \
+                                  f'по {Converter.convert_date(date_limit_in_future) or "..."}'
+                    raise PermissionDenied(
+                        self.error_messages['approve_days_interval_restriction'].format(
+                            wd_type_str=wd_type_display_str,
+                            dt_interval=dt_interval,
+                        )
+                    )
 
         user_ids = Employment.objects.get_active(
             Shop.objects.get(id=serializer.data['shop_id']).network_id,
@@ -216,7 +249,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         for (limit_days_in_past, limit_days_in_future), wd_types in wd_types_grouped_by_limit.items():
             q = Q(type__in=wd_types)
             if limit_days_in_past or limit_days_in_future:
-                today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
                 if limit_days_in_past:
                     q &= Q(dt__gte=today - datetime.timedelta(days=limit_days_in_past))
                 if limit_days_in_future:

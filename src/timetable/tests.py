@@ -193,8 +193,6 @@ class TestWorkerDay(APITestCase):
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         fact_id = response.json()['id']
-        parent_id = response.json()['parent_worker_day_id']
-        self.assertEqual(parent_id, plan_id)
 
         # edit not approved plan
         data_holiday = {
@@ -222,10 +220,12 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(response.json()['dttm_work_end'], data['dttm_work_end'])
 
         # Approve plan
+        approve_dt_from = dt - timedelta(days=5)
+        approve_dt_to = dt + timedelta(days=2)
         data_approve = {
             'shop_id': self.shop.id,
-            'dt_from': dt,
-            'dt_to': dt + timedelta(days=2),
+            'dt_from': approve_dt_from,
+            'dt_to': approve_dt_to,
             'is_fact': False,
             'wd_types': WorkerDay.TYPES_USED,
         }
@@ -234,14 +234,52 @@ class TestWorkerDay(APITestCase):
         # если нету ни одного разрешения для action=approve, то ответ -- 403
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        GroupWorkerDayPermission.objects.create(
+        gwdp = GroupWorkerDayPermission.objects.create(
             group=self.admin_group,
             worker_day_permission=WorkerDayPermission.objects.get(
                 action=WorkerDayPermission.APPROVE,
                 graph_type=WorkerDayPermission.PLAN,
                 wd_type=WorkerDay.TYPE_HOLIDAY,
             ),
+            limit_days_in_past=3,
+            limit_days_in_future=1,
         )
+        response = self.client.post(self.url_approve, data_approve, format='json')
+        # разрешено изменять день только на 1 день в будущем
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertDictEqual(
+            response.json(),
+            {
+                'detail': 'У вас нет прав на подтверждения типа дня "Выходной" в выбранные '
+                          'даты. Необходимо изменить интервал для подтверждения. '
+                          'Разрешенный интевал для подтверждения: '
+                          f'с {Converter.convert_date(self.dt - timedelta(days=gwdp.limit_days_in_past))} '
+                          f'по {Converter.convert_date(self.dt + timedelta(days=gwdp.limit_days_in_future))}'
+            }
+        )
+
+        gwdp.limit_days_in_past = 10
+        gwdp.limit_days_in_future = 5
+        gwdp.save()
+
+        response = self.client.post(self.url_approve, data_approve, format='json')
+        # проверка наличия прав на редактирование переданных типов дней
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertDictEqual(
+            response.json(),
+            {
+                'detail': 'У вас нет прав на подтверждение типа дня "Рабочий день"'
+            }
+        )
+
+        for wdp in WorkerDayPermission.objects.filter(
+                action=WorkerDayPermission.APPROVE,
+                graph_type=WorkerDayPermission.PLAN):
+            GroupWorkerDayPermission.objects.get_or_create(
+                group=self.admin_group,
+                worker_day_permission=wdp,
+            )
+
         response = self.client.post(self.url_approve, data_approve, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -252,18 +290,18 @@ class TestWorkerDay(APITestCase):
         data_approve['is_fact'] = True
 
         response = self.client.post(self.url_approve, data_approve, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         fact = WorkerDay.objects.get(id=fact_id)
         self.assertEqual(fact.is_approved, False)
 
-        GroupWorkerDayPermission.objects.create(
-            group=self.admin_group,
-            worker_day_permission=WorkerDayPermission.objects.get(
+        for wdp in WorkerDayPermission.objects.filter(
                 action=WorkerDayPermission.APPROVE,
-                graph_type=WorkerDayPermission.FACT,
-                wd_type=fact.type,
-            ),
-        )
+                graph_type=WorkerDayPermission.FACT):
+            GroupWorkerDayPermission.objects.get_or_create(
+                group=self.admin_group,
+                worker_day_permission=wdp,
+            )
+
         response = self.client.post(self.url_approve, data_approve, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(WorkerDay.objects.get(id=fact_id).is_approved, True)
@@ -275,7 +313,6 @@ class TestWorkerDay(APITestCase):
         new_plan_id = response.json()['id']
         new_plan = WorkerDay.objects.get(id=new_plan_id)
         self.assertNotEqual(new_plan_id, plan_id)
-        self.assertEqual(response.json()['parent_worker_day_id'], plan_id)
         self.assertEqual(response.json()['type'], data['type'])
 
         # # create approved plan again
@@ -295,7 +332,6 @@ class TestWorkerDay(APITestCase):
         new_fact_id = res['id']
         new_fact = WorkerDay.objects.get(id=new_fact_id)
         self.assertNotEqual(new_fact_id, fact_id)
-        self.assertEqual(WorkerDay.objects.get(id=new_fact_id).parent_worker_day_id, fact_id)
         self.assertEqual(res['dttm_work_start'], data['dttm_work_start'])
         self.assertEqual(res['dttm_work_end'], data['dttm_work_end'])
 
