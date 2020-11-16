@@ -521,7 +521,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         need_work_types = WorkType.objects.filter(shop_id=shop_id).values_list('id', flat=True)
         worker_cashbox_info = {}
         for worker_cashbox_inf in list \
-                    (EmploymentWorkType.objects.select_related('employment').filter(work_type_id__in=need_work_types,
+                    (EmploymentWorkType.objects.select_related('employment', 'work_type').filter(work_type_id__in=need_work_types,
                                                                                     employment__in=employments,
                                                                                     is_active=True)):
             key = worker_cashbox_inf.employment.user_id
@@ -739,6 +739,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         'id': obj.id,
                         'worker': obj.employment.user_id,
                         'work_type': obj.work_type_id,
+                        'work_type_name': obj.work_type.work_type_name_id,
                         'mean_speed': obj.mean_speed,
                         'bills_amount': obj.bills_amount,
                         'period': obj.period,
