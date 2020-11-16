@@ -285,6 +285,7 @@ class PeriodClientsManager(models.Manager):
         param:
         shop - Shop object
         weekday - bool - смотреть по дням недели
+        https://docs.djangoproject.com/en/3.0/ref/models/querysets/#week-day
         '''
         weekdays_db = {
             0: 2,
@@ -300,10 +301,11 @@ class PeriodClientsManager(models.Manager):
             for k, v in shop.open_times.items():
                 tm_start = v
                 tm_end = shop.close_times[k]
+                week_day = (k + 2) % 7 or 7
                 if tm_start < tm_end:
-                    filt |= (models.Q(dttm_forecast__week_day=weekdays_db[int(k)]) & (models.Q(dttm_forecast__time__gte=tm_start) & models.Q(dttm_forecast__time__lt=tm_end)))
+                    filt |= (models.Q(dttm_forecast__week_day=week_day) & (models.Q(dttm_forecast__time__gte=tm_start) & models.Q(dttm_forecast__time__lt=tm_end)))
                 elif tm_start > tm_end:
-                    filt |= (models.Q(dttm_forecast__week_day=weekdays_db[int(k)]) & (models.Q(dttm_forecast__time__gte=tm_start) | models.Q(dttm_forecast__time__lt=tm_end)))
+                    filt |= (models.Q(dttm_forecast__week_day=week_day) & (models.Q(dttm_forecast__time__gte=tm_start) | models.Q(dttm_forecast__time__lt=tm_end)))
             return self.filter(filt, *args, **kwargs)
         else:
             max_shop_time = max(list(shop.close_times.values()))
