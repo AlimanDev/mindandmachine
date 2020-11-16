@@ -288,7 +288,7 @@ class WorkerDayQuerySet(QuerySet):
         raise NotImplementedError
 
     def get_tabel(self, network, fact_only=True, **kwargs):
-        qs = self.filter(is_fact=False, is_approved=True)
+        qs = self.filter(is_fact=False, is_approved=True, worker__isnull=False)
         fact_approved_wdays_subq = WorkerDay.objects.filter(
             Q(type=WorkerDay.TYPE_WORKDAY, shop_id=OuterRef('shop_id')) | Q(type=WorkerDay.TYPE_QUALIFICATION),
             # type=OuterRef('type'),  нужно? обучения и командировки в факт. графике должны заноситься как обучения или как рд?
