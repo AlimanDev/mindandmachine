@@ -301,7 +301,7 @@ class PeriodClientsManager(models.Manager):
             for k, v in shop.open_times.items():
                 tm_start = v
                 tm_end = shop.close_times[k]
-                week_day = (k + 2) % 7 or 7
+                week_day = (int(k) + 2) % 7 or 7
                 if tm_start < tm_end:
                     filt |= (models.Q(dttm_forecast__week_day=week_day) & (models.Q(dttm_forecast__time__gte=tm_start) & models.Q(dttm_forecast__time__lt=tm_end)))
                 elif tm_start > tm_end:
