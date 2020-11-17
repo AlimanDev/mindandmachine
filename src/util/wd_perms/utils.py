@@ -63,7 +63,7 @@ class DirectorOrtekaPreset(WdPermsPreset):
             [WorkerDayPermission.CREATE_OR_UPDATE, WorkerDayPermission.DELETE],
             [WorkerDayPermission.PLAN],
             ALL,
-            7, 90
+            35, 90
         ),
         (
             [WorkerDayPermission.APPROVE],
