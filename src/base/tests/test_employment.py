@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from src.base.models import WorkerPosition, Employment, Break
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
 from src.util.mixins.tests import TestsHelperMixin
+from src.util.models_converter import Converter
 
 
 class TestEmploymentAPI(TestsHelperMixin, APITestCase):
@@ -21,6 +22,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code')
         cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2')
         cls.worker_position.default_work_type_names.set([cls.wt_name, cls.wt_name2])
+        cls.dt_now = timezone.now().date()
 
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
@@ -38,7 +40,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         return resp
 
     def test_work_types_added_on_employment_creation(self):
-
         resp = self._create_employment()
         self.assertEqual(resp.status_code, 201)
         resp_data = resp.json()
@@ -49,7 +50,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             ).exists())
 
     def test_work_types_updated_on_position_change(self):
-
         another_worker_position = WorkerPosition.objects.create(
             name='Заместитель директора магазина',
             network=self.network,
@@ -174,10 +174,14 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             "employment_ids": employment_ids,
             "auto_timetable": False,
         }
-        response = self.client.post('/rest_api/employment/auto_timetable/', data=self.dump_data(data), content_type='application/json')
+        response = self.client.post('/rest_api/employment/auto_timetable/', data=self.dump_data(data),
+                                    content_type='application/json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).count(), 2)
-        self.assertEqual(list(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).values_list('id', flat=True)), employment_ids)
+        self.assertEqual(list(
+            Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).values_list('id',
+                                                                                                          flat=True)),
+            employment_ids)
 
     def test_work_hours_change_on_update_position(self):
         dt = date.today()
@@ -215,9 +219,37 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 dt=dt + timedelta(i + 3),
             )
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt).work_hours, timedelta(hours=9))
-        self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours, timedelta(hours=9))
+        self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours,
+                         timedelta(hours=9))
         emp = Employment.objects.get(pk=resp['id'])
         emp.position = another_worker_position
         emp.save()
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt).work_hours, timedelta(hours=9))
-        self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours, timedelta(hours=9, minutes=30))
+        self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours,
+                         timedelta(hours=9, minutes=30))
+
+    def _get_empls(self, extra_params=None):
+        params = {
+            'dt_from': Converter.convert_date(self.dt_now),
+            'dt_to': Converter.convert_date(self.dt_now),
+        }
+
+        if extra_params:
+            params.update(extra_params)
+
+        return self.client.get(path=self.get_url('Employment-list'), data=params)
+
+    def test_get_mine_employments(self):
+        resp = self._get_empls()
+        self.assertEqual(len(resp.json()), 7)
+
+        resp = self._get_empls(extra_params={'mine': True})
+        self.assertEqual(len(resp.json()), 7)
+
+        self.client.force_authenticate(user=self.user2)
+        resp = self._get_empls(extra_params={'mine': True})
+        self.assertEqual(len(resp.json()), 5)
+
+        self.client.force_authenticate(user=self.user5)
+        resp = self._get_empls(extra_params={'mine': True})
+        self.assertEqual(len(resp.json()), 6)
