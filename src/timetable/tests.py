@@ -135,7 +135,7 @@ class TestWorkerDay(APITestCase):
             'dt_from': self.dt,
             'dt_to': self.dt + timedelta(days=2),
             'is_fact': False,
-            'wd_types': WorkerDay.TYPES_USED,
+            # 'wd_types': WorkerDay.TYPES_USED,  # временно
         }
         response = self.client.post(self.url_approve, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
