@@ -136,12 +136,12 @@ def count_daily_stat(data):
         ('work_types', 'operation_type__work_type_id', Q(operation_type__work_type__shop_id=shop_id)),
         ('operation_types', 'operation_type_id', Q(operation_type__operation_type_name__is_special=True)),
     ]
-
+    shop = Shop.objects.get(pk=shop_id)
     for (metric_name, field_name, cond) in q:
         period_clients = PeriodClients.objects.filter(
             cond,
-            dttm_forecast__gte=dt_start,
-            dttm_forecast__lte=dt_end,
+            dttm_forecast__date__gte=dt_start,
+            dttm_forecast__date__lte=dt_end,
         ).annotate(
             dt=TruncDate('dttm_forecast'),
             field=F(field_name)
