@@ -642,7 +642,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         # Спрос
 
         absenteeism_coef = shop.settings.absenteeism if shop.settings else 0
-        periods = PeriodClients.objects.filter(
+        periods = PeriodClients.objects.shop_times_filter(
+            shop,
             operation_type__dttm_deleted__isnull=True,
             operation_type__work_type__shop_id=shop_id,
             operation_type__work_type__dttm_deleted__isnull=True,

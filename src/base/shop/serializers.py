@@ -1,6 +1,7 @@
 import datetime
 import json
 
+import geopy.distance
 import pytz
 from django.utils import six
 from django.utils.translation import ugettext_lazy as _
@@ -53,14 +54,24 @@ class ShopSerializer(serializers.ModelSerializer):
     tm_open_dict = serializers.JSONField(required=False)
     tm_close_dict = serializers.JSONField(required=False)
     load_template_status = serializers.CharField(read_only=True)
-    timezone = TimeZoneField()
+    timezone = TimeZoneField(required=False)
+    is_active = serializers.BooleanField(required=False, default=True)
+    director_code = serializers.CharField(required=False)
+    distance = serializers.SerializerMethodField(label='Расстояние до магазина (км)')
+
+    def get_distance(self, shop):
+        lat = self.context.get('request').META.get('X-LAT')
+        lon = self.context.get('request').META.get('X-LON')
+        if lat and lon and shop.latitude and shop.longitude:
+            return round(geopy.distance.distance((lat, lon), (shop.latitude, shop.longitude)).km, 2)
 
     class Meta:
         model = Shop
         fields = ['id', 'parent_id', 'parent_code', 'name', 'settings_id', 'tm_open_dict', 'tm_close_dict',
                   'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id',
                   'network_id', 'restricted_start_times', 'restricted_end_times', 'exchange_settings_id',
-                  'load_template_id', 'area', 'forecast_step_minutes', 'load_template_status']
+                  'load_template_id', 'area', 'forecast_step_minutes', 'load_template_status', 'is_active',
+                  'director_code', 'latitude', 'longitude', 'director_id', 'distance']
         extra_kwargs = {
             'restricted_start_times': {
                 'validators': [RestrictedTimeValidator()]

@@ -273,15 +273,15 @@ class WorkerDayQuerySet(QuerySet):
         )
 
     def get_last_ordered(self, is_fact, order_by, **kwargs):
-        ordered_subq = WorkerDay.objects.filter(
+        ordered_subq = self.filter(
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
             is_fact=is_fact,
         ).order_by(*order_by).values_list('id')[:1]
         return self.filter(
-            **kwargs,
             is_fact=is_fact,
             id=Subquery(ordered_subq),
+            **kwargs,
         )
 
     def get_fact_edit(self, **kwargs):
@@ -1014,25 +1014,24 @@ class AttendanceRecords(AbstractModel):
                 if settings.MDA_SKIP_LEAVING_TICK:
                     return
 
+            dt = self.dttm.date()
+            active_user_empl = Employment.objects.get_active(
+                self.user.network_id, dt_from=dt, dt_to=dt, user=self.user, shop=self.shop).last()
+            if not active_user_empl:
+                active_user_empl = Employment.objects.get_active(
+                    self.user.network_id, dt_from=dt, dt_to=dt, user=self.user).last()
+
             wd = WorkerDay(
                 shop=self.shop,
                 worker=self.user,
+                employment=active_user_empl,
                 dt=self.dttm.date(),
                 is_fact=True,
                 is_approved=True,
                 type=WorkerDay.TYPE_WORKDAY,
             )
             setattr(wd, type2dtfield[self.type], self.dttm)
-
-            wd.parent_worker_day = wdays['plan']['approved'] \
-                if wdays['plan']['approved'] \
-                else wdays['plan']['not_approved']
-
             wd.save()
-
-            if wdays['fact']['not_approved']:
-                wdays['fact']['not_approved'].parent_worker_day = wd
-                wdays['fact']['not_approved'].save()
 
 
 class ExchangeSettings(AbstractModel):
@@ -1087,6 +1086,75 @@ class VacancyBlackList(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
     symbol = models.CharField(max_length=128)
 
-
     def get_department(self):
         return self.shop
+
+
+class WorkerDayPermission(AbstractModel):
+    PLAN = 'P'
+    FACT = 'F'
+
+    GRAPH_TYPES = (
+        (PLAN, 'План'),
+        (FACT, 'Факт'),
+    )
+
+    CREATE_OR_UPDATE = 'CU'
+    DELETE = 'D'
+    APPROVE = 'A'
+
+    ACTIONS = (
+        (CREATE_OR_UPDATE, 'Создание/Редактирование'),
+        (DELETE, 'Удаление'),
+        (APPROVE, 'Подтверждение'),
+    )
+
+    action = models.CharField(choices=ACTIONS, max_length=2, verbose_name='Действие')
+    graph_type = models.CharField(choices=GRAPH_TYPES, max_length=1, verbose_name='Тип графика')
+    wd_type = models.CharField(choices=WorkerDay.TYPES, max_length=2, verbose_name='Тип дня')
+
+    class Meta:
+        verbose_name = 'Разрешение для рабочего дня'
+        verbose_name_plural = 'Разрешения для рабочего дня'
+        unique_together = ('action', 'graph_type', 'wd_type')
+        ordering = ('action', 'graph_type', 'wd_type')
+
+    def __str__(self):
+        return f'{self.get_action_display()} {self.get_graph_type_display()} {self.get_wd_type_display()}'
+
+
+class GroupWorkerDayPermission(AbstractModel):
+    group = models.ForeignKey('base.Group', on_delete=models.CASCADE, verbose_name='Группа доступа')
+    worker_day_permission = models.ForeignKey(
+        'timetable.WorkerDayPermission', on_delete=models.CASCADE, verbose_name='Разрешение для рабочего дня')
+    limit_days_in_past = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Ограничение на дни в прошлом',
+        help_text='Если null - нет ограничений, если n - можно выполнять действие только n последних дней',
+    )
+    limit_days_in_future = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Ограничение на дни в будущем',
+        help_text='Если null - нет ограничений, если n - можно выполнять действие только n будущих дней',
+    )
+
+    class Meta:
+        verbose_name = 'Разрешение группы для рабочего дня'
+        verbose_name_plural = 'Разрешения группы для рабочего дня'
+        unique_together = ('group', 'worker_day_permission',)
+
+    def __str__(self):
+        return f'{self.group.name} {self.worker_day_permission}'
+
+    @classmethod
+    def has_permission(cls, user, action, graph_type, wd_type, wd_dt):
+        if isinstance(wd_dt, str):
+            wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
+        # FIXME-devx: будет временной лаг из-за того, что USE_TZ=False, откуда брать таймзону? - из shop?
+        today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
+        return cls.objects.filter(
+            Q(limit_days_in_past__isnull=True) | Q(limit_days_in_past__gte=(today - wd_dt).days),
+            Q(limit_days_in_future__isnull=True) | Q(limit_days_in_future__gte=(wd_dt - today).days),
+            group__in=user.get_group_ids(user.network),  # добавить shop ?
+            worker_day_permission__action=action,
+            worker_day_permission__graph_type=graph_type,
+            worker_day_permission__wd_type=wd_type,
+        ).exists()

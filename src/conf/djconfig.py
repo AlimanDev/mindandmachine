@@ -28,7 +28,7 @@ UPLOAD_TT_MATCH_EMPLOYMENT = True
 
 QOS_CAMERA_KEY = '1'
 
-HOST = '127.0.0.1:8000' # dev
+HOST = 'http://127.0.0.1:8000' # dev
 TIMETABLE_IP = "127.0.0.1:5000"
 
 
@@ -71,6 +71,9 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'django_filters',
+    'django_admin_listfilter_dropdown',
+    'rangefilter',
+    'admin_numeric_filter',
     'rest_auth',
     'rest_framework.authtoken',
     'src',
@@ -81,6 +84,7 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'src.celery',
     'fcm_django',
+    'src.recognition',
 ]
 
 REST_FRAMEWORK = {
@@ -326,6 +330,20 @@ JOD_CONVERTER_URL = 'http://localhost:8030'
 
 # docker run --restart unless-stopped -p 3001:3000 -d thecodingmachine/gotenberg:6
 GOTENBERG_URL = 'http://localhost:3001'
+
+RECOGNITION_PARTNER = 'Tevian'
+
+TEVIAN_URL = "https://backend.facecloud.tevian.ru/api/v1/"
+TEVIAN_EMAIL = 'a.aleskin@mindandmachine.ru'
+TEVIAN_PASSWORD = 'BIQL8pjMUY'
+TEVIAN_DATABASE_ID = 26  # TESTURV database
+TEVIAN_FD_THRESHOLD = 0.8
+TEVIAN_FR_THRESHOLD = 0.8
+
+TRUST_TICK_REQUEST = False
+USERS_WITH_SCHEDULE_ONLY = False
+
+CLIENT_TIMEZONE = 3
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

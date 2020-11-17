@@ -13,6 +13,7 @@ from src.base.models import (
     Network,
     Break,
 )
+from src.timetable.models import GroupWorkerDayPermission
 
 
 @admin.register(Network)
@@ -35,6 +36,7 @@ class WorkerPositionAdmin(admin.ModelAdmin):
 class QsUserAdmin(admin.ModelAdmin):
     list_display = ('first_name', 'last_name', 'shop_name', 'id', 'username',)
     search_fields = ('first_name', 'last_name', 'id', 'username',)
+
     # list_filter = ('employment__shop', )
 
     # list_display = ('first_name', 'last_name', 'employment__shop__title', 'parent_title', 'work_type_name', 'id')
@@ -75,10 +77,27 @@ class ShopSettingsAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name')
 
 
+class GroupWorkerDayPermissionInline(admin.TabularInline):
+    model = GroupWorkerDayPermission
+    extra = 0
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('group', 'worker_day_permission')
+
+
 @admin.register(Group)
 class GroupAdmin(admin.ModelAdmin):
     list_dispaly = ('id', 'dttm_added', 'name', 'subordinates')
     list_filter = ('id', 'name')
+    inlines = (
+        GroupWorkerDayPermissionInline,
+    )
+
+    def get_actions(self, request):
+        from src.util.wd_perms.utils import WdPermsHelper
+        actions = super().get_actions(request)
+        actions.update(WdPermsHelper.get_preset_actions())
+        return actions
 
 
 @admin.register(FunctionGroup)

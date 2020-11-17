@@ -154,7 +154,6 @@ class FunctionGroupView(ModelViewSet):
         ).values_list("group_id", flat=True)
         return FunctionGroup.objects.filter(group__in=groups).distinct('func')
 
-
     @action(detail=False, methods=['get'])
     def functions(self, request):
         return Response(FunctionGroup.FUNCS)
