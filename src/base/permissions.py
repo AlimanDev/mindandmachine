@@ -4,6 +4,7 @@ from rest_framework import permissions
 from rest_framework.exceptions import ValidationError, NotFound
 
 from src.base.models import Employment, Shop
+from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
 
 
 class Permission(permissions.BasePermission):
@@ -52,6 +53,36 @@ class Permission(permissions.BasePermission):
             if employment.has_permission(func, method):
                 return True
         return False
+
+
+class WdPermission(Permission):
+    def has_permission(self, request, view):
+        has_permission = super(WdPermission, self).has_permission(request, view)
+        if has_permission is False:
+            return has_permission
+
+        view_action = view.action.lower()
+        if view_action in ['create', 'update']:
+            return GroupWorkerDayPermission.has_permission(
+                user=request.user,
+                action=WorkerDayPermission.CREATE_OR_UPDATE,
+                graph_type=WorkerDayPermission.FACT if request.data.get('is_fact') else WorkerDayPermission.PLAN,
+                wd_type=request.data.get('type'),
+                wd_dt=request.data.get('dt'),
+            )
+        elif view_action == 'destroy':
+            wd_dict = WorkerDay.objects.filter(id=view.kwargs['pk']).values('type', 'dt', 'is_fact').first()
+            if not wd_dict:
+                return False
+            return GroupWorkerDayPermission.has_permission(
+                user=request.user,
+                action=WorkerDayPermission.DELETE,
+                graph_type=WorkerDayPermission.FACT if wd_dict.get('is_fact') else WorkerDayPermission.PLAN,
+                wd_type=wd_dict.get('type'),
+                wd_dt=wd_dict.get('dt'),
+            )
+
+        return has_permission
 
 
 class FilteredListPermission(Permission):
