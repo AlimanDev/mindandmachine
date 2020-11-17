@@ -17,7 +17,7 @@ class TestWdPermsPresets(TestsHelperMixin, TestCase):
         self.assertEqual(GroupWorkerDayPermission.objects.filter(group=self.group).count(), expected_count)
 
     def test_wd_perms(self):
-        self._test_wd_perm(AdminPreset, 45)
-        self._test_wd_perm(URSOrtekaPreset, 45)
+        self._test_wd_perm(AdminPreset, 66)
+        self._test_wd_perm(URSOrtekaPreset, 66)
         self._test_wd_perm(DirectorOrtekaPreset, 33)
         self._test_wd_perm(EmptyPreset, 0)
