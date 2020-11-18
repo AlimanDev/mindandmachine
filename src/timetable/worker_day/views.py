@@ -135,7 +135,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         if request.query_params.get('hours_details', False) and (is_tabel or fact_tabel):
             data = []
             def _time_to_float(t):
-                return t.hour + t.minute / 60 + t.second / 60
+                return t.hour + t.minute / 60 + t.second / 3600
             prod_day_filter = {
                 'is_celebration': True,
             }
@@ -172,10 +172,12 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                             data.append(wd_dict)
                             continue
                         tm_start = _time_to_float(night_edges[0])
-                        if work_end.time() <= night_edges[1]:
-                            tm_end = _time_to_float(work_end.time())
-                        else:
-                            tm_end = _time_to_float(night_edges[1])
+                        tm_end = _time_to_float(work_end.time())
+                        # TODO: отрефакторить, разобрать разные кейсы, написать тесты
+                        # if work_end.time() <= night_edges[1]:
+                        #     tm_end = _time_to_float(work_end.time())
+                        # else:
+                        #     tm_end = _time_to_float(night_edges[1])
 
                         night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
                         total_seconds = (work_end - work_start).total_seconds()
@@ -186,8 +188,9 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                             break_time_seconds = total_seconds - work_seconds
 
                         wd_dict['work_hours_details']['D'] = round(
-                            (total_seconds - night_seconds - break_time_seconds / 2) / 3600, 1)
-                        wd_dict['work_hours_details']['N'] = round((night_seconds - break_time_seconds / 2) / 3600, 1)
+                            (total_seconds - night_seconds - break_time_seconds / 2) / 3600, 2)
+                        wd_dict['work_hours_details']['N'] = round((night_seconds - break_time_seconds / 2) / 3600, 2)
+                        wd_dict['work_hours'] = wd_dict['work_hours_details']['D'] + wd_dict['work_hours_details']['N']
                 else:
                     wd_dict['work_hours'] = 0.0
                 data.append(wd_dict)
