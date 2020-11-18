@@ -657,7 +657,7 @@ class TestWorkerDay(APITestCase):
             fact_end=fact_dttm_work_end,
             expected_start=fact_dttm_work_start,
             expected_end=plan_dttm_work_end,
-            expected_hours=9.08,
+            expected_hours=9.09,
             extra_get_params=dict(
                 hours_details=True,
             )
