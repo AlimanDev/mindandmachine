@@ -2,12 +2,15 @@ import binascii
 import os
 import uuid
 
+from django.conf import settings
+from django.contrib.auth.models import Group
 from django.db import models
+from django.utils.html import format_html
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy
 
 from src.base.models_abstract import AbstractActiveModel, AbstractActiveNamedModel
-from src.timetable.models import User, Shop
+from src.timetable.models import User, Shop, Employment
 
 
 def user_directory_path(instance, filename):
@@ -73,6 +76,52 @@ class Tick(AbstractActiveModel):
     lateness = models.DurationField(null=True)
     verified_score = models.FloatField(default=0)
     is_front = models.BooleanField(default=False)
+
+    def get_tick_photo(self, type):
+        if hasattr(self, 'tickphotos_list'):
+            for tickphoto in self.tickphotos_list:
+                if tickphoto.type == type:
+                    return tickphoto
+            return
+
+        return TickPhoto.objects.filter(type=type, tick=self).first()
+
+    @property
+    def type_display(self):
+        return self.get_type_display()
+
+    def image_tag_first(self):
+        return self.image_tag(TickPhoto.TYPE_FIRST)
+
+    def image_tag_last(self):
+        return self.image_tag(TickPhoto.TYPE_LAST)
+
+    def image_tag_self(self):
+        return self.image_tag(TickPhoto.TYPE_SELF)
+
+    def image_tag(self, type):
+        tickphoto = self.get_tick_photo(type)
+        if tickphoto:
+            return format_html('<a href="{0}"> <img src="{0}", height="150" /></a>'.format(tickphoto.image.url))
+        return ''
+
+    @property
+    def first_tick_photo_image_url(self):
+        tick_photo = self.get_tick_photo(TickPhoto.TYPE_FIRST)
+        if tick_photo:
+            return settings.HOST + tick_photo.image.url
+
+    @property
+    def last_tick_photo_image_url(self):
+        tick_photo = self.get_tick_photo(TickPhoto.TYPE_LAST)
+        if tick_photo:
+            return settings.HOST + tick_photo.image.url
+
+    @property
+    def self_tick_photo_image_url(self):
+        tick_photo = self.get_tick_photo(TickPhoto.TYPE_SELF)
+        if tick_photo:
+            return settings.HOST + tick_photo.image.url
 
 
 class TickPhoto(AbstractActiveModel):

@@ -4,6 +4,7 @@ import xlsxwriter
 from admin_numeric_filter.admin import RangeNumericFilter
 from django.contrib import admin
 from django.contrib.auth.models import Group
+from django.db.models import Prefetch
 from django.http import HttpResponse
 from django.utils.html import format_html
 from django.utils.timezone import now
@@ -11,7 +12,8 @@ from django_admin_listfilter_dropdown.filters import RelatedOnlyDropdownFilter
 from rangefilter.filter import DateTimeRangeFilter
 
 from src.recognition.models import TickPoint, Tick, TickPhoto, UserConnecter
-from src.timetable.models import User, Shop, Employment
+from src.timetable.models import User, Employment
+from src.util.dg.ticks_report import TicksReportGenerator
 
 admin.site.unregister(Group)
 
@@ -71,8 +73,17 @@ class PhotoUserListFilter(UserListFilter):
 @admin.register(Tick)
 class TickAdmin(admin.ModelAdmin):
     raw_id_fields = ("user", "tick_point")
-    list_display = ['id', 'user', 'type', 'tick_point', 'dttm', 'verified_score', 'image_tag_self', 'image_tag_first',
-                    'image_tag_last']
+    list_display = [
+        'id',
+        'user',
+        'type',
+        'tick_point',
+        'dttm',
+        'verified_score',
+        'image_tag_self',
+        'image_tag_first',
+        'image_tag_last',
+    ]
 
     list_filter = [
         ('tick_point__shop', RelatedOnlyDropdownFilter),
@@ -81,25 +92,28 @@ class TickAdmin(admin.ModelAdmin):
         UserListFilter,
     ]
 
-    actions = ['download']
+    actions = ['download_old', 'download']
 
-    def image_tag_first(self, obj):
-        return self.image_tag(obj, TickPhoto.TYPE_FIRST)
+    def get_queryset(self, request):
+        return super(TickAdmin, self).get_queryset(request).select_related(
+            'user', 'tick_point', 'tick_point__shop'
+        ).prefetch_related(
+            Prefetch(
+                'tickphoto_set',
+                queryset=TickPhoto.objects.filter(),
+                to_attr='tickphotos_list',
+            )
+        )
 
-    def image_tag_last(self, obj):
-        return self.image_tag(obj, TickPhoto.TYPE_LAST)
-
-    def image_tag_self(self, obj):
-        return self.image_tag(obj, TickPhoto.TYPE_SELF)
-
-    def image_tag(self, obj, type):
-        tickphoto = TickPhoto.objects.filter(type=type, tick=obj).first()
-        if tickphoto:
-            return format_html('<a href="{0}"> <img src="{0}", height="150" /></a>'.format(tickphoto.image.url))
-        return ''
+    def download(self, request, queryset):
+        generator = TicksReportGenerator(ticks_queryset=queryset)
+        content = generator.generate()
+        response = HttpResponse(content, content_type='application/octet-stream')
+        response['Content-Disposition'] = 'attachment; filename="urv.xlsx"'
+        return response
 
     # aa: fixme: remove, not working
-    def download(self, request, queryset):
+    def download_old(self, request, queryset):
         def set_tick(dict, tick):
             if tick.type not in dict \
                     or (tick.type == Tick.TYPE_COMING and tick.dttm < dict[tick.type].dttm) \
@@ -121,46 +135,20 @@ class TickAdmin(admin.ModelAdmin):
              'employee_tabel',
              'StartTimestamp',
              'FinalTimestamp',
-             'ShiftStart',
-             'ShiftFinish',
              ], format_meta_bold)
 
-        wd_ticks = {}
         dt_ticks = {}
         for tick in queryset:
             if not (tick.type == Tick.TYPE_COMING or tick.type == Tick.TYPE_LEAVING):
                 continue
-            if tick.worker_day_id:
-                if tick.worker_day_id not in wd_ticks:
-                    wd_ticks[tick.worker_day_id] = {}
-                set_tick(wd_ticks[tick.worker_day_id], tick)
-            else:
-                dt = tick.dttm.date()
-                if dt not in dt_ticks:
-                    dt_ticks[dt] = {}
-                if tick.user_id not in dt_ticks[dt]:
-                    dt_ticks[dt][tick.user_id] = {}
-                set_tick(dt_ticks[dt][tick.user_id], tick)
+
+            dt = tick.dttm.date()
+            if dt not in dt_ticks:
+                dt_ticks[dt] = {}
+            if tick.user_id not in dt_ticks[dt]:
+                dt_ticks[dt][tick.user_id] = {}
+            set_tick(dt_ticks[dt][tick.user_id], tick)
         index = 0
-        for index, worker_day_id in enumerate(wd_ticks.keys(), 1):
-            tick_c = wd_ticks[worker_day_id].get(Tick.TYPE_COMING)
-            tick_l = wd_ticks[worker_day_id].get(Tick.TYPE_LEAVING)
-            tick = tick_c if tick_c else tick_l
-            worksheet.write_row(
-                index, 0,
-                [tick.tick_point.shop.name,
-                 tick.tick_point.shop.code,
-                 "{} {} {}".format(
-                     tick.user.last_name,
-                     tick.user.first_name,
-                     tick.user.middle_name),
-                 tick.user.tabel_code,
-                 tick_c.dttm.strftime(format) if tick_c else '',
-                 tick_l.dttm.strftime(format) if tick_l else '',
-                 tick.worker_day.dttm_work_start.strftime(format),
-                 tick.worker_day.dttm_work_end.strftime(format),
-                 ]
-            )
         for dt in dt_ticks.keys():
             for user_id in dt_ticks[dt].keys():
                 index += 1
@@ -178,8 +166,6 @@ class TickAdmin(admin.ModelAdmin):
                      tick.user.tabel_code,
                      tick_c.dttm.strftime(format) if tick_c else '',
                      tick_l.dttm.strftime(format) if tick_l else '',
-                     '',
-                     ''
                      ]
                 )
 
