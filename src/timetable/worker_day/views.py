@@ -131,8 +131,8 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
     def list(self, request):
         is_tabel = request.query_params.get('is_tabel', False)
-        orteka_tabel = request.query_params.get('orteka_tabel', False)
-        if request.query_params.get('hours_details', False) and (is_tabel or orteka_tabel):
+        fact_tabel = request.query_params.get('fact_tabel', False)
+        if request.query_params.get('hours_details', False) and (is_tabel or fact_tabel):
             data = []
             def _time_to_float(t):
                 return t.hour + t.minute / 60 + t.second / 60

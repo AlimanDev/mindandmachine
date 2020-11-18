@@ -19,7 +19,7 @@ class WorkerDayFilter(FilterSet):
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода")  # aa: fixme: delete
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода') # aa: fixme: delete
     is_tabel = BooleanFilter(method='filter_tabel', label="Выгрузка табеля")
-    orteka_tabel = BooleanFilter(method='filter_orteka_tabel', label="Выгрузка табеля для Ортеки")
+    fact_tabel = BooleanFilter(method='filter_fact_tabel', label="Выгрузка табеля для Ортеки")
 
     def filter_tabel(self, queryset, name, value):
         if value:
@@ -27,7 +27,7 @@ class WorkerDayFilter(FilterSet):
 
         return queryset
 
-    def filter_orteka_tabel(self, queryset, name, value):
+    def filter_fact_tabel(self, queryset, name, value):
         if value:
             ordered_subq = queryset.filter(
                 dt=OuterRef('dt'),
