@@ -491,15 +491,20 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             res['status_code'] = 400
             return res
 
+        employment = Employment.objects.get_active(
+                user.network_id, dt_from=vacancy.dt, dt_to=vacancy.dt, user=user
+        ).last() or user_worker_day.employment
+
         # сотрудник из другой сети не может принять вакансию если это не аутсорс вакансия
-        if not vacancy.is_outsource and user_worker_day.employment.shop.network_id != vacancy_shop.network_id:
+        if not vacancy.is_outsource and employment and \
+                employment.shop.network_id != vacancy_shop.network_id:
             res['code'] = 'cant_apply_vacancy'
             res['status_code'] = 400
             return res
 
-        # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни  # TODO: правильно?
+        # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
         update_condition = user_worker_day.type not in WorkerDay.TYPES_PAID
-        if user_worker_day.employment.shop_id != vacancy_shop.id and not exchange:
+        if employment and employment.shop_id != vacancy_shop.id and not exchange:
             try:
                 tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
             except ShopMonthStat.DoesNotExist:
@@ -512,7 +517,7 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
 
         if update_condition or exchange:
             vacancy.worker = user
-            vacancy.employment = user_worker_day.employment
+            vacancy.employment = employment
             vacancy.save(update_fields=('worker', 'employment'))
 
             if user_worker_day.is_vacancy and user_worker_day.shop and user_worker_day.shop.email:
