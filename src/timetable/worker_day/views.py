@@ -397,102 +397,102 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             ])
         return Response(WorkerDaySerializer(editable_vacancy).data)
 
-    @action(detail=False, methods=['post'])
-    def change_list(self, request):
-        data = ListChangeSrializer(data=request.data, context={'request': request})
-        data.is_valid(raise_exception=True)
-        data = data.validated_data
-        is_type_with_tm_range = WorkerDay.is_type_with_tm_range(data['type'])
+    # @action(detail=False, methods=['post'])
+    # def change_list(self, request):
+    #     data = ListChangeSrializer(data=request.data, context={'request': request})
+    #     data.is_valid(raise_exception=True)
+    #     data = data.validated_data
+    #     is_type_with_tm_range = WorkerDay.is_type_with_tm_range(data['type'])
 
-        response = {}
+    #     response = {}
 
-        shop_id = data['shop_id']
-        shop = Shop.objects.get(id=shop_id)
+    #     shop_id = data['shop_id']
+    #     shop = Shop.objects.get(id=shop_id)
 
-        work_type = WorkType.objects.get(id=data['work_type']) if data['work_type'] else None
-        work_types = {}
-        employments = {
-            e.user_id: e
-            for e in Employment.objects.get_active(
-                network_id=shop.network_id,
-                user_id__in=data['workers'].keys(),
-                shop_id=shop_id,
-            )
-        }
-        for user_id, dates in data['workers'].items():
-            employment = employments.get(user_id, None)
-            wds = []
-            for dt in dates:
-                wd_args = {
-                    'type': data['type'],
-                    'employment': employment,
-                    'created_by': request.user,
-                    'comment': data['comment'],
-                    'dttm_added': timezone.now(),
-                    'is_vacancy': False,
-                }
-                if is_type_with_tm_range:
-                    dttm_work_start = timezone.datetime.combine(dt, data[
-                        'tm_work_start'])  # на самом деле с фронта приходят время а не дата-время
-                    tm_work_end = data['tm_work_end']
-                    dttm_work_end = timezone.datetime.combine(dt, tm_work_end) if tm_work_end > data['tm_work_start'] else \
-                        timezone.datetime.combine(dt + timezone.timedelta(days=1), tm_work_end)
-                    wd_args.update({
-                        'dttm_work_start': dttm_work_start,
-                        'dttm_work_end': dttm_work_end,
-                    })
-                wd, created = WorkerDay.objects.filter(Q(shop_id=shop_id)|Q(shop__isnull=True)).update_or_create(
-                    worker_id=user_id,
-                    dt=dt,
-                    is_approved=False,
-                    is_fact=False,
-                    defaults=wd_args,
-                )
-                wd_details = WorkerDayCashboxDetails.objects.filter(worker_day=wd)
-                work_types.update({
-                    wd.work_type_id: wd.work_type.shop_id
-                    for wd in wd_details.select_related('work_type')
-                })
-                wd_details.delete()
-                #TODO add cancel worker day
-                # if not created and wd_details.exists():
-                #     old_work_type = wd_details.first().work_type
-                #     if old_work_type not in work_types:
-                #         work_types.append(old_work_type)
-                #     if wd_details.filter(is_vacancy=True).exists():
-                #         for wd_detail in wd_details.filter(is_vacancy=True):
-                #             cancel_vacancy(wd_detail.id)
-                #             worker_day.canceled = True
-                #     else:
-                #         worker_day.canceled = False
-                #     wd_details.filter(is_vacancy=False).delete()
-                # else:
-                #     worker_day.canceled = False
-                if created:
-                    wd.parent_worker_day = WorkerDay.objects.filter(
-                        worker_id=user_id,
-                        dt=dt,
-                        shop_id=shop_id,
-                        is_approved=True,
-                    ).first()
-                    wd.save()
-                if wd.type == WorkerDay.TYPE_WORKDAY:      
-                    WorkerDayCashboxDetails.objects.create(
-                        work_type=work_type,
-                        worker_day=wd,
-                    )
+    #     work_type = WorkType.objects.get(id=data['work_type']) if data['work_type'] else None
+    #     work_types = {}
+    #     employments = {
+    #         e.user_id: e
+    #         for e in Employment.objects.get_active(
+    #             network_id=shop.network_id,
+    #             user_id__in=data['workers'].keys(),
+    #             shop_id=shop_id,
+    #         )
+    #     }
+    #     for user_id, dates in data['workers'].items():
+    #         employment = employments.get(user_id, None)
+    #         wds = []
+    #         for dt in dates:
+    #             wd_args = {
+    #                 'type': data['type'],
+    #                 'employment': employment,
+    #                 'created_by': request.user,
+    #                 'comment': data['comment'],
+    #                 'dttm_added': timezone.now(),
+    #                 'is_vacancy': False,
+    #             }
+    #             if is_type_with_tm_range:
+    #                 dttm_work_start = timezone.datetime.combine(dt, data[
+    #                     'tm_work_start'])  # на самом деле с фронта приходят время а не дата-время
+    #                 tm_work_end = data['tm_work_end']
+    #                 dttm_work_end = timezone.datetime.combine(dt, tm_work_end) if tm_work_end > data['tm_work_start'] else \
+    #                     timezone.datetime.combine(dt + timezone.timedelta(days=1), tm_work_end)
+    #                 wd_args.update({
+    #                     'dttm_work_start': dttm_work_start,
+    #                     'dttm_work_end': dttm_work_end,
+    #                 })
+    #             wd, created = WorkerDay.objects.filter(Q(shop_id=shop_id)|Q(shop__isnull=True)).update_or_create(
+    #                 worker_id=user_id,
+    #                 dt=dt,
+    #                 is_approved=False,
+    #                 is_fact=False,
+    #                 defaults=wd_args,
+    #             )
+    #             wd_details = WorkerDayCashboxDetails.objects.filter(worker_day=wd)
+    #             work_types.update({
+    #                 wd.work_type_id: wd.work_type.shop_id
+    #                 for wd in wd_details.select_related('work_type')
+    #             })
+    #             wd_details.delete()
+    #             #TODO add cancel worker day
+    #             # if not created and wd_details.exists():
+    #             #     old_work_type = wd_details.first().work_type
+    #             #     if old_work_type not in work_types:
+    #             #         work_types.append(old_work_type)
+    #             #     if wd_details.filter(is_vacancy=True).exists():
+    #             #         for wd_detail in wd_details.filter(is_vacancy=True):
+    #             #             cancel_vacancy(wd_detail.id)
+    #             #             worker_day.canceled = True
+    #             #     else:
+    #             #         worker_day.canceled = False
+    #             #     wd_details.filter(is_vacancy=False).delete()
+    #             # else:
+    #             #     worker_day.canceled = False
+    #             if created:
+    #                 wd.parent_worker_day = WorkerDay.objects.filter(
+    #                     worker_id=user_id,
+    #                     dt=dt,
+    #                     shop_id=shop_id,
+    #                     is_approved=True,
+    #                 ).first()
+    #                 wd.save()
+    #             if wd.type == WorkerDay.TYPE_WORKDAY:      
+    #                 WorkerDayCashboxDetails.objects.create(
+    #                     work_type=work_type,
+    #                     worker_day=wd,
+    #                 )
 
-                wds.append(wd)
+    #             wds.append(wd)
 
-            response[user_id] = WorkerDaySerializer(wds, many=True).data
+    #         response[user_id] = WorkerDaySerializer(wds, many=True).data
                 
-        if work_type and data['type'] == WorkerDay.TYPE_WORKDAY:
-            cancel_vacancies(work_type.shop_id, work_type.id)
-        if len(work_types):
-            for wt, sh_id in work_types.items():
-                create_vacancies_and_notify(sh_id, wt)
+    #     if work_type and data['type'] == WorkerDay.TYPE_WORKDAY:
+    #         cancel_vacancies(work_type.shop_id, work_type.id)
+    #     if len(work_types):
+    #         for wt, sh_id in work_types.items():
+    #             create_vacancies_and_notify(sh_id, wt)
 
-        return Response(response, status=200)
+    #     return Response(response, status=200)
 
     @action(detail=False, methods=['post'])
     def duplicate(self, request):
@@ -566,159 +566,159 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             cancel_vacancies(shop_id, work_type)
         return Response(WorkerDaySerializer(created_wds, many=True).data)
 
-    @action(detail=False, methods=['post'])
-    def delete_timetable(self, request):
-        data = DeleteTimetableSerializer(data=request.data, context={'request': request})
-        data.is_valid(raise_exception=True)
-        data = data.validated_data
-        employments = None
-        shop_id = data['shop_id']
-        shop = Shop.objects.get(id=shop_id)
-        worker_day_filter = {
-            'is_approved': False,
-            'is_fact': False,
-        }
-        dt_first = data['dt_from'].replace(day=1)
-        tts = ShopMonthStat.objects.filter(
-            shop_id=shop_id, 
-            dt=dt_first,
-        )
-        processing_tts = tts.filter(status=ShopMonthStat.PROCESSING, task_id__isnull=False)
-        for tt in processing_tts:
-            try:
-                requests.post(
-                    'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
-                )
-            except (requests.ConnectionError, requests.ConnectTimeout):
-                pass
-        processing_tts.update(status=ShopMonthStat.NOT_DONE)
-        if data.get('delete_all'):
-            dt_from = set_timetable_date_from(data['dt_from'].year, data['dt_from'].month)
-            if dt_from and not data['dt_to']:
-                dt_to = (dt_first + relativedelta(months=1))                
-                tts.update(status=ShopMonthStat.NOT_DONE)
-            else:
-                dt_from = data['dt_from']
-                dt_to = data['dt_to'] if data['dt_to'] else (dt_from.replace(day=1) + relativedelta(months=1))
+    # @action(detail=False, methods=['post'])
+    # def delete_timetable(self, request):
+    #     data = DeleteTimetableSerializer(data=request.data, context={'request': request})
+    #     data.is_valid(raise_exception=True)
+    #     data = data.validated_data
+    #     employments = None
+    #     shop_id = data['shop_id']
+    #     shop = Shop.objects.get(id=shop_id)
+    #     worker_day_filter = {
+    #         'is_approved': False,
+    #         'is_fact': False,
+    #     }
+    #     dt_first = data['dt_from'].replace(day=1)
+    #     tts = ShopMonthStat.objects.filter(
+    #         shop_id=shop_id, 
+    #         dt=dt_first,
+    #     )
+    #     processing_tts = tts.filter(status=ShopMonthStat.PROCESSING, task_id__isnull=False)
+    #     for tt in processing_tts:
+    #         try:
+    #             requests.post(
+    #                 'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
+    #             )
+    #         except (requests.ConnectionError, requests.ConnectTimeout):
+    #             pass
+    #     processing_tts.update(status=ShopMonthStat.NOT_DONE)
+    #     if data.get('delete_all'):
+    #         dt_from = set_timetable_date_from(data['dt_from'].year, data['dt_from'].month)
+    #         if dt_from and not data['dt_to']:
+    #             dt_to = (dt_first + relativedelta(months=1))                
+    #             tts.update(status=ShopMonthStat.NOT_DONE)
+    #         else:
+    #             dt_from = data['dt_from']
+    #             dt_to = data['dt_to'] if data['dt_to'] else (dt_from.replace(day=1) + relativedelta(months=1))
 
-            employments = Employment.objects.get_active(
-                shop.network_id,
-                dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
-            workers = User.objects.filter(id__in=employments.values_list('user_id'))
-            employments = list(employments)
-        else:
-            dt_from = data['dt_from']
-            dt_to = data['dt_to']
-            if not len(data['users']):
-                employments = Employment.objects.get_active(
-                    shop.network_id,
-                    dt_from, dt_to,
-                    shop_id=shop_id,
-                    auto_timetable=True)
-                workers = User.objects.filter(id__in=employments.values_list('user_id'))
-                employments = list(employments)
-            else:
-                workers = User.objects.filter(id__in=data['users'])
-        if len(data['types']) and not data['delete_all']:
-            worker_day_filter['type__in'] = data['types']
+    #         employments = Employment.objects.get_active(
+    #             shop.network_id,
+    #             dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
+    #         workers = User.objects.filter(id__in=employments.values_list('user_id'))
+    #         employments = list(employments)
+    #     else:
+    #         dt_from = data['dt_from']
+    #         dt_to = data['dt_to']
+    #         if not len(data['users']):
+    #             employments = Employment.objects.get_active(
+    #                 shop.network_id,
+    #                 dt_from, dt_to,
+    #                 shop_id=shop_id,
+    #                 auto_timetable=True)
+    #             workers = User.objects.filter(id__in=employments.values_list('user_id'))
+    #             employments = list(employments)
+    #         else:
+    #             workers = User.objects.filter(id__in=data['users'])
+    #     if len(data['types']) and not data['delete_all']:
+    #         worker_day_filter['type__in'] = data['types']
 
-        if data['except_created_by']:
-            worker_day_filter['created_by__isnull'] = True
+    #     if data['except_created_by']:
+    #         worker_day_filter['created_by__isnull'] = True
         
 
-        WorkerDay.objects.filter(
-            Q(shop_id=shop_id)|Q(shop_id__isnull=True),
-            worker__in=workers,
-            dt__gte=dt_from,
-            dt__lt=dt_to,
-            is_vacancy=False,
-            **worker_day_filter,
-        ).delete()
-        if not employments:
-            employments = list(Employment.objects.get_active(
-                network_id=shop.network_id,
-                dt_from=dt_from,
-                dt_to=dt_to,
-                shop_id=shop_id,
-                user__in=workers))
-        WorkerDay.objects.filter(
-            employment__in=employments,
-            dt__gte=dt_from,
-            dt__lt=dt_to,
-            is_vacancy=True,
-            **worker_day_filter,
-        ).delete()
-        if data['delete_all']:
-            # cancel vacancy
-            # todo: add deleting workerdays
-            for worker_day in WorkerDay.objects.filter(shop_id=shop_id, is_vacancy=True):
-                cancel_vacancy(worker_day.id)
-        return Response()
+    #     WorkerDay.objects.filter(
+    #         Q(shop_id=shop_id)|Q(shop_id__isnull=True),
+    #         worker__in=workers,
+    #         dt__gte=dt_from,
+    #         dt__lt=dt_to,
+    #         is_vacancy=False,
+    #         **worker_day_filter,
+    #     ).delete()
+    #     if not employments:
+    #         employments = list(Employment.objects.get_active(
+    #             network_id=shop.network_id,
+    #             dt_from=dt_from,
+    #             dt_to=dt_to,
+    #             shop_id=shop_id,
+    #             user__in=workers))
+    #     WorkerDay.objects.filter(
+    #         employment__in=employments,
+    #         dt__gte=dt_from,
+    #         dt__lt=dt_to,
+    #         is_vacancy=True,
+    #         **worker_day_filter,
+    #     ).delete()
+    #     if data['delete_all']:
+    #         # cancel vacancy
+    #         # todo: add deleting workerdays
+    #         for worker_day in WorkerDay.objects.filter(shop_id=shop_id, is_vacancy=True):
+    #             cancel_vacancy(worker_day.id)
+    #     return Response()
 
-    @action(detail=False, methods=['post'])
-    def exchange(self, request):
-        new_wds = []
-        def create_worker_day(wd_parent, wd_swap, is_approved):
-            parent_worker_day_id = wd_swap.id if is_approved else wd_parent.parent_worker_day_id
-            wd_new = WorkerDay(
-                type=wd_swap.type,
-                dttm_work_start=wd_swap.dttm_work_start,
-                dttm_work_end=wd_swap.dttm_work_end,
-                worker_id=wd_parent.worker_id,
-                employment_id=wd_parent.employment_id,
-                dt=wd_parent.dt,
-                parent_worker_day_id=parent_worker_day_id,
-                created_by=request.user,
-                is_approved=False,
-                is_vacancy=wd_swap.is_vacancy,
-            )
-            wd_new.save()
-            new_wds.append(wd_new)
-            WorkerDayCashboxDetails.objects.bulk_create([
-                WorkerDayCashboxDetails(
-                    worker_day_id=wd_new.id,
-                    work_type_id=wd_cashbox_details_parent.work_type_id,
-                    work_part=wd_cashbox_details_parent.work_part,
-                )
-                for wd_cashbox_details_parent in wd_swap.worker_day_details.all()
-            ])
+    # @action(detail=False, methods=['post'])
+    # def exchange(self, request):
+    #     new_wds = []
+    #     def create_worker_day(wd_parent, wd_swap, is_approved):
+    #         parent_worker_day_id = wd_swap.id if is_approved else wd_parent.parent_worker_day_id
+    #         wd_new = WorkerDay(
+    #             type=wd_swap.type,
+    #             dttm_work_start=wd_swap.dttm_work_start,
+    #             dttm_work_end=wd_swap.dttm_work_end,
+    #             worker_id=wd_parent.worker_id,
+    #             employment_id=wd_parent.employment_id,
+    #             dt=wd_parent.dt,
+    #             parent_worker_day_id=parent_worker_day_id,
+    #             created_by=request.user,
+    #             is_approved=False,
+    #             is_vacancy=wd_swap.is_vacancy,
+    #         )
+    #         wd_new.save()
+    #         new_wds.append(wd_new)
+    #         WorkerDayCashboxDetails.objects.bulk_create([
+    #             WorkerDayCashboxDetails(
+    #                 worker_day_id=wd_new.id,
+    #                 work_type_id=wd_cashbox_details_parent.work_type_id,
+    #                 work_part=wd_cashbox_details_parent.work_part,
+    #             )
+    #             for wd_cashbox_details_parent in wd_swap.worker_day_details.all()
+    #         ])
 
-        data = ExchangeSerializer(data=request.data, context={'request': request})
-        data.is_valid(raise_exception=True)
-        data = data.validated_data
-        days = len(data['dates'])
+    #     data = ExchangeSerializer(data=request.data, context={'request': request})
+    #     data.is_valid(raise_exception=True)
+    #     data = data.validated_data
+    #     days = len(data['dates'])
 
-        wd_parent_list = list(WorkerDay.objects.prefetch_related('child').filter(
-            worker_id__in=(data['worker1_id'], data['worker2_id']),
-            dt__in=data['dates'],
-            is_approved=data['is_approved'],
-            is_fact=False,
-        ).order_by('dt'))
-        if data['is_approved']:
-            id_to_delete = []
-            for wd in wd_parent_list:
-                if wd.child.first():
-                    id_to_delete.append(wd.child.first().id)
-        else:
-            id_to_delete = [wd.id for wd in wd_parent_list]
+    #     wd_parent_list = list(WorkerDay.objects.prefetch_related('child').filter(
+    #         worker_id__in=(data['worker1_id'], data['worker2_id']),
+    #         dt__in=data['dates'],
+    #         is_approved=data['is_approved'],
+    #         is_fact=False,
+    #     ).order_by('dt'))
+    #     if data['is_approved']:
+    #         id_to_delete = []
+    #         for wd in wd_parent_list:
+    #             if wd.child.first():
+    #                 id_to_delete.append(wd.child.first().id)
+    #     else:
+    #         id_to_delete = [wd.id for wd in wd_parent_list]
 
-        if len(wd_parent_list) != days * 2:
-            raise ValidationError(self.error_messages['no_timetable'])
+    #     if len(wd_parent_list) != days * 2:
+    #         raise ValidationError(self.error_messages['no_timetable'])
 
-        day_pairs = []
-        for day_ind in range(days):
-            day_pair = [wd_parent_list[day_ind * 2], wd_parent_list[day_ind * 2 + 1]]
-            if day_pair[0].dt != day_pair[1].dt:
-                raise ValidationError(self.error_messages['worker_days_mismatch'])
-            day_pairs.append(day_pair)
+    #     day_pairs = []
+    #     for day_ind in range(days):
+    #         day_pair = [wd_parent_list[day_ind * 2], wd_parent_list[day_ind * 2 + 1]]
+    #         if day_pair[0].dt != day_pair[1].dt:
+    #             raise ValidationError(self.error_messages['worker_days_mismatch'])
+    #         day_pairs.append(day_pair)
 
-        for day_pair in day_pairs:
-            create_worker_day(day_pair[0], day_pair[1], data['is_approved'])
-            create_worker_day(day_pair[1], day_pair[0], data['is_approved'])
+    #     for day_pair in day_pairs:
+    #         create_worker_day(day_pair[0], day_pair[1], data['is_approved'])
+    #         create_worker_day(day_pair[1], day_pair[0], data['is_approved'])
 
-        WorkerDay.objects.filter(id__in=id_to_delete).delete()
+    #     WorkerDay.objects.filter(id__in=id_to_delete).delete()
 
-        return Response(WorkerDaySerializer(new_wds, many=True).data)
+    #     return Response(WorkerDaySerializer(new_wds, many=True).data)
 
     @action(detail=False, methods=['post'])
     @get_uploaded_file
