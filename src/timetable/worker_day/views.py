@@ -153,6 +153,9 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                         worker_day.tabel_work_hours * 3600 if is_tabel else worker_day.work_hours.seconds)
                     work_start = (worker_day.tabel_dttm_work_start if is_tabel else worker_day.dttm_work_start)
                     work_end = (worker_day.tabel_dttm_work_end if is_tabel else worker_day.dttm_work_end)
+                    if not (work_start and work_end):
+                        wd_dict['work_hours'] = 0.0
+                        continue
 
                     wd_dict['work_hours'] = round(work_seconds / 3600, 2)
                     wd_dict['work_hours_details'] = {}

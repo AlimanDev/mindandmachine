@@ -35,7 +35,7 @@ class WorkerDayFilter(FilterSet):
                 is_approved=True,
             ).order_by('-is_fact', '-work_hours').values_list('id')[:1]
             return queryset.filter(
-                Q(is_fact=True, dttm_work_start__isnull=False, dttm_work_end__isnull=False) |
+                Q(is_fact=True) |
                 Q(~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE), is_fact=False),
                 is_approved=True,
                 id=Subquery(ordered_subq),
