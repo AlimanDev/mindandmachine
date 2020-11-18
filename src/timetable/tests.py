@@ -527,6 +527,7 @@ class TestWorkerDay(APITestCase):
             'shop_id': self.shop.id,
             'limit': 100,
             'is_tabel': 'true',
+            'hours_details': 'true',
             'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
             'dt__lte': self.dt.strftime('%Y-%m-%d'),
         }

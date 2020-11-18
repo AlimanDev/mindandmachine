@@ -131,7 +131,8 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
     def list(self, request):
         is_tabel = request.query_params.get('is_tabel', False)
-        if request.query_params.get('hours_details', False) and is_tabel:
+        orteka_tabel = request.query_params.get('orteka_tabel', False)
+        if request.query_params.get('hours_details', False) and (is_tabel or orteka_tabel):
             data = []
             def _time_to_float(t):
                 return t.hour + t.minute / 60 + t.second / 60
@@ -145,14 +146,15 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             celebration_dates = ProductionDay.objects.filter(**prod_day_filter).values_list('dt', flat=True)
 
             night_edges = [Converter.parse_time(t) for t in request.user.network.night_edges]
-            for worker_day in self.filter_queryset(
-                    self.get_queryset().prefetch_related('worker_day_details')).get_tabel(self.request.user.network):
+            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 if worker_day.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                    work_seconds = (
+                        worker_day.tabel_work_hours * 3600 if is_tabel else worker_day.work_hours.seconds)
                     work_start = (worker_day.tabel_dttm_work_start if is_tabel else worker_day.dttm_work_start)
                     work_end = (worker_day.tabel_dttm_work_end if is_tabel else worker_day.dttm_work_end)
 
-                    wd_dict['work_hours'] = worker_day.tabel_work_hours
+                    wd_dict['work_hours'] = round(work_seconds / 3600, 2)
                     wd_dict['work_hours_details'] = {}
                     if worker_day.dt in celebration_dates:
                         wd_dict['work_hours_details']['H'] = wd_dict['work_hours']
@@ -173,7 +175,11 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
                         night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
                         total_seconds = (work_end - work_start).total_seconds()
-                        break_time_seconds = worker_day.tabel_breaktime_seconds or 0
+
+                        if is_tabel:
+                            break_time_seconds = worker_day.tabel_breaktime_seconds or 0
+                        else:
+                            break_time_seconds = total_seconds - work_seconds
 
                         wd_dict['work_hours_details']['D'] = round(
                             (total_seconds - night_seconds - break_time_seconds / 2) / 3600, 1)
