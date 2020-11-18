@@ -237,7 +237,7 @@ class WorkTypeConverter(Converter):
             'min_workers_amount': obj.min_workers_amount,
             'max_workers_amount': obj.max_workers_amount,
             'operation_types': [cls.convert_operation_type(obj.operation_type)],
-            'work_type_name_id': cls.work_type_name_id,
+            'work_type_name_id': obj.work_type_name_id,
         }
         # if convert_operations:
         #     converted_dict['operation_types'] = [
