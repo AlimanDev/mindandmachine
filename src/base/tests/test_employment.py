@@ -228,7 +228,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours,
                          timedelta(hours=9, minutes=30))
 
-    def _get_empls(self, extra_params=None):
+    def _test_get_empls(self, extra_params=None, check_length=None):
         params = {
             'dt_from': Converter.convert_date(self.dt_now),
             'dt_to': Converter.convert_date(self.dt_now),
@@ -237,19 +237,22 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         if extra_params:
             params.update(extra_params)
 
-        return self.client.get(path=self.get_url('Employment-list'), data=params)
+        resp = self.client.get(path=self.get_url('Employment-list'), data=params)
+
+        if check_length:
+            self.assertEqual(len(resp.json()), check_length)
+
+        return resp
 
     def test_get_mine_employments(self):
-        resp = self._get_empls()
-        self.assertEqual(len(resp.json()), 7)
-
-        resp = self._get_empls(extra_params={'mine': True})
-        self.assertEqual(len(resp.json()), 7)
+        self._test_get_empls(check_length=8)
+        self._test_get_empls(extra_params={'mine': True}, check_length=8)
 
         self.client.force_authenticate(user=self.user2)
-        resp = self._get_empls(extra_params={'mine': True})
-        self.assertEqual(len(resp.json()), 5)
+        self._test_get_empls(extra_params={'mine': True}, check_length=5)
 
         self.client.force_authenticate(user=self.user5)
-        resp = self._get_empls(extra_params={'mine': True})
-        self.assertEqual(len(resp.json()), 6)
+        self._test_get_empls(extra_params={'mine': True}, check_length=7)
+
+        self.client.force_authenticate(user=self.user8)
+        self._test_get_empls(extra_params={'mine': True}, check_length=1)

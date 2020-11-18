@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -82,6 +83,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         "no_user": _("There is {amount} models of user with username: {username}."),
         "wd_details_shop_mismatch": _("Shop in work type and in work day must match."),
         "user_mismatch": _("User in employment and in worker day must match."),
+        "no_active_employments": _(
+            "Can't create a working day in the schedule, since the user is not employed during this period"),
     }
 
     worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
@@ -111,15 +114,15 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             raise ValidationError({"error": "Нельзя менять подтвержденную версию."})
 
         is_fact = attrs['is_fact'] if 'is_fact' in attrs else getattr(self.instance, 'is_fact', None)
-        type = attrs['type']
+        wd_type = attrs['type']
 
-        if is_fact and type not in WorkerDay.TYPES_WITH_TM_RANGE + (WorkerDay.TYPE_EMPTY,):
+        if is_fact and wd_type not in WorkerDay.TYPES_WITH_TM_RANGE + (WorkerDay.TYPE_EMPTY,):
             raise ValidationError({
                 "error": "Для фактической неподтвержденной версии можно установить только 'Рабочий день',"
                          " 'Обучение', 'Командировка' и 'НД'."
             })
 
-        if not WorkerDay.is_type_with_tm_range(type):
+        if not WorkerDay.is_type_with_tm_range(wd_type):
             attrs['dttm_work_start'] = None
             attrs['dttm_work_end'] = None
         elif not (attrs.get('dttm_work_start') and attrs.get('dttm_work_end')):
@@ -148,7 +151,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             else:
                 self.fail('no_user', amount=len(users), username=username)
 
-        if not type == WorkerDay.TYPE_WORKDAY or is_fact:
+        if not wd_type == WorkerDay.TYPE_WORKDAY or is_fact:
             attrs.pop('worker_day_details', None)
         elif not (attrs.get('worker_day_details')):
             raise ValidationError({
@@ -168,35 +171,68 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                     "employment": self.error_messages['user_mismatch']
                 })
 
+        if is_fact and wd_type == WorkerDay.TYPE_WORKDAY \
+                and attrs.get('worker_id') and attrs.get('shop_id') and attrs.get('created_by'):
+            similar_plan_exists = WorkerDay.objects.filter(
+                type=WorkerDay.TYPE_WORKDAY,
+                is_fact=False,
+                is_approved=True,
+                dt=attrs.get('dt'),
+                worker_id=attrs.get('worker_id'),
+                shop_id=attrs.get('shop_id'),
+            ).exists()
+            if not similar_plan_exists:
+                raise ValidationError({
+                    "error": "Не существует рабочего дня в плановом подтвержденном графике. "
+                             "Необходимо создать и подтвердить рабочий день в плановом графике, "
+                             "или проверить, что магазины в плановом и фактическом графиках совпадают."
+                })
+
         return attrs
 
     def create(self, validated_data):
-        if not (validated_data.get('is_vacancy') and not validated_data.get('worker_id')):
-            WorkerDay.objects.filter(
-                worker_id=validated_data.get('worker_id'),
-                dt=validated_data.get('dt'),
-                is_approved=validated_data.get('is_approved'),
-                is_fact=validated_data.get('is_fact'),
-            ).delete()
-        details = validated_data.pop('worker_day_details', None)
-        if validated_data.get('type') == WorkerDay.TYPE_WORKDAY and not validated_data.get('is_vacancy') \
-                and validated_data.get('worker_id') and validated_data.get('shop_id'):
-            worker_has_active_empl_in_shop = Employment.objects.get_active(
-                network_id=self.context['request'].user.network_id,
-                dt_from=validated_data.get('dt'),
-                dt_to=validated_data.get('dt'),
-                user_id=validated_data.get('worker_id'),
-                shop_id=validated_data.get('shop_id'),
-            )
-            if not worker_has_active_empl_in_shop:
-                validated_data['is_vacancy'] = True
+        with transaction.atomic():
+            if validated_data.get('worker_id'):
+                if validated_data.get('type') == WorkerDay.TYPE_WORKDAY and validated_data.get('shop_id'):
+                    worker_active_empls = list(Employment.objects.get_active(
+                        network_id=self.context['request'].user.network_id,
+                        dt_from=validated_data.get('dt'),
+                        dt_to=validated_data.get('dt'),
+                        user_id=validated_data.get('worker_id'),
+                    ).values('id', 'shop_id'))
 
-        worker_day = WorkerDay.objects.create(**validated_data)
-        if details:
-            for wd_detail in details:
-                WorkerDayCashboxDetails.objects.create(worker_day=worker_day, **wd_detail)
+                    if not worker_active_empls:
+                        raise self.fail('no_active_employments')
 
-        return worker_day
+                    worker_active_empl_in_wd_shop = None
+                    for worker_active_empl in worker_active_empls:
+                        if validated_data.get('shop_id') == worker_active_empl['shop_id']:
+                            worker_active_empl_in_wd_shop = worker_active_empl
+                            break
+
+                    if not worker_active_empl_in_wd_shop:
+                        validated_data['is_vacancy'] = True
+
+                    if validated_data.get('employment_id') is None:
+                        if worker_active_empl_in_wd_shop:
+                            validated_data['employment_id'] = worker_active_empl_in_wd_shop['id']
+                        else:
+                            validated_data['employment_id'] = worker_active_empls[0]['id']
+
+                WorkerDay.objects.filter(
+                    worker_id=validated_data.get('worker_id'),
+                    dt=validated_data.get('dt'),
+                    is_approved=validated_data.get('is_approved'),
+                    is_fact=validated_data.get('is_fact'),
+                ).delete()
+
+            details = validated_data.pop('worker_day_details', None)
+            worker_day = WorkerDay.objects.create(**validated_data)
+            if details:
+                for wd_detail in details:
+                    WorkerDayCashboxDetails.objects.create(worker_day=worker_day, **wd_detail)
+
+            return worker_day
 
     def update(self, instance, validated_data):
         details = validated_data.pop('worker_day_details', [])
@@ -207,7 +243,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 WorkerDayCashboxDetails.objects.create(worker_day=instance, **wd_detail)
 
         res = super().update(instance, validated_data)
-        if not (instance.is_vacancy and not instance.worker_id):
+        if instance.worker_id:
             WorkerDay.objects.filter(
                 worker_id=instance.worker_id,
                 dt=instance.dt,
