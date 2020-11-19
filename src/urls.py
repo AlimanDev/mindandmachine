@@ -42,12 +42,12 @@ api_urlpatterns = [
 urlpatterns = [
     path('api/', include(api_urlpatterns)),
     path('admin/', admin.site.urls),
+    path('rest_api/recognition/', include(recognition_router.get_urls())),
     path('rest_api/', include(
         base_api.urlpatterns +
         timetable_api.urlpatterns +
         forecast_api.urlpatterns +
-        misc_api.urlpatterns +
-        recognition_router.get_urls(),
+        misc_api.urlpatterns
     )),
 ]
 
