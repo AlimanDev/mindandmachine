@@ -20,13 +20,24 @@ class BaseNetworkSerializer(serializers.ModelSerializer):
 
 class NetworkSerializer(serializers.ModelSerializer):
     logo = serializers.SerializerMethodField('get_logo_url')
+
     def get_logo_url(self, obj):
         if obj.logo:
             return obj.logo.url
         return None
+
     class Meta:
         model = Network
-        fields = ['id', 'name', 'logo', 'url', 'primary_color', 'secondary_color']
+        fields = [
+            'id',
+            'name',
+            'logo',
+            'url',
+            'primary_color',
+            'secondary_color',
+            'allowed_geo_distance_km',
+            'enable_camera_ticks',
+        ]
 
 
 class UserListSerializer(serializers.Serializer):
