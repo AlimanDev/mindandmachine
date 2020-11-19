@@ -13,7 +13,7 @@ from rangefilter.filter import DateTimeRangeFilter
 
 from src.recognition.models import TickPoint, Tick, TickPhoto, UserConnecter
 from src.timetable.models import User, Employment
-from src.util.dg.ticks_report import TicksReportGenerator
+from src.util.dg.ticks_report import TicksOdsReportGenerator, TicksOdtReportGenerator
 
 admin.site.unregister(Group)
 
@@ -106,7 +106,7 @@ class TickAdmin(admin.ModelAdmin):
         UserListFilter,
     ]
 
-    actions = ['download_old', 'download']
+    actions = ['download_old', 'ticks_report_xlsx', 'ticks_report_docx']
 
     def get_queryset(self, request):
         return super(TickAdmin, self).get_queryset(request).prefetch_related(
@@ -117,11 +117,18 @@ class TickAdmin(admin.ModelAdmin):
             )
         )
 
-    def download(self, request, queryset):
-        generator = TicksReportGenerator(ticks_queryset=queryset)
-        content = generator.generate()
+    def ticks_report_xlsx(self, request, queryset):
+        generator = TicksOdsReportGenerator(ticks_queryset=queryset)
+        content = generator.generate(convert_to='xlsx')
         response = HttpResponse(content, content_type='application/octet-stream')
-        response['Content-Disposition'] = 'attachment; filename="urv.xlsx"'
+        response['Content-Disposition'] = 'attachment; filename="ticks_report.xlsx"'
+        return response
+
+    def ticks_report_docx(self, request, queryset):
+        generator = TicksOdtReportGenerator(ticks_queryset=queryset)
+        content = generator.generate(convert_to='docx')
+        response = HttpResponse(content, content_type='application/octet-stream')
+        response['Content-Disposition'] = 'attachment; filename="ticks_report.docx"'
         return response
 
     # aa: fixme: remove, not working

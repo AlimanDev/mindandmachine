@@ -77,6 +77,9 @@ class Tick(AbstractActiveModel):
     verified_score = models.FloatField(default=0)
     is_front = models.BooleanField(default=False)
 
+    def test_img(self):
+        return b'', ''
+
     @property
     def min_liveness_prop(self):
         if hasattr(self, 'min_liveness'):
@@ -98,11 +101,31 @@ class Tick(AbstractActiveModel):
                     return tickphoto
             return
 
-        return TickPhoto.objects.filter(type=type, tick=self).first()
+        self.tickphotos_list = list(self.tickphoto_set.all())
+        return self.get_tick_photo(type)
 
     @property
     def type_display(self):
         return self.get_type_display()
+
+    def _get_img(self, type):
+        tick_photo = self.get_tick_photo(type)
+        if tick_photo:
+            return (tick_photo.image, 'image/png')
+
+        return (b'', 'image/png')
+
+    @property
+    def image_first(self):
+        return self._get_img(TickPhoto.TYPE_FIRST)
+
+    @property
+    def image_self(self):
+        return self._get_img(TickPhoto.TYPE_SELF)
+
+    @property
+    def image_last(self):
+        return self._get_img(TickPhoto.TYPE_LAST)
 
     def image_tag_first(self):
         return self.image_tag(TickPhoto.TYPE_FIRST)
