@@ -77,6 +77,20 @@ class Tick(AbstractActiveModel):
     verified_score = models.FloatField(default=0)
     is_front = models.BooleanField(default=False)
 
+    @property
+    def min_liveness_prop(self):
+        if hasattr(self, 'min_liveness'):
+            return self.min_liveness
+
+        if hasattr(self, 'tickphotos_list'):
+            liveness_list = [tickphoto.liveness for tickphoto in self.tickphotos_list if tickphoto.liveness is not None]
+            if liveness_list:
+                return min(liveness_list)
+            return
+
+        self.tickphotos_list = list(self.tickphoto_set.all())
+        return self.min_liveness_prop
+
     def get_tick_photo(self, type):
         if hasattr(self, 'tickphotos_list'):
             for tickphoto in self.tickphotos_list:

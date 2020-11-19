@@ -19,12 +19,6 @@ class TicksReportGenerator(BaseDocGenerator):
             'ticks': list(
                 self.ticks_queryset.select_related(
                     'user', 'tick_point', 'tick_point__shop'
-                ).prefetch_related(
-                    Prefetch(
-                        'tickphoto_set',
-                        queryset=TickPhoto.objects.filter(),
-                        to_attr='tickphotos_list',
-                    )
                 )
             )
         }

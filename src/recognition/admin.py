@@ -4,7 +4,7 @@ import xlsxwriter
 from admin_numeric_filter.admin import RangeNumericFilter
 from django.contrib import admin
 from django.contrib.auth.models import Group
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Min
 from django.http import HttpResponse
 from django.utils.html import format_html
 from django.utils.timezone import now
@@ -70,6 +70,17 @@ class PhotoUserListFilter(UserListFilter):
         return queryset
 
 
+class TickMinLivenessFilter(RangeNumericFilter):
+    title = 'Min liveness'
+    parameter_name = 'min_liveness'
+
+    def queryset(self, request, queryset):
+        queryset = queryset.annotate(
+            min_liveness=Min('tickphoto__liveness'),
+        )
+        return super(TickMinLivenessFilter, self).queryset(request, queryset)
+
+
 @admin.register(Tick)
 class TickAdmin(admin.ModelAdmin):
     raw_id_fields = ("user", "tick_point")
@@ -78,14 +89,17 @@ class TickAdmin(admin.ModelAdmin):
         'user',
         'type',
         'tick_point',
+        'tick_point',
         'dttm',
         'verified_score',
+        'min_liveness_prop',
         'image_tag_self',
         'image_tag_first',
         'image_tag_last',
     ]
 
     list_filter = [
+        ('tickphoto__liveness', TickMinLivenessFilter),
         ('tick_point__shop', RelatedOnlyDropdownFilter),
         ('dttm', DateTimeRangeFilter),
         'type',
@@ -95,9 +109,7 @@ class TickAdmin(admin.ModelAdmin):
     actions = ['download_old', 'download']
 
     def get_queryset(self, request):
-        return super(TickAdmin, self).get_queryset(request).select_related(
-            'user', 'tick_point', 'tick_point__shop'
-        ).prefetch_related(
+        return super(TickAdmin, self).get_queryset(request).prefetch_related(
             Prefetch(
                 'tickphoto_set',
                 queryset=TickPhoto.objects.filter(),
