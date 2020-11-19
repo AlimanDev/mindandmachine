@@ -463,7 +463,7 @@ def create_departments_and_users(self):
     self.breaks = Break.objects.create(
         name='Default',
         network=self.network,
-        value='[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]]'
+        value='[[0, 360, [30]], [360, 540, [30, 30]], [540, 1020, [30, 30, 15]]]'
     )
 
     self.shop_settings = ShopSettings.objects.create(

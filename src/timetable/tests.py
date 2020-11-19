@@ -704,6 +704,29 @@ class TestWorkerDay(APITestCase):
         self.assertIn('work_hours_details', resp_data[0])
         self.assertDictEqual({'D': 3.75, 'N': 0.75}, resp_data[0]['work_hours_details'])
 
+    def test_get_fact_tabel3(self):
+        plan_dttm_work_start = datetime.combine(self.dt, time(18, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt + timedelta(days=1), time(9, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(18, 0, 0))
+        fact_dttm_work_end = datetime.combine(self.dt + timedelta(days=1), time(9, 0, 0))
+
+        resp_data = self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=fact_dttm_work_start,
+            expected_end=fact_dttm_work_end,
+            expected_hours=13.76,
+            extra_get_params=dict(
+                hours_details=True,
+            ),
+            tabel_kwarg='fact_tabel',
+        )
+
+        self.assertIn('work_hours_details', resp_data[0])
+        self.assertDictEqual({'D': 6.38, 'N': 7.38}, resp_data[0]['work_hours_details'])
+
     def test_get_worker_day_by_worker__username__in(self):
         get_params = {
             'worker__username__in': self.user2.username,
