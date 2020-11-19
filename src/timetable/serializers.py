@@ -171,22 +171,22 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                     "employment": self.error_messages['user_mismatch']
                 })
 
-        if is_fact and wd_type == WorkerDay.TYPE_WORKDAY \
-                and attrs.get('worker_id') and attrs.get('shop_id') and attrs.get('created_by'):
-            similar_plan_exists = WorkerDay.objects.filter(
-                type=WorkerDay.TYPE_WORKDAY,
-                is_fact=False,
-                is_approved=True,
-                dt=attrs.get('dt'),
-                worker_id=attrs.get('worker_id'),
-                shop_id=attrs.get('shop_id'),
-            ).exists()
-            if not similar_plan_exists:
-                raise ValidationError({
-                    "error": "Не существует рабочего дня в плановом подтвержденном графике. "
-                             "Необходимо создать и подтвердить рабочий день в плановом графике, "
-                             "или проверить, что магазины в плановом и фактическом графиках совпадают."
-                })
+        # if is_fact and wd_type == WorkerDay.TYPE_WORKDAY \
+        #         and attrs.get('worker_id') and attrs.get('shop_id') and attrs.get('created_by'):
+        #     similar_plan_exists = WorkerDay.objects.filter(
+        #         type=WorkerDay.TYPE_WORKDAY,
+        #         is_fact=False,
+        #         is_approved=True,
+        #         dt=attrs.get('dt'),
+        #         worker_id=attrs.get('worker_id'),
+        #         shop_id=attrs.get('shop_id'),
+        #     ).exists()
+        #     if not similar_plan_exists:
+        #         raise ValidationError({
+        #             "error": "Не существует рабочего дня в плановом подтвержденном графике. "
+        #                      "Необходимо создать и подтвердить рабочий день в плановом графике, "
+        #                      "или проверить, что магазины в плановом и фактическом графиках совпадают."
+        #         })
 
         return attrs
 

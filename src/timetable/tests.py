@@ -909,33 +909,33 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertFalse(wd.is_vacancy)
         self.assertEqual(wd.employment.id, self.employment8.id)
 
-    def test_cant_create_fact_worker_day_when_there_is_no_plan(self):
-        data = {
-            "shop_id": self.shop2.id,
-            "worker_id": self.user8.id,
-            "dt": self.dt,
-            "is_fact": True,
-            "is_approved": True,
-            "type": WorkerDay.TYPE_WORKDAY,
-            "dttm_work_start": datetime.combine(self.dt, time(10, 0, 0)),
-            "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
-            "worker_day_details": [{
-                "work_part": 1.0,
-                "work_type_id": self.work_type2.id}
-            ]
-        }
-        resp = self.client.post(self.url, data, format='json')
-        self.assertEqual(resp.status_code, 400)
-        self.assertDictEqual(
-            resp.json(),
-            {
-                "error": [
-                    "Не существует рабочего дня в плановом подтвержденном графике. "
-                    "Необходимо создать и подтвердить рабочий день в плановом графике, "
-                    "или проверить, что магазины в плановом и фактическом графиках совпадают."
-                ]
-            },
-        )
+    # def test_cant_create_fact_worker_day_when_there_is_no_plan(self):
+    #     data = {
+    #         "shop_id": self.shop2.id,
+    #         "worker_id": self.user8.id,
+    #         "dt": self.dt,
+    #         "is_fact": True,
+    #         "is_approved": True,
+    #         "type": WorkerDay.TYPE_WORKDAY,
+    #         "dttm_work_start": datetime.combine(self.dt, time(10, 0, 0)),
+    #         "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
+    #         "worker_day_details": [{
+    #             "work_part": 1.0,
+    #             "work_type_id": self.work_type2.id}
+    #         ]
+    #     }
+    #     resp = self.client.post(self.url, data, format='json')
+    #     self.assertEqual(resp.status_code, 400)
+    #     self.assertDictEqual(
+    #         resp.json(),
+    #         {
+    #             "error": [
+    #                 "Не существует рабочего дня в плановом подтвержденном графике. "
+    #                 "Необходимо создать и подтвердить рабочий день в плановом графике, "
+    #                 "или проверить, что магазины в плановом и фактическом графиках совпадают."
+    #             ]
+    #         },
+    #     )
 
 
 class TestWorkerDayCreateFact(APITestCase):
@@ -976,6 +976,7 @@ class TestWorkerDayCreateFact(APITestCase):
 
         # create not approved fact
         response = self.client.post(self.url, data, format='json')
+        print(response.json())
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         fact_id = response.json()['id']
 
