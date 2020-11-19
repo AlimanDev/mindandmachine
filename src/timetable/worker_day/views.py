@@ -178,13 +178,15 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                             wd_dict['work_hours_details']['N'] = wd_dict['work_hours']
                             data.append(wd_dict)
                             continue
-                        tm_start = _time_to_float(night_edges[0])
-                        tm_end = _time_to_float(work_end.time())
-                        # TODO: отрефакторить, разобрать разные кейсы, написать тесты
-                        # if work_end.time() <= night_edges[1]:
-                        #     tm_end = _time_to_float(work_end.time())
-                        # else:
-                        #     tm_end = _time_to_float(night_edges[1])
+
+                        if work_start.time() > night_edges[0] or work_start.time() < night_edges[1]:
+                            tm_start = _time_to_float(work_start.time())
+                        else:
+                            tm_start = _time_to_float(night_edges[0])
+                        if work_end.time() > night_edges[0] or work_end.time() < night_edges[1]:
+                            tm_end = _time_to_float(work_end.time())
+                        else:
+                            tm_end = _time_to_float(night_edges[1])
 
                         night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
                         total_seconds = (work_end - work_start).total_seconds()
