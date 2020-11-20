@@ -140,8 +140,8 @@ class TickViewSet(viewsets.ModelViewSet):
 
     def get_authenticators(self):
         return [
-            CsrfExemptSessionAuthentication(),
             TickPointTokenAuthentication(raise_auth_exc=False),
+            CsrfExemptSessionAuthentication(),
             TokenAuthentication()
         ]
 
@@ -250,8 +250,8 @@ class TickPhotoViewSet(viewsets.ModelViewSet):
 
     def get_authenticators(self):
         return [
-            CsrfExemptSessionAuthentication(),
             TickPointTokenAuthentication(raise_auth_exc=False),
+            CsrfExemptSessionAuthentication(),
             TokenAuthentication()
         ]
 
