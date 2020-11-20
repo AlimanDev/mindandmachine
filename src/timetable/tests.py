@@ -819,6 +819,52 @@ class TestWorkerDay(APITestCase):
         self.assertEqual(
             response.json()['employment'][0], 'Сотрудник в трудоустройстве и в рабочем дне должны совпадать.')
 
+    def test_change_range(self):
+        data = {
+          "ranges": [
+            {
+              "worker": self.user2.tabel_code,
+              "dt_from": self.dt - timedelta(days=10),
+              "dt_to": self.dt + timedelta(days=10),
+              "type": WorkerDay.TYPE_MATERNITY,
+              "is_fact": False,
+              "is_approved": True
+            }
+          ]
+        }
+        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertDictEqual(
+            response.json(),
+            {self.user2.tabel_code: {'created_count': 21, 'deleted_count': 1, 'existing_count': 0}}
+        )
+        self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).exists())
+        self.assertEqual(
+            WorkerDay.objects.filter(worker__tabel_code=self.user2.tabel_code, type=WorkerDay.TYPE_MATERNITY).count(),
+            21,
+        )
+
+        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertDictEqual(
+            response.json(),
+            {self.user2.tabel_code: {'created_count': 0, 'deleted_count': 0, 'existing_count': 21}}
+        )
+
+        WorkerDay.objects.create(
+            worker=self.user2,
+            dt=self.dt,
+            is_fact=False,
+            is_approved=True,
+            type=WorkerDay.TYPE_MATERNITY,
+        )
+        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertDictEqual(
+            response.json(),
+            {self.user2.tabel_code: {'created_count': 0, 'deleted_count': 1, 'existing_count': 21}}
+        )
+
 
 class TestWorkerDayCreateFact(APITestCase):
     USER_USERNAME = "user1"

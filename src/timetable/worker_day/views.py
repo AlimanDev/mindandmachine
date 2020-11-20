@@ -2,9 +2,11 @@ import datetime
 import json
 from itertools import groupby
 
+import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
+from django.db import transaction
 from django.db.models import OuterRef, Subquery, Q, F
 from django.http import HttpResponse
 from django.utils import timezone
@@ -16,13 +18,13 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
-from src.main.timetable.auto_settings.utils import set_timetable_date_from
 
 from src.base.exceptions import FieldError
 from src.base.exceptions import MessageError
 from src.base.message import Message
 from src.base.models import Employment, Shop, User, ProductionDay
 from src.base.permissions import WdPermission
+from src.main.timetable.auto_settings.utils import set_timetable_date_from
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
@@ -46,6 +48,7 @@ from src.timetable.serializers import (
     DownloadSerializer,
     WorkerDayListSerializer,
     DownloadTabelSerializer,
+    ChangeRangeListSerializer,
 )
 from src.timetable.vacancy.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy, confirm_vacancy
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
@@ -396,6 +399,62 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 for d in WorkerDayCashboxDetails.objects.filter(worker_day=vacancy)
             ])
         return Response(WorkerDaySerializer(editable_vacancy).data)
+
+    @action(detail=False, methods=['post'])
+    def change_range(self, request):
+        serializer = ChangeRangeListSerializer(data=request.data, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+
+        res = {}
+        for range in serializer.validated_data['ranges']:
+            with transaction.atomic():
+                deleted = WorkerDay.objects.filter(
+                    worker=range['worker'],
+                    dt__gte=range['dt_from'],
+                    dt__lte=range['dt_to'],
+                    is_approved=range['is_approved'],
+                    is_fact=range['is_fact'],
+                ).exclude(
+                    id__in=Subquery(
+                        WorkerDay.objects.filter(
+                            dt=OuterRef('dt'),
+                            worker=OuterRef('worker'),
+                            is_approved=OuterRef('is_approved'),
+                            is_fact=OuterRef('is_fact'),
+                            type=range['type'],
+                        ).order_by('-id').values_list('id')[:1]),
+                ).delete()
+
+                existing_dates = list(WorkerDay.objects.filter(
+                    worker=range['worker'],
+                    dt__gte=range['dt_from'],
+                    dt__lte=range['dt_to'],
+                    is_approved=range['is_approved'],
+                    is_fact=range['is_fact'],
+                    type=range['type'],
+                ).values_list('dt', flat=True))
+
+                wdays_to_create = []
+                for dt in [d.date() for d in pd.date_range(range['dt_from'], range['dt_to'])]:
+                    if dt not in existing_dates:
+                        wdays_to_create.append(
+                            WorkerDay(
+                                worker=range['worker'],
+                                dt=dt,
+                                is_approved=range['is_approved'],
+                                is_fact=range['is_fact'],
+                                type=range['type']
+                            )
+                        )
+                WorkerDay.objects.bulk_create(wdays_to_create)
+
+                res[range['worker'].tabel_code] = {
+                    'deleted_count': deleted[0],
+                    'existing_count': len(existing_dates),
+                    'created_count': len(wdays_to_create)
+                }
+
+        return Response(res)
 
     @action(detail=False, methods=['post'])
     def change_list(self, request):

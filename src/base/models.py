@@ -790,6 +790,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_download_tabel',
         'WorkerDay_editable_vacancy',
         'WorkerDay_approve_vacancy',
+        'WorkerDay_change_range',
         'WorkerPosition',
         'WorkTypeName',
         'WorkType',
