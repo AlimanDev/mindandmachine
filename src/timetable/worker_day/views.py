@@ -308,7 +308,60 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             ).exclude(
                 id__in=wdays_to_approve.values_list('id', flat=True)
             ).delete()
+            list_wd = list(
+                wdays_to_approve.select_related(
+                    'shop', 
+                    'employment', 
+                    'employment__position', 
+                    'employment__position__breaks',
+                    'shop__settings__breaks',
+                ).prefetch_related(
+                    'worker_day_details',
+                )
+            )
+
             wdays_to_approve.update(is_approved=True)
+
+            wds = WorkerDay.objects.bulk_create(
+                [
+                    WorkerDay(
+                        shop=wd.shop,
+                        worker_id=wd.worker_id,
+                        employment=wd.employment,
+                        dttm_work_start=wd.dttm_work_start,
+                        dttm_work_end=wd.dttm_work_end,
+                        dt=wd.dt,
+                        is_fact=wd.is_fact,
+                        is_approved=False,
+                        type=wd.type,
+                        created_by_id=wd.created_by_id,
+                        is_vacancy=wd.is_vacancy,
+                        is_outsource=wd.is_outsource,
+                        comment=wd.comment,
+                        canceled=wd.canceled,
+                        need_count_wh=True,
+                    )
+                    for wd in list_wd
+                ]
+            )
+            search_wds = {}
+            for wd in wds:
+                key_worker = wd.worker_id
+                if not key_worker in search_wds:
+                    search_wds[key_worker] = {}
+                search_wds[key_worker][wd.dt] = wd
+            
+            WorkerDayCashboxDetails.objects.bulk_create(
+                [
+                    WorkerDayCashboxDetails(
+                        work_part=details.work_part,
+                        worker_day=search_wds[wd.worker_id][wd.dt],
+                        work_type_id=details.work_type_id,
+                    )
+                    for wd in list_wd
+                    for details in wd.worker_day_details.all()
+                ]
+            )
 
             # если план, то отмечаем, что график подтвержден
             if not serializer.data['is_fact']:
