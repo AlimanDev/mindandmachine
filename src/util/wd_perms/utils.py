@@ -84,11 +84,30 @@ class DirectorOrtekaPreset(WdPermsPreset):
     )
 
 
+class DirectorAndURSMtsPreset(WdPermsPreset):
+    wd_perms = (
+        (
+            [WorkerDayPermission.CREATE_OR_UPDATE, WorkerDayPermission.DELETE],
+            [WorkerDayPermission.PLAN],
+            ALL,
+            35, 90
+        ),
+        (
+            [WorkerDayPermission.CREATE_OR_UPDATE, WorkerDayPermission.DELETE],
+            [WorkerDayPermission.FACT],
+            WorkerDay.TYPES_WITH_TM_RANGE + (WorkerDay.TYPE_EMPTY,),
+            35, 1
+        ),
+    )
+
+
 WD_PERMS_PRESETS = (
     ('Пустой', 'empty', EmptyPreset),  # Для удаления всех пермишнов
     ('Админ', 'admin', AdminPreset),
     ('УРС (Ортека)', 'urs_orteka', URSOrtekaPreset),
+    ('УРС (МТС)', 'urs_mts', DirectorAndURSMtsPreset),
     ('Директор (Ортека)', 'dir_orteka', DirectorOrtekaPreset),
+    ('Директор (МТС)', 'dir_mts', DirectorAndURSMtsPreset),
 )
 
 
