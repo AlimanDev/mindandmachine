@@ -2,12 +2,15 @@ import binascii
 import os
 import uuid
 
+from django.conf import settings
+from django.contrib.auth.models import Group
 from django.db import models
+from django.utils.html import format_html
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy
 
 from src.base.models_abstract import AbstractActiveModel, AbstractActiveNamedModel
-from src.timetable.models import User, Shop
+from src.timetable.models import User, Shop, Employment
 
 
 def user_directory_path(instance, filename):
@@ -73,6 +76,89 @@ class Tick(AbstractActiveModel):
     lateness = models.DurationField(null=True)
     verified_score = models.FloatField(default=0)
     is_front = models.BooleanField(default=False)
+
+    def test_img(self):
+        return b'', ''
+
+    @property
+    def min_liveness_prop(self):
+        if hasattr(self, 'min_liveness'):
+            return self.min_liveness
+
+        if hasattr(self, 'tickphotos_list'):
+            liveness_list = [tickphoto.liveness for tickphoto in self.tickphotos_list if tickphoto.liveness is not None]
+            if liveness_list:
+                return min(liveness_list)
+            return
+
+        self.tickphotos_list = list(self.tickphoto_set.all())
+        return self.min_liveness_prop
+
+    def get_tick_photo(self, type):
+        if hasattr(self, 'tickphotos_list'):
+            for tickphoto in self.tickphotos_list:
+                if tickphoto.type == type:
+                    return tickphoto
+            return
+
+        self.tickphotos_list = list(self.tickphoto_set.all())
+        return self.get_tick_photo(type)
+
+    @property
+    def type_display(self):
+        return self.get_type_display()
+
+    def _get_img(self, type):
+        tick_photo = self.get_tick_photo(type)
+        if tick_photo:
+            return (tick_photo.image, 'image/png')
+
+        return (b'', 'image/png')
+
+    @property
+    def image_first(self):
+        return self._get_img(TickPhoto.TYPE_FIRST)
+
+    @property
+    def image_self(self):
+        return self._get_img(TickPhoto.TYPE_SELF)
+
+    @property
+    def image_last(self):
+        return self._get_img(TickPhoto.TYPE_LAST)
+
+    def image_tag_first(self):
+        return self.image_tag(TickPhoto.TYPE_FIRST)
+
+    def image_tag_last(self):
+        return self.image_tag(TickPhoto.TYPE_LAST)
+
+    def image_tag_self(self):
+        return self.image_tag(TickPhoto.TYPE_SELF)
+
+    def image_tag(self, type):
+        tickphoto = self.get_tick_photo(type)
+        if tickphoto:
+            return format_html('<a href="{0}"> <img src="{0}", height="150" /></a>'.format(tickphoto.image.url))
+        return ''
+
+    @property
+    def first_tick_photo_image_url(self):
+        tick_photo = self.get_tick_photo(TickPhoto.TYPE_FIRST)
+        if tick_photo:
+            return settings.HOST + tick_photo.image.url
+
+    @property
+    def last_tick_photo_image_url(self):
+        tick_photo = self.get_tick_photo(TickPhoto.TYPE_LAST)
+        if tick_photo:
+            return settings.HOST + tick_photo.image.url
+
+    @property
+    def self_tick_photo_image_url(self):
+        tick_photo = self.get_tick_photo(TickPhoto.TYPE_SELF)
+        if tick_photo:
+            return settings.HOST + tick_photo.image.url
 
 
 class TickPhoto(AbstractActiveModel):
