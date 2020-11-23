@@ -376,3 +376,4 @@ class Receipt(AbstractModel):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True)
     info = models.TextField()
     data_type = models.CharField(max_length=128, verbose_name='Тип данных', null=True, blank=True)
+    version = models.IntegerField(verbose_name='Версия объекта', default=0)
