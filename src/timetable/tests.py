@@ -995,13 +995,13 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertTrue(wd.is_vacancy)
         self.assertEqual(wd.employment.id, self.employment8.id)
 
-    def test_wd_not_created_as_vacancy_for_the_same_shop_and_employment_was_set(self):
+    def test_create_vacancy_for_the_same_shop_then_update_for_other_shop(self):
         data = {
             "shop_id": self.shop2.id,
             "worker_id": self.user8.id,
             "dt": self.dt,
             "is_fact": False,
-            "is_approved": True,
+            "is_approved": False,
             "type": WorkerDay.TYPE_WORKDAY,
             "dttm_work_start": datetime.combine(self.dt, time(10, 0, 0)),
             "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
@@ -1010,12 +1010,26 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                 "work_type_id": self.work_type2.id}
             ]
         }
-        resp = self.client.post(self.url, data, format='json')
+        resp = self.client.post(self.get_url('WorkerDay-list'), data, format='json')
         self.assertEqual(resp.status_code, 201)
         resp_data = resp.json()
         wd = WorkerDay.objects.get(id=resp_data['id'])
         self.assertFalse(wd.is_vacancy)
         self.assertEqual(wd.employment.id, self.employment8.id)
+
+        data['shop_id'] = self.shop.id
+        data['worker_day_details'][0]['work_type_id'] = self.work_type.id
+        resp = self.client.put(self.get_url('WorkerDay-detail', pk=wd.pk), data, format='json')
+        self.assertEqual(resp.status_code, 200)
+        wd.refresh_from_db()
+        self.assertTrue(wd.is_vacancy)
+
+        data['shop_id'] = self.shop2.id
+        data['worker_day_details'][0]['work_type_id'] = self.work_type2.id
+        resp = self.client.put(self.get_url('WorkerDay-detail', pk=wd.pk), data, format='json')
+        self.assertEqual(resp.status_code, 200)
+        wd.refresh_from_db()
+        self.assertFalse(wd.is_vacancy)
 
     # def test_cant_create_fact_worker_day_when_there_is_no_plan(self):
     #     data = {
