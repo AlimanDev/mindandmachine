@@ -65,6 +65,19 @@ class UserFilter(FilterSet):
     shop_code__in = CharFilter(method='shop_code_in')
     last_name = CharFilter(field_name='last_name', lookup_expr='icontains')
 
+    employments__dt_from = DateFilter(method='employments_dt_from')
+    employments__dt_to = DateFilter(method='employments_dt_to')
+
+    def employments_dt_from(self, queryset, name, value):
+        return queryset.filter(
+            Q(employments__dt_fired__gte=value) | Q(employments__dt_fired__isnull=True),
+        )
+
+    def employments_dt_to(self, queryset, name, value):
+        return queryset.filter(
+            Q(employments__dt_hired__lte=value) | Q(employments__dt_hired__isnull=True),
+        )
+
     def shop_id_in(self, queryset, name, value):
         return queryset.filter(
             employments__shop_id__in=value.split(','),
@@ -78,10 +91,10 @@ class UserFilter(FilterSet):
     class Meta:
         model = User
         fields = {
-            'id':['exact', 'in'],
-            'tabel_code':['exact', 'in'],
-            'username':['exact', 'in'],
-            'last_name':['in',],
+            'id': ['exact', 'in'],
+            'tabel_code': ['exact', 'in'],
+            'username': ['exact', 'in'],
+            'last_name': ['in', ],
             'shop_id': ['exact', 'in'],
             'shop_code': ['exact'],
         }
