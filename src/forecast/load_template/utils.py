@@ -16,8 +16,12 @@ from src.forecast.operation_type_template.views import OperationTypeTemplateSeri
 from src.base.shop.serializers import ShopSerializer
 from django.db.models import F
 from src.util.models_converter import Converter
-from src.conf.djconfig import HOST_IP
+from src.conf.djconfig import HOST
 import json
+import pandas as pd
+from rest_framework.response import Response
+from src.base.exceptions import MessageError
+from src.util.download import xlsx_method
 
 
 ########################## Вспомогательные функции ##########################
@@ -416,7 +420,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
         'dt_from': dt_from,
         'dt_to': dt_to,
         'shop': ShopSerializer(shop).data,
-        'IP': HOST_IP,
+        'IP': HOST,
         'forecast_params': json.loads(shop.load_template.forecast_params)
     }
     relations = {}
@@ -468,3 +472,115 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             o_type['type'] = 'O'
         
     return data
+
+
+def upload_load_template(template_file, form, lang='ru'):
+    df = pd.read_excel(template_file)
+    network_id = form['network_id']
+    o_types = {otn.name: otn for otn in OperationTypeName.objects.filter(network_id=network_id)}
+    O_TYPE_COL = df.columns[0]
+    DEPENDENCY_COL = df.columns[1]
+    FORMULA_COL = df.columns[2]
+    TIMESTEP_COL = df.columns[3]
+    TM_START_COL = df.columns[4]
+    TM_END_COL = df.columns[5]
+    WORK_TYPE_COL = df.columns[6]
+    o_types_db_set = set(o_types.keys())
+    undefined_o_types = set(df[O_TYPE_COL].dropna()).difference(o_types_db_set)
+    if len(undefined_o_types):
+        raise MessageError(code='load_template_undefined_types', lang=lang, params={'types': undefined_o_types})
+    lt = LoadTemplate.objects.create(name=form['name'], network_id=network_id)
+    df = df.fillna('')
+    forecast_steps = {
+        '1h': datetime.timedelta(hours=1),
+        '30m': datetime.timedelta(minutes=30),
+        '1d': datetime.timedelta(days=1),
+        '1m': datetime.timedelta(minutes=1),
+    }
+    templates = OperationTypeTemplate.objects.bulk_create(
+        [
+            OperationTypeTemplate(
+                operation_type_name=o_types[row[O_TYPE_COL]],
+                load_template=lt,
+                tm_from=row[TM_START_COL] or None,
+                tm_to=row[TM_END_COL] or None,
+                forecast_step=forecast_steps.get(row[TIMESTEP_COL]),
+            )
+            for i, row in df.iterrows()
+            if not row[O_TYPE_COL] == ''
+        ]
+    )
+    created_templates = {t.operation_type_name.name: t for t in templates}
+    prev_name = None
+    for i, row in df.iterrows():
+        if row[O_TYPE_COL] == '':
+            name = prev_name
+        else:
+            name = row[O_TYPE_COL]
+            prev_name = name
+        if not row[DEPENDENCY_COL] == '':
+            OperationTypeRelation.objects.create(
+                base=created_templates[name],
+                depended=created_templates[row[DEPENDENCY_COL]],
+                formula=row[FORMULA_COL],
+            )
+    return Response()
+            
+
+@xlsx_method      
+def download_load_template(request, workbook, load_template_id):
+    forecast_steps = {
+        datetime.timedelta(hours=1): '1h',
+        datetime.timedelta(minutes=30): '30m',
+        datetime.timedelta(days=1): '1d',
+        datetime.timedelta(minutes=1): '1m',
+    }
+    relations = {}
+    for rel in OperationTypeRelation.objects.filter(
+            base__load_template_id=load_template_id,
+        ).annotate(
+            base_name=F('base__operation_type_name_id'),
+            depended_name=F('depended__operation_type_name__name'),
+        ).values('type', 'formula', 'depended_name', 'base_name'):
+        key = rel.get('base_name')
+        if not key in relations:
+            relations[key] = []
+        relations[key].append(rel)
+    operation_types = [
+        {
+            'operation_type_name': o.operation_type_name.name,
+            'work_type_name': o.operation_type_name.work_type_name.name if o.operation_type_name.work_type_name else '',
+            'tm_from': o.tm_from or '',
+            'tm_to': o.tm_to or '',
+            'forecast_step': forecast_steps.get(o.forecast_step),
+            'dependences': relations.get(o.operation_type_name_id, [])
+        }
+        for o in OperationTypeTemplate.objects.select_related('operation_type_name', 'operation_type_name__work_type_name').filter(load_template_id=load_template_id)
+    ]
+    worksheet = workbook.add_worksheet('Шаблон нагрузки')
+    worksheet.set_column(0, 3, 30)
+    worksheet.write(0, 0, 'Тип операции')
+    worksheet.write(0, 1, 'Зависимости')
+    worksheet.write(0, 2, 'Формула')
+    worksheet.write(0, 3, 'Шаг прогноза')
+    worksheet.write(0, 4, 'Время начала')
+    worksheet.write(0, 5, 'Время окончания')
+    worksheet.write(0, 6, 'Тип работ')
+    index = 0
+    data = []
+    for ot in operation_types:
+        index += 1
+        worksheet.write(index, 0, ot['operation_type_name'])
+        worksheet.write(index, 3, ot['forecast_step'])
+        worksheet.write(index, 4, str(ot['tm_from']))
+        worksheet.write(index, 5, str(ot['tm_to']))
+        worksheet.write(index, 6, ot['work_type_name'])
+        if len(ot['dependences']):
+            index -= 1
+            for dependency in ot['dependences']:
+                index += 1            
+                worksheet.write(index, 1, dependency['depended_name'])
+                worksheet.write(index, 2, dependency['formula'])   
+            
+                         
+    return workbook, 'Load_template'

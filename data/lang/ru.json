@@ -38,5 +38,6 @@
   "time_shop_incorrect_time_start_end": "Время открытия не может быть больше времени закрытия",
   "no_such_shop": "Нет департамента с таким идентификатором: {key}.",
   "multi_object_unique": "Данные с уникальными полями уже существуют",
-  "receive_data_info_not_found": "Не найдены настройки для обработки данных"
+  "receive_data_info_not_found": "Не найдены настройки для обработки данных",
+  "load_template_undefined_types": "Данные типы операций не существуют: {types}"
 }

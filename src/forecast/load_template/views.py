@@ -10,7 +10,7 @@ from django_filters import CharFilter
 
 
 from src.forecast.models import LoadTemplate
-from src.forecast.load_template.utils import create_load_template_for_shop
+from src.forecast.load_template.utils import create_load_template_for_shop, download_load_template, upload_load_template
 from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
 
 from src.celery.tasks import calculate_shops_load, apply_load_template_to_shops
@@ -22,6 +22,8 @@ from src.base.permissions import Permission
 
 from django.db.models import Exists, OuterRef, Case, When, CharField, Value
 from django.utils.translation import gettext_lazy as _
+from src.util.upload import get_uploaded_file
+from src.base.fields import CurrentUserNetwork
 
 
 # Serializers define the API representation.
@@ -40,6 +42,11 @@ class LoadTemplateSpecSerializer(serializers.Serializer):
     id = serializers.IntegerField(write_only=True)
     shop_id = serializers.IntegerField(write_only=True, required=False)
 
+
+class LoadTemplateUploadSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    file = serializers.FileField()
+    network_id = serializers.HiddenField(default=CurrentUserNetwork())
 
 class LoadTemplateFilter(FilterSet):
     name = CharFilter(field_name='name', lookup_expr='icontains')
@@ -240,3 +247,16 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
         load_template.delete()
 
         return Response(status=204)
+
+
+    @action(detail=False, methods=['post'])
+    @get_uploaded_file
+    def upload(self, request, file):
+        data = LoadTemplateUploadSerializer(data=request.data, context={'request': request})
+        data.is_valid(raise_exception=True)
+        return upload_load_template(file, data.validated_data, lang=request.user.lang)
+    
+
+    @action(detail=True, methods=['get'])
+    def download(self, request, pk=None):
+        return download_load_template(request, pk)

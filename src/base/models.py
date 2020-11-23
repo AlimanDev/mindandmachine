@@ -753,6 +753,8 @@ class FunctionGroup(AbstractModel):
         'LoadTemplate',
         'LoadTemplate_apply',
         'LoadTemplate_calculate',
+        'LoadTemplate_download',
+        'LoadTemplate_upload',
         'Network',
         'Notification',
         'OperationTemplate',
