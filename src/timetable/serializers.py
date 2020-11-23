@@ -412,6 +412,25 @@ class ListChangeSrializer(serializers.Serializer):
                     raise ValidationError({'error': self.error_messages['invalid_dt_change_list']})
 
 
+class ChangeRangeSerializer(serializers.Serializer):
+    is_fact = serializers.BooleanField()
+    is_approved = serializers.BooleanField()
+    dt_from = serializers.DateField()
+    dt_to = serializers.DateField()
+    type = serializers.ChoiceField(choices=[WorkerDay.TYPE_MATERNITY, WorkerDay.TYPE_MATERNITY_CARE])
+
+    def __init__(self, *args, **kwargs):
+        super(ChangeRangeSerializer, self).__init__(*args, **kwargs)
+        self.fields['worker'] = serializers.SlugRelatedField(
+            slug_field='tabel_code', queryset=User.objects.filter(network=self.context['request'].user.network))
+
+
+class ChangeRangeListSerializer(serializers.Serializer):
+    def __init__(self, *args, **kwargs):
+        super(ChangeRangeListSerializer, self).__init__(*args, **kwargs)
+        self.fields['ranges'] = ChangeRangeSerializer(many=True, context=self.context)
+
+
 class DuplicateSrializer(serializers.Serializer):
     default_error_messages = {
         'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")

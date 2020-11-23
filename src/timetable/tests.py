@@ -514,7 +514,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(resp_data[0]['type'], 'S')
 
     def _test_tabel(self, plan_start, plan_end, fact_start, fact_end, expected_start, expected_end, expected_hours,
-                    extra_get_params=None):
+                    extra_get_params=None, tabel_kwarg='is_tabel'):
         plan_dttm_work_start = plan_start
         plan_dttm_work_end = plan_end
         WorkerDay.objects.filter(
@@ -525,19 +525,12 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         )
         fact_dttm_work_start = fact_start
         fact_dttm_work_end = fact_end
-        WorkerDay.objects.filter(
-            id=self.worker_day_fact_approved.id,
-        ).update(
-            dttm_work_start=fact_dttm_work_start,
-            dttm_work_end=fact_dttm_work_end,
-        )
-        get_params = {
-            'shop_id': self.shop.id,
-            'limit': 100,
-            'is_tabel': 'true',
-            'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
-            'dt__lte': self.dt.strftime('%Y-%m-%d'),
-        }
+        self.worker_day_fact_approved.dttm_work_start = fact_dttm_work_start
+        self.worker_day_fact_approved.dttm_work_end = fact_dttm_work_end
+        self.worker_day_fact_approved.save()
+        get_params = {'shop_id': self.shop.id, 'limit': 100, 'hours_details': 'true',
+                      'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
+                      'dt__lte': self.dt.strftime('%Y-%m-%d'), tabel_kwarg: 'true'}
         get_params.update(extra_get_params or {})
         response = self.client.get('/rest_api/worker_day/', data=get_params)
         self.assertEqual(response.status_code, 200)
@@ -664,14 +657,83 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             fact_end=fact_dttm_work_end,
             expected_start=fact_dttm_work_start,
             expected_end=plan_dttm_work_end,
-            expected_hours=9.08,
+            expected_hours=9.09,
             extra_get_params=dict(
                 hours_details=True,
             )
         )
 
         self.assertIn('work_hours_details', resp_data[0])
-        self.assertDictEqual({'D': 4.7, 'N': 4.4}, resp_data[0]['work_hours_details'])
+        self.assertDictEqual({'D': 4.71, 'N': 4.38}, resp_data[0]['work_hours_details'])
+
+    def test_get_fact_tabel(self):
+        plan_dttm_work_start = datetime.combine(self.dt, time(12, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt + timedelta(days=1), time(3, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(17, 0, 0))
+        fact_dttm_work_end = datetime.combine(self.dt + timedelta(days=1), time(3, 0, 0))
+
+        resp_data = self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=fact_dttm_work_start,
+            expected_end=fact_dttm_work_end,
+            expected_hours=8.76,
+            extra_get_params=dict(
+                hours_details=True,
+            ),
+            tabel_kwarg='fact_tabel',
+        )
+
+        self.assertIn('work_hours_details', resp_data[0])
+        self.assertDictEqual({'D': 4.38, 'N': 4.38}, resp_data[0]['work_hours_details'])
+
+    def test_get_fact_tabel2(self):
+        plan_dttm_work_start = datetime.combine(self.dt, time(12, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt, time(23, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(18, 0, 0))
+        fact_dttm_work_end = datetime.combine(self.dt, time(23, 0, 0))
+
+        resp_data = self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=fact_dttm_work_start,
+            expected_end=fact_dttm_work_end,
+            expected_hours=4.5,
+            extra_get_params=dict(
+                hours_details=True,
+            ),
+            tabel_kwarg='fact_tabel',
+        )
+
+        self.assertIn('work_hours_details', resp_data[0])
+        self.assertDictEqual({'D': 3.75, 'N': 0.75}, resp_data[0]['work_hours_details'])
+
+    def test_get_fact_tabel3(self):
+        plan_dttm_work_start = datetime.combine(self.dt, time(18, 0, 0))
+        plan_dttm_work_end = datetime.combine(self.dt + timedelta(days=1), time(9, 0, 0))
+        fact_dttm_work_start = datetime.combine(self.dt, time(18, 0, 0))
+        fact_dttm_work_end = datetime.combine(self.dt + timedelta(days=1), time(9, 0, 0))
+
+        resp_data = self._test_tabel(
+            plan_start=plan_dttm_work_start,
+            plan_end=plan_dttm_work_end,
+            fact_start=fact_dttm_work_start,
+            fact_end=fact_dttm_work_end,
+            expected_start=fact_dttm_work_start,
+            expected_end=fact_dttm_work_end,
+            expected_hours=13.76,
+            extra_get_params=dict(
+                hours_details=True,
+            ),
+            tabel_kwarg='fact_tabel',
+        )
+
+        self.assertIn('work_hours_details', resp_data[0])
+        self.assertDictEqual({'D': 6.38, 'N': 7.38}, resp_data[0]['work_hours_details'])
 
     def test_get_worker_day_by_worker__username__in(self):
         get_params = {
@@ -839,6 +901,52 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
             response.json()['employment'][0], 'Сотрудник в трудоустройстве и в рабочем дне должны совпадать.')
+
+    def test_change_range(self):
+        data = {
+          "ranges": [
+            {
+              "worker": self.user2.tabel_code,
+              "dt_from": self.dt - timedelta(days=10),
+              "dt_to": self.dt + timedelta(days=10),
+              "type": WorkerDay.TYPE_MATERNITY,
+              "is_fact": False,
+              "is_approved": True
+            }
+          ]
+        }
+        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertDictEqual(
+            response.json(),
+            {self.user2.tabel_code: {'created_count': 21, 'deleted_count': 1, 'existing_count': 0}}
+        )
+        self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).exists())
+        self.assertEqual(
+            WorkerDay.objects.filter(worker__tabel_code=self.user2.tabel_code, type=WorkerDay.TYPE_MATERNITY).count(),
+            21,
+        )
+
+        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertDictEqual(
+            response.json(),
+            {self.user2.tabel_code: {'created_count': 0, 'deleted_count': 0, 'existing_count': 21}}
+        )
+
+        WorkerDay.objects.create(
+            worker=self.user2,
+            dt=self.dt,
+            is_fact=False,
+            is_approved=True,
+            type=WorkerDay.TYPE_MATERNITY,
+        )
+        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertDictEqual(
+            response.json(),
+            {self.user2.tabel_code: {'created_count': 0, 'deleted_count': 1, 'existing_count': 21}}
+        )
 
     def test_cant_create_workday_if_user_has_no_active_employment(self):
         WorkerDay.objects.filter(worker=self.user2).delete()

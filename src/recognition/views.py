@@ -20,7 +20,7 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from src.base.auth.authentication import WFMSessionAuthentication
+from src.base.auth.authentication import CsrfExemptSessionAuthentication
 from src.base.models import User
 from src.recognition.api.recognition import Recognition
 from src.recognition.authentication import TickPointTokenAuthentication
@@ -139,7 +139,11 @@ class TickViewSet(viewsets.ModelViewSet):
     basename = ''
 
     def get_authenticators(self):
-        return [TickPointTokenAuthentication(raise_auth_exc=False), TokenAuthentication()]
+        return [
+            TickPointTokenAuthentication(raise_auth_exc=False),
+            CsrfExemptSessionAuthentication(),
+            TokenAuthentication()
+        ]
 
     @cached_property
     def strategy(self):
@@ -245,7 +249,11 @@ class TickPhotoViewSet(viewsets.ModelViewSet):
     serializer_class = TickPhotoSerializer
 
     def get_authenticators(self):
-        return [TickPointTokenAuthentication(raise_auth_exc=False), TokenAuthentication()]
+        return [
+            TickPointTokenAuthentication(raise_auth_exc=False),
+            CsrfExemptSessionAuthentication(),
+            TokenAuthentication()
+        ]
 
     def create(self, request, **kwargs):
         """

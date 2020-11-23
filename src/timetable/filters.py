@@ -1,7 +1,7 @@
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from django.db.models import Q
+from django.db.models import Subquery, OuterRef, Q
 from django_filters.rest_framework import (
     FilterSet,
     BooleanFilter,
@@ -19,10 +19,27 @@ class WorkerDayFilter(FilterSet):
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода")  # aa: fixme: delete
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода') # aa: fixme: delete
     is_tabel = BooleanFilter(method='filter_tabel', label="Выгрузка табеля")
+    fact_tabel = BooleanFilter(method='filter_fact_tabel', label="Выгрузка табеля для Ортеки")
 
     def filter_tabel(self, queryset, name, value):
         if value:
             return queryset.get_tabel(network=self.request.user.network)
+
+        return queryset
+
+    def filter_fact_tabel(self, queryset, name, value):
+        if value:
+            ordered_subq = queryset.filter(
+                dt=OuterRef('dt'),
+                worker_id=OuterRef('worker_id'),
+                is_approved=True,
+            ).exclude(type=WorkerDay.TYPE_EMPTY).order_by('-is_fact', '-work_hours').values_list('id')[:1]
+            return queryset.filter(
+                Q(is_fact=True) |
+                Q(~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE), is_fact=False),
+                is_approved=True,
+                id=Subquery(ordered_subq),
+            )
 
         return queryset
 

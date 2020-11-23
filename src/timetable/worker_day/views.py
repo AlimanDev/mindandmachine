@@ -2,9 +2,11 @@ import datetime
 import json
 from itertools import groupby
 
+import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
+from django.db import transaction
 from django.db.models import OuterRef, Subquery, Q, F
 from django.http import HttpResponse
 from django.utils import timezone
@@ -16,13 +18,13 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
-from src.main.timetable.auto_settings.utils import set_timetable_date_from
 
 from src.base.exceptions import FieldError
 from src.base.exceptions import MessageError
 from src.base.message import Message
 from src.base.models import Employment, Shop, User, ProductionDay
 from src.base.permissions import WdPermission
+from src.main.timetable.auto_settings.utils import set_timetable_date_from
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
@@ -46,6 +48,7 @@ from src.timetable.serializers import (
     DownloadSerializer,
     WorkerDayListSerializer,
     DownloadTabelSerializer,
+    ChangeRangeListSerializer,
 )
 from src.timetable.vacancy.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy, confirm_vacancy
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
@@ -131,10 +134,11 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
     def list(self, request):
         is_tabel = request.query_params.get('is_tabel', False)
-        if request.query_params.get('hours_details', False) and is_tabel:
+        fact_tabel = request.query_params.get('fact_tabel', False)
+        if request.query_params.get('hours_details', False) and (is_tabel or fact_tabel):
             data = []
             def _time_to_float(t):
-                return t.hour + t.minute / 60 + t.second / 60
+                return t.hour + t.minute / 60 + t.second / 3600
             prod_day_filter = {
                 'is_celebration': True,
             }
@@ -145,14 +149,26 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             celebration_dates = ProductionDay.objects.filter(**prod_day_filter).values_list('dt', flat=True)
 
             night_edges = [Converter.parse_time(t) for t in request.user.network.night_edges]
-            for worker_day in self.filter_queryset(
-                    self.get_queryset().prefetch_related('worker_day_details')).get_tabel(self.request.user.network):
+            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 if worker_day.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                    if is_tabel:
+                        work_seconds = worker_day.tabel_work_hours * 3600
+                    else:
+                        if worker_day.work_hours > datetime.timedelta(0):
+                            work_seconds = worker_day.work_hours.seconds
+                        else:
+                            wd_dict['work_hours'] = 0.0
+                            data.append(wd_dict)
+                            continue
                     work_start = (worker_day.tabel_dttm_work_start if is_tabel else worker_day.dttm_work_start)
                     work_end = (worker_day.tabel_dttm_work_end if is_tabel else worker_day.dttm_work_end)
+                    if not (work_start and work_end):
+                        wd_dict['work_hours'] = 0.0
+                        data.append(wd_dict)
+                        continue
 
-                    wd_dict['work_hours'] = worker_day.tabel_work_hours
+                    wd_dict['work_hours'] = round(work_seconds / 3600, 2)
                     wd_dict['work_hours_details'] = {}
                     if worker_day.dt in celebration_dates:
                         wd_dict['work_hours_details']['H'] = wd_dict['work_hours']
@@ -165,19 +181,28 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                             wd_dict['work_hours_details']['N'] = wd_dict['work_hours']
                             data.append(wd_dict)
                             continue
-                        tm_start = _time_to_float(night_edges[0])
-                        if work_end.time() <= night_edges[1]:
+
+                        if work_start.time() > night_edges[0] or work_start.time() < night_edges[1]:
+                            tm_start = _time_to_float(work_start.time())
+                        else:
+                            tm_start = _time_to_float(night_edges[0])
+                        if work_end.time() > night_edges[0] or work_end.time() < night_edges[1]:
                             tm_end = _time_to_float(work_end.time())
                         else:
                             tm_end = _time_to_float(night_edges[1])
 
                         night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
                         total_seconds = (work_end - work_start).total_seconds()
-                        break_time_seconds = worker_day.tabel_breaktime_seconds or 0
+
+                        if is_tabel:
+                            break_time_seconds = worker_day.tabel_breaktime_seconds or 0
+                        else:
+                            break_time_seconds = total_seconds - work_seconds
 
                         wd_dict['work_hours_details']['D'] = round(
-                            (total_seconds - night_seconds - break_time_seconds / 2) / 3600, 1)
-                        wd_dict['work_hours_details']['N'] = round((night_seconds - break_time_seconds / 2) / 3600, 1)
+                            (total_seconds - night_seconds - break_time_seconds / 2) / 3600, 2)
+                        wd_dict['work_hours_details']['N'] = round((night_seconds - break_time_seconds / 2) / 3600, 2)
+                        wd_dict['work_hours'] = wd_dict['work_hours_details']['D'] + wd_dict['work_hours_details']['N']
                 else:
                     wd_dict['work_hours'] = 0.0
                 data.append(wd_dict)
@@ -283,7 +308,60 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             ).exclude(
                 id__in=wdays_to_approve.values_list('id', flat=True)
             ).delete()
+            list_wd = list(
+                wdays_to_approve.select_related(
+                    'shop', 
+                    'employment', 
+                    'employment__position', 
+                    'employment__position__breaks',
+                    'shop__settings__breaks',
+                ).prefetch_related(
+                    'worker_day_details',
+                )
+            )
+
             wdays_to_approve.update(is_approved=True)
+
+            wds = WorkerDay.objects.bulk_create(
+                [
+                    WorkerDay(
+                        shop=wd.shop,
+                        worker_id=wd.worker_id,
+                        employment=wd.employment,
+                        dttm_work_start=wd.dttm_work_start,
+                        dttm_work_end=wd.dttm_work_end,
+                        dt=wd.dt,
+                        is_fact=wd.is_fact,
+                        is_approved=False,
+                        type=wd.type,
+                        created_by_id=wd.created_by_id,
+                        is_vacancy=wd.is_vacancy,
+                        is_outsource=wd.is_outsource,
+                        comment=wd.comment,
+                        canceled=wd.canceled,
+                        need_count_wh=True,
+                    )
+                    for wd in list_wd
+                ]
+            )
+            search_wds = {}
+            for wd in wds:
+                key_worker = wd.worker_id
+                if not key_worker in search_wds:
+                    search_wds[key_worker] = {}
+                search_wds[key_worker][wd.dt] = wd
+            
+            WorkerDayCashboxDetails.objects.bulk_create(
+                [
+                    WorkerDayCashboxDetails(
+                        work_part=details.work_part,
+                        worker_day=search_wds[wd.worker_id][wd.dt],
+                        work_type_id=details.work_type_id,
+                    )
+                    for wd in list_wd
+                    for details in wd.worker_day_details.all()
+                ]
+            )
 
             # если план, то отмечаем, что график подтвержден
             if not serializer.data['is_fact']:
@@ -396,6 +474,62 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 for d in WorkerDayCashboxDetails.objects.filter(worker_day=vacancy)
             ])
         return Response(WorkerDaySerializer(editable_vacancy).data)
+
+    @action(detail=False, methods=['post'])
+    def change_range(self, request):
+        serializer = ChangeRangeListSerializer(data=request.data, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+
+        res = {}
+        for range in serializer.validated_data['ranges']:
+            with transaction.atomic():
+                deleted = WorkerDay.objects.filter(
+                    worker=range['worker'],
+                    dt__gte=range['dt_from'],
+                    dt__lte=range['dt_to'],
+                    is_approved=range['is_approved'],
+                    is_fact=range['is_fact'],
+                ).exclude(
+                    id__in=Subquery(
+                        WorkerDay.objects.filter(
+                            dt=OuterRef('dt'),
+                            worker=OuterRef('worker'),
+                            is_approved=OuterRef('is_approved'),
+                            is_fact=OuterRef('is_fact'),
+                            type=range['type'],
+                        ).order_by('-id').values_list('id')[:1]),
+                ).delete()
+
+                existing_dates = list(WorkerDay.objects.filter(
+                    worker=range['worker'],
+                    dt__gte=range['dt_from'],
+                    dt__lte=range['dt_to'],
+                    is_approved=range['is_approved'],
+                    is_fact=range['is_fact'],
+                    type=range['type'],
+                ).values_list('dt', flat=True))
+
+                wdays_to_create = []
+                for dt in [d.date() for d in pd.date_range(range['dt_from'], range['dt_to'])]:
+                    if dt not in existing_dates:
+                        wdays_to_create.append(
+                            WorkerDay(
+                                worker=range['worker'],
+                                dt=dt,
+                                is_approved=range['is_approved'],
+                                is_fact=range['is_fact'],
+                                type=range['type']
+                            )
+                        )
+                WorkerDay.objects.bulk_create(wdays_to_create)
+
+                res[range['worker'].tabel_code] = {
+                    'deleted_count': deleted[0],
+                    'existing_count': len(existing_dates),
+                    'created_count': len(wdays_to_create)
+                }
+
+        return Response(res)
 
     @action(detail=False, methods=['post'])
     def change_list(self, request):

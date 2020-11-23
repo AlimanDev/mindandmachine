@@ -45,6 +45,8 @@ class Network(AbstractActiveModel):
         max_digits=10, decimal_places=2, null=True, blank=True,
         verbose_name='Разрешенная дистанция до магазина при создании отметок (км)',
     )
+    enable_camera_ticks = models.BooleanField(
+        default=False, verbose_name='Включить отметки по камере в мобильной версии')
 
     def get_department(self):
         return None
@@ -788,6 +790,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_download_tabel',
         'WorkerDay_editable_vacancy',
         'WorkerDay_approve_vacancy',
+        'WorkerDay_change_range',
         'WorkerPosition',
         'WorkTypeName',
         'WorkType',

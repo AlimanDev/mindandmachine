@@ -516,6 +516,16 @@ class WorkerDay(AbstractModel):
 
     def __repr__(self):
         return self.__str__()
+    
+    def __init__(self, *args, need_count_wh=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if need_count_wh:
+            position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
+            if self.dttm_work_end and self.dttm_work_start and self.shop and (self.shop.settings or position_break_triplet_cond):
+                breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks
+                self.work_hours = self.count_work_hours(breaks, self.dttm_work_start, self.dttm_work_end)
+            else:
+                self.work_hours = datetime.timedelta(0)
 
     id = models.BigAutoField(primary_key=True, db_index=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
