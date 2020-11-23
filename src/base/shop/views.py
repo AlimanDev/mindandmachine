@@ -127,9 +127,11 @@ class ShopViewSet(UpdateorCreateViewSet):
         shops = self.filter_queryset(self.get_queryset())
         shops = shops.filter(id__in=employments.values_list('shop_id', flat=True))
         if not only_top:
+            now = datetime.datetime.now()
             shops = Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
+                Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=now),
                 Q(dt_closed__isnull=True) |
-                Q(dt_closed__gte=datetime.datetime.today() - datetime.timedelta(days=30)),
+                Q(dt_closed__gte=now.today() - datetime.timedelta(days=30)),
             )
 
         tree = []
