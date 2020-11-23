@@ -67,7 +67,7 @@ def get_efficiency(shop_id, form, consider_vacancies=False,):
         for wt in work_types
     }
 
-    need_workers = PeriodClients.objects.annotate(
+    need_workers = PeriodClients.objects.shop_times_filter(shop, weekday=True).annotate(
         need_workers=F('value'),
     ).select_related('operation_type').filter(
         dttm_forecast__gte=from_dt,
@@ -202,6 +202,7 @@ def get_efficiency(shop_id, form, consider_vacancies=False,):
                 'deadtime': deadtime,
                 'covering': covering,
                 'fot': fot,
+                'predict_needs': predict_needs.sum(),
             },
         })
 

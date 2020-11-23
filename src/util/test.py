@@ -1,14 +1,17 @@
 import datetime
+import uuid
 from contextlib import contextmanager
 from typing import TypeVar
 
 from dateutil.relativedelta import relativedelta
 from django.db import connection
+from django.db.models import Value, F, CharField
+from django.db.models.functions import Concat
 from django.test import TestCase
 from django.utils.timezone import now
 from requests import Response
-from etc.scripts import fill_calendar
 
+from etc.scripts import fill_calendar
 from src.base.models import (
     Employment,
     FunctionGroup,
@@ -20,6 +23,11 @@ from src.base.models import (
     Network,
     Break,
 )
+from src.forecast.models import (
+    OperationType,
+    PeriodClients,
+    OperationTypeName,
+)
 from src.timetable.models import (
     AttendanceRecords,
     Cashbox,
@@ -30,12 +38,9 @@ from src.timetable.models import (
     WorkType,
     WorkTypeName,
     WorkerDay,
-    UserWeekdaySlot
-)
-from src.forecast.models import (
-    OperationType,
-    PeriodClients,
-    OperationTypeName,
+    UserWeekdaySlot,
+    WorkerDayPermission,
+    GroupWorkerDayPermission,
 )
 
 
@@ -399,6 +404,12 @@ def create_departments_and_users(self):
             # access_type=FunctionGroup.TYPE_ALL
         ) for func in FunctionGroup.FUNCS for method in FunctionGroup.METHODS
     ])
+    GroupWorkerDayPermission.objects.bulk_create(
+        GroupWorkerDayPermission(
+            group=self.admin_group,
+            worker_day_permission=wdp,
+        ) for wdp in WorkerDayPermission.objects.all()
+    )
 
     # # central office
     # self.hq_group = Group.objects.create(name='ЦО')
@@ -423,6 +434,13 @@ def create_departments_and_users(self):
             # access_type=FunctionGroup.TYPE_SUPERSHOP
         ) for func in FunctionGroup.FUNCS
     ])
+    GroupWorkerDayPermission.objects.bulk_create(
+        GroupWorkerDayPermission(
+            group=self.chief_group,
+            worker_day_permission=wdp,
+        ) for wdp in WorkerDayPermission.objects.filter(
+            action__in=[WorkerDayPermission.CREATE_OR_UPDATE, WorkerDayPermission.DELETE])
+    )
 
     # employee
     self.employee_group = Group.objects.create(name='Сотрудник')
@@ -443,9 +461,9 @@ def create_departments_and_users(self):
     self.root_shop.save()
 
     self.breaks = Break.objects.create(
-        name='Default', 
-        network=self.network, 
-        value='[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]]'
+        name='Default',
+        network=self.network,
+        value='[[0, 360, [30]], [360, 540, [30, 30]], [540, 1020, [30, 30, 15]]]'
     )
 
     self.shop_settings = ShopSettings.objects.create(
@@ -488,8 +506,6 @@ def create_departments_and_users(self):
         settings=self.shop_settings,
         network=self.network,
     )
-    self.shop.code = str(self.shop.id)
-    self.shop.save(update_fields=['code'])
     self.shop2 = Shop.objects.create(
         # id=2,
         parent=self.reg_shop1,
@@ -523,6 +539,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment1 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user1.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user1,
         shop=self.root_shop,
         function_group=self.admin_group,
@@ -536,6 +554,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment2 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user2,
         shop=self.shop,
         function_group=self.employee_group,
@@ -551,6 +571,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment3 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user3.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user3,
         shop=self.shop,
         auto_timetable=False,
@@ -568,6 +590,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment4 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user4.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user4,
         shop=self.shop,
         function_group=self.admin_group,
@@ -582,6 +606,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment5 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user5.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user5,
         shop=self.reg_shop1,
         function_group=self.chief_group,
@@ -596,6 +622,8 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment6 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user6.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user6,
         shop=self.shop,
         function_group=self.chief_group,
@@ -610,10 +638,18 @@ def create_departments_and_users(self):
         network=self.network,
     )
     self.employment7 = Employment.objects.create(
+        network=self.network,
+        code=f'{self.user7.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         user=self.user7,
         shop=self.shop,
         function_group=self.employee_group,
     )
+    Shop.objects.all().update(code=Concat(Value('code-', output_field=CharField()), F('id')), network=self.network)
+    User.objects.all().update(tabel_code=F('username'))
+    for s in [self.root_shop, self.shop, self.shop2, self.shop3, self.reg_shop1, self.reg_shop2]:
+        s.refresh_from_db()
+    for s in [self.user1, self.user2, self.user3, self.user4, self.user5, self.user6, self.user7]:
+        s.refresh_from_db()
 
 # def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
 #     CameraCashboxStat.objects.create(
@@ -650,4 +686,4 @@ def create_period_clients(dttm_forecast, value, type, operation_type):
         value=value,
         type=type,
         operation_type=operation_type
-)
+    )

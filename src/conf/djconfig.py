@@ -28,7 +28,7 @@ UPLOAD_TT_MATCH_EMPLOYMENT = True
 
 QOS_CAMERA_KEY = '1'
 
-HOST_IP = '127.0.0.1:8000' # dev
+HOST = 'http://127.0.0.1:8000' # dev
 TIMETABLE_IP = "127.0.0.1:5000"
 
 
@@ -53,6 +53,7 @@ URV_STAT_SHOP_LEVEL = 2
 URV_STAT_SEND_TODAY_HOUR = 3
 URV_STAT_SEND_TODAY_MINUTE = 0
 MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE = False  # отправлять ли запрос по связке юзера и магазина при сохранении workerday
+MDA_SYNC_USER_TO_SHOP_DAILY = False  # запускать таск, который будет отправлять все связки на текущий день
 MDA_PUBLIC_API_HOST = 'https://example.com'
 MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
 
@@ -70,6 +71,9 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'django_filters',
+    'django_admin_listfilter_dropdown',
+    'rangefilter',
+    'admin_numeric_filter',
     'rest_auth',
     'rest_framework.authtoken',
     'src',
@@ -80,6 +84,7 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'src.celery',
     'fcm_django',
+    'src.recognition',
 ]
 
 REST_FRAMEWORK = {
@@ -87,6 +92,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'src.base.auth.authentication.WFMSessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
     ]
 }
 OLD_PASSWORD_FIELD_ENABLED=True
@@ -303,6 +311,40 @@ REBUILD_TIMETABLE_MIN_DELTA = 2
 # например, для Ортеки для отображения в отчете нужны показатели только по продавцам-кассирам
 UPDATE_SHOP_STATS_WORK_TYPES_CODES = None
 
+MAX_WORK_SHIFT_SECONDS = 60 * 60 * 16  # максимальная длина смены (в секундах)
+
+# пропускать создание отметки об уходе,
+# если с момент открытия предыдущей незакрытой смены прошло более MAX_WORK_SHIFT_SECONDS
+MDA_SKIP_LEAVING_TICK = False
+
+# docker volume create jod_converter_conf
+# docker run \
+# 	--memory 512m \
+# 	--name jod-converter \
+# 	-v jod_converter_conf:/etc/app \
+# 	--restart unless-stopped \
+# 	-p 8030:8080 \
+#   -d \
+# 	eugenmayer/kontextwork-converter:production
+JOD_CONVERTER_URL = 'http://localhost:8030'
+
+# docker run --restart unless-stopped -p 3001:3000 -d thecodingmachine/gotenberg:6
+GOTENBERG_URL = 'http://localhost:3001'
+
+RECOGNITION_PARTNER = 'Tevian'
+
+TEVIAN_URL = "https://backend.facecloud.tevian.ru/api/v1/"
+TEVIAN_EMAIL = 'a.aleskin@mindandmachine.ru'
+TEVIAN_PASSWORD = 'BIQL8pjMUY'
+TEVIAN_DATABASE_ID = 26  # TESTURV database
+TEVIAN_FD_THRESHOLD = 0.8
+TEVIAN_FR_THRESHOLD = 0.8
+
+TRUST_TICK_REQUEST = False
+USERS_WITH_SCHEDULE_ONLY = False
+
+CLIENT_TIMEZONE = 3
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
 
@@ -401,6 +443,13 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+if MDA_SYNC_USER_TO_SHOP_DAILY:
+    CELERY_BEAT_SCHEDULE['task-sync-mda-user-to-shop-relation'] = {
+        'task': 'src.celery.tasks.sync_mda_user_to_shop_relation',
+        'schedule': crontab(hour=1, minute=30),
+        'options': {'queue': BACKEND_QUEUE}
+    }
+
 if 'test' in sys.argv:
     # Disable migrations in test, fill the schema directly
     class MigrationDisabler(dict):
@@ -409,3 +458,6 @@ if 'test' in sys.argv:
 
 
     MIGRATION_MODULES = MigrationDisabler()
+
+if DEBUG:
+    REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'].append('rest_framework.renderers.BrowsableAPIRenderer')

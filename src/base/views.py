@@ -66,7 +66,9 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
-    get_object_field = 'tabel_code'
+
+    def perform_create(self, serializer):
+        serializer.save(network=self.request.user.network)
 
     def get_queryset(self):
         return Employment.objects.filter(
@@ -86,35 +88,6 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         data = data.validated_data
         Employment.objects.filter(id__in=data.get('employment_ids')).update(auto_timetable=data.get('auto_timetable'))
         return Response()
-
-    def update(self, request, *args, **kwargs):
-        if 'by_code' in request.data:
-            partial = kwargs.pop('partial', False)
-            serializer = self.get_serializer(data=request.data, partial=partial)
-            serializer.is_valid(raise_exception=True)
-
-            # Может быть несколько записей с одинаковым dt_hired.
-            # Подстрахуемся, исключив те, у которых dt_hired=dt_fired.
-            if serializer.validated_data['dt_hired'] == serializer.validated_data['dt_fired']:
-                return Response({})
-
-            employment = Employment.objects.filter(
-                dt_hired=serializer.validated_data['dt_hired'],
-                user_id=serializer.validated_data['user_id'],
-                shop_id=serializer.validated_data['shop_id'],
-                position_id=serializer.validated_data['position_id'],
-            ).order_by('dt_fired', 'dt_hired').last()
-
-            if employment:
-                serializer.instance = employment
-                response_code = status.HTTP_200_OK
-            else:
-                response_code = status.HTTP_201_CREATED
-
-            serializer.save()
-            return Response(serializer.data, status=response_code)
-
-        return super(EmploymentViewSet, self).update(request, *args, **kwargs)
 
 
 class UserViewSet(BaseActiveNamedModelViewSet):
@@ -180,7 +153,6 @@ class FunctionGroupView(ModelViewSet):
             group_id=Coalesce(F('function_group_id'),F('position__group_id'))
         ).values_list("group_id", flat=True)
         return FunctionGroup.objects.filter(group__in=groups).distinct('func')
-
 
     @action(detail=False, methods=['get'])
     def functions(self, request):

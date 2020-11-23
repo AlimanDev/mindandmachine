@@ -19,7 +19,7 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
         shop_id = request.query_params.get('shop_id')
         shop_code = request.query_params.get('shop_code')
         if shop_id or shop_code:
-            shop = Shop.objects.get(id=shop_id) if shop_id else Shop.objects.get(id=shop_code)
+            shop = Shop.objects.get(id=shop_id) if shop_id else Shop.objects.get(code=shop_code)
             shop_id = shop.id
 
         filterset = self.get_filterset(request, queryset, view)

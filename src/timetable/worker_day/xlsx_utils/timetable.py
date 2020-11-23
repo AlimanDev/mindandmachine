@@ -116,12 +116,12 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.write_string(9, count_of_days + 3, 'В', format_header_text)
         self.worksheet.write_string(9, count_of_days + 4, 'ОТ', format_header_text)
 
-    def fill_table(self, workdays, employments, triplets, row_s, col_s):
+    def fill_table(self, workdays, employments, breaktimes, row_s, col_s):
         """
         одинаковая сортировка у workdays и users должна быть
         :param workdays:
         :param employments:
-        :param triplets:
+        :param breaktimes:
         :return:
         """
 
@@ -129,6 +129,7 @@ class Timetable_xlsx(Tabel_xlsx):
         cell_format = dict(self.day_type)
         n_workdays = len(workdays)
         for row_shift, employment in enumerate(employments):
+            triplets = breaktimes.get(employment.position_id) or breaktimes.get('default')
             night_hours = 0
             for day in range(len(self.prod_days)):
                 if (it < n_workdays) and (workdays[it].worker_id == employment.user_id) and (day + 1 == workdays[it].dt.day):

@@ -10,102 +10,54 @@
 
 
 from uuid import uuid4
-from django.utils import timezone
-from src.base.models import Shop, Employment
-import datetime
+from src.base.models import Group, FunctionGroup, Network
+import pandas as pd
+
 
 def password_generator(len=14):
     return str(uuid4()).replace('-', '')[:len]  # algo based on SHA-1 (not safe enough nowdays)
 
 
-def main(hq_accs=2):
-    """
+def create_group_functions(path=None, network=None, verbose=True):
+    if path is None:
+        path = 'etc/scripts/function_group_default.xlsx'
 
-    :param hq_accs: кол-во аккаунтов для ЦО
-    :return:
-    """
+    if (network is None) and verbose:
+        print('no network set. use None')
 
-    root_shop = Shop.objects.filter(level=0).first()
-    middle_shops = Shop.objects.filter(level=1)
-    leaf_shop = Shop.objects.filter(level=2).first()
+    df_funcs = pd.read_excel(path)
 
-    from src.base.models import (
-        User,
-        Group,
-        FunctionGroup
-    )
+    for group_name in df_funcs['group'].unique():
+        group = Group.objects.create(name=group_name, network=network)
+        fgs = FunctionGroup.objects.bulk_create([
+            FunctionGroup(
+                group=group,
+                func=func['func'],
+                method=func['method'],
+                level_up=1,
+                level_down=100,
+            ) for _, func in df_funcs[df_funcs['group'] == group_name].iterrows()
+        ])
+        if verbose:
+            print(f'created {group}, with {len(fgs)} access')
 
-    # creating groups
-    # admins
-    admin_group = Group.objects.create(name='Администратор')
-    FunctionGroup.objects.bulk_create([
-        FunctionGroup(
-            group=admin_group,
-            func=func,
-            level_up=1,
-            level_down=100,
-        ) for func in FunctionGroup.FUNCS
-    ])
-
-
-    # employee
-    employee_group = Group.objects.create(name='Сотрудник')
-    FunctionGroup.objects.bulk_create([
-        FunctionGroup(
-            group=employee_group,
-            func=func,
-            level_up=0,
-            level_down=0,
-        ) for func in FunctionGroup.FUNCS
-    ])
-
-
-    # creating users
-    admin = User.objects.create(
-        is_staff=True,
-        is_superuser=True,
-        username='qadmin',
-        first_name='Admin',
-        last_name='Admin',
-    )
-    Employment.objects.create(
-        user=admin,
-        function_group=admin_group,
-        dt_hired=timezone.now().date(),
-        shop=root_shop,
-    )
-    u_pass = password_generator()
-    admin.set_password(u_pass)
-    admin.save()
-    print('admin login: {}, password: {}'.format('qadmin', u_pass))
-
-
-    for i in range(0, len(middle_shops)):
-        username = 'hq_{}'.format(i+1)
-        hq_acc = User.objects.create(
-            username=username,
-            first_name='ЦО',
-            last_name='',
-        )
-        Employment.objects.create(
-            user=hq_acc,
-            function_group=admin_group,
-            dt_hired=datetime.date(2019, 1, 1),
-            shop=middle_shops[i],
-        )
-        u_pass = password_generator()
-        hq_acc.set_password(u_pass)
-        hq_acc.save()
-        print('CO login: {}, password: {}'.format(username, u_pass))
-
-
-if __name__ == "__main__":
-    import os, django
-
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "src.conf.djconfig")
-    django.setup()
-
-    print('start creating groups \n\n')
-    main()
-    print('\n\nfinish creating groups')
+#
+# def main(hq_accs=2):
+#     """
+#
+#     :param hq_accs: кол-во аккаунтов для ЦО
+#     :return:
+#     """
+#
+#
+#
+# if __name__ == "__main__":
+#     import os, django
+#
+#     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "src.conf.djconfig")
+#     django.setup()
+#
+#     print('start creating groups \n\n')
+#     main()
+#     print('\n\nfinish creating groups')
 

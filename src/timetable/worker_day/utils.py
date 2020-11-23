@@ -299,6 +299,15 @@ def download_timetable_util(request, workbook, form):
     ).order_by(
         'worker__last_name', 'worker__first_name', 'worker__middle_name', 'worker_id', 'dt')
 
+    workdays = workdays.get_last_ordered(
+        is_fact=False,
+        order_by=[
+            '-is_approved' if form['is_approved'] else 'is_approved',
+            '-is_vacancy',
+            '-id',
+        ]
+    )
+
     if form.get('inspection_version', False):
         timetable.change_for_inspection(timetable.prod_month.get('norm_work_hours', 0), workdays)
 

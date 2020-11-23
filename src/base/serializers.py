@@ -20,13 +20,24 @@ class BaseNetworkSerializer(serializers.ModelSerializer):
 
 class NetworkSerializer(serializers.ModelSerializer):
     logo = serializers.SerializerMethodField('get_logo_url')
+
     def get_logo_url(self, obj):
         if obj.logo:
             return obj.logo.url
         return None
+
     class Meta:
         model = Network
-        fields = ['id', 'name', 'logo', 'url', 'primary_color', 'secondary_color']
+        fields = [
+            'id',
+            'name',
+            'logo',
+            'url',
+            'primary_color',
+            'secondary_color',
+            'allowed_geo_distance_km',
+            'enable_camera_ticks',
+        ]
 
 
 class UserListSerializer(serializers.Serializer):
@@ -47,6 +58,7 @@ class UserListSerializer(serializers.Serializer):
         if obj.avatar:
             return obj.avatar.url
         return None
+
 
 class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
@@ -126,7 +138,7 @@ class EmploymentListSerializer(serializers.Serializer):
     min_time_btw_shifts = serializers.IntegerField()
     shift_hours_length_min = serializers.IntegerField()
     shift_hours_length_max = serializers.IntegerField()
-    auto_timetable = serializers.BooleanField()
+    auto_timetable = serializers.BooleanField(default=True)
     tabel_code = serializers.CharField()
     is_ready_for_overworkings = serializers.BooleanField()
     dt_new_week_availability_from = serializers.DateField()
@@ -162,10 +174,18 @@ class EmploymentSerializer(serializers.ModelSerializer):
                   'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
                   'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
                   'dt_new_week_availability_from', 'user', 'is_visible',  'worker_constraints', 'work_types',
-                  'shop_code', 'position_code', 'username'
+                  'shop_code', 'position_code', 'username', 'code'
         ]
-        create_only_fields = ['user_id', 'shop_id', 'shop', 'tabel_code', 'user']
+        create_only_fields = ['user_id', 'user']
         read_only_fields = ['user']
+        extra_kwargs = {
+            'auto_timetable': {
+                'default': True,
+            },
+            'is_visible': {
+                'default': True,
+            },
+        }
 
     def validate(self, attrs):
         if self.instance:

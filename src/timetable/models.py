@@ -6,11 +6,13 @@ from django.contrib.auth.models import (
     UserManager
 )
 from django.db import models
-from django.db.models import Subquery, OuterRef, Max
+from django.db.models import Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField, DateField, \
+    TimeField, DecimalField
+from django.db.models.functions import Extract, Coalesce, Cast, Round, Greatest
 from django.db.models.query import QuerySet
 from django.utils import timezone
 
-from src.base.models import Shop, Employment, User, Event, Network
+from src.base.models import Shop, Employment, User, Event, Network, Break
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, \
     AbstractActiveModelManager
 
@@ -31,11 +33,11 @@ class WorkTypeManager(AbstractActiveModelManager):
         """
 
         return self.filter(
-            models.Q(dttm_added__date__lte=dt_from) | models.Q(dttm_added__isnull=True)
+            Q(dttm_added__date__lte=dt_from) | Q(dttm_added__isnull=True)
         ).filter(
-            models.Q(dttm_deleted__date__gte=dt_to) | models.Q(dttm_deleted__isnull=True)
+            Q(dttm_deleted__date__gte=dt_to) | Q(dttm_deleted__isnull=True)
         ).filter(*args, **kwargs)
-    
+
     def qos_delete(self, *args, **kwargs):
         for obj in self.filter(*args, **kwargs):
             obj.delete()
@@ -96,14 +98,14 @@ class WorkType(AbstractActiveModel):
         if hasattr(self, 'code'):
             self.work_type_name = WorkTypeName.objects.get(code=self.code)
         super(WorkType, self).save(*args, **kwargs)
-        
+
     def get_department(self):
         return self.shop
 
     def delete(self):
         if Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True).exists():
             raise models.ProtectedError('There is cashboxes with such work_type', Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True))
-        
+
         super(WorkType, self).delete()
         # self.dttm_deleted = datetime.datetime.now()
         # self.save()
@@ -169,9 +171,9 @@ class CashboxManager(models.Manager):
         """
 
         return self.filter(
-            models.Q(dttm_added__date__lte=dt_from) | models.Q(dttm_added__isnull=True)
+            Q(dttm_added__date__lte=dt_from) | Q(dttm_added__isnull=True)
         ).filter(
-            models.Q(dttm_deleted__date__gt=dt_to) | models.Q(dttm_deleted__isnull=True)
+            Q(dttm_deleted__date__gt=dt_to) | Q(dttm_deleted__isnull=True)
         ).filter(*args, **kwargs)
 
 
@@ -261,56 +263,99 @@ class WorkerDayQuerySet(QuerySet):
         return self.filter(is_fact=True, is_approved=False, **kwargs)
 
     def get_plan_edit(self, **kwargs):
-        ordered_subq = WorkerDay.objects.filter(
-            dt=OuterRef('dt'),
-            worker_id=OuterRef('worker_id'),
+        return self.get_last_ordered(
             is_fact=False,
-        ).order_by(
-            'is_approved',
-        ).values_list('id')[:1]
-        return self.filter(
-            **kwargs,
-            is_fact=False,
-            id=Subquery(ordered_subq),
+            order_by=[
+                'is_approved',
+                '-id',
+            ],
+            **kwargs
         )
 
-    def get_approved4change(self, is_fact):
-        ordered_subq = WorkerDay.objects.filter(
+    def get_last_ordered(self, is_fact, order_by, **kwargs):
+        ordered_subq = self.filter(
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
             is_fact=is_fact,
-        ).order_by(
-            'is_approved', '-id', # сортировка по id -- если вдруг будет несколько approved версий (вдруг), то удаляем более раннюю
-        ).values_list('id')[1:]
+        ).order_by(*order_by).values_list('id')[:1]
         return self.filter(
             is_fact=is_fact,
-            id__in=Subquery(ordered_subq),
+            id=Subquery(ordered_subq),
+            **kwargs,
         )
 
     def get_fact_edit(self, **kwargs):
         raise NotImplementedError
 
-    def get_tabel(self, **kwargs):
-        query = self.filter(
-            models.Q(is_fact=True, is_approved=True) |
-            models.Q(models.Q(is_approved=True) & ~models.Q(type__in=WorkerDay.TYPES_PAID))
+    def get_tabel(self, network, fact_only=True, **kwargs):
+        qs = self.filter(is_fact=False, is_approved=True, worker__isnull=False)
+        fact_approved_wdays_subq = WorkerDay.objects.filter(
+            Q(type=WorkerDay.TYPE_WORKDAY, shop_id=OuterRef('shop_id')) | Q(type=WorkerDay.TYPE_QUALIFICATION),
+            # type=OuterRef('type'),  нужно? обучения и командировки в факт. графике должны заноситься как обучения или как рд?
+            dt=OuterRef('dt'),
+            worker_id=OuterRef('worker_id'),
+            is_fact=True,
+            is_approved=True,
+        ).order_by('-id')
+        qs = qs.annotate(
+            plan_dttm_work_start=F('dttm_work_start'),
+            plan_dttm_work_end=F('dttm_work_end'),
+            fact_dttm_work_start=Subquery(fact_approved_wdays_subq.values('dttm_work_start')[:1]),
+            fact_dttm_work_end=Subquery(fact_approved_wdays_subq.values('dttm_work_end')[:1]),
+            tabel_dttm_work_start=Case(
+                When(fact_dttm_work_start__isnull=True, then=F('fact_dttm_work_start')),
+                When(plan_dttm_work_start__lt=F('fact_dttm_work_start') - network.allowed_interval_for_late_arrival,
+                     then=F('fact_dttm_work_start')),
+                default=F('plan_dttm_work_start'), output_field=DateTimeField()
+            ),
+            tabel_dttm_work_end=Case(
+                When(fact_dttm_work_end__isnull=True, then=F('fact_dttm_work_end')),
+                When(plan_dttm_work_end__gt=F('fact_dttm_work_end') + network.allowed_interval_for_early_departure,
+                     then=F('fact_dttm_work_end')),
+                default=F('plan_dttm_work_end'), output_field=DateTimeField()
+            ),
+            tabel_work_interval=Coalesce(
+                F('tabel_dttm_work_end') - F('tabel_dttm_work_start'),
+                datetime.timedelta(hours=0)
+            ),
+            tabel_total_work_seconds=Cast(Extract(F('tabel_work_interval'), 'epoch'), FloatField()),
+            tabel_breaktime_seconds=WorkerDay.get_breaktime(
+                network_id=network.id, break_calc_field_name='tabel_total_work_seconds'),  # TODO: для обучений тоже учитывать перерывы?
+            tabel_work_hours=Cast(Greatest(
+                F('tabel_total_work_seconds') - F('tabel_breaktime_seconds'), 0, output_field=FloatField()
+            ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=2)),
         )
-        worker_days = list(query.order_by('worker_id', 'dt', '-is_fact'))
-        exists = []
-        remove = []
-        for worker_day in worker_days:
-            if (worker_day.worker_id, worker_day.dt) in exists:
-                remove.append(worker_day.id)
-            else:
-                exists.append((worker_day.worker_id, worker_day.dt))
-        return query.filter(**kwargs).exclude(id__in=remove)
+
+        if fact_only:
+            qs = qs.filter(
+                Q(
+                    type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                    fact_dttm_work_start__isnull=False,
+                    fact_dttm_work_end__isnull=False,
+                ) | ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+            )
+        else:
+            qs = qs.annotate(
+                plan_work_interval=Coalesce(
+                    F('plan_dttm_work_end') - F('plan_dttm_work_start'),
+                    datetime.timedelta(hours=0)
+                ),
+                plan_total_work_seconds=Cast(Extract(F('plan_work_interval'), 'epoch'), FloatField()),
+                plan_breaktime_seconds=WorkerDay.get_breaktime(
+                    network_id=network.id, break_calc_field_name='plan_total_work_seconds'),
+                plan_work_hours=Cast(Greatest(
+                    F('plan_total_work_seconds') - F('plan_breaktime_seconds'), 0, output_field=FloatField()
+                ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=2)),
+            )
+
+        return qs.filter(**kwargs)
 
 
 class WorkerDayManager(models.Manager):
     def qos_current_version(self, approved_only=False):
         if approved_only:
             return super().get_queryset().filter(
-                models.Q(child__id__isnull=True) | models.Q(child__worker_day_approve=False),
+                Q(child__id__isnull=True) | Q(child__worker_day_approve=False),
                 worker_day_approve=True,
             )
         else:
@@ -336,19 +381,24 @@ class WorkerDayManager(models.Manager):
         последнюю версию за каждый день.
         """
         super().get_queryset()
+        subq_kwargs = kwargs.copy()
+        subq_kwargs.pop('dt', None)
+        subq_kwargs.pop('worker_id', None)
+        subq_kwargs.pop('is_fact', None)
         max_dt_subq = WorkerDay.objects.filter(
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
             is_fact=False,
+            **subq_kwargs,
             # shop_id=OuterRef('shop_id')
         ).values( # for group by
-            'dttm_added'
-        ).annotate(dt_max=Max('dttm_added')).values('dt_max')[:1]
+            'dttm_modified'
+        ).annotate(dt_max=Max('dttm_modified')).values('dt_max')[:1]
         return super().get_queryset().filter(
             *args,
             **kwargs,
             is_fact=False,
-            dttm_added=Subquery(max_dt_subq),
+            dttm_modified=Subquery(max_dt_subq),
         )
 
     @staticmethod
@@ -391,8 +441,8 @@ class WorkerDay(AbstractModel):
     TYPE_HOLIDAY_WORK = 'HW'
     TYPE_REAL_ABSENCE = 'RA'
     TYPE_EXTRA_VACATION = 'EV'
-    TYPE_TRAIN_VACATION = 'TV'
-    TYPE_SELF_VACATION = 'SV'
+    TYPE_STUDY_VACATION = 'SV'
+    TYPE_SELF_VACATION = 'TV'  # TV, а не SV, потому что так написали в документации
     TYPE_SELF_VACATION_TRUE = 'ST'
     TYPE_GOVERNMENT = 'G'
     TYPE_HOLIDAY_SPECIAL = 'HS'
@@ -415,7 +465,7 @@ class WorkerDay(AbstractModel):
         (TYPE_HOLIDAY_WORK, 'Работа в выходной день'),
         (TYPE_REAL_ABSENCE, 'Прогул на основании акта'),
         (TYPE_EXTRA_VACATION, 'Доп. отпуск'),
-        (TYPE_TRAIN_VACATION, 'Учебный отпуск'),
+        (TYPE_STUDY_VACATION, 'Учебный отпуск'),
         (TYPE_SELF_VACATION, 'Отпуск за свой счёт'),
         (TYPE_SELF_VACATION_TRUE, 'Отпуск за свой счёт по уважительной причине'),
         (TYPE_GOVERNMENT, 'Гос. обязанности'),
@@ -428,6 +478,7 @@ class WorkerDay(AbstractModel):
         TYPE_HOLIDAY,
         TYPE_WORKDAY,
         TYPE_VACATION,
+        TYPE_SELF_VACATION,
         TYPE_SICK,
         TYPE_QUALIFICATION,
         TYPE_ABSENSE,
@@ -442,8 +493,14 @@ class WorkerDay(AbstractModel):
         TYPE_BUSINESS_TRIP,
         TYPE_HOLIDAY_WORK,
         TYPE_EXTRA_VACATION,
-        TYPE_TRAIN_VACATION,
+        TYPE_STUDY_VACATION,
     ]
+
+    TYPES_WITH_TM_RANGE = (
+        TYPE_WORKDAY,
+        TYPE_QUALIFICATION,
+        TYPE_BUSINESS_TRIP,
+    )
 
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
@@ -459,6 +516,16 @@ class WorkerDay(AbstractModel):
 
     def __repr__(self):
         return self.__str__()
+    
+    def __init__(self, *args, need_count_wh=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if need_count_wh:
+            position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
+            if self.dttm_work_end and self.dttm_work_start and self.shop and (self.shop.settings or position_break_triplet_cond):
+                breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks
+                self.work_hours = self.count_work_hours(breaks, self.dttm_work_start, self.dttm_work_end)
+            else:
+                self.work_hours = datetime.timedelta(0)
 
     id = models.BigAutoField(primary_key=True, db_index=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
@@ -490,7 +557,7 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def is_type_with_tm_range(cls, t):
-        return t in (cls.TYPE_WORKDAY, cls.TYPE_BUSINESS_TRIP, cls.TYPE_QUALIFICATION)
+        return t in cls.TYPES_WITH_TM_RANGE
 
     @staticmethod
     def count_work_hours(break_triplets, dttm_work_start, dttm_work_end):
@@ -500,9 +567,43 @@ class WorkerDay(AbstractModel):
                 work_hours = work_hours - sum(break_triplet[2])
                 break
         return datetime.timedelta(minutes=work_hours)
-    
+
     def get_department(self):
         return self.shop
+
+    @classmethod
+    def get_breaktime(cls, network_id, break_calc_field_name):
+        break_triplets = Break.get_break_triplets(network_id=network_id)
+        breaktime = Value(0, output_field=FloatField())
+        if break_triplets:
+            whens = [
+                When(
+                    Q(**{f'{break_calc_field_name}__gte': break_triplet[0]}, **{f'{break_calc_field_name}__lte': break_triplet[1]}) &
+                    (
+                        Q(employment__position__breaks_id=break_id) |
+                        (
+                            Q(employment__position__breaks__isnull=True) &
+                            Q(employment__shop__settings__breaks_id=break_id)
+                        ) |
+                        (Q(employment__isnull=True) & Q(shop__settings__breaks_id=break_id))
+                    ),
+                    then=break_triplet[2]
+                )
+                for break_id, breaks in break_triplets.items()
+                for break_triplet in breaks
+            ]
+            breaktime = Case(*whens, output_field=FloatField())
+
+        return breaktime
+
+    @property
+    def dt_as_str(self):
+        from src.util.models_converter import Converter
+        return Converter.convert_date(self.dt)
+
+    @property
+    def type_name(self):
+        return self.get_type_display()
 
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
@@ -512,11 +613,24 @@ class WorkerDay(AbstractModel):
         else:
             self.work_hours = datetime.timedelta(0)
 
-        if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and self.is_vacancy and self.worker and self.shop:
-            from src.celery.tasks import create_mda_user_to_shop_relation
-            create_mda_user_to_shop_relation.delay(username=self.worker.username, shop_code=self.shop.code)
+        is_new = self.id is None
 
-        return super().save(*args, **kwargs)
+        res = super().save(*args, **kwargs)
+
+        if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and \
+                (self.is_vacancy or self.type == WorkerDay.TYPE_QUALIFICATION) and self.worker and self.shop:
+            from src.celery.tasks import create_mda_user_to_shop_relation
+            create_mda_user_to_shop_relation.delay(
+                username=self.worker.username,
+                shop_code=self.shop.code,
+                debug_info={
+                    'wd_id': self.id,
+                    'approved': self.is_approved,
+                    'is_new': is_new,
+                },
+            )
+
+        return res
 
 
 class WorkerDayCashboxDetailsManager(models.Manager):
@@ -666,9 +780,9 @@ class Event(AbstractModel):
                 is_updated = False
                 update_condition = user_worker_day.type != WorkerDay.TYPE_WORKDAY or \
                                    WorkerDayCashboxDetails.objects.filter(
-                                       models.Q(dttm_from__gte=vacancy.dttm_from, dttm_from__lt=vacancy.dttm_to) |
-                                       models.Q(dttm_to__gt=vacancy.dttm_from, dttm_to__lte=vacancy.dttm_to) |
-                                       models.Q(dttm_from__lte=vacancy.dttm_from, dttm_to__gte=vacancy.dttm_to),
+                                       Q(dttm_from__gte=vacancy.dttm_from, dttm_from__lt=vacancy.dttm_to) |
+                                       Q(dttm_to__gt=vacancy.dttm_from, dttm_to__lte=vacancy.dttm_to) |
+                                       Q(dttm_from__lte=vacancy.dttm_from, dttm_to__gte=vacancy.dttm_to),
                                        worker_day_id=user_worker_day.id,
                                        dttm_deleted__isnull=True,
                                    ).count() == 0
@@ -799,6 +913,7 @@ class ShopMonthStat(AbstractModel):
     workers_amount = models.IntegerField(default=0, blank=True, null=True)
     revenue = models.IntegerField(default=0, blank=True, null=True)
     fot_revenue = models.IntegerField(default=0, blank=True, null=True)
+    predict_needs = models.IntegerField(default=0, blank=True, null=True, verbose_name='Количество часов по нагрузке')
 
     task_id = models.CharField(max_length=256, null=True, blank=True)
 
@@ -883,27 +998,50 @@ class AttendanceRecords(AbstractModel):
                 return
 
             setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
+            setattr(wdays['fact']['approved'], 'type', WorkerDay.TYPE_WORKDAY)
             wdays['fact']['approved'].save()
         else:
+            if self.type == self.TYPE_LEAVING:
+                prev_fa_wd = WorkerDay.objects.filter(
+                    shop=self.shop,
+                    worker=self.user,
+                    dt__lt=self.dttm.date(),
+                    is_fact=True,
+                    is_approved=True,
+                ).order_by('dt').last()
+
+                # Если предыдущая смена не закрыта.
+                if prev_fa_wd and prev_fa_wd.dttm_work_start and prev_fa_wd.dttm_work_end is None:
+                    close_prev_work_shift_cond = (
+                         self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
+                    # Если с момента открытия предыдущей смены прошло менее MAX_WORK_SHIFT_SECONDS,
+                    # то закрываем предыдущую смену.
+                    if close_prev_work_shift_cond:
+                        setattr(prev_fa_wd, type2dtfield[self.type], self.dttm)
+                        prev_fa_wd.save()
+                        return
+
+                if settings.MDA_SKIP_LEAVING_TICK:
+                    return
+
+            dt = self.dttm.date()
+            active_user_empl = Employment.objects.get_active(
+                self.user.network_id, dt_from=dt, dt_to=dt, user=self.user, shop=self.shop).last()
+            if not active_user_empl:
+                active_user_empl = Employment.objects.get_active(
+                    self.user.network_id, dt_from=dt, dt_to=dt, user=self.user).last()
+
             wd = WorkerDay(
                 shop=self.shop,
                 worker=self.user,
+                employment=active_user_empl,
                 dt=self.dttm.date(),
                 is_fact=True,
                 is_approved=True,
                 type=WorkerDay.TYPE_WORKDAY,
             )
             setattr(wd, type2dtfield[self.type], self.dttm)
-
-            wd.parent_worker_day = wdays['plan']['approved'] \
-                if wdays['plan']['approved'] \
-                else wdays['plan']['not_approved']
-
             wd.save()
-
-            if wdays['fact']['not_approved']:
-                wdays['fact']['not_approved'].parent_worker_day = wd
-                wdays['fact']['not_approved'].save()
 
 
 class ExchangeSettings(AbstractModel):
@@ -958,6 +1096,75 @@ class VacancyBlackList(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
     symbol = models.CharField(max_length=128)
 
-
     def get_department(self):
         return self.shop
+
+
+class WorkerDayPermission(AbstractModel):
+    PLAN = 'P'
+    FACT = 'F'
+
+    GRAPH_TYPES = (
+        (PLAN, 'План'),
+        (FACT, 'Факт'),
+    )
+
+    CREATE_OR_UPDATE = 'CU'
+    DELETE = 'D'
+    APPROVE = 'A'
+
+    ACTIONS = (
+        (CREATE_OR_UPDATE, 'Создание/Редактирование'),
+        (DELETE, 'Удаление'),
+        (APPROVE, 'Подтверждение'),
+    )
+
+    action = models.CharField(choices=ACTIONS, max_length=2, verbose_name='Действие')
+    graph_type = models.CharField(choices=GRAPH_TYPES, max_length=1, verbose_name='Тип графика')
+    wd_type = models.CharField(choices=WorkerDay.TYPES, max_length=2, verbose_name='Тип дня')
+
+    class Meta:
+        verbose_name = 'Разрешение для рабочего дня'
+        verbose_name_plural = 'Разрешения для рабочего дня'
+        unique_together = ('action', 'graph_type', 'wd_type')
+        ordering = ('action', 'graph_type', 'wd_type')
+
+    def __str__(self):
+        return f'{self.get_action_display()} {self.get_graph_type_display()} {self.get_wd_type_display()}'
+
+
+class GroupWorkerDayPermission(AbstractModel):
+    group = models.ForeignKey('base.Group', on_delete=models.CASCADE, verbose_name='Группа доступа')
+    worker_day_permission = models.ForeignKey(
+        'timetable.WorkerDayPermission', on_delete=models.CASCADE, verbose_name='Разрешение для рабочего дня')
+    limit_days_in_past = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Ограничение на дни в прошлом',
+        help_text='Если null - нет ограничений, если n - можно выполнять действие только n последних дней',
+    )
+    limit_days_in_future = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Ограничение на дни в будущем',
+        help_text='Если null - нет ограничений, если n - можно выполнять действие только n будущих дней',
+    )
+
+    class Meta:
+        verbose_name = 'Разрешение группы для рабочего дня'
+        verbose_name_plural = 'Разрешения группы для рабочего дня'
+        unique_together = ('group', 'worker_day_permission',)
+
+    def __str__(self):
+        return f'{self.group.name} {self.worker_day_permission}'
+
+    @classmethod
+    def has_permission(cls, user, action, graph_type, wd_type, wd_dt):
+        if isinstance(wd_dt, str):
+            wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
+        # FIXME-devx: будет временной лаг из-за того, что USE_TZ=False, откуда брать таймзону? - из shop?
+        today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
+        return cls.objects.filter(
+            Q(limit_days_in_past__isnull=True) | Q(limit_days_in_past__gte=(today - wd_dt).days),
+            Q(limit_days_in_future__isnull=True) | Q(limit_days_in_future__gte=(wd_dt - today).days),
+            group__in=user.get_group_ids(user.network),  # добавить shop ?
+            worker_day_permission__action=action,
+            worker_day_permission__graph_type=graph_type,
+            worker_day_permission__wd_type=wd_type,
+        ).exists()

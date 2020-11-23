@@ -113,7 +113,6 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
             path=self.get_url('Receipt-detail', pk=receipt.pk),
             data=self.dump_data({'data': data, 'data_type': 'Чек'}), content_type='application/json',
         )
-        self.print_resp(resp)
         self.assertEqual(resp.status_code, 200)
 
     def test_create_receipt_when_shop_with_spaces(self):

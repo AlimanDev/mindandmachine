@@ -21,10 +21,70 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         cls.settings = ShopSettings.objects.first()
         cls.load_template = LoadTemplateFactory(network=cls.network)
 
+        cls.root_shop.code = "main"
+        cls.root_shop.save(update_fields=('code',))
+
         cls.shop_url = f'{cls.url}{cls.shop.id}/'
 
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
+
+    @staticmethod
+    def _get_shop_data():
+        return {
+            "address": "ул. Кибальчича, д. 2. корп. 1",
+            "by_code": True,
+            "code": "3-001",
+            "dt_closed": "3001-01-01",
+            "dt_opened": "2016-09-27",
+            "name": "ООО \"НИКАМЕД\" ОРТЕКА  ВДНХ",
+            "parent_code": "main",
+            "timezone": "Europe/Moscow",
+            "tm_close_dict": {
+                "d0": "21:00:00",
+                "d1": "21:00:00",
+                "d2": "21:00:00",
+                "d3": "21:00:00",
+                "d4": "21:00:00",
+                "d5": "21:00:00",
+                "d6": "21:00:00"
+            },
+            "tm_open_dict": {
+                "d0": "09:00:00",
+                "d1": "09:00:00",
+                "d2": "09:00:00",
+                "d3": "09:00:00",
+                "d4": "09:00:00",
+                "d5": "09:00:00",
+                "d6": "09:00:00"
+            }
+        }
+
+    def test_create_department(self):
+        resp = self.client.post(self.url, data=self.dump_data(self._get_shop_data()), content_type='application/json')
+        self.assertEqual(resp.status_code, 201)
+
+    def test_create_and_update_department_with_put_by_code(self):
+        shop_data = self._get_shop_data()
+        put_url = f'{self.url}{shop_data["code"]}/'
+        resp = self.client.put(put_url, data=self.dump_data(shop_data), content_type='application/json')
+        self.assertEqual(resp.status_code, 201)
+
+        resp = self.client.put(put_url, data=self.dump_data(shop_data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+
+        resp = self.client.put(put_url, data=self.dump_data(shop_data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+
+        self.assertEqual(Shop.objects.filter(code=shop_data["code"]).count(), 1)
+
+    def test_cant_create_multiple_shops_with_the_same_code(self):
+        shop_data = self._get_shop_data()
+        resp = self.client.post(self.url, data=self.dump_data(shop_data), content_type='application/json')
+        self.assertEqual(resp.status_code, 201)
+
+        resp = self.client.post(self.url, data=self.dump_data(shop_data), content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
 
     def test_get_list(self):
         # Админ
@@ -88,7 +148,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
 
     def test_create(self):
         data = {
-            "parent_id": self.root_shop.id,
+            "parent_code": self.root_shop.code,
             "name": 'Region Shop3',
             "tm_open_dict": {"all": "07:00:00"},
             "tm_close_dict": {"all": "23:00:00"},
@@ -103,6 +163,9 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'restricted_start_times': '[]',
             'settings_id': self.shop_settings.id,
             'forecast_step_minutes': '00:30:00',
+            'is_active': True,
+            'director_code': self.user2.username,
+            'distance': None,
         }
         # response = self.client.post(self.url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -111,11 +174,17 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         shop = response.json()
         data['id'] = shop['id']
+        data['parent_id'] = self.root_shop.id
+        data.pop('parent_code')
+        data['director_id'] = self.user2.id
         data['area'] = 0.0
         data['dt_closed'] = None
         data['load_template_id'] = None
         data['load_template_status'] = 'R'
         data['exchange_settings_id'] = None
+        data['latitude'] = None
+        data['longitude'] = None
+        data['distance'] = None
         self.assertDictEqual(shop, data)
 
     def test_update(self):
@@ -135,6 +204,10 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'restricted_start_times': '[]',
             'settings_id': self.shop_settings.id,
             'forecast_step_minutes': '00:30:00',
+            'is_active': False,
+            'latitude': '52.229675',
+            'longitude': '21.012228',
+            'director_code': 'nonexistent',
         }
         # response = self.client.put(self.shop_url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -143,11 +216,57 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         shop = response.json()
         data['id'] = shop['id']
+        data['director_id'] = None
+        data['director_code'] = None
         data['area'] = 0.0
         data['load_template_id'] = None
         data['exchange_settings_id'] = None
+        data['distance'] = None
         data['load_template_status'] = 'R'
         self.assertEqual(shop, data)
+        self.assertIsNotNone(Shop.objects.get(id=shop['id']).dttm_deleted)
+
+    def test_404_resp_for_unexistent_parent_code(self):
+        data = {
+            "parent_code": 'nonexistent',
+            "name": 'Title 2',
+            "tm_open_dict": {"all": "07:00:00"},
+            "tm_close_dict": {"all": "23:00:00"},
+            "region_id": self.region.id,
+            "code": "10",
+            "address": 'address',
+            "type": Shop.TYPE_REGION,
+            "dt_opened": '2019-01-01',
+            "dt_closed": "2020-01-01",
+            "timezone": 'Europe/Berlin',
+            'restricted_end_times': '[]',
+            'restricted_start_times': '[]',
+            'settings_id': self.shop_settings.id,
+            'forecast_step_minutes': '00:30:00',
+            'is_active': False,
+            'latitude': '52.229675',
+            'longitude': '21.012228',
+            'director_code': 'nonexistent',
+        }
+        response = self.client.put(self.shop_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_cant_save_with_invalid_restricted_times(self):
+        data = {
+            'id': self.shop.id,
+            'restricted_start_times': '[false, ""]',
+            'restricted_end_times': '[false]',
+            'settings_id': self.shop_settings.id,
+            'load_template_id': self.load_template.id,
+            'name': 'Имя магазина',
+            'timezone': 'Europe/Moscow',
+        }
+
+        resp = self.client.put(self.shop_url, data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        resp_data = resp.json()
+        self.assertIn('restricted_start_times', resp_data)
+        self.assertIn('restricted_end_times', resp_data)
 
     def test_update_without_tm_open_close_dict_dont_clean_it(self):
         prev_tm_open_dict_val = self.shop.tm_open_dict
@@ -210,3 +329,22 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'lack_curr': 10.0}]
 
         self.assertEqual(response.json(), data)
+
+    def test_get_shops_with_distance(self):
+        self.shop.latitude = 51.229675
+        self.shop.longitude = 21.012228
+        self.shop.save()
+        self.shop2.latitude = 52.129675
+        self.shop2.longitude = 22.412228
+        self.shop2.save()
+        response = self.client.get(
+            self.url,
+            data={'id__in': f'{self.shop.id},{self.shop2.id},{self.shop3.id}'},
+            **{'X-LAT': 52.229675, 'X-LON': 21.012228}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        shops = sorted(response.json(), key=lambda i: i['id'])
+        self.assertEqual(len(shops), 3)
+        self.assertEqual(shops[0]['distance'], 111.26)
+        self.assertEqual(shops[1]['distance'], 96.41)
+        self.assertEqual(shops[2]['distance'], None)

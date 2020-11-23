@@ -2,12 +2,17 @@ import datetime
 import json
 
 from django.apps import apps
+from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.db.models import Case, When, Sum, Value, IntegerField
+from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
+from django.db.models.functions import Coalesce
+from django.db.models.query import QuerySet
+from django.shortcuts import get_object_or_404
+from django.utils.functional import cached_property
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
 from timezone_field import TimeZoneField
@@ -31,9 +36,28 @@ class Network(AbstractActiveModel):
     # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
     need_symbol_for_vacancy = models.BooleanField(default=False)
     settings_values = models.TextField(default='{}')  # настройки для сети. Cейчас есть настройки для приемки чеков + ночные смены
+    allowed_interval_for_late_arrival = models.DurationField(
+        verbose_name='Допустимый интервал для опоздания', default=datetime.timedelta(seconds=0))
+    allowed_interval_for_early_departure = models.DurationField(
+        verbose_name='Допустимый интервал для раннего ухода', default=datetime.timedelta(seconds=0))
+    okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name='Код по ОКПО')
+    allowed_geo_distance_km = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        verbose_name='Разрешенная дистанция до магазина при создании отметок (км)',
+    )
+    enable_camera_ticks = models.BooleanField(
+        default=False, verbose_name='Включить отметки по камере в мобильной версии')
 
     def get_department(self):
         return None
+
+    @cached_property
+    def night_edges(self):
+        default_night_edges = (
+            '22:00:00',
+            '06:00:00',
+        )
+        return json.loads(self.settings_values).get('night_edges', default_night_edges)
 
     def __str__(self):
         return f'name: {self.name}, code: {self.code}'
@@ -62,14 +86,21 @@ class Break(AbstractActiveNamedModel):
                     return []
         return super().__getattribute__(attr)
 
+    @classmethod
+    def get_break_triplets(cls, network_id):
+        return {
+            b.id: list(map(lambda x: (x[0] * 60, x[1] * 60, sum(x[2]) * 60), b.breaks))
+            for b in cls.objects.filter(network_id=network_id)
+        }
+
     @staticmethod
     def clean_value(value):
         return json.dumps(value)
 
     def save(self, *args, **kwargs):
         self.value = self.clean_value(self.breaks)
-        super().save(*args, **kwargs)
-      
+        return super().save(*args, **kwargs)
+
 
 class ShopSettings(AbstractActiveNamedModel):
     class Meta(AbstractActiveNamedModel.Meta):
@@ -186,6 +217,10 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
     settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True, blank=True)
 
+    latitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Широта')
+    longitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Долгота')
+    director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
+
     def __str__(self):
         return '{}, {}, {}'.format(
             self.name,
@@ -215,10 +250,18 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         return self
 
     def __init__(self, *args, **kwargs):
-        code = kwargs.pop('parent_code', None)
+        parent_code = kwargs.pop('parent_code', None)
         super().__init__(*args, **kwargs)
-        if code:
-            self.parent = Shop.objects.get(code=code)
+        if parent_code:
+            self.parent = get_object_or_404(Shop, code=parent_code)
+
+    @property
+    def director_code(self):
+        return getattr(self.director, 'tabel_code', None)
+
+    @director_code.setter
+    def director_code(self, val):
+        self.director = User.objects.filter(tabel_code=val).first()
 
     def __getattribute__(self, attr):
         if attr in ['open_times', 'close_times']:
@@ -254,15 +297,16 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             raise MessageError(code='time_shop_differerent_keys')
         if open_times.get('all') and len(open_times) != 1:
             raise MessageError(code='time_shop_all_or_days')
-
-        for key in open_times.keys():
-            close_hour = close_times[key].hour if close_times[key].hour != 0 else 24
-            if open_times[key].hour > close_hour:
-                raise MessageError(code='time_shop_incorrect_time_start_end')
+        
+        #TODO fix
+        # for key in open_times.keys():
+        #     close_hour = close_times[key].hour if close_times[key].hour != 0 else 24
+        #     if open_times[key].hour > close_hour:
+        #         raise MessageError(code='time_shop_incorrect_time_start_end')
         self.tm_open_dict = self.clean_time_dict(self.open_times)
         self.tm_close_dict = self.clean_time_dict(self.close_times)
         if hasattr(self, 'parent_code'):
-            self.parent = Shop.objects.get(code=self.parent_code)
+            self.parent = get_object_or_404(Shop, code=self.parent_code)
         load_template = None
         if self.load_template_id and self.id:
             new_template = self.load_template_id
@@ -287,9 +331,16 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 shops__isnull=True,
             ).first()
 
+    def get_tz_offset(self):
+        if self.timezone:
+            offset = int(self.timezone.utcoffset(datetime.datetime.now()).seconds / 3600)
+        else:
+            offset = settings.CLIENT_TIMEZONE
+
+        return offset
 
 class EmploymentManager(models.Manager):
-    def get_active(self, network_id, dt_from=datetime.date.today(), dt_to=datetime.date.today(), *args, **kwargs):
+    def get_active(self, network_id, dt_from=None, dt_to=None, *args, **kwargs):
         """
         hired earlier then dt_from, hired later then dt_to
         :paramShop dt_from:
@@ -298,6 +349,9 @@ class EmploymentManager(models.Manager):
         :param kwargs:
         :return:
         """
+        today = datetime.date.today()
+        dt_from = dt_from or today
+        dt_to = dt_to or today
 
         return self.filter(
             models.Q(dt_hired__lte=dt_to) | models.Q(dt_hired__isnull=True),
@@ -402,9 +456,6 @@ class User(DjangoAbstractUser, AbstractModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def get_fio(self):
-        return self.last_name + ' ' + self.first_name
-
     id = models.BigAutoField(primary_key=True)
     middle_name = models.CharField(max_length=64, blank=True, null=True)
 
@@ -431,6 +482,43 @@ class User(DjangoAbstractUser, AbstractModel):
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     black_list_symbol = models.CharField(max_length=128, null=True, blank=True)
 
+    def get_fio(self):
+        """
+        :return: Фамилия Имя Отчество (если есть)
+        """
+        fio = f'{self.last_name} {self.first_name}'
+        if self.middle_name:
+            fio += f' {self.middle_name}'
+        return fio
+
+    def get_short_fio(self):
+        """
+        :return: Фамилия с инициалами
+        """
+        short_fio = f'{self.last_name} {self.first_name[0].upper()}.'
+        if self.middle_name:
+            short_fio += f'{self.middle_name[0].upper()}.'
+        return short_fio
+
+    @property
+    def short_fio(self):
+        return self.get_short_fio()
+
+    @property
+    def fio(self):
+        return self.get_fio()
+
+    def get_active_employments(self, network, shop=None):
+        kwargs = {'network_id': network.id}
+        if shop:
+            kwargs['shop__in'] = shop.get_ancestors(include_self=True)
+        return self.employments.get_active(**kwargs)
+
+    def get_group_ids(self, network, shop=None):
+        return self.get_active_employments(network, shop).annotate(
+            group_id=Coalesce(F('function_group_id'), F('position__group_id')),
+        ).values_list('group_id', flat=True)
+
 
 class WorkerPosition(AbstractActiveNamedModel):
     """
@@ -455,6 +543,14 @@ class WorkerPosition(AbstractActiveNamedModel):
 
     def get_department(self):
         return None
+
+
+class EmploymentQuerySet(QuerySet):
+    def last_hired(self):
+        last_hired_subq = self.filter(user_id=OuterRef('user_id')).order_by('-dt_hired').values('id')[:1]
+        return self.filter(
+            id=Subquery(last_hired_subq)
+        )
 
 
 class Employment(AbstractActiveModel):
@@ -500,7 +596,7 @@ class Employment(AbstractActiveModel):
 
     position_tracker = FieldTracker(fields=['position'])
 
-    objects = EmploymentManager()
+    objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
 
     def has_permission(self, permission, method='GET'):
         group = self.function_group or (self.position.group if self.position else None)
@@ -513,6 +609,13 @@ class Employment(AbstractActiveModel):
 
     def get_department(self):
         return self.shop
+
+    def get_short_fio_and_position(self):
+        short_fio_and_position = f'{self.user.get_short_fio()}'
+        if self.position and self.position.name:
+            short_fio_and_position += f', {self.position.name}'
+
+        return short_fio_and_position
 
     def __init__(self, *args, **kwargs):
         shop_code = kwargs.pop('shop_code', None)
@@ -571,7 +674,7 @@ class Employment(AbstractActiveModel):
         if position_has_changed:
             from django.apps import apps
             from django.db.models import When, Case, Q, F, DurationField, Value, Subquery, OuterRef
-            from django.db.models.functions import Cast
+            from django.db.models.functions import Cast, Coalesce
             if self.position.breaks:
                 break_id = self.position.breaks_id
                 breaks = self.position.breaks.breaks
@@ -607,12 +710,12 @@ class Employment(AbstractActiveModel):
                 is_fact=False,
                 dt__gt=dt,
             ).update(
-                work_hours=Subquery(
+                work_hours=Coalesce(Subquery(
                     WorkerDay.objects.filter(pk=OuterRef('pk')).annotate(
                         hours_plan_0=Cast(F('dttm_work_end') - F('dttm_work_start'), DurationField()),
                         hours_plan=Cast(F('hours_plan_0') - breaktime_plan, DurationField()),
                     ).values('hours_plan')[:1]
-                )
+                ), datetime.timedelta(0))
             )
 
         return res
@@ -687,6 +790,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_download_tabel',
         'WorkerDay_editable_vacancy',
         'WorkerDay_approve_vacancy',
+        'WorkerDay_change_range',
         'WorkerPosition',
         'WorkTypeName',
         'WorkType',
