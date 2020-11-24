@@ -5,6 +5,7 @@ from rest_framework import serializers
 from src.base.models import Shop
 from src.recognition.models import TickPoint, Tick, TickPhoto
 from src.timetable.models import User as WFMUser
+from src.util.drf.fields import RoundingDecimalField
 from src.util.utils import generate_user_token
 
 
@@ -93,8 +94,8 @@ class PostTickSerializer_user(serializers.ModelSerializer):
         self.fields['shop_code'] = serializers.SlugRelatedField(
             slug_field='code', queryset=Shop.objects.filter(network=self.context['request'].user.network))
         if self.context['request'].user.network.allowed_geo_distance_km:
-            self.fields['lat'] = serializers.DecimalField(decimal_places=8, max_digits=12)
-            self.fields['lon'] = serializers.DecimalField(decimal_places=8, max_digits=12)
+            self.fields['lat'] = RoundingDecimalField(decimal_places=6, max_digits=12)
+            self.fields['lon'] = RoundingDecimalField(decimal_places=6, max_digits=12)
 
     def validate(self, attrs):
         if self.context['request'].user.network.allowed_geo_distance_km:
