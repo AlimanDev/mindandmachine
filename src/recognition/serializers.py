@@ -98,8 +98,10 @@ class PostTickSerializer_user(serializers.ModelSerializer):
             self.fields['lon'] = RoundingDecimalField(decimal_places=6, max_digits=12)
 
     def validate(self, attrs):
-        if self.context['request'].user.network.allowed_geo_distance_km \
-                and attrs['shop_code'].latitude and attrs['shop_code'].longitude:
+        if self.context['request'].user.network.allowed_geo_distance_km:
+            if not attrs['shop_code'].latitude or not attrs['shop_code'].longitude:
+                raise serializers.ValidationError(
+                    'Для выбранного магазина не настроены координаты. Пожалуйста, обратитесь к администратору системы.')
             distance = geopy.distance.distance(
                 (attrs['lat'], attrs['lon']),
                 (attrs['shop_code'].latitude, attrs['shop_code'].longitude),
