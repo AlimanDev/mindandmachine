@@ -98,7 +98,8 @@ class PostTickSerializer_user(serializers.ModelSerializer):
             self.fields['lon'] = RoundingDecimalField(decimal_places=6, max_digits=12)
 
     def validate(self, attrs):
-        if self.context['request'].user.network.allowed_geo_distance_km:
+        if self.context['request'].user.network.allowed_geo_distance_km \
+                and attrs['shop_code'].latitude and attrs['shop_code'].longitude:
             distance = geopy.distance.distance(
                 (attrs['lat'], attrs['lon']),
                 (attrs['shop_code'].latitude, attrs['shop_code'].longitude),
