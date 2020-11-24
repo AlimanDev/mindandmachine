@@ -130,6 +130,7 @@ class TestWorkerDay(APITestCase):
             'worker_day_details': [],
             'is_outsource': False,
             'is_vacancy': False,
+            'crop_work_hours_by_shop_schedule': True,
         }
 
         self.assertEqual(response.json(), data)
