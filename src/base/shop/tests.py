@@ -348,3 +348,24 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(shops[0]['distance'], 111.26)
         self.assertEqual(shops[1]['distance'], 96.41)
         self.assertEqual(shops[2]['distance'], None)
+
+    def test_get_shops_without_deleted_and_closed(self):
+        self.assertEqual(Shop.objects.count(), 6)
+        self.shop.dttm_deleted = datetime(2020, 1, 1)
+        self.shop.save()
+        self.shop2.dt_closed = datetime(2020, 1, 1).date()
+        self.shop2.save()
+        response = self.client.get(self.url + 'tree/')
+        response = response.json()
+        self.assertEqual(len(response[0]['children'][0]['children']), 0)
+        self.assertEqual(len(response[0]['children'][1]['children']), 1)
+
+
+    def test_get_shops_ordered_by_name(self):
+        response = self.client.get(self.url + 'tree/')
+        response = response.json()
+        self.assertEqual(response[0]['children'][0]['label'], 'Region Shop1')
+        self.assertEqual(response[0]['children'][1]['label'], 'Region Shop2')
+        self.assertEqual(response[0]['children'][0]['children'][0]['label'], 'Shop1')
+        self.assertEqual(response[0]['children'][0]['children'][1]['label'], 'Shop2')
+        self.assertEqual(response[0]['children'][1]['children'][0]['label'], 'Shop3')

@@ -132,7 +132,7 @@ class ShopViewSet(UpdateorCreateViewSet):
                 Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=now),
                 Q(dt_closed__isnull=True) |
                 Q(dt_closed__gte=now.today() - datetime.timedelta(days=30)),
-            )
+            ).order_by('level', 'name')
 
         tree = []
         parent_indexes = {}
