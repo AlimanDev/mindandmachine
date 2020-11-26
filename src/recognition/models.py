@@ -29,7 +29,7 @@ class UserConnecter(AbstractActiveModel):
 
 
 class TickPoint(AbstractActiveNamedModel):
-    class Meta(object):
+    class Meta:
         verbose_name = 'Точка отметки'
         verbose_name_plural = 'Точки отметок'
 
@@ -39,11 +39,8 @@ class TickPoint(AbstractActiveNamedModel):
     is_authenticated = True
 
     id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=128, null=True, blank=True)
-    title = models.CharField(max_length=64)  # TODO: перенести title в name, сделать name обяз., удалить title
     shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT)
     key = models.UUIDField(default=uuid.uuid4, unique=True)
-    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return "{} {}".format(self.id, self.title)

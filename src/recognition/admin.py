@@ -230,7 +230,7 @@ class TickPhotoAdmin(admin.ModelAdmin):
 @admin.register(TickPoint)
 class TickPointAdmin(admin.ModelAdmin):
     list_filter = ['shop']
-    list_display = ['id', 'title', 'shop', 'dttm_added', 'is_active']
+    list_display = ['id', 'name', 'shop', 'dttm_added', 'is_active']
 
 
 admin.site.register(UserConnecter)
