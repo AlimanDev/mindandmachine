@@ -121,14 +121,18 @@ class ShopViewSet(UpdateorCreateViewSet):
         # aa: fixme: refactor code
         employments = Employment.objects.get_active(
             network_id=user.network_id,
-            user=user
-        ).values('shop_id')
+            user=user,
+        )
 
         shops = self.filter_queryset(self.get_queryset())
-        level = 0
-        shops = shops.filter(id__in=employments.values('shop_id'))
+        shops = shops.filter(id__in=employments.values_list('shop_id', flat=True))
         if not only_top:
-            shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
+            now = datetime.datetime.now()
+            shops = Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
+                Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=now),
+                Q(dt_closed__isnull=True) |
+                Q(dt_closed__gte=now.today() - datetime.timedelta(days=30)),
+            ).order_by('level', 'name')
 
         tree = []
         parent_indexes = {}
