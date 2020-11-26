@@ -974,6 +974,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             auto_timetable=True
         ).values('user_id')
 
+        created_by_filter = {}
+        if not form['delete_created_by']:
+            created_by_filter['created_by__isnull'] = True
+
         # Not approved
         wdays = WorkerDay.objects.filter(
             Q(shop_id=shop_id) | Q(shop_id__isnull=True),
@@ -982,12 +986,12 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             worker_id__in=user_ids,
             is_approved=False,
             # is_vacancy=False,
-            created_by__isnull=True,
+            **created_by_filter,
         )
 
-        WorkerDayCashboxDetails.objects.filter(
-            worker_day__in=wdays,
-        ).delete()
+        # WorkerDayCashboxDetails.objects.filter(
+        #     worker_day__in=wdays,
+        # ).delete()
         wdays.delete()
 
         # wdays.filter(
@@ -1010,8 +1014,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             worker_id__in=user_ids,
             is_approved=True,
             # is_vacancy=False,
-            created_by__isnull=True,
-            child__isnull=True
+            child__isnull=True,
+            **created_by_filter,
         )
         # WorkerDay.objects.bulk_create(
         #     [WorkerDay(
