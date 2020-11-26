@@ -497,7 +497,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                             is_approved=OuterRef('is_approved'),
                             is_fact=OuterRef('is_fact'),
                             type=range['type'],
-                        ).order_by('-id').values_list('id')[:1]),
+                        ).order_by('created_by').values_list('id')[:1]),  # оставляем тех, у кого есть created_by
                 ).delete()
 
                 existing_dates = list(WorkerDay.objects.filter(
@@ -518,7 +518,8 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                                 dt=dt,
                                 is_approved=range['is_approved'],
                                 is_fact=range['is_fact'],
-                                type=range['type']
+                                type=range['type'],
+                                created_by=self.request.user,
                             )
                         )
                 WorkerDay.objects.bulk_create(wdays_to_create)
