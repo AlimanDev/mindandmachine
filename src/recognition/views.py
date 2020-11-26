@@ -111,7 +111,7 @@ class UserAuthTickViewStrategy(TickViewStrategy):
         shop = data['shop_code']
         tick_point = TickPoint.objects.filter(shop=shop, dttm_deleted__isnull=True).first()
         if tick_point is None:
-            tick_point = TickPoint.objects.create(title=f'autocreate tickpoint {shop.id}', shop=shop)
+            tick_point = TickPoint.objects.create(name=f'autocreate tickpoint {shop.id}', shop=shop)
 
         return user_id, tick_point
 
@@ -374,7 +374,7 @@ class TickPhotoViewSet(viewsets.ModelViewSet):
         for tick in ticks:
             worksheet.write(row, 0, tick.tick.user.__str__())
             worksheet.write(row, 1, record_types.get(tick.type))
-            worksheet.write(row, 2, tick.tick.tick_point.title)
+            worksheet.write(row, 2, tick.tick.tick_point.name)
             worksheet.write(row, 3, tick.liveness)
             worksheet.write(row, 4, tick.verified_score)
             worksheet.write(row, 5, tick.dttm.strftime('%Y-%m-%dT%H:%M:%S'))
