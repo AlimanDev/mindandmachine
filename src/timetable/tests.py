@@ -1108,7 +1108,6 @@ class TestWorkerDayCreateFact(APITestCase):
 
         # create not approved fact
         response = self.client.post(self.url, data, format='json')
-        print(response.json())
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         fact_id = response.json()['id']
 
