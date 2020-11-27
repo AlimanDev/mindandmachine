@@ -11,7 +11,6 @@ from django.db.models import Subquery, OuterRef, F, Max, Q, Case, When, Value, D
 from django.db.models.functions import Extract, Coalesce, Cast, Round, Greatest
 from django.db.models.query import QuerySet
 from django.utils import timezone
-
 from src.base.models import Shop, Employment, User, Event, Network, Break
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, \
     AbstractActiveModelManager
@@ -516,16 +515,41 @@ class WorkerDay(AbstractModel):
 
     def __repr__(self):
         return self.__str__()
-    
+
+    def _calc_wh(self):
+        position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
+        if self.dttm_work_end and self.dttm_work_start and self.shop and (
+                self.shop.settings or position_break_triplet_cond):
+            breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks
+            dttm_work_start = self.dttm_work_start
+            dttm_work_end = self.dttm_work_end
+            if self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
+                from src.util.models_converter import Converter
+                dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
+                shop_schedule = self.shop.get_schedule(dt)
+
+                open_at_0 = all(getattr(shop_schedule['tm_open'], a) == 0 for a in ['hour', 'second', 'minute'])
+                close_at_0 = all(getattr(shop_schedule['tm_close'], a) == 0 for a in ['hour', 'second', 'minute'])
+                shop_24h_open = open_at_0 and close_at_0
+
+                if not shop_24h_open:
+                    dttm_shop_open = datetime.datetime.combine(dt, shop_schedule['tm_open'])
+                    if self.dttm_work_start < dttm_shop_open:
+                        dttm_work_start = dttm_shop_open
+
+                    dttm_shop_close = datetime.datetime.combine(
+                        (dt + datetime.timedelta(days=1)) if close_at_0 else dt, shop_schedule['tm_close'])
+                    if self.dttm_work_end > dttm_shop_close:
+                        dttm_work_end = dttm_shop_close
+
+            return self.count_work_hours(breaks, dttm_work_start, dttm_work_end)
+
+        return datetime.timedelta(0)
+
     def __init__(self, *args, need_count_wh=False, **kwargs):
         super().__init__(*args, **kwargs)
         if need_count_wh:
-            position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
-            if self.dttm_work_end and self.dttm_work_start and self.shop and (self.shop.settings or position_break_triplet_cond):
-                breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks
-                self.work_hours = self.count_work_hours(breaks, self.dttm_work_start, self.dttm_work_end)
-            else:
-                self.work_hours = datetime.timedelta(0)
+            self.work_hours = self._calc_wh()
 
     id = models.BigAutoField(primary_key=True, db_index=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
@@ -552,6 +576,8 @@ class WorkerDay(AbstractModel):
     dttm_added = models.DateTimeField(default=timezone.now)
     canceled = models.BooleanField(default=False)
     is_outsource = models.BooleanField(default=False)
+    crop_work_hours_by_shop_schedule = models.BooleanField(
+        default=True, verbose_name='Обрезать рабочие часы по времени работы магазина')
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()
 
@@ -606,12 +632,7 @@ class WorkerDay(AbstractModel):
         return self.get_type_display()
 
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
-        position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
-        if self.dttm_work_end and self.dttm_work_start and self.shop and (self.shop.settings or position_break_triplet_cond):
-            breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks
-            self.work_hours = self.count_work_hours(breaks, self.dttm_work_start, self.dttm_work_end)
-        else:
-            self.work_hours = datetime.timedelta(0)
+        self.work_hours = self._calc_wh()
 
         is_new = self.id is None
 
