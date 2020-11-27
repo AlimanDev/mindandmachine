@@ -348,6 +348,7 @@ class AutoSettingsSerializer(serializers.Serializer):
     dt_to = serializers.DateField()
     is_remaking = serializers.BooleanField(default=False)
     use_not_approved = serializers.BooleanField(default=False)
+    delete_created_by = serializers.BooleanField(default=False)
 
 
 class ListChangeSrializer(serializers.Serializer):
