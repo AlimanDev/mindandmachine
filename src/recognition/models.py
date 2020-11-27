@@ -43,7 +43,7 @@ class TickPoint(AbstractActiveNamedModel):
     key = models.UUIDField(default=uuid.uuid4, unique=True)
 
     def __str__(self):
-        return "{} {}".format(self.id, self.title)
+        return "{} {}".format(self.id, self.name)
 
 
 class Tick(AbstractActiveModel):
