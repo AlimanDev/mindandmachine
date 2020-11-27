@@ -255,4 +255,5 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self._test_get_empls(extra_params={'mine': True}, check_length=7)
 
         self.client.force_authenticate(user=self.user8)
+        self._test_get_empls(check_length=8)
         self._test_get_empls(extra_params={'mine': True}, check_length=1)
