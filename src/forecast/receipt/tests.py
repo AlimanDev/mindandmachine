@@ -2,6 +2,7 @@ import json
 
 from rest_framework.test import APITestCase
 
+from src.forecast.models import Receipt
 from src.forecast.tests.factories import ReceiptFactory
 from src.util.mixins.tests import TestsHelperMixin
 
@@ -88,7 +89,6 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 201)
 
     def test_update_receipt(self):
-
         receipt = ReceiptFactory(
             shop=self.shop,
             info=self.dump_data({}),
@@ -101,7 +101,6 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
 
     def test_update_receipt_when_shop_with_spaces(self):
-
         receipt = ReceiptFactory(
             shop=self.shop,
             info=self.dump_data({}),
@@ -123,3 +122,53 @@ class TestReceiptCreateAndUpdate(TestsHelperMixin, APITestCase):
             data=self.dump_data({'data': [data], 'data_type': 'Чек'}), content_type='application/json',
         )
         self.assertEqual(resp.status_code, 201)
+
+    def test_create_receipt_with_put(self):
+        data = self._get_data()
+        resp = self.client.put(
+            path=self.get_url('Receipt-detail', pk=data['Ссылка']),
+            data=self.dump_data({'data': data, 'data_type': 'Чек', 'version': 1, "by_code": True}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 201)
+        receipt = Receipt.objects.filter(code=data['Ссылка']).first()
+        self.assertIsNotNone(receipt)
+        self.assertEqual(receipt.version, 1)
+
+    def test_lower_version_skipped(self):
+        data = self._get_data()
+        data['СуммаДокумента'] = 1000
+        resp = self.client.put(
+            path=self.get_url('Receipt-detail', pk=data['Ссылка']),
+            data=self.dump_data({'data': data, 'data_type': 'Чек', 'version': '1', "by_code": True}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 201)
+        receipt = Receipt.objects.filter(code=data['Ссылка']).first()
+        self.assertIsNotNone(receipt)
+        receipt_data = json.loads(receipt.info)
+        self.assertEqual(receipt_data['СуммаДокумента'], 1000)
+
+        data['СуммаДокумента'] = 2000
+        resp = self.client.put(
+            path=self.get_url('Receipt-detail', pk=data['Ссылка']),
+            data=self.dump_data({'data': data, 'data_type': 'Чек', 'version': '3', "by_code": True}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        receipt = Receipt.objects.filter(code=data['Ссылка']).first()
+        self.assertIsNotNone(receipt)
+        receipt_data = json.loads(receipt.info)
+        self.assertEqual(receipt_data['СуммаДокумента'], 2000)
+
+        data['СуммаДокумента'] = 1500
+        resp = self.client.put(
+            path=self.get_url('Receipt-detail', pk=data['Ссылка']),
+            data=self.dump_data({'data': data, 'data_type': 'Чек', 'version': '2', "by_code": True}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 412)
+        receipt = Receipt.objects.filter(code=data['Ссылка']).first()
+        self.assertIsNotNone(receipt)
+        receipt_data = json.loads(receipt.info)
+        self.assertEqual(receipt_data['СуммаДокумента'], 2000)

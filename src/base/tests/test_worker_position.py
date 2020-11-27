@@ -36,6 +36,8 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         resp = self.client.get(self.get_url('WorkerPosition-list'))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.json()), self.worker_positions_count)
+        self.assertEqual(resp.json()[0]['name'], 'Директор магазина')
+        self.assertEqual(resp.json()[1]['name'], 'ЗДМ')
 
     def test_create(self):
 

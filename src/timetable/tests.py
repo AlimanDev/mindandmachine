@@ -934,7 +934,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             {self.user2.tabel_code: {'created_count': 0, 'deleted_count': 0, 'existing_count': 21}}
         )
 
-        WorkerDay.objects.create(
+        wd_without_created_by = WorkerDay.objects.create(
             worker=self.user2,
             dt=self.dt,
             is_fact=False,
@@ -947,6 +947,16 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             response.json(),
             {self.user2.tabel_code: {'created_count': 0, 'deleted_count': 1, 'existing_count': 21}}
         )
+        self.assertFalse(WorkerDay.objects.filter(id=wd_without_created_by.id).exists())
+        wd = WorkerDay.objects.filter(
+            worker=self.user2,
+            dt=self.dt,
+            is_fact=False,
+            is_approved=True,
+            type=WorkerDay.TYPE_MATERNITY,
+        ).last()
+        self.assertIsNotNone(wd.created_by)
+        self.assertEqual(wd.created_by.id, self.user1.id)
 
     def test_cant_create_workday_if_user_has_no_active_employment(self):
         WorkerDay.objects.filter(worker=self.user2).delete()

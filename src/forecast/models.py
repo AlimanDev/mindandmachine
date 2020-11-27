@@ -322,7 +322,9 @@ class PeriodClients(AbstractModel):
 
     class Meta(object):
         verbose_name = 'Значение операций'
-        index_together = [('dttm_forecast', 'operation_type')]
+        unique_together = [
+            ('dttm_forecast', 'operation_type', 'type'),
+        ]
     
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
@@ -376,3 +378,4 @@ class Receipt(AbstractModel):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True)
     info = models.TextField()
     data_type = models.CharField(max_length=128, verbose_name='Тип данных', null=True, blank=True)
+    version = models.IntegerField(verbose_name='Версия объекта', default=0)

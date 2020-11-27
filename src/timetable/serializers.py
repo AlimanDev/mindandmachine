@@ -394,6 +394,7 @@ class AutoSettingsSerializer(serializers.Serializer):
     dt_to = serializers.DateField()
     is_remaking = serializers.BooleanField(default=False)
     use_not_approved = serializers.BooleanField(default=False)
+    delete_created_by = serializers.BooleanField(default=False)
 
 
 class ListChangeSrializer(serializers.Serializer):
@@ -428,7 +429,14 @@ class ChangeRangeSerializer(serializers.Serializer):
     is_approved = serializers.BooleanField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
-    type = serializers.ChoiceField(choices=[WorkerDay.TYPE_MATERNITY, WorkerDay.TYPE_MATERNITY_CARE])
+    type = serializers.ChoiceField(
+        choices=[
+            WorkerDay.TYPE_MATERNITY,
+            WorkerDay.TYPE_MATERNITY_CARE,
+            WorkerDay.TYPE_SICK,
+            WorkerDay.TYPE_VACATION,
+        ]
+    )
 
     def __init__(self, *args, **kwargs):
         super(ChangeRangeSerializer, self).__init__(*args, **kwargs)

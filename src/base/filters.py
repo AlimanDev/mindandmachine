@@ -5,7 +5,7 @@ from src.base.models import  Employment, User, Notification, Subscribe, Shop
 
 
 class BaseActiveNamedModelFilter(FilterSet):
-    name = CharFilter(field_name='name', lookup_expr='exact')
+    name = CharFilter(field_name='name', lookup_expr='icontains')
     name__in = CharFilter(field_name='name', method='field_in')
     code = CharFilter(field_name='code', lookup_expr='exact')
     code__in = CharFilter(field_name='code', method='field_in')
