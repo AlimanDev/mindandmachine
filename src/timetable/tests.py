@@ -989,7 +989,10 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
             worker_day=wd,
             work_part=1,
         )
-        self.assertEqual(timedelta(hours=expected_work_h), wd.work_hours)
+        self.assertEqual(
+            timedelta(hours=expected_work_h) if isinstance(expected_work_h, int) else expected_work_h,
+            wd.work_hours
+        )
 
     def _test_crop_both_bulk_and_original_save(self, *args, **kwargs):
         self._test_crop_hours(*args, bulk=False, **kwargs)
@@ -1016,6 +1019,21 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
         weekday = self.dt_now.weekday()
         self._test_crop_both_bulk_and_original_save(
             f'{{"{weekday}":"12:00:00"}}', f'{{"{weekday}":"23:00:00"}}', 10, 20, 7)
+
+        # факт. время работы с минутами
+        self._test_crop_both_bulk_and_original_save(
+            10, 22,
+            datetime.combine(self.dt_now, time(9, 46, 15)),
+            datetime.combine(self.dt_now, time(21, 47, 23)),
+            timedelta(seconds=38843),
+        )
+        self._test_crop_both_bulk_and_original_save(
+            10, 22,
+            datetime.combine(self.dt_now, time(9, 46, 15)),
+            datetime.combine(self.dt_now, time(21, 47, 23)),
+            timedelta(seconds=39668),
+            crop=False,
+        )
 
         # todo: ночные смены (когда-нибудь)
 
