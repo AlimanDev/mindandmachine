@@ -944,6 +944,27 @@ class TestWorkerDay(APITestCase):
         self.assertIsNotNone(wd.created_by)
         self.assertEqual(wd.created_by.id, self.user1.id)
 
+    def test_valid_error_message_returned_when_dt_is_none(self):
+        data = {
+            "shop_id": self.shop.id,
+            "worker_id": self.user2.id,
+            "dt": None,
+            "is_fact": False,
+            "is_approved": False,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(8, 0, 0)),
+            "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.json()['dt'][0], 'Поле дата не может быть пустым.')
+
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod

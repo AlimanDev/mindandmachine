@@ -477,3 +477,21 @@ class DownloadTabelSerializer(serializers.Serializer):
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
     shop_id = serializers.IntegerField()
     convert_to = serializers.ChoiceField(required=False, choices=['pdf', 'xlsx'], default='xlsx')
+
+
+class WsPermissionDataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkerDay
+        fields = (
+            'dt',
+            'type',
+            'is_fact',
+        )
+        extra_kwargs = {
+            "dt": {
+                "error_messages": {
+                    "required": "Поле дата не может быть пустым.",
+                    "null": "Поле дата не может быть пустым.",
+                },
+            },
+        }
