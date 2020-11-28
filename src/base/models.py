@@ -8,7 +8,7 @@ from django.contrib.auth.models import (
 )
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
+from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F, Q
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404
@@ -546,6 +546,12 @@ class WorkerPosition(AbstractActiveNamedModel):
 
 
 class EmploymentQuerySet(QuerySet):
+    def annotate_value_equality(self, annotate_name, field_name, value):
+        return self.annotate(**{annotate_name: Case(
+            When(**{field_name: value}, then=True),
+            default=False, output_field=models.BooleanField()
+        )})
+
     def last_hired(self):
         last_hired_subq = self.filter(user_id=OuterRef('user_id')).order_by('-dt_hired').values('id')[:1]
         return self.filter(

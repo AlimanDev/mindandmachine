@@ -1,3 +1,4 @@
+import uuid
 from datetime import timedelta, time, datetime, date
 
 from django.core import mail
@@ -7,7 +8,7 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup, Network
+from src.base.models import FunctionGroup, Network, Employment
 from src.timetable.models import (
     WorkerDay,
     AttendanceRecords,
@@ -1040,6 +1041,41 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
         wd.refresh_from_db()
         self.assertFalse(wd.is_vacancy)
+
+    def test_inactive_employment_replaced_by_active(self):
+        Employment.objects.filter(id=self.employment2.id).update(
+            dt_hired=self.dt - timedelta(days=100),
+            dt_fired=self.dt - timedelta(days=1),
+        )
+        e2_2 = Employment.objects.create(
+            network=self.network,
+            code=f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
+            user=self.user2,
+            shop=self.shop2,
+            function_group=self.employee_group,
+            dt_hired=self.dt,
+            dt_fired=self.dt + timedelta(days=100),
+        )
+        data = {
+            "shop_id": self.shop2.id,
+            "worker_id": self.user2.id,
+            "employment_id": self.employment2.id,
+            "dt": self.dt,
+            "is_fact": False,
+            "is_approved": False,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(10, 0, 0)),
+            "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type2.id}
+            ]
+        }
+        resp = self.client.post(self.get_url('WorkerDay-list'), data, format='json')
+        self.assertEqual(resp.status_code, 201)
+        resp_data = resp.json()
+        wd = WorkerDay.objects.get(id=resp_data['id'])
+        self.assertEqual(wd.employment.id, e2_2.id)
 
     # def test_cant_create_fact_worker_day_when_there_is_no_plan(self):
     #     data = {

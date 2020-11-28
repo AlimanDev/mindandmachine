@@ -196,27 +196,22 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             dt_from=validated_data.get('dt'),
             dt_to=validated_data.get('dt'),
             user_id=validated_data.get('worker_id'),
-        ).values('id', 'shop_id'))
+        ).annotate_value_equality(
+            'is_equal_employments', 'id', validated_data.get('employment_id'),
+        ).annotate_value_equality(
+            'is_equal_shops', 'shop_id', validated_data.get('shop_id'),
+        ).order_by(
+            '-is_equal_shops', '-is_equal_employments',
+        ).values(
+            'id', 'shop_id', 'is_equal_shops',
+        ))
 
         if not worker_active_empls:
             raise self.fail('no_active_employments')
 
-        worker_active_empl_in_wd_shop = None
-        for worker_active_empl in worker_active_empls:
-            if validated_data.get('shop_id') == worker_active_empl['shop_id']:
-                worker_active_empl_in_wd_shop = worker_active_empl
-                break
-
-        if worker_active_empl_in_wd_shop:
-            validated_data['is_vacancy'] = False
-        else:
-            validated_data['is_vacancy'] = True
-
-        if validated_data.get('employment_id') is None:
-            if worker_active_empl_in_wd_shop:
-                validated_data['employment_id'] = worker_active_empl_in_wd_shop['id']
-            else:
-                validated_data['employment_id'] = worker_active_empls[0]['id']
+        worker_active_empl = worker_active_empls[0]
+        validated_data['employment_id'] = worker_active_empl['id']
+        validated_data['is_vacancy'] = not worker_active_empl['is_equal_shops']
 
     def create(self, validated_data):
         with transaction.atomic():
