@@ -8,7 +8,7 @@ from django.contrib.auth.models import (
 )
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F, Q
+from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404
@@ -47,6 +47,9 @@ class Network(AbstractActiveModel):
     )
     enable_camera_ticks = models.BooleanField(
         default=False, verbose_name='Включить отметки по камере в мобильной версии')
+    clean_wdays_on_employment_dt_change = models.BooleanField(
+        default=False, verbose_name='Запускать скрипт очистки дней при изменении дат трудойстройства',
+    )
 
     def get_department(self):
         return None
@@ -600,7 +603,7 @@ class Employment(AbstractActiveModel):
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
     is_visible = models.BooleanField(default=True)
 
-    position_tracker = FieldTracker(fields=['position'])
+    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired'])
 
     objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
 
@@ -648,7 +651,7 @@ class Employment(AbstractActiveModel):
 
         force_create_work_types = kwargs.pop('force_create_work_types', False)
         is_new = self.pk is None
-        position_has_changed = self.position_tracker.has_changed('position')
+        position_has_changed = self.tracker.has_changed('position')
         res = super().save(*args, **kwargs)
         # при создании трудоустройства или при смене должности проставляем типы работ по умолчанию
         if force_create_work_types or is_new or position_has_changed:
@@ -677,7 +680,7 @@ class Employment(AbstractActiveModel):
                     ) for work_type in work_types
                 )
         # при смене должности пересчитываем рабочие часы в будущем
-        if position_has_changed:
+        if not is_new and position_has_changed:
             from django.apps import apps
             from django.db.models import When, Case, Q, F, DurationField, Value, Subquery, OuterRef
             from django.db.models.functions import Cast, Coalesce
@@ -722,6 +725,26 @@ class Employment(AbstractActiveModel):
                         hours_plan=Cast(F('hours_plan_0') - breaktime_plan, DurationField()),
                     ).values('hours_plan')[:1]
                 ), datetime.timedelta(0))
+            )
+
+        if not is_new and (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired')) and \
+                self.network.clean_wdays_on_employment_dt_change:
+            from src.celery.tasks import clean_wdays
+            from src.timetable.models import WorkerDay
+            from src.util.models_converter import Converter
+            clean_wdays.apply_async(
+                kwargs={
+                    'filter_kwargs': {
+                        'type': WorkerDay.TYPE_WORKDAY,
+                        'employment_id': self.id,
+                    },
+                    'exclude_kwargs': {
+                        'dt__gte': Converter.convert_date(self.dt_hired),
+                        'dt__lt': Converter.convert_date(self.dt_fired),
+                    },
+                    'only_logging': False,
+                },
+                countdown=60 * 5,
             )
 
         return res

@@ -26,6 +26,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
 
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
+        self.employment2.network.refresh_from_db()
 
     def _create_employment(self):
         data = {
@@ -257,3 +258,49 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.client.force_authenticate(user=self.user8)
         self._test_get_empls(check_length=8)
         self._test_get_empls(extra_params={'mine': True}, check_length=1)
+
+    def test_inactive_wdays_deleted_on_save(self):
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            dt = datetime.today()
+            self.network.clean_wdays_on_employment_dt_change = True
+            self.network.save()
+
+            wd1 = WorkerDay.objects.create(
+                shop=self.shop,
+                worker=self.user2,
+                employment=self.employment2,
+                dt=dt + timedelta(days=50),
+                is_fact=False,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(8, 0, 0)),
+                dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
+                is_approved=True,
+            )
+            wd2 = WorkerDay.objects.create(
+                shop=self.shop,
+                worker=self.user2,
+                employment=self.employment2,
+                dt=dt + timedelta(days=25),
+                is_fact=False,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(8, 0, 0)),
+                dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
+                is_approved=True,
+            )
+            wd_holiday = WorkerDay.objects.create(
+                shop=self.shop,
+                worker=self.user2,
+                employment=self.employment2,
+                dt=dt + timedelta(days=20),
+                is_fact=False,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_approved=True,
+            )
+            wd_count_before_save = WorkerDay.objects.count()
+            self.employment2.dt_hired = dt
+            self.employment2.dt_fired = dt + timedelta(days=30)
+            self.employment2.save()
+            self.assertFalse(WorkerDay.objects.filter(id=wd1.id).exists())
+            self.assertTrue(WorkerDay.objects.filter(id=wd2.id).exists())
+            self.assertTrue(WorkerDay.objects.filter(id=wd_holiday.id).exists())
+            self.assertEqual(WorkerDay.objects.count(), wd_count_before_save - 1)

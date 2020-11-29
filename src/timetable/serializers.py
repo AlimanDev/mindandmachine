@@ -238,7 +238,6 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         with transaction.atomic():
             details = validated_data.pop('worker_day_details', [])
-
             if not instance.is_fact:
                 WorkerDayCashboxDetails.objects.filter(worker_day=instance).delete()
                 for wd_detail in details:
