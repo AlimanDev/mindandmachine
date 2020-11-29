@@ -208,6 +208,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             WorkerDay.objects.create(
                 employment_id=resp['id'],
                 worker=self.user2,
+                type=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt + timedelta(i), time(10)),
                 dttm_work_end=datetime.combine(dt + timedelta(i), time(20)),
                 shop=self.shop,
