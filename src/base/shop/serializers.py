@@ -60,10 +60,11 @@ class ShopSerializer(serializers.ModelSerializer):
     distance = serializers.SerializerMethodField(label='Расстояние до магазина (км)')
 
     def get_distance(self, shop):
-        lat = self.context.get('request').META.get('X-LAT')
-        lon = self.context.get('request').META.get('X-LON')
-        if lat and lon and shop.latitude and shop.longitude:
-            return round(geopy.distance.distance((lat, lon), (shop.latitude, shop.longitude)).km, 2)
+        if self.context.get('request', False):
+            lat = self.context.get('request').META.get('X-LAT')
+            lon = self.context.get('request').META.get('X-LON')
+            if lat and lon and shop.latitude and shop.longitude:
+                return round(geopy.distance.distance((lat, lon), (shop.latitude, shop.longitude)).km, 2)
 
     class Meta:
         model = Shop
