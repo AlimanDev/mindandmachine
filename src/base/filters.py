@@ -46,6 +46,7 @@ class UserFilter(FilterSet):
     shop_code = CharFilter(field_name='employments__shop__code', label='Код магазина')
     shop_code__in = CharFilter(field_name='employments__shop__code', method='field_in')
     last_name = CharFilter(field_name='last_name', lookup_expr='icontains')
+    first_name = CharFilter(field_name='first_name', lookup_expr='icontains')
     position_id__in = CharFilter(field_name='employments__position_id', method='field_in')
     work_type_id__in = CharFilter(field_name='employments__work_types__work_type__work_type_name_id', method='field_in')
     worker_day_type__in = CharFilter(field_name='worker_day__type', method='field_in')
