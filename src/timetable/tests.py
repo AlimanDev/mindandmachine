@@ -665,7 +665,17 @@ class TestWorkerDay(APITestCase):
         self.assertIn('work_hours_details', resp_data[0])
         self.assertDictEqual({'D': 4.71, 'N': 4.38}, resp_data[0]['work_hours_details'])
 
-    def test_get_hours_details_and_work_hours_as_decimal_for_plan_approved(self):
+    def test_work_hours_as_decimal_for_plan_approved(self):
+        get_params = {'shop_id': self.shop.id,
+                      'dt__gte': self.worker_day_plan_approved.dt,
+                      'dt__lte': self.worker_day_plan_approved.dt,
+                      'is_fact': False, 'is_approved': True}
+        resp = self.client.get('/rest_api/worker_day/', data=get_params)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['work_hours'], 10.75)
+
+    def test_get_hours_details_for_plan_approved(self):
         get_params = {'shop_id': self.shop.id,
                       'dt__gte': self.worker_day_plan_approved.dt,
                       'dt__lte': self.worker_day_plan_approved.dt,
