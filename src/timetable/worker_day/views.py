@@ -133,9 +133,8 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         super().perform_destroy(worker_day)
 
     def list(self, request):
-        is_tabel = request.query_params.get('is_tabel', False)
-        fact_tabel = request.query_params.get('fact_tabel', False)
-        if request.query_params.get('hours_details', False) and (is_tabel or fact_tabel):
+        if request.query_params.get('hours_details', False):
+            is_tabel = request.query_params.get('is_tabel', False)
             data = []
             def _time_to_float(t):
                 return t.hour + t.minute / 60 + t.second / 3600

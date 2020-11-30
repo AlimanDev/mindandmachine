@@ -527,9 +527,9 @@ class TestWorkerDay(APITestCase):
         self.worker_day_fact_approved.dttm_work_start = fact_dttm_work_start
         self.worker_day_fact_approved.dttm_work_end = fact_dttm_work_end
         self.worker_day_fact_approved.save()
-        get_params = {'shop_id': self.shop.id, 'limit': 100, 'hours_details': 'true',
-                      'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
-                      'dt__lte': self.dt.strftime('%Y-%m-%d'), tabel_kwarg: 'true'}
+        get_params = {'shop_id': self.shop.id, 'limit': 100,
+                      'dt__gte': (self.dt - timedelta(days=5)),
+                      'dt__lte': self.dt, tabel_kwarg: 'true'}
         get_params.update(extra_get_params or {})
         response = self.client.get('/rest_api/worker_day/', data=get_params)
         self.assertEqual(response.status_code, 200)
@@ -665,6 +665,28 @@ class TestWorkerDay(APITestCase):
         self.assertIn('work_hours_details', resp_data[0])
         self.assertDictEqual({'D': 4.71, 'N': 4.38}, resp_data[0]['work_hours_details'])
 
+    def test_work_hours_as_decimal_for_plan_approved(self):
+        get_params = {'shop_id': self.shop.id,
+                      'dt__gte': self.worker_day_plan_approved.dt,
+                      'dt__lte': self.worker_day_plan_approved.dt,
+                      'is_fact': False, 'is_approved': True}
+        resp = self.client.get('/rest_api/worker_day/', data=get_params)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['work_hours'], 10.75)
+
+    def test_get_hours_details_for_plan_approved(self):
+        get_params = {'shop_id': self.shop.id,
+                      'dt__gte': self.worker_day_plan_approved.dt,
+                      'dt__lte': self.worker_day_plan_approved.dt,
+                      'is_fact': False, 'is_approved': True, 'hours_details': True}
+        resp = self.client.get('/rest_api/worker_day/', data=get_params)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['work_hours'], 10.75)
+        self.assertIn('work_hours_details', resp_data[0])
+        self.assertDictEqual({'D': 10.75}, resp_data[0]['work_hours_details'])
+
     def test_get_fact_tabel(self):
         plan_dttm_work_start = datetime.combine(self.dt, time(12, 0, 0))
         plan_dttm_work_end = datetime.combine(self.dt + timedelta(days=1), time(3, 0, 0))
@@ -739,8 +761,8 @@ class TestWorkerDay(APITestCase):
             'worker__username__in': self.user2.username,
             'is_fact': 'true',
             'is_approved': 'true',
-            'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
-            'dt__lte': self.dt.strftime('%Y-%m-%d'),
+            'dt__gte': (self.dt - timedelta(days=5)),
+            'dt__lte': self.dt,
             'by_code': 'true',
         }
         response = self.client.get('/rest_api/worker_day/', data=get_params)
