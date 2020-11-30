@@ -89,11 +89,12 @@ class ShopSerializer(serializers.ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         super(ShopSerializer, self).__init__(*args, **kwargs)
-        self.fields['code'].validators.append(
-            UniqueValidator(
-                Shop.objects.filter(network=self.context.get('request').user.network)
+        if self.context.get('request', False):
+            self.fields['code'].validators.append(
+                UniqueValidator(
+                    Shop.objects.filter(network=self.context.get('request').user.network)
+                )
             )
-        )
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
