@@ -212,7 +212,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
         worker_active_empl = worker_active_empls[0]
         validated_data['employment_id'] = worker_active_empl['id']
-        validated_data['is_vacancy'] = not worker_active_empl['is_equal_shops']
+        validated_data['is_vacancy'] = validated_data.get('is_vacancy') or not worker_active_empl['is_equal_shops']
 
     def create(self, validated_data):
         with transaction.atomic():

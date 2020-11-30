@@ -493,18 +493,24 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
 
         employment = Employment.objects.get_active(
                 user.network_id, dt_from=vacancy.dt, dt_to=vacancy.dt, user=user
-        ).last() or user_worker_day.employment
+        ).last()
+
+        # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
+        # TODO: сделать более информативные сообщения об ошибками
+        if not employment:
+            res['code'] = 'cant_apply_vacancy'
+            res['status_code'] = 400
+            return res
 
         # сотрудник из другой сети не может принять вакансию если это не аутсорс вакансия
-        if not vacancy.is_outsource and employment and \
-                employment.shop.network_id != vacancy_shop.network_id:
+        if not vacancy.is_outsource and employment.shop.network_id != vacancy_shop.network_id:
             res['code'] = 'cant_apply_vacancy'
             res['status_code'] = 400
             return res
 
         # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
         update_condition = user_worker_day.type not in WorkerDay.TYPES_PAID
-        if employment and employment.shop_id != vacancy_shop.id and not exchange:
+        if employment.shop_id != vacancy_shop.id and not exchange:
             try:
                 tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
             except ShopMonthStat.DoesNotExist:
