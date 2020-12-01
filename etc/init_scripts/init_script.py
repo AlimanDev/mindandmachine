@@ -24,6 +24,10 @@ class ServerConfig:
         
 
     def remove_changes(self, name):
+        os.system(f'rm /etc/supervisor/conf.d/{name}_celery.conf')
+        os.system(f'rm /etc/supervisor/conf.d/{name}_celerybeat.conf')
+        os.system(f'rm /etc/supervisor/conf.d/{name}_uwsgi.conf')
+        os.system('supervisorctl update')
         os.system(f'userdel {name}')
         os.system(f'sudo -u postgres psql -c "DROP DATABASE {name};"')
         os.system(f'sudo -u postgres psql -c "DROP ROLE {name};"')
@@ -34,11 +38,7 @@ class ServerConfig:
         os.system(f'rm /etc/nginx/sites-enabled/{name}.conf')
         os.system(f'rm /etc/nginx/sites-available/{name}-urv.conf')
         os.system(f'rm /etc/nginx/sites-enabled/{name}-urv.conf')
-        os.system(f'rm /etc/supervisor/conf.d/{name}_celery.conf')
-        os.system(f'rm /etc/supervisor/conf.d/{name}_celerybeat.conf')
-        os.system(f'rm /etc/supervisor/conf.d/{name}_uwsgi.conf')
         os.system(f'service nginx restart')
-        os.system('supervisorctl update')
 
     def add_repos(self, name, branch, db_info):
         # нужно чтобы бд c таким именем уже была

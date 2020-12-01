@@ -94,7 +94,7 @@ def main(lang='ru', need_test_shop=False):
     super_shop.name = 'Корневой магазин'
     super_shop.save()
     network = Network.objects.first()
-    create_group_functions(network=network)
+    create_group_functions(network=network, path='../scripts/function_group_default.xlsx')
     admin = User.objects.create(
         is_staff=True,
         is_superuser=True,
