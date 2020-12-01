@@ -93,13 +93,15 @@ def main(lang='ru', need_test_shop=False):
     super_shop = Shop.objects.first()
     super_shop.name = 'Корневой магазин'
     super_shop.save()
-    create_group_functions(network=Network.objects.first())
+    network = Network.objects.first()
+    create_group_functions(network=network)
     admin = User.objects.create(
         is_staff=True,
         is_superuser=True,
         username='qadmin',
         first_name='Admin',
         last_name='Admin',
+        network=network,
     )
     Employment.objects.create(
         user=admin,
@@ -122,6 +124,7 @@ def main(lang='ru', need_test_shop=False):
             region_id=region.id,
             tm_open_dict='{"all":"07:00:00"}',
             tm_close_dict='{"all":"23:00:00"}',
+            network=network,
         )
         for i in range(5):
             u = User.objects.create(
@@ -129,6 +132,7 @@ def main(lang='ru', need_test_shop=False):
                 first_name=f'{i + 1}',
                 last_name='сотрудник',
                 middle_name='',
+                network=network,
             )
             u.username = f'u{u.id}'
             u.save()
@@ -145,6 +149,7 @@ def main(lang='ru', need_test_shop=False):
                 work_type_names[work_type] =  WorkTypeName.objects.create(
                     name=work_type,
                     code=last_work_type_code,
+                    network=network,
                 )
             work_type = WorkType.objects.create(work_type_name=work_type_names[work_type], shop_id=shop.id)
             if work_type not in operation_type_names:
@@ -152,12 +157,13 @@ def main(lang='ru', need_test_shop=False):
                 operation_type_names[work_type] =  OperationTypeName.objects.create(
                     name=work_type,
                     code=last_operation_type_code,
+                    network=network,
                 )
             operation_types.append(OperationType(operation_type_name=operation_type_names[work_type], work_type=work_type))
         OperationType.objects.bulk_create(operation_types)
         fill_demand(shop)
     Shop.objects.rebuild()
-    ExchangeSettings.objects.create()
+    ExchangeSettings.objects.create(network=network)
 
 
 if __name__ == "__main__":

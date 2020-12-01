@@ -25,7 +25,6 @@ class ServerConfig:
 
     def remove_changes(self, name):
         os.system(f'userdel {name}')
-        os.system(f'{self.PATH_PREFIX}/servers/{name}/backend/bin/uwsgi --stop /var/servers/{name}/backend/qos.pid\n')
         os.system(f'sudo -u postgres psql -c "DROP DATABASE {name};"')
         os.system(f'sudo -u postgres psql -c "DROP ROLE {name};"')
         os.system(f'rm -r {self.PATH_PREFIX}/servers/{name}')
@@ -132,7 +131,7 @@ class ServerConfig:
             ))
 
         os.system(f'ln -s /etc/nginx/sites-available/{name}.conf /etc/nginx/sites-enabled/')
-        with open('time_attendance_nginx_template') as f:
+        with open('urv_nginx_template') as f:
             server_nginx = f.read()
 
         with open(f'/etc/nginx/sites-available/{name}-urv.conf', 'w+') as f:
