@@ -494,14 +494,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                     is_approved=range['is_approved'],
                     is_fact=range['is_fact'],
                 ).exclude(
-                    id__in=Subquery(
-                        WorkerDay.objects.filter(
-                            dt=OuterRef('dt'),
-                            worker=OuterRef('worker'),
-                            is_approved=OuterRef('is_approved'),
-                            is_fact=OuterRef('is_fact'),
-                            type=range['type'],
-                        ).order_by('created_by').values_list('id')[:1]),  # оставляем тех, у кого есть created_by
+                    type=range['type'],
                 ).delete()
 
                 existing_dates = list(WorkerDay.objects.filter(
@@ -529,7 +522,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 WorkerDay.objects.bulk_create(wdays_to_create)
 
                 res[range['worker'].tabel_code] = {
-                    'deleted_count': deleted[0],
+                    'deleted_count': deleted[1].get('timetable.WorkerDay', 0),
                     'existing_count': len(existing_dates),
                     'created_count': len(wdays_to_create)
                 }

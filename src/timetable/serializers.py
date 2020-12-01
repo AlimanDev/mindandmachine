@@ -442,6 +442,11 @@ class ChangeRangeSerializer(serializers.Serializer):
         self.fields['worker'] = serializers.SlugRelatedField(
             slug_field='tabel_code', queryset=User.objects.filter(network=self.context['request'].user.network))
 
+    def validate(self, data):
+        if not data['dt_to'] >= data['dt_from']:
+            raise serializers.ValidationError("dt_to must be greater than or equal to dt_from")
+        return data
+
 
 class ChangeRangeListSerializer(serializers.Serializer):
     def __init__(self, *args, **kwargs):
