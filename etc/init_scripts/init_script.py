@@ -158,10 +158,10 @@ class ServerConfig:
         with open('celery_template') as f:
             celery_conf = f.read()
 
-        with open('celerybeat_template') as f
+        with open('celerybeat_template') as f:
             celerybeat_conf = f.read()
 
-        with open('uwsgi_supervisor_template') as f
+        with open('uwsgi_supervisor_template') as f:
             uwsgi_conf = f.read()
 
         with open(f'/etc/supervisor/conf.d/{name}_celery.conf', 'w') as f:
