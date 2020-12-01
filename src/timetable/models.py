@@ -975,58 +975,36 @@ class AttendanceRecords(AbstractModel):
         Создание WorkerDay при занесении отметок.
 
         При создании отметки время о приходе или уходе заносится в фактический подтвержденный график WorkerDay.
-        Если подтвержденного факта нет - создаем новый подтвержденный факт. Неподтвержденный факт привязываем к нему.
-        Новый подтвержденный факт привязываем к плану - подтвержденному, если есть, либо неподтвержденному.
+        Если подтвержденного факта нет - создаем новый подтвержденный факт.
         """
-        super(AttendanceRecords, self).save(*args, **kwargs)
-
-        # Достаем сразу все планы и факты за день
-        worker_days = WorkerDay.objects.filter(
-            shop=self.shop,
-            worker=self.user,
-            dt=self.dttm.date(),
-        )
-
-        if len(worker_days) > 4:
-            raise ValueError(f"Worker {self.user} has too many worker days on {self.dttm.date()}")
-
-        wdays = {
-            'fact': {
-                'approved': None,
-                'not_approved': None,
-            },
-            'plan': {
-                'approved': None,
-                'not_approved': None,
-            }
-        }
-
-        for wd in worker_days:
-            key_fact = 'fact' if wd.is_fact else 'plan'
-            key_approved = 'approved' if wd.is_approved else 'not_approved'
-            wdays[key_fact][key_approved] = wd
+        res = super(AttendanceRecords, self).save(*args, **kwargs)
 
         type2dtfield = {
             self.TYPE_COMING: 'dttm_work_start',
-            self.TYPE_LEAVING: 'dttm_work_end'
+            self.TYPE_LEAVING: 'dttm_work_end',
         }
 
-        if wdays['fact']['approved']:
+        fact_approved = WorkerDay.objects.get_fact_approved(
+            dt=self.dttm.date(),
+            worker=self.user,
+            shop_id=self.shop_id,
+        ).first()
+
+        if fact_approved:
             # если это отметка о приходе, то не перезаписываем время начала работы в графике
             # если время отметки больше, чем время начала работы в существующем графике
             skip_condition = (self.type == self.TYPE_COMING) and \
-                             wdays['fact']['approved'].dttm_work_start and self.dttm > wdays['fact'][
-                                 'approved'].dttm_work_start
+                 fact_approved.dttm_work_start and self.dttm > fact_approved.dttm_work_start
             if skip_condition:
                 return
 
-            setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
-            setattr(wdays['fact']['approved'], 'type', WorkerDay.TYPE_WORKDAY)
-            wdays['fact']['approved'].save()
+            setattr(fact_approved, type2dtfield[self.type], self.dttm)
+            setattr(fact_approved, 'type', WorkerDay.TYPE_WORKDAY)
+            fact_approved.save()
         else:
             if self.type == self.TYPE_LEAVING:
                 prev_fa_wd = WorkerDay.objects.filter(
-                    shop=self.shop,
+                    shop_id=self.shop_id,
                     worker=self.user,
                     dt__lt=self.dttm.date(),
                     is_fact=True,
@@ -1059,17 +1037,20 @@ class AttendanceRecords(AbstractModel):
                 '-is_equal_shops',
             ).first()
 
-            wd = WorkerDay(
-                shop=self.shop,
-                worker=self.user,
-                employment=active_user_empl,
+            WorkerDay.objects.update_or_create(
                 dt=self.dttm.date(),
+                worker=self.user,
                 is_fact=True,
                 is_approved=True,
-                type=WorkerDay.TYPE_WORKDAY,
+                defaults={
+                    'shop_id': self.shop_id,
+                    'employment': active_user_empl,
+                    'type': WorkerDay.TYPE_WORKDAY,
+                    type2dtfield[self.type]: self.dttm,
+                }
             )
-            setattr(wd, type2dtfield[self.type], self.dttm)
-            wd.save()
+
+        return res
 
 
 class ExchangeSettings(AbstractModel):
