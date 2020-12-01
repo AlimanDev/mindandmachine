@@ -1047,10 +1047,15 @@ class AttendanceRecords(AbstractModel):
 
             dt = self.dttm.date()
             active_user_empl = Employment.objects.get_active(
-                self.user.network_id, dt_from=dt, dt_to=dt, user=self.user, shop=self.shop).last()
-            if not active_user_empl:
-                active_user_empl = Employment.objects.get_active(
-                    self.user.network_id, dt_from=dt, dt_to=dt, user=self.user).last()
+                self.user.network_id,
+                dt_from=dt,
+                dt_to=dt,
+                user_id=self.user_id,
+            ).annotate_value_equality(
+                'is_equal_shops', 'shop_id', self.shop_id,
+            ).order_by(
+                '-is_equal_shops',
+            ).first()
 
             wd = WorkerDay(
                 shop=self.shop,
