@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -69,10 +71,12 @@ class WorkerDayListSerializer(serializers.Serializer):
             self.fields['dttm_work_end'].source_attrs = ['tabel_dttm_work_end']
 
     def get_work_hours(self, obj):
-        if self.context.get('request').query_params.get('is_tabel'):
-            return getattr(obj, 'tabel_work_hours', obj.work_hours)
+        work_hours = getattr(obj, 'tabel_work_hours', obj.work_hours)
 
-        return obj.work_hours
+        if isinstance(work_hours, timedelta):
+            return round(obj.work_hours.total_seconds() / 3600, 2)
+
+        return work_hours
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):
@@ -518,3 +522,21 @@ class DownloadTabelSerializer(serializers.Serializer):
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
     shop_id = serializers.IntegerField()
     convert_to = serializers.ChoiceField(required=False, choices=['pdf', 'xlsx'], default='xlsx')
+
+
+class WsPermissionDataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkerDay
+        fields = (
+            'dt',
+            'type',
+            'is_fact',
+        )
+        extra_kwargs = {
+            "dt": {
+                "error_messages": {
+                    "required": "Поле дата не может быть пустым.",
+                    "null": "Поле дата не может быть пустым.",
+                },
+            },
+        }
