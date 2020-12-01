@@ -65,13 +65,13 @@ class ServerConfig:
         os.system("git config --global credential.helper 'cache --timeout=3600'")
 
         # backend
-        os.system(f'virtualenv --python=python3.6 {self.PATH_PREFIX}/servers/{name}/backend')
+        os.system(f'virtualenv --python=python3.6 {self.PATH_PREFIX}/servers/{name}/backend/env')
         os.system(f'git clone https://github.com/alexanderaleskin/QoS_backend.git {self.PATH_PREFIX}/servers/{name}/backend/qos')
 
         os.chdir(f'{self.PATH_PREFIX}/servers/{name}/backend/qos')
         os.system("git config --global credential.helper 'cache --timeout=3600'")
         os.system(f'git checkout {branch}')
-        os.system(f'../bin/pip install -r requirements.txt')
+        os.system(f'../env/bin/pip install -r requirements.txt')
 
         with open('src/conf/djconfig_local.py', 'w+') as f:
             f.write(local % (  # старый формат форматирования (ибо { распознается для вставки
@@ -85,8 +85,8 @@ class ServerConfig:
                 self.timetable_port,
             ))
 
-        os.system('../bin/python manage.py migrate')
-        os.system('../bin/python manage.py collectstatic')
+        os.system('../env/bin/python manage.py migrate')
+        os.system('../env/bin/python manage.py collectstatic')
 
         with open('../uwsgi.ini', 'w+') as f:
             f.write(uwsgi.format(
@@ -205,14 +205,15 @@ class ServerConfig:
 
     def add(self, name, back_branch, secret_path, public_path):
         if os.path.isdir(f'{self.PATH_PREFIX}/servers/{name}'):
-            answer = input('Project already exists! Remove? y/N')
+            answer = input(f'Project {name} already exists at {self.PATH_PREFIX}/servers/{name}!\n Remove? y/N ')
             if answer == 'y':
                 a = random.randint(0, 100)
                 b = random.randint(0, 100)
                 c = a + b
-                user_c = input(f'Are you sure? Solve this: {a} + {b} = ?')
+                user_c = input(f'Are you sure? Solve this: {a} + {b} = ')
                 if int(user_c) == c:
                     self.remove_changes(name)
+            return
 
         os.system(f'useradd -r  {name} -g wfm')
 
@@ -246,7 +247,7 @@ if __name__ == '__main__':
         sc.add(args.domain, args.back, args.ssl_secret_path, args.ssl_public_path)
         os.chdir(f'{sc.PATH_PREFIX}/servers/{args.domain}/backend/qos/etc/init_scripts/')
         #call fill db
-        res = os.system(f'../../../bin/python init_db.py --lang {args.lang} --need_test_shop {args.need_test_shop}')
+        res = os.system(f'../../../env/bin/python init_db.py --lang {args.lang} --need_test_shop {args.need_test_shop}')
         if res != 0:
             raise Exception('Error in fill_db')
     except Exception as e:
