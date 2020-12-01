@@ -21,7 +21,7 @@ db.sqlite3
 qos_backend.log*
 
 venv/*
-celerybeat*
+./celerybeat*
 docs/_*
 docs/qos*
 .vscode*

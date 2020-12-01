@@ -1,14 +1,18 @@
 [uwsgi]
-
-chdir       = /var/servers/{}/backend/qos/
-wsgi-file   = wsgi.py
-
-pidfile     = /var/servers/{}/backend/qos.pid
-
-master      = true
-processed   = 8
-threads     = 8
-http        = 127.0.0.1:{}
-
-daemonize = /var/log/servers/{}/uwsgi.log
-
+chdir        = /var/servers/{}/backend/qos/
+pidfile      = /var/servers/{}/backend/qos.pid
+socket       = /var/servers/{}/backend/uwsgi.sock
+chmod-socket = 666
+virtualenv   = /var/servers/{}/backend
+pythonpath   = .
+pythonpath   = {}
+module       = wsgi:application
+callable     = app
+master       = true
+processed    = 8
+threads      = 7
+harakiri     = 30
+socket-timeout = 300
+http-timeout = 300
+http-connect-timeout = 300
+buffer-size=32768
