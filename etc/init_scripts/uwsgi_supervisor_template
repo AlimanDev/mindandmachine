@@ -1,16 +1,16 @@
-[program:{}_uwsgi]
-environment=PATH="/var/servers/{}/backend/bin"
+[program:%s_uwsgi]
+environment=PATH="/var/servers/%s/backend/bin"
 numprocs=1
-directory=/var/servers/{}/backend/qos/
-command=/var/servers/{}/backend/bin/uwsgi --ini /var/servers/{}/backend/uwsgi.ini
-user={}
+directory=/var/servers/%s/backend/qos/
+command=/var/servers/%s/backend/bin/uwsgi --ini /var/servers/%s/backend/uwsgi.ini
+user=%s
 autostart=true
 autorestart=true
 redirect_stderr=true
 stopwaitsecs=60
 stopsignal=INT
-stderr_logfile=/var/log/servers/{}/err.log
-stdout_logfile=/var/log/servers/{}/out.log
+stderr_logfile=/var/log/servers/%s/err.log
+stdout_logfile=/var/log/servers/%s/out.log
 stdout_logfile_maxbytes=100MB
 stdout_logfile_backups=30
 stdout_capture_maxbytes=1MB
