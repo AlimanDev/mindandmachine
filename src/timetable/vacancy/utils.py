@@ -491,16 +491,24 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             res['status_code'] = 400
             return res
 
-        employment = Employment.objects.get_active(
-                user.network_id, dt_from=vacancy.dt, dt_to=vacancy.dt, user=user
-        ).last()
+        active_employments = list(Employment.objects.get_active(
+                user.network_id, dt_from=vacancy.dt, dt_to=vacancy.dt, user=user,
+        ).select_related(
+            'shop',
+        ).annotate_value_equality(
+            'is_equal_shops', 'shop_id', vacancy.shop_id,
+        ).order_by(
+            '-is_equal_shops',
+        ))
 
         # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
-        # TODO: сделать более информативные сообщения об ошибками
-        if not employment:
+        # TODO: сделать более информативные сообщения об ошибках
+        if not active_employments:
             res['code'] = 'cant_apply_vacancy'
             res['status_code'] = 400
             return res
+
+        employment = active_employments[0]
 
         # сотрудник из другой сети не может принять вакансию если это не аутсорс вакансия
         if not vacancy.is_outsource and employment.shop.network_id != vacancy_shop.network_id:
