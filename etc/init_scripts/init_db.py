@@ -46,7 +46,7 @@ def fill_demand(shop):
     dt_from = date.today().replace(day=1)
     dt_to = dt_from + relativedelta(months=2)
     dttms = [
-        datetime.combine(dt_from + timedelta(i), time(tm_from.hour + j))
+        datetime.combine(dt_from + timedelta(i), time(j))
         for i in range((dt_to - dt_from).days)
         for j in range(24)
     ]
