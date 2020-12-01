@@ -1,5 +1,5 @@
 [program:%s_celery]
-command=/var/servers/%s/backend/venv/bin/celery -A src.celery worker --loglevel=INFO -Q %s_queue
+command=/var/servers/%s/backend/bin/celery -A src.celery worker --loglevel=INFO -Q %s_queue
 directory=/var/servers/%s/backend/qos/
 user=%s
 numprocs=1

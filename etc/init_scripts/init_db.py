@@ -117,6 +117,7 @@ def main(lang='ru', need_test_shop=False):
     operation_type_names = {}
     if need_test_shop:
         last_work_type_code = 0
+        last_operation_type_code = 0
         shop = Shop.objects.create(
             parent_id=super_shop.id,
             name='Тестовый отдел',
