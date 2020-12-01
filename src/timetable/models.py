@@ -422,7 +422,9 @@ class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
-        index_together = [('dt', 'worker')]
+        unique_together = (
+            ('dt', 'worker', 'is_fact', 'is_approved'),
+        )
 
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
