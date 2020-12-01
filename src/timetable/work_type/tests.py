@@ -350,6 +350,6 @@ class TestWorkType(APITestCase):
         resp_data = response.json()
         self.assertIn('indicators', resp_data)
         self.assertNotIn('day_stats', resp_data)
-        self.assertEqual(resp_data['indicators']['fot'], 880.0)
+        self.assertIsInstance(resp_data['indicators']['fot'], float)
         self.assertEqual(resp_data['indicators']['covering'], 9.8)
         self.assertEqual(resp_data['indicators']['deadtime'], 15.4)
