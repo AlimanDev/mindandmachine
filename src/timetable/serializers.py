@@ -96,7 +96,6 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     employment_id = serializers.IntegerField(required=False, allow_null=True)
     shop_id = serializers.IntegerField(required=False)
     parent_worker_day_id = serializers.IntegerField(required=False, read_only=True)
-    is_fact = serializers.BooleanField(required=False)
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
     type = serializers.CharField(required=True)
@@ -113,6 +112,14 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                   'crop_work_hours_by_shop_schedule']
         read_only_fields = ['work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
+        extra_kwargs = {
+            'is_fact': {
+                'required': False,
+            },
+            'is_approved': {
+                'default': False,
+            }
+        }
 
     def validate(self, attrs):
         if self.instance and self.instance.is_approved:

@@ -44,8 +44,6 @@ class WorkerDayFactory(factory.django.DjangoModelFactory):
     )
     worker = factory.SubFactory('src.base.tests.factories.UserFactory')
     type = factory.LazyFunction(lambda: random.choice(WorkerDay.TYPES_USED))
-    is_fact = factory.LazyFunction(lambda: random.choice([True, False]))
-    is_approved = factory.LazyFunction(lambda: random.choice([True, False]))
 
     class Meta:
         model = WorkerDay

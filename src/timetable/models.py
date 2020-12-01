@@ -573,7 +573,7 @@ class WorkerDay(AbstractModel):
     parent_worker_day = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child') # todo: remove
     work_hours = models.DurationField(default=datetime.timedelta(days=0))
 
-    is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
+    is_fact = models.BooleanField(default=False)  # плановое или фактическое расписание
     is_vacancy = models.BooleanField(default=False)  # вакансия ли это
     dttm_added = models.DateTimeField(default=timezone.now)
     canceled = models.BooleanField(default=False)
