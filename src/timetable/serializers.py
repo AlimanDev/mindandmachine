@@ -202,7 +202,17 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def _create_update_clean(self, validated_data):
+    def _create_update_clean(self, validated_data, instance=None):
+        wdays_qs = WorkerDay.objects.filter(
+            worker_id=validated_data.get('worker_id'),
+            dt=validated_data.get('dt'),
+            is_approved=validated_data.get('is_approved'),
+            is_fact=validated_data.get('is_fact'),
+        )
+        if instance:
+            wdays_qs = wdays_qs.exclude(id=instance.id)
+        wdays_qs.delete()
+
         worker_active_empls = list(Employment.objects.get_active(
             network_id=self.context['request'].user.network_id,
             dt_from=validated_data.get('dt'),
@@ -221,23 +231,15 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         if not worker_active_empls:
             raise self.fail('no_active_employments')
 
-        worker_active_empl = worker_active_empls[0]
-        validated_data['employment_id'] = worker_active_empl['id']
-        validated_data['is_vacancy'] = validated_data.get('is_vacancy') or not worker_active_empl['is_equal_shops']
+        if validated_data.get('type') in WorkerDay.TYPES_WITH_TM_RANGE:
+            worker_active_empl = worker_active_empls[0]
+            validated_data['employment_id'] = worker_active_empl['id']
+            validated_data['is_vacancy'] = validated_data.get('is_vacancy') or not worker_active_empl['is_equal_shops']
 
     def create(self, validated_data):
         with transaction.atomic():
-            if validated_data.get('worker_id') and \
-                    validated_data.get('type') == WorkerDay.TYPE_WORKDAY and validated_data.get('shop_id'):
-                self._create_update_clean(validated_data)
-
             if validated_data.get('worker_id'):
-                WorkerDay.objects.filter(
-                    worker_id=validated_data.get('worker_id'),
-                    dt=validated_data.get('dt'),
-                    is_approved=validated_data.get('is_approved'),
-                    is_fact=validated_data.get('is_fact'),
-                ).delete()
+                self._create_update_clean(validated_data)
 
             details = validated_data.pop('worker_day_details', None)
             worker_day = WorkerDay.objects.create(**validated_data)
@@ -255,19 +257,10 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 for wd_detail in details:
                     WorkerDayCashboxDetails.objects.create(worker_day=instance, **wd_detail)
 
-            if validated_data.get('worker_id') and \
-                    validated_data.get('type') == WorkerDay.TYPE_WORKDAY and validated_data.get('shop_id'):
-                self._create_update_clean(validated_data)
+            if validated_data.get('worker_id'):
+                self._create_update_clean(validated_data, instance=instance)
 
-            res = super().update(instance, validated_data)
-            if instance.worker_id:
-                WorkerDay.objects.filter(
-                    worker_id=instance.worker_id,
-                    dt=instance.dt,
-                    is_approved=instance.is_approved,
-                    is_fact=instance.is_fact,
-                ).exclude(id=instance.id).delete()
-            return res
+            return super().update(instance, validated_data)
 
     def to_internal_value(self, data):
         data = super(WorkerDaySerializer, self).to_internal_value(data)
