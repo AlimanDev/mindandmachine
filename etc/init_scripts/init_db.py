@@ -43,14 +43,12 @@ from src.util.models_converter import Converter
 
 def fill_demand(shop):
     period_clients = []
-    tm_from = shop.tm_shop_opens
-    tm_to = shop.tm_shop_closes
     dt_from = date.today().replace(day=1)
     dt_to = dt_from + relativedelta(months=2)
     dttms = [
         datetime.combine(dt_from + timedelta(i), time(tm_from.hour + j))
         for i in range((dt_to - dt_from).days)
-        for j in range((tm_to.hour - tm_from.hour) + 1)
+        for j in range(24)
     ]
     period_clients = [
         PeriodClients(

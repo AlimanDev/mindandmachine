@@ -202,8 +202,6 @@ class ServerConfig:
             )
 
         os.system('supervisorctl update')
-        os.system(f'supervisorctl start {name}_celery {name}_celerybeat {name}_uwsgi')
-
 
     def add(self, name, back_branch, secret_path, public_path):
         if os.path.isdir(f'{self.PATH_PREFIX}/servers/{name}'):
