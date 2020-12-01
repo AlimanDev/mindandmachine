@@ -213,7 +213,7 @@ class ServerConfig:
                 user_c = input(f'Are you sure? Solve this: {a} + {b} = ')
                 if int(user_c) == c:
                     self.remove_changes(name)
-            return
+            exit()
 
         os.system(f'useradd -r  {name} -g wfm')
 
