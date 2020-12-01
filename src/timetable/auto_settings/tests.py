@@ -1,19 +1,16 @@
 import json
 from datetime import datetime, time, date, timedelta
 
-from rest_framework.test import APITestCase
+from django.test import override_settings
 from django.utils.timezone import now
-from django.conf import settings
+from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup
-from src.timetable.models import ShopMonthStat, WorkerDay, WorkerDayCashboxDetails,WorkType, WorkTypeName
+from src.timetable.models import ShopMonthStat, WorkerDay, WorkerDayCashboxDetails, WorkType, WorkTypeName
 from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
 
 
-settings.CELERY_TASK_ALWAYS_EAGER = True
-
-
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 class TestAutoSettings(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"

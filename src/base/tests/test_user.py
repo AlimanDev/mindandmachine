@@ -71,7 +71,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         response = self.client.get(
             self.url,
         )
-        self.assertEqual(len(response.json()), 7)
+        self.assertEqual(len(response.json()), 8)
         response = self.client.get(
             self.url + f'?shop_id__in={self.root_shop.id}',
         )
@@ -86,7 +86,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         response = self.client.get(
             self.url,
         )
-        self.assertEqual(len(response.json()), 7)
+        self.assertEqual(len(response.json()), 8)
         response = self.client.get(
             self.url + f'?position_id__in={self.position1.id}',
         )
@@ -101,7 +101,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         response = self.client.get(
             self.url,
         )
-        self.assertEqual(len(response.json()), 7)
+        self.assertEqual(len(response.json()), 8)
         response = self.client.get(
             self.url + f'?work_type_id__in={self.wt_name.id}',
         )
@@ -117,7 +117,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             self.url,
         )
         dt_now = date.today()
-        self.assertEqual(len(response.json()), 7)
+        self.assertEqual(len(response.json()), 8)
         WorkerDay.objects.create(
             worker=self.user1,
             type=WorkerDay.TYPE_HOLIDAY,

@@ -207,12 +207,14 @@ class TestAutoWorkerExchange(TestCase):
     def create_users(self, quantity):
         for number in range(1, quantity + 1):
             user = User.objects.create_user(
+                network=self.network,
                 username='User{}'.format(number),
                 email='test{}@test.ru'.format(number),
                 last_name='Имя{}'.format(number),
                 first_name='Фамилия{}'.format(number)
             )
             emp = Employment.objects.create(
+                network=self.network,
                 shop=self.shop2,
                 user=user,
                 dt_hired=self.dt_now - datetime.timedelta(days=1),

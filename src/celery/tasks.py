@@ -45,6 +45,7 @@ from src.timetable.models import (
     ExchangeSettings,
     WorkerDay,
 )
+from src.timetable.utils import CleanWdaysHelper
 from src.timetable.vacancy.utils import (
     create_vacancies_and_notify,
     cancel_vacancies,
@@ -742,3 +743,13 @@ def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
         create_mda_user_to_shop_relation(username=wd['worker__username'], shop_code=wd['shop__code'])
         if delay_sec:
             time_in_secs.sleep(delay_sec)
+
+
+@app.task
+def clean_wdays(filter_kwargs: dict = None, exclude_kwargs: dict = None, only_logging=True):
+    clean_wdays_helper = CleanWdaysHelper(
+        filter_kwargs=filter_kwargs,
+        exclude_kwargs=exclude_kwargs,
+        only_logging=only_logging,
+    )
+    clean_wdays_helper.run()
