@@ -85,16 +85,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 user_login=F('worker__username'),
             )
 
-        if self.action == 'list':
-            # временно, пока не решим проблему коллизий дней
-            ordered_subq = queryset.filter(
-                dt=OuterRef('dt'),
-                worker_id=OuterRef('worker_id'),
-                is_fact=OuterRef('is_fact'),
-                is_approved=OuterRef('is_approved'),
-            ).order_by('-is_vacancy', '-id').values_list('id')[:1]
-            queryset = queryset.filter(id=Subquery(ordered_subq))
-
         return queryset
 
     # тут переопределяется update а не perform_update потому что надо в Response вернуть
