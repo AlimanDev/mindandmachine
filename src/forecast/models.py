@@ -293,13 +293,12 @@ class PeriodClientsManager(models.Manager):
                 tm_start = v
                 tm_end = shop.close_times[k]
                 week_day = (int(k) + 2) % 7 or 7
+                if tm_end == datetime.time(0):
+                    tm_end = datetime.time(23, 59)
                 if tm_start < tm_end:
                     filt |= (models.Q(dttm_forecast__week_day=week_day) & (models.Q(dttm_forecast__time__gte=tm_start) & models.Q(dttm_forecast__time__lt=tm_end)))
                 elif tm_start > tm_end:
-                    if tm_end == datetime.time(0):
-                        filt |= (models.Q(dttm_forecast__week_day=week_day) & (models.Q(dttm_forecast__time__gte=tm_start) & models.Q(dttm_forecast__time__lte=datetime.time(23))))
-                    else:
-                        filt |= (models.Q(dttm_forecast__week_day=week_day) & (models.Q(dttm_forecast__time__gte=tm_start) | models.Q(dttm_forecast__time__lt=tm_end)))
+                    filt |= (models.Q(dttm_forecast__week_day=week_day) & (models.Q(dttm_forecast__time__gte=tm_start) | models.Q(dttm_forecast__time__lt=tm_end)))
             return self.filter(filt, *args, **kwargs)
         else:
             max_shop_time = max(list(shop.close_times.values()))
@@ -308,9 +307,8 @@ class PeriodClientsManager(models.Manager):
             if max_shop_time != min_shop_time:
                 time_filter['dttm_forecast__time__gte'] = min_shop_time if min_shop_time < max_shop_time else max_shop_time
                 if max_shop_time == datetime.time(0):
-                    time_filter['dttm_forecast__time__lte'] = datetime.time(23)
-                else:
-                    time_filter['dttm_forecast__time__lt'] = max_shop_time if min_shop_time < max_shop_time else min_shop_time
+                    max_shop_time = datetime.time(23, 59)
+                time_filter['dttm_forecast__time__lt'] = max_shop_time if min_shop_time < max_shop_time else min_shop_time
             kwargs.update(time_filter)
         return self.filter(*args, **kwargs)
 
