@@ -83,6 +83,7 @@ class ServerConfig:
                 name,
                 name,
                 self.timetable_port,
+                name,
             ))
 
         os.system('../env/bin/python manage.py migrate')

@@ -87,7 +87,7 @@ def main(lang='ru', need_test_shop=False):
     region = Region.objects.create(
         name=f"Регион 1",
     )
-    fill_calendar.fill_days('2019.1.1', datetime.now().date().strftime('%Y.%m.%d'), 1, file_name='../scripts/work_data.csv')
+    fill_calendar.fill_days('2020.1.1', (datetime.now() + timedelta(days=730)).date().strftime('%Y.%m.%d'), 1, file_name='../scripts/work_data.csv')
     super_shop = Shop.objects.first()
     super_shop.name = 'Корневой магазин'
     super_shop.save()

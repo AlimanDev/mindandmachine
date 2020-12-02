@@ -35,3 +35,4 @@ QOS_DEV_MODE_ENABLED = True
 HOST = 'https://%s.mindandmachine.ru' # dev
 TIMETABLE_IP = "127.0.0.1:%s"
 
+BACKEND_QUEUE = '%s_queue'
