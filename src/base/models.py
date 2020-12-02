@@ -595,7 +595,8 @@ class Employment(AbstractActiveModel):
     network = models.ForeignKey('base.Network', on_delete=models.PROTECT, null=True)
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="employments")
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name="employments")
-    function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True)
+    function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True, related_name="employments")
+    dt_to_function_group = models.DateField(null=True, blank=True) # Дата до которой действуют права function_group
     position = models.ForeignKey(WorkerPosition, null=True, blank=True, on_delete=models.PROTECT)
     is_fixed_hours = models.BooleanField(default=False)
 

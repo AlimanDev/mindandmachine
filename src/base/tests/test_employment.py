@@ -4,10 +4,11 @@ from datetime import timedelta, date, datetime, time
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from src.base.models import WorkerPosition, Employment, Break
+from src.base.models import WorkerPosition, Employment, Break, Group
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
+from src.celery.tasks import delete_inactive_employment_groups
 
 
 class TestEmploymentAPI(TestsHelperMixin, APITestCase):
@@ -305,3 +306,45 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             self.assertTrue(WorkerDay.objects.filter(id=wd2.id).exists())
             self.assertTrue(WorkerDay.objects.filter(id=wd_holiday.id).exists())
             self.assertEqual(WorkerDay.objects.count(), wd_count_before_save - 1)
+
+
+    def test_change_function_group_tmp(self):
+        self.admin_group.subordinates.add(self.chief_group)
+        self.admin_group.subordinates.add(self.employee_group)
+        put_data = {
+            'function_group_id': self.chief_group.id,
+            'dt_to_function_group': (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'),
+            'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
+        }
+
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk=self.employment2.id),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.json()['function_group_id'], self.chief_group.id)
+        self.assertEqual(resp.json()['dt_to_function_group'], (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'))
+
+    
+    def test_change_function_group_tmp_no_perm(self):
+        put_data = {
+            'function_group_id': self.chief_group.id,
+            'dt_to_function_group': (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'),
+            'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
+        }
+
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk=self.employment2.id),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.json(), {'detail': 'У вас нет прав для выполнения этой операции.'})
+
+
+    def test_delete_inactive_function_groups(self):
+        self.employment2.dt_to_function_group = date.today() - timedelta(days=5)
+        self.employment2.save()
+        delete_inactive_employment_groups()
+        self.assertIsNone(Employment.objects.get(id=self.employment2.id).function_group_id)
+        self.assertIsNotNone(Employment.objects.get(id=self.employment1.id).function_group_id)

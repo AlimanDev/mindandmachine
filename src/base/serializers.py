@@ -1,7 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.validators import UniqueValidator
 
 from django.conf import settings
@@ -162,6 +162,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField(required=False)
     shop_code = serializers.CharField(required=False, source='shop.code')
     user_id = serializers.IntegerField(required=False)
+    function_group_id = serializers.IntegerField(required=False)
     work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
     username = serializers.CharField(required=False, source='user.username')
@@ -174,7 +175,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
                   'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
                   'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
                   'dt_new_week_availability_from', 'user', 'is_visible',  'worker_constraints', 'work_types',
-                  'shop_code', 'position_code', 'username', 'code'
+                  'shop_code', 'position_code', 'username', 'code', 'function_group_id', 'dt_to_function_group',
         ]
         create_only_fields = ['user_id', 'user']
         read_only_fields = ['user']
@@ -246,6 +247,13 @@ class EmploymentSerializer(serializers.ModelSerializer):
         return data
 
     def update(self, instance, validated_data, *args, **kwargs):
+        if instance.function_group_id != validated_data.get('function_group_id'):
+            has_perm = Group.objects.filter(
+                employments__user=self.context['request'].user,
+                subordinates__id=validated_data.get('function_group_id'),
+            ).exists()
+            if not has_perm:
+                raise PermissionDenied()
         if instance.is_visible != validated_data.get('is_visible', True):
             Employment.objects.filter(
                 shop_id=instance.shop_id, 
