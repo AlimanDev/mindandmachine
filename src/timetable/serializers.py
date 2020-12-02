@@ -203,43 +203,49 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         return attrs
 
     def _create_update_clean(self, validated_data, instance=None):
-        wdays_qs = WorkerDay.objects.filter(
-            worker_id=validated_data.get('worker_id'),
-            dt=validated_data.get('dt'),
-            is_approved=validated_data.get('is_approved'),
-            is_fact=validated_data.get('is_fact'),
-        )
-        if instance:
-            wdays_qs = wdays_qs.exclude(id=instance.id)
-        wdays_qs.delete()
+        worker_id = validated_data.get('worker_id', instance.worker_id if instance else None)
+        if worker_id:
+            wdays_qs = WorkerDay.objects.filter(
+                worker_id=worker_id,
+                dt=validated_data.get('dt'),
+                is_approved=validated_data.get(
+                    'is_approved',
+                    instance.is_approved if instance else WorkerDay._meta.get_field('is_approved').default,
+                ),
+                is_fact=validated_data.get(
+                    'is_fact', instance.is_fact if instance else WorkerDay._meta.get_field('is_fact').default),
+            )
+            if instance:
+                wdays_qs = wdays_qs.exclude(id=instance.id)
+            wdays_qs.delete()
 
-        worker_active_empls = list(Employment.objects.get_active(
-            network_id=self.context['request'].user.network_id,
-            dt_from=validated_data.get('dt'),
-            dt_to=validated_data.get('dt'),
-            user_id=validated_data.get('worker_id'),
-        ).annotate_value_equality(
-            'is_equal_employments', 'id', validated_data.get('employment_id'),
-        ).annotate_value_equality(
-            'is_equal_shops', 'shop_id', validated_data.get('shop_id'),
-        ).order_by(
-            '-is_equal_shops', '-is_equal_employments',
-        ).values(
-            'id', 'shop_id', 'is_equal_shops',
-        ))
+            if validated_data.get('type') in WorkerDay.TYPES_WITH_TM_RANGE:
+                worker_active_empls = list(Employment.objects.get_active(
+                    network_id=self.context['request'].user.network_id,
+                    dt_from=validated_data.get('dt'),
+                    dt_to=validated_data.get('dt'),
+                    user_id=worker_id,
+                ).annotate_value_equality(
+                    'is_equal_employments', 'id', validated_data.get('employment_id'),
+                ).annotate_value_equality(
+                    'is_equal_shops', 'shop_id', validated_data.get('shop_id'),
+                ).order_by(
+                    '-is_equal_shops', '-is_equal_employments',
+                ).values(
+                    'id', 'shop_id', 'is_equal_shops',
+                ))
 
-        if not worker_active_empls:
-            raise self.fail('no_active_employments')
+                if not worker_active_empls:
+                    raise self.fail('no_active_employments')
 
-        if validated_data.get('type') in WorkerDay.TYPES_WITH_TM_RANGE:
-            worker_active_empl = worker_active_empls[0]
-            validated_data['employment_id'] = worker_active_empl['id']
-            validated_data['is_vacancy'] = validated_data.get('is_vacancy') or not worker_active_empl['is_equal_shops']
+                worker_active_empl = worker_active_empls[0]
+                validated_data['employment_id'] = worker_active_empl['id']
+                validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
+                    or not worker_active_empl['is_equal_shops']
 
     def create(self, validated_data):
         with transaction.atomic():
-            if validated_data.get('worker_id'):
-                self._create_update_clean(validated_data)
+            self._create_update_clean(validated_data)
 
             details = validated_data.pop('worker_day_details', None)
             worker_day = WorkerDay.objects.create(**validated_data)
@@ -257,8 +263,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 for wd_detail in details:
                     WorkerDayCashboxDetails.objects.create(worker_day=instance, **wd_detail)
 
-            if validated_data.get('worker_id'):
-                self._create_update_clean(validated_data, instance=instance)
+            self._create_update_clean(validated_data, instance=instance)
 
             return super().update(instance, validated_data)
 
