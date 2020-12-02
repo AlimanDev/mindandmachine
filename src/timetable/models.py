@@ -1060,6 +1060,7 @@ class AttendanceRecords(AbstractModel):
                 is_fact=True,
                 is_approved=True,
                 type=WorkerDay.TYPE_WORKDAY,
+                is_vacancy=active_user_empl.shop_id != self.shop_id if active_user_empl else False,
             )
             setattr(wd, type2dtfield[self.type], self.dttm)
             wd.save()
