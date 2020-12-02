@@ -1,10 +1,11 @@
-[program:%s_celerybeat]
-command=/var/servers/%s/backend/env/bin/celery -A src.celery beat --loglevel=INFO
-directory=/var/servers/%s/backend/qos
-user=%s
-numprocs=1
-stdout_logfile=/var/log/celery/%s_beat.log
-stderr_logfile=/var/log/celery/%s_beat.log
-autostart=true
-autorestart=true
-priority=999
+[program:celerybeat]
+process_name = %s
+command      = /var/servers/%s/backend/env/bin/celery -A src.celery beat --loglevel=INFO
+directory    = /var/servers/%s/backend/qos
+user         = %s
+numprocs     = 1
+autostart    = true
+autorestart  = true
+priority     = 999
+stdout_logfile = /var/log/celery/%s_beat.log
+stderr_logfile = /var/log/celery/%s_beat.log

@@ -1,12 +1,13 @@
-[program:%s_celery]
-command=/var/servers/%s/backend/env/bin/celery -A src.celery worker --loglevel=INFO -Q %s_queue
-directory=/var/servers/%s/backend/qos/
-user=%s
-numprocs=1
-stdout_logfile=/var/log/celery/%s_celery.log
-stdout_logfile_maxbytes=20MB
-stderr_logfile=/var/log/celery/%s_celery.log
-stderr_logfile_maxbytes=20MB
-autostart=true
-autorestart=true
-priority=999
+[program:celery]
+process_name = %s
+command      = /var/servers/%s/backend/env/bin/celery -A src.celery worker --loglevel=INFO -Q %s_queue
+directory    = /var/servers/%s/backend/qos/
+user         = %s
+numprocs     = 1
+autostart    = true
+autorestart  = true
+priority     = 999
+stdout_logfile          = /var/log/celery/%s_celery.log
+stdout_logfile_maxbytes = 20MB
+stderr_logfile          = /var/log/celery/%s_celery.log
+stderr_logfile_maxbytes = 20MB
