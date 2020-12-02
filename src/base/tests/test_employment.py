@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from src.base.models import WorkerPosition, Employment, Break
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
 from src.util.mixins.tests import TestsHelperMixin
+from src.util.models_converter import Converter
 
 
 class TestEmploymentAPI(TestsHelperMixin, APITestCase):
@@ -21,9 +22,11 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code')
         cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2')
         cls.worker_position.default_work_type_names.set([cls.wt_name, cls.wt_name2])
+        cls.dt_now = timezone.now().date()
 
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
+        self.employment2.network.refresh_from_db()
 
     def _create_employment(self):
         data = {
@@ -38,7 +41,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         return resp
 
     def test_work_types_added_on_employment_creation(self):
-
         resp = self._create_employment()
         self.assertEqual(resp.status_code, 201)
         resp_data = resp.json()
@@ -49,7 +51,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             ).exists())
 
     def test_work_types_updated_on_position_change(self):
-
         another_worker_position = WorkerPosition.objects.create(
             name='Заместитель директора магазина',
             network=self.network,
@@ -174,10 +175,14 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             "employment_ids": employment_ids,
             "auto_timetable": False,
         }
-        response = self.client.post('/rest_api/employment/auto_timetable/', data=self.dump_data(data), content_type='application/json')
+        response = self.client.post('/rest_api/employment/auto_timetable/', data=self.dump_data(data),
+                                    content_type='application/json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).count(), 2)
-        self.assertEqual(list(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).values_list('id', flat=True)), employment_ids)
+        self.assertEqual(list(
+            Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).values_list('id',
+                                                                                                          flat=True)),
+            employment_ids)
 
     def test_work_hours_change_on_update_position(self):
         dt = date.today()
@@ -216,9 +221,87 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 dt=dt + timedelta(i + 3),
             )
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt).work_hours, timedelta(hours=9))
-        self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours, timedelta(hours=9))
+        self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours,
+                         timedelta(hours=9))
         emp = Employment.objects.get(pk=resp['id'])
         emp.position = another_worker_position
         emp.save()
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt).work_hours, timedelta(hours=9))
-        self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours, timedelta(hours=9, minutes=30))
+        self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours,
+                         timedelta(hours=9, minutes=30))
+
+    def _test_get_empls(self, extra_params=None, check_length=None):
+        params = {
+            'dt_from': Converter.convert_date(self.dt_now),
+            'dt_to': Converter.convert_date(self.dt_now),
+        }
+
+        if extra_params:
+            params.update(extra_params)
+
+        resp = self.client.get(path=self.get_url('Employment-list'), data=params)
+
+        if check_length:
+            self.assertEqual(len(resp.json()), check_length)
+
+        return resp
+
+    def test_get_mine_employments(self):
+        self._test_get_empls(check_length=8)
+        self._test_get_empls(extra_params={'mine': True}, check_length=8)
+
+        self.client.force_authenticate(user=self.user2)
+        self._test_get_empls(extra_params={'mine': True}, check_length=5)
+
+        self.client.force_authenticate(user=self.user5)
+        self._test_get_empls(extra_params={'mine': True}, check_length=7)
+
+        self.client.force_authenticate(user=self.user8)
+        self._test_get_empls(check_length=8)
+        self._test_get_empls(extra_params={'mine': True}, check_length=1)
+
+    def test_inactive_wdays_deleted_on_save(self):
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            dt = datetime.today()
+            self.network.clean_wdays_on_employment_dt_change = True
+            self.network.save()
+
+            wd1 = WorkerDay.objects.create(
+                shop=self.shop,
+                worker=self.user2,
+                employment=self.employment2,
+                dt=dt + timedelta(days=50),
+                is_fact=False,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(8, 0, 0)),
+                dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
+                is_approved=True,
+            )
+            wd2 = WorkerDay.objects.create(
+                shop=self.shop,
+                worker=self.user2,
+                employment=self.employment2,
+                dt=dt + timedelta(days=25),
+                is_fact=False,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(8, 0, 0)),
+                dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
+                is_approved=True,
+            )
+            wd_holiday = WorkerDay.objects.create(
+                shop=self.shop,
+                worker=self.user2,
+                employment=self.employment2,
+                dt=dt + timedelta(days=20),
+                is_fact=False,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_approved=True,
+            )
+            wd_count_before_save = WorkerDay.objects.count()
+            self.employment2.dt_hired = dt
+            self.employment2.dt_fired = dt + timedelta(days=30)
+            self.employment2.save()
+            self.assertFalse(WorkerDay.objects.filter(id=wd1.id).exists())
+            self.assertTrue(WorkerDay.objects.filter(id=wd2.id).exists())
+            self.assertTrue(WorkerDay.objects.filter(id=wd_holiday.id).exists())
+            self.assertEqual(WorkerDay.objects.count(), wd_count_before_save - 1)

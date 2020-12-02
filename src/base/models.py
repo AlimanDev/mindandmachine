@@ -50,6 +50,9 @@ class Network(AbstractActiveModel):
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=True, verbose_name='Обрезать рабочие часы по времени работы магазина'
     )
+    clean_wdays_on_employment_dt_change = models.BooleanField(
+        default=False, verbose_name='Запускать скрипт очистки дней при изменении дат трудойстройства',
+    )
 
     def get_department(self):
         return None
@@ -563,6 +566,12 @@ class WorkerPosition(AbstractActiveNamedModel):
 
 
 class EmploymentQuerySet(QuerySet):
+    def annotate_value_equality(self, annotate_name, field_name, value):
+        return self.annotate(**{annotate_name: Case(
+            When(**{field_name: value}, then=True),
+            default=False, output_field=models.BooleanField()
+        )})
+
     def last_hired(self):
         last_hired_subq = self.filter(user_id=OuterRef('user_id')).order_by('-dt_hired').values('id')[:1]
         return self.filter(
@@ -611,7 +620,7 @@ class Employment(AbstractActiveModel):
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
     is_visible = models.BooleanField(default=True)
 
-    position_tracker = FieldTracker(fields=['position'])
+    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired'])
 
     objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
 
@@ -659,7 +668,7 @@ class Employment(AbstractActiveModel):
 
         force_create_work_types = kwargs.pop('force_create_work_types', False)
         is_new = self.pk is None
-        position_has_changed = self.position_tracker.has_changed('position')
+        position_has_changed = self.tracker.has_changed('position')
         res = super().save(*args, **kwargs)
         # при создании трудоустройства или при смене должности проставляем типы работ по умолчанию
         if force_create_work_types or is_new or position_has_changed:
@@ -698,6 +707,26 @@ class Employment(AbstractActiveModel):
                         type__in=WorkerDay.TYPES_WITH_TM_RANGE,
                     ):
                 wd.save(update_fields=['work_hours'])
+
+        if not is_new and (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired')) and \
+                self.network.clean_wdays_on_employment_dt_change:
+            from src.celery.tasks import clean_wdays
+            from src.timetable.models import WorkerDay
+            from src.util.models_converter import Converter
+            clean_wdays.apply_async(
+                kwargs={
+                    'filter_kwargs': {
+                        'type': WorkerDay.TYPE_WORKDAY,
+                        'employment_id': self.id,
+                    },
+                    'exclude_kwargs': {
+                        'dt__gte': Converter.convert_date(self.dt_hired),
+                        'dt__lt': Converter.convert_date(self.dt_fired),
+                    },
+                    'only_logging': False,
+                },
+                countdown=60 * 5,
+            )
 
         return res
 

@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-11-10 09:45+0000\n"
+"POT-Creation-Date: 2020-11-17 22:46+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -25,50 +25,50 @@ msgstr ""
 "%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || (n"
 "%100>=11 && n%100<=14)? 2 : 3);\n"
 
-#: src/base/auth/views.py:39
+#: src/base/auth/views.py:36
 msgid "There is no such user"
 msgstr "Нет такого пользователя"
 
-#: src/base/auth/views.py:40 src/base/auth/views.py:108
-#: src/recognition/serializers.py:30
+#: src/base/auth/views.py:37 src/base/auth/views.py:100
+#: src/recognition/serializers.py:28
 msgid "Unable to log in with provided credentials."
 msgstr "Невозможно войти с предоставленными учетными данными."
 
-#: src/base/permissions.py:72
+#: src/base/permissions.py:103
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
-#: src/base/serializers.py:76
+#: src/base/serializers.py:77
 msgid "Passwords are mismatched."
 msgstr "Пароли не совпадают."
 
-#: src/base/serializers.py:77
+#: src/base/serializers.py:78
 msgid "Password is wrong."
 msgstr "Неверный пароль."
 
-#: src/base/serializers.py:141
+#: src/base/serializers.py:142
 #, python-brace-format
 msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:142 src/timetable/serializers.py:77
+#: src/base/serializers.py:143 src/timetable/serializers.py:83
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
-#: src/base/serializers.py:143
+#: src/base/serializers.py:144
 #, python-brace-format
 msgid "There is {amount} models of shop with code: {code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
 
-#: src/base/serializers.py:144
+#: src/base/serializers.py:145
 #, python-brace-format
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
 
-#: src/base/shop/serializers.py:32
+#: src/base/shop/serializers.py:33
 #, python-brace-format
 msgid "Invalid time format. Format should be {format}"
 msgstr "Неверный формат времени. Должен быть {format}"
@@ -107,19 +107,19 @@ msgstr "Ошибка в формуле: {formula}"
 msgid "Base model not formula."
 msgstr "У базовой модели тип расчета должен быть формула"
 
-#: src/recognition/models.py:112
+#: src/recognition/models.py:105
 msgid "Key"
 msgstr "Ключ"
 
-#: src/recognition/models.py:117
+#: src/recognition/models.py:110
 msgid "Created"
 msgstr "Создан"
 
-#: src/recognition/serializers.py:33
+#: src/recognition/serializers.py:31
 msgid "Must include \"username\" and \"password\"."
 msgstr "Должен включать \"username\" и \"password\"."
 
-#: src/recognition/serializers.py:110
+#: src/recognition/serializers.py:107
 #, python-brace-format
 msgid ""
 "The distance to the department should not exceed {allowed_distance_km} km "
@@ -164,17 +164,17 @@ msgstr "Ошибка отправки данных на сервер."
 msgid "You can't delete timetable in the past."
 msgstr "Вы не можете удалить расписание в прошлом."
 
-#: src/timetable/serializers.py:74 src/timetable/serializers.py:391
+#: src/timetable/serializers.py:80 src/timetable/serializers.py:415
 #, fuzzy
 #| msgid "Date start should be less then date end."
 msgid "Date start should be less then date end"
 msgstr "Дата начала должна быть меньше чем дата окончания."
 
-#: src/timetable/serializers.py:75
+#: src/timetable/serializers.py:81
 msgid "Worker day already exist."
 msgstr "У сотрудника уже существует рабочий день."
 
-#: src/timetable/serializers.py:76
+#: src/timetable/serializers.py:82
 #, fuzzy, python-brace-format
 #| msgid ""
 #| "Worker day intercepts with another: {shop_name}, {work_start} - "
@@ -185,38 +185,58 @@ msgstr ""
 "Рабочий день пересекается с другим рабочим днем: {shop_name}, {work_start} - "
 "{work_end}"
 
-#: src/timetable/serializers.py:78
+#: src/timetable/serializers.py:84
 msgid "Shop in work type and in work day must match."
 msgstr "Магазин в типе работ и в рабочем дне должен совпадать."
 
-#: src/timetable/serializers.py:79
+#: src/timetable/serializers.py:85
 msgid "User in employment and in worker day must match."
 msgstr "Сотрудник в трудоустройстве и в рабочем дне должны совпадать."
 
-#: src/timetable/serializers.py:349
+#: src/timetable/serializers.py:87
+msgid ""
+"Can't create a working day in the schedule, since the user is not employed "
+"during this period"
+msgstr ""
+"Невозможно создать рабочий день, так как пользователь в этот период не трудоустроен"
+
+#: src/timetable/serializers.py:373
 msgid "Wrong dates format."
 msgstr "Неправильный формат дат."
 
-#: src/timetable/serializers.py:376 src/timetable/serializers.py:415
+#: src/timetable/serializers.py:400 src/timetable/serializers.py:439
 #, python-brace-format
 msgid "Invalid pk \"{pk_value}\" - object does not exist."
 msgstr "Недопустимый первичный ключ \"{pk_value}\" - объект не существует."
 
-#: src/timetable/worker_day/views.py:58
+#: src/timetable/worker_day/views.py:60
 msgid "Worker days mismatch."
 msgstr "Рабочие дни сотрудников не совпадают."
 
-#: src/timetable/worker_day/views.py:59
+#: src/timetable/worker_day/views.py:61
 msgid "Workers don't have timetable."
 msgstr "Отсутствует расписание у сотрудников."
 
-#: src/timetable/worker_day/views.py:60
+#: src/timetable/worker_day/views.py:62
 msgid "Cannot_delete approved version."
 msgstr "Нельзя удалить подтвержденную версию."
 
-#: src/timetable/worker_day/views.py:61
+#: src/timetable/worker_day/views.py:63
 msgid "Not approved version already exists."
 msgstr "У расписания уже есть неподтвержденная версия."
+
+#: src/timetable/worker_day/views.py:64
+#, python-brace-format
+msgid "У вас нет прав на подтверждение типа дня \"{wd_type_str}\""
+msgstr ""
+
+#: src/timetable/worker_day/views.py:65
+#, python-brace-format
+msgid ""
+"У вас нет прав на подтверждения типа дня \"{wd_type_str}\" в выбранные даты. "
+"Необходимо изменить интервал для подтверждения. Разрешенный интевал для "
+"подтверждения: {dt_interval}"
+msgstr ""
 
 #~ msgid "Invalid basic header. No credentials provided."
 #~ msgstr "Недопустимый заголовок. Не предоставлены учетные данные."

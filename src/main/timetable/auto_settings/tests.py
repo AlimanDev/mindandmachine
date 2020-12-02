@@ -1,21 +1,17 @@
-import json
 import datetime
-from src.base.models import Employment
-from src.timetable.models import  ShopMonthStat, WorkerDay, WorkerDayCashboxDetails
-from src.util.test import LocalTestCase
-from django.utils.timezone import now
-
-from src.util.models_converter import Converter
-
-
-from django.conf import settings
+import json
 from unittest.mock import Mock, patch
 
+from django.test import override_settings
+from django.utils.timezone import now
 
-settings.CELERY_TASK_ALWAYS_EAGER = True
+from src.base.models import Employment
+from src.timetable.models import ShopMonthStat, WorkerDay, WorkerDayCashboxDetails
+from src.util.models_converter import Converter
+from src.util.test import LocalTestCase
 
 
-
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 class TestAutoSettings(LocalTestCase):
     def test_get_status(self):
         self.auth()

@@ -1,3 +1,4 @@
+import contextlib
 import json
 import sys
 from functools import wraps
@@ -328,3 +329,8 @@ def generate_user_token(login):
     salt = settings.MDAUDIT_AUTHTOKEN_SALT
     dt = now().date().strftime("%Y%m%d")
     return md5(f"{login}:{dt}:{salt}".encode()).hexdigest()
+
+
+@contextlib.contextmanager
+def dummy_context_mgr():
+    yield None
