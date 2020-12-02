@@ -271,20 +271,14 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         approve_condition = Q(
             wd_types_q,
-            Q(shop_id=serializer.data['shop_id']) | Q(Q(shop__isnull=True) | Q(type=WorkerDay.TYPE_QUALIFICATION), worker_id__in=user_ids),
+            Q(shop_id=serializer.data['shop_id']) |
+            Q(type=WorkerDay.TYPE_QUALIFICATION, worker_id__in=user_ids),
             dt__lte=serializer.data['dt_to'],
             dt__gte=serializer.data['dt_from'],
             is_fact=serializer.data['is_fact'],
             is_approved=False,
         )
-
-        wdays_to_approve = WorkerDay.objects.get_last_ordered(
-            is_fact=serializer.data['is_fact'],
-            order_by=[
-                'is_approved',
-                '-id',
-            ]
-        ).filter(approve_condition)
+        wdays_to_approve = WorkerDay.objects.filter(approve_condition)
 
         worker_dt_pairs_list = list(
             wdays_to_approve.values_list('worker_id', 'dt').order_by('worker_id', 'dt').distinct())
