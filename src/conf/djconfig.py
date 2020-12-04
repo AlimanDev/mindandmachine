@@ -203,7 +203,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'simple': {
-            'format': '%(levelname)s %(asctime)s %(message)s'
+            'format': '%(levelname)s %(process)d %(asctime)s %(message)s'
         },
     },
     'filters': {
@@ -218,6 +218,12 @@ LOGGING = {
             'filename': 'qos_backend.log',  # directory with logs must be already created
             'maxBytes': 5 * 1024 * 1024,
             'backupCount': 10,
+            'formatter': 'simple',
+        },
+        'clean_wdays': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.WatchedFileHandler',
+            'filename': 'clean_wdays.log',
             'formatter': 'simple',
         },
         'mail_admins': {
@@ -238,6 +244,11 @@ LOGGING = {
         'django.request': {
             'handlers': ['mail_admins'],
             'level': 'ERROR',
+            'propagate': True,
+        },
+        'clean_wdays': {
+            'handlers': ['clean_wdays'],
+            'level': 'DEBUG',
             'propagate': True,
         },
         # 'django.db.backends': {

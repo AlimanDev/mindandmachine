@@ -18,7 +18,6 @@ from requests.exceptions import HTTPError
 
 logger = logging.getLogger('django')
 
-RECOGNITION_PARTNER = settings.RECOGNITION_PARTNER
 TEVIAN_URL = settings.TEVIAN_URL
 TEVIAN_EMAIL = settings.TEVIAN_EMAIL
 TEVIAN_PASSWORD = settings.TEVIAN_PASSWORD
@@ -28,8 +27,14 @@ TEVIAN_FR_THRESHOLD = settings.TEVIAN_FR_THRESHOLD
 
 
 class Recognition:
-    def __init__(self):
-        self.partner = globals()[RECOGNITION_PARTNER]()
+    _partner = None
+
+    @property
+    def partner(self):
+        if self._partner is None:
+            self._partner = globals()[settings.RECOGNITION_PARTNER]()
+
+        return self._partner
 
     def create_database(self, data):
         return self.partner.create_database(data)
