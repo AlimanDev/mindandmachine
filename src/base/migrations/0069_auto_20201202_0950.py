@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='employment',
             name='dt_to_function_group',
-            field=models.DateField(blank=True, null=True),
+            field=models.DateField(blank=True, null=True, verbose_name='Дата до которой действуют права function_group'),
         ),
         migrations.AlterField(
             model_name='employment',
