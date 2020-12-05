@@ -290,8 +290,8 @@ class TestWorkType(APITestCase):
         self.assertEqual(data['tt_periods']['real_cashiers'][9]['amount'], 1.0)
         self.assertEqual(data['tt_periods']['real_cashiers'][34]['amount'], 0.0)
         day_stats = data['day_stats']
-        self.assertEqual(day_stats['covering'][Converter.convert_date(dt_now)], 0.125)
-        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 72.0)
+        self.assertEqual(day_stats['covering'][Converter.convert_date(dt_now)], 0.17647058823529413)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 51.0)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(dt_now)], 9.0)
 
         get_params['graph_type'] = 'plan_edit'
@@ -302,22 +302,22 @@ class TestWorkType(APITestCase):
         self.assertEqual(data['tt_periods']['real_cashiers'][9]['amount'], 0.0)
         self.assertEqual(data['tt_periods']['real_cashiers'][34]['amount'], 1.0)
         day_stats = data['day_stats']
-        self.assertEqual(day_stats['covering'][Converter.convert_date(tomorrow)], 0.16666666666666666)
-        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(tomorrow)], 72.0)
+        self.assertEqual(day_stats['covering'][Converter.convert_date(tomorrow)], 0.23529411764705882)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(tomorrow)], 51.0)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(tomorrow)], 12.0)
 
         get_params['work_type_ids'] = [self.work_type1.id]
         response = self.client.get(url, data=get_params)
         day_stats = response.json()['day_stats']
         self.assertEqual(day_stats['covering'][Converter.convert_date(after_tomorrow)], 0)
-        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(after_tomorrow)], 48.0)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(after_tomorrow)], 34.0)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(after_tomorrow)], 0)
 
         get_params['work_type_ids'] = [self.work_type3.id]
         response = self.client.get(url, data=get_params)
         day_stats = response.json()['day_stats']
-        self.assertEqual(day_stats['covering'][Converter.convert_date(after_tomorrow)], 0.5)
-        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(after_tomorrow)], 24.0)
+        self.assertEqual(day_stats['covering'][Converter.convert_date(after_tomorrow)], 0.7058823529411765)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(after_tomorrow)], 17.0)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(after_tomorrow)], 12.0)
 
         wd5 = WorkerDay.objects.create(
@@ -351,5 +351,5 @@ class TestWorkType(APITestCase):
         self.assertIn('indicators', resp_data)
         self.assertNotIn('day_stats', resp_data)
         self.assertIsInstance(resp_data['indicators']['fot'], float)
-        self.assertEqual(resp_data['indicators']['covering'], 9.8)
+        self.assertEqual(resp_data['indicators']['covering'], 13.7)
         self.assertEqual(resp_data['indicators']['deadtime'], 15.4)
