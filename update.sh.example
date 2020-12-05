@@ -3,17 +3,25 @@
 set -e
 
 PROJECT_NAME=
-PROJECT_PATH=/var/servers/${PROJECT_NAME}/backend/qos/
+PROJECT_PATH=/var/servers/${PROJECT_NAME}/backend/qos
 USER=${PROJECT_NAME}
 GIT_BRANCH=
 VENV_PATH=${PROJECT_PATH}/../env
 
-su - ${USER} -c "cd ${PROJECT_PATH} && git fetch origin ${GIT_BRANCH}"
-su - ${USER} -c "cd ${PROJECT_PATH} && git reset origin/${GIT_BRANCH}"
+if [[ `sudo su - ${USER} -c "cd $PROJECT_PATH && git status --porcelain"` ]]; then
+    echo 'start updating'
 
-su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/pip install -r requirements.txt"
-su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/python manage.py migrate"
+    sudo su - ${USER} -c "cd ${PROJECT_PATH} && git fetch origin ${GIT_BRANCH}"
+    sudo su - ${USER} -c "cd ${PROJECT_PATH} && git reset origin/${GIT_BRANCH}"
 
-supervisorctl restart ${PROJECT_NAME}_uwsgi
-supervisorctl restart ${PROJECT_NAME}_celery
-supervisorctl restart ${PROJECT_NAME}_celerybeat
+    sudo su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/pip install -r requirements.txt"
+    sudo su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/python manage.py migrate"
+
+    supervisorctl restart ${PROJECT_NAME}_uwsgi
+    supervisorctl restart ${PROJECT_NAME}_celery
+    supervisorctl restart ${PROJECT_NAME}_celerybeat
+
+    echo 'finish updating'
+else
+    echo 'no changes, skip updating'
+fi
