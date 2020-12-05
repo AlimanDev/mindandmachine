@@ -1,0 +1,19 @@
+#!/bin/bash
+
+set -e
+
+PROJECT_NAME=
+PROJECT_PATH=/var/servers/${PROJECT_NAME}/backend/qos/
+USER=${PROJECT_NAME}
+GIT_BRANCH=
+VENV_PATH=${PROJECT_PATH}/../env
+
+su - ${USER} -c "cd ${PROJECT_PATH} && git fetch origin ${GIT_BRANCH}"
+su - ${USER} -c "cd ${PROJECT_PATH} && git reset origin/${GIT_BRANCH}"
+
+su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/pip install -r requirements.txt"
+su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/python manage.py migrate"
+
+supervisorctl restart ${PROJECT_NAME}_uwsgi
+supervisorctl restart ${PROJECT_NAME}_celery
+supervisorctl restart ${PROJECT_NAME}_celerybeat
