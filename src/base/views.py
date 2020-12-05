@@ -2,9 +2,10 @@ from django.utils import timezone
 from django.db.models import F, Q
 from django.db.models.functions import Coalesce
 from rest_auth.views import UserDetailsView
+from drf_yasg.utils import swagger_auto_schema
 
 from rest_framework import mixins
-from rest_framework.viewsets import ModelViewSet, GenericViewSet
+from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
@@ -47,7 +48,8 @@ from src.base.models import (
 from src.base.filters import UserFilter
 from src.base.views_abstract import (
     BaseActiveNamedModelViewSet,
-    UpdateorCreateViewSet
+    UpdateorCreateViewSet,
+    BaseModelViewSet,
 )
 from django.middleware.csrf import rotate_token
 
@@ -84,7 +86,8 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         else:
             return EmploymentSerializer
 
-    @action(detail=False, methods=['post',])
+    @swagger_auto_schema(responses={200:'OK'},request_body=AutoTimetableSerializer)
+    @action(detail=False, methods=['post',], serializer_class=AutoTimetableSerializer)
     def auto_timetable(self, request):
         data = AutoTimetableSerializer(data=request.data)
         data.is_valid(raise_exception=True)
@@ -142,7 +145,7 @@ class AuthUserView(UserDetailsView):
         return super().check_permissions(request, *args, **kwargs)
 
 
-class FunctionGroupView(ModelViewSet):
+class FunctionGroupView(BaseModelViewSet):
     permission_classes = [Permission]
     serializer_class = FunctionGroupSerializer
     pagination_class = LimitOffsetPagination
@@ -175,7 +178,7 @@ class WorkerPositionViewSet(BaseActiveNamedModelViewSet):
         )
 
 
-class SubscribeViewSet(ModelViewSet):
+class SubscribeViewSet(BaseModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = SubscribeSerializer
     filterset_class = SubscribeFilter
@@ -197,6 +200,7 @@ class NotificationViewSet(
     permission_classes = [IsAuthenticated]
     serializer_class = NotificationSerializer
     filterset_class = NotificationFilter
+    http_method_names = ['get', 'put']
 
     def get_queryset(self):
         user = self.request.user

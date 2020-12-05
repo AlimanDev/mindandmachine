@@ -11,7 +11,6 @@ from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
 from requests.exceptions import HTTPError
 from rest_framework import (
-    viewsets,
     exceptions,
     permissions
 )
@@ -22,6 +21,7 @@ from rest_framework.response import Response
 
 from src.base.auth.authentication import CsrfExemptSessionAuthentication
 from src.base.models import User
+from src.base.views_abstract import BaseModelViewSet
 from src.recognition.api.recognition import Recognition
 from src.recognition.authentication import TickPointTokenAuthentication
 from src.recognition.models import Tick, TickPhoto, TickPoint, UserConnecter, TickPointToken
@@ -133,7 +133,7 @@ class TickPointAuthTickViewStrategy(TickViewStrategy):
         return user_id, tick_point
 
 
-class TickViewSet(viewsets.ModelViewSet):
+class TickViewSet(BaseModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     basename = ''
@@ -242,7 +242,7 @@ class TickViewSet(viewsets.ModelViewSet):
         return Response(TickSerializer(tick).data)
 
 
-class TickPhotoViewSet(viewsets.ModelViewSet):
+class TickPhotoViewSet(BaseModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     basename = ''

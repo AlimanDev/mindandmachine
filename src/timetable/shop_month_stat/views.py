@@ -81,6 +81,7 @@ class ShopMonthStatViewSet(mixins.UpdateModelMixin,
     permission_classes = [FilteredListPermission]
     serializer_class = ShopMonthStatSerializer
     queryset = ShopMonthStat.objects.filter(shop__dttm_deleted__isnull=True)
+    http_method_names = ['get', 'put']
 
 
     @action(detail=False, methods=['get',])

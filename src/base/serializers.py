@@ -21,7 +21,7 @@ class BaseNetworkSerializer(serializers.ModelSerializer):
 class NetworkSerializer(serializers.ModelSerializer):
     logo = serializers.SerializerMethodField('get_logo_url')
 
-    def get_logo_url(self, obj):
+    def get_logo_url(self, obj) -> str:
         if obj.logo:
             return obj.logo.url
         return None
@@ -54,7 +54,7 @@ class UserListSerializer(serializers.Serializer):
     username = serializers.CharField()
     network_id = serializers.IntegerField()
 
-    def get_avatar_url(self, obj):
+    def get_avatar_url(self, obj) -> str:
         if obj.avatar:
             return obj.avatar.url
         return None
@@ -69,7 +69,7 @@ class UserSerializer(BaseNetworkSerializer):
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
                   'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
-    def get_avatar_url(self, obj):
+    def get_avatar_url(self, obj) -> str:
         if obj.avatar:
             return obj.avatar.url
         return None
@@ -285,7 +285,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         fields = ['id','worker_id', 'is_read', 'event', 'message']
         read_only_fields = ['worker_id', 'event']
 
-    def get_message(self, instance):
+    def get_message(self, instance) -> str:
         lang = self.context['request'].user.lang
 
         event = instance.event

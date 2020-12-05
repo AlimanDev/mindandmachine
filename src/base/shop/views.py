@@ -1,11 +1,14 @@
 import datetime
 
+from drf_yasg.utils import swagger_auto_schema
+
 from dateutil.relativedelta import relativedelta
 from django.db.models import Q, Sum
 from django_filters.rest_framework import NumberFilter
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
+from rest_framework import serializers
 
 from src.base.filters import BaseActiveNamedModelFilter
 from src.base.models import Employment, Shop, Region
@@ -23,6 +26,18 @@ class ShopFilter(BaseActiveNamedModelFilter):
             'load_template_id': ['exact',],
             'load_template_status': ['exact'],
         }
+
+# для redoc
+class ShopTreeSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    tm_open_dict = serializers.JSONField(default={'all':'07:00:00'})
+    tm_close_dict = serializers.JSONField(default={'all':'22:00:00'})
+    address = serializers.CharField()
+    forecast_step_minutes = serializers.DurationField()
+
+class TreeSerializer(ShopTreeSerializer):
+    children = ShopTreeSerializer(many=True)
 
 
 class ShopViewSet(UpdateorCreateViewSet):
@@ -54,6 +69,26 @@ class ShopViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
+
+    @swagger_auto_schema(responses={200: ShopSerializer(many=True)}, operation_description='GET /rest_api/department/')
+    def list(self, *args, **kwargs):
+       return super().list(*args, **kwargs)
+
+    @swagger_auto_schema(request_body=ShopSerializer, responses={201: ShopSerializer}, operation_description='POST /rest_api/department/')
+    def create(self, *args, **kwargs):
+        return super().create(*args, **kwargs)
+
+    @swagger_auto_schema(responses={200: ShopSerializer}, operation_description='GET /rest_api/department/{id}/')
+    def retrieve(self, *args, **kwargs):
+       return super().retrieve(*args, **kwargs)
+
+    @swagger_auto_schema(responses={200: ShopSerializer}, request_body=ShopSerializer, operation_description='PUT /rest_api/department/{id}/')
+    def update(self, *args, **kwargs):
+       return super().update(*args, **kwargs)
+
+    @swagger_auto_schema(operation_description='DELETE /rest_api/department/{id}/')
+    def destroy(self, *args, **kwargs):
+       return super().destroy(*args, **kwargs)
 
     def perform_create(self, serializer):
         serializer.save(region=Region.objects.first())  # TODO: переделать на получение региона по коду в api???
@@ -108,6 +143,7 @@ class ShopViewSet(UpdateorCreateViewSet):
         serializer = ShopStatSerializer(shops, many=True)
         return Response(serializer.data)
 
+    @swagger_auto_schema(responses={200:TreeSerializer})
     @action(detail=False, methods=['get'])
     def tree(self, request):
         """

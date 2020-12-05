@@ -1,4 +1,3 @@
-from rest_framework import viewsets
 
 from src.base.permissions import FilteredListPermission
 from src.timetable.filters import EmploymentWorkTypeFilter
@@ -8,9 +7,10 @@ from src.timetable.models import (
 from src.timetable.serializers import (
     EmploymentWorkTypeSerializer,
 )
+from src.base.views_abstract import BaseModelViewSet
 
 
-class EmploymentWorkTypeViewSet(viewsets.ModelViewSet):
+class EmploymentWorkTypeViewSet(BaseModelViewSet):
     permission_classes = [FilteredListPermission]
     serializer_class = EmploymentWorkTypeSerializer
     filterset_class = EmploymentWorkTypeFilter

@@ -59,7 +59,9 @@ class ShopSerializer(serializers.ModelSerializer):
     director_code = serializers.CharField(required=False)
     distance = serializers.SerializerMethodField(label='Расстояние до магазина (км)')
 
-    def get_distance(self, shop):
+    def get_distance(self, shop) -> float:
+        if not self.context.get('request', False):
+            return 1.0
         lat = self.context.get('request').META.get('X-LAT')
         lon = self.context.get('request').META.get('X-LON')
         if lat and lon and shop.latitude and shop.longitude:
@@ -89,11 +91,12 @@ class ShopSerializer(serializers.ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         super(ShopSerializer, self).__init__(*args, **kwargs)
-        self.fields['code'].validators.append(
-            UniqueValidator(
-                Shop.objects.filter(network=self.context.get('request').user.network)
+        if self.context.get('request'):
+            self.fields['code'].validators.append(
+                UniqueValidator(
+                    Shop.objects.filter(network=self.context.get('request').user.network)
+                )
             )
-        )
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)

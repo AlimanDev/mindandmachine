@@ -70,7 +70,7 @@ class WorkerDayListSerializer(serializers.Serializer):
             self.fields['dttm_work_end'].source = 'tabel_dttm_work_end'
             self.fields['dttm_work_end'].source_attrs = ['tabel_dttm_work_end']
 
-    def get_work_hours(self, obj):
+    def get_work_hours(self, obj) -> float:
         work_hours = getattr(obj, 'tabel_work_hours', obj.work_hours)
 
         if isinstance(work_hours, timedelta):
@@ -113,6 +113,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                   'crop_work_hours_by_shop_schedule']
         read_only_fields = ['work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
+        ref_name = 'WorkerDaySerializer'
 
     def validate(self, attrs):
         if self.instance and self.instance.is_approved:
@@ -381,7 +382,7 @@ class VacancySerializer(serializers.Serializer):
         super(VacancySerializer, self).__init__(*args, **kwargs)
         self.fields['shop'] = ShopSerializer(context=self.context)
 
-    def get_avatar_url(self, obj):
+    def get_avatar_url(self, obj) -> str:
         if obj.worker_id and obj.worker.avatar:
             return obj.worker.avatar.url
         return None

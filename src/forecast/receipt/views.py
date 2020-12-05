@@ -1,13 +1,13 @@
 import json
 
 from django.http.response import Http404
-from rest_framework import serializers, viewsets, status
+from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from src.base.exceptions import MessageError
 from src.base.models import Shop
 from src.base.permissions import FilteredListPermission
-from src.base.views_abstract import GetObjectByCodeMixin
+from src.base.views_abstract import GetObjectByCodeMixin, BaseModelViewSet
 from src.forecast.models import Receipt
 
 
@@ -18,7 +18,7 @@ class PeriodClientsCreateSerializer(serializers.Serializer):
 
 
 # TODO: documentation
-class ReceiptViewSet(GetObjectByCodeMixin, viewsets.ModelViewSet):
+class ReceiptViewSet(GetObjectByCodeMixin, BaseModelViewSet):
     """
     """
     permission_classes = [FilteredListPermission]

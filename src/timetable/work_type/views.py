@@ -1,6 +1,7 @@
-from rest_framework import serializers, viewsets
+from rest_framework import serializers
 from django_filters.rest_framework import FilterSet
 from src.base.permissions import Permission
+from src.base.views_abstract import BaseModelViewSet
 from src.timetable.models import WorkType,WorkTypeName
 from src.timetable.work_type_name.views import WorkTypeNameSerializer
 from rest_framework.decorators import action
@@ -60,7 +61,7 @@ class WorkTypeFilter(FilterSet):
         }
 
 
-class WorkTypeViewSet(viewsets.ModelViewSet):
+class WorkTypeViewSet(BaseModelViewSet):
     """
 
     GET /rest_api/work_type/

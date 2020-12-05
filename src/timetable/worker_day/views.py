@@ -13,7 +13,6 @@ from django.utils import timezone
 from django.utils.encoding import escape_uri_path
 from django.utils.translation import gettext_lazy as _
 from django_filters import utils
-from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
@@ -24,6 +23,7 @@ from src.base.exceptions import MessageError
 from src.base.message import Message
 from src.base.models import Employment, Shop, User, ProductionDay
 from src.base.permissions import WdPermission
+from src.base.views_abstract import BaseModelViewSet
 from src.main.timetable.auto_settings.utils import set_timetable_date_from
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
@@ -58,7 +58,7 @@ from src.util.models_converter import Converter
 from src.util.upload import get_uploaded_file
 
 
-class WorkerDayViewSet(viewsets.ModelViewSet):
+class WorkerDayViewSet(BaseModelViewSet):
     error_messages = {
         "worker_days_mismatch": _("Worker days mismatch."),
         "no_timetable": _("Workers don't have timetable."),

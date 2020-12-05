@@ -1,7 +1,8 @@
-from rest_framework import serializers, viewsets
+from rest_framework import serializers
 from src.timetable.models import VacancyBlackList
 from django_filters.rest_framework import FilterSet, NumberFilter
 from src.base.permissions import FilteredListPermission
+from src.base.views_abstract import BaseModelViewSet
 
 
 class VacancyBlackListSerializer(serializers.ModelSerializer):
@@ -20,7 +21,7 @@ class VacancyBlackListFilter(FilterSet):
         }
 
 
-class VacancyBlackListViewSet(viewsets.ModelViewSet):
+class VacancyBlackListViewSet(BaseModelViewSet):
     serializer_class = VacancyBlackListSerializer
     filterset_class = VacancyBlackListFilter
     queryset = VacancyBlackList.objects.all()

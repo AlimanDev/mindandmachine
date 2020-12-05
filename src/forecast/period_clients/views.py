@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, time
-from rest_framework import serializers, viewsets, status
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from django_filters import DateFilter, NumberFilter
@@ -15,6 +15,7 @@ from src.forecast.load_template.utils import apply_reverse_formula # чтобы 
 from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util, create_demand
 from src.util.upload import get_uploaded_file
 import json
+from src.base.views_abstract import BaseModelViewSet
 
 
 # Serializers define the API representation.
@@ -77,7 +78,7 @@ class PeriodClientsFilter(FilterSet):
         }
 
 
-class PeriodClientsViewSet(viewsets.ModelViewSet):
+class PeriodClientsViewSet(BaseModelViewSet):
     """
 
     GET /rest_api/period_clients/

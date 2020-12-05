@@ -17,7 +17,11 @@ class GetObjectByCodeMixin:
         return super().get_object()
 
 
-class BaseActiveNamedModelViewSet(GetObjectByCodeMixin, ModelViewSet):
+class BaseModelViewSet(ModelViewSet):
+    http_method_names = ['get', 'post', 'put', 'delete']
+
+
+class BaseActiveNamedModelViewSet(GetObjectByCodeMixin, BaseModelViewSet):
     """
     Класс переопределяющий get_object() для возможности
     получения сущности по коду либо иному полю, указанному

@@ -1,6 +1,7 @@
-from rest_framework import serializers, viewsets, permissions
+from rest_framework import serializers, permissions
 from src.timetable.models import ExchangeSettings
 from django_filters.rest_framework import FilterSet
+from src.base.views_abstract import BaseModelViewSet
 
 
 # Serializers define the API representation.
@@ -19,7 +20,7 @@ class ExchangeSettingsFilter(FilterSet):
         }
 
 
-class ExchangeSettingsViewSet(viewsets.ModelViewSet):
+class ExchangeSettingsViewSet(BaseModelViewSet):
     
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ExchangeSettingsSerializer
