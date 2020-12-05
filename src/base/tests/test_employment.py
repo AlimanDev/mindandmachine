@@ -326,6 +326,45 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.json()['dt_to_function_group'], (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'))
 
     
+    def test_change_function_group_tmp_through_position(self):
+        self.admin_group.subordinates.add(self.chief_group)
+        self.admin_group.subordinates.add(self.employee_group)
+        self.worker_position.group = self.admin_group
+        self.worker_position.save()
+        self.employment1.function_group_id = None
+        self.employment1.position = self.worker_position
+        self.employment1.save()
+        put_data = {
+            'function_group_id': self.chief_group.id,
+            'dt_to_function_group': (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'),
+            'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
+        }
+
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk=self.employment2.id),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.json()['function_group_id'], self.chief_group.id)
+        self.assertEqual(resp.json()['dt_to_function_group'], (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'))
+
+    
+    def test_delete_function_group_tmp(self):
+        self.admin_group.subordinates.add(self.chief_group)
+        self.admin_group.subordinates.add(self.employee_group)
+        put_data = {
+            'function_group_id': None,
+            'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
+        }
+
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk=self.employment2.id),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        self.assertIsNone(resp.json()['function_group_id'])
+
+    
     def test_change_function_group_tmp_no_perm(self):
         put_data = {
             'function_group_id': self.chief_group.id,

@@ -162,7 +162,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField(required=False)
     shop_code = serializers.CharField(required=False, source='shop.code')
     user_id = serializers.IntegerField(required=False)
-    function_group_id = serializers.IntegerField(required=False)
+    function_group_id = serializers.IntegerField(required=False, allow_null=True)
     work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
     username = serializers.CharField(required=False, source='user.username')
@@ -248,9 +248,11 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data, *args, **kwargs):
         if instance.function_group_id != validated_data.get('function_group_id'):
+            group = instance.function_group_id or validated_data.get('function_group_id')
+            user = self.context['request'].user
             has_perm = Group.objects.filter(
-                employments__user=self.context['request'].user,
-                subordinates__id=validated_data.get('function_group_id'),
+                Q(employments__user=user) | Q(workerposition__employment__user=user),
+                subordinates__id=group,
             ).exists()
             if not has_perm:
                 raise PermissionDenied()
