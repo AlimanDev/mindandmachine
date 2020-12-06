@@ -8,10 +8,18 @@ USER=${PROJECT_NAME}
 GIT_BRANCH=
 VENV_PATH=${PROJECT_PATH}/../env
 
-if [[ `sudo su - ${USER} -c "cd $PROJECT_PATH && git status --porcelain"` ]]; then
+sudo su - ${USER} -c "cd ${PROJECT_PATH} && git fetch origin ${GIT_BRANCH}"
+
+UPSTREAM=${1:-'@{u}'}
+LOCAL=$(cd ${PROJECT_PATH} && git rev-parse @)
+REMOTE=$(cd ${PROJECT_PATH} && git rev-parse "$UPSTREAM")
+BASE=$(cd ${PROJECT_PATH} && git merge-base @ "$UPSTREAM")
+
+if [ $LOCAL = $REMOTE ]; then
+    echo "no changes, skip updating"
+elif [ $LOCAL = $BASE ]; then
     echo 'start updating'
 
-    sudo su - ${USER} -c "cd ${PROJECT_PATH} && git fetch origin ${GIT_BRANCH}"
     sudo su - ${USER} -c "cd ${PROJECT_PATH} && git reset origin/${GIT_BRANCH}"
 
     sudo su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/pip install -r requirements.txt"
@@ -22,6 +30,8 @@ if [[ `sudo su - ${USER} -c "cd $PROJECT_PATH && git status --porcelain"` ]]; th
     supervisorctl restart ${PROJECT_NAME}_celerybeat
 
     echo 'finish updating'
+elif [ $REMOTE = $BASE ]; then
+    echo "need to push"
 else
-    echo 'no changes, skip updating'
+    echo "diverged"
 fi
