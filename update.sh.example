@@ -26,9 +26,9 @@ elif [ $LOCAL = $BASE ]; then
     sudo su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/pip install -r requirements.txt"
     sudo su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/python manage.py migrate"
 
-    supervisorctl restart ${PROJECT_NAME}_uwsgi
-    supervisorctl restart ${PROJECT_NAME}_celery
-    supervisorctl restart ${PROJECT_NAME}_celerybeat
+    sudo supervisorctl restart ${PROJECT_NAME}_uwsgi
+    sudo supervisorctl restart ${PROJECT_NAME}_celery
+    sudo supervisorctl restart ${PROJECT_NAME}_celerybeat
 
     echo "finish updating"
 elif [ $REMOTE = $BASE ]; then
