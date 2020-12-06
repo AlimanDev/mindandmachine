@@ -13,8 +13,8 @@ GIT_UPSTREAM=${GIT_REMOTE}/${GIT_BRANCH}
 sudo su - ${USER} -c "cd ${PROJECT_PATH} && git fetch ${GIT_REMOTE} ${GIT_BRANCH}"
 
 LOCAL=$(cd ${PROJECT_PATH} && git rev-parse @)
-REMOTE=$(cd ${PROJECT_PATH} && git rev-parse "$UPSTREAM")
-BASE=$(cd ${PROJECT_PATH} && git merge-base @ "$UPSTREAM")
+REMOTE=$(cd ${PROJECT_PATH} && git rev-parse "${GIT_UPSTREAM}")
+BASE=$(cd ${PROJECT_PATH} && git merge-base @ "${GIT_UPSTREAM}")
 
 if [ $LOCAL = $REMOTE ]; then
     echo "no changes, skip updating"
