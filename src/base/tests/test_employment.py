@@ -305,3 +305,29 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             self.assertTrue(WorkerDay.objects.filter(id=wd2.id).exists())
             self.assertTrue(WorkerDay.objects.filter(id=wd_holiday.id).exists())
             self.assertEqual(WorkerDay.objects.count(), wd_count_before_save - 1)
+
+
+    def test_timetable_permissions(self):
+        data = {
+            'dt_fired': '2020-10-10',
+            'position_id': self.worker_position.id,
+            'is_fixed_hours': True,
+            'is_visible': False,
+        }
+        response = self.client.put(f'/rest_api/employment/{self.employment3.id}/timetable/', data=self.dump_data(data), content_type='application/json') 
+        data = {
+            'is_fixed_hours': True, 
+            'salary': '150.00', 
+            'week_availability': 7, 
+            'norm_work_hours': 100, 
+            'min_time_btw_shifts': None, 
+            'shift_hours_length_min': None, 
+            'shift_hours_length_max': None, 
+            'tabel_code': None, 
+            'is_ready_for_overworkings': False, 
+            'is_visible': False
+        }
+        self.assertEqual(response.json(), data)
+        self.employment3.refresh_from_db()
+        self.assertIsNone(self.employment3.position_id)
+        self.assertIsNone(self.employment3.dt_fired)
