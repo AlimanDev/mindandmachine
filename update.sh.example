@@ -21,7 +21,7 @@ if [ $LOCAL = $REMOTE ]; then
 elif [ $LOCAL = $BASE ]; then
     echo "start updating"
 
-    sudo su - ${USER} -c "cd ${PROJECT_PATH} && git reset ${GIT_UPSTREAM}"
+    sudo su - ${USER} -c "cd ${PROJECT_PATH} && git reset ${GIT_UPSTREAM} --hard"
 
     sudo su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/pip install -r requirements.txt"
     sudo su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/python manage.py migrate"
