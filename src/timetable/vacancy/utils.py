@@ -491,7 +491,7 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             res['status_code'] = 400
             return res
 
-        active_employments = list(Employment.objects.get_active(
+        active_employment = Employment.objects.get_active(
                 user.network_id, dt_from=vacancy.dt, dt_to=vacancy.dt, user=user,
         ).select_related(
             'shop',
@@ -499,26 +499,24 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             'is_equal_shops', 'shop_id', vacancy.shop_id,
         ).order_by(
             '-is_equal_shops',
-        ))
+        ).first()
 
         # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
         # TODO: сделать более информативные сообщения об ошибках
-        if not active_employments:
+        if not active_employment:
             res['code'] = 'cant_apply_vacancy'
             res['status_code'] = 400
             return res
 
-        employment = active_employments[0]
-
         # сотрудник из другой сети не может принять вакансию если это не аутсорс вакансия
-        if not vacancy.is_outsource and employment.shop.network_id != vacancy_shop.network_id:
+        if not vacancy.is_outsource and active_employment.shop.network_id != vacancy_shop.network_id:
             res['code'] = 'cant_apply_vacancy'
             res['status_code'] = 400
             return res
 
         # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
         update_condition = user_worker_day.type not in WorkerDay.TYPES_PAID
-        if employment.shop_id != vacancy_shop.id and not exchange:
+        if active_employment.shop_id != vacancy_shop.id and not exchange:
             try:
                 tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
             except ShopMonthStat.DoesNotExist:
@@ -530,43 +528,16 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
                 update_condition = False
 
         if update_condition or exchange:
+            user_worker_day.delete()
+
             vacancy.worker = user
-            vacancy.employment = employment
+            vacancy.employment = active_employment
             vacancy.save(update_fields=('worker', 'employment'))
 
-            if user_worker_day.is_vacancy and user_worker_day.shop and user_worker_day.shop.email:
-                work_types = list(user_worker_day.work_types.all().values_list('work_type_name__name', flat=True))
-                work_types = ', '.join(work_types)
-
-                send_email(
-                    template_name='emails/employee_canceled_vacancy.html',
-                    to=user_worker_day.shop.email,
-                    subject='Изменение в графике выхода сотрудников',
-                    context=dict(
-                        shop=user_worker_day.shop,
-                        user=user,
-                        work_types=work_types,
-                        dttm_work_start=user_worker_day.dttm_work_start,
-                        dttm_work_end=user_worker_day.dttm_work_end,
-                        dt=user_worker_day.dt,
-                        domain=settings.DOMAIN,
-                    ),
-                )
-            if vacancy_shop.email:
-                send_email(
-                    template_name='emails/employee_assigned_to_vacancy.html',
-                    to=vacancy_shop.email,
-                    subject='Изменение в графике выхода сотрудников',
-                    context=dict(
-                        shop=vacancy.shop,
-                        user=user,
-                        dt=vacancy.dt,
-                        domain=settings.DOMAIN,
-                    ),
-                )
+            # TODO: создать событие об отклике на вакансию,
+            # TODO: сделать возможность отправки email на почту подразделения через систему уведомлений о событиях
 
             Event.objects.filter(worker_day=vacancy).delete()
-            user_worker_day.delete()
             res['code'] = 'vacancy_success'
         else:
             res['code'] = 'cant_apply_vacancy'

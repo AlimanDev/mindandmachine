@@ -96,7 +96,6 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     employment_id = serializers.IntegerField(required=False, allow_null=True)
     shop_id = serializers.IntegerField(required=False)
     parent_worker_day_id = serializers.IntegerField(required=False, read_only=True)
-    is_fact = serializers.BooleanField(required=False)
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
     type = serializers.CharField(required=True)
@@ -113,6 +112,14 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                   'crop_work_hours_by_shop_schedule']
         read_only_fields = ['work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
+        extra_kwargs = {
+            'is_fact': {
+                'required': False,
+            },
+            'is_approved': {
+                'default': False,
+            }
+        }
 
     def validate(self, attrs):
         if self.instance and self.instance.is_approved:
@@ -195,42 +202,50 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def _create_update_clean(self, validated_data):
-        worker_active_empls = list(Employment.objects.get_active(
-            network_id=self.context['request'].user.network_id,
-            dt_from=validated_data.get('dt'),
-            dt_to=validated_data.get('dt'),
-            user_id=validated_data.get('worker_id'),
-        ).annotate_value_equality(
-            'is_equal_employments', 'id', validated_data.get('employment_id'),
-        ).annotate_value_equality(
-            'is_equal_shops', 'shop_id', validated_data.get('shop_id'),
-        ).order_by(
-            '-is_equal_shops', '-is_equal_employments',
-        ).values(
-            'id', 'shop_id', 'is_equal_shops',
-        ))
+    def _create_update_clean(self, validated_data, instance=None):
+        worker_id = validated_data.get('worker_id', instance.worker_id if instance else None)
+        if worker_id:
+            wdays_qs = WorkerDay.objects.filter(
+                worker_id=worker_id,
+                dt=validated_data.get('dt'),
+                is_approved=validated_data.get(
+                    'is_approved',
+                    instance.is_approved if instance else WorkerDay._meta.get_field('is_approved').default,
+                ),
+                is_fact=validated_data.get(
+                    'is_fact', instance.is_fact if instance else WorkerDay._meta.get_field('is_fact').default),
+            )
+            if instance:
+                wdays_qs = wdays_qs.exclude(id=instance.id)
+            wdays_qs.delete()
 
-        if not worker_active_empls:
-            raise self.fail('no_active_employments')
+            if validated_data.get('type') in WorkerDay.TYPES_WITH_TM_RANGE:
+                worker_active_empls = list(Employment.objects.get_active(
+                    network_id=self.context['request'].user.network_id,
+                    dt_from=validated_data.get('dt'),
+                    dt_to=validated_data.get('dt'),
+                    user_id=worker_id,
+                ).annotate_value_equality(
+                    'is_equal_employments', 'id', validated_data.get('employment_id'),
+                ).annotate_value_equality(
+                    'is_equal_shops', 'shop_id', validated_data.get('shop_id'),
+                ).order_by(
+                    '-is_equal_shops', '-is_equal_employments',
+                ).values(
+                    'id', 'shop_id', 'is_equal_shops',
+                ))
 
-        worker_active_empl = worker_active_empls[0]
-        validated_data['employment_id'] = worker_active_empl['id']
-        validated_data['is_vacancy'] = validated_data.get('is_vacancy') or not worker_active_empl['is_equal_shops']
+                if not worker_active_empls:
+                    raise self.fail('no_active_employments')
+
+                worker_active_empl = worker_active_empls[0]
+                validated_data['employment_id'] = worker_active_empl['id']
+                validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
+                    or not worker_active_empl['is_equal_shops']
 
     def create(self, validated_data):
         with transaction.atomic():
-            if validated_data.get('worker_id') and \
-                    validated_data.get('type') == WorkerDay.TYPE_WORKDAY and validated_data.get('shop_id'):
-                self._create_update_clean(validated_data)
-
-            if validated_data.get('worker_id'):
-                WorkerDay.objects.filter(
-                    worker_id=validated_data.get('worker_id'),
-                    dt=validated_data.get('dt'),
-                    is_approved=validated_data.get('is_approved'),
-                    is_fact=validated_data.get('is_fact'),
-                ).delete()
+            self._create_update_clean(validated_data)
 
             details = validated_data.pop('worker_day_details', None)
             worker_day = WorkerDay.objects.create(**validated_data)
@@ -248,19 +263,9 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 for wd_detail in details:
                     WorkerDayCashboxDetails.objects.create(worker_day=instance, **wd_detail)
 
-            if validated_data.get('worker_id') and \
-                    validated_data.get('type') == WorkerDay.TYPE_WORKDAY and validated_data.get('shop_id'):
-                self._create_update_clean(validated_data)
+            self._create_update_clean(validated_data, instance=instance)
 
-            res = super().update(instance, validated_data)
-            if instance.worker_id:
-                WorkerDay.objects.filter(
-                    worker_id=instance.worker_id,
-                    dt=instance.dt,
-                    is_approved=instance.is_approved,
-                    is_fact=instance.is_fact,
-                ).exclude(id=instance.id).delete()
-            return res
+            return super().update(instance, validated_data)
 
     def to_internal_value(self, data):
         data = super(WorkerDaySerializer, self).to_internal_value(data)
@@ -441,6 +446,11 @@ class ChangeRangeSerializer(serializers.Serializer):
         super(ChangeRangeSerializer, self).__init__(*args, **kwargs)
         self.fields['worker'] = serializers.SlugRelatedField(
             slug_field='tabel_code', queryset=User.objects.filter(network=self.context['request'].user.network))
+
+    def validate(self, data):
+        if not data['dt_to'] >= data['dt_from']:
+            raise serializers.ValidationError("dt_to must be greater than or equal to dt_from")
+        return data
 
 
 class ChangeRangeListSerializer(serializers.Serializer):

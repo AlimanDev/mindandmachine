@@ -85,16 +85,6 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 user_login=F('worker__username'),
             )
 
-        if self.action == 'list':
-            # временно, пока не решим проблему коллизий дней
-            ordered_subq = queryset.filter(
-                dt=OuterRef('dt'),
-                worker_id=OuterRef('worker_id'),
-                is_fact=OuterRef('is_fact'),
-                is_approved=OuterRef('is_approved'),
-            ).order_by('-is_vacancy', '-id').values_list('id')[:1]
-            queryset = queryset.filter(id=Subquery(ordered_subq))
-
         return queryset
 
     # тут переопределяется update а не perform_update потому что надо в Response вернуть
@@ -281,20 +271,14 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         approve_condition = Q(
             wd_types_q,
-            Q(shop_id=serializer.data['shop_id']) | Q(Q(shop__isnull=True) | Q(type=WorkerDay.TYPE_QUALIFICATION), worker_id__in=user_ids),
+            Q(shop_id=serializer.data['shop_id']) |
+            Q(type=WorkerDay.TYPE_QUALIFICATION, worker_id__in=user_ids),
             dt__lte=serializer.data['dt_to'],
             dt__gte=serializer.data['dt_from'],
             is_fact=serializer.data['is_fact'],
             is_approved=False,
         )
-
-        wdays_to_approve = WorkerDay.objects.get_last_ordered(
-            is_fact=serializer.data['is_fact'],
-            order_by=[
-                'is_approved',
-                '-id',
-            ]
-        ).filter(approve_condition)
+        wdays_to_approve = WorkerDay.objects.filter(approve_condition)
 
         worker_dt_pairs_list = list(
             wdays_to_approve.values_list('worker_id', 'dt').order_by('worker_id', 'dt').distinct())
@@ -426,18 +410,23 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def approve_vacancy(self, request, pk=None):
-        vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True, is_approved=False).first()
-        if vacancy is None:
-            raise MessageError(code='no_vacancy_or_approved', lang=request.user.lang)
-        vacancy.is_approved = True
-        vacancy.save()
-        if vacancy.worker_id:
-            WorkerDay.objects.filter(
-                dt=vacancy.dt,
-                worker_id=vacancy.worker_id,
-                is_fact=vacancy.is_fact,
-                is_approved=True,
-            ).exclude(id=vacancy.id).delete()
+        with transaction.atomic():
+            vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True, is_approved=False).select_for_update().first()
+            if vacancy is None:
+                raise MessageError(code='no_vacancy_or_approved', lang=request.user.lang)
+
+            if vacancy.worker_id:
+                WorkerDay.objects.filter(
+                    dt=vacancy.dt,
+                    worker_id=vacancy.worker_id,
+                    is_fact=vacancy.is_fact,
+                    is_approved=True,
+                ).exclude(id=vacancy.id).delete()
+
+            # TODO: нужно ли оставлять вакансию в неподтвержденной версии?
+            vacancy.is_approved = True
+            vacancy.save()
+
         return Response(WorkerDaySerializer(vacancy).data)
 
     @action(detail=True, methods=['get'])
@@ -489,14 +478,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                     is_approved=range['is_approved'],
                     is_fact=range['is_fact'],
                 ).exclude(
-                    id__in=Subquery(
-                        WorkerDay.objects.filter(
-                            dt=OuterRef('dt'),
-                            worker=OuterRef('worker'),
-                            is_approved=OuterRef('is_approved'),
-                            is_fact=OuterRef('is_fact'),
-                            type=range['type'],
-                        ).order_by('created_by').values_list('id')[:1]),  # оставляем тех, у кого есть created_by
+                    type=range['type'],
                 ).delete()
 
                 existing_dates = list(WorkerDay.objects.filter(
@@ -524,109 +506,109 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 WorkerDay.objects.bulk_create(wdays_to_create)
 
                 res[range['worker'].tabel_code] = {
-                    'deleted_count': deleted[0],
+                    'deleted_count': deleted[1].get('timetable.WorkerDay', 0),
                     'existing_count': len(existing_dates),
                     'created_count': len(wdays_to_create)
                 }
 
         return Response(res)
 
-    @action(detail=False, methods=['post'])
-    def change_list(self, request):
-        data = ListChangeSrializer(data=request.data, context={'request': request})
-        data.is_valid(raise_exception=True)
-        data = data.validated_data
-        is_type_with_tm_range = WorkerDay.is_type_with_tm_range(data['type'])
-
-        response = {}
-
-        shop_id = data['shop_id']
-        shop = Shop.objects.get(id=shop_id)
-
-        work_type = WorkType.objects.get(id=data['work_type']) if data['work_type'] else None
-        work_types = {}
-        employments = {
-            e.user_id: e
-            for e in Employment.objects.get_active(
-                network_id=shop.network_id,
-                user_id__in=data['workers'].keys(),
-                shop_id=shop_id,
-            )
-        }
-        for user_id, dates in data['workers'].items():
-            employment = employments.get(user_id, None)
-            wds = []
-            for dt in dates:
-                wd_args = {
-                    'type': data['type'],
-                    'employment': employment,
-                    'created_by': request.user,
-                    'comment': data['comment'],
-                    'dttm_added': timezone.now(),
-                    'is_vacancy': False,
-                }
-                if is_type_with_tm_range:
-                    dttm_work_start = timezone.datetime.combine(dt, data[
-                        'tm_work_start'])  # на самом деле с фронта приходят время а не дата-время
-                    tm_work_end = data['tm_work_end']
-                    dttm_work_end = timezone.datetime.combine(dt, tm_work_end) if tm_work_end > data['tm_work_start'] else \
-                        timezone.datetime.combine(dt + timezone.timedelta(days=1), tm_work_end)
-                    wd_args.update({
-                        'dttm_work_start': dttm_work_start,
-                        'dttm_work_end': dttm_work_end,
-                    })
-                wd, created = WorkerDay.objects.filter(Q(shop_id=shop_id)|Q(shop__isnull=True)).update_or_create(
-                    worker_id=user_id,
-                    dt=dt,
-                    is_approved=False,
-                    is_fact=False,
-                    defaults=wd_args,
-                )
-                wd_details = WorkerDayCashboxDetails.objects.filter(worker_day=wd)
-                work_types.update({
-                    wd.work_type_id: wd.work_type.shop_id
-                    for wd in wd_details.select_related('work_type')
-                })
-                wd_details.delete()
-                #TODO add cancel worker day
-                # if not created and wd_details.exists():
-                #     old_work_type = wd_details.first().work_type
-                #     if old_work_type not in work_types:
-                #         work_types.append(old_work_type)
-                #     if wd_details.filter(is_vacancy=True).exists():
-                #         for wd_detail in wd_details.filter(is_vacancy=True):
-                #             cancel_vacancy(wd_detail.id)
-                #             worker_day.canceled = True
-                #     else:
-                #         worker_day.canceled = False
-                #     wd_details.filter(is_vacancy=False).delete()
-                # else:
-                #     worker_day.canceled = False
-                if created:
-                    wd.parent_worker_day = WorkerDay.objects.filter(
-                        worker_id=user_id,
-                        dt=dt,
-                        shop_id=shop_id,
-                        is_approved=True,
-                    ).first()
-                    wd.save()
-                if wd.type == WorkerDay.TYPE_WORKDAY:      
-                    WorkerDayCashboxDetails.objects.create(
-                        work_type=work_type,
-                        worker_day=wd,
-                    )
-
-                wds.append(wd)
-
-            response[user_id] = WorkerDaySerializer(wds, many=True).data
-                
-        if work_type and data['type'] == WorkerDay.TYPE_WORKDAY:
-            cancel_vacancies(work_type.shop_id, work_type.id)
-        if len(work_types):
-            for wt, sh_id in work_types.items():
-                create_vacancies_and_notify(sh_id, wt)
-
-        return Response(response, status=200)
+    # @action(detail=False, methods=['post'])
+    # def change_list(self, request):
+    #     data = ListChangeSrializer(data=request.data, context={'request': request})
+    #     data.is_valid(raise_exception=True)
+    #     data = data.validated_data
+    #     is_type_with_tm_range = WorkerDay.is_type_with_tm_range(data['type'])
+    #
+    #     response = {}
+    #
+    #     shop_id = data['shop_id']
+    #     shop = Shop.objects.get(id=shop_id)
+    #
+    #     work_type = WorkType.objects.get(id=data['work_type']) if data['work_type'] else None
+    #     work_types = {}
+    #     employments = {
+    #         e.user_id: e
+    #         for e in Employment.objects.get_active(
+    #             network_id=shop.network_id,
+    #             user_id__in=data['workers'].keys(),
+    #             shop_id=shop_id,
+    #         )
+    #     }
+    #     for user_id, dates in data['workers'].items():
+    #         employment = employments.get(user_id, None)
+    #         wds = []
+    #         for dt in dates:
+    #             wd_args = {
+    #                 'type': data['type'],
+    #                 'employment': employment,
+    #                 'created_by': request.user,
+    #                 'comment': data['comment'],
+    #                 'dttm_added': timezone.now(),
+    #                 'is_vacancy': False,
+    #             }
+    #             if is_type_with_tm_range:
+    #                 dttm_work_start = timezone.datetime.combine(dt, data[
+    #                     'tm_work_start'])  # на самом деле с фронта приходят время а не дата-время
+    #                 tm_work_end = data['tm_work_end']
+    #                 dttm_work_end = timezone.datetime.combine(dt, tm_work_end) if tm_work_end > data['tm_work_start'] else \
+    #                     timezone.datetime.combine(dt + timezone.timedelta(days=1), tm_work_end)
+    #                 wd_args.update({
+    #                     'dttm_work_start': dttm_work_start,
+    #                     'dttm_work_end': dttm_work_end,
+    #                 })
+    #             wd, created = WorkerDay.objects.filter(Q(shop_id=shop_id)|Q(shop__isnull=True)).update_or_create(
+    #                 worker_id=user_id,
+    #                 dt=dt,
+    #                 is_approved=False,
+    #                 is_fact=False,
+    #                 defaults=wd_args,
+    #             )
+    #             wd_details = WorkerDayCashboxDetails.objects.filter(worker_day=wd)
+    #             work_types.update({
+    #                 wd.work_type_id: wd.work_type.shop_id
+    #                 for wd in wd_details.select_related('work_type')
+    #             })
+    #             wd_details.delete()
+    #             #TODO add cancel worker day
+    #             # if not created and wd_details.exists():
+    #             #     old_work_type = wd_details.first().work_type
+    #             #     if old_work_type not in work_types:
+    #             #         work_types.append(old_work_type)
+    #             #     if wd_details.filter(is_vacancy=True).exists():
+    #             #         for wd_detail in wd_details.filter(is_vacancy=True):
+    #             #             cancel_vacancy(wd_detail.id)
+    #             #             worker_day.canceled = True
+    #             #     else:
+    #             #         worker_day.canceled = False
+    #             #     wd_details.filter(is_vacancy=False).delete()
+    #             # else:
+    #             #     worker_day.canceled = False
+    #             if created:
+    #                 wd.parent_worker_day = WorkerDay.objects.filter(
+    #                     worker_id=user_id,
+    #                     dt=dt,
+    #                     shop_id=shop_id,
+    #                     is_approved=True,
+    #                 ).first()
+    #                 wd.save()
+    #             if wd.type == WorkerDay.TYPE_WORKDAY:
+    #                 WorkerDayCashboxDetails.objects.create(
+    #                     work_type=work_type,
+    #                     worker_day=wd,
+    #                 )
+    #
+    #             wds.append(wd)
+    #
+    #         response[user_id] = WorkerDaySerializer(wds, many=True).data
+    #
+    #     if work_type and data['type'] == WorkerDay.TYPE_WORKDAY:
+    #         cancel_vacancies(work_type.shop_id, work_type.id)
+    #     if len(work_types):
+    #         for wt, sh_id in work_types.items():
+    #             create_vacancies_and_notify(sh_id, wt)
+    #
+    #     return Response(response, status=200)
 
     @action(detail=False, methods=['post'])
     def duplicate(self, request):
@@ -635,69 +617,96 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         data = data.validated_data
         to_worker_id = data['to_worker_id']
 
-        main_worker_days = list(WorkerDay.objects.filter(
-            id__in=data['from_workerday_ids'],
-            is_fact=False,
-        ))
-        main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
-            worker_day__in=main_worker_days,
-        ).select_related('work_type'))
+        with transaction.atomic():
+            main_worker_days = list(WorkerDay.objects.filter(
+                id__in=data['from_workerday_ids'],
+                is_fact=False,
+            ).select_related(
+                'worker',
+                'shop__settings__breaks',
+            ))
+            main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
+                worker_day__in=main_worker_days,
+            ).select_related('work_type'))
 
-        main_worker_days_details = {}
-        for detail in main_worker_days_details_set:
-            key = detail.worker_day_id
-            if key not in main_worker_days_details:
-                main_worker_days_details[key] = []
-            main_worker_days_details[key].append(detail)
+            main_worker_days_details = {}
+            for detail in main_worker_days_details_set:
+                key = detail.worker_day_id
+                if key not in main_worker_days_details:
+                    main_worker_days_details[key] = []
+                main_worker_days_details[key].append(detail)
 
-        trainee_worker_days = WorkerDay.objects.filter(
-            worker_id=to_worker_id,
-            dt__in=data['to_dates'],
-            is_approved=False,
-            is_fact=False,
-        )
-        trainee_worker_days.delete()
-
-        created_wds = []
-        wdcds_list_to_create = []
-        length_main_wds = len(main_worker_days)
-        for i, dt in enumerate(data['to_dates']):
-            i = i % length_main_wds
-            blank_day = main_worker_days[i]
-            new_wd = WorkerDay.objects.create(
+            trainee_worker_days = WorkerDay.objects.filter(
                 worker_id=to_worker_id,
-                dt=dt,
-                shop_id=blank_day.shop_id,
-                work_hours=blank_day.work_hours,
-                type=blank_day.type,
-                dttm_work_start=datetime.datetime.combine(
-                    dt, blank_day.dttm_work_start.timetz()) if blank_day.dttm_work_start else None,
-                dttm_work_end=datetime.datetime.combine(
-                    dt, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
+                dt__in=data['to_dates'],
                 is_approved=False,
                 is_fact=False,
-                created_by=request.user,
             )
-            created_wds.append(new_wd)
-            new_wdcds = main_worker_days_details.get(blank_day.id, [])
-            for new_wdcd in new_wdcds:
-                wdcds_list_to_create.append(
-                    WorkerDayCashboxDetails(
-                        worker_day=new_wd,
-                        work_type_id=new_wdcd.work_type_id,
-                        work_part=new_wdcd.work_part,
+            trainee_worker_days.delete()
+
+            created_wds = []
+            wdcds_list_to_create = []
+            length_main_wds = len(main_worker_days)
+            for i, dt in enumerate(data['to_dates']):
+                i = i % length_main_wds
+                blank_day = main_worker_days[i]
+
+                worker_active_empl = Employment.objects.get_active(
+                    network_id=blank_day.worker.network_id,
+                    dt_from=dt,
+                    dt_to=dt,
+                    user_id=to_worker_id,
+                ).annotate_value_equality(
+                    'is_equal_shops', 'shop_id', blank_day.shop_id,
+                ).order_by(
+                    '-is_equal_shops',
+                ).select_related(
+                    'position__breaks',
+                ).first()
+
+                # не создавать день, если нету активного трудоустройства на эту дату
+                if not worker_active_empl:
+                    raise ValidationError(
+                        'Невозможно создать дни в выбранные даты. '
+                        'Пожалуйста, проверьте наличие активного трудоустройства у сотрудника.'
                     )
+
+                new_wd = WorkerDay.objects.create(
+                    worker_id=to_worker_id,
+                    employment=worker_active_empl,
+                    dt=dt,
+                    shop=blank_day.shop,
+                    type=blank_day.type,
+                    dttm_work_start=datetime.datetime.combine(
+                        dt, blank_day.dttm_work_start.timetz()) if blank_day.dttm_work_start else None,
+                    dttm_work_end=datetime.datetime.combine(
+                        dt, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
+                    is_approved=False,
+                    is_fact=False,
+                    created_by=request.user,
                 )
+                created_wds.append(new_wd)
 
-        WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
+                new_wdcds = main_worker_days_details.get(blank_day.id, [])
+                for new_wdcd in new_wdcds:
+                    wdcds_list_to_create.append(
+                        WorkerDayCashboxDetails(
+                            worker_day=new_wd,
+                            work_type_id=new_wdcd.work_type_id,
+                            work_part=new_wdcd.work_part,
+                        )
+                    )
 
-        work_types = [
-            (wdcds.work_type.shop_id, wdcds.work_type_id)
-            for wdcds in main_worker_days_details_set
-        ]
+            WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
 
-        for shop_id, work_type in set(work_types):
-            cancel_vacancies(shop_id, work_type)
+            work_types = [
+                (wdcds.work_type.shop_id, wdcds.work_type_id)
+                for wdcds in main_worker_days_details_set
+            ]
+
+            for shop_id, work_type in set(work_types):
+                cancel_vacancies(shop_id, work_type)
+
         return Response(WorkerDaySerializer(created_wds, many=True).data)
 
     # @action(detail=False, methods=['post'])

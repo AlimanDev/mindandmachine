@@ -784,7 +784,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             "username": self.user2.username,
             "employment_id": self.employment2.id,
             "dt": dt,
-            "is_fact": 'true',
+            "is_fact": True,
             "type": WorkerDay.TYPE_HOLIDAY,
         }
         response = self.client.post(self.url, data, format='json')
@@ -964,20 +964,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             {self.user2.tabel_code: {'created_count': 0, 'deleted_count': 0, 'existing_count': 21}}
         )
 
-        wd_without_created_by = WorkerDay.objects.create(
-            worker=self.user2,
-            dt=self.dt,
-            is_fact=False,
-            is_approved=True,
-            type=WorkerDay.TYPE_MATERNITY,
-        )
-        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertDictEqual(
-            response.json(),
-            {self.user2.tabel_code: {'created_count': 0, 'deleted_count': 1, 'existing_count': 21}}
-        )
-        self.assertFalse(WorkerDay.objects.filter(id=wd_without_created_by.id).exists())
         wd = WorkerDay.objects.filter(
             worker=self.user2,
             dt=self.dt,
@@ -1173,6 +1159,13 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
         self.shop.tm_open_dict = f'{{"all":"{shop_open_h}:00:00"}}' if isinstance(shop_open_h, int) else shop_open_h
         self.shop.tm_close_dict = f'{{"all":"{shop_close_h}:00:00"}}' if isinstance(shop_close_h, int) else shop_close_h
         self.shop.save()
+
+        WorkerDay.objects.filter(
+            dt=self.dt_now,
+            worker=self.user2,
+            is_fact=True,
+            is_approved=True,
+        ).delete()
 
         wd_kwargs = dict(
             shop=self.shop,
@@ -1736,9 +1729,6 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
 
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].subject, 'Изменение в графике выхода сотрудников')
-
         self.assertFalse(WorkerDay.objects.filter(id=pawd.id).exists())
 
     def test_approve_vacancy(self):
@@ -1782,7 +1772,7 @@ class TestAditionalFunctions(APITestCase):
         ExchangeSettings.objects.create(network=self.network)
         self.client.force_authenticate(user=self.user1)
 
-    def create_holidays(self, employment, dt_from, count, approved, wds={}):
+    def update_or_create_holidays(self, employment, dt_from, count, approved, wds={}):
         result = {}
         for day in range(count):
             dt = dt_from + timedelta(days=day)
@@ -1854,7 +1844,7 @@ class TestAditionalFunctions(APITestCase):
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
         self.create_worker_days(self.employment2, dt_from, 3, 16, 20, False)
         self.create_worker_days(self.employment3, dt_from, 4, 10, 21, False)
-        self.create_holidays(self.employment2, dt_from + timedelta(3), 1, False)
+        self.update_or_create_holidays(self.employment2, dt_from + timedelta(3), 1, False)
         url = f'{self.url}delete_timetable/'
         response = self.client.post(url, data, format='json')
 
@@ -1897,7 +1887,7 @@ class TestAditionalFunctions(APITestCase):
         dt_from = date.today()
         self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
-        self.create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
+        self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
         data = {
             'from_workerday_ids': list(WorkerDay.objects.filter(worker=self.user2).values_list('id', flat=True)),
             'to_worker_id': self.user3.id,
@@ -1912,7 +1902,7 @@ class TestAditionalFunctions(APITestCase):
         dt_from = date.today()
         self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
-        self.create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
+        self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
         data = {
             'from_workerday_ids': list(WorkerDay.objects.filter(worker=self.user2).values_list('id', flat=True)),
             'to_worker_id': self.user3.id,
@@ -1927,7 +1917,7 @@ class TestAditionalFunctions(APITestCase):
         dt_from = date.today()
         self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
-        self.create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
+        self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
         data = {
             'from_workerday_ids': list(WorkerDay.objects.filter(worker=self.user2).values_list('id', flat=True)),
             'to_worker_id': self.user3.id,
@@ -1955,7 +1945,7 @@ class TestAditionalFunctions(APITestCase):
     def test_duplicate_day_without_time(self):
         dt_from = date.today()
         dt_from2 = dt_from + timedelta(days=10)
-        self.create_holidays(self.employment2, dt_from, 1, False)
+        self.update_or_create_holidays(self.employment2, dt_from, 1, False)
 
         data = {
             'from_workerday_ids': list(WorkerDay.objects.filter(worker=self.user2).values_list('id', flat=True)),
@@ -1967,37 +1957,62 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(len(response.json()), 8)
         self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False).count(), 8)
 
-    def test_change_list(self):
+    def test_cant_duplicate_when_there_is_no_active_employment(self):
         dt_from = date.today()
+        dt_from2 = dt_from + timedelta(days=10)
+
+        Employment.objects.filter(id=self.employment3.id).update(
+            dt_hired=dt_from - timedelta(days=30),
+            dt_fired=dt_from2,
+        )
+
+        self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
         data = {
-            'shop_id': self.shop.id,
-            'workers': {
-                self.user2.id: [
-                    Converter.convert_date(dt_from),
-                    Converter.convert_date(dt_from + timedelta(1)),
-                    Converter.convert_date(dt_from + timedelta(3)),
-                ],
-                self.user3.id: [
-                    Converter.convert_date(dt_from),
-                    Converter.convert_date(dt_from + timedelta(2)),
-                    Converter.convert_date(dt_from + timedelta(3)),
-                ],
-            },
-            'type': WorkerDay.TYPE_WORKDAY,
-            'tm_work_start': '10:00:00',
-            'tm_work_end': '22:00:00',
-            'work_type': self.work_type.id,
-            'comment': 'Test change',
+            'from_workerday_ids': list(WorkerDay.objects.filter(worker=self.user2).values_list('id', flat=True)),
+            'to_worker_id': self.user3.id,
+            'to_dates': [Converter.convert_date(dt_from2 + timedelta(i)) for i in range(8)],
         }
-        wds = self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
-        self.create_worker_days(self.employment2, dt_from, 2, 10, 20, False, wds=wds)
-        wds = self.create_worker_days(self.employment2, dt_from, 3, 10, 20, True)
-        wds.update(self.create_holidays(self.employment3, dt_from + timedelta(3), 1, True))
-        self.create_worker_days(self.employment3, dt_from, 4, 10, 21, False, wds=wds)
-        self.create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
-        url = f'{self.url}change_list/'
+        url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
-        data = response.json()
-        self.assertEqual(len(data), 2)
-        self.assertEqual(len(data[str(self.user2.id)]), 3)
-        self.assertEqual(len(data[str(self.user3.id)]), 3)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.json()[0],
+            'Невозможно создать дни в выбранные даты. Пожалуйста, '
+            'проверьте наличие активного трудоустройства у сотрудника.'
+        )
+        self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False).count(), 0)
+
+    # def test_change_list(self):
+    #     dt_from = date.today()
+    #     data = {
+    #         'shop_id': self.shop.id,
+    #         'workers': {
+    #             self.user2.id: [
+    #                 Converter.convert_date(dt_from),
+    #                 Converter.convert_date(dt_from + timedelta(1)),
+    #                 Converter.convert_date(dt_from + timedelta(3)),
+    #             ],
+    #             self.user3.id: [
+    #                 Converter.convert_date(dt_from),
+    #                 Converter.convert_date(dt_from + timedelta(2)),
+    #                 Converter.convert_date(dt_from + timedelta(3)),
+    #             ],
+    #         },
+    #         'type': WorkerDay.TYPE_WORKDAY,
+    #         'tm_work_start': '10:00:00',
+    #         'tm_work_end': '22:00:00',
+    #         'work_type': self.work_type.id,
+    #         'comment': 'Test change',
+    #     }
+    #     wds = self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
+    #     self.create_worker_days(self.employment2, dt_from, 2, 10, 20, False, wds=wds)
+    #     wds = self.create_worker_days(self.employment2, dt_from, 3, 10, 20, True)
+    #     wds.update(self.update_or_create_holidays(self.employment3, dt_from + timedelta(3), 1, True))
+    #     self.create_worker_days(self.employment3, dt_from, 4, 10, 21, False, wds=wds)
+    #     self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
+    #     url = f'{self.url}change_list/'
+    #     response = self.client.post(url, data, format='json')
+    #     data = response.json()
+    #     self.assertEqual(len(data), 2)
+    #     self.assertEqual(len(data[str(self.user2.id)]), 3)
+    #     self.assertEqual(len(data[str(self.user3.id)]), 3)
