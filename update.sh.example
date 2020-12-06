@@ -3,14 +3,15 @@
 set -e
 
 PROJECT_NAME=
-PROJECT_PATH=/var/servers/${PROJECT_NAME}/backend/qos
 USER=${PROJECT_NAME}
-GIT_BRANCH=
+PROJECT_PATH=/var/servers/${PROJECT_NAME}/backend/qos
 VENV_PATH=${PROJECT_PATH}/../env
+GIT_REMOTE=
+GIT_BRANCH=
+GIT_UPSTREAM=${GIT_REMOTE}/${GIT_BRANCH}
 
-sudo su - ${USER} -c "cd ${PROJECT_PATH} && git fetch origin ${GIT_BRANCH}"
+sudo su - ${USER} -c "cd ${PROJECT_PATH} && git fetch ${GIT_REMOTE} ${GIT_BRANCH}"
 
-UPSTREAM=${1:-'@{u}'}
 LOCAL=$(cd ${PROJECT_PATH} && git rev-parse @)
 REMOTE=$(cd ${PROJECT_PATH} && git rev-parse "$UPSTREAM")
 BASE=$(cd ${PROJECT_PATH} && git merge-base @ "$UPSTREAM")
@@ -20,7 +21,7 @@ if [ $LOCAL = $REMOTE ]; then
 elif [ $LOCAL = $BASE ]; then
     echo 'start updating'
 
-    sudo su - ${USER} -c "cd ${PROJECT_PATH} && git reset origin/${GIT_BRANCH}"
+    sudo su - ${USER} -c "cd ${PROJECT_PATH} && git reset ${GIT_UPSTREAM}"
 
     sudo su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/pip install -r requirements.txt"
     sudo su - ${USER} -c "cd ${PROJECT_PATH} && ${VENV_PATH}/bin/python manage.py migrate"
