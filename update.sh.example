@@ -19,7 +19,7 @@ BASE=$(cd ${PROJECT_PATH} && git merge-base @ "$UPSTREAM")
 if [ $LOCAL = $REMOTE ]; then
     echo "no changes, skip updating"
 elif [ $LOCAL = $BASE ]; then
-    echo 'start updating'
+    echo "start updating"
 
     sudo su - ${USER} -c "cd ${PROJECT_PATH} && git reset ${GIT_UPSTREAM}"
 
@@ -30,7 +30,7 @@ elif [ $LOCAL = $BASE ]; then
     supervisorctl restart ${PROJECT_NAME}_celery
     supervisorctl restart ${PROJECT_NAME}_celerybeat
 
-    echo 'finish updating'
+    echo "finish updating"
 elif [ $REMOTE = $BASE ]; then
     echo "need to push"
 else
