@@ -1047,6 +1047,7 @@ class AttendanceRecords(AbstractModel):
                     'employment': active_user_empl,
                     'type': WorkerDay.TYPE_WORKDAY,
                     type2dtfield[self.type]: self.dttm,
+                    'is_vacancy': active_user_empl.shop_id != self.shop_id if active_user_empl else False,
                 }
             )
 
