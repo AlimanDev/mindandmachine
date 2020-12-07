@@ -380,6 +380,29 @@ class EmploymentManager(models.Manager):
             user__network_id=network_id
         ).filter(*args, **kwargs)
 
+    def get_active_empl_for_user(
+            self, network_id, user_id, dt=None, priority_shop_id=None, priority_employment_id=None):
+        qs = self.get_active(network_id, dt_from=dt, dt_to=dt, user_id=user_id)
+
+        order_by = []
+
+        if priority_shop_id:
+            qs = qs.annotate_value_equality(
+                'is_equal_shops', 'shop_id', priority_shop_id,
+            )
+            order_by.append('-is_equal_shops')
+
+        if priority_employment_id:
+            qs = qs.annotate_value_equality(
+                'is_equal_employments', 'id', priority_employment_id,
+            )
+            order_by.append('-is_equal_employments')
+
+        if order_by:
+            qs = qs.order_by(*order_by)
+
+        return qs
+
 
 class Group(AbstractActiveNamedModel):
     class Meta(AbstractActiveNamedModel.Meta):

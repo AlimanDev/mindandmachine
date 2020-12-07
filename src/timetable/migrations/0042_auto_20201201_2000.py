@@ -7,7 +7,7 @@ from django.db.models import OuterRef, Subquery
 
 
 def remove_worker_day_duplicates(apps, schema_editor):
-    # TODO: продумать логику удаления
+    # оставляем последние созданные дни
     WorkerDay = apps.get_model('timetable', 'WorkerDay')
     pc_subq = WorkerDay.objects.filter(
         dt=OuterRef('dt'),
