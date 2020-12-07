@@ -95,7 +95,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
 
     @action(detail=True, methods=['put',])
     def timetable(self, request, pk=None):
-        data = EmploymentSerializer(data=request.data, instance=Employment.objects.get(pk=pk), context={'request':request, 'view': self})
+        data = EmploymentSerializer(data=request.data, instance=self.get_object(), context={'request':request, 'view': self})
         data.is_valid(raise_exception=True)
         data.save()
         return Response(data.data)
