@@ -9,6 +9,9 @@ from src.timetable.work_type.utils import get_efficiency
 from src.conf.djconfig import QOS_DATE_FORMAT
 from rest_framework.validators import UniqueTogetherValidator
 from rest_framework.response import Response
+from drf_yasg.utils import swagger_auto_schema
+from src.util.openapi.responses import efficieny_response_schema_dict as response_schema_dict
+
 
 
 # Serializers define the API representation.
@@ -175,7 +178,12 @@ class WorkTypeViewSet(BaseModelViewSet):
             WorkType.objects.select_related('work_type_name').filter(dttm_deleted__isnull=True)
         )
 
-    @action(detail=False, methods=['get'])
+    @swagger_auto_schema(
+        query_serializer=EfficiencySerializer,
+        operation_description='Возвращает нагрузку',
+        responses=response_schema_dict,
+    )
+    @action(detail=False, methods=['get'], filterset_class=None)
     def efficiency(self, request):
         data = EfficiencySerializer(data=request.query_params)
 

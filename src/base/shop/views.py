@@ -15,6 +15,7 @@ from src.base.models import Employment, Shop, Region
 from src.base.permissions import Permission
 from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
 from src.base.views_abstract import UpdateorCreateViewSet
+from src.util.openapi.responses import shop_tree_response_schema_dict as tree_response_schema_dict
 
 
 class ShopFilter(BaseActiveNamedModelFilter):
@@ -26,18 +27,6 @@ class ShopFilter(BaseActiveNamedModelFilter):
             'load_template_id': ['exact',],
             'load_template_status': ['exact'],
         }
-
-# для redoc
-class ShopTreeSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    title = serializers.CharField()
-    tm_open_dict = serializers.JSONField(default={'all':'07:00:00'})
-    tm_close_dict = serializers.JSONField(default={'all':'22:00:00'})
-    address = serializers.CharField()
-    forecast_step_minutes = serializers.DurationField()
-
-class TreeSerializer(ShopTreeSerializer):
-    children = ShopTreeSerializer(many=True)
 
 
 class ShopViewSet(UpdateorCreateViewSet):
@@ -143,7 +132,7 @@ class ShopViewSet(UpdateorCreateViewSet):
         serializer = ShopStatSerializer(shops, many=True)
         return Response(serializer.data)
 
-    @swagger_auto_schema(responses={200:TreeSerializer})
+    @swagger_auto_schema(responses=tree_response_schema_dict)
     @action(detail=False, methods=['get'])
     def tree(self, request):
         """

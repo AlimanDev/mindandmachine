@@ -7,6 +7,7 @@ from src.timetable.models import ShopMonthStat
 from django_filters.rest_framework import FilterSet
 from rest_framework.validators import UniqueTogetherValidator
 from rest_framework.decorators import action
+from drf_yasg.utils import swagger_auto_schema
 
 
 # Serializers define the API representation.
@@ -84,6 +85,13 @@ class ShopMonthStatViewSet(mixins.UpdateModelMixin,
     http_method_names = ['get', 'put']
 
 
+    @swagger_auto_schema(
+        query_serializer=StatusSerializer, 
+        responses={200:ShopMonthStatSerializer},
+        operation_description='''
+        Метод для получения статуса расписания по магазину
+        ''',
+    )
     @action(detail=False, methods=['get',])
     def status(self, request):
         data = StatusSerializer(data=request.query_params)

@@ -1,6 +1,5 @@
 from rest_framework import serializers, permissions
 from src.timetable.models import ExchangeSettings
-from django_filters.rest_framework import FilterSet
 from src.base.views_abstract import BaseModelViewSet
 
 
@@ -11,13 +10,6 @@ class ExchangeSettingsSerializer(serializers.ModelSerializer):
         model = ExchangeSettings
         fields = '__all__'
 
-
-class ExchangeSettingsFilter(FilterSet):
-    class Meta:
-        model = ExchangeSettings
-        fields = {
-            'network_id': ['exact', 'in'],
-        }
 
 
 class ExchangeSettingsViewSet(BaseModelViewSet):

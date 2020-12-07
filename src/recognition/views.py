@@ -42,6 +42,9 @@ from src.timetable.models import (
     Employment,
 )
 
+from drf_yasg.utils import swagger_auto_schema
+
+
 logger = logging.getLogger('django')
 recognition = Recognition()
 
@@ -345,6 +348,10 @@ class TickPhotoViewSet(BaseModelViewSet):
             )
         return Response(TickPhotoSerializer(tick_photo).data)
 
+    @swagger_auto_schema(
+        responses={200:'Файл с отметками'},
+        operation_description='Запрос на скачивание файла с отметками',
+    )
     @action(detail=False, methods=['get'])
     def download(self, request):
         if not request.user.is_superuser:

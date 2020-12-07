@@ -56,6 +56,13 @@ from src.timetable.worker_day.utils import download_timetable_util, upload_timet
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.upload import get_uploaded_file
+from drf_yasg.utils import swagger_auto_schema
+from src.util.openapi.responses import (
+    worker_stat_response_schema_dictionary, 
+    daily_stat_response_schema_dictionary,
+    confirm_vacancy_response_schema_dictionary,
+    change_range_response_schema_dictionary,
+)
 
 
 class WorkerDayViewSet(BaseModelViewSet):
@@ -212,6 +219,13 @@ class WorkerDayViewSet(BaseModelViewSet):
             ).data
         return Response(data)
 
+    @swagger_auto_schema(
+        request_body=WorkerDayApproveSerializer,
+        responses={200:'empty response'},
+        operation_description='''
+        Метод для подтверждения графика
+        ''',
+    )
     @action(detail=False, methods=['post'])
     def approve(self, request):
         kwargs = {'context': self.get_serializer_context()}
@@ -372,7 +386,13 @@ class WorkerDayViewSet(BaseModelViewSet):
                 )
         return Response()
 
-    @action(detail=False, methods=['get'], )
+    @swagger_auto_schema(
+        operation_description='''
+        Возвращает статистику по сотрудникам
+        ''',
+        responses=worker_stat_response_schema_dictionary,
+    )
+    @action(detail=False, methods=['get'], filterset_class=WorkerDayStatFilter)
     def worker_stat(self, request):
         filterset = WorkerDayStatFilter(request.query_params)
         if filterset.form.is_valid():
@@ -383,7 +403,13 @@ class WorkerDayViewSet(BaseModelViewSet):
         stat = count_worker_stat(data)
         return Response(stat)
 
-    @action(detail=False, methods=['get'], )
+    @swagger_auto_schema(
+        operation_description='''
+        Возвращает статистику по дням
+        ''',
+        responses=daily_stat_response_schema_dictionary,
+    )
+    @action(detail=False, methods=['get'], filterset_class=WorkerDayStatFilter)
     def daily_stat(self, request):
         filterset = WorkerDayStatFilter(request.query_params)
         if filterset.form.is_valid():
@@ -394,7 +420,12 @@ class WorkerDayViewSet(BaseModelViewSet):
         stat = count_daily_stat(data)
         return Response(stat)
 
-    @action(detail=False, methods=['get'], )
+    @swagger_auto_schema(
+        operation_description='''
+        Возвращает вакансии
+        ''',
+    )
+    @action(detail=False, methods=['get'], filterset_class=VacancyFilter)
     def vacancy(self, request):
         filterset_class = VacancyFilter(request.query_params)
         if not filterset_class.form.is_valid():
@@ -413,7 +444,13 @@ class WorkerDayViewSet(BaseModelViewSet):
 
         return paginator.get_paginated_response(data.data)
 
-    @action(detail=True, methods=['post'])
+    @swagger_auto_schema(
+        operation_description='''
+        Метод для выхода на вакансию
+        ''',
+        responses=confirm_vacancy_response_schema_dictionary,
+    )
+    @action(detail=True, methods=['post'], serializer_class=None)
     def confirm_vacancy(self, request, pk=None):
         result = confirm_vacancy(pk, request.user)
 
@@ -424,6 +461,11 @@ class WorkerDayViewSet(BaseModelViewSet):
 
         return Response({'result': result}, status=status_code)
 
+    @swagger_auto_schema(
+        operation_description='''
+        Метод для подтверждения вакансии
+        ''',
+    )
     @action(detail=True, methods=['post'])
     def approve_vacancy(self, request, pk=None):
         vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True, is_approved=False).first()
@@ -440,6 +482,11 @@ class WorkerDayViewSet(BaseModelViewSet):
             ).exclude(id=vacancy.id).delete()
         return Response(WorkerDaySerializer(vacancy).data)
 
+    @swagger_auto_schema(
+        operation_description='''
+        Метод для получения редактируемой версии вакансии
+        ''',
+    )
     @action(detail=True, methods=['get'])
     def editable_vacancy(self, request, pk=None):
         vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True).first()
@@ -474,6 +521,13 @@ class WorkerDayViewSet(BaseModelViewSet):
             ])
         return Response(WorkerDaySerializer(editable_vacancy).data)
 
+    @swagger_auto_schema(
+        request_body=ChangeRangeListSerializer,
+        operation_description='''
+        Метод для изменения нескольких дней одновременно
+        ''',
+        responses=change_range_response_schema_dictionary,
+    )
     @action(detail=False, methods=['post'])
     def change_range(self, request):
         serializer = ChangeRangeListSerializer(data=request.data, context=self.get_serializer_context())
@@ -531,6 +585,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
         return Response(res)
 
+    @swagger_auto_schema(deprecated=True)
     @action(detail=False, methods=['post'])
     def change_list(self, request):
         data = ListChangeSrializer(data=request.data, context={'request': request})
@@ -628,6 +683,13 @@ class WorkerDayViewSet(BaseModelViewSet):
 
         return Response(response, status=200)
 
+    @swagger_auto_schema(
+        request_body=DuplicateSrializer,
+        operation_description='''
+        Метод для копирования рабочих дней
+        ''',
+        responses={200:WorkerDaySerializer(many=True)},
+    )
     @action(detail=False, methods=['post'])
     def duplicate(self, request):
         data = DuplicateSrializer(data=request.data, context={'request': request})
@@ -854,6 +916,15 @@ class WorkerDayViewSet(BaseModelViewSet):
 
     #     return Response(WorkerDaySerializer(new_wds, many=True).data)
 
+
+    @swagger_auto_schema(
+        request_body=UploadTimetableSerializer,
+        responses={200: 'empty response'},
+        operation_description='''
+        Загружает расписание в систему.\n
+        Должен быть прикреплён файл с расписанием в формате excel в поле file.
+        ''',
+    )
     @action(detail=False, methods=['post'])
     @get_uploaded_file
     def upload(self, request, file):
@@ -863,13 +934,27 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.validated_data['network_id'] = request.user.network_id
         return upload_timetable_util(data.validated_data, file)
 
-    @action(detail=False, methods=['get'])
+    @swagger_auto_schema(
+        query_serializer=DownloadSerializer,
+        responses={200:'Файл с расписанием в формате excel.'},
+        operation_description='''
+        Метод для скачивания графика работы сотрудников.
+        ''',
+    )
+    @action(detail=False, methods=['get'], filterset_class=None)
     def download_timetable(self, request):
         data = DownloadSerializer(data=request.query_params)
         data.is_valid(raise_exception=True)
         return download_timetable_util(request, data.validated_data)
 
-    @action(detail=False, methods=['get'])
+    @swagger_auto_schema(
+        query_serializer=DownloadSerializer,
+        responses={200:'Файл с табелем'},
+        operation_description='''
+        Метод для скачивания табеля для подразделения.
+        '''
+    )
+    @action(detail=False, methods=['get'], filterset_class=None)
     def download_tabel(self, request):
         serializer = DownloadTabelSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)

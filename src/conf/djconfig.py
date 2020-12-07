@@ -286,6 +286,10 @@ MEDIA_URL = '/_i/media/'
 
 SESSION_COOKIE_SECURE = True
 
+REDOC_SETTINGS = {
+    'PATH_IN_MIDDLE': True,
+    'HIDE_HOSTNAME': True,
+}
 
 # DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
 

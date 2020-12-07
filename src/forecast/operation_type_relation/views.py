@@ -102,8 +102,7 @@ class OperationTypeRelationFilter(FilterSet):
 
 class OperationTypeRelationViewSet(BaseModelViewSet):
     """
-
-   
+    Отношения типов операций через формулу или через прогноз   
     """
     permission_classes = [Permission]
     serializer_class = OperationTypeRelationSerializer

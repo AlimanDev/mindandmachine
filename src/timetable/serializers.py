@@ -388,13 +388,23 @@ class VacancySerializer(serializers.Serializer):
         return None
 
 
-class AutoSettingsSerializer(serializers.Serializer):
+class BaseAutoSettingsSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
-    is_remaking = serializers.BooleanField(default=False)
-    use_not_approved = serializers.BooleanField(default=False)
-    delete_created_by = serializers.BooleanField(default=False)
+
+
+class AutoSettingsCreateSerializer(BaseAutoSettingsSerializer):
+    is_remaking = serializers.BooleanField(default=False, help_text='Пересоставление')
+    use_not_approved = serializers.BooleanField(default=False, help_text='Использовать неподтвержденную версию')
+
+
+class AutoSettingsDeleteSerializer(BaseAutoSettingsSerializer):
+    delete_created_by = serializers.BooleanField(default=False, help_text='Удалить ручные изменения')
+
+
+class AutoSettingsSetSerializer(serializers.Serializer):
+    data = serializers.JSONField(help_text='Данные в формате JSON от сервера.')
 
 
 class ListChangeSrializer(serializers.Serializer):
@@ -440,8 +450,9 @@ class ChangeRangeSerializer(serializers.Serializer):
 
     def __init__(self, *args, **kwargs):
         super(ChangeRangeSerializer, self).__init__(*args, **kwargs)
-        self.fields['worker'] = serializers.SlugRelatedField(
-            slug_field='tabel_code', queryset=User.objects.filter(network=self.context['request'].user.network))
+        if self.context.get('request'):
+            self.fields['worker'] = serializers.SlugRelatedField(
+                slug_field='tabel_code', queryset=User.objects.filter(network=self.context['request'].user.network))
 
 
 class ChangeRangeListSerializer(serializers.Serializer):
