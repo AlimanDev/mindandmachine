@@ -1,4 +1,9 @@
+{% extends 'notifications/email/base.html' %}
+
+{% block content %}
 Это автоматическое уведомление для {{ shop.name }} об изменениях в графике: <br><br>
 Сотрудник {{ user.last_name }} {{ user.first_name }}
-назначен на вакансию на {{ dt }}. <br><br>
+отмененил вакансию на типах работ {{ work_types }},
+с {{ dttm_work_start }} по {{ dttm_work_end }}, дата {{ dt }}. <br><br>
 Посмотреть детали можно по ссылке: http://{{ domain }}
+{% endblock %}

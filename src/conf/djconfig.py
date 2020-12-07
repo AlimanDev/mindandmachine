@@ -85,6 +85,8 @@ INSTALLED_APPS = [
     'src.celery',
     'fcm_django',
     'src.recognition',
+    'src.events',
+    'src.notifications',
 ]
 
 REST_FRAMEWORK = {

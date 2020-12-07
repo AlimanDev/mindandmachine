@@ -9,7 +9,7 @@ from django.utils.html import format_html
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy
 
-from src.base.models_abstract import AbstractActiveModel, AbstractActiveNamedModel
+from src.base.models_abstract import AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel
 from src.timetable.models import User, Shop, Employment
 
 
@@ -28,7 +28,7 @@ class UserConnecter(AbstractActiveModel):
     partner_id = models.IntegerField(null=False)
 
 
-class TickPoint(AbstractActiveNamedModel):
+class TickPoint(AbstractActiveNetworkSpecificCodeNamedModel):
     class Meta(object):
         verbose_name = 'Точка отметки'
         verbose_name_plural = 'Точки отметок'

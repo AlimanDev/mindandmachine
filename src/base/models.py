@@ -18,7 +18,7 @@ from mptt.models import MPTTModel, TreeForeignKey
 from timezone_field import TimeZoneField
 
 from src.base.exceptions import MessageError
-from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
+from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNetworkSpecificCodeNamedModel
 from src.conf.djconfig import QOS_TIME_FORMAT
 
 
@@ -63,14 +63,14 @@ class Network(AbstractActiveModel):
         return f'name: {self.name}, code: {self.code}'
 
 
-class Region(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class Region(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Регион'
         verbose_name_plural = 'Регионы'
 
 
-class Break(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class Break(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Перерыв'
         verbose_name_plural = 'Перерывы'
     value = models.CharField(max_length=1024, default='[]')
@@ -102,8 +102,8 @@ class Break(AbstractActiveNamedModel):
         return super().save(*args, **kwargs)
 
 
-class ShopSettings(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class ShopSettings(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Настройки автосоставления'
         verbose_name_plural = 'Настройки автосоставления'
 
@@ -145,7 +145,7 @@ class ShopSettings(AbstractActiveNamedModel):
 
 
 # на самом деле это отдел
-class Shop(MPTTModel, AbstractActiveNamedModel):
+class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     class Meta:
         # unique_together = ('parent', 'title')
         verbose_name = 'Отдел'
@@ -339,11 +339,13 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
         return offset
 
+
 class EmploymentManager(models.Manager):
-    def get_active(self, network_id, dt_from=None, dt_to=None, *args, **kwargs):
+    def get_active(self, network_id=None, dt_from=None, dt_to=None, *args, **kwargs):
         """
         hired earlier then dt_from, hired later then dt_to
-        :paramShop dt_from:
+        :param network_id:
+        :param dt_from:
         :param dt_to:
         :param args:
         :param kwargs:
@@ -353,16 +355,21 @@ class EmploymentManager(models.Manager):
         dt_from = dt_from or today
         dt_to = dt_to or today
 
-        return self.filter(
+        q = models.Q(
             models.Q(dt_hired__lte=dt_to) | models.Q(dt_hired__isnull=True),
             models.Q(dt_fired__gte=dt_from) | models.Q(dt_fired__isnull=True),
-            shop__network_id=network_id,
-            user__network_id=network_id
-        ).filter(*args, **kwargs)
+        )
+        if network_id:
+            q &= models.Q(
+                shop__network_id=network_id,
+                user__network_id=network_id,
+            )
+        qs = self.filter(q)
+        return qs.filter(*args, **kwargs)
 
 
-class Group(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class Group(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Группа пользователей'
         verbose_name_plural = 'Группы пользователей'
 
@@ -451,7 +458,7 @@ class User(DjangoAbstractUser, AbstractModel):
         #     ss_title = self.shop.parent.title
         # else:
         #     ss_title = None
-        return '{}, {}, {}'.format(self.first_name, self.last_name, self.id)
+        return '{}, {}, {}, {}'.format(self.first_name, self.last_name, self.id, self.username)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -520,12 +527,12 @@ class User(DjangoAbstractUser, AbstractModel):
         ).values_list('group_id', flat=True)
 
 
-class WorkerPosition(AbstractActiveNamedModel):
+class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     """
     Describe employee's position
     """
 
-    class Meta(AbstractActiveNamedModel.Meta):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Должность сотрудника'
         verbose_name_plural = 'Должности сотрудников'
 

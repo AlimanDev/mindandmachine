@@ -25,6 +25,7 @@ from src.base.models import (
 from src.celery.celery import app
 from src.conf.djconfig import EMAIL_HOST_USER
 from src.conf.djconfig import URV_STAT_EMAILS, URV_STAT_SHOP_LEVEL
+from src.events.signals import event_signal
 from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
 from src.forecast.models import (
     OperationTemplate,
@@ -742,3 +743,8 @@ def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
         create_mda_user_to_shop_relation(username=wd['worker__username'], shop_code=wd['shop__code'])
         if delay_sec:
             time_in_secs.sleep(delay_sec)
+
+
+@app.task
+def trigger_event(**kwargs):
+    event_signal.send(sender=None, **kwargs)

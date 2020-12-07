@@ -4,14 +4,14 @@ from src.base import models_utils
 import datetime
 from django.utils import timezone
 
-from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel
+from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel
 from src.base.models import Shop
 
 from src.timetable.models import WorkType, WorkTypeName, Network
 
 
-class OperationTypeName(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class OperationTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Название операции'
         verbose_name_plural = 'Названия операций'
 
@@ -145,7 +145,7 @@ class OperationTypeRelation(AbstractModel):
         )
 
 
-class OperationTemplate(AbstractActiveNamedModel):
+class OperationTemplate(AbstractActiveNetworkSpecificCodeNamedModel):
     """
         Шаблоны операций.
         В соответствии с ними создаются записи в PeriodClients
@@ -175,7 +175,7 @@ class OperationTemplate(AbstractActiveNamedModel):
         В PeriodClients создадутся записи о потребности в 1 человеке
             с 10 до 12 каждый месяц 1,3,5,15 числа
     """
-    class Meta(AbstractActiveNamedModel.Meta):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Шаблон операций'
         verbose_name_plural = 'Шаблоны операций'
 
@@ -366,8 +366,8 @@ class Receipt(AbstractModel):
     """
 
     class Meta:
-        verbose_name = 'Событие'
-        verbose_name_plural = 'События'
+        verbose_name = 'Событийные данные'
+        verbose_name_plural = 'Событийные данные'
 
     # id = models.BigAutoField(primary_key=True)
     code = models.UUIDField()
