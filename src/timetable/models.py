@@ -8,7 +8,7 @@ from django.contrib.auth.models import (
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField, DecimalField, CharField,
+    Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField, DecimalField, CharField, TimeField,
 )
 from django.db.models.functions import Extract, Coalesce, Cast, Greatest, TruncSecond
 from django.db.models.query import QuerySet
