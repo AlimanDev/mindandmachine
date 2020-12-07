@@ -5,6 +5,7 @@ from rest_framework.exceptions import ValidationError, NotFound
 
 from src.base.models import Employment, Shop
 from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
+from src.timetable.serializers import WsPermissionDataSerializer
 
 
 class Permission(permissions.BasePermission):
@@ -63,6 +64,9 @@ class WdPermission(Permission):
 
         view_action = view.action.lower()
         if view_action in ['create', 'update']:
+            # проверка пермишнов происходит раньше, чем валидация данных,
+            # поэтому предварительно провалидируем данные, используемые для проверки доступа
+            WsPermissionDataSerializer(data=request.data).is_valid(raise_exception=True)
             return GroupWorkerDayPermission.has_permission(
                 user=request.user,
                 action=WorkerDayPermission.CREATE_OR_UPDATE,

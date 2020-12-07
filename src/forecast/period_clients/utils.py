@@ -11,7 +11,7 @@ from dateutil.relativedelta import relativedelta
 from src.util.download import xlsx_method
 from django.apps import apps
 import json
-
+from django.db import transaction
 from src.base.models import (
     Shop,
 )
@@ -285,36 +285,37 @@ def create_demand(data):
             max_time = serie['dttm'].time()
 
         if serie['dttm'].time() < min_time:
-            max_time = serie['dttm'].time()
+            min_time = serie['dttm'].time()
 
-    PeriodClients.objects.filter(
-        Q(operation_type__shop_id=shop.id) | Q(operation_type__work_type__shop_id=shop.id),
-        type=forecase_type,
-        dttm_forecast__date__gte=dt_from,
-        dttm_forecast__date__lte=dt_to,
-        dttm_forecast__time__gte=min_time,
-        dttm_forecast__time__lte=max_time,
-        operation_type__operation_type_name__do_forecast=OperationTypeName.FORECAST,
-        operation_type__in=operation_types_to_delete,
-    ).delete()
-    
-    for period_demand_value in data['serie']:
-        clients = period_demand_value['value']
-        clients = 0 if clients < 0 else clients
-        operation_type = None
-        if period_demand_value.get('timeserie_code', False):
-            operation_type = operation_codes.get(period_demand_value.get('timeserie_code'))
-        elif period_demand_value.get('timeserie_name', False):
-            operation_type = operation_names.get(period_demand_value.get('timeserie_name'))
-        elif period_demand_value.get('timeserie_id', False):
-            operation_type = operation_ids.get(period_demand_value.get('timeserie_id'))
-        models_list.append(
-            PeriodClients(
-                type=forecase_type,
-                dttm_forecast=period_demand_value.get('dttm'),
-                operation_type=operation_type,
-                value=clients,
+    with transaction.atomic():
+        PeriodClients.objects.filter(
+            Q(operation_type__shop_id=shop.id) | Q(operation_type__work_type__shop_id=shop.id),
+            type=forecase_type,
+            dttm_forecast__date__gte=dt_from,
+            dttm_forecast__date__lte=dt_to,
+            dttm_forecast__time__gte=min_time,
+            dttm_forecast__time__lte=max_time,
+            operation_type__operation_type_name__do_forecast=OperationTypeName.FORECAST,
+            operation_type__in=operation_types_to_delete,
+        ).delete()
+
+        for period_demand_value in data['serie']:
+            clients = period_demand_value['value']
+            clients = 0 if clients < 0 else clients
+            operation_type = None
+            if period_demand_value.get('timeserie_code', False):
+                operation_type = operation_codes.get(period_demand_value.get('timeserie_code'))
+            elif period_demand_value.get('timeserie_name', False):
+                operation_type = operation_names.get(period_demand_value.get('timeserie_name'))
+            elif period_demand_value.get('timeserie_id', False):
+                operation_type = operation_ids.get(period_demand_value.get('timeserie_id'))
+            models_list.append(
+                PeriodClients(
+                    type=forecase_type,
+                    dttm_forecast=period_demand_value.get('dttm'),
+                    operation_type=operation_type,
+                    value=clients,
+                )
             )
-        )
-    PeriodClients.objects.bulk_create(models_list)
+        PeriodClients.objects.bulk_create(models_list)
     return True

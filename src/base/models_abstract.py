@@ -120,8 +120,7 @@ class AbstractActiveNetworkSpecificCodeNamedModel(AbstractActiveModel, AbstractC
 
     class Meta:
         abstract = True
-        unique_together = (
-            ('code', 'network'),
-        )
+        unique_together = (('code', 'network'),)
+        ordering = ['name',]
 
     objects = AbstractActiveNetworkSpecificCodeNamedModelManager()

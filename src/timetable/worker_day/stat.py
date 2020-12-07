@@ -251,7 +251,7 @@ def count_worker_stat(data):
                     else:
                         field = 'other'
                     fields = [field, 'total', 'overtime']
-                days, hours = count_fact(worker_day, wdays)
+                days, hours = count_wd_hours(worker_day, wdays)
                 for f in fields:
                     cur_stat['paid_days'][f] += days
                     cur_stat['paid_hours'][f] += hours
@@ -262,20 +262,12 @@ def count_worker_stat(data):
     return month_info
 
 
-def count_fact(fact, wdays):
-    if not fact.is_fact:
-        return (1, fact.work_hours.seconds / 3600)
+def count_wd_hours(wd, _wdays):
+    # TODO: отрефакторить с учетом настроек
+    if wd.work_hours > timedelta(0):
+        return 1, wd.work_hours.seconds / 3600
 
-    plan = wdays['plan']['approved'] if wdays['plan']['approved'] else None
-
-    if not plan or plan.type != WorkerDay.TYPE_WORKDAY:
-        return (0, 0)
-    start = fact.dttm_work_start if fact.dttm_work_start > plan.dttm_work_start else plan.dttm_work_start
-    end = fact.dttm_work_end if fact.dttm_work_end < plan.dttm_work_end else plan.dttm_work_end
-    if end < start:
-        return (0, 0)
-
-    return (1, round((end-start).seconds / 3600))
+    return 0, 0
 
 
 def init_values(overtime, overtime_prev):
