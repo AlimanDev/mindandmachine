@@ -651,15 +651,10 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 i = i % length_main_wds
                 blank_day = main_worker_days[i]
 
-                worker_active_empl = Employment.objects.get_active(
-                    network_id=blank_day.worker.network_id,
-                    dt_from=dt,
-                    dt_to=dt,
-                    user_id=to_worker_id,
-                ).annotate_value_equality(
-                    'is_equal_shops', 'shop_id', blank_day.shop_id,
-                ).order_by(
-                    '-is_equal_shops',
+                worker_active_empl = Employment.objects.get_active_empl_for_user(
+                    network_id=blank_day.worker.network_id, user_id=to_worker_id,
+                    dt=dt,
+                    priority_shop_id=blank_day.shop_id,
                 ).select_related(
                     'position__breaks',
                 ).first()

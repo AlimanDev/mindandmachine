@@ -1530,6 +1530,33 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(new_wd.dttm_work_end, None)
         self.assertEqual(new_wd.is_vacancy, True)
 
+    def test_create_attendance_records_for_different_shops(self):
+        tm_start = datetime.combine(self.dt, time(6, 0, 0))
+        AttendanceRecords.objects.create(
+            dttm=tm_start,
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop2,
+            user=self.user2
+        )
+        self.worker_day_fact_approved.refresh_from_db()
+        self.assertEqual(self.worker_day_fact_approved.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(self.worker_day_fact_approved.dttm_work_start, tm_start)
+        self.assertEqual(self.worker_day_fact_approved.dttm_work_end, None)
+        self.assertEqual(self.worker_day_fact_approved.is_vacancy, True)
+
+        tm_end = datetime.combine(self.dt, time(19, 0, 0))
+        AttendanceRecords.objects.create(
+            dttm=tm_end,
+            type=AttendanceRecords.TYPE_LEAVING,
+            shop=self.shop2,
+            user=self.user2
+        )
+        self.worker_day_fact_approved.refresh_from_db()
+        self.assertEqual(self.worker_day_fact_approved.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(self.worker_day_fact_approved.dttm_work_start, tm_start)
+        self.assertEqual(self.worker_day_fact_approved.dttm_work_end, tm_end)
+        self.assertEqual(self.worker_day_fact_approved.is_vacancy, True)
+
 
 class TestVacancy(TestsHelperMixin, APITestCase):
     @classmethod

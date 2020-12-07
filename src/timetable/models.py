@@ -6,11 +6,14 @@ from django.contrib.auth.models import (
     UserManager
 )
 from django.db import models
-from django.db.models import Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField, DateField, \
-    TimeField, DecimalField, CharField
-from django.db.models.functions import Extract, Coalesce, Cast, Round, Greatest, TruncTime
+from django.db import transaction
+from django.db.models import (
+    Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField, DecimalField, CharField,
+)
+from django.db.models.functions import Extract, Coalesce, Cast, Greatest, TruncTime
 from django.db.models.query import QuerySet
 from django.utils import timezone
+
 from src.base.models import Shop, Employment, User, Event, Network, Break
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, \
     AbstractActiveModelManager
@@ -964,6 +967,11 @@ class AttendanceRecords(AbstractModel):
         (TYPE_BREAK_END, 'break_end')
     )
 
+    TYPE_2_DTTM_FIELD = {
+        TYPE_COMING: 'dttm_work_start',
+        TYPE_LEAVING: 'dttm_work_end',
+    }
+
     dttm = models.DateTimeField()
     type = models.CharField(max_length=1, choices=RECORD_TYPES)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
@@ -983,77 +991,82 @@ class AttendanceRecords(AbstractModel):
         """
         res = super(AttendanceRecords, self).save(*args, **kwargs)
 
-        type2dtfield = {
-            self.TYPE_COMING: 'dttm_work_start',
-            self.TYPE_LEAVING: 'dttm_work_end',
-        }
-
-        fact_approved = WorkerDay.objects.get_fact_approved(
-            dt=self.dttm.date(),
-            worker=self.user,
-            shop_id=self.shop_id,
-        ).first()
-
-        if fact_approved:
-            # если это отметка о приходе, то не перезаписываем время начала работы в графике
-            # если время отметки больше, чем время начала работы в существующем графике
-            skip_condition = (self.type == self.TYPE_COMING) and \
-                 fact_approved.dttm_work_start and self.dttm > fact_approved.dttm_work_start
-            if skip_condition:
-                return
-
-            setattr(fact_approved, type2dtfield[self.type], self.dttm)
-            setattr(fact_approved, 'type', WorkerDay.TYPE_WORKDAY)
-            fact_approved.save()
-        else:
-            if self.type == self.TYPE_LEAVING:
-                prev_fa_wd = WorkerDay.objects.filter(
-                    shop_id=self.shop_id,
-                    worker=self.user,
-                    dt__lt=self.dttm.date(),
-                    is_fact=True,
-                    is_approved=True,
-                ).order_by('dt').last()
-
-                # Если предыдущая смена не закрыта.
-                if prev_fa_wd and prev_fa_wd.dttm_work_start and prev_fa_wd.dttm_work_end is None:
-                    close_prev_work_shift_cond = (
-                         self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
-                    # Если с момента открытия предыдущей смены прошло менее MAX_WORK_SHIFT_SECONDS,
-                    # то закрываем предыдущую смену.
-                    if close_prev_work_shift_cond:
-                        setattr(prev_fa_wd, type2dtfield[self.type], self.dttm)
-                        prev_fa_wd.save()
-                        return
-
-                if settings.MDA_SKIP_LEAVING_TICK:
-                    return
-
+        with transaction.atomic():
             dt = self.dttm.date()
-            active_user_empl = Employment.objects.get_active(
-                self.user.network_id,
-                dt_from=dt,
-                dt_to=dt,
-                user_id=self.user_id,
-            ).annotate_value_equality(
-                'is_equal_shops', 'shop_id', self.shop_id,
-            ).order_by(
-                '-is_equal_shops',
-            ).first()
 
-            WorkerDay.objects.update_or_create(
-                dt=self.dttm.date(),
+            fact_approved = WorkerDay.objects.filter(
+                dt=dt,
                 worker=self.user,
                 is_fact=True,
                 is_approved=True,
-                defaults={
-                    'shop_id': self.shop_id,
-                    'employment': active_user_empl,
-                    'type': WorkerDay.TYPE_WORKDAY,
-                    'is_vacancy': active_user_empl.shop_id != self.shop_id if active_user_empl else False,
-                    type2dtfield[self.type]: self.dttm,
-                }
-            )
+            ).select_for_update().first()
+
+            # для случаев когда сотрудник перепутал магазины, отметился сначала в одном, потом еще раз в другом
+            if fact_approved and fact_approved.shop_id != self.shop_id:
+                fact_approved.dttm_work_start = None
+                fact_approved.dttm_work_end = None
+                fact_approved.shop_id = self.shop_id
+                active_user_empl = Employment.objects.get_active_empl_for_user(
+                    network_id=self.user.network_id, user_id=self.user_id, dt=dt, priority_shop_id=self.shop_id
+                ).first()
+                fact_approved.is_vacancy = active_user_empl.shop_id != self.shop_id if active_user_empl else False
+                fact_approved.save(update_fields=('shop_id', 'dttm_work_start', 'dttm_work_end', 'is_vacancy'))
+
+            if fact_approved:
+                # если это отметка о приходе, то не перезаписываем время начала работы в графике
+                # если время отметки больше, чем время начала работы в существующем графике
+                skip_condition = (self.type == self.TYPE_COMING) and \
+                                 fact_approved.dttm_work_start and self.dttm > fact_approved.dttm_work_start
+                if skip_condition:
+                    return
+
+                setattr(fact_approved, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
+                setattr(fact_approved, 'type', WorkerDay.TYPE_WORKDAY)
+                fact_approved.save()
+            else:
+                if self.type == self.TYPE_LEAVING:
+                    prev_fa_wd = WorkerDay.objects.filter(
+                        shop_id=self.shop_id,
+                        worker=self.user,
+                        dt__lt=self.dttm.date(),
+                        is_fact=True,
+                        is_approved=True,
+                    ).order_by('dt').last()
+
+                    # Если предыдущая смена не закрыта.
+                    if prev_fa_wd and prev_fa_wd.dttm_work_start and prev_fa_wd.dttm_work_end is None:
+                        close_prev_work_shift_cond = (
+                                                             self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
+                        # Если с момента открытия предыдущей смены прошло менее MAX_WORK_SHIFT_SECONDS,
+                        # то закрываем предыдущую смену.
+                        if close_prev_work_shift_cond:
+                            setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
+                            setattr(prev_fa_wd, 'type', WorkerDay.TYPE_WORKDAY)
+                            prev_fa_wd.save()
+                            return
+
+                    if settings.MDA_SKIP_LEAVING_TICK:
+                        return
+
+                active_user_empl = Employment.objects.get_active_empl_for_user(
+                    network_id=self.user.network_id, user_id=self.user_id,
+                    dt=dt,
+                    priority_shop_id=self.shop_id,
+                ).first()
+
+                WorkerDay.objects.update_or_create(
+                    dt=self.dttm.date(),
+                    worker=self.user,
+                    is_fact=True,
+                    is_approved=True,
+                    defaults={
+                        'shop_id': self.shop_id,
+                        'employment': active_user_empl,
+                        'type': WorkerDay.TYPE_WORKDAY,
+                        self.TYPE_2_DTTM_FIELD[self.type]: self.dttm,
+                        'is_vacancy': active_user_empl.shop_id != self.shop_id if active_user_empl else False,
+                    }
+                )
 
         return res
 

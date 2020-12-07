@@ -491,14 +491,11 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             res['status_code'] = 400
             return res
 
-        active_employment = Employment.objects.get_active(
-                user.network_id, dt_from=vacancy.dt, dt_to=vacancy.dt, user=user,
+        active_employment = Employment.objects.get_active_empl_for_user(
+            network_id=user.network_id, user_id=user.id, dt=vacancy.dt,
+            priority_shop_id=vacancy.shop_id,
         ).select_related(
             'shop',
-        ).annotate_value_equality(
-            'is_equal_shops', 'shop_id', vacancy.shop_id,
-        ).order_by(
-            '-is_equal_shops',
         ).first()
 
         # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии

@@ -220,28 +220,20 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             wdays_qs.delete()
 
             if validated_data.get('type') in WorkerDay.TYPES_WITH_TM_RANGE:
-                worker_active_empls = list(Employment.objects.get_active(
+                worker_active_empl = Employment.objects.get_active_empl_for_user(
                     network_id=self.context['request'].user.network_id,
-                    dt_from=validated_data.get('dt'),
-                    dt_to=validated_data.get('dt'),
                     user_id=worker_id,
-                ).annotate_value_equality(
-                    'is_equal_employments', 'id', validated_data.get('employment_id'),
-                ).annotate_value_equality(
-                    'is_equal_shops', 'shop_id', validated_data.get('shop_id'),
-                ).order_by(
-                    '-is_equal_shops', '-is_equal_employments',
-                ).values(
-                    'id', 'shop_id', 'is_equal_shops',
-                ))
+                    dt=validated_data.get('dt'),
+                    priority_shop_id=validated_data.get('shop_id'),
+                    priority_employment_id=validated_data.get('employment_id'),
+                ).first()
 
-                if not worker_active_empls:
+                if not worker_active_empl:
                     raise self.fail('no_active_employments')
 
-                worker_active_empl = worker_active_empls[0]
-                validated_data['employment_id'] = worker_active_empl['id']
+                validated_data['employment_id'] = worker_active_empl.id
                 validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
-                    or not worker_active_empl['is_equal_shops']
+                    or not worker_active_empl.is_equal_shops
 
     def create(self, validated_data):
         with transaction.atomic():
