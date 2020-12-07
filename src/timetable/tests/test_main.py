@@ -1968,6 +1968,31 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(len(response.json()), 8)
         self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False).count(), 8)
 
+    def test_cant_duplicate_when_there_is_no_active_employment(self):
+        dt_from = date.today()
+        dt_from2 = dt_from + timedelta(days=10)
+
+        Employment.objects.filter(id=self.employment3.id).update(
+            dt_hired=dt_from - timedelta(days=30),
+            dt_fired=dt_from2,
+        )
+
+        self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
+        data = {
+            'from_workerday_ids': list(WorkerDay.objects.filter(worker=self.user2).values_list('id', flat=True)),
+            'to_worker_id': self.user3.id,
+            'to_dates': [Converter.convert_date(dt_from2 + timedelta(i)) for i in range(8)],
+        }
+        url = f'{self.url}duplicate/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.json()[0],
+            'Невозможно создать дни в выбранные даты. Пожалуйста, '
+            'проверьте наличие активного трудоустройства у сотрудника.'
+        )
+        self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False).count(), 0)
+
     def test_change_list(self):
         dt_from = date.today()
         data = {
