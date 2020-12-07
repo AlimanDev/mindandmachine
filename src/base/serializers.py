@@ -256,13 +256,23 @@ class EmploymentSerializer(serializers.ModelSerializer):
         return data
 
     def update(self, instance, validated_data, *args, **kwargs):
-        if instance.function_group_id != validated_data.get('function_group_id'):
-            group = instance.function_group_id or validated_data.get('function_group_id')
+        if instance.function_group_id != validated_data.get('function_group_id', instance.function_group_id):
             user = self.context['request'].user
-            has_perm = Group.objects.filter(
-                Q(employments__user=user) | Q(workerposition__employment__user=user),
-                subordinates__id=group,
-            ).exists()
+            group_from = instance.function_group_id
+            group_to = validated_data.get('function_group_id')
+            group_from_perm = True
+            if group_from:
+                group_from_perm = Group.objects.filter(
+                    Q(employments__user=user) | Q(workerposition__employment__user=user),
+                    subordinates__id=group_from,
+                ).exists()
+            group_to_perm = True
+            if group_to:
+                group_to_perm = Group.objects.filter(
+                    Q(employments__user=user) | Q(workerposition__employment__user=user),
+                    subordinates__id=group_to,
+                ).exists()
+            has_perm = group_from_perm and group_to_perm
             if not has_perm:
                 raise PermissionDenied()
         if instance.is_visible != validated_data.get('is_visible', True):

@@ -392,6 +392,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
 
 
     def test_change_function_group_tmp_no_perm(self):
+        self.admin_group.subordinates.add(self.employee_group)
         put_data = {
             'function_group_id': self.chief_group.id,
             'dt_to_function_group': (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'),
