@@ -187,6 +187,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 'default': True,
             },
         }
+        timetable_fields = [
+            'function_group_id', 'is_fixed_hours', 'salary', 'week_availability', 'norm_work_hours', 'shift_hours_length_min', 
+            'shift_hours_length_max', 'min_time_btw_shifts', 'tabel_code', 'is_ready_for_overworkings', 'is_visible',
+        ]
 
     def validate(self, attrs):
         if self.instance:
@@ -228,6 +232,11 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
         if not show_constraints:
             self.fields.pop('worker_constraints')
+        
+        if self.context.get('view') and self.context['view'].action == 'timetable':
+            exclude_fields = set(self.Meta.fields).difference(set(self.Meta.timetable_fields))
+            for f in exclude_fields:
+                self.fields.pop(f, None)
 
     def to_internal_value(self, data):
         data = super(EmploymentSerializer, self).to_internal_value(data)

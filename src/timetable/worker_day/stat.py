@@ -265,7 +265,7 @@ def count_worker_stat(data):
 def count_wd_hours(wd, _wdays):
     # TODO: отрефакторить с учетом настроек
     if wd.work_hours > timedelta(0):
-        return 1, round(wd.work_hours.seconds / 3600)
+        return 1, wd.work_hours.seconds / 3600
 
     return 0, 0
 

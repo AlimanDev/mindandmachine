@@ -388,3 +388,30 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         delete_inactive_employment_groups()
         self.assertIsNone(Employment.objects.get(id=self.employment2.id).function_group_id)
         self.assertIsNotNone(Employment.objects.get(id=self.employment1.id).function_group_id)
+
+
+    def test_timetable_permissions(self):
+        data = {
+            'dt_fired': '2020-10-10',
+            'position_id': self.worker_position.id,
+            'is_fixed_hours': True,
+            'is_visible': False,
+        }
+        response = self.client.put(f'/rest_api/employment/{self.employment3.id}/timetable/', data=self.dump_data(data), content_type='application/json') 
+        data = {
+            'is_fixed_hours': True, 
+            'salary': '150.00', 
+            'week_availability': 7, 
+            'norm_work_hours': 100, 
+            'min_time_btw_shifts': None, 
+            'shift_hours_length_min': None, 
+            'shift_hours_length_max': None, 
+            'tabel_code': None, 
+            'is_ready_for_overworkings': False, 
+            'is_visible': False,
+            'function_group_id': self.employee_group.id,
+        }
+        self.assertEqual(response.json(), data)
+        self.employment3.refresh_from_db()
+        self.assertIsNone(self.employment3.position_id)
+        self.assertIsNone(self.employment3.dt_fired)

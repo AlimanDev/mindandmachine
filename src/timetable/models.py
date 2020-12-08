@@ -7,8 +7,8 @@ from django.contrib.auth.models import (
 )
 from django.db import models
 from django.db.models import Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField, DateField, \
-    TimeField, DecimalField
-from django.db.models.functions import Extract, Coalesce, Cast, Round, Greatest
+    TimeField, DecimalField, CharField
+from django.db.models.functions import Extract, Coalesce, Cast, Round, Greatest, TruncSecond
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from src.base.models import Shop, Employment, User, Event, Network, Break
@@ -299,8 +299,12 @@ class WorkerDayQuerySet(QuerySet):
         qs = qs.annotate(
             plan_dttm_work_start=F('dttm_work_start'),
             plan_dttm_work_end=F('dttm_work_end'),
+            plan_work_start=Cast(TruncSecond('plan_dttm_work_start', output_field=TimeField()), output_field=CharField()),
+            plan_work_end=Cast(TruncSecond('plan_dttm_work_end', output_field=TimeField()), output_field=CharField()),
             fact_dttm_work_start=Subquery(fact_approved_wdays_subq.values('dttm_work_start')[:1]),
             fact_dttm_work_end=Subquery(fact_approved_wdays_subq.values('dttm_work_end')[:1]),
+            fact_work_start=Cast(TruncSecond('fact_dttm_work_start', output_field=TimeField()), output_field=CharField()),
+            fact_work_end=Cast(TruncSecond('fact_dttm_work_end', output_field=TimeField()), output_field=CharField()),
             tabel_dttm_work_start=Case(
                 When(fact_dttm_work_start__isnull=True, then=F('fact_dttm_work_start')),
                 When(plan_dttm_work_start__lt=F('fact_dttm_work_start') - network.allowed_interval_for_late_arrival,
@@ -1060,6 +1064,7 @@ class AttendanceRecords(AbstractModel):
                 is_fact=True,
                 is_approved=True,
                 type=WorkerDay.TYPE_WORKDAY,
+                is_vacancy=active_user_empl.shop_id != self.shop_id if active_user_empl else False,
             )
             setattr(wd, type2dtfield[self.type], self.dttm)
             wd.save()
