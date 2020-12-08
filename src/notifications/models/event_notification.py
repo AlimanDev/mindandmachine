@@ -1,7 +1,9 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
+from django.template import loader as template_loader, Template
 
-from src.base.models import User, Employment
+from src.base.models import User, Employment, Shop
 from src.base.models_abstract import AbstractModel
 from src.events.registry import EventRegistryHolder
 from src.notifications.templates import SYSTEM_EMAIL_TEMPLATES
@@ -48,6 +50,7 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
     system_email_template = models.CharField(
         max_length=256, choices=SYSTEM_EMAIL_TEMPLATES, verbose_name='Системный E-mail шаблон', null=True, blank=True)
     custom_email_template = models.TextField(verbose_name='Пользовательский E-mail шаблон', null=True, blank=True)
+    subject = models.CharField(max_length=256, verbose_name='Тема письма', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Email оповещение о событиях'
@@ -75,17 +78,43 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
                 )
                 recipients.extend(list(event.get_recipients()))
         recipients.extend(list(self.users.all()))
+        recipients.extend(list(self.groups.all()))
+        shop_id = context.get('shop_id')
+        if shop_id:
+            shop = Shop.objects.get(id=shop_id)
+            shop_q = Q(shop=shop)
+            if self.shop_descendants:
+                shop_q |= Q(shop__in=shop.get_descendants())
+            if self.shop_ancestors:
+                shop_q |= Q(shop__in=shop.get_ancestors())
+            recipients.extend(
+                list(User.objects.filter(
+                    id__in=Employment.objects.get_active().filter(
+                        Q(function_group__in=self.shop_groups.all()) | Q(position__group__in=self.shop_groups.all()),
+                        shop_q,
+                    ).values_list('user_id', flat=True),
+                    email__isnull=False,
+                ))
+            )
         recipients.extend(
             list(User.objects.filter(
-                id__in=self.groups.filter(
-                    employment__in=Employment.objects.get_active()
-                ).values_list('employment__user_id', flat=True),
+                id__in=Employment.objects.get_active().filter(
+                    Q(function_group__in=self.groups.all()) | Q(position__group__in=self.groups.all()),
+                ).values_list('user_id', flat=True),
                 email__isnull=False,
             ))
         )
-        recipients.extend(self.email_addresses.split(','))
-        emails = list(set(r.email.strip() for r in recipients if r.email))
-        return emails
+        emails = [r.email.strip() for r in recipients if r.email]
+        if self.email_addresses:
+            emails.extend(self.email_addresses.split(','))
+        return list(set(emails))
+
+    def get_email_template(self):
+        if self.system_email_template:
+            return template_loader.get_template(self.system_email_template)
+
+        elif self.custom_email_template:
+            return Template(self.custom_email_template)
 
 
 class EventOnlineNotification(AbstractEventNotificationWithRecipients):

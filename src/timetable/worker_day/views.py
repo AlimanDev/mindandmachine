@@ -50,6 +50,7 @@ from src.timetable.serializers import (
     WorkerDayListSerializer,
     DownloadTabelSerializer,
     ChangeRangeListSerializer,
+    RequestApproveSerializer,
 )
 from src.timetable.vacancy.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy, confirm_vacancy
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
@@ -218,11 +219,17 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         """
         Запрос на подтверждении графика
         """
-        request.data.get('dt_from')
-        request.data.get('dt_to')
-        request.data.get('user_id')  # кого запросить ?
-
-        raise NotImplementedError
+        serializer = RequestApproveSerializer(data=request.data, **kwargs)
+        serializer.is_valid(raise_exception=True)
+        event_context = serializer.data.copy()
+        transaction.on_commit(lambda: event_signal.send(
+            sender=None,
+            network_id=request.user.network_id,
+            event_code=REQUEST_APPROVE_EVENT_TYPE,
+            user_author_id=request.user.id,
+            context=event_context,
+        ))
+        return Response({})
 
     @action(detail=False, methods=['post'])
     def approve(self, request):
@@ -308,17 +315,18 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             ]
         ).filter(approve_condition)
 
-        worker_dt_pairs_list = list(
-            wdays_to_approve.values_list('worker_id', 'dt').order_by('worker_id', 'dt').distinct())
+        worker_dt_pairs_list = list(wdays_to_approve.values_list(
+            'worker_id', 'dt', 'type',
+        ).order_by('worker_id', 'dt', 'type').distinct())
 
         grouped_worker_dates = {}
         if worker_dt_pairs_list:
-            for worker_id, dates_grouper in groupby(worker_dt_pairs_list, key=lambda i: i[0]):
-                grouped_worker_dates[worker_id] = [i[1] for i in list(dates_grouper)]
+            for worker_id, grouper in groupby(worker_dt_pairs_list, key=lambda i: i[0]):
+                grouped_worker_dates[worker_id] = [(Converter.convert_date(i[1]), *i[2:]) for i in list(grouper)]
             with transaction.atomic():
                 worker_days_q = Q()
-                for worker_id, dates in grouped_worker_dates.items():
-                    worker_days_q |= Q(worker_id=worker_id, dt__in=dates)
+                for worker_id, data in grouped_worker_dates.items():
+                    worker_days_q |= Q(worker_id=worker_id, dt__in=[d[0] for d in data])
                 WorkerDay.objects.filter(
                     worker_days_q, is_fact=serializer.data['is_fact'],
                 ).exclude(
@@ -395,7 +403,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             network_id=request.user.network_id,
             event_code=APPROVE_EVENT_TYPE,
             user_author_id=request.user.id,
-            context=event_context
+            context=event_context,
         ))
 
         return Response()

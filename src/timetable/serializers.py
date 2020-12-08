@@ -18,6 +18,11 @@ from src.timetable.models import (
 from src.util.models_converter import Converter
 
 
+class RequestApproveSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField(required=True)
+    comment = serializers.CharField(allow_blank=True, required=False)
+
+
 class WorkerDayApproveSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField(required=True)
     is_fact = serializers.BooleanField()
