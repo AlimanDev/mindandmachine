@@ -407,7 +407,7 @@ class TestAutoWorkerExchange(TestCase):
         workers_exchange()
 
         worker_days = WorkerDay.objects.all()
-        self.assertEqual(len(worker_days), 5)
+        self.assertEqual(len(worker_days), 4)
         self.assertIsNotNone(worker_days.filter(is_vacancy=True).first().worker_id)
 
     # Предикшн в 4 человека -> 4 человека в работе -> никого не перекидывает.

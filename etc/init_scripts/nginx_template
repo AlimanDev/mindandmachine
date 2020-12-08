@@ -10,20 +10,54 @@ server {
 
     server_name  %s.mindandmachine.ru;
 
-    location /_i/static/admin/ {
-        alias /var/www/servers/%s/admin/;
+    location /static/ {
+        alias /var/www/servers/%s/;
     }
 
     location / {
+         add_header Cache-Control 'no-cache, no-store, must-revalidate';
+         add_header Pragma no-cache;
+         add_header Expires 0;
          root /var/www/servers/%s/frontend/dist/;
     }
 
-    location /api/ {
-        proxy_pass http://127.0.0.1:%s;
+    location /_i/media/ {
+        alias /var/www/servers/%s/media/;
     }
 
+    location /rest_api/ {
+        uwsgi_pass unix:///var/servers/%s/backend/uwsgi.sock;
+        include uwsgi_params;
+        uwsgi_read_timeout 300s;
+        uwsgi_send_timeout 300s;
+    }
+
+    location /swagger-ui/ {
+        uwsgi_pass unix:///var/servers/%s/backend/uwsgi.sock;
+        include uwsgi_params;
+    }
+
+    location /openapi/ {
+        uwsgi_pass unix:///var/servers/%s/backend/uwsgi.sock;
+        include uwsgi_params;
+    }
     location /admin/ {
-        proxy_pass http://127.0.0.1:%s/admin/;
+        uwsgi_pass unix:///var/servers/%s/backend/uwsgi.sock;
+        include uwsgi_params;
     }
 
+    location /docker/ {
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+
+    if ($scheme = http) {
+        return 301 https://$server_name$request_uri;
+    }
+
+    listen 443 ssl;
+    ssl_certificate %s;
+    ssl_certificate_key %s;
+    access_log /var/log/nginx/%s-access.log;
+    error_log /var/log/nginx/%s-error.log;
 }

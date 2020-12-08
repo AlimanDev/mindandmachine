@@ -779,6 +779,7 @@ class FunctionGroup(AbstractModel):
         'Break',
         'Employment',
         'Employment_auto_timetable',
+        'Employment_timetable',
         'EmploymentWorkType',
         'ExchangeSettings',
         'FunctionGroupView',
