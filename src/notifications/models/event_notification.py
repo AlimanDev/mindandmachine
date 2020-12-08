@@ -77,8 +77,20 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
                     context=context,
                 )
                 recipients.extend(list(event.get_recipients()))
+
         recipients.extend(list(self.users.all()))
-        recipients.extend(list(self.groups.all()))
+
+        groups = list(self.groups.all())
+        if groups:
+            recipients.extend(
+                list(User.objects.filter(
+                    id__in=Employment.objects.get_active().filter(
+                        Q(function_group__in=groups) | Q(position__group__in=groups),
+                    ).values_list('user_id', flat=True),
+                    email__isnull=False,
+                ))
+            )
+
         shop_id = context.get('shop_id')
         if shop_id:
             shop = Shop.objects.get(id=shop_id)
@@ -96,22 +108,15 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
                     email__isnull=False,
                 ))
             )
-        recipients.extend(
-            list(User.objects.filter(
-                id__in=Employment.objects.get_active().filter(
-                    Q(function_group__in=self.groups.all()) | Q(position__group__in=self.groups.all()),
-                ).values_list('user_id', flat=True),
-                email__isnull=False,
-            ))
-        )
-        emails = [r.email.strip() for r in recipients if r.email]
+
         if self.email_addresses:
-            emails.extend(self.email_addresses.split(','))
-        return list(set(emails))
+            recipients.extend(list(User.objects.filter(email__in=self.email_addresses.split(','))))
+
+        return recipients
 
     def get_email_template(self):
         if self.system_email_template:
-            return template_loader.get_template(self.system_email_template)
+            return Template(template_loader.get_template(self.system_email_template))
 
         elif self.custom_email_template:
             return Template(self.custom_email_template)
