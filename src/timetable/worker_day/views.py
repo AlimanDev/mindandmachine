@@ -272,7 +272,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         approve_condition = Q(
             wd_types_q,
             Q(shop_id=serializer.data['shop_id']) |
-            Q(type=WorkerDay.TYPE_QUALIFICATION, worker_id__in=user_ids),
+            Q(Q(shop__isnull=True) | Q(type=WorkerDay.TYPE_QUALIFICATION), worker_id__in=user_ids),
             dt__lte=serializer.data['dt_to'],
             dt__gte=serializer.data['dt_from'],
             is_fact=serializer.data['is_fact'],
