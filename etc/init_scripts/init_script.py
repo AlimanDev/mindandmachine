@@ -13,6 +13,7 @@ import json
 import uuid
 import argparse
 import random
+import re
 
 
 class ServerConfig:
@@ -41,6 +42,16 @@ class ServerConfig:
         os.system(f'service nginx restart')
 
     def add_repos(self, name, branch, db_info):
+        if not os.path.isdir(f'{self.PATH_PREFIX}/servers'):
+            os.system(f'mkdir -p {self.PATH_PREFIX}/servers')
+
+        if not os.path.isdir(f'{self.PATH_PREFIX}/www/servers'):
+            os.system(f'mkdir -p {self.PATH_PREFIX}/www/servers')
+        
+        with open('/etc/group') as f:
+            if re.search(r'\bwfm:', f.read()) is None:
+                os.system('groupadd wfm')
+
         # нужно чтобы бд c таким именем уже была
         # local config
         with open('djconfig_local_template') as f:
