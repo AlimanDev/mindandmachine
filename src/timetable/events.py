@@ -22,3 +22,8 @@ class ApproveEvent(BaseRegisteredEvent):
     name = 'Подтверждение графика'
     code = APPROVE_EVENT_TYPE
     context_serializer_cls = RequestApproveEventSerializer
+
+    def get_recipients(self):
+        # TODO: добавить пользователей, для которых был подтвержден график
+        # TODO: подтверждаются все неподтвержденные дни периода, даже если они не отличаются от планового, что делать?
+        return []

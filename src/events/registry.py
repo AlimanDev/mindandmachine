@@ -31,13 +31,11 @@ class BaseRegisteredEvent(metaclass=EventRegistryHolder):
     code = None
     name = None
     write_history = True
-    context_serializer_cls: Type[serializers.Serializer] = None
 
     def __init__(self, network_id, user_author_id, context):
         self.network_id = network_id
         self.user_author_id = user_author_id
         self.context = context
-        self._context_validated = False
 
     def __str__(self):
         return self.name
@@ -45,12 +43,5 @@ class BaseRegisteredEvent(metaclass=EventRegistryHolder):
     def __repr__(self):
         return self.__str__()
 
-    def _validate_context(self):
-        if not self._context_validated and self.context_serializer_cls:
-            serializer = self.context_serializer_cls(data=self.context)
-            serializer.is_valid(raise_exception=True)
-            self._context_validated = True
-
     def get_recipients(self):
-        self._validate_context()
         return []
