@@ -6,11 +6,13 @@ from django.contrib.auth.models import (
     UserManager
 )
 from django.db import models
-from django.db.models import Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField, DateField, \
+from django.db import transaction
+from django.db.models import Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField, TimeField, \
     TimeField, DecimalField, CharField
-from django.db.models.functions import Extract, Coalesce, Cast, Round, Greatest, TruncSecond
+from django.db.models.functions import Extract, Coalesce, Cast, Greatest, TruncSecond
 from django.db.models.query import QuerySet
 from django.utils import timezone
+
 from src.base.models import Shop, Employment, User, Event, Network, Break
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
@@ -426,7 +428,9 @@ class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
-        index_together = [('dt', 'worker')]
+        unique_together = (
+            ('dt', 'worker', 'is_fact', 'is_approved'),
+        )
 
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
@@ -575,7 +579,7 @@ class WorkerDay(AbstractModel):
     parent_worker_day = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child') # todo: remove
     work_hours = models.DurationField(default=datetime.timedelta(days=0))
 
-    is_fact = models.BooleanField(default=False) # плановое или фактическое расписание
+    is_fact = models.BooleanField(default=False)  # плановое или фактическое расписание
     is_vacancy = models.BooleanField(default=False)  # вакансия ли это
     dttm_added = models.DateTimeField(default=timezone.now)
     canceled = models.BooleanField(default=False)
@@ -962,6 +966,11 @@ class AttendanceRecords(AbstractModel):
         (TYPE_BREAK_END, 'break_end')
     )
 
+    TYPE_2_DTTM_FIELD = {
+        TYPE_COMING: 'dttm_work_start',
+        TYPE_LEAVING: 'dttm_work_end',
+    }
+
     dttm = models.DateTimeField()
     type = models.CharField(max_length=1, choices=RECORD_TYPES)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
@@ -977,97 +986,88 @@ class AttendanceRecords(AbstractModel):
         Создание WorkerDay при занесении отметок.
 
         При создании отметки время о приходе или уходе заносится в фактический подтвержденный график WorkerDay.
-        Если подтвержденного факта нет - создаем новый подтвержденный факт. Неподтвержденный факт привязываем к нему.
-        Новый подтвержденный факт привязываем к плану - подтвержденному, если есть, либо неподтвержденному.
+        Если подтвержденного факта нет - создаем новый подтвержденный факт.
         """
-        super(AttendanceRecords, self).save(*args, **kwargs)
+        res = super(AttendanceRecords, self).save(*args, **kwargs)
 
-        # Достаем сразу все планы и факты за день
-        worker_days = WorkerDay.objects.filter(
-            shop=self.shop,
-            worker=self.user,
-            dt=self.dttm.date(),
-        )
-
-        if len(worker_days) > 4:
-            raise ValueError(f"Worker {self.user} has too many worker days on {self.dttm.date()}")
-
-        wdays = {
-            'fact': {
-                'approved': None,
-                'not_approved': None,
-            },
-            'plan': {
-                'approved': None,
-                'not_approved': None,
-            }
-        }
-
-        for wd in worker_days:
-            key_fact = 'fact' if wd.is_fact else 'plan'
-            key_approved = 'approved' if wd.is_approved else 'not_approved'
-            wdays[key_fact][key_approved] = wd
-
-        type2dtfield = {
-            self.TYPE_COMING: 'dttm_work_start',
-            self.TYPE_LEAVING: 'dttm_work_end'
-        }
-
-        if wdays['fact']['approved']:
-            # если это отметка о приходе, то не перезаписываем время начала работы в графике
-            # если время отметки больше, чем время начала работы в существующем графике
-            skip_condition = (self.type == self.TYPE_COMING) and \
-                             wdays['fact']['approved'].dttm_work_start and self.dttm > wdays['fact'][
-                                 'approved'].dttm_work_start
-            if skip_condition:
-                return
-
-            setattr(wdays['fact']['approved'], type2dtfield[self.type], self.dttm)
-            setattr(wdays['fact']['approved'], 'type', WorkerDay.TYPE_WORKDAY)
-            wdays['fact']['approved'].save()
-        else:
-            if self.type == self.TYPE_LEAVING:
-                prev_fa_wd = WorkerDay.objects.filter(
-                    shop=self.shop,
-                    worker=self.user,
-                    dt__lt=self.dttm.date(),
-                    is_fact=True,
-                    is_approved=True,
-                ).order_by('dt').last()
-
-                # Если предыдущая смена не закрыта.
-                if prev_fa_wd and prev_fa_wd.dttm_work_start and prev_fa_wd.dttm_work_end is None:
-                    close_prev_work_shift_cond = (
-                         self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
-                    # Если с момента открытия предыдущей смены прошло менее MAX_WORK_SHIFT_SECONDS,
-                    # то закрываем предыдущую смену.
-                    if close_prev_work_shift_cond:
-                        setattr(prev_fa_wd, type2dtfield[self.type], self.dttm)
-                        prev_fa_wd.save()
-                        return
-
-                if settings.MDA_SKIP_LEAVING_TICK:
-                    return
-
+        with transaction.atomic():
             dt = self.dttm.date()
-            active_user_empl = Employment.objects.get_active(
-                self.user.network_id, dt_from=dt, dt_to=dt, user=self.user, shop=self.shop).last()
-            if not active_user_empl:
-                active_user_empl = Employment.objects.get_active(
-                    self.user.network_id, dt_from=dt, dt_to=dt, user=self.user).last()
 
-            wd = WorkerDay(
-                shop=self.shop,
+            fact_approved = WorkerDay.objects.filter(
+                dt=dt,
                 worker=self.user,
-                employment=active_user_empl,
-                dt=self.dttm.date(),
                 is_fact=True,
                 is_approved=True,
-                type=WorkerDay.TYPE_WORKDAY,
-                is_vacancy=active_user_empl.shop_id != self.shop_id if active_user_empl else False,
-            )
-            setattr(wd, type2dtfield[self.type], self.dttm)
-            wd.save()
+            ).select_for_update().first()
+
+            # для случаев когда сотрудник перепутал магазины, отметился сначала в одном, потом еще раз в другом
+            if fact_approved and fact_approved.shop_id != self.shop_id:
+                fact_approved.dttm_work_start = None
+                fact_approved.dttm_work_end = None
+                fact_approved.shop_id = self.shop_id
+                active_user_empl = Employment.objects.get_active_empl_for_user(
+                    network_id=self.user.network_id, user_id=self.user_id, dt=dt, priority_shop_id=self.shop_id
+                ).first()
+                fact_approved.is_vacancy = active_user_empl.shop_id != self.shop_id if active_user_empl else False
+                fact_approved.save(update_fields=('shop_id', 'dttm_work_start', 'dttm_work_end', 'is_vacancy'))
+
+            if fact_approved:
+                # если это отметка о приходе, то не перезаписываем время начала работы в графике
+                # если время отметки больше, чем время начала работы в существующем графике
+                skip_condition = (self.type == self.TYPE_COMING) and \
+                                 fact_approved.dttm_work_start and self.dttm > fact_approved.dttm_work_start
+                if skip_condition:
+                    return
+
+                setattr(fact_approved, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
+                setattr(fact_approved, 'type', WorkerDay.TYPE_WORKDAY)
+                fact_approved.save()
+            else:
+                if self.type == self.TYPE_LEAVING:
+                    prev_fa_wd = WorkerDay.objects.filter(
+                        shop_id=self.shop_id,
+                        worker=self.user,
+                        dt__lt=self.dttm.date(),
+                        is_fact=True,
+                        is_approved=True,
+                    ).order_by('dt').last()
+
+                    # Если предыдущая смена не закрыта.
+                    if prev_fa_wd and prev_fa_wd.dttm_work_start and prev_fa_wd.dttm_work_end is None:
+                        close_prev_work_shift_cond = (
+                                                             self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
+                        # Если с момента открытия предыдущей смены прошло менее MAX_WORK_SHIFT_SECONDS,
+                        # то закрываем предыдущую смену.
+                        if close_prev_work_shift_cond:
+                            setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
+                            setattr(prev_fa_wd, 'type', WorkerDay.TYPE_WORKDAY)
+                            prev_fa_wd.save()
+                            return
+
+                    if settings.MDA_SKIP_LEAVING_TICK:
+                        return
+
+                active_user_empl = Employment.objects.get_active_empl_for_user(
+                    network_id=self.user.network_id, user_id=self.user_id,
+                    dt=dt,
+                    priority_shop_id=self.shop_id,
+                ).first()
+
+                WorkerDay.objects.update_or_create(
+                    dt=self.dttm.date(),
+                    worker=self.user,
+                    is_fact=True,
+                    is_approved=True,
+                    defaults={
+                        'shop_id': self.shop_id,
+                        'employment': active_user_empl,
+                        'type': WorkerDay.TYPE_WORKDAY,
+                        self.TYPE_2_DTTM_FIELD[self.type]: self.dttm,
+                        'is_vacancy': active_user_empl.shop_id != self.shop_id if active_user_empl else False,
+                    }
+                )
+
+        return res
 
 
 class ExchangeSettings(AbstractModel):

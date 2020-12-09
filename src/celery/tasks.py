@@ -21,6 +21,7 @@ from src.base.models import (
     Subscribe,
     Event,
     Network,
+    Employment,
 )
 from src.celery.celery import app
 from src.conf.djconfig import EMAIL_HOST_USER
@@ -754,6 +755,17 @@ def clean_wdays(filter_kwargs: dict = None, exclude_kwargs: dict = None, only_lo
         only_logging=only_logging,
     )
     clean_wdays_helper.run()
+
+
+@app.task
+def delete_inactive_employment_groups():
+    dt_now = date.today()
+    Employment.objects.filter(
+        dt_to_function_group__lt=dt_now,
+    ).update(
+        function_group=None,
+        dt_to_function_group=None,
+    )
 
 
 @app.task

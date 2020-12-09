@@ -4,6 +4,7 @@ from dateutil.relativedelta import relativedelta
 from django.test import TestCase
 from django.utils.timezone import now
 
+from etc.scripts import fill_calendar
 from src.base.models import (
     Shop,
     Employment,
@@ -14,6 +15,11 @@ from src.base.models import (
     Network,
     Break,
 )
+from src.forecast.models import (
+    OperationType,
+    PeriodClients,
+    OperationTypeName,
+)
 from src.timetable.models import (
     WorkType,
     WorkTypeName,
@@ -23,13 +29,6 @@ from src.timetable.models import (
     ShopMonthStat,
     EmploymentWorkType,
 )
-
-from src.forecast.models import (
-    OperationType,
-    PeriodClients,
-    OperationTypeName,
-)
-from etc.scripts import fill_calendar
 from src.timetable.vacancy.utils import (
     create_vacancies_and_notify,
     cancel_vacancies,
@@ -242,16 +241,19 @@ class TestAutoWorkerExchange(TestCase):
                 worker_day=wd
             )
 
-    def create_holidays(self, employment, dt_from, count):
+    def update_or_create_holidays(self, employment, dt_from, count):
         for day in range(count):
             date = dt_from + datetime.timedelta(days=day)
-            WorkerDay.objects.create(
-                employment=employment,
-                worker=employment.user,
-                shop=employment.shop,
+            WorkerDay.objects.update_or_create(
                 dt=date,
-                type=WorkerDay.TYPE_HOLIDAY,
+                worker=employment.user,
+                is_fact=False,
                 is_approved=True,
+                defaults=dict(
+                    type=WorkerDay.TYPE_HOLIDAY,
+                    shop=employment.shop,
+                    employment=employment,
+                )
             )
 
     def create_worker_days(self, employment, dt_from, count, from_tm, to_tm):
@@ -438,7 +440,8 @@ class TestAutoWorkerExchange(TestCase):
         vacancy = self.create_vacancy(9, 21, self.work_type2)
         employment = Employment.objects.first()
         dt = self.dt_now
-        self.create_holidays(employment, dt, 3)
+        self.update_or_create_holidays(employment, dt, 3)
+
         self.create_worker_days(employment, dt + datetime.timedelta(days=4), 2, 2, 10)
         self.create_worker_days(employment, dt - datetime.timedelta(days=4), 2, 2, 10)
         Event.objects.create(
@@ -458,14 +461,14 @@ class TestAutoWorkerExchange(TestCase):
         self.create_worker_days(employment1, dt, 4, 10, 23)
         self.create_worker_days(employment2, dt, 4, 10, 18)
         dt = dt + datetime.timedelta(days=4)
-        self.create_holidays(employment1, dt, 2)
-        self.create_holidays(employment2, dt, 2)
+        self.update_or_create_holidays(employment1, dt, 2)
+        self.update_or_create_holidays(employment2, dt, 2)
         dt = dt + datetime.timedelta(days=2)
         self.create_worker_days(employment1, dt, 3, 10, 23)
         self.create_worker_days(employment2, dt, 3, 10, 18)
         dt = dt + datetime.timedelta(days=3)
-        self.create_holidays(employment1, dt, 2)
-        self.create_holidays(employment2, dt, 2)
+        self.update_or_create_holidays(employment1, dt, 2)
+        self.update_or_create_holidays(employment2, dt, 2)
         Event.objects.create(
             worker_day=vacancy,
         )
@@ -486,20 +489,20 @@ class TestAutoWorkerExchange(TestCase):
         self.create_worker_days(employment2, dt, 3, 10, 18)
         self.create_worker_days(employment3, dt, 3, 10, 20)
         dt = dt + datetime.timedelta(days=3)
-        self.create_holidays(employment2, dt, 2)
-        self.create_holidays(employment3, dt, 2)
+        self.update_or_create_holidays(employment2, dt, 2)
+        self.update_or_create_holidays(employment3, dt, 2)
         dt = dt + datetime.timedelta(days=1)
-        self.create_holidays(employment1, dt, 2)
+        self.update_or_create_holidays(employment1, dt, 2)
         dt = dt + datetime.timedelta(days=1)
         self.create_worker_days(employment2, dt, 3, 10, 18)
         self.create_worker_days(employment3, dt, 3, 9, 23)
         dt = dt + datetime.timedelta(days=1)
         self.create_worker_days(employment1, dt, 3, 10, 23)
         dt = dt + datetime.timedelta(days=2)
-        self.create_holidays(employment2, dt, 2)
-        self.create_holidays(employment3, dt, 2)
+        self.update_or_create_holidays(employment2, dt, 2)
+        self.update_or_create_holidays(employment3, dt, 2)
         dt = dt + datetime.timedelta(days=1)
-        self.create_holidays(employment1, dt, 2)
+        self.update_or_create_holidays(employment1, dt, 2)
         Event.objects.create(
             worker_day=vacancy,
         )
@@ -517,19 +520,19 @@ class TestAutoWorkerExchange(TestCase):
         employment3 = employments[2]
         self.dt_now = self.dt_now - datetime.timedelta(days=8)
         self.create_worker_days(employment1, self.dt_now + datetime.timedelta(days=4), 4, 10, 23)
-        self.create_holidays(employment1, self.dt_now + datetime.timedelta(days=8), 2)
+        self.update_or_create_holidays(employment1, self.dt_now + datetime.timedelta(days=8), 2)
         self.create_worker_days(employment1, self.dt_now + datetime.timedelta(days=10), 3, 10, 23)
-        self.create_holidays(employment1, self.dt_now + datetime.timedelta(days=13), 2)
+        self.update_or_create_holidays(employment1, self.dt_now + datetime.timedelta(days=13), 2)
 
         self.create_worker_days(employment2, self.dt_now + datetime.timedelta(days=4), 4, 10, 18)
-        self.create_holidays(employment2, self.dt_now + datetime.timedelta(days=8), 1)
+        self.update_or_create_holidays(employment2, self.dt_now + datetime.timedelta(days=8), 1)
         self.create_worker_days(employment2, self.dt_now + datetime.timedelta(days=9), 3, 10, 18)
-        self.create_holidays(employment3, self.dt_now + datetime.timedelta(days=12), 2)
+        self.update_or_create_holidays(employment3, self.dt_now + datetime.timedelta(days=12), 2)
 
         self.create_worker_days(employment3, self.dt_now + datetime.timedelta(days=4), 3, 8, 23)
-        self.create_holidays(employment3, self.dt_now + datetime.timedelta(days=7), 2)
+        self.update_or_create_holidays(employment3, self.dt_now + datetime.timedelta(days=7), 2)
         self.create_worker_days(employment3, self.dt_now + datetime.timedelta(days=9), 3, 9, 23)
-        self.create_holidays(employment3, self.dt_now + datetime.timedelta(days=12), 2)
+        self.update_or_create_holidays(employment3, self.dt_now + datetime.timedelta(days=12), 2)
 
         Event.objects.create(
             worker_day=vacancy,
@@ -542,7 +545,7 @@ class TestAutoWorkerExchange(TestCase):
         self.create_users(1)
         user = User.objects.first()
         vacancy = self.create_vacancy(9, 21, self.work_type1)
-        self.create_holidays(Employment.objects.get(user=user), self.dt_now, 1)
+        self.update_or_create_holidays(Employment.objects.get(user=user), self.dt_now, 1)
         tt = ShopMonthStat.objects.get(shop_id=self.shop.id)
         tt.dttm_status_change = self.dt_now + relativedelta(months=1)
         tt.save()
@@ -556,7 +559,7 @@ class TestAutoWorkerExchange(TestCase):
         self.create_users(1)
         user = User.objects.first()
         vacancy = self.create_vacancy(9, 21, self.work_type1)
-        self.create_holidays(Employment.objects.get(user=user), self.dt_now, 1)
+        self.update_or_create_holidays(Employment.objects.get(user=user), self.dt_now, 1)
         Event.objects.create(
             worker_day=vacancy,
         )
