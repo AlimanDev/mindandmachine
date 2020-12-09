@@ -30,9 +30,9 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
     for recipient in set(event_email_notification.get_recipients(user_author_id, context)):
         email = recipient.email
         if email:
-            context = context.copy()
-            context['recipient'] = recipient
-            message_content = template.render(Context(context))
+            context_copy = context.copy()
+            context_copy['recipient'] = recipient
+            message_content = template.render(Context(context_copy))
             datatuple.append(
                 (
                     subject,

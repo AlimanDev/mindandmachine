@@ -95,19 +95,21 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
         max_length=256, null=True, blank=True, verbose_name='E-mail адреса получателей, через запятую')
     system_email_template = models.CharField(
         max_length=256, choices=SYSTEM_EMAIL_TEMPLATES, verbose_name='Системный E-mail шаблон', null=True, blank=True)
-    custom_email_template = models.TextField(verbose_name='Пользовательский E-mail шаблон', null=True, blank=True)
-    subject = models.CharField(max_length=256, verbose_name='Тема письма', null=True, blank=True)
+    custom_email_template = models.TextField(
+        verbose_name='Пользовательский E-mail шаблон',
+        help_text='Будет использован только если не выбран "Системный E-mail шаблон"',
+        null=True, blank=True,
+    )
+    subject = models.CharField(
+        max_length=256, verbose_name='Тема письма', null=True, blank=True,
+        help_text='По умолчанию берется из названия "Системный E-mail шаблон"'
+    )
 
     class Meta:
         verbose_name = 'Email оповещение о событиях'
         verbose_name_plural = 'Email оповещения о событиях'
 
     def clean(self):
-        if self.system_email_template and self.custom_email_template:
-            raise ValidationError(
-                'Нельзя выбрать одновременно "Системный E-mail шаблон" и "Пользовательский E-mail шаблон"'
-            )
-
         if not (self.system_email_template or self.custom_email_template):
             raise ValidationError(
                 'Необходимо выбрать "Системный E-mail шаблон", либо заполнить "Пользовательский E-mail шаблон"'
@@ -115,7 +117,7 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
 
     def get_email_template(self):
         if self.system_email_template:
-            return Template(template_loader.get_template(self.system_email_template))
+            return template_loader.get_template(self.system_email_template).template
 
         elif self.custom_email_template:
             return Template(self.custom_email_template)
