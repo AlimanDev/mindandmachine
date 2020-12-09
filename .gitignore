@@ -27,3 +27,5 @@ docs/_*
 docs/qos*
 .vscode*
 *DS_STORE
+
+update.sh
