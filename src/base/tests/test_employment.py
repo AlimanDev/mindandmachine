@@ -325,7 +325,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.json()['function_group_id'], self.chief_group.id)
         self.assertEqual(resp.json()['dt_to_function_group'], (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'))
 
-    
+
     def test_change_function_group_tmp_through_position(self):
         self.admin_group.subordinates.add(self.chief_group)
         self.admin_group.subordinates.add(self.employee_group)
@@ -348,7 +348,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.json()['function_group_id'], self.chief_group.id)
         self.assertEqual(resp.json()['dt_to_function_group'], (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'))
 
-    
+
     def test_delete_function_group_tmp(self):
         self.admin_group.subordinates.add(self.chief_group)
         self.admin_group.subordinates.add(self.employee_group)
@@ -364,7 +364,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         )
         self.assertIsNone(resp.json()['function_group_id'])
 
-    
+
     def test_change_function_group_tmp_no_perm(self):
         self.admin_group.subordinates.add(self.employee_group)
         put_data = {

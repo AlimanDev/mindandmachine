@@ -659,6 +659,15 @@ def create_departments_and_users(self):
         shop=self.shop2,
         function_group=self.employee_group,
     )
+    self.employment8_old = Employment.objects.create(
+        dt_hired=dt - datetime.timedelta(days=900),
+        dt_fired=dt - datetime.timedelta(days=700),
+        network=self.network,
+        code=f'{self.user8.username}:{uuid.uuid4()}:{uuid.uuid4()}',
+        user=self.user8,
+        shop=self.shop2,
+        function_group=self.employee_group,
+    )
     Shop.objects.all().update(code=Concat(Value('code-', output_field=CharField()), F('id')), network=self.network)
     User.objects.all().update(tabel_code=F('username'))
     for s in [self.root_shop, self.shop, self.shop2, self.shop3, self.reg_shop1, self.reg_shop2]:
