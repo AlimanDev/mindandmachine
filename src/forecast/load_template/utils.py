@@ -22,6 +22,7 @@ import pandas as pd
 from rest_framework.response import Response
 from src.base.exceptions import MessageError
 from src.util.download import xlsx_method
+from dateutil.relativedelta import relativedelta
 
 
 ########################## Вспомогательные функции ##########################
@@ -449,7 +450,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
     timeseries = {}
     values = list(PeriodClients.objects.select_related('operation_type').filter(
         operation_type__shop_id=shop_id,
-        dttm_forecast__date__gte=dt_from,
+        dttm_forecast__date__gte=dt_from - relativedelta(years=3),
         dttm_forecast__date__lte=dt_to,
         type=PeriodClients.FACT_TYPE,
         operation_type__operation_type_name__operationtypetemplate__load_template_id=load_template_id,
