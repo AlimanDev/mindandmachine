@@ -3,13 +3,7 @@ from rest_framework.response import Response
 from django.http.response import Http404
 
 
-class BaseActiveNamedModelViewSet(ModelViewSet):
-    """
-    Класс переопределяющий get_object() для возможности
-    получения сущности по коду либо иному полю, указанному
-    в свойстве get_object_field
-    """
-
+class GetObjectByCodeMixin:
     get_object_field = 'code'
 
     def get_object(self):
@@ -21,6 +15,14 @@ class BaseActiveNamedModelViewSet(ModelViewSet):
             self.lookup_field = self.get_object_field
             self.kwargs[self.get_object_field] = self.kwargs['pk']
         return super().get_object()
+
+
+class BaseActiveNamedModelViewSet(GetObjectByCodeMixin, ModelViewSet):
+    """
+    Класс переопределяющий get_object() для возможности
+    получения сущности по коду либо иному полю, указанному
+    в свойстве get_object_field
+    """
 
 
 class UpdateorCreateViewSet(BaseActiveNamedModelViewSet):

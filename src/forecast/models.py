@@ -294,13 +294,16 @@ class PeriodClientsManager(models.Manager):
                 tm_start = v
                 tm_end = shop.close_times[k]
                 week_day = (int(k) + 2) % 7 or 7
+                if tm_end == datetime.time(0):
+                    tm_end = datetime.time(23, 59)
                 if tm_start < tm_end:
                     filt |= (models.Q(dttm_forecast__week_day=week_day) & (models.Q(dttm_forecast__time__gte=tm_start) & models.Q(dttm_forecast__time__lt=tm_end)))
                 elif tm_start > tm_end:
                     filt |= (models.Q(dttm_forecast__week_day=week_day) & (models.Q(dttm_forecast__time__gte=tm_start) | models.Q(dttm_forecast__time__lt=tm_end)))
             return self.filter(filt, *args, **kwargs)
         else:
-            max_shop_time = max(list(shop.close_times.values()))
+            shop_close_times = list(shop.close_times.values())
+            max_shop_time = datetime.time(23, 59) if datetime.time(0,0) in shop_close_times else max(shop_close_times)
             min_shop_time = min(list(shop.open_times.values()))
             time_filter = {}
             if max_shop_time != min_shop_time:
@@ -323,7 +326,9 @@ class PeriodClients(AbstractModel):
 
     class Meta(object):
         verbose_name = 'Значение операций'
-        index_together = [('dttm_forecast', 'operation_type')]
+        unique_together = [
+            ('dttm_forecast', 'operation_type', 'type'),
+        ]
     
     def __str__(self):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
@@ -377,3 +382,4 @@ class Receipt(AbstractModel):
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True)
     info = models.TextField()
     data_type = models.CharField(max_length=128, verbose_name='Тип данных', null=True, blank=True)
+    version = models.IntegerField(verbose_name='Версия объекта', default=0)

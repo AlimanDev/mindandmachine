@@ -47,6 +47,12 @@ class Network(AbstractActiveModel):
     )
     enable_camera_ticks = models.BooleanField(
         default=False, verbose_name='Включить отметки по камере в мобильной версии')
+    crop_work_hours_by_shop_schedule = models.BooleanField(
+        default=True, verbose_name='Обрезать рабочие часы по времени работы магазина'
+    )
+    clean_wdays_on_employment_dt_change = models.BooleanField(
+        default=False, verbose_name='Запускать скрипт очистки дней при изменении дат трудойстройства',
+    )
 
     def get_department(self):
         return None
@@ -263,23 +269,19 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     def director_code(self, val):
         self.director = User.objects.filter(tabel_code=val).first()
 
-    def __getattribute__(self, attr):
-        if attr in ['open_times', 'close_times']:
-            try:
-                return super().__getattribute__(attr)
-            except:
-                fields_scope = {
-                    'open_times': 'tm_open_dict',
-                    'close_times': 'tm_close_dict',
-                }
-                try:
-                    self.__setattr__(attr, {
-                        k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
-                        for k, v in json.loads(getattr(self, fields_scope.get(attr))).items()
-                    })
-                except:
-                    return {}
-        return super().__getattribute__(attr)
+    def _parse_times(self, attr):
+        return {
+            k: datetime.datetime.strptime(v, QOS_TIME_FORMAT).time()
+            for k, v in json.loads(getattr(self, attr)).items()
+        }
+
+    @property
+    def open_times(self):
+        return self._parse_times('tm_open_dict')
+
+    @property
+    def close_times(self):
+        return self._parse_times('tm_close_dict')
 
     @staticmethod
     def clean_time_dict(time_dict):
@@ -291,11 +293,9 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
 
     def save(self, *args, **kwargs):
-        open_times = self.open_times
-        close_times = self.close_times
-        if open_times.keys() != close_times.keys():
+        if self.open_times.keys() != self.close_times.keys():
             raise MessageError(code='time_shop_differerent_keys')
-        if open_times.get('all') and len(open_times) != 1:
+        if self.open_times.get('all') and len(self.open_times) != 1:
             raise MessageError(code='time_shop_all_or_days')
         
         #TODO fix
@@ -338,6 +338,26 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             offset = settings.CLIENT_TIMEZONE
 
         return offset
+
+    def get_schedule(self, dt):
+        res = {
+            'tm_open': datetime.time(0, 0, 0),
+            'tm_close': datetime.time(0, 0, 0),
+        }
+        weekday = str(dt.weekday())
+
+        if 'all' in self.open_times:
+            res['tm_open'] = self.open_times.get('all')
+        elif weekday in self.open_times:
+            res['tm_open'] = self.open_times.get(weekday)
+
+        if 'all' in self.close_times:
+            res['tm_close'] = self.close_times.get('all')
+        elif weekday in self.close_times:
+            res['tm_close'] = self.close_times.get(weekday)
+
+        return res
+
 
 class EmploymentManager(models.Manager):
     def get_active(self, network_id, dt_from=None, dt_to=None, *args, **kwargs):
@@ -546,6 +566,12 @@ class WorkerPosition(AbstractActiveNamedModel):
 
 
 class EmploymentQuerySet(QuerySet):
+    def annotate_value_equality(self, annotate_name, field_name, value):
+        return self.annotate(**{annotate_name: Case(
+            When(**{field_name: value}, then=True),
+            default=False, output_field=models.BooleanField()
+        )})
+
     def last_hired(self):
         last_hired_subq = self.filter(user_id=OuterRef('user_id')).order_by('-dt_hired').values('id')[:1]
         return self.filter(
@@ -594,7 +620,7 @@ class Employment(AbstractActiveModel):
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
     is_visible = models.BooleanField(default=True)
 
-    position_tracker = FieldTracker(fields=['position'])
+    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired'])
 
     objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
 
@@ -642,7 +668,7 @@ class Employment(AbstractActiveModel):
 
         force_create_work_types = kwargs.pop('force_create_work_types', False)
         is_new = self.pk is None
-        position_has_changed = self.position_tracker.has_changed('position')
+        position_has_changed = self.tracker.has_changed('position')
         res = super().save(*args, **kwargs)
         # при создании трудоустройства или при смене должности проставляем типы работ по умолчанию
         if force_create_work_types or is_new or position_has_changed:
@@ -671,51 +697,35 @@ class Employment(AbstractActiveModel):
                     ) for work_type in work_types
                 )
         # при смене должности пересчитываем рабочие часы в будущем
-        if position_has_changed:
-            from django.apps import apps
-            from django.db.models import When, Case, Q, F, DurationField, Value, Subquery, OuterRef
-            from django.db.models.functions import Cast, Coalesce
-            if self.position.breaks:
-                break_id = self.position.breaks_id
-                breaks = self.position.breaks.breaks
-            else:
-                break_id = self.shop.settings.breaks_id
-                breaks = self.shop.settings.breaks.breaks
-            breaks = list(
-                map(
-                    lambda x: (
-                        datetime.timedelta(seconds=x[0] * 60), 
-                        datetime.timedelta(seconds=x[1] * 60), 
-                        datetime.timedelta(seconds=sum(x[2]) * 60)
-                    ), 
-                    breaks
-                )
-            )
-            breaktime_plan = Value(datetime.timedelta(0), output_field=DurationField())
-            if len(breaks):
-                whens = [
-                    When(
-                        Q(hours_plan_0__gte=break_triplet[0], hours_plan_0__lte=break_triplet[1]) & 
-                        (Q(employment__position__breaks_id=break_id) | 
-                        (Q(employment__position__breaks__isnull=True) & Q(employment__shop__settings__breaks_id=break_id))),
-                        then=break_triplet[2]
-                    )
-                    for break_triplet in breaks
-                ]
-                breaktime_plan = Case(*whens, output_field=DurationField())
-            WorkerDay = apps.get_model('timetable', 'WorkerDay')
+        if not is_new and position_has_changed:
+            from src.timetable.models import WorkerDay
             dt = datetime.date.today()
-            WorkerDay.objects.filter(
-                employment_id=self.id,
-                is_fact=False,
-                dt__gt=dt,
-            ).update(
-                work_hours=Coalesce(Subquery(
-                    WorkerDay.objects.filter(pk=OuterRef('pk')).annotate(
-                        hours_plan_0=Cast(F('dttm_work_end') - F('dttm_work_start'), DurationField()),
-                        hours_plan=Cast(F('hours_plan_0') - breaktime_plan, DurationField()),
-                    ).values('hours_plan')[:1]
-                ), datetime.timedelta(0))
+            for wd in WorkerDay.objects.filter(
+                        employment_id=self.id,
+                        is_fact=False,
+                        dt__gt=dt,
+                        type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                    ):
+                wd.save(update_fields=['work_hours'])
+
+        if not is_new and (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired')) and \
+                self.network.clean_wdays_on_employment_dt_change:
+            from src.celery.tasks import clean_wdays
+            from src.timetable.models import WorkerDay
+            from src.util.models_converter import Converter
+            clean_wdays.apply_async(
+                kwargs={
+                    'filter_kwargs': {
+                        'type': WorkerDay.TYPE_WORKDAY,
+                        'employment_id': self.id,
+                    },
+                    'exclude_kwargs': {
+                        'dt__gte': Converter.convert_date(self.dt_hired),
+                        'dt__lt': Converter.convert_date(self.dt_fired),
+                    },
+                    'only_logging': False,
+                },
+                countdown=60 * 5,
             )
 
         return res
@@ -746,6 +756,7 @@ class FunctionGroup(AbstractModel):
         'Break',
         'Employment',
         'Employment_auto_timetable',
+        'Employment_timetable',
         'EmploymentWorkType',
         'ExchangeSettings',
         'FunctionGroupView',

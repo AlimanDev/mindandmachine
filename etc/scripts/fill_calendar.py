@@ -68,7 +68,7 @@ month_dict = {
 #             )
 
 
-def fill_days(from_date, to_date, region_id):
+def fill_days(from_date, to_date, region_id, file_name='etc/scripts/work_data.csv'):
     """
     including boundaries
     Args:
@@ -76,7 +76,7 @@ def fill_days(from_date, to_date, region_id):
         to_date(str): e.g. '2019.1.1'
     """
     data = pd.read_csv(
-        'etc/scripts/work_data.csv',
+        file_name,
         index_col='Год/Месяц'
     )
 

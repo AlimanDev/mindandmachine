@@ -71,9 +71,12 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         serializer.save(network=self.request.user.network)
 
     def get_queryset(self):
-        return Employment.objects.filter(
+        qs = Employment.objects.filter(
             shop__network_id=self.request.user.network_id
         ).order_by('-dt_hired')
+        if self.action in ['list', 'retrieve']:
+            qs = qs.select_related('user', 'shop').prefetch_related('work_types', 'worker_constraints')
+        return qs
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -88,6 +91,14 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         data = data.validated_data
         Employment.objects.filter(id__in=data.get('employment_ids')).update(auto_timetable=data.get('auto_timetable'))
         return Response()
+
+
+    @action(detail=True, methods=['put',])
+    def timetable(self, request, pk=None):
+        data = EmploymentSerializer(data=request.data, instance=self.get_object(), context={'request':request, 'view': self})
+        data.is_valid(raise_exception=True)
+        data.save()
+        return Response(data.data)
 
 
 class UserViewSet(BaseActiveNamedModelViewSet):

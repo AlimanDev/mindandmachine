@@ -90,6 +90,7 @@ class AbstractActiveNamedModel(AbstractActiveModel):
     class Meta:
         abstract = True
         unique_together = (('code', 'network'),)
+        ordering = ['name',]
 
     name = models.CharField(max_length=128)
     code = models.CharField(max_length=64, null=True, blank=True)

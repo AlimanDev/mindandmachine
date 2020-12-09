@@ -19,9 +19,10 @@ etc/docker/requirements.txt
 db.sqlite3
 
 qos_backend.log*
+clean_wdays.log*
 
 venv/*
-celerybeat*
+./celerybeat*
 docs/_*
 docs/qos*
 .vscode*

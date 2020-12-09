@@ -1,0 +1,17 @@
+[program:uwsgi]
+process_name    = %s
+environment     = PATH="/var/servers/%s/backend/env/bin"
+numprocs        = 1
+directory       = /var/servers/%s/backend/qos/
+command         = /var/servers/%s/backend/env/bin/uwsgi --ini /var/servers/%s/backend/uwsgi.ini
+user            = %s
+autostart       = true
+autorestart     = true
+redirect_stderr = true
+stopwaitsecs    = 60
+stopsignal      = INT
+stderr_logfile  = /var/log/servers/%s/err.log
+stdout_logfile  = /var/log/servers/%s/out.log
+stdout_logfile_maxbytes = 100MB
+stdout_logfile_backups  = 30
+stdout_capture_maxbytes = 1MB

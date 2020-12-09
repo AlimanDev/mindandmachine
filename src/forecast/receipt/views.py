@@ -1,20 +1,24 @@
-from src.base.permissions import FilteredListPermission
-from src.base.exceptions import MessageError
-from rest_framework import serializers, viewsets, status, exceptions, permissions
+import json
+
+from django.http.response import Http404
+from rest_framework import serializers, viewsets, status
 from rest_framework.response import Response
 
-from src.forecast.models import Receipt
+from src.base.exceptions import MessageError
 from src.base.models import Shop
-import json
+from src.base.permissions import FilteredListPermission
+from src.base.views_abstract import GetObjectByCodeMixin
+from src.forecast.models import Receipt
 
 
 class PeriodClientsCreateSerializer(serializers.Serializer):
     data = serializers.JSONField(write_only=True)
     data_type = serializers.CharField(max_length=128, write_only=True)
+    version = serializers.IntegerField(required=False)
 
 
 # TODO: documentation
-class ReceiptViewSet(viewsets.ModelViewSet):
+class ReceiptViewSet(GetObjectByCodeMixin, viewsets.ModelViewSet):
     """
     """
     permission_classes = [FilteredListPermission]
@@ -22,16 +26,6 @@ class ReceiptViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return self.filter_queryset(Receipt.objects.all())
-
-    def get_object(self):
-        if self.request.method == 'GET':
-            by_code = self.request.query_params.get('by_code', False)
-        else:
-            by_code = self.request.data.get('by_code', False)
-        if by_code:
-            self.lookup_field = 'code'
-            self.kwargs['code'] = self.kwargs['pk']
-        return super().get_object()
 
     @staticmethod
     def _get_receive_data_info(data_type, settings_values):
@@ -67,15 +61,19 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         receipts = []
         for receipt in data:
             if shop_dict.get(receipt[receive_data_info['shop_code_field_name']], '') == '':
-                raise MessageError(code='no_such_shop', params={'key': receipt[receive_data_info['shop_code_field_name']]})
+                raise MessageError(code='no_such_shop',
+                                   params={'key': receipt[receive_data_info['shop_code_field_name']]})
 
-            receipts.append(Receipt(
+            receipt = Receipt(
                 shop_id=shop_dict[receipt[receive_data_info['shop_code_field_name']]],
                 code=receipt[receive_data_info['receipt_code_field_name']],
                 dttm=receipt[receive_data_info['dttm_field_name']],
                 info=json.dumps(receipt),
                 data_type=data_type,
-            ))
+            )
+            if 'version' in serializer.validated_data:
+                receipt.version = serializer.validated_data['version']
+            receipts.append(receipt)
         Receipt.objects.bulk_create(receipts)
 
         return Response(status=status.HTTP_201_CREATED)
@@ -92,16 +90,27 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         shop = Shop.objects.filter(code=data[receive_data_info['shop_code_field_name']]).first()
         if shop is None:
             raise MessageError(code='no_such_shop', params={'key': data[receive_data_info['shop_code_field_name']]})
-        instance = self.get_object()
+
+        try:
+            instance = self.get_object()
+        except Http404:
+            instance = Receipt()
+        else:
+            if 'version' in serializer.validated_data and instance.version > serializer.validated_data['version']:
+                return Response({'detail': 'Versions mismatch'}, status=412)
+
+        is_new = instance.pk is None
+
         instance.shop_id = shop.id
         instance.code = data[receive_data_info['receipt_code_field_name']]
         instance.dttm = data[receive_data_info['dttm_field_name']]
         instance.info = json.dumps(data)
         instance.data_type = data_type
+        if 'version' in serializer.validated_data:
+            instance.version = serializer.validated_data['version']
         instance.save()
 
-        return Response(data)
-
+        return Response(data, status=status.HTTP_201_CREATED if is_new else status.HTTP_200_OK)
 
 # {
 # "Ссылка": "954a22a1-cd84-11ea-8edf-00155d012a03",
