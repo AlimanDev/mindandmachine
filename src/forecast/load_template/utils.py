@@ -461,7 +461,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
         timeseries[key].append(
             {
                 'value': timeserie.value,
-                'dttm': Converter.convert_datetime(timeserie.dttm_forecast),
+                'dttm': timeserie.dttm_forecast,
             }
         )
     data['timeserie'] = timeseries

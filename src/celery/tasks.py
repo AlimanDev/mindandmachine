@@ -10,7 +10,6 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.db.models import Q
-from django.utils import timezone
 from django.utils.timezone import now
 from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
 
@@ -27,7 +26,6 @@ from src.base.models import (
 )
 from src.celery.celery import app
 from src.conf.djconfig import EMAIL_HOST_USER, TIMETABLE_IP, QOS_DATETIME_FORMAT, URV_STAT_EMAILS, URV_STAT_SHOP_LEVEL
-from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
 from src.forecast.models import (
     OperationTemplate,
     LoadTemplate,
@@ -749,7 +747,7 @@ def create_mda_user_to_shop_relation(username, shop_code, debug_info=None):
 
 @app.task
 def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
-    dt = dt or timezone.now().today()
+    dt = dt or now().today()
     wdays = WorkerDay.objects.filter(
         Q(is_vacancy=True) | Q(type=WorkerDay.TYPE_QUALIFICATION),
         is_fact=False, is_approved=True,
