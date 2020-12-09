@@ -120,6 +120,16 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
         elif self.custom_email_template:
             return Template(self.custom_email_template)
 
+    def get_subject_template(self):
+        subject = ''
+        if self.subject:
+            subject = self.subject
+
+        if not subject and self.system_email_template:
+            subject = self.get_system_email_template_display()
+
+        return subject
+
 
 class EventOnlineNotification(AbstractEventNotificationWithRecipients):
     class Meta:

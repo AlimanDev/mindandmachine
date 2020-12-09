@@ -47,8 +47,8 @@ class EventTypeAdmin(admin.ModelAdmin):
 
 @admin.register(EventHistory)
 class EventHistoryAdmin(admin.ModelAdmin):
-    list_display = ('event_type', 'dttm_modified', 'network', 'user_author', 'context')
-    list_filter = ('network', 'event_type', 'user_author')
+    list_display = ('event_type', 'dttm_modified', 'shop', 'network', 'user_author', 'context')
+    list_filter = ('network', 'event_type', 'shop', 'user_author')
 
     def has_change_permission(self, request, obj=None):
         return False

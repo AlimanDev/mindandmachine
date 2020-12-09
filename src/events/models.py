@@ -20,6 +20,7 @@ class EventHistory(AbstractModel):
     network = models.ForeignKey('base.Network', null=True, blank=True, on_delete=models.SET_NULL)
     event_type = models.ForeignKey('events.EventType', on_delete=models.CASCADE)
     user_author = models.ForeignKey('base.User', null=True, blank=True, on_delete=models.SET_NULL)
+    shop = models.ForeignKey('base.Shop', null=True, blank=True, on_delete=models.SET_NULL)
     context = JSONField(default=dict)
 
     class Meta:

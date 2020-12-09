@@ -13,6 +13,7 @@ def write_event_history(sender, **kwargs):
             network_id=kwargs.get('network_id'),
             event_type=event_type,
             user_author_id=kwargs.get('user_author_id'),
+            shop_id=kwargs.get('shop_id'),
             context=kwargs.get('context', {}),
         )
 

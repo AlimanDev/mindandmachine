@@ -227,6 +227,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             network_id=request.user.network_id,
             event_code=REQUEST_APPROVE_EVENT_TYPE,
             user_author_id=request.user.id,
+            shop_id=serializer.data['shop_id'],
             context=event_context,
         ))
         return Response({})
@@ -397,12 +398,14 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                     )
 
         event_context = serializer.data.copy()
-        event_context['grouped_worker_dates'] = grouped_worker_dates
+        # TODO: добавлять ли дни в контекст?
+        # event_context['grouped_worker_dates'] = grouped_worker_dates
         transaction.on_commit(lambda: event_signal.send(
             sender=None,
             network_id=request.user.network_id,
             event_code=APPROVE_EVENT_TYPE,
             user_author_id=request.user.id,
+            shop_id=serializer.data['shop_id'],
             context=event_context,
         ))
 

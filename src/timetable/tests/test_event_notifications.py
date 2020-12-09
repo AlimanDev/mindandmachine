@@ -8,7 +8,7 @@ from rest_framework.test import APITestCase
 from src.base.models import FunctionGroup
 from src.base.tests.factories import ShopFactory, UserFactory, GroupFactory, EmploymentFactory
 from src.events.models import EventType
-from src.notifications.models import SmtpServerSettings, EventEmailNotification
+from src.notifications.models import EventEmailNotification
 from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE
 from src.util.mixins.tests import TestsHelperMixin
 

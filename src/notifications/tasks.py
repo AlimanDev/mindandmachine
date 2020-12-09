@@ -1,8 +1,8 @@
-from django.core.mail import send_mass_mail
-from django.template import Context
+from django.template import Template, Context
 
 from src.base.models import Shop
 from src.celery.celery import app
+from .helpers import send_mass_html_mail, textify
 from .models import (
     EventEmailNotification,
     EventOnlineNotification,
@@ -23,6 +23,8 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
         id=event_email_notification_id,
     )
     template = event_email_notification.get_email_template()
+    enrich_context(context)
+    subject = Template(event_email_notification.get_subject_template()).render(Context(context))
     datatuple = []
 
     for recipient in set(event_email_notification.get_recipients(user_author_id, context)):
@@ -30,10 +32,12 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
         if email:
             context = context.copy()
             context['recipient'] = recipient
+            message_content = template.render(Context(context))
             datatuple.append(
                 (
-                    event_email_notification.subject,
-                    template.render(Context(context)),
+                    subject,
+                    textify(message_content),
+                    message_content,
                     None,
                     [email]
                 )
@@ -42,16 +46,18 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
     if event_email_notification.email_addresses:
         emails = event_email_notification.email_addresses.split(',')
         for email in emails:
+            message_content = template.render(Context(context))
             datatuple.append(
                 (
-                    event_email_notification.subject,
-                    template.render(Context(context)),
+                    subject,
+                    textify(message_content),
+                    message_content,
                     None,
                     [email]
                 )
             )
 
-    send_mass_mail(datatuple=datatuple)
+    send_mass_html_mail(datatuple=datatuple)
 
 
 @app.task

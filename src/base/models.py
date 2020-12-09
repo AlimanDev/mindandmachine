@@ -228,10 +228,12 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
 
     def __str__(self):
-        return '{}, {}, {}'.format(
+        return '{}, {}, {}, {}'.format(
             self.name,
             self.parent_title(),
-            self.id)
+            self.id,
+            self.code,
+        )
 
     def system_step_in_minutes(self):
         return self.forecast_step_minutes.hour * 60 + self.forecast_step_minutes.minute
