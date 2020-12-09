@@ -454,6 +454,11 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=URV_STAT_SEND_TODAY_HOUR, minute=URV_STAT_SEND_TODAY_MINUTE),
         'options': {'queue': BACKEND_QUEUE}
     },
+    'task-delete-inactive-employment-group': {
+        'task': 'src.celery.tasks.delete_inactive_employment_groups',
+        'schedule': crontab(hour=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
 }
 
 if MDA_SYNC_USER_TO_SHOP_DAILY:
