@@ -1,7 +1,7 @@
-from django.conf import settings
-from django.core.mail import get_connection, send_mass_mail
+from django.core.mail import send_mass_mail
 from django.template import Context
 
+from src.base.models import Shop
 from src.celery.celery import app
 from .models import (
     EventEmailNotification,
@@ -10,17 +10,21 @@ from .models import (
 )
 
 
+def enrich_context(context):
+    if 'shop_id' in context:
+        context['shop'] = Shop.objects.filter(id=context['shop_id']).first()
+
+
 @app.task
 def send_event_email_notifications(event_email_notification_id: int, user_author_id: int, context: dict):
     event_email_notification = EventEmailNotification.objects.select_related(
-        'event_type', 'smtp_server_settings',
-    ).get(id=event_email_notification_id)
-    connection = get_connection(
-        backend=settings.EMAIL_BACKEND,
-        **event_email_notification.smtp_server_settings.get_smtp_server_settings()
+        'event_type',
+    ).get(
+        id=event_email_notification_id,
     )
     template = event_email_notification.get_email_template()
     datatuple = []
+
     for recipient in set(event_email_notification.get_recipients(user_author_id, context)):
         email = recipient.email
         if email:
@@ -35,7 +39,19 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
                 )
             )
 
-    send_mass_mail(datatuple=datatuple, connection=connection)
+    if event_email_notification.email_addresses:
+        emails = event_email_notification.email_addresses.split(',')
+        for email in emails:
+            datatuple.append(
+                (
+                    event_email_notification.subject,
+                    template.render(Context(context)),
+                    None,
+                    [email]
+                )
+            )
+
+    send_mass_mail(datatuple=datatuple)
 
 
 @app.task

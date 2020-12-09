@@ -29,7 +29,6 @@ class TestRequestApproveEventNotifications(TestsHelperMixin, APITestCase):
         cls.employment_urs = EmploymentFactory(
             user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
-        cls.smtp_settings = SmtpServerSettings.objects.create(email_host='127.0.0.1', email_port=1025)
         cls.request_approve_event = EventType.objects.get(code=REQUEST_APPROVE_EVENT_TYPE)
 
     def setUp(self):
@@ -42,7 +41,6 @@ class TestRequestApproveEventNotifications(TestsHelperMixin, APITestCase):
             shop_ancestors=True,
             system_email_template='notifications/email/request_approve.html',
             subject=subject,
-            smtp_server_settings=self.smtp_settings,
         )
         event_email_notification.shop_groups.add(self.group_urs)
         with mock.patch.object(transaction, 'on_commit', lambda t: t()):

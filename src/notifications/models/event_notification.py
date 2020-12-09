@@ -40,34 +40,12 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
     class Meta:
         abstract = True
 
-
-class EventEmailNotification(AbstractEventNotificationWithRecipients):
-    email_addresses = models.CharField(
-        max_length=256, null=True, blank=True, verbose_name='E-mail адреса получателей, через запятую')
-    smtp_server_settings = models.ForeignKey(
-        'notifications.SmtpServerSettings', on_delete=models.CASCADE, verbose_name='Настройки smtp-сервера'
-    )
-    system_email_template = models.CharField(
-        max_length=256, choices=SYSTEM_EMAIL_TEMPLATES, verbose_name='Системный E-mail шаблон', null=True, blank=True)
-    custom_email_template = models.TextField(verbose_name='Пользовательский E-mail шаблон', null=True, blank=True)
-    subject = models.CharField(max_length=256, verbose_name='Тема письма', null=True, blank=True)
-
-    class Meta:
-        verbose_name = 'Email оповещение о событиях'
-        verbose_name_plural = 'Email оповещения о событиях'
-
-    def clean(self):
-        if self.system_email_template and self.custom_email_template:
-            raise ValidationError(
-                'Нужно оставить что-то одно: "Системный E-mail шаблон" или "Пользовательский E-mail шаблон"'
-            )
-
-        if not (self.system_email_template or self.custom_email_template):
-            raise ValidationError(
-                'Необходимо выбрать "Системный E-mail шаблон", либо заполнить "Пользовательский E-mail шаблон"'
-            )
-
-    def get_recipients(self, user_author_id, context):
+    def get_recipients(self, user_author_id: int, context: dict):
+        """
+        :param user_author_id:
+        :param context:
+        :return: Список пользователей, которые должны получить оповещение
+        """
         recipients = []
         if self.get_recipients_from_event_type:
             event_cls = EventRegistryHolder.get_registry().get(self.event_type.code)
@@ -109,10 +87,31 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
                 ))
             )
 
-        if self.email_addresses:
-            recipients.extend(list(User.objects.filter(email__in=self.email_addresses.split(','))))
-
         return recipients
+
+
+class EventEmailNotification(AbstractEventNotificationWithRecipients):
+    email_addresses = models.CharField(
+        max_length=256, null=True, blank=True, verbose_name='E-mail адреса получателей, через запятую')
+    system_email_template = models.CharField(
+        max_length=256, choices=SYSTEM_EMAIL_TEMPLATES, verbose_name='Системный E-mail шаблон', null=True, blank=True)
+    custom_email_template = models.TextField(verbose_name='Пользовательский E-mail шаблон', null=True, blank=True)
+    subject = models.CharField(max_length=256, verbose_name='Тема письма', null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Email оповещение о событиях'
+        verbose_name_plural = 'Email оповещения о событиях'
+
+    def clean(self):
+        if self.system_email_template and self.custom_email_template:
+            raise ValidationError(
+                'Нельзя выбрать одновременно "Системный E-mail шаблон" и "Пользовательский E-mail шаблон"'
+            )
+
+        if not (self.system_email_template or self.custom_email_template):
+            raise ValidationError(
+                'Необходимо выбрать "Системный E-mail шаблон", либо заполнить "Пользовательский E-mail шаблон"'
+            )
 
     def get_email_template(self):
         if self.system_email_template:
