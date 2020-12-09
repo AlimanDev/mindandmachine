@@ -528,7 +528,7 @@ def apply_load_template_to_shops(load_template_id, dt_from, shop_id=None):
                 'timeserie_code': код операции,
                 'timeserie_action': ['count', 'sum'],
                 'timeserie_value': какое значение для агрегации использовать,
-                # 'timeserie_filters': словарь какие поля, какие значения должны иметь, # todo: круто бы добавить
+                'timeserie_filters': словарь, например: {"ВидОперации": "Продажа"}
             },
             ...
         ],
@@ -563,6 +563,7 @@ def aggregate_timeserie_value():
                 grouping_period = timeserie.get('grouping_period', 'h1')
                 update_gap = timeserie.get('update_gap', 3)
                 for aggregate in timeserie['aggregate']:
+                    aggr_filters = aggregate.get('timeserie_filters')
                     timeserie_action = aggregate.get('timeserie_action', 'sum')
                     dttm_for_update = (datetime.now() - timedelta(days=update_gap)).replace(hour=0, minute=0, second=0)
 
@@ -590,6 +591,10 @@ def aggregate_timeserie_value():
                         items = Receipt.objects.filter(shop=operation_type.shop, dttm__gte=dttm_for_update)
                         for item in items:
                             item.info = json.loads(item.info)
+
+                            # Пропускаем записи, которые не удовл. значениям в фильтре
+                            if aggr_filters and not all(item.info.get(k) == v for k, v in aggr_filters.items()):
+                                continue
                             items_list.append({
                                 'dttm': item.dttm,
                                 'value': float(item.info.get(aggregate['timeserie_value'], 0))  # fixme: то ли ошибку лучше кидать, то ли пропускать (0 ставить)

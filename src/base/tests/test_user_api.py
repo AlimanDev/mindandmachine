@@ -60,3 +60,12 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         resp = self.client.get(self.get_url('User-list'), data=params)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.json()), 2)
+
+    def test_distinct_users_with_employment_filters(self):
+        params = {
+            'employments__dt_from': Converter.convert_date(self.dt_now + timedelta(days=70)),
+            'employments__dt_to': Converter.convert_date(self.dt_now + timedelta(days=70)),
+        }
+        resp = self.client.get(self.get_url('User-list'), data=params)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.json()), 8)

@@ -113,7 +113,7 @@ class UserViewSet(BaseActiveNamedModelViewSet):
         user = self.request.user
         return User.objects.filter(
             network_id=user.network_id
-        )
+        ).distinct()
 
     def perform_create(self, serializer):
         if 'username' not in serializer.validated_data:
