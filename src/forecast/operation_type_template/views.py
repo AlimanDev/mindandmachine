@@ -14,7 +14,7 @@ class OperationTypeTemplateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OperationTypeTemplate
-        fields = ['id', 'load_template_id', 'operation_type_name_id', 'operation_type_name', 'tm_from', 'tm_to', 'forecast_step']
+        fields = ['id', 'load_template_id', 'operation_type_name_id', 'operation_type_name', 'tm_from', 'tm_to', 'forecast_step', 'const_value']
         validators = [
             UniqueTogetherValidator(
                 queryset=OperationTypeTemplate.objects.all(),

@@ -111,6 +111,7 @@ class OperationTypeTemplate(AbstractModel):
     tm_from = models.TimeField(null=True, blank=True)
     tm_to = models.TimeField(null=True, blank=True)
     forecast_step = models.DurationField(default=datetime.timedelta(hours=1))
+    const_value = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return 'id: {}, load_template: {}, operation_type_name: ({})'.format(
