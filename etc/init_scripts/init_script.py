@@ -171,10 +171,10 @@ class ServerConfig:
         celery_name = f'{name}_celery'
         celerybeat_name = f'{name}_celerybeat'
         uwsgi_name = f'{name}_uwsgi'
-        programs = [celery_name, celerybeat_name, uwsgi_name]
-        group_config = f'[group:{name}]\nprograms={",".join(programs)}\npriority=999'
+        programs = ','.join([celery_name, celerybeat_name, uwsgi_name])
+        group_config = f'[group:{name}]\nprograms={programs}\npriority=999'
         with open(f'/etc/supervisor/conf.d/{name}_group.conf', 'w') as f:
-            f.write('\n'.join(group_config))
+            f.write(group_config)
       
         with open('celery_template') as f:
             celery_conf = f.read()
