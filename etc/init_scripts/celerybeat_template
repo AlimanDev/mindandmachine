@@ -1,5 +1,4 @@
-[program:celerybeat]
-process_name = %s
+[program:%s]
 command      = /var/servers/%s/backend/env/bin/celery -A src.celery beat --loglevel=INFO
 directory    = /var/servers/%s/backend/qos
 user         = %s

@@ -1,5 +1,4 @@
-[program:celery]
-process_name = %s
+[program:%s]
 command      = /var/servers/%s/backend/env/bin/celery -A src.celery worker --loglevel=INFO -Q %s_queue
 directory    = /var/servers/%s/backend/qos/
 user         = %s

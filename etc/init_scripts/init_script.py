@@ -165,7 +165,33 @@ class ServerConfig:
         os.system('service nginx restart')
 
 
+    def edit_group_config(self, conf_name, proc_name):
+        if not os.path.exists(f'/etc/supervisor/conf.d/{conf_name}_group.conf'):
+            conf = f'[group:{conf_name}]\nprograms=\npriority=999'
+        else:
+            with open(f'/etc/supervisor/conf.d/{conf_name}.conf') as f:
+                conf = f.read()
+
+        conf = conf.split('\n')
+        for i, row in enumerate(conf):
+            if row.startswith('programs='):
+                programs = row.split('=')
+                if len(programs) == 1:
+                    programs = []
+                else:
+                    programs = programs[1].split(',')
+                programs.append(proc_name)
+                programs = ','.join(programs)
+                conf[i] = programs
+        with open(f'/etc/supervisor/conf.d/{conf_name}.conf', 'w') as f:
+            f.write('\n'.join(conf))
+
     def start_celery(self, name):
+        celery_name = f'{name}_celery'
+        celerybeat_name = f'{name}_celerybeat'
+        uwsgi_name = f'{name}_uwsgi'
+        
+      
         with open('celery_template') as f:
             celery_conf = f.read()
 
@@ -178,7 +204,7 @@ class ServerConfig:
         with open(f'/etc/supervisor/conf.d/{name}_celery.conf', 'w') as f:
             f.write(
                 celery_conf % (
-                    name, 
+                    celery_name, 
                     name,
                     name,
                     name,
@@ -190,7 +216,7 @@ class ServerConfig:
         with open(f'/etc/supervisor/conf.d/{name}_celerybeat.conf', 'w') as f:
             f.write(
                 celerybeat_conf % (
-                    name, 
+                    celerybeat_name, 
                     name,
                     name,
                     name,
@@ -202,7 +228,7 @@ class ServerConfig:
         with open(f'/etc/supervisor/conf.d/{name}_uwsgi.conf', 'w') as f:
             f.write(
                 uwsgi_conf % (
-                    name, 
+                    uwsgi_name, 
                     name,
                     name,
                     name,
@@ -212,6 +238,10 @@ class ServerConfig:
                     name,
                 )
             )
+        
+        self.edit_group_config('uwsgi', uwsgi_name)
+        self.edit_group_config('celery', celery_name)
+        self.edit_group_config('celerybeat', celerybeat_name)
 
         os.system('supervisorctl update')
 
