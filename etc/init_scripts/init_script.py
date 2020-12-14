@@ -157,6 +157,7 @@ class ServerConfig:
                 name,
                 name,
                 name,
+                name,
                 public_path,
                 secret_path,
                 name,
