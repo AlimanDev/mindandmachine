@@ -1,4 +1,5 @@
 [program:%s]
+process_name = %s
 environment     = PATH="/var/servers/%s/backend/env/bin"
 numprocs        = 1
 directory       = /var/servers/%s/backend/qos/

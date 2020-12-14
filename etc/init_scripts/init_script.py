@@ -211,12 +211,14 @@ class ServerConfig:
                     name,
                     name,
                     name,
+                    name,
                 )
             )
         with open(f'/etc/supervisor/conf.d/{name}_celerybeat.conf', 'w') as f:
             f.write(
                 celerybeat_conf % (
                     celerybeat_name, 
+                    name,
                     name,
                     name,
                     name,
@@ -229,6 +231,7 @@ class ServerConfig:
             f.write(
                 uwsgi_conf % (
                     uwsgi_name, 
+                    name,
                     name,
                     name,
                     name,
