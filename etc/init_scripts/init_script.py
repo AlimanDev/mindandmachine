@@ -28,6 +28,10 @@ class ServerConfig:
         os.system(f'rm /etc/supervisor/conf.d/{name}_celery.conf')
         os.system(f'rm /etc/supervisor/conf.d/{name}_celerybeat.conf')
         os.system(f'rm /etc/supervisor/conf.d/{name}_uwsgi.conf')
+        self.remove_from_group_config('uwsgi', f'{name}_uwsgi')
+        self.remove_from_group_config('celery', f'{name}_celery')
+        self.remove_from_group_config('celerybeat', f'{name}_celerybeat')
+        os.system('supervisorctl update')
         os.system(f'userdel {name}')
         os.system(f'sudo -u postgres psql -c "DROP DATABASE {name};"')
         os.system(f'sudo -u postgres psql -c "DROP ROLE {name};"')
@@ -39,10 +43,6 @@ class ServerConfig:
         os.system(f'rm /etc/nginx/sites-available/{name}-urv.conf')
         os.system(f'rm /etc/nginx/sites-enabled/{name}-urv.conf')
         os.system(f'service nginx restart')
-        self.remove_from_group_config('uwsgi', f'{name}_uwsgi')
-        self.remove_from_group_config('celery', f'{name}_celery')
-        self.remove_from_group_config('celerybeat', f'{name}_celerybeat')
-        os.system('supervisorctl update')
 
     def add_repos(self, name, branch, db_info):
         if not os.path.isdir(f'{self.PATH_PREFIX}/servers'):
@@ -204,6 +204,7 @@ class ServerConfig:
                     return
                 else:
                     programs = programs.split(',')
+                    print(f'programs in group: {programs}')
                 if proc_name in programs:
                     programs.pop(programs.index(proc_name))
                 else:
