@@ -28,9 +28,7 @@ class ServerConfig:
         os.system(f'rm /etc/supervisor/conf.d/{name}_celery.conf')
         os.system(f'rm /etc/supervisor/conf.d/{name}_celerybeat.conf')
         os.system(f'rm /etc/supervisor/conf.d/{name}_uwsgi.conf')
-        self.remove_from_group_config('uwsgi', f'{name}_uwsgi')
-        self.remove_from_group_config('celery', f'{name}_celery')
-        self.remove_from_group_config('celerybeat', f'{name}_celerybeat')
+        os.system(f'rm /etc/supervisor/conf.d/{name}_group.conf')
         os.system('supervisorctl update')
         os.system(f'userdel {name}')
         os.system(f'sudo -u postgres psql -c "DROP DATABASE {name};"')
@@ -169,57 +167,14 @@ class ServerConfig:
         os.system('service nginx restart')
 
 
-    def edit_group_config(self, conf_name, proc_name):
-        if not os.path.exists(f'/etc/supervisor/conf.d/{conf_name}_group.conf'):
-            conf = f'[group:{conf_name}]\nprograms=\npriority=999'
-        else:
-            with open(f'/etc/supervisor/conf.d/{conf_name}_group.conf') as f:
-                conf = f.read()
-
-        conf = conf.split('\n')
-        for i, row in enumerate(conf):
-            if row.startswith('programs='):
-                programs = row.split('=')[1]
-                if len(programs) == 0:
-                    programs = []
-                else:
-                    programs = programs.split(',')
-                programs.append(proc_name)
-                programs = ','.join(programs)
-                conf[i] = 'programs=' + programs
-        with open(f'/etc/supervisor/conf.d/{conf_name}_group.conf', 'w') as f:
-            f.write('\n'.join(conf))
-
-    def remove_from_group_config(self, conf_name, proc_name):
-        if not os.path.exists(f'/etc/supervisor/conf.d/{conf_name}_group.conf'):
-            return
-        else:
-            with open(f'/etc/supervisor/conf.d/{conf_name}_group.conf') as f:
-                conf = f.read()
-
-        conf = conf.split('\n')
-        for i, row in enumerate(conf):
-            if row.startswith('programs='):
-                programs = row.split('=')[1]
-                if len(programs) == 0:
-                    return
-                else:
-                    programs = programs.split(',')
-                    print(f'programs in group: {programs}')
-                if proc_name in programs:
-                    programs.pop(programs.index(proc_name))
-                else:
-                    return
-                programs = ','.join(programs)
-                conf[i] = 'programs=' + programs
-        with open(f'/etc/supervisor/conf.d/{conf_name}_group.conf', 'w') as f:
-            f.write('\n'.join(conf))
-
     def start_celery(self, name):
         celery_name = f'{name}_celery'
         celerybeat_name = f'{name}_celerybeat'
         uwsgi_name = f'{name}_uwsgi'
-        
+        programs = [celery_name, celerybeat_name, uwsgi_name]
+        group_config = f'[group:{conf_name}]\nprograms={",".join(programs)}\npriority=999'
+        with open(f'/etc/supervisor/conf.d/{name}_group.conf', 'w') as f:
+            f.write('\n'.join(group_config))
       
         with open('celery_template') as f:
             celery_conf = f.read()
@@ -240,14 +195,12 @@ class ServerConfig:
                     name,
                     name,
                     name,
-                    name,
                 )
             )
         with open(f'/etc/supervisor/conf.d/{name}_celerybeat.conf', 'w') as f:
             f.write(
                 celerybeat_conf % (
                     celerybeat_name, 
-                    name,
                     name,
                     name,
                     name,
@@ -260,7 +213,6 @@ class ServerConfig:
             f.write(
                 uwsgi_conf % (
                     uwsgi_name, 
-                    name,
                     name,
                     name,
                     name,
