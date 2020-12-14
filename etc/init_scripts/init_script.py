@@ -223,9 +223,6 @@ class ServerConfig:
                 )
             )
         
-        self.edit_group_config('uwsgi', uwsgi_name)
-        self.edit_group_config('celery', celery_name)
-        self.edit_group_config('celerybeat', celerybeat_name)
 
         os.system('supervisorctl update')
 
