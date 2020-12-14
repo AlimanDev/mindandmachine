@@ -175,15 +175,13 @@ class ServerConfig:
         conf = conf.split('\n')
         for i, row in enumerate(conf):
             if row.startswith('programs='):
-                programs = row.split('=')
-                if len(programs) == 1:
+                programs = row.split('=')[1]
+                if len(programs) == 0:
                     programs = []
                 else:
-                    programs = programs[1].split(',')
+                    programs = programs.split(',')
                 programs.append(proc_name)
-                print(programs)
                 programs = ','.join(programs)
-                print(programs)
                 conf[i] = 'programs=' + programs
         with open(f'/etc/supervisor/conf.d/{conf_name}.conf', 'w') as f:
             f.write('\n'.join(conf))
