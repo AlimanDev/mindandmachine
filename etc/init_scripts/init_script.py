@@ -172,7 +172,7 @@ class ServerConfig:
         if not os.path.exists(f'/etc/supervisor/conf.d/{conf_name}_group.conf'):
             conf = f'[group:{conf_name}]\nprograms=\npriority=999'
         else:
-            with open(f'/etc/supervisor/conf.d/{conf_name}.conf') as f:
+            with open(f'/etc/supervisor/conf.d/{conf_name}_group.conf') as f:
                 conf = f.read()
 
         conf = conf.split('\n')
@@ -186,14 +186,14 @@ class ServerConfig:
                 programs.append(proc_name)
                 programs = ','.join(programs)
                 conf[i] = 'programs=' + programs
-        with open(f'/etc/supervisor/conf.d/{conf_name}.conf', 'w') as f:
+        with open(f'/etc/supervisor/conf.d/{conf_name}_group.conf', 'w') as f:
             f.write('\n'.join(conf))
 
     def remove_from_group_config(self, conf_name, proc_name):
         if not os.path.exists(f'/etc/supervisor/conf.d/{conf_name}_group.conf'):
             return
         else:
-            with open(f'/etc/supervisor/conf.d/{conf_name}.conf') as f:
+            with open(f'/etc/supervisor/conf.d/{conf_name}_group.conf') as f:
                 conf = f.read()
 
         conf = conf.split('\n')
@@ -211,7 +211,7 @@ class ServerConfig:
                     return
                 programs = ','.join(programs)
                 conf[i] = 'programs=' + programs
-        with open(f'/etc/supervisor/conf.d/{conf_name}.conf', 'w') as f:
+        with open(f'/etc/supervisor/conf.d/{conf_name}_group.conf', 'w') as f:
             f.write('\n'.join(conf))
 
     def start_celery(self, name):
