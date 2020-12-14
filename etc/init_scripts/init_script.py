@@ -181,8 +181,10 @@ class ServerConfig:
                 else:
                     programs = programs[1].split(',')
                 programs.append(proc_name)
+                print(programs)
                 programs = ','.join(programs)
-                conf[i] = programs
+                print(programs)
+                conf[i] = 'programs=' + programs
         with open(f'/etc/supervisor/conf.d/{conf_name}.conf', 'w') as f:
             f.write('\n'.join(conf))
 
