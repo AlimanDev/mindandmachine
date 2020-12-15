@@ -395,9 +395,8 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
     shop = Shop.objects.get(id=shop_id)
     forecast_steps = {
         datetime.timedelta(hours=1): '1h',
-        datetime.timedelta(minutes=30): '30m',
+        datetime.timedelta(minutes=30): '30min',
         datetime.timedelta(days=1): '1d',
-        datetime.timedelta(minutes=1): '1m',
     }
     def get_times(times_shop, time_operation_type, t_from=True):
         if times_shop.get('all'):
@@ -483,10 +482,11 @@ def upload_load_template(template_file, form, lang='ru'):
     O_TYPE_COL = df.columns[0]
     DEPENDENCY_COL = df.columns[1]
     FORMULA_COL = df.columns[2]
-    TIMESTEP_COL = df.columns[3]
-    TM_START_COL = df.columns[4]
-    TM_END_COL = df.columns[5]
-    WORK_TYPE_COL = df.columns[6]
+    CONSTANT_COL = df.columns[3]
+    TIMESTEP_COL = df.columns[4]
+    TM_START_COL = df.columns[5]
+    TM_END_COL = df.columns[6]
+    WORK_TYPE_COL = df.columns[7]
     o_types_db_set = set(o_types.keys())
     undefined_o_types = set(df[O_TYPE_COL].dropna()).difference(o_types_db_set)
     if len(undefined_o_types):
@@ -495,9 +495,8 @@ def upload_load_template(template_file, form, lang='ru'):
     df = df.fillna('')
     forecast_steps = {
         '1h': datetime.timedelta(hours=1),
-        '30m': datetime.timedelta(minutes=30),
+        '30min': datetime.timedelta(minutes=30),
         '1d': datetime.timedelta(days=1),
-        '1m': datetime.timedelta(minutes=1),
     }
     templates = OperationTypeTemplate.objects.bulk_create(
         [
@@ -507,6 +506,7 @@ def upload_load_template(template_file, form, lang='ru'):
                 tm_from=row[TM_START_COL] or None,
                 tm_to=row[TM_END_COL] or None,
                 forecast_step=forecast_steps.get(row[TIMESTEP_COL]),
+                const_value=row[CONSTANT_COL] or None,
             )
             for i, row in df.iterrows()
             if not row[O_TYPE_COL] == ''
@@ -533,9 +533,8 @@ def upload_load_template(template_file, form, lang='ru'):
 def download_load_template(request, workbook, load_template_id):
     forecast_steps = {
         datetime.timedelta(hours=1): '1h',
-        datetime.timedelta(minutes=30): '30m',
+        datetime.timedelta(minutes=30): '30min',
         datetime.timedelta(days=1): '1d',
-        datetime.timedelta(minutes=1): '1m',
     }
     relations = {}
     for rel in OperationTypeRelation.objects.filter(
@@ -554,6 +553,7 @@ def download_load_template(request, workbook, load_template_id):
             'work_type_name': o.operation_type_name.work_type_name.name if o.operation_type_name.work_type_name else '',
             'tm_from': o.tm_from or '',
             'tm_to': o.tm_to or '',
+            'const_value': o.const_value or '',
             'forecast_step': forecast_steps.get(o.forecast_step),
             'dependences': relations.get(o.operation_type_name_id, [])
         }
@@ -564,19 +564,21 @@ def download_load_template(request, workbook, load_template_id):
     worksheet.write(0, 0, 'Тип операции')
     worksheet.write(0, 1, 'Зависимости')
     worksheet.write(0, 2, 'Формула')
-    worksheet.write(0, 3, 'Шаг прогноза')
-    worksheet.write(0, 4, 'Время начала')
-    worksheet.write(0, 5, 'Время окончания')
-    worksheet.write(0, 6, 'Тип работ')
+    worksheet.write(0, 3, 'Константа')
+    worksheet.write(0, 4, 'Шаг прогноза')
+    worksheet.write(0, 5, 'Время начала')
+    worksheet.write(0, 6, 'Время окончания')
+    worksheet.write(0, 7, 'Тип работ')
     index = 0
     data = []
     for ot in operation_types:
         index += 1
         worksheet.write(index, 0, ot['operation_type_name'])
-        worksheet.write(index, 3, ot['forecast_step'])
-        worksheet.write(index, 4, str(ot['tm_from']))
-        worksheet.write(index, 5, str(ot['tm_to']))
-        worksheet.write(index, 6, ot['work_type_name'])
+        worksheet.write(index, 3, ot['const_value'])
+        worksheet.write(index, 4, ot['forecast_step'])
+        worksheet.write(index, 5, str(ot['tm_from']))
+        worksheet.write(index, 6, str(ot['tm_to']))
+        worksheet.write(index, 7, ot['work_type_name'])
         if len(ot['dependences']):
             index -= 1
             for dependency in ot['dependences']:
