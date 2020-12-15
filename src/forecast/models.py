@@ -134,8 +134,8 @@ class OperationTypeRelation(AbstractModel):
         (TYPE_PREDICTION, 'Прогнозирование'),
     ]
 
-    base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends')
-    depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases')
+    base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends') # child
+    depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases') # parent
     formula = models.CharField(max_length=256)
     type = models.CharField(max_length=1, default=TYPE_FORMULA)
 

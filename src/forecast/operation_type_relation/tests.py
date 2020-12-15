@@ -115,7 +115,8 @@ class TestOperationTypeRelation(APITestCase):
                 },
                 'tm_from': None,
                 'tm_to': None,
-                'forecast_step': '01:00:00'
+                'forecast_step': '01:00:00',
+                'const_value': None,
             }, 
             'depended': {
                 'id': self.operation_type_template2.id, 
@@ -129,7 +130,8 @@ class TestOperationTypeRelation(APITestCase):
                 },
                 'tm_from': None,
                 'tm_to': None,
-                'forecast_step': '01:00:00'
+                'forecast_step': '01:00:00',
+                'const_value': None,
             }, 
             'formula': 'a * 2',
             'type': 'F'
@@ -170,7 +172,8 @@ class TestOperationTypeRelation(APITestCase):
                 },
                 'tm_from': None,
                 'tm_to': None,
-                'forecast_step': '01:00:00'
+                'forecast_step': '01:00:00',
+                'const_value': None,
             }, 
             'depended': {
                 'id': op_temp2.id, 
@@ -184,7 +187,8 @@ class TestOperationTypeRelation(APITestCase):
                 },
                 'tm_from': None,
                 'tm_to': None,
-                'forecast_step': '01:00:00'
+                'forecast_step': '01:00:00',
+                'const_value': None,
             }, 
             'formula': 'a + a * 2',
             'type': 'F'
@@ -233,3 +237,45 @@ class TestOperationTypeRelation(APITestCase):
             OperationType.UPDATED,
         )
     
+    def test_const_cant_be_base(self):
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+            const_value=1.0,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name2,
+        )
+        data = {
+            'base_id': op_temp1.id,
+            'depended_id': op_temp2.id,
+            'formula': 'a + a * 2'
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.json(),{'base': "Constant operation can't be base."})
+
+
+    def test_bad_steps(self):
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name2,
+            forecast_step=timedelta(minutes=30),
+        )
+        data = {
+            'base_id': op_temp1.id,
+            'depended_id': op_temp2.id,
+            'formula': 'a + a * 2'
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.json(), {'non_field_errors': 'Depended must have same or bigger forecast step, got 0:30:00 -> 1:00:00'})
