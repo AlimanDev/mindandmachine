@@ -86,7 +86,8 @@ class TestOperationTypeTemplate(APITestCase):
             },
             'tm_from': None,
             'tm_to': None,
-            'forecast_step': '01:00:00'
+            'forecast_step': '01:00:00',
+            'const_value': None,
         }
         self.assertEqual(response.json(), data)
 
@@ -110,7 +111,8 @@ class TestOperationTypeTemplate(APITestCase):
             },
             'tm_from': None,
             'tm_to': None,
-            'forecast_step': '01:00:00'
+            'forecast_step': '01:00:00',
+            'const_value': None,
         }
         self.assertEqual(operation_type_template, data)
 
@@ -134,7 +136,8 @@ class TestOperationTypeTemplate(APITestCase):
             },
             'tm_from': None,
             'tm_to': None,
-            'forecast_step': '00:30:00'
+            'forecast_step': '00:30:00',
+            'const_value': None,
         }
         self.assertEqual(operation_type_template, data)
 
@@ -142,3 +145,61 @@ class TestOperationTypeTemplate(APITestCase):
         response = self.client.delete(f'{self.url}{self.operation_type_template1.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
     
+
+    def test_cant_change_forecast_step(self):
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name2,
+        )
+        OperationTypeRelation.objects.create(
+            base=op_temp1,
+            depended=op_temp2,
+            formula='lambda a: a * 2 + a',
+        )
+        data = {
+            'load_template_id': load_template.id,
+            'operation_type_name_id': self.operation_type_name1.id,
+            'forecast_step': '1 00:00:00'
+        }
+        response = self.client.put(f'{self.url}{op_temp1.id}/', data, format='json')
+        self.assertEqual(response.json(), {'non_field_errors': 'This operation type depends on operations with less forecast steps.'})
+        data = {
+            'load_template_id': load_template.id,
+            'operation_type_name_id': self.operation_type_name2.id,
+            'forecast_step': '00:30:00'
+        }
+        response = self.client.put(f'{self.url}{op_temp2.id}/', data, format='json')
+        self.assertEqual(response.json(), {'non_field_errors': 'This operation type is dependency of operations with bigger forecast steps.'})
+
+
+    def test_cant_set_const(self):
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name2,
+        )
+        OperationTypeRelation.objects.create(
+            base=op_temp1,
+            depended=op_temp2,
+            formula='lambda a: a * 2 + a',
+        )
+        data = {
+            'load_template_id': load_template.id,
+            'operation_type_name_id': self.operation_type_name1.id,
+            'const_value': 1.0,
+        }
+        response = self.client.put(f'{self.url}{op_temp1.id}/', data, format='json')
+        self.assertEqual(response.json(), {'non_field_errors': 'You cant set constant value because this operation has depndences.'})

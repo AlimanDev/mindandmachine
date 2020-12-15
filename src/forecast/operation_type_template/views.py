@@ -16,6 +16,7 @@ class OperationTypeTemplateSerializer(serializers.ModelSerializer):
     default_error_messages = {
         "bad_steps_base": _("This operation type depends on operations with less forecast steps."),
         "bad_steps_depended": _("This operation type is dependency of operations with bigger forecast steps."),
+        "cant_set_constant": _("You cant set constant value because this operation has depndences."),
     }
 
     operation_type_name = OperationTypeNameSerializer(read_only=True)
@@ -33,6 +34,9 @@ class OperationTypeTemplateSerializer(serializers.ModelSerializer):
         ]
 
     def update(self, instance, validated_data):
+        const_value = validated_data.get('const_value')
+        if const_value and instance.depends.exists():
+            raise FieldError(self.error_messages["cant_set_constant"])
         new_timestep = validated_data.get('forecast_step')
         impossible_dependences = []
         impossible_bases = []

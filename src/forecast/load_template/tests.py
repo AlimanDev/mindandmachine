@@ -13,6 +13,7 @@ from src.forecast.models import (
     OperationTypeRelation,
     PeriodClients,
 )
+from src.forecast.load_template.utils import prepare_load_template_request
 from src.timetable.models import WorkTypeName, WorkType
 
 
@@ -91,7 +92,8 @@ class TestLoadTemplate(APITestCase):
                     },
                     'tm_from': None, 
                     'tm_to': None, 
-                    'forecast_step': '01:00:00'
+                    'forecast_step': '01:00:00',
+                    'const_value': None,
                 }, 
                 {
                     'id': self.operation_type_template2.id, 
@@ -105,7 +107,8 @@ class TestLoadTemplate(APITestCase):
                     },
                     'tm_from': None, 
                     'tm_to': None, 
-                    'forecast_step': '01:00:00'
+                    'forecast_step': '01:00:00',
+                    'const_value': None,
                 }
             ]
         }
@@ -143,7 +146,8 @@ class TestLoadTemplate(APITestCase):
                 },
                 'tm_from': None, 
                 'tm_to': None, 
-                'forecast_step': '01:00:00'
+                'forecast_step': '01:00:00',
+                'const_value': None,
             }, 
             {
                 'id': self.operation_type_template2.id, 
@@ -157,58 +161,58 @@ class TestLoadTemplate(APITestCase):
                 },
                 'tm_from': None, 
                 'tm_to': None, 
-                'forecast_step': '01:00:00'
+                'forecast_step': '01:00:00',
+                'const_value': None,
             }
         ]
         self.assertEqual(load_template, data)
 
     def test_apply_template(self):
-        data = {
-            'id': self.load_template.id,
-            'shop_id': self.shop.id,
-        }
-        response = self.client.post(f'{self.url}apply/', data, format='json')
-        self.assertEqual(response.status_code, 200)
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            data = {
+                'id': self.load_template.id,
+                'shop_id': self.shop.id,
+            }
+            response = self.client.post(f'{self.url}apply/', data, format='json')
+            self.assertEqual(response.status_code, 200)
 
-        self.assertEqual(OperationType.objects.filter(shop=self.shop).count(), 2)
-        self.assertEqual(WorkType.objects.filter(shop=self.shop).count(), 1)
+            self.assertEqual(OperationType.objects.filter(shop=self.shop).count(), 2)
+            self.assertEqual(WorkType.objects.filter(shop=self.shop).count(), 1)
 
-    @skip('Функционал будет перенесён на алгоритмы')
-    def test_calculate(self):
-        self.shop.forecast_step_minutes = time(1)
-        self.shop.save()
-        OperationTypeRelation.objects.create(
-            base=self.operation_type_template1,
-            depended=self.operation_type_template2,
-            formula='lambda a: a * 2 + a',
-        )
-        dt_now = datetime.now().date()
-        data = {
-            'id': self.load_template.id,
-            'shop_id': self.shop.id,
-            'dt_from': dt_now,
-            'dt_to': dt_now + timedelta(days=1)
-        }
-        self.client.post(f'{self.url}apply/', data, format='json')
 
-        operation_type = OperationType.objects.get(shop=self.shop, operation_type_name=self.operation_type_name2)
+    def test_prepare_load_template_request(self):
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            OperationTypeRelation.objects.create(
+                base=self.operation_type_template1,
+                depended=self.operation_type_template2,
+                formula='lambda a: a * 2 + a',
+            )
+            dt_now = datetime.now().date()
+            data = {
+                'id': self.load_template.id,
+                'shop_id': self.shop.id,
+                'dt_from': dt_now,
+                'dt_to': dt_now + timedelta(days=1)
+            }
+            self.client.post(f'{self.url}apply/', data, format='json')
 
-        for day in range(2):
-            dt = dt_now + timedelta(days=day)
-            for tm in range(24):
-                PeriodClients.objects.create(
-                    dttm_forecast=datetime.combine(dt, time(tm)),
-                    value=2.0,
-                    operation_type=operation_type,
-                )
-        response = self.client.post(f'{self.url}calculate/', data, format='json')
-        
-        self.assertEqual(response.status_code, 200)
-        operation_type = OperationType.objects.get(shop=self.shop, operation_type_name=self.operation_type_name1)
-        period_clients = PeriodClients.objects.filter(operation_type=operation_type).first()
-        self.assertEqual(period_clients.value, 6.0)
-        self.assertEqual(PeriodClients.objects.filter(operation_type=operation_type).count(), 48)
-        self.assertEqual(operation_type.status, OperationType.READY)
+            operation_type = OperationType.objects.get(shop=self.shop, operation_type_name=self.operation_type_name2)
+
+            for day in range(2):
+                dt = dt_now + timedelta(days=day)
+                for tm in range(24):
+                    PeriodClients.objects.create(
+                        dttm_forecast=datetime.combine(dt, time(tm)),
+                        value=2.0,
+                        operation_type=operation_type,
+                        type=PeriodClients.FACT_TYPE,
+                    )
+            request = prepare_load_template_request(self.load_template.id, self.shop.id, dt_from=dt_now, dt_to=dt_now + timedelta(days=1))
+            self.assertEqual(len(request['timeserie'][str(self.operation_type_name2.id)]), 48)
+            self.assertEqual(len(request['operation_types']), 2)
+            self.assertEqual(len(request['operation_types'][0]['dependences']), 1)
+            self.assertEqual(len(request['operation_types'][1]['dependences']), 0)            
+
     @skip('А нужен ли этот функционал?')
     def test_create_from_shop(self):
         data = {
