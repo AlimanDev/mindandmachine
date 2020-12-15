@@ -44,10 +44,10 @@ class OperationTypeTemplateSerializer(serializers.ModelSerializer):
         elif new_timestep == timedelta(minutes=30):
             impossible_bases = [timedelta(days=1),timedelta(hours=1)]
 
-        dependences = instance.depends.filter(forecast_step__in=impossible_dependences).exists()
+        dependences = instance.depends.filter(depended__forecast_step__in=impossible_dependences).exists()
         if dependences:
             raise FieldError(self.error_messages["bad_steps_base"])
-        bases = instance.bases.filter(forecast_step__in=impossible_bases).exists()
+        bases = instance.bases.filter(base__forecast_step__in=impossible_bases).exists()
         if bases:
             raise FieldError(self.error_messages["bad_steps_depended"])
         return super().update(instance, validated_data)
