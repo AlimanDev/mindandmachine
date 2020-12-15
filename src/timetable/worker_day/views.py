@@ -308,7 +308,10 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 id__in=wdays_to_approve.values_list('id', flat=True)
             ).delete()
             list_wd = list(
-                wdays_to_approve.select_related(
+                wdays_to_approve.exclude(
+                    is_vacancy=True,
+                    type='W',
+                ).select_related(
                     'shop', 
                     'employment', 
                     'employment__position', 
