@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from src.base.models import FunctionGroup
-from src.base.tests.factories import ShopFactory, UserFactory, GroupFactory, EmploymentFactory
+from src.base.tests.factories import ShopFactory, UserFactory, GroupFactory, EmploymentFactory, NetworkFactory
 from src.events.models import EventType
 from src.notifications.models import EventEmailNotification
 from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE
@@ -19,23 +19,26 @@ from src.util.mixins.tests import TestsHelperMixin
 class TestRequestApproveEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.root_shop = ShopFactory()
+        cls.network = NetworkFactory()
+        cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
             name='SHOP_NAME',
+            network=cls.network,
         )
-        cls.user_dir = UserFactory(email='dir@example.com')
-        cls.user_urs = UserFactory(email='urs@example.com')
-        cls.group_dir = GroupFactory(name='Директор')
+        cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
+        cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.group_dir = GroupFactory(name='Директор', network=cls.network)
         FunctionGroup.objects.create(group=cls.group_dir, func='WorkerDay_request_approve', method='POST')
-        cls.group_urs = GroupFactory(name='УРС')
+        cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir,
+            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs,
+            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
         )
-        cls.request_approve_event = EventType.objects.get(code=REQUEST_APPROVE_EVENT_TYPE)
+        cls.request_approve_event, _created = EventType.objects.get_or_create(
+            code=REQUEST_APPROVE_EVENT_TYPE, network=cls.network)
 
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
@@ -60,14 +63,15 @@ class TestRequestApproveEventNotifications(TestsHelperMixin, APITestCase):
 class TestApproveEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.root_shop = ShopFactory()
-        cls.shop = ShopFactory(parent=cls.root_shop)
-        cls.user_worker = UserFactory(email='worker@example.com')
-        cls.user_dir = UserFactory(email='dir@example.com')
-        cls.user_urs = UserFactory(email='urs@example.com')
-        cls.group_worker = GroupFactory(name='Сотрудник')
-        cls.group_dir = GroupFactory(name='Директор')
-        cls.group_urs = GroupFactory(name='УРС')
+        cls.network = NetworkFactory()
+        cls.root_shop = ShopFactory(network=cls.network)
+        cls.shop = ShopFactory(parent=cls.root_shop, network=cls.network)
+        cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
+        cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
+        cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
+        cls.group_dir = GroupFactory(name='Директор', network=cls.network)
+        cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         FunctionGroup.objects.create(group=cls.group_urs, func='WorkerDay_approve', method='POST')
         GroupWorkerDayPermission.objects.create(
             group=cls.group_urs,
@@ -78,15 +82,15 @@ class TestApproveEventNotifications(TestsHelperMixin, APITestCase):
             ),
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker,
+            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
         )
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir,
+            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs,
+            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
         )
-        cls.approve_event_type = EventType.objects.get(code=APPROVE_EVENT_TYPE)
+        cls.approve_event_type, _created = EventType.objects.get_or_create(code=APPROVE_EVENT_TYPE, network=cls.network)
         cls.dt = datetime.now().date()
         cls.plan_not_approved = WorkerDayFactory(
             is_approved=False,

@@ -72,7 +72,10 @@ def send_webhook_notifications(webhook_notification_id, user_author_id, context)
 
 @app.task
 def send_notifications_task(**kwargs):
-    event_email_notifications = EventEmailNotification.objects.filter(event_type__code=kwargs.get('event_code'))
+    event_email_notifications = EventEmailNotification.objects.filter(
+        event_type__code=kwargs.get('event_code'),
+        event_type__network_id=kwargs.get('network_id'),
+    )
 
     for event_email_notification in event_email_notifications:
         send_event_email_notifications.delay(
@@ -81,7 +84,10 @@ def send_notifications_task(**kwargs):
             context=kwargs.get('context'),
         )
 
-    online_notifications = EventOnlineNotification.objects.filter(event_type__code=kwargs.get('event_code'))
+    online_notifications = EventOnlineNotification.objects.filter(
+        event_type__code=kwargs.get('event_code'),
+        event_type__network_id=kwargs.get('network_id'),
+    )
     for online_notification in online_notifications:
         send_online_notifications.delay(
             online_notification_id=online_notification.id,
@@ -89,7 +95,10 @@ def send_notifications_task(**kwargs):
             context=kwargs.get('context'),
         )
 
-    webhook_notifications = EventWebhookNotification.objects.filter(event_type__code=kwargs.get('event_code'))
+    webhook_notifications = EventWebhookNotification.objects.filter(
+        event_type__code=kwargs.get('event_code'),
+        event_type__network_id=kwargs.get('network_id'),
+    )
     for webhook_notification in webhook_notifications:
         send_webhook_notifications.delay(
             webhook_notification_id=webhook_notification.id,

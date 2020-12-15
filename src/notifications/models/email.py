@@ -1,9 +1,9 @@
 from django.db import models
 
-from src.base.models_abstract import AbstractActiveNamedModel
+from src.base.models_abstract import AbstractActiveNetworkSpecificCodeNamedModel
 
 
-class SmtpServerSettings(AbstractActiveNamedModel):
+class SmtpServerSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     email_default_from = models.CharField(verbose_name='from:', max_length=100, null=True, blank=True)
     email_host = models.CharField(verbose_name='Хост', max_length=100, null=True, blank=True)
     email_port = models.IntegerField(verbose_name='Порт', null=True, blank=True)
