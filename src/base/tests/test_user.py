@@ -1,11 +1,11 @@
-from datetime import timedelta, date, datetime, time
+from datetime import timedelta, date
 
-from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from src.base.models import User, WorkerPosition, Employment
+from src.base.models import WorkerPosition, Employment
 from src.timetable.models import WorkTypeName, WorkType, EmploymentWorkType, WorkerDay
 from src.util.mixins.tests import TestsHelperMixin
+
 
 class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     @classmethod
@@ -66,7 +66,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
-
     def test_shop_id__in_filter(self):
         response = self.client.get(
             self.url,
@@ -80,7 +79,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             self.url + f'?shop_id__in={self.root_shop.id},{self.shop.id}',
         )
         self.assertEqual(len(response.json()), 6)
-
 
     def test_position_id__in_filter(self):
         response = self.client.get(
@@ -96,7 +94,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(len(response.json()), 7)
 
-
     def test_work_type_id__in_filter(self):
         response = self.client.get(
             self.url,
@@ -110,7 +107,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             self.url + f'?work_type_id__in={self.wt_name.id},{self.wt_name2.id}',
         )
         self.assertEqual(len(response.json()), 7)
-
 
     def test_worker_day__in_filter(self):
         response = self.client.get(
