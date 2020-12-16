@@ -136,7 +136,7 @@ class OperationTypeRelation(AbstractModel):
 
     base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends') # child
     depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases') # parent
-    formula = models.CharField(max_length=256)
+    formula = models.CharField(max_length=512)
     type = models.CharField(max_length=1, default=TYPE_FORMULA)
 
     def __str__(self):
