@@ -226,6 +226,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     latitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Широта')
     longitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Долгота')
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
+    tracker = FieldTracker(fields=['load_template'])
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -307,19 +308,11 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         self.tm_close_dict = self.clean_time_dict(self.close_times)
         if hasattr(self, 'parent_code'):
             self.parent = get_object_or_404(Shop, code=self.parent_code)
-        load_template = None
-        if self.load_template_id and self.id:
-            new_template = self.load_template_id
-            self.refresh_from_db(fields=['load_template_id'])
-            load_template = self.load_template_id
-            self.load_template_id = new_template
+        load_template_changed = self.tracker.has_changed('load_template')
         super().save(*args, **kwargs)
-        if False: # self.load_template_id:  # aa: todo: fixme: delete tmp False
+        if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
-            if load_template != None and load_template != new_template:
-                apply_load_template(new_template, self.id)
-            elif load_template == None:
-                apply_load_template(self.load_template_id, self.id)
+            apply_load_template(self.load_template_id, self.id)
 
     def get_exchange_settings(self):
         return self.exchange_settings if self.exchange_settings_id \

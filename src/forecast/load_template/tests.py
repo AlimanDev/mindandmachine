@@ -274,3 +274,10 @@ class TestLoadTemplate(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     
+    def test_apply_template_to_shop_on_load_template_change(self):
+        self.assertEqual(OperationType.objects.filter(shop=self.shop).count(), 0)
+        self.assertEqual(WorkType.objects.filter(shop=self.shop).count(), 0)
+        self.shop.load_template = self.load_template
+        self.shop.save()
+        self.assertEqual(OperationType.objects.filter(shop=self.shop).count(), 2)
+        self.assertEqual(WorkType.objects.filter(shop=self.shop).count(), 1)

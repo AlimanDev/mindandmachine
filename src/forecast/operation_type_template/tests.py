@@ -169,14 +169,14 @@ class TestOperationTypeTemplate(APITestCase):
             'forecast_step': '1 00:00:00'
         }
         response = self.client.put(f'{self.url}{op_temp1.id}/', data, format='json')
-        self.assertEqual(response.json(), {'non_field_errors': 'This operation type depends on operations with less forecast steps.'})
+        self.assertEqual(response.json(), {'non_field_errors': 'Этот тип операции зависит от операций с меньшим шагом прогноза.'})
         data = {
             'load_template_id': load_template.id,
             'operation_type_name_id': self.operation_type_name2.id,
             'forecast_step': '00:30:00'
         }
         response = self.client.put(f'{self.url}{op_temp2.id}/', data, format='json')
-        self.assertEqual(response.json(), {'non_field_errors': 'This operation type is dependency of operations with bigger forecast steps.'})
+        self.assertEqual(response.json(), {'non_field_errors': 'От этого типа операций зависят операции с большим шагом прогноза.'})
 
 
     def test_cant_set_const(self):
@@ -202,4 +202,4 @@ class TestOperationTypeTemplate(APITestCase):
             'const_value': 1.0,
         }
         response = self.client.put(f'{self.url}{op_temp1.id}/', data, format='json')
-        self.assertEqual(response.json(), {'non_field_errors': 'You cant set constant value because this operation has depndences.'})
+        self.assertEqual(response.json(), {'non_field_errors': 'Вы не можете указать постоянное значение, так как у данной операции есть зависимости.'})
