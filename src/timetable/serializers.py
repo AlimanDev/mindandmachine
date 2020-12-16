@@ -385,12 +385,22 @@ class VacancySerializer(serializers.Serializer):
 
 
 class AutoSettingsSerializer(serializers.Serializer):
+    default_error_messages = {
+        'check_dates': _('Date start should be less then date end'),
+    }
+
     shop_id = serializers.IntegerField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
     is_remaking = serializers.BooleanField(default=False)
     use_not_approved = serializers.BooleanField(default=False)
     delete_created_by = serializers.BooleanField(default=False)
+
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+
+        if self.validated_data.get('dt_from') > self.validated_data.get('dt_to'):
+            raise self.fail('check_dates')
 
 
 class ListChangeSrializer(serializers.Serializer):
