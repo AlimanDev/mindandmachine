@@ -435,6 +435,9 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             relations[key] = {}
         rel['formula'] = f'lambda a: {rel["formula"]}'
         relations[key][str(rel.get('depended_name'))] = rel
+
+    templates = list(OperationTypeTemplate.objects.select_related('operation_type_name').filter(load_template_id=load_template_id))
+    
     data['operation_types'] = [
         {
             'operation_type_name': o.operation_type_name_id,
@@ -445,8 +448,9 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             'dependences': relations.get(o.operation_type_name_id, {}),
             'const_value': o.const_value,
         }
-        for o in OperationTypeTemplate.objects.select_related('operation_type_name').filter(load_template_id=load_template_id)
+        for o in templates
     ]
+    templates = {str(o.id): o for o in templates}
     timeseries = {}
     values = list(PeriodClients.objects.select_related('operation_type').filter(
         operation_type__shop_id=shop_id,
@@ -458,13 +462,23 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
     for timeserie in values:
         key = str(timeserie.operation_type.operation_type_name_id)
         if not key in timeseries:
-            timeseries[key] = []
-        timeseries[key].append(
+            timeseries[key] = {}
+        second_key = timeserie.dttm_forecast.replace(hour=0, minute=0, second=0)
+        if templates[key].forecast_step == datetime.timedelta(hours=1):
+            second_key = timeserie.dttm_forecast.replace(minute=0, second=0)
+        elif templates[key].forecast_step == datetime.timedelta(minutes=30):
+            second_key = timeserie.dttm_forecast.replace(minute=30, second=0) if timeserie.dttm_forecast.minute >= 30 else timeserie.dttm_forecast.replace(minute=0, second=0)
+        timeseries[key][second_key] = timeseries[key].get(second_key, 0) + timeserie.value
+    timeseries = {
+        o_type: [
             {
-                'value': timeserie.value,
-                'dttm': timeserie.dttm_forecast,
+                'value': value,
+                'dttm': dttm,
             }
-        )
+            for dttm, value in values.items()
+        ]
+        for o_type, values in timeseries.items()
+    }
     data['timeserie'] = timeseries
     for o_type in data['operation_types']:
         if str(o_type['operation_type_name']) in timeseries.keys():
