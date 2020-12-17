@@ -12,162 +12,260 @@ import sys
 import json
 import uuid
 import argparse
+import random
+import re
 
 
 class ServerConfig:
-    DJANGO_POSSIBLE_PIDS = list(range(8000, 8200))
     PATH_PREFIX = '/var'
-    SERVERS_CONFIG_PATH = f'{PATH_PREFIX}/multi_server/multi_server/servers.json'
 
     def __init__(self):
-        f = open(self.SERVERS_CONFIG_PATH)  # todo: add lock until process finished
-        self.servers = json.load(f)
-        f.close()
         self.timetable_port = '5000'
+        self.secret_key = str(uuid.uuid4()).replace('-', '') + str(uuid.uuid4()).replace('-', '')
+        
 
-    def add_repos(self, name, self_port, db_info):
+    def remove_changes(self, name):
+        os.system(f'rm /etc/supervisor/conf.d/{name}_celery.conf')
+        os.system(f'rm /etc/supervisor/conf.d/{name}_celerybeat.conf')
+        os.system(f'rm /etc/supervisor/conf.d/{name}_uwsgi.conf')
+        os.system('supervisorctl update')
+        os.system(f'userdel {name}')
+        os.system(f'sudo -u postgres psql -c "DROP DATABASE {name};"')
+        os.system(f'sudo -u postgres psql -c "DROP ROLE {name};"')
+        os.system(f'rm -r {self.PATH_PREFIX}/servers/{name}')
+        os.system(f'rm -r {self.PATH_PREFIX}/www/servers/{name}')
+        os.system(f'rm -r {self.PATH_PREFIX}/log/servers/{name}')
+        os.system(f'rm /etc/nginx/sites-available/{name}.conf')
+        os.system(f'rm /etc/nginx/sites-enabled/{name}.conf')
+        os.system(f'rm /etc/nginx/sites-available/{name}-urv.conf')
+        os.system(f'rm /etc/nginx/sites-enabled/{name}-urv.conf')
+        os.system(f'service nginx restart')
+
+    def add_repos(self, name, branch, db_info):
+        if not os.path.isdir(f'{self.PATH_PREFIX}/servers'):
+            os.system(f'mkdir -p {self.PATH_PREFIX}/servers')
+
+        if not os.path.isdir(f'{self.PATH_PREFIX}/www/servers'):
+            os.system(f'mkdir -p {self.PATH_PREFIX}/www/servers')
+        
+        with open('/etc/group') as f:
+            if re.search(r'\bwfm:', f.read()) is None:
+                os.system('groupadd wfm')
+
         # нужно чтобы бд c таким именем уже была
         # local config
-        f = open('djconfig_local_template')
-        local = f.read()
-        f.close()
+        with open('djconfig_local_template') as f:
+            local = f.read()
 
         # uwsgi
-        f = open('uwsgi_template')
-        uwsgi = f.read()
-        f.close()
+        with open('uwsgi_template') as f:
+            uwsgi = f.read()
 
         curr_path = os.getcwd()
-        #
+
         # # добавим репозитории
         os.mkdir(f'{self.PATH_PREFIX}/servers/{name}')
         # frontend
         os.mkdir(f'{self.PATH_PREFIX}/servers/{name}/frontend')
         os.mkdir(f'{self.PATH_PREFIX}/www/servers/{name}/')
         os.mkdir(f'{self.PATH_PREFIX}/www/servers/{name}/frontend')
-        os.system(f'git clone https://github.com/alexanderaleskin/QoS_frontend.git {self.PATH_PREFIX}/servers/{name}/frontend/qos')
-        os.chdir(f'{self.PATH_PREFIX}/servers/{name}/frontend/qos')
-        os.system(f'git checkout {name}')
+        os.mkdir(f'{self.PATH_PREFIX}/www/servers/{name}/frontend/dist')
+        os.mkdir(f'{self.PATH_PREFIX}/www/servers/{name}/time_attendance')
+        os.mkdir(f'{self.PATH_PREFIX}/www/servers/{name}/time_attendance/frontend') #добавить в эту папку собранный фронт urv
+
         os.system("git config --global credential.helper 'cache --timeout=3600'")
 
-        # os.system('npm install')
-        # os.system('npm run build')
-        os.system(f'echo "mv {self.PATH_PREFIX}/servers/{name}/frontend/qos/dist /var/www/servers/{name}/frontend/" > ../send2front.sh')
-        os.chmod('../send2front.sh', 0o744)
-        # os.system('../send2front.sh')
-
         # backend
-        os.system(f'virtualenv --python=python3.6 {self.PATH_PREFIX}/servers/{name}/backend')
+        os.system(f'virtualenv --python=python3.6 {self.PATH_PREFIX}/servers/{name}/backend/env')
         os.system(f'git clone https://github.com/alexanderaleskin/QoS_backend.git {self.PATH_PREFIX}/servers/{name}/backend/qos')
 
         os.chdir(f'{self.PATH_PREFIX}/servers/{name}/backend/qos')
         os.system("git config --global credential.helper 'cache --timeout=3600'")
-        os.system(f'git checkout {name}')
-        os.system(f'../bin/pip install -r requirements.txt')
+        os.system(f'git checkout {branch}')
+        os.system(f'../env/bin/pip install -r requirements.txt')
 
-        secret = str(uuid.uuid4()).replace('-', '') + str(uuid.uuid4()).replace('-', '')
+        with open('src/conf/djconfig_local.py', 'w+') as f:
+            f.write(local % (  # старый формат форматирования (ибо { распознается для вставки
+                self.secret_key,
+                db_info['NAME'],
+                db_info['USER'],
+                db_info['PASSWORD'],
+                name,
+                name,
+                name,
+                self.timetable_port,
+                name,
+            ))
 
-        f = open('src/conf/djconfig_local.py', 'w+')
-        f.write(local % (  # старый формат форматирования (ибо { распознается для вставки
-            secret,
-            db_info['NAME'],
-            db_info['USER'],
-            db_info['PASSWORD'],
-            name,
-            name,
-            self_port,
-            self.timetable_port,
-        ))
-        f.close()
+        os.system('../env/bin/python manage.py migrate')
+        os.system('../env/bin/python manage.py collectstatic')
 
-        os.system('../bin/python manage.py migrate')
-        os.system('../bin/python manage.py collectstatic')
-        # os.system(f'{self.PATH_PREFIX}/servers/{name}/backend/bin/python /var/servers/{name}/backend/qos/manage.py collectstatics')
+        with open('../uwsgi.ini', 'w+') as f:
+            f.write(uwsgi.format(
+                name,
+                name,
+                name,
+                name,
+                name,
+            ))
 
-        f = open('../uwsgi.ini', 'w+')
-        f.write(uwsgi.format(
-            name,
-            name,
-            self_port,
-            name,
-        ))
-        f.close()
-
-        f = open('../update_uwsgi.sh', 'w+')
-        f.write(
-            f'{self.PATH_PREFIX}/servers/{name}/backend/bin/uwsgi --stop /var/servers/{name}/backend/qos.pid\n'
-            'sleep 2\n'
-            f'{self.PATH_PREFIX}/servers/{name}/backend/bin/uwsgi --ini  /var/servers/{name}/backend/uwsgi.ini\n'
-        )
-        f.close()
-        os.chmod('../update_uwsgi.sh', 0o744)
         os.chdir(curr_path)
 
         os.mkdir(f'{self.PATH_PREFIX}/log/servers/{name}')
         os.system(f'chown {name}:wfm -R {self.PATH_PREFIX}/servers/{name}')
         os.system(f'chown {name}:wfm -R {self.PATH_PREFIX}/log/servers/{name}')
         os.system(f'chown {name}:wfm -R {self.PATH_PREFIX}/www/servers/{name}')
-        os.system(f'sudo -u {name} {self.PATH_PREFIX}/servers/{name}/backend/update_uwsgi.sh')
         return True
 
-    def add_db(self, name, password):
-        # print(f'sudo -u postgres psql -c "CREATE DATABASE {name} encoding \'UTF8\' LC_COLLATE = \'en_US.UTF-8\' LC_CTYPE = \'en_US.UTF-8\' TEMPLATE = template0;"')
-        os.system(f'sudo -u postgres psql -c "CREATE DATABASE {name} encoding \'UTF8\' LC_COLLATE = \'en_US.UTF-8\' LC_CTYPE = \'en_US.UTF-8\' TEMPLATE = template0;"')  # aaa fucking postgres
-        os.system(f'sudo -u postgres psql -c "CREATE USER {name} WITH ENCRYPTED PASSWORD \'{password}\';"')
+    def add_db(self, name):
+        os.system(f'sudo -u postgres psql -c "CREATE DATABASE {name} encoding \'UTF8\' LC_COLLATE = \'en_US.UTF-8\' LC_CTYPE = \'en_US.UTF-8\' TEMPLATE = template0;"')
+        os.system(f'sudo -u postgres psql -c "CREATE USER {name} WITH PASSWORD \'{name}\';"')
         os.system(f'sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE {name} TO {name};"')
 
-    def add2nginx(self, name, port):
-        f = open('nginx_template')
-        server_nginx = f.read()
-        f.close()
+    def add2nginx(self, name, secret_path, public_path):
+        with open('nginx_template') as f:
+            server_nginx = f.read()
 
-        f = open(f'/etc/nginx/sites-available/{name}.conf', 'w+')
-        f.write(server_nginx % (
-            # name,
-            name,
-            name,
-            name,
-            port,
-            port
-        ))
-        f.close()
+        with open(f'/etc/nginx/sites-available/{name}.conf', 'w+') as f:
+            f.write(server_nginx % (
+                name,
+                name,
+                name,
+                name,
+                name,
+                name,
+                name,
+                name,
+                public_path,
+                secret_path,
+                name,
+                name,
+            ))
+
         os.system(f'ln -s /etc/nginx/sites-available/{name}.conf /etc/nginx/sites-enabled/')
+        with open('urv_nginx_template') as f:
+            server_nginx = f.read()
+
+        with open(f'/etc/nginx/sites-available/{name}-urv.conf', 'w+') as f:
+            f.write(server_nginx % (
+                name,
+                name,
+                name,
+                name,
+                name,
+                name,
+                public_path,
+                secret_path,
+                name,
+                name,
+            ))
+
+        os.system(f'ln -s /etc/nginx/sites-available/{name}-urv.conf /etc/nginx/sites-enabled/')
 
         os.system('service nginx restart')
 
 
-    def add(self, name):
-        if name in self.servers.keys():
-            raise ValueError(f'{name} already exist in servers: {self.servers.keys()}')
+    def start_celery(self, name):
+        with open('celery_template') as f:
+            celery_conf = f.read()
 
-        self_port = self.DJANGO_POSSIBLE_PIDS[0]
-        while self_port in self.servers.values():
-            self_port += 1
+        with open('celerybeat_template') as f:
+            celerybeat_conf = f.read()
 
-        self.servers[name] = self_port
-        f = open(self.SERVERS_CONFIG_PATH, 'w+')
-        json.dump(self.servers, f)
-        f.close()
+        with open('uwsgi_supervisor_template') as f:
+            uwsgi_conf = f.read()
+
+        with open(f'/etc/supervisor/conf.d/{name}_celery.conf', 'w') as f:
+            f.write(
+                celery_conf % (
+                    name, 
+                    name,
+                    name,
+                    name,
+                    name,
+                    name,
+                    name,
+                )
+            )
+        with open(f'/etc/supervisor/conf.d/{name}_celerybeat.conf', 'w') as f:
+            f.write(
+                celerybeat_conf % (
+                    name, 
+                    name,
+                    name,
+                    name,
+                    name,
+                    name,
+                )
+            )
+
+        with open(f'/etc/supervisor/conf.d/{name}_uwsgi.conf', 'w') as f:
+            f.write(
+                uwsgi_conf % (
+                    name, 
+                    name,
+                    name,
+                    name,
+                    name,
+                    name,
+                    name,
+                    name,
+                )
+            )
+
+        os.system('supervisorctl update')
+
+    def add(self, name, back_branch, secret_path, public_path):
+        if os.path.isdir(f'{self.PATH_PREFIX}/servers/{name}'):
+            answer = input(f'Project {name} already exists at {self.PATH_PREFIX}/servers/{name}!\n Remove? y/N ')
+            if answer == 'y':
+                a = random.randint(0, 100)
+                b = random.randint(0, 100)
+                c = a + b
+                user_c = input(f'Are you sure? Solve this: {a} + {b} = ')
+                if int(user_c) == c:
+                    self.remove_changes(name)
+            exit()
 
         os.system(f'useradd -r  {name} -g wfm')
 
-        password_db = str(uuid.uuid4()).replace('-', '')[:14]
-        print(password_db)
         db_info = {
             'NAME': name,
             'USER': name,
-            'PASSWORD': password_db,
+            'PASSWORD': name,
         }
 
-        self.add_db(name, password_db)
-        self.add_repos(name, self_port, db_info)
-        self.add2nginx(name, self_port)
-
+        self.add_db(name)
+        self.add_repos(name, back_branch, db_info)
+        self.add2nginx(name, secret_path, public_path)
+        self.start_celery(name)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Add environment for client')
-    parser.add_argument('name', help='Name of client')
+    parser.add_argument('--domain', help='Domain name of client', required=True)
+    parser.add_argument('--back', help='Backend branch', default='zoloto_prod')
+    parser.add_argument('--lang', help='Language of client', default='ru')
+    parser.add_argument('--fail_remove', help='Remove all changes if process fails', type=bool, default=False)
+    parser.add_argument('--ssl_secret_path', help='Path to secret key', default='/etc/MM-CERT/private.key', type=str)
+    parser.add_argument('--ssl_public_path', help='Path to public key', default='/etc/MM-CERT/public.key', type=str)
+    parser.add_argument('--need_test_shop', help='Creates test shop', default=False, type=bool)
 
+
+
+    args = parser.parse_args()
     sc = ServerConfig()
-    sc.add(parser.parse_args().name)
+    try:
+        sc.add(args.domain, args.back, args.ssl_secret_path, args.ssl_public_path)
+        os.chdir(f'{sc.PATH_PREFIX}/servers/{args.domain}/backend/qos/etc/init_scripts/')
+        #call fill db
+        res = os.system(f'../../../env/bin/python init_db.py --lang {args.lang} --need_test_shop {args.need_test_shop}')
+        if res != 0:
+            raise Exception('Error in fill_db')
+    except Exception as e:
+        print("-------------ERROR-------------")
+        print(e)
+        print("-------------------------------")
+        if (args.fail_remove):
+            print('removing changes...')
+            sc.remove_changes(args.domain)

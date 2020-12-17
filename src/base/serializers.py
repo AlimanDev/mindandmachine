@@ -1,7 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.validators import UniqueValidator
 
 from django.conf import settings
@@ -162,6 +162,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField(required=False)
     shop_code = serializers.CharField(required=False, source='shop.code')
     user_id = serializers.IntegerField(required=False)
+    function_group_id = serializers.IntegerField(required=False, allow_null=True)
     work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
     username = serializers.CharField(required=False, source='user.username')
@@ -174,7 +175,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
                   'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
                   'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
                   'dt_new_week_availability_from', 'user', 'is_visible',  'worker_constraints', 'work_types',
-                  'shop_code', 'position_code', 'username', 'code'
+                  'shop_code', 'position_code', 'username', 'code', 'function_group_id', 'dt_to_function_group',
         ]
         create_only_fields = ['user_id', 'user']
         read_only_fields = ['user']
@@ -186,6 +187,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 'default': True,
             },
         }
+        timetable_fields = [
+            'function_group_id', 'is_fixed_hours', 'salary', 'week_availability', 'norm_work_hours', 'shift_hours_length_min', 
+            'shift_hours_length_max', 'min_time_btw_shifts', 'tabel_code', 'is_ready_for_overworkings', 'is_visible',
+        ]
 
     def validate(self, attrs):
         if self.instance:
@@ -227,6 +232,11 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
         if not show_constraints:
             self.fields.pop('worker_constraints')
+        
+        if self.context.get('view') and self.context['view'].action == 'timetable':
+            exclude_fields = set(self.Meta.fields).difference(set(self.Meta.timetable_fields))
+            for f in exclude_fields:
+                self.fields.pop(f, None)
 
     def to_internal_value(self, data):
         data = super(EmploymentSerializer, self).to_internal_value(data)
@@ -246,6 +256,25 @@ class EmploymentSerializer(serializers.ModelSerializer):
         return data
 
     def update(self, instance, validated_data, *args, **kwargs):
+        if instance.function_group_id != validated_data.get('function_group_id', instance.function_group_id):
+            user = self.context['request'].user
+            group_from = instance.function_group_id
+            group_to = validated_data.get('function_group_id')
+            group_from_perm = True
+            if group_from:
+                group_from_perm = Group.objects.filter(
+                    Q(employments__user=user) | Q(workerposition__employment__user=user),
+                    subordinates__id=group_from,
+                ).exists()
+            group_to_perm = True
+            if group_to:
+                group_to_perm = Group.objects.filter(
+                    Q(employments__user=user) | Q(workerposition__employment__user=user),
+                    subordinates__id=group_to,
+                ).exists()
+            has_perm = group_from_perm and group_to_perm
+            if not has_perm:
+                raise PermissionDenied()
         if instance.is_visible != validated_data.get('is_visible', True):
             Employment.objects.filter(
                 shop_id=instance.shop_id, 

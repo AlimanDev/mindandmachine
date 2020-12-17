@@ -149,22 +149,12 @@ class CleanWdaysHelper:
 
                 changes = {}
 
-                worker_active_empls = list(Employment.objects.get_active(
-                    network_id=wd.worker.network_id,
-                    dt_from=wd.dt,
-                    dt_to=wd.dt,
-                    user_id=wd.worker_id
-                ).annotate_value_equality(
-                    'is_equal_employments', 'id', wd.employment_id,
-                ).annotate_value_equality(
-                    'is_equal_shops', 'shop_id', wd.shop_id,
-                ).order_by(
-                    '-is_equal_shops', '-is_equal_employments',
-                ).values(
-                    'id', 'shop_id', 'is_equal_shops',
-                ))
+                worker_active_empl = Employment.objects.get_active_empl_for_user(
+                    network_id=wd.worker.network_id, user_id=wd.worker_id, dt=wd.dt,
+                    priority_shop_id=wd.shop_id, priority_employment_id=wd.employment_id,
+                ).first()
 
-                if not worker_active_empls:
+                if not worker_active_empl:
                     if wd.type in [WorkerDay.TYPE_MATERNITY, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK]:
                         self._log_wd(wd, 'skip deleting')
                         continue
@@ -175,21 +165,20 @@ class CleanWdaysHelper:
                         wd.delete()
                     continue
 
-                worker_active_empl = worker_active_empls[0]
-                if wd.employment_id != worker_active_empl['id']:
+                if wd.employment_id != worker_active_empl.id:
                     changes.update({'employment_id': {
                         'from': wd.employment_id,
-                        'to': worker_active_empl['id'],
+                        'to': worker_active_empl.id,
                     }})
-                    wd.employment_id = worker_active_empl['id']
+                    wd.employment_id = worker_active_empl.id
 
                 if wd.type == WorkerDay.TYPE_WORKDAY:
-                    if wd.is_vacancy != (not worker_active_empl['is_equal_shops']):
+                    if wd.is_vacancy != (not worker_active_empl.is_equal_shops):
                         changes.update({'is_vacancy': {
                             'from': wd.is_vacancy,
-                            'to': not worker_active_empl['is_equal_shops'],
+                            'to': not worker_active_empl.is_equal_shops,
                         }})
-                        wd.is_vacancy = not worker_active_empl['is_equal_shops']
+                        wd.is_vacancy = not worker_active_empl.is_equal_shops
 
                 elif wd.type not in WorkerDay.TYPES_WITH_TM_RANGE:
                     if wd.shop_id is not None:

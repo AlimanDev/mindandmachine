@@ -96,6 +96,14 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         return Response()
 
 
+    @action(detail=True, methods=['put',])
+    def timetable(self, request, pk=None):
+        data = EmploymentSerializer(data=request.data, instance=self.get_object(), context={'request':request, 'view': self})
+        data.is_valid(raise_exception=True)
+        data.save()
+        return Response(data.data)
+
+
 class UserViewSet(BaseActiveNamedModelViewSet):
     page_size = 10
     pagination_class = LimitOffsetPagination
@@ -108,7 +116,7 @@ class UserViewSet(BaseActiveNamedModelViewSet):
         user = self.request.user
         return User.objects.filter(
             network_id=user.network_id
-        )
+        ).distinct()
 
     def perform_create(self, serializer):
         if 'username' not in serializer.validated_data:
