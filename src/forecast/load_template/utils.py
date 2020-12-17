@@ -468,6 +468,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
                 'value': timeserie.value,
                 'dttm': timeserie.dttm_forecast,
             }
+        )
     # for timeserie in values:
     #     key = str(timeserie.operation_type.operation_type_name_id)
     #     if not key in timeseries:
