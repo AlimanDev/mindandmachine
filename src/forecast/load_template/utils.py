@@ -450,7 +450,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
         }
         for o in templates
     ]
-    templates = {str(o.id): o for o in templates}
+    templates = {str(o.operation_type_name_id): o for o in templates}
     timeseries = {}
     values = list(PeriodClients.objects.select_related('operation_type').filter(
         operation_type__shop_id=shop_id,
