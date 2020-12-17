@@ -1,5 +1,5 @@
-[program:uwsgi]
-process_name    = %s
+[program:%s]
+process_name    = uwsgi
 environment     = PATH="/var/servers/%s/backend/env/bin"
 numprocs        = 1
 directory       = /var/servers/%s/backend/qos/
