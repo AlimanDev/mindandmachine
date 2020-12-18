@@ -140,6 +140,7 @@ class TickViewSet(BaseModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     basename = ''
+    openapi_tags = ['Tick',]
 
     def get_authenticators(self):
         return [
@@ -250,6 +251,8 @@ class TickPhotoViewSet(BaseModelViewSet):
     filter_backends = [DjangoFilterBackend]
     basename = ''
     serializer_class = TickPhotoSerializer
+    openapi_tags = ['TickPhoto',]
+    http_method_names = ['get', 'post', 'delete']
 
     def get_authenticators(self):
         return [
@@ -258,6 +261,10 @@ class TickPhotoViewSet(BaseModelViewSet):
             TokenAuthentication()
         ]
 
+    @swagger_auto_schema(
+        request_body=PostTickPhotoSerializer,
+        responses={201:TickPhotoSerializer},
+    )
     def create(self, request, **kwargs):
         """
             POST /api/v1/tick_photos
@@ -351,6 +358,7 @@ class TickPhotoViewSet(BaseModelViewSet):
     @swagger_auto_schema(
         responses={200:'Файл с отметками'},
         operation_description='Запрос на скачивание файла с отметками',
+        query_serializer=DownloadTickPhotoExcelSerializer,
     )
     @action(detail=False, methods=['get'])
     def download(self, request):

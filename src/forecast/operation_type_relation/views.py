@@ -107,6 +107,7 @@ class OperationTypeRelationViewSet(BaseModelViewSet):
     permission_classes = [Permission]
     serializer_class = OperationTypeRelationSerializer
     filterset_class = OperationTypeRelationFilter
+    openapi_tags = ['OperationTypeRelation',]
 
     def get_queryset(self):
         return OperationTypeRelation.objects.filter(

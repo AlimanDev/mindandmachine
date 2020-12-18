@@ -68,6 +68,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
     serializer_class = AutoSettingsCreateSerializer
     permission_classes = [Permission]
     basename = 'AutoSettings'
+    openapi_tags = ['AutoSettings',]
 
     @swagger_auto_schema(methods=['post'], request_body=AutoSettingsCreateSerializer, responses={200:'Empty response', 400: 'Fail sending data to server.'})
     @action(detail=False, methods=['post'])

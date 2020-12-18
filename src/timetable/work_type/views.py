@@ -172,6 +172,7 @@ class WorkTypeViewSet(BaseModelViewSet):
     permission_classes = [Permission]
     serializer_class = WorkTypeSerializer
     filterset_class = WorkTypeFilter
+    openapi_tags = ['WorkType',]
 
     def get_queryset(self):
         return self.filter_queryset(

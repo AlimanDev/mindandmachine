@@ -290,6 +290,8 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
 
     def __init__(self, *args, **kwargs):
         super(WorkerPositionSerializer, self).__init__(*args, **kwargs)
+        if getattr(self.context.get('view', None), 'swagger_fake_view', False):
+            return
         self.fields['code'].validators.append(
             UniqueValidator(
                 WorkerPosition.objects.filter(network=self.context.get('request').user.network)

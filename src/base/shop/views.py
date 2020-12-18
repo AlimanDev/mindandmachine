@@ -58,6 +58,7 @@ class ShopViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
+    openapi_tags = ['Shop',]
 
     @swagger_auto_schema(responses={200: ShopSerializer(many=True)}, operation_description='GET /rest_api/department/')
     def list(self, *args, **kwargs):

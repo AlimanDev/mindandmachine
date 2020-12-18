@@ -68,6 +68,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
+    openapi_tags = ['Employment',]
 
     def perform_create(self, serializer):
         serializer.save(network=self.request.user.network)
@@ -111,6 +112,7 @@ class UserViewSet(BaseActiveNamedModelViewSet):
     serializer_class = UserSerializer
     filterset_class = UserFilter
     get_object_field = 'username'
+    openapi_tags = ['User',]
 
     def get_queryset(self):
         user = self.request.user
@@ -147,6 +149,7 @@ class UserViewSet(BaseActiveNamedModelViewSet):
 
 class AuthUserView(UserDetailsView):
     serializer_class = AuthUserSerializer
+    openapi_tags = ['Auth',]
 
     def check_permissions(self, request, *args, **kwargs):
         rotate_token(request)
@@ -157,6 +160,7 @@ class FunctionGroupView(BaseModelViewSet):
     permission_classes = [Permission]
     serializer_class = FunctionGroupSerializer
     pagination_class = LimitOffsetPagination
+    openapi_tags = ['FunctionGroup',]
 
     def get_queryset(self):
         user = self.request.user
@@ -178,6 +182,7 @@ class WorkerPositionViewSet(BaseActiveNamedModelViewSet):
     serializer_class = WorkerPositionSerializer
     pagination_class = LimitOffsetPagination
     filterset_class = BaseActiveNamedModelFilter
+    openapi_tags = ['WorkerPosition',]
 
     def get_queryset(self):
         return WorkerPosition.objects.filter(
@@ -190,6 +195,7 @@ class SubscribeViewSet(BaseModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = SubscribeSerializer
     filterset_class = SubscribeFilter
+    openapi_tags = ['Subscribe',]
 
     def get_queryset(self):
         user = self.request.user
@@ -209,6 +215,7 @@ class NotificationViewSet(
     serializer_class = NotificationSerializer
     filterset_class = NotificationFilter
     http_method_names = ['get', 'put']
+    openapi_tags = ['Notification',]
 
     def get_queryset(self):
         user = self.request.user
@@ -221,6 +228,7 @@ class ShopSettingsViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [Permission]
     serializer_class = ShopSettingsSerializer
     filterset_class = BaseActiveNamedModelFilter
+    openapi_tags = ['ShopSettings',]
 
     def get_queryset(self):
         user = self.request.user
@@ -233,6 +241,7 @@ class NetworkViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [Permission]
     serializer_class = NetworkSerializer
     queryset = Network.objects.all()
+    openapi_tags = ['Network',]
 
 
 class GroupViewSet(BaseActiveNamedModelViewSet):
@@ -240,6 +249,7 @@ class GroupViewSet(BaseActiveNamedModelViewSet):
     serializer_class = GroupSerializer
     pagination_class = LimitOffsetPagination
     filterset_class = BaseActiveNamedModelFilter
+    openapi_tags = ['Group',]
     
     def get_queryset(self):
         return Group.objects.filter(
@@ -251,6 +261,7 @@ class BreakViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [Permission]
     serializer_class = BreakSerializer
     filterset_class = BaseActiveNamedModelFilter
+    openapi_tags = ['Break',]
 
     def get_queryset(self):
         return Break.objects.filter(

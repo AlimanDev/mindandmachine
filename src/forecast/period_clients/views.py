@@ -171,6 +171,7 @@ class PeriodClientsViewSet(BaseModelViewSet):
     permission_classes = [FilteredListPermission]
     filterset_class = PeriodClientsFilter
     serializer_class = PeriodClientsSerializer
+    openapi_tags = ['TimeSerie',]
 
     def get_queryset(self):
         return self.filter_queryset(PeriodClients.objects.all())

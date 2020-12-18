@@ -14,6 +14,7 @@ class WorkerConstraintViewSet(BaseModelViewSet):
     permission_classes = [EmploymentFilteredListPermission]
     serializer_class = WorkerConstraintSerializer
     filterset_class = WorkerConstraintFilter
+    openapi_tags = ['WorkerConstraint',]
 
     def get_serializer_class(self):
         if self.action == 'create':

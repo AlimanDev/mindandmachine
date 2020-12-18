@@ -4,6 +4,8 @@ from django.http.response import Http404
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
+from drf_yasg.utils import swagger_auto_schema
+
 from src.base.exceptions import MessageError
 from src.base.models import Shop
 from src.base.permissions import FilteredListPermission
@@ -23,6 +25,7 @@ class ReceiptViewSet(GetObjectByCodeMixin, BaseModelViewSet):
     """
     permission_classes = [FilteredListPermission]
     serializer_class = PeriodClientsCreateSerializer
+    openapi_tags = ['Reciept',]
 
     def get_queryset(self):
         return self.filter_queryset(Receipt.objects.all())
@@ -34,7 +37,8 @@ class ReceiptViewSet(GetObjectByCodeMixin, BaseModelViewSet):
                 return receive_data_info
 
         raise MessageError(code='receive_data_info_not_found')
-
+    
+    @swagger_auto_schema(responses={201:'empty_response'})
     def create(self, request, *args, **kwargs):
         serializer = PeriodClientsCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

@@ -120,6 +120,7 @@ class OperationTypeViewSet(BaseModelViewSet):
     permission_classes = [FilteredListPermission]
     serializer_class = OperationTypeSerializer
     filterset_class = OperationTypeFilter
+    openapi_tags = ['OperationType',]
 
     def get_queryset(self):
         return OperationType.objects.select_related('operation_type_name').filter(

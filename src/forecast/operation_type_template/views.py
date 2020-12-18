@@ -41,6 +41,7 @@ class OperationTypeTemplateViewSet(BaseModelViewSet):
     permission_classes = [Permission]
     filterset_class = OperationTypeTemplateFilter
     serializer_class = OperationTypeTemplateSerializer
+    openapi_tags = ['OperationTypeTemplate',]
 
     def get_queryset(self):
         return OperationTypeTemplate.objects.filter(

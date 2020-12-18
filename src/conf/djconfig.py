@@ -293,6 +293,12 @@ REDOC_SETTINGS = {
     'HIDE_HOSTNAME': True,
 }
 
+SWAGGER_SETTINGS = {
+    'TAGS_SORTER': 'alpha',
+    'OPERATIONS_SORTER': 'alpha',
+    'DEFAULT_AUTO_SCHEMA_CLASS': "src.util.openapi.auto_schema.WFMAutoSchema",
+}
+
 # DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
 
 QOS_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S" #'%H:%M:%S %d.%m.%Y'

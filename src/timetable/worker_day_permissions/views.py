@@ -13,6 +13,7 @@ from .serializers import (
 class WorkerDayPermissionsAPIView(GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = GroupWorkerDayPermissionSerializer
+    openapi_tags = ['WorkerDayPermissions',]
 
     def get(self, *args, **kwargs):
         """

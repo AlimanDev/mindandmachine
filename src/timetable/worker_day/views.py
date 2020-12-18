@@ -82,6 +82,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
     filter_backends = [MultiShopsFilterBackend]
+    openapi_tags = ['WorkerDay',]
 
     def get_queryset(self):
         queryset = WorkerDay.objects.all()

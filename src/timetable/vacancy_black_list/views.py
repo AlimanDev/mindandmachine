@@ -26,3 +26,4 @@ class VacancyBlackListViewSet(BaseModelViewSet):
     filterset_class = VacancyBlackListFilter
     queryset = VacancyBlackList.objects.all()
     permission_classes = [FilteredListPermission]
+    openapi_tags = ['VacancyBlackList',]

@@ -16,6 +16,7 @@ class ExchangeSettingsViewSet(BaseModelViewSet):
     
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ExchangeSettingsSerializer
+    openapi_tags = ['ExchangeSettings',]
     
 
     def get_queryset(self):

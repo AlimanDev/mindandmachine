@@ -83,6 +83,7 @@ class ShopMonthStatViewSet(mixins.UpdateModelMixin,
     serializer_class = ShopMonthStatSerializer
     queryset = ShopMonthStat.objects.filter(shop__dttm_deleted__isnull=True)
     http_method_names = ['get', 'put']
+    openapi_tags = ['ShopMonthStat',]
 
 
     @swagger_auto_schema(

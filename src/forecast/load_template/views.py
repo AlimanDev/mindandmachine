@@ -169,6 +169,7 @@ class LoadTemplateViewSet(BaseModelViewSet):
     filterset_class = LoadTemplateFilter
     serializer_class = LoadTemplateSerializer
     pagination_class = LimitOffsetPagination
+    openapi_tags = ['LoadTemplate',]
 
     def get_queryset(self):
         return LoadTemplate.objects.filter(

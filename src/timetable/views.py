@@ -15,3 +15,4 @@ class EmploymentWorkTypeViewSet(BaseModelViewSet):
     serializer_class = EmploymentWorkTypeSerializer
     filterset_class = EmploymentWorkTypeFilter
     queryset = EmploymentWorkType.objects.all()
+    openapi_tags = ['EmploymentWorkType',]
