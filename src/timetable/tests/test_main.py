@@ -150,8 +150,16 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         }
         response = self.client.post(self.url_approve, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # id = response.json()['id']
+        # не должен подтвердиться, т.к. нету изменений в дне
+        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).is_approved, False)
+
+        WorkerDay.objects.filter(id=self.worker_day_plan_not_approved.id).update(
+            dttm_work_start=datetime.combine(self.dt, time(8, 30, 0))
+        )
+        response = self.client.post(self.url_approve, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).is_approved, True)
+
         # self.assertIsNone(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).parent_worker_day_id)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).exists())
         # self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).parent_worker_day_id,

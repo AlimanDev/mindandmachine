@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-12-16 07:24+0000\n"
+"POT-Creation-Date: 2020-12-21 06:37+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -119,19 +119,24 @@ msgstr "Операция с постоянным значением не мож�
 
 #: src/forecast/operation_type_relation/views.py:29
 msgid "Depended must have same or bigger forecast step, got {} -> {}"
-msgstr "Зависимая операция должна иметь одинаковый или больший шаг прогноза, имеется {} -> {}"
+msgstr ""
+"Зависимая операция должна иметь одинаковый или больший шаг прогноза, имеется "
+"{} -> {}"
 
 #: src/forecast/operation_type_template/views.py:17
 msgid "This operation type depends on operations with less forecast steps."
 msgstr "Этот тип операции зависит от операций с меньшим шагом прогноза."
 
 #: src/forecast/operation_type_template/views.py:18
-msgid "This operation type is dependency of operations with bigger forecast steps."
+msgid ""
+"This operation type is dependency of operations with bigger forecast steps."
 msgstr "От этого типа операций зависят операции с большим шагом прогноза."
 
 #: src/forecast/operation_type_template/views.py:19
 msgid "You cant set constant value because this operation has depndences."
-msgstr "Вы не можете указать постоянное значение, так как у данной операции есть зависимости."
+msgstr ""
+"Вы не можете указать постоянное значение, так как у данной операции есть "
+"зависимости."
 
 #: src/recognition/models.py:188
 msgid "Key"
@@ -190,9 +195,8 @@ msgstr "Ошибка отправки данных на сервер."
 msgid "You can't delete timetable in the past."
 msgstr "Вы не можете удалить расписание в прошлом."
 
-#: src/timetable/serializers.py:84 src/timetable/serializers.py:469
-#, fuzzy
-#| msgid "Date start should be less then date end."
+#: src/timetable/serializers.py:84 src/timetable/serializers.py:389
+#: src/timetable/serializers.py:481
 msgid "Date start should be less then date end"
 msgstr "Дата начала должна быть меньше чем дата окончания."
 
@@ -227,11 +231,11 @@ msgstr ""
 "Невозможно создать рабочий день, так как пользователь в этот период не "
 "трудоустроен"
 
-#: src/timetable/serializers.py:401
+#: src/timetable/serializers.py:408
 msgid "Wrong dates format."
 msgstr "Неправильный формат дат."
 
-#: src/timetable/serializers.py:454 src/timetable/serializers.py:493
+#: src/timetable/serializers.py:466 src/timetable/serializers.py:505
 #, python-brace-format
 msgid "Invalid pk \"{pk_value}\" - object does not exist."
 msgstr "Недопустимый первичный ключ \"{pk_value}\" - объект не существует."

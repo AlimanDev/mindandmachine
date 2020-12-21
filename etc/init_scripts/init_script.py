@@ -28,6 +28,7 @@ class ServerConfig:
         os.system(f'rm /etc/supervisor/conf.d/{name}_celery.conf')
         os.system(f'rm /etc/supervisor/conf.d/{name}_celerybeat.conf')
         os.system(f'rm /etc/supervisor/conf.d/{name}_uwsgi.conf')
+        os.system(f'rm /etc/supervisor/conf.d/{name}_group.conf')
         os.system('supervisorctl update')
         os.system(f'userdel {name}')
         os.system(f'sudo -u postgres psql -c "DROP DATABASE {name};"')
@@ -154,6 +155,7 @@ class ServerConfig:
                 name,
                 name,
                 name,
+                name,
                 public_path,
                 secret_path,
                 name,
@@ -166,6 +168,14 @@ class ServerConfig:
 
 
     def start_celery(self, name):
+        celery_name = f'{name}_celery'
+        celerybeat_name = f'{name}_celerybeat'
+        uwsgi_name = f'{name}_uwsgi'
+        programs = ','.join([celery_name, celerybeat_name, uwsgi_name])
+        group_config = f'[group:{name}]\nprograms={programs}\npriority=999'
+        with open(f'/etc/supervisor/conf.d/{name}_group.conf', 'w') as f:
+            f.write(group_config)
+      
         with open('celery_template') as f:
             celery_conf = f.read()
 
@@ -178,7 +188,7 @@ class ServerConfig:
         with open(f'/etc/supervisor/conf.d/{name}_celery.conf', 'w') as f:
             f.write(
                 celery_conf % (
-                    name, 
+                    celery_name, 
                     name,
                     name,
                     name,
@@ -190,7 +200,7 @@ class ServerConfig:
         with open(f'/etc/supervisor/conf.d/{name}_celerybeat.conf', 'w') as f:
             f.write(
                 celerybeat_conf % (
-                    name, 
+                    celerybeat_name, 
                     name,
                     name,
                     name,
@@ -202,7 +212,7 @@ class ServerConfig:
         with open(f'/etc/supervisor/conf.d/{name}_uwsgi.conf', 'w') as f:
             f.write(
                 uwsgi_conf % (
-                    name, 
+                    uwsgi_name, 
                     name,
                     name,
                     name,
@@ -212,6 +222,7 @@ class ServerConfig:
                     name,
                 )
             )
+        
 
         os.system('supervisorctl update')
 
