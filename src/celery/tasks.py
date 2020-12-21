@@ -496,7 +496,7 @@ def upload_vacation_task():
 #             )
 #             create_notifications_for_event(event.id)
 @app.task
-def calculate_shops_load(lang, load_template_id, dt_from, dt_to, shop_id=None):
+def calculate_shops_load(load_template_id, dt_from, dt_to, shop_id=None):
     if type(dt_from) == str:
         dt_from = datetime.strptime(dt_from, QOS_DATETIME_FORMAT).date()
     if type(dt_to) == str:

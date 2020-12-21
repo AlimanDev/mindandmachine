@@ -1,5 +1,6 @@
 import datetime
 import json
+from dateutil.relativedelta import relativedelta
 
 from django.apps import apps
 from django.conf import settings
@@ -312,7 +313,14 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         super().save(*args, **kwargs)
         if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
+            from src.celery.tasks import calculate_shops_load
             apply_load_template(self.load_template_id, self.id)
+            calculate_shops_load.delay(
+                self.load_template_id,
+                datetime.date.today(),
+                datetime.date.today().replace(day=1) + relativedelta(months=1),
+                shop_id=self.id,
+            )
 
     def get_exchange_settings(self):
         return self.exchange_settings if self.exchange_settings_id \

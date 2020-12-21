@@ -33,7 +33,7 @@ class LoadTemplateSerializer(BaseNetworkSerializer):
     status = serializers.CharField(read_only=True)
     class Meta:
         model = LoadTemplate
-        fields = ['id', 'name', 'shop_id', 'operation_type_templates', 'status', 'network_id']
+        fields = ['id', 'name', 'shop_id', 'operation_type_templates', 'status', 'network_id', 'round_delta']
 
 
 class LoadTemplateSpecSerializer(serializers.Serializer):
@@ -232,9 +232,9 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
                 {'dt_to': self.error_messages['required']}
             )
         try:
-            calculate_shops_load.delay(request.user.lang, load_template_id, dt_from, dt_to, shop_id=shop_id)
+            calculate_shops_load.delay(load_template_id, dt_from, dt_to, shop_id=shop_id)
         except celery_exceptions.OperationalError:
-            calculate_shops_load(request.user.lang, load_template_id, dt_from, dt_to, shop_id=shop_id)
+            calculate_shops_load(load_template_id, dt_from, dt_to, shop_id=shop_id)
 
         return Response(200)
 

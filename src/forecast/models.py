@@ -49,6 +49,7 @@ class LoadTemplate(AbstractModel):
     name = models.CharField(max_length=64, unique=True)
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     forecast_params = models.TextField(default='{}')
+    round_delta = models.FloatField(default=0)
 
     def __str__(self):
         return f'id: {self.id}, name: {self.name}'

@@ -421,7 +421,8 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
         'dt_to': dt_to,
         'shop': ShopSerializer(shop).data,
         'IP': HOST,
-        'forecast_params': json.loads(shop.load_template.forecast_params)
+        'forecast_params': json.loads(shop.load_template.forecast_params),
+        'round_delta': shop.load_template.round_delta,
     }
     relations = {}
     for rel in OperationTypeRelation.objects.filter(

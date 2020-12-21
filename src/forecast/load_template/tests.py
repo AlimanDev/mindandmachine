@@ -79,6 +79,7 @@ class TestLoadTemplate(APITestCase):
             'id': self.load_template.id, 
             'name': 'Test1', 
             'status': 'R',
+            'round_delta': 0.0,
             'operation_type_templates': [
                 {
                     'id': self.operation_type_template1.id, 
@@ -117,6 +118,7 @@ class TestLoadTemplate(APITestCase):
     def test_create(self):
         data = {
             'name': 'Тестовый шаблон',
+            'round_delta': 0.8,
         }
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -128,6 +130,7 @@ class TestLoadTemplate(APITestCase):
     def test_update(self):
         data = {
             'name': 'Test2',
+            'round_delta': 0.5,
         }
         response = self.client.put(f'{self.url}{self.load_template.id}/', data, format='json')
         load_template = response.json()
