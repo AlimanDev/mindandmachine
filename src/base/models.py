@@ -817,7 +817,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_vacancy',
         'WorkerDay_change_list',
         'WorkerDay_duplicate',
-        'WorkerDay_delete_timetable',
+        'WorkerDay_delete_worker_days',
         'WorkerDay_exchange',
         'WorkerDay_confirm_vacancy',
         'WorkerDay_upload',

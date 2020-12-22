@@ -476,28 +476,11 @@ class DuplicateSrializer(serializers.Serializer):
         return True
 
 
-class DeleteTimetableSerializer(serializers.Serializer):
+class DeleteWorkerDaysSerializer(serializers.Serializer):
     default_error_messages = {
         'check_dates': _('Date start should be less then date end'),
     }
-    shop_id = serializers.IntegerField()
-    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
-    dt_to = serializers.DateField(format=QOS_DATE_FORMAT, required=False, default=None)
-    users = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
-    types = serializers.ListField(child=serializers.CharField(), required=False, default=[])
-    delete_all = serializers.BooleanField(default=False)
-    except_created_by = serializers.BooleanField(default=True)
-
-    def is_valid(self, *args, **kwargs):
-        super().is_valid(*args, **kwargs)
-        dt_from = self.validated_data.get('dt_from')
-        dt_to = self.validated_data.get('dt_to')
-
-        if not self.validated_data.get('delete_all') and not dt_to:
-            raise ValidationError({'dt_to': self.error_messages['required']})
-
-        if dt_to and dt_from > dt_to:
-            self.fail('check_dates')
+    worker_day_ids = serializers.ListField(child=serializers.IntegerField())
 
 
 class ExchangeSerializer(serializers.Serializer):

@@ -42,7 +42,7 @@ from src.timetable.serializers import (
     VacancySerializer,
     ListChangeSrializer,
     DuplicateSrializer,
-    DeleteTimetableSerializer,
+    DeleteWorkerDaysSerializer,
     ExchangeSerializer,
     UploadTimetableSerializer,
     DownloadSerializer,
@@ -723,159 +723,77 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
 
         return Response(WorkerDaySerializer(created_wds, many=True).data)
 
-    # @action(detail=False, methods=['post'])
-    # def delete_timetable(self, request):
-    #     data = DeleteTimetableSerializer(data=request.data, context={'request': request})
-    #     data.is_valid(raise_exception=True)
-    #     data = data.validated_data
-    #     employments = None
-    #     shop_id = data['shop_id']
-    #     shop = Shop.objects.get(id=shop_id)
-    #     worker_day_filter = {
-    #         'is_approved': False,
-    #         'is_fact': False,
-    #     }
-    #     dt_first = data['dt_from'].replace(day=1)
-    #     tts = ShopMonthStat.objects.filter(
-    #         shop_id=shop_id, 
-    #         dt=dt_first,
-    #     )
-    #     processing_tts = tts.filter(status=ShopMonthStat.PROCESSING, task_id__isnull=False)
-    #     for tt in processing_tts:
-    #         try:
-    #             requests.post(
-    #                 'http://{}/delete_task'.format(settings.TIMETABLE_IP), data=json.dumps({'id': tt.task_id}).encode('ascii')
-    #             )
-    #         except (requests.ConnectionError, requests.ConnectTimeout):
-    #             pass
-    #     processing_tts.update(status=ShopMonthStat.NOT_DONE)
-    #     if data.get('delete_all'):
-    #         dt_from = set_timetable_date_from(data['dt_from'].year, data['dt_from'].month)
-    #         if dt_from and not data['dt_to']:
-    #             dt_to = (dt_first + relativedelta(months=1))                
-    #             tts.update(status=ShopMonthStat.NOT_DONE)
-    #         else:
-    #             dt_from = data['dt_from']
-    #             dt_to = data['dt_to'] if data['dt_to'] else (dt_from.replace(day=1) + relativedelta(months=1))
+    @action(detail=False, methods=['post'])
+    def delete_worker_days(self, request):
+        data = DeleteWorkerDaysSerializer(data=request.data, context={'request': request})
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        if WorkerDay.objects.filter(is_approved=True, id__in=data.get('worker_day_ids')).exists():
+            raise ValidationError('Вы не можете удалять подтвержденные рабочие дни.')
+        WorkerDay.objects.filter(id__in=data.get('worker_day_ids')).delete()
 
-    #         employments = Employment.objects.get_active(
-    #             shop.network_id,
-    #             dt_from, dt_to, shop_id=shop_id, auto_timetable=True)
-    #         workers = User.objects.filter(id__in=employments.values_list('user_id'))
-    #         employments = list(employments)
-    #     else:
-    #         dt_from = data['dt_from']
-    #         dt_to = data['dt_to']
-    #         if not len(data['users']):
-    #             employments = Employment.objects.get_active(
-    #                 shop.network_id,
-    #                 dt_from, dt_to,
-    #                 shop_id=shop_id,
-    #                 auto_timetable=True)
-    #             workers = User.objects.filter(id__in=employments.values_list('user_id'))
-    #             employments = list(employments)
-    #         else:
-    #             workers = User.objects.filter(id__in=data['users'])
-    #     if len(data['types']) and not data['delete_all']:
-    #         worker_day_filter['type__in'] = data['types']
+        return Response()
 
-    #     if data['except_created_by']:
-    #         worker_day_filter['created_by__isnull'] = True
-        
+    @action(detail=False, methods=['post'])
+    def exchange(self, request):
+        new_wds = []
+        def create_worker_day(wd_parent, wd_swap):
+            wd_new = WorkerDay(
+                type=wd_swap.type,
+                dttm_work_start=wd_swap.dttm_work_start,
+                dttm_work_end=wd_swap.dttm_work_end,
+                worker_id=wd_parent.worker_id,
+                employment_id=wd_parent.employment_id,
+                dt=wd_parent.dt,
+                created_by=request.user,
+                is_approved=False,
+                is_vacancy=wd_swap.is_vacancy,
+            )
+            wd_new.save()
+            new_wds.append(wd_new)
+            WorkerDayCashboxDetails.objects.bulk_create([
+                WorkerDayCashboxDetails(
+                    worker_day_id=wd_new.id,
+                    work_type_id=wd_cashbox_details_parent.work_type_id,
+                    work_part=wd_cashbox_details_parent.work_part,
+                )
+                for wd_cashbox_details_parent in wd_swap.worker_day_details.all()
+            ])
 
-    #     WorkerDay.objects.filter(
-    #         Q(shop_id=shop_id)|Q(shop_id__isnull=True),
-    #         worker__in=workers,
-    #         dt__gte=dt_from,
-    #         dt__lt=dt_to,
-    #         is_vacancy=False,
-    #         **worker_day_filter,
-    #     ).delete()
-    #     if not employments:
-    #         employments = list(Employment.objects.get_active(
-    #             network_id=shop.network_id,
-    #             dt_from=dt_from,
-    #             dt_to=dt_to,
-    #             shop_id=shop_id,
-    #             user__in=workers))
-    #     WorkerDay.objects.filter(
-    #         employment__in=employments,
-    #         dt__gte=dt_from,
-    #         dt__lt=dt_to,
-    #         is_vacancy=True,
-    #         **worker_day_filter,
-    #     ).delete()
-    #     if data['delete_all']:
-    #         # cancel vacancy
-    #         # todo: add deleting workerdays
-    #         for worker_day in WorkerDay.objects.filter(shop_id=shop_id, is_vacancy=True):
-    #             cancel_vacancy(worker_day.id)
-    #     return Response()
+        data = ExchangeSerializer(data=request.data, context={'request': request})
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        days = len(data['dates'])
+        with transaction.atomic():
+            wd_parent_list = list(WorkerDay.objects.filter(
+                worker_id__in=(data['worker1_id'], data['worker2_id']),
+                dt__in=data['dates'],
+                is_approved=data['is_approved'],
+                is_fact=False,
+            ).order_by('dt'))
 
-    # @action(detail=False, methods=['post'])
-    # def exchange(self, request):
-    #     new_wds = []
-    #     def create_worker_day(wd_parent, wd_swap, is_approved):
-    #         parent_worker_day_id = wd_swap.id if is_approved else wd_parent.parent_worker_day_id
-    #         wd_new = WorkerDay(
-    #             type=wd_swap.type,
-    #             dttm_work_start=wd_swap.dttm_work_start,
-    #             dttm_work_end=wd_swap.dttm_work_end,
-    #             worker_id=wd_parent.worker_id,
-    #             employment_id=wd_parent.employment_id,
-    #             dt=wd_parent.dt,
-    #             parent_worker_day_id=parent_worker_day_id,
-    #             created_by=request.user,
-    #             is_approved=False,
-    #             is_vacancy=wd_swap.is_vacancy,
-    #         )
-    #         wd_new.save()
-    #         new_wds.append(wd_new)
-    #         WorkerDayCashboxDetails.objects.bulk_create([
-    #             WorkerDayCashboxDetails(
-    #                 worker_day_id=wd_new.id,
-    #                 work_type_id=wd_cashbox_details_parent.work_type_id,
-    #                 work_part=wd_cashbox_details_parent.work_part,
-    #             )
-    #             for wd_cashbox_details_parent in wd_swap.worker_day_details.all()
-    #         ])
+            if len(wd_parent_list) != days * 2:
+                raise ValidationError(self.error_messages['no_timetable'])
 
-    #     data = ExchangeSerializer(data=request.data, context={'request': request})
-    #     data.is_valid(raise_exception=True)
-    #     data = data.validated_data
-    #     days = len(data['dates'])
+            day_pairs = []
+            for day_ind in range(days):
+                day_pair = [wd_parent_list[day_ind * 2], wd_parent_list[day_ind * 2 + 1]]
+                if day_pair[0].dt != day_pair[1].dt:
+                    raise ValidationError(self.error_messages['worker_days_mismatch'])
+                day_pairs.append(day_pair)
+            
+            WorkerDay.objects.filter(
+                worker_id__in=(data['worker1_id'], data['worker2_id']),
+                dt__in=data['dates'],
+                is_approved=False,
+                is_fact=False,
+            ).delete()
 
-    #     wd_parent_list = list(WorkerDay.objects.prefetch_related('child').filter(
-    #         worker_id__in=(data['worker1_id'], data['worker2_id']),
-    #         dt__in=data['dates'],
-    #         is_approved=data['is_approved'],
-    #         is_fact=False,
-    #     ).order_by('dt'))
-    #     if data['is_approved']:
-    #         id_to_delete = []
-    #         for wd in wd_parent_list:
-    #             if wd.child.first():
-    #                 id_to_delete.append(wd.child.first().id)
-    #     else:
-    #         id_to_delete = [wd.id for wd in wd_parent_list]
+            for day_pair in day_pairs:
+                create_worker_day(day_pair[0], day_pair[1])
+                create_worker_day(day_pair[1], day_pair[0])
 
-    #     if len(wd_parent_list) != days * 2:
-    #         raise ValidationError(self.error_messages['no_timetable'])
-
-    #     day_pairs = []
-    #     for day_ind in range(days):
-    #         day_pair = [wd_parent_list[day_ind * 2], wd_parent_list[day_ind * 2 + 1]]
-    #         if day_pair[0].dt != day_pair[1].dt:
-    #             raise ValidationError(self.error_messages['worker_days_mismatch'])
-    #         day_pairs.append(day_pair)
-
-    #     for day_pair in day_pairs:
-    #         create_worker_day(day_pair[0], day_pair[1], data['is_approved'])
-    #         create_worker_day(day_pair[1], day_pair[0], data['is_approved'])
-
-    #     WorkerDay.objects.filter(id__in=id_to_delete).delete()
-
-    #     return Response(WorkerDaySerializer(new_wds, many=True).data)
+        return Response(WorkerDaySerializer(new_wds, many=True).data)
 
     @action(detail=False, methods=['post'])
     @get_uploaded_file
