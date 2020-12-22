@@ -572,8 +572,8 @@ class CalendarPaidDays:
                 dt_end = employment.dt_fired
 
         day_hours = self.calendar_days.loc[(
-            (self.calendar_days.index >= dt_start)
-            & (self.calendar_days.index <= dt_end)
+                (self.calendar_days.index >= dt_start)
+                & (self.calendar_days.index <= dt_end)
         )].hours
 
         return {
