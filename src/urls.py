@@ -6,6 +6,7 @@ from django.urls import path
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+from src.util.openapi.auto_schema import WFMOpenAPISchemaGenerator
 
 from src.base import urls as base_api
 from src.conf.djconfig import DEBUG
@@ -81,6 +82,8 @@ from django.views.generic import TemplateView
 #         extra_context={'schema_url':'openapi-schema'}
 #     ), name='swagger-ui'),
 # ]
+
+
 schema_view = get_schema_view(
    openapi.Info(
       title="WFM",
@@ -92,6 +95,7 @@ schema_view = get_schema_view(
    ),
    public=True,
    permission_classes=(permissions.IsAdminUser,),
+   generator_class=WFMOpenAPISchemaGenerator,
 )
 
 urlpatterns += [
