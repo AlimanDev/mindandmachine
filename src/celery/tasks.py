@@ -503,11 +503,11 @@ def calculate_shops_load(load_template_id, dt_from, dt_to, shop_id=None):
         dt_to = datetime.strptime(dt_to, QOS_DATETIME_FORMAT).date()
     load_template = LoadTemplate.objects.get(pk=load_template_id)
     shops = [load_template.shops.get(pk=shop_id)] if shop_id else load_template.shops.all()
-    Shop.objects.filter(id__in=list(map(lambda x: x.id, shops))).update(load_template_status=Shop.LOAD_TEMPLATE_PROCESS)
     for shop in shops:
         data = prepare_load_template_request(load_template_id, shop.id, dt_from, dt_to)
-        data = json.dumps(data, cls=DjangoJSONEncoder)
-        response = requests.post(f'http://{TIMETABLE_IP}/calculate_shop_load/', data=data)
+        if not (data is None):
+            data = json.dumps(data, cls=DjangoJSONEncoder)
+            response = requests.post(f'http://{TIMETABLE_IP}/calculate_shop_load/', data=data)
 
 
 
