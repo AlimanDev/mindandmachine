@@ -139,6 +139,7 @@ class TestAutoSettings(APITestCase):
         self.wd1_plan_approved = WorkerDay.objects.create(
             shop=self.shop,
             worker=self.user2,
+            employment=self.employment2,
             dt=self.dt,
             is_fact=False,
             type=WorkerDay.TYPE_WORKDAY,
@@ -148,6 +149,7 @@ class TestAutoSettings(APITestCase):
         )
         self.wd1_plan_not_approved = WorkerDay.objects.create(
             worker=self.user2,
+            employment=self.employment2,
             dt=self.dt,
             is_fact=False,
             type=WorkerDay.TYPE_HOLIDAY,
@@ -157,6 +159,7 @@ class TestAutoSettings(APITestCase):
         self.wd2_plan_approved = WorkerDay.objects.create(
             shop=self.shop,
             worker=self.user3,
+            employment=self.employment3,
             dt=self.dt,
             is_fact=False,
             type=WorkerDay.TYPE_WORKDAY,
@@ -167,6 +170,7 @@ class TestAutoSettings(APITestCase):
 
         self.wd3_plan_not_approved = WorkerDay.objects.create(
             worker=self.user4,
+            employment=self.employment4,
             dt=self.dt,
             is_fact=False,
             type=WorkerDay.TYPE_HOLIDAY,

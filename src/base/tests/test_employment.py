@@ -302,12 +302,12 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             self.employment2.dt_hired = dt
             self.employment2.dt_fired = dt + timedelta(days=30)
             self.employment2.save()
-            self.assertTrue(WorkerDay.objects.filter(id=wd1.id).exists())
+            self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd1.id).exists())
             wd1.refresh_from_db()
             self.assertIsNone(wd1.employment_id)
             self.assertTrue(WorkerDay.objects.filter(id=wd2.id).exists())
             self.assertTrue(WorkerDay.objects.filter(id=wd_holiday.id).exists())
-            self.assertEqual(WorkerDay.objects.count(), wd_count_before_save)
+            self.assertEqual(WorkerDay.objects_with_excluded.count(), wd_count_before_save)
 
 
     def test_change_function_group_tmp(self):

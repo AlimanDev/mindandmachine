@@ -975,7 +975,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(wd.created_by.id, self.user1.id)
 
     def test_cant_create_workday_if_user_has_no_active_employment(self):
-        WorkerDay.objects.filter(worker=self.user2).delete()
+        WorkerDay.objects_with_excluded.filter(worker=self.user2).delete()
         self.user2.employments.all().delete()
         dt = self.dt - timedelta(days=60)
         data = {

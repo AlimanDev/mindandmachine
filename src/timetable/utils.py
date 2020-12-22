@@ -143,7 +143,7 @@ class CleanWdaysHelper:
             self.filter_kwargs, self.exclude_kwargs, self.only_logging
         )
 
-        wdays_qs = WorkerDay.objects.exclude(
+        wdays_qs = WorkerDay.objects_with_excluded.exclude(
             worker__isnull=True,
         ).exclude(
             type=WorkerDay.TYPE_EMPTY,
@@ -160,7 +160,7 @@ class CleanWdaysHelper:
 
         for worker_day in wdays_qs:
             with transaction.atomic() if not self.only_logging else dummy_context_mgr():
-                wd_qs = WorkerDay.objects.filter(id=worker_day.id)
+                wd_qs = WorkerDay.objects_with_excluded.filter(id=worker_day.id)
                 if not self.only_logging:
                     wd_qs = wd_qs.select_for_update()
                 wd = wd_qs.first()

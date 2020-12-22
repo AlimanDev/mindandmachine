@@ -636,7 +636,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                     main_worker_days_details[key] = []
                 main_worker_days_details[key].append(detail)
 
-            trainee_worker_days = WorkerDay.objects.filter(
+            trainee_worker_days = WorkerDay.objects_with_excluded.filter(
                 worker_id=to_worker_id,
                 dt__in=data['to_dates'],
                 is_approved=False,
