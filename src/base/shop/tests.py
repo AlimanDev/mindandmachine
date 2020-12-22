@@ -369,3 +369,10 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(response[0]['children'][0]['children'][0]['label'], 'Shop1')
         self.assertEqual(response[0]['children'][0]['children'][1]['label'], 'Shop2')
         self.assertEqual(response[0]['children'][1]['children'][0]['label'], 'Shop3')
+
+    
+    def test_cant_change_load_template(self):
+        self.shop.load_template_status = Shop.LOAD_TEMPLATE_PROCESS
+        self.shop.save()
+        response = self.client.put(f'{self.url}{self.shop.id}/', data={'load_template_id': self.load_template.id, 'name': 'Shop Test'})
+        self.assertEqual(response.json(), {'message': 'Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета.'})
