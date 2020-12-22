@@ -744,7 +744,6 @@ class Employment(AbstractActiveModel):
                 kwargs['filter_kwargs'] = {
                     'type': WorkerDay.TYPE_WORKDAY,
                     'worker_id': self.user_id,
-                    'employment__isnull': True,
                 }
                 if self.dt_hired:
                     kwargs['filter_kwargs']['dt__gte'] = Converter.convert_date(self.dt_hired)
@@ -754,8 +753,7 @@ class Employment(AbstractActiveModel):
                 kwargs['filter_kwargs'] = {
                     'type': WorkerDay.TYPE_WORKDAY,
                     'worker_id': self.user_id,
-                    'employment_id': self.id,
-                    'dt__gte': Converter.convert_date(self.dt_fired),
+                    'dt__gte': Converter.convert_date(self.dt_hired),
                 }
 
             clean_wdays.apply_async(kwargs=kwargs)
