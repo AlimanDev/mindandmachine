@@ -529,11 +529,7 @@ class WorkersStatsGetter:
         return worker_days_dict
 
     def run(self):
-        acc_period_worker_days = list(self.get_worker_day_qs())
-        if not len(acc_period_worker_days):
-            return self.res
-
-        self.wdays_dict = self.prepare_wdays_dict(acc_period_worker_days)
+        self.wdays_dict = self.prepare_wdays_dict(list(self.get_worker_day_qs()))
 
         for worker_id in self.workers_dict.keys():
             for plan_or_fact in ['plan', 'fact']:
