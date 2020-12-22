@@ -393,6 +393,9 @@ def search_related_operation_types(operation_type, operation_type_relations, ope
 
 def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
     shop = Shop.objects.get(id=shop_id)
+    #TODO SEND ERROR
+    if shop.load_template_status == Shop.LOAD_TEMPLATE_PROCESS:
+        return
     forecast_steps = {
         datetime.timedelta(hours=1): '1h',
         datetime.timedelta(minutes=30): '30min',

@@ -176,7 +176,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         data.is_valid(raise_exception=True)
         data = data.validated_data['data']
         # данные от алгоритма
-        if data.get('status', False) == Shop.LOAD_TEMPLATE_READY:
+        if data.get('status', False):
             if data.get('status') == Shop.LOAD_TEMPLATE_READY:
                 create_demand(data)
             Shop.objects.filter(id=data.get('shop_id')).update(load_template_status=data.get('status'))

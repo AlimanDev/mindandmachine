@@ -310,6 +310,8 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         if hasattr(self, 'parent_code'):
             self.parent = get_object_or_404(Shop, code=self.parent_code)
         load_template_changed = self.tracker.has_changed('load_template')
+        if load_template_changed and self.load_template_status == self.LOAD_TEMPLATE_PROCESS:
+            raise MessageError(code='cant_change_load_template')
         super().save(*args, **kwargs)
         if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
