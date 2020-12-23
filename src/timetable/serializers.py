@@ -461,6 +461,11 @@ class ChangeRangeListSerializer(serializers.Serializer):
         self.fields['ranges'] = ChangeRangeSerializer(many=True, context=self.context)
 
 
+class CopyApprovedSerializer(serializers.Serializer):
+    worker_ids = serializers.ListField(child=serializers.IntegerField())
+    dates = serializers.ListField(child=serializers.DateField())
+
+
 class DuplicateSrializer(serializers.Serializer):
     default_error_messages = {
         'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")

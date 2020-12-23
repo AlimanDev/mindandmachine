@@ -49,6 +49,7 @@ from src.timetable.serializers import (
     WorkerDayListSerializer,
     DownloadTabelSerializer,
     ChangeRangeListSerializer,
+    CopyApprovedSerializer,
 )
 from src.timetable.vacancy.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy, confirm_vacancy
 from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
@@ -628,6 +629,93 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
     #             create_vacancies_and_notify(sh_id, wt)
     #
     #     return Response(response, status=200)
+
+
+    @action(detail=False, methods=['post'])
+    def copy_approved(self, request):
+        data = CopyApprovedSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        with transaction.atomic():
+            list_wd = list(
+                WorkerDay.objects.exclude(
+                    is_vacancy=True,
+                ).filter(
+                    dt__in=data['dates'],
+                    worker_id__in=data['worker_ids'],
+                    is_approved=True,
+                    is_fact=False,
+                ).select_related(
+                    'shop', 
+                    'employment', 
+                    'employment__position', 
+                    'employment__position__breaks',
+                    'shop__settings__breaks',
+                ).prefetch_related(
+                    'worker_day_details',
+                )
+            )
+            WorkerDay.objects.exclude(
+                is_vacancy=True,
+            ).filter(
+                dt__in=data['dates'],
+                worker_id__in=data['worker_ids'],
+                is_approved=False,
+                is_fact=False,
+            ).delete()
+
+            WorkerDay.objects.bulk_create(
+                [
+                    WorkerDay(
+                        shop=wd.shop,
+                        worker_id=wd.worker_id,
+                        employment=wd.employment,
+                        dttm_work_start=wd.dttm_work_start,
+                        dttm_work_end=wd.dttm_work_end,
+                        dt=wd.dt,
+                        is_fact=wd.is_fact,
+                        is_approved=False,
+                        type=wd.type,
+                        created_by_id=wd.created_by_id,
+                        is_vacancy=wd.is_vacancy,
+                        is_outsource=wd.is_outsource,
+                        comment=wd.comment,
+                        canceled=wd.canceled,
+                        need_count_wh=True,
+                    )
+                    for wd in list_wd
+                ]
+            )
+            wds = WorkerDay.objects.exclude(
+                is_vacancy=True,
+            ).filter(
+                dt__in=data['dates'],
+                worker_id__in=data['worker_ids'],
+                is_approved=False,
+                is_fact=False,
+            )
+            search_wds = {}
+            for wd in wds:
+                key_worker = wd.worker_id
+                if not key_worker in search_wds:
+                    search_wds[key_worker] = {}
+                search_wds[key_worker][wd.dt] = wd
+            
+            WorkerDayCashboxDetails.objects.bulk_create(
+                [
+                    WorkerDayCashboxDetails(
+                        work_part=details.work_part,
+                        worker_day=search_wds[wd.worker_id][wd.dt],
+                        work_type_id=details.work_type_id,
+                    )
+                    for wd in list_wd
+                    for details in wd.worker_day_details.all()
+                ]
+            )
+        
+        return Response(WorkerDayListSerializer(wds.prefetch_related('worker_day_details'), many=True, context={'request':request}).data)
+
+
 
     @action(detail=False, methods=['post'])
     def duplicate(self, request):
