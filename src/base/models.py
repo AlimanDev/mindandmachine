@@ -732,25 +732,31 @@ class Employment(AbstractActiveModel):
                     ):
                 wd.save(update_fields=['work_hours'])
 
-        if not is_new and (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired')) and \
+        if (is_new or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
                 self.network.clean_wdays_on_employment_dt_change:
             from src.celery.tasks import clean_wdays
             from src.timetable.models import WorkerDay
             from src.util.models_converter import Converter
-            clean_wdays.apply_async(
-                kwargs={
-                    'filter_kwargs': {
-                        'type': WorkerDay.TYPE_WORKDAY,
-                        'employment_id': self.id,
-                    },
-                    'exclude_kwargs': {
-                        'dt__gte': Converter.convert_date(self.dt_hired),
-                        'dt__lt': Converter.convert_date(self.dt_fired),
-                    },
-                    'only_logging': False,
-                },
-                countdown=60 * 5,
-            )
+            kwargs = {
+                'only_logging': False,
+            }
+            if is_new:
+                kwargs['filter_kwargs'] = {
+                    'type': WorkerDay.TYPE_WORKDAY,
+                    'worker_id': self.user_id,
+                }
+                if self.dt_hired:
+                    kwargs['filter_kwargs']['dt__gte'] = Converter.convert_date(self.dt_hired)
+                if self.dt_fired:
+                    kwargs['filter_kwargs']['dt__lt'] = Converter.convert_date(self.dt_fired)
+            else:
+                kwargs['filter_kwargs'] = {
+                    'type': WorkerDay.TYPE_WORKDAY,
+                    'worker_id': self.user_id,
+                    'dt__gte': Converter.convert_date(self.dt_hired),
+                }
+
+            clean_wdays.apply_async(kwargs=kwargs)
 
         return res
 
