@@ -1,7 +1,6 @@
 import datetime
 import json
 from itertools import groupby
-
 import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
@@ -51,11 +50,12 @@ from src.timetable.serializers import (
     ChangeRangeListSerializer,
 )
 from src.timetable.vacancy.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy, confirm_vacancy
-from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
+from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.upload import get_uploaded_file
+from .stat import WorkersStatsGetter
 
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
@@ -383,7 +383,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         else:
             raise utils.translate_validation(filterset.errors)
 
-        stat = count_worker_stat(data)
+        stat = WorkersStatsGetter(**data).run()
         return Response(stat)
 
     @action(detail=False, methods=['get'], )

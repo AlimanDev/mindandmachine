@@ -184,7 +184,8 @@ def get_efficiency(shop_id, form, consider_vacancies=False,):
         })
 
     if form.get('indicators', False):
-        norm_work_hours = ProductionDay.get_norm_work_hours(shop.region_id, from_dt.month, from_dt.year)
+        norm_work_hours = ProductionDay.get_norm_work_hours(
+            shop.region_id, from_dt.year, month=from_dt.month)[from_dt.month]
 
         # TODO: если сотрудник уволен раньше to_dt, то будет некорректное значение?
         active_empls_norm_work_hours = sum(Employment.objects.filter(
