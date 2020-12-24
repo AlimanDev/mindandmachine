@@ -101,7 +101,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         return Response(data.data)
 
 
-class UserViewSet(BaseActiveNamedModelViewSet):
+class UserViewSet(UpdateorCreateViewSet):
     page_size = 10
     pagination_class = LimitOffsetPagination
     permission_classes = [Permission]

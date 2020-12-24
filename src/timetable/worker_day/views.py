@@ -1,13 +1,12 @@
 import datetime
 import json
 from itertools import groupby
-
 import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.db import transaction
-from django.db.models import OuterRef, Subquery, Q, F
+from django.db.models import OuterRef, Subquery, Q, F, Exists
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.encoding import escape_uri_path
@@ -51,11 +50,12 @@ from src.timetable.serializers import (
     ChangeRangeListSerializer,
 )
 from src.timetable.vacancy.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy, confirm_vacancy
-from src.timetable.worker_day.stat import count_worker_stat, count_daily_stat
+from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.upload import get_uploaded_file
+from .stat import WorkersStatsGetter
 
 
 class WorkerDayViewSet(viewsets.ModelViewSet):
@@ -278,7 +278,23 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
             is_fact=serializer.data['is_fact'],
             is_approved=False,
         )
-        wdays_to_approve = WorkerDay.objects.filter(approve_condition)
+        wdays_to_approve = WorkerDay.objects.filter(
+            approve_condition,
+        ).annotate(
+            same_approved_exists=Exists(
+                WorkerDay.objects.filter(
+                    Q(shop_id=OuterRef('shop_id')) | Q(shop__isnull=True),
+                    Q(dttm_work_start=OuterRef('dttm_work_start')) | Q(dttm_work_start__isnull=True),
+                    Q(dttm_work_end=OuterRef('dttm_work_end')) | Q(dttm_work_end__isnull=True),
+                    Q(work_types=OuterRef('work_types')) | Q(work_types__isnull=True),
+                    worker_id=OuterRef('worker_id'),
+                    dt=OuterRef('dt'),
+                    is_fact=OuterRef('is_fact'),
+                    type=OuterRef('type'),
+                    is_approved=True,
+                )
+            )
+        ).filter(same_approved_exists=False)
 
         worker_dt_pairs_list = list(
             wdays_to_approve.values_list('worker_id', 'dt').order_by('worker_id', 'dt').distinct())
@@ -292,7 +308,10 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 id__in=wdays_to_approve.values_list('id', flat=True)
             ).delete()
             list_wd = list(
-                wdays_to_approve.select_related(
+                wdays_to_approve.exclude(
+                    is_vacancy=True,
+                    type='W',
+                ).select_related(
                     'shop', 
                     'employment', 
                     'employment__position', 
@@ -364,7 +383,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
         else:
             raise utils.translate_validation(filterset.errors)
 
-        stat = count_worker_stat(data)
+        stat = WorkersStatsGetter(**data).run()
         return Response(stat)
 
     @action(detail=False, methods=['get'], )
@@ -636,7 +655,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                     main_worker_days_details[key] = []
                 main_worker_days_details[key].append(detail)
 
-            trainee_worker_days = WorkerDay.objects.filter(
+            trainee_worker_days = WorkerDay.objects_with_excluded.filter(
                 worker_id=to_worker_id,
                 dt__in=data['to_dates'],
                 is_approved=False,

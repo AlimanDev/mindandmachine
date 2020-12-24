@@ -139,6 +139,7 @@ class TestAutoSettings(APITestCase):
         self.wd1_plan_approved = WorkerDay.objects.create(
             shop=self.shop,
             worker=self.user2,
+            employment=self.employment2,
             dt=self.dt,
             is_fact=False,
             type=WorkerDay.TYPE_WORKDAY,
@@ -148,6 +149,7 @@ class TestAutoSettings(APITestCase):
         )
         self.wd1_plan_not_approved = WorkerDay.objects.create(
             worker=self.user2,
+            employment=self.employment2,
             dt=self.dt,
             is_fact=False,
             type=WorkerDay.TYPE_HOLIDAY,
@@ -157,6 +159,7 @@ class TestAutoSettings(APITestCase):
         self.wd2_plan_approved = WorkerDay.objects.create(
             shop=self.shop,
             worker=self.user3,
+            employment=self.employment3,
             dt=self.dt,
             is_fact=False,
             type=WorkerDay.TYPE_WORKDAY,
@@ -167,6 +170,7 @@ class TestAutoSettings(APITestCase):
 
         self.wd3_plan_not_approved = WorkerDay.objects.create(
             worker=self.user4,
+            employment=self.employment4,
             dt=self.dt,
             is_fact=False,
             type=WorkerDay.TYPE_HOLIDAY,
@@ -340,3 +344,8 @@ class TestAutoSettings(APITestCase):
         self.assertEqual(response.status_code, 200)
 
         self.assertEqual(WorkerDay.objects.count(), 3)
+
+    
+    def test_bad_dates(self):
+        response = self.client.post('/rest_api/auto_settings/create_timetable/', data={'shop_id': self.shop.id, 'dt_from': '2020-10-31', 'dt_to': '2020-10-01'})
+        self.assertEqual(response.json(), ['Дата начала должна быть меньше чем дата окончания.'])
