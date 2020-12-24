@@ -393,8 +393,8 @@ class WorkersStatsGetter:
             network_id=self.network.id,
             dt_from=dt_from,
             dt_to=dt_to,
-            shop_id=self.shop_id,
-        ).select_related('position')
+            user__employments__shop_id=self.shop_id,
+        ).select_related('position').distinct()
         if self.worker_id:
             employments = employments.filter(user_id=self.worker_id)
         if self.worker_id__in:
