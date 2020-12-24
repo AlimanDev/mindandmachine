@@ -775,7 +775,7 @@ class Employment(AbstractActiveModel):
                 wd.save(update_fields=['work_hours'])
 
         if (is_new or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
-                self.network.clean_wdays_on_employment_dt_change:
+                self.network and self.network.clean_wdays_on_employment_dt_change:
             from src.celery.tasks import clean_wdays
             from src.timetable.models import WorkerDay
             from src.util.models_converter import Converter

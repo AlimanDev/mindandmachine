@@ -134,25 +134,21 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "selected_shop": 10.75,
                         "other_shops": 10.75
                     },
-                    "work_hours_curr_month_end": {
-                        "total": 21.5,
-                        "selected_shop": 10.75,
-                        "other_shops": 10.75
-                    },
                     "work_hours_prev_months": {
                         "total": 0,
                         "selected_shop": 0,
                         "other_shops": 0
                     },
-                    "work_hours_prev_period": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
+                    "work_hours_curr_month_end": {
+                        "value": 21.5
                     },
-                    "work_hours_acc_period": {
+                    "work_hours_until_acc_period_end": {
                         "total": 21.5,
                         "selected_shop": 10.75,
                         "other_shops": 10.75
+                    },
+                    "work_hours_acc_period": {
+                        "value": 21.5
                     },
                     "day_type": {
                         "W": 2,
@@ -195,30 +191,26 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "selected_shop": 10.75,
                         "other_shops": 21.5
                     },
+                    "work_hours_prev_months": {
+                        "total": 0,
+                        "selected_shop": 0,
+                        "other_shops": 0
+                    },
                     "work_hours_curr_month": {
                         "total": 32.25,
                         "selected_shop": 10.75,
                         "other_shops": 21.5
                     },
                     "work_hours_curr_month_end": {
+                        "value": 32.25
+                    },
+                    "work_hours_until_acc_period_end": {
                         "total": 32.25,
                         "selected_shop": 10.75,
                         "other_shops": 21.5
-                    },
-                    "work_hours_prev_months": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
-                    },
-                    "work_hours_prev_period": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
                     },
                     "work_hours_acc_period": {
-                        "total": 32.25,
-                        "selected_shop": 10.75,
-                        "other_shops": 21.5
+                        "value": 32.25
                     },
                     "day_type": {
                         "H": 2,
@@ -260,30 +252,26 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "selected_shop": 10.75,
                         "other_shops": 10.75
                     },
+                    "work_hours_prev_months": {
+                        "total": 0,
+                        "selected_shop": 0,
+                        "other_shops": 0
+                    },
                     "work_hours_curr_month": {
                         "total": 21.5,
                         "selected_shop": 10.75,
                         "other_shops": 10.75
                     },
                     "work_hours_curr_month_end": {
+                        "value": 21.5
+                    },
+                    "work_hours_until_acc_period_end": {
                         "total": 21.5,
                         "selected_shop": 10.75,
                         "other_shops": 10.75
-                    },
-                    "work_hours_prev_months": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
-                    },
-                    "work_hours_prev_period": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
                     },
                     "work_hours_acc_period": {
-                        "total": 21.5,
-                        "selected_shop": 10.75,
-                        "other_shops": 10.75
+                        "value": 21.5
                     },
                     "day_type": {
                         "H": 1,
@@ -317,6 +305,11 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             },
             "fact": {
                 "approved": {
+                    "work_hours_prev_months": {
+                        "total": 0,
+                        "selected_shop": 0,
+                        "other_shops": 0
+                    },
                     "work_days": {
                         "total": 2,
                         "selected_shop": 1,
@@ -333,24 +326,15 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "other_shops": 10.75
                     },
                     "work_hours_curr_month_end": {
+                        "value": 21.5
+                    },
+                    "work_hours_until_acc_period_end": {
                         "total": 21.5,
                         "selected_shop": 10.75,
                         "other_shops": 10.75
-                    },
-                    "work_hours_prev_months": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
-                    },
-                    "work_hours_prev_period": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
                     },
                     "work_hours_acc_period": {
-                        "total": 21.5,
-                        "selected_shop": 10.75,
-                        "other_shops": 10.75
+                        "value": 21.5
                     },
                     "day_type": {
                         "W": 2
@@ -391,30 +375,26 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "selected_shop": 32.25,
                         "other_shops": 21.5
                     },
+                    "work_hours_prev_months": {
+                        "total": 0,
+                        "selected_shop": 0,
+                        "other_shops": 0
+                    },
                     "work_hours_curr_month": {
                         "total": 53.75,
                         "selected_shop": 32.25,
                         "other_shops": 21.5
                     },
                     "work_hours_curr_month_end": {
+                        "value": 53.75
+                    },
+                    "work_hours_until_acc_period_end": {
                         "total": 53.75,
                         "selected_shop": 32.25,
                         "other_shops": 21.5
-                    },
-                    "work_hours_prev_months": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
-                    },
-                    "work_hours_prev_period": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
                     },
                     "work_hours_acc_period": {
-                        "total": 53.75,
-                        "selected_shop": 32.25,
-                        "other_shops": 21.5
+                        "value": 53.75
                     },
                     "day_type": {
                         "W": 5
@@ -455,30 +435,26 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "selected_shop": 21.5,
                         "other_shops": 10.75
                     },
+                    "work_hours_prev_months": {
+                        "total": 0,
+                        "selected_shop": 0,
+                        "other_shops": 0
+                    },
                     "work_hours_curr_month": {
                         "total": 32.25,
                         "selected_shop": 21.5,
                         "other_shops": 10.75
                     },
                     "work_hours_curr_month_end": {
+                        "value": 32.25
+                    },
+                    "work_hours_until_acc_period_end": {
                         "total": 32.25,
                         "selected_shop": 21.5,
                         "other_shops": 10.75
-                    },
-                    "work_hours_prev_months": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
-                    },
-                    "work_hours_prev_period": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
                     },
                     "work_hours_acc_period": {
-                        "total": 32.25,
-                        "selected_shop": 21.5,
-                        "other_shops": 10.75
+                        "value": 32.25
                     },
                     "day_type": {
                         "W": 3
@@ -510,7 +486,6 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                 }
             }
         }}
-        self.print_resp(response)
         self.assertEqual(response.json()[str(self.user2.id)], stat[str(self.user2.id)])
 
     def test_daily_stat(self):
