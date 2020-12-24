@@ -880,16 +880,6 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         elif True in wdays:
                             wd_obj.parent_worker_day=wdays[True]
 
-                        # удаляем существующий рабочий день (в т.ч. скрытый) перед созданием
-                        # TODO: можно ли удалить все такие дни 1 запросом в самом начале?
-                        if wd['type'] == WorkerDay.TYPE_WORKDAY:
-                            WorkerDay.objects_with_excluded.filter(
-                                is_approved=False,
-                                is_fact=False,
-                                dt=dt,
-                                worker_id=uid,
-                            ).delete()
-
                         if wd['type'] == WorkerDay.TYPE_WORKDAY:
                             wd_obj.shop = shop
                             wd_obj.employment = employments.get(uid)
@@ -899,6 +889,14 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                                 wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
                                 wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
                                 # wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
+
+                                if wd_obj.id is None:
+                                    WorkerDay.objects_with_excluded.filter(
+                                        is_approved=False,
+                                        is_fact=False,
+                                        dt=wd_obj.dt,
+                                        worker_id=wd_obj.worker_id,
+                                    ).delete()
                                 wd_obj.save()
 
                                 wdd_list = []
@@ -923,6 +921,13 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                                 wd_obj.work_hours = timedelta(hours=0)
                                 wd_obj.shop = None
                                 wd_obj.employment = None
+                                if wd_obj.id is None:
+                                    WorkerDay.objects_with_excluded.filter(
+                                        is_approved=False,
+                                        is_fact=False,
+                                        dt=wd_obj.dt,
+                                        worker_id=wd_obj.worker_id,
+                                    ).delete()
                                 wd_obj.save()
 
                 for work_type in shop.worktype_set.all():
