@@ -239,6 +239,7 @@ class WorkerNormHoursGetter(WorkerIterateWorkDaysParamGetter):
                 dt_start=dt_from,
                 dt_end=dt_to,
                 rate=empl.norm_work_hours,
+                hours_in_a_week=getattr(empl.position, 'hours_in_a_week', 40),
             )
             self.empls_norms[(dt_from, dt_to)] = (empl, empl_norm_hours)
             norm_hours += empl_norm_hours
@@ -270,6 +271,7 @@ CURR_MONTH_POSTFIX = 'curr_month'  # текущий месяц
 CURR_MONTH_END_POSTFIX = 'curr_month_end'  # с начала уч. периода до конца текущего месяца
 PREV_MONTHS_POSTFIX = 'prev_months'  # прошедшие месяца
 ACC_PERIOD_POSTFIX = 'acc_period'  # весь учетный период
+UNTIL_ACC_PERIOD_END_POSTFIX = 'until_acc_period_end'  # до конца уч. периода (включая текущий месяц)
 
 
 COMBINED_GRAPHS_MAPPING = {
@@ -278,17 +280,32 @@ COMBINED_GRAPHS_MAPPING = {
     ('fact', 'combined'): ('plan', 'approved'),
 }
 
+# за пред. периоды учитывать факт. часы
+WORK_HOURS_PREV_PERIODS_MAPPING = {
+    ('plan', 'approved'): ('fact', 'approved'),
+    ('plan', 'not_approved'): ('fact', 'approved'),
+    ('plan', 'combined'): ('fact', 'approved'),
+}
+
 worker_params_getters = (
     # рабочих дней
     ('work_days', {'cls': WorkerWorkDaysGetter},),  # Рабочих дней за выбранный период
 
     # рабочих часов
     ('work_hours', {'cls': WorkerWorkHoursGetter},),
+    (f'work_hours_{PREV_MONTHS_POSTFIX}', {
+        'cls': WorkerWorkHoursGetter,
+        'res_mapping': WORK_HOURS_PREV_PERIODS_MAPPING,
+    }),
     (f'work_hours_{CURR_MONTH_POSTFIX}', {'cls': WorkerWorkHoursGetter},),
-    (f'work_hours_{CURR_MONTH_END_POSTFIX}', {'cls': WorkerWorkHoursGetter},),
-    (f'work_hours_{PREV_MONTHS_POSTFIX}', {'cls': WorkerWorkHoursGetter},),
-    (f'work_hours_{PREV_PERIOD_POSTFIX}', {'cls': WorkerWorkHoursGetter},),
-    (f'work_hours_{ACC_PERIOD_POSTFIX}', {'cls': WorkerWorkHoursGetter},),
+    (f'work_hours_{CURR_MONTH_END_POSTFIX}', {
+        'calc_str': f'{{work_hours_{PREV_MONTHS_POSTFIX}|total}}+{{work_hours_{CURR_MONTH_POSTFIX}|total}}',
+    },),
+    # (f'work_hours_{PREV_PERIOD_POSTFIX}', {'cls': WorkerWorkHoursGetter},),
+    (f'work_hours_{UNTIL_ACC_PERIOD_END_POSTFIX}', {'cls': WorkerWorkHoursGetter},),
+    (f'work_hours_{ACC_PERIOD_POSTFIX}', {
+        'calc_str': f'{{work_hours_{PREV_MONTHS_POSTFIX}|total}}+{{work_hours_{UNTIL_ACC_PERIOD_END_POSTFIX}|total}}',
+    },),
 
     # количество типов дней
     ('day_type', {'cls': WorkerDayTypesCountGetter},),
@@ -304,13 +321,13 @@ worker_params_getters = (
         'calc_str': f'{{work_hours_{CURR_MONTH_POSTFIX}|total}}-{{norm_hours_{CURR_MONTH_POSTFIX}|value}}',
     },),
     (f'overtime_{CURR_MONTH_END_POSTFIX}', {
-        'calc_str': f'{{work_hours_{CURR_MONTH_END_POSTFIX}|total}}-{{norm_hours_{CURR_MONTH_END_POSTFIX}|value}}',
+        'calc_str': f'{{work_hours_{CURR_MONTH_END_POSTFIX}|value}}-{{norm_hours_{CURR_MONTH_END_POSTFIX}|value}}',
     },),
     (f'overtime_{PREV_MONTHS_POSTFIX}', {
         'calc_str': f'{{work_hours_{PREV_MONTHS_POSTFIX}|total}}-{{norm_hours_{PREV_MONTHS_POSTFIX}|value}}',
     },),
     (f'overtime_{ACC_PERIOD_POSTFIX}', {
-        'calc_str': f'{{work_hours_{ACC_PERIOD_POSTFIX}|total}}-{{norm_hours_{ACC_PERIOD_POSTFIX}|value}}',
+        'calc_str': f'{{work_hours_{ACC_PERIOD_POSTFIX}|value}}-{{norm_hours_{ACC_PERIOD_POSTFIX}|value}}',
     },),
 )
 worker_params_getters_map = dict(worker_params_getters)
@@ -338,6 +355,12 @@ class WorkersStatsGetter:
     @cached_property
     def acc_period_range(self):
         return self.network.get_acc_period_range(self.dt_from)
+
+    @cached_property
+    def until_acc_period_end_range(self):
+        dt_from = self.dt_from.replace(day=1)
+        _acc_period_dt_from, acc_period_dt_to = self.acc_period_range
+        return dt_from, acc_period_dt_to
 
     @cached_property
     def curr_month_range(self):
@@ -371,7 +394,7 @@ class WorkersStatsGetter:
             dt_from=dt_from,
             dt_to=dt_to,
             shop_id=self.shop_id,
-        )
+        ).select_related('position')
         if self.worker_id:
             employments = employments.filter(user_id=self.worker_id)
         if self.worker_id__in:
@@ -436,6 +459,8 @@ class WorkersStatsGetter:
             kwargs['dt_from'], kwargs['dt_to'] = self.prev_months_range
         elif param_name.endswith(ACC_PERIOD_POSTFIX):
             kwargs['dt_from'], kwargs['dt_to'] = self.acc_period_range
+        elif param_name.endswith(UNTIL_ACC_PERIOD_END_POSTFIX):
+            kwargs['dt_from'], kwargs['dt_to'] = self.until_acc_period_end_range
 
         return kwargs
 
@@ -577,8 +602,8 @@ class CalendarPaidDays:
             'hours': -day_hours.sum(),
         }
 
-    def get_prod_cal_days(self, dt_start, dt_end, rate=100):
+    def get_prod_cal_days(self, dt_start, dt_end, rate=100, hours_in_a_week=40):
         return self.calendar_days.loc[(
                 (self.calendar_days.index >= dt_start)
                 & (self.calendar_days.index <= dt_end)
-        )].hours.sum() * rate / 100
+        )].hours.sum() * (rate / 100) * (hours_in_a_week / 40)

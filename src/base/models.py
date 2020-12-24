@@ -621,6 +621,7 @@ class WorkerPosition(AbstractActiveNamedModel):
         blank=True,
     )
     breaks = models.ForeignKey(Break, on_delete=models.PROTECT, null=True, blank=True)
+    hours_in_a_week = models.PositiveSmallIntegerField(default=40, verbose_name='Часов в рабочей неделе')
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
@@ -774,7 +775,7 @@ class Employment(AbstractActiveModel):
                 wd.save(update_fields=['work_hours'])
 
         if (is_new or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
-                self.network.clean_wdays_on_employment_dt_change:
+                self.network and self.network.clean_wdays_on_employment_dt_change:
             from src.celery.tasks import clean_wdays
             from src.timetable.models import WorkerDay
             from src.util.models_converter import Converter
