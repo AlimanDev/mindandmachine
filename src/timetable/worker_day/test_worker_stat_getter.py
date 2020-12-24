@@ -3,7 +3,9 @@ from datetime import date, timedelta
 from django.test import TestCase
 
 from etc.scripts import fill_calendar
-from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, EmploymentFactory, ShopSettingsFactory
+from src.base.tests.factories import (
+    NetworkFactory, ShopFactory, UserFactory, EmploymentFactory, ShopSettingsFactory, WorkerPositionFactory
+)
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from .stat import WorkersStatsGetter
@@ -20,14 +22,17 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         cls.shop = ShopFactory(settings=cls.shop_settings)
         cls.shop2 = ShopFactory(settings=cls.shop_settings)
         cls.user = UserFactory()
+        cls.position = WorkerPositionFactory()
         cls.employment = EmploymentFactory(
             shop=cls.shop, user=cls.user,
             dt_hired=cls.dt_from - timedelta(days=90), dt_fired=None,
+            position=cls.position,
         )
         fill_calendar.fill_days('2020.12.1', '2020.12.31', cls.shop.region.id)
 
     def setUp(self):
         self.network.refresh_from_db()
+        self.position.refresh_from_db()
 
     def _set_accounting_period_length(self, length):
         self.network.accounting_period_length = length
@@ -139,5 +144,57 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             stats[str(self.user.id)]['fact']['approved']['overtime_curr_month'],
             {
                 'value': -165.0,
+            }
+        )
+
+    def test_work_hours_for_prev_months_counted_from_fact(self):
+        self._set_accounting_period_length(3)
+        WorkerDayFactory(is_fact=True, is_approved=True, worker=self.user, employment=self.employment,
+                         shop=self.shop, dt=date(2020, 10, 1), type='W')
+        WorkerDayFactory(is_fact=True, is_approved=True, worker=self.user, employment=self.employment,
+                         shop=self.shop, dt=date(2020, 11, 1), type='W')
+        WorkerDayFactory(is_fact=True, is_approved=True, worker=self.user, employment=self.employment,
+                         shop=self.shop, dt=date(2020, 12, 1), type='W')
+
+        WorkerDayFactory(is_fact=False, is_approved=True, worker=self.user, employment=self.employment,
+                         shop=self.shop, dt=date(2020, 10, 1), type='W')
+        WorkerDayFactory(is_fact=False, is_approved=True, worker=self.user, employment=self.employment,
+                         shop=self.shop, dt=date(2020, 12, 1), type='W')
+
+        stats = self._get_worker_stats()
+        self.assertDictEqual(
+            stats[str(self.user.id)]['fact']['approved']['work_hours_prev_months'],
+            {'other_shops': 0, 'selected_shop': 18.0, 'total': 18.0}
+        )
+        self.assertDictEqual(
+            stats[str(self.user.id)]['plan']['approved']['work_hours_prev_months'],
+            {'other_shops': 0, 'selected_shop': 18.0, 'total': 18.0}
+        )
+        self.assertDictEqual(
+            stats[str(self.user.id)]['fact']['approved']['work_hours_acc_period'],
+            {'value': 27}
+        )
+        self.assertDictEqual(
+            stats[str(self.user.id)]['plan']['approved']['work_hours_acc_period'],
+            {'value': 27}
+        )
+        self.assertDictEqual(
+            stats[str(self.user.id)]['fact']['approved']['overtime_acc_period'],
+            {'value': -491.0}
+        )
+        self.assertDictEqual(
+            stats[str(self.user.id)]['plan']['approved']['overtime_acc_period'],
+            {'value': -491.0}
+        )
+
+    def test_hours_in_a_week_affect_norm_hours(self):
+        self.position.hours_in_a_week = 39
+        self.position.save()
+
+        stats = self._get_worker_stats()
+        self.assertDictEqual(
+            stats[str(self.user.id)]['plan']['approved']['norm_hours_curr_month'],
+            {
+                'value': 178.42499999999998,
             }
         )
