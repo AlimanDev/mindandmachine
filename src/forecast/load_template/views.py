@@ -236,7 +236,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
         except celery_exceptions.OperationalError:
             calculate_shops_load(load_template_id, dt_from, dt_to, shop_id=shop_id)
 
-        return Response(200)
+        return Response("Данные для расчета нагрузки успешно отправлены на сервер.")
 
 
     def destroy(self, request, pk=None):
