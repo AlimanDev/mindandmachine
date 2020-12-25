@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'drf_yasg',
     'corsheaders',
     'rest_framework',
     'django_filters',
@@ -287,6 +288,16 @@ MEDIA_URL = '/_i/media/'
 
 SESSION_COOKIE_SECURE = True
 
+REDOC_SETTINGS = {
+    'PATH_IN_MIDDLE': True,
+    'HIDE_HOSTNAME': True,
+}
+
+SWAGGER_SETTINGS = {
+    'TAGS_SORTER': 'alpha',
+    'OPERATIONS_SORTER': 'alpha',
+    'DEFAULT_AUTO_SCHEMA_CLASS': "src.util.openapi.auto_schema.WFMAutoSchema",
+}
 
 # DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
 
