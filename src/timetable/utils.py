@@ -236,8 +236,8 @@ class CleanWdaysHelper:
                     skipped += 1
 
         self.logger.info(
-            'clean_wdays finished, results: not_found=%s, changed=%s, skipped=%s',
-            not_found, changed, skipped,
+            'clean_wdays finished, results: not_found=%s, changed=%s, skipped=%s, empl_cleaned=%s',
+            not_found, changed, skipped, empl_cleaned,
         )
         return {
             'not_found': not_found,
