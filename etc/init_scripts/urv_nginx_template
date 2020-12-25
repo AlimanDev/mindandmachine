@@ -28,6 +28,10 @@ server {
         alias /var/www/servers/%s/media/;
     }
 
+    location /_i/media/ {
+        alias /var/www/servers/%s/media/;
+    }
+
     location /static/admin/ {
         alias /var/www/servers/%s/admin/;
     }

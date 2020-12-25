@@ -61,6 +61,7 @@ class WorkerDayListSerializer(serializers.Serializer):
     parent_worker_day_id = serializers.IntegerField()
     shop_code = serializers.CharField(required=False, read_only=True)
     user_login = serializers.CharField(required=False, read_only=True)
+    created_by_id = serializers.IntegerField(read_only=True)
 
     def __init__(self, *args, **kwargs):
         super(WorkerDayListSerializer, self).__init__(*args, **kwargs)
@@ -205,7 +206,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     def _create_update_clean(self, validated_data, instance=None):
         worker_id = validated_data.get('worker_id', instance.worker_id if instance else None)
         if worker_id:
-            wdays_qs = WorkerDay.objects.filter(
+            wdays_qs = WorkerDay.objects_with_excluded.filter(
                 worker_id=worker_id,
                 dt=validated_data.get('dt'),
                 is_approved=validated_data.get(
@@ -385,12 +386,22 @@ class VacancySerializer(serializers.Serializer):
 
 
 class AutoSettingsSerializer(serializers.Serializer):
+    default_error_messages = {
+        'check_dates': _('Date start should be less then date end'),
+    }
+
     shop_id = serializers.IntegerField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
     is_remaking = serializers.BooleanField(default=False)
     use_not_approved = serializers.BooleanField(default=False)
     delete_created_by = serializers.BooleanField(default=False)
+
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+
+        if self.validated_data.get('dt_from') > self.validated_data.get('dt_to'):
+            raise self.fail('check_dates')
 
 
 class ListChangeSrializer(serializers.Serializer):
