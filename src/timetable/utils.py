@@ -95,6 +95,28 @@ def wd_stat_count_total(worker_days, shop):
 
 
 class CleanWdaysHelper:
+    """
+    Класс, предназначенный для того, чтобы корректировать рабочие дни
+    (изначально делался для того, чтобы пофиксить последствия того, что Ортека шлет трудоустройства задним числом)
+
+    Проходит по всем дням, которые находятся с учетом filter_kwargs и exclude_kwargs
+    Алгоритм для каждого дня:
+    1. Если нету активного трудоустройства:
+    1.1 Если тип дня один из [WorkerDay.TYPE_MATERNITY, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK], то КОНЕЦ.
+    1.2 В остальных случаях очищаем employment_id, КОНЕЦ.
+    2. Если есть активное трудоустройство:
+    2.1 Если employment в дне и в активном трудоустройстве не совпадают:
+    2.1.1 Если в дне магазин не равен магазину из активного трудоустройства на этот день и is_vacancy=False,
+        то очищаем employment, КОНЕЦ.
+    2.1.2 В остальных случаях делаем employment в дне равным активному трудоустройству.
+    2.2 Если тип дня рабочий день (type == 'W'), то корректируем is_vacancy:
+        если магазины в дне и в активном трудоустройстве отличаются, то ставим is_vacancy=True,
+        если не отличаются, то ставим False
+    2.3 Если тип не в TYPES_WITH_TM_RANGE, то корректируем удаляем shop_id и проставляем is_vacancy=False
+    КОНЕЦ.
+
+    КОНЕЦ -- завершения алгоритма и переход к следующему дню сотрудника.
+    """
     def __init__(
             self,
             filter_kwargs: dict = None,
@@ -121,7 +143,7 @@ class CleanWdaysHelper:
             self.filter_kwargs, self.exclude_kwargs, self.only_logging
         )
 
-        wdays_qs = WorkerDay.objects.exclude(
+        wdays_qs = WorkerDay.objects_with_excluded.exclude(
             worker__isnull=True,
         ).exclude(
             type=WorkerDay.TYPE_EMPTY,
@@ -134,11 +156,11 @@ class CleanWdaysHelper:
         not_found = 0
         changed = 0
         skipped = 0
-        deleted = 0
+        empl_cleaned = 0
 
         for worker_day in wdays_qs:
             with transaction.atomic() if not self.only_logging else dummy_context_mgr():
-                wd_qs = WorkerDay.objects.filter(id=worker_day.id)
+                wd_qs = WorkerDay.objects_with_excluded.filter(id=worker_day.id)
                 if not self.only_logging:
                     wd_qs = wd_qs.select_for_update()
                 wd = wd_qs.first()
@@ -156,16 +178,26 @@ class CleanWdaysHelper:
 
                 if not worker_active_empl:
                     if wd.type in [WorkerDay.TYPE_MATERNITY, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK]:
-                        self._log_wd(wd, 'skip deleting')
                         continue
 
-                    self._log_wd(wd, 'deleted')
-                    deleted += 1
+                    self._log_wd(wd, 'no active empl empl_cleaned')
+                    empl_cleaned += 1
                     if not self.only_logging:
-                        wd.delete()
+                        wd.employment_id = None
+                        wd.save(update_fields=('employment_id',))
+
                     continue
 
                 if wd.employment_id != worker_active_empl.id:
+                    if wd.is_fact is False and wd.shop_id \
+                            and wd.shop_id != worker_active_empl.shop_id and wd.is_vacancy is False:
+                        self._log_wd(wd, 'plan empl_cleaned')
+                        empl_cleaned += 1
+                        if not self.only_logging:
+                            wd.employment_id = None
+                            wd.save(update_fields=('employment_id',))
+                        continue
+
                     changes.update({'employment_id': {
                         'from': wd.employment_id,
                         'to': worker_active_empl.id,
@@ -180,7 +212,7 @@ class CleanWdaysHelper:
                         }})
                         wd.is_vacancy = not worker_active_empl.is_equal_shops
 
-                elif wd.type not in WorkerDay.TYPES_WITH_TM_RANGE:
+                if wd.type not in WorkerDay.TYPES_WITH_TM_RANGE:
                     if wd.shop_id is not None:
                         changes.update({'shop_id': {
                             'from': wd.shop_id,
@@ -204,7 +236,12 @@ class CleanWdaysHelper:
                     skipped += 1
 
         self.logger.info(
-            'clean_wdays finished, results: not_found=%s, changed=%s, skipped=%s, deleted=%s',
-            not_found, changed, skipped, deleted,
+            'clean_wdays finished, results: not_found=%s, changed=%s, skipped=%s',
+            not_found, changed, skipped,
         )
-        return {'not_found': not_found, 'changed': changed, 'skipped': skipped, 'deleted': deleted}
+        return {
+            'not_found': not_found,
+            'changed': changed,
+            'skipped': skipped,
+            'empl_cleaned': empl_cleaned,
+        }

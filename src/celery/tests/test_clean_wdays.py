@@ -17,12 +17,14 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
         cls.user = UserFactory()
         cls.shop = ShopFactory()
 
-    def test_wday_deleted_when_there_is_no_other_active_empl(self):
+    def test_empl_cleaned_when_there_is_no_other_active_empl(self):
         empl = EmploymentFactory(
             user=self.user, shop=self.shop,
             dt_hired=self.dt_now - timedelta(days=30), dt_fired=self.dt_now - timedelta(days=1),
         )
         wd = WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
             dt=self.dt_now,
             worker=self.user,
             shop=self.shop,
@@ -33,8 +35,10 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
         clean_wdays_helper = CleanWdaysHelper(only_logging=False)
         results = clean_wdays_helper.run()
 
-        self.assertDictEqual(results, {'changed': 0, 'deleted': 1, 'skipped': 0, 'not_found': 0})
-        self.assertFalse(WorkerDay.objects.filter(id=wd.id).exists())
+        self.assertDictEqual(results, {'changed': 0, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 1})
+        self.assertTrue(WorkerDay.objects.filter(id=wd.id).exists())
+        wd.refresh_from_db()
+        self.assertIsNone(wd.employment_id)
 
     def test_wday_inactive_employment_replaced_with_active_employment_from_the_same_shop(self):
         inactive_empl = EmploymentFactory(
@@ -56,13 +60,41 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
         clean_wdays_helper = CleanWdaysHelper(only_logging=False)
         results = clean_wdays_helper.run()
 
-        self.assertDictEqual(results, {'changed': 1, 'deleted': 0, 'skipped': 0, 'not_found': 0})
+        self.assertDictEqual(results, {'changed': 1, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 0})
         self.assertTrue(WorkerDay.objects.filter(id=wd.id).exists())
         wd.refresh_from_db()
         self.assertEqual(wd.employment_id, active_empl.id)
         self.assertFalse(wd.is_vacancy)
 
-    def test_wday_inactive_employment_replaced_with_active_employment_from_other_shop(self):
+    def test_empl_cleaned_if_is_plan_and_shops_differs_and_is_vacancy_false(self):
+        inactive_empl = EmploymentFactory(
+            user=self.user, shop=self.shop,
+            dt_hired=self.dt_now - timedelta(days=30), dt_fired=self.dt_now - timedelta(days=1),
+        )
+        other_shop = ShopFactory()
+        EmploymentFactory(
+            user=self.user, shop=other_shop,
+            dt_hired=self.dt_now, dt_fired=self.dt_now + timedelta(days=50),
+        )
+        wd = WorkerDayFactory(
+            dt=self.dt_now + timedelta(days=1),
+            worker=self.user,
+            shop=self.shop,
+            employment=inactive_empl,
+            type=WorkerDay.TYPE_WORKDAY,
+            is_vacancy=False,
+        )
+
+        clean_wdays_helper = CleanWdaysHelper(only_logging=False)
+        results = clean_wdays_helper.run()
+
+        self.assertDictEqual(results, {'changed': 0, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 1})
+        self.assertTrue(WorkerDay.objects.filter(id=wd.id).exists())
+        wd.refresh_from_db()
+        self.assertIsNone(wd.employment_id)
+        self.assertFalse(wd.is_vacancy)
+
+    def test_wday_inactive_employment_replaced_with_active_employment_from_other_shop_if_is_vacancy_true(self):
         inactive_empl = EmploymentFactory(
             user=self.user, shop=self.shop,
             dt_hired=self.dt_now - timedelta(days=30), dt_fired=self.dt_now - timedelta(days=1),
@@ -78,12 +110,13 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
             shop=self.shop,
             employment=inactive_empl,
             type=WorkerDay.TYPE_WORKDAY,
+            is_vacancy=True,
         )
 
         clean_wdays_helper = CleanWdaysHelper(only_logging=False)
         results = clean_wdays_helper.run()
 
-        self.assertDictEqual(results, {'changed': 1, 'deleted': 0, 'skipped': 0, 'not_found': 0})
+        self.assertDictEqual(results, {'changed': 1, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 0})
         self.assertTrue(WorkerDay.objects.filter(id=wd.id).exists())
         wd.refresh_from_db()
         self.assertEqual(wd.employment_id, active_empl_in_other_shop.id)
@@ -107,9 +140,32 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
         clean_wdays_helper = CleanWdaysHelper(only_logging=False)
         results = clean_wdays_helper.run()
 
-        self.assertDictEqual(results, {'changed': 1, 'deleted': 0, 'skipped': 0, 'not_found': 0})
+        self.assertDictEqual(results, {'changed': 1, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 0})
         self.assertTrue(WorkerDay.objects.filter(id=wd.id).exists())
         wd.refresh_from_db()
         self.assertEqual(wd.employment_id, active_empl_in_other_shop.id)
         self.assertFalse(wd.is_vacancy)
         self.assertIsNone(wd.shop_id)
+
+    def test_fact_not_deleted_but_empl_cleaned_if_there_is_no_active_empl(self):
+        empl = EmploymentFactory(
+            user=self.user, shop=self.shop,
+            dt_hired=self.dt_now - timedelta(days=30), dt_fired=self.dt_now - timedelta(days=1),
+        )
+        wd = WorkerDayFactory(
+            is_fact=True,
+            is_approved=True,
+            dt=self.dt_now,
+            worker=self.user,
+            shop=self.shop,
+            employment=empl,
+            type=WorkerDay.TYPE_WORKDAY,
+        )
+
+        clean_wdays_helper = CleanWdaysHelper(only_logging=False)
+        results = clean_wdays_helper.run()
+
+        self.assertDictEqual(results, {'changed': 0, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 1})
+        self.assertTrue(WorkerDay.objects.filter(id=wd.id).exists())
+        wd.refresh_from_db()
+        self.assertIsNone(wd.employment_id)

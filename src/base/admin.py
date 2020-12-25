@@ -12,6 +12,7 @@ from src.base.models import (
     ProductionDay,
     Network,
     Break,
+    SAWHSettings,
 )
 from src.timetable.models import GroupWorkerDayPermission
 
@@ -124,3 +125,33 @@ class ProductionDayAdmin(admin.ModelAdmin):
 class BreakAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('name',)
+
+
+@admin.register(SAWHSettings)
+class SAWHSettingsAdmin(admin.ModelAdmin):
+    list_display = (
+        'name',
+        'year',
+    )
+    list_filter = (
+        'year',
+        'shops',
+        'positions',
+    )
+    filter_horizontal = (
+        'shops',
+        'positions',
+    )
+
+    def get_queryset(self, request):
+        return super(SAWHSettingsAdmin, self).get_queryset(request).filter(network_id=request.user.network_id)
+
+    def has_change_permission(self, request, obj=None):
+        if obj and obj.code == 'default':
+            return False
+        return super(SAWHSettingsAdmin, self).has_change_permission(request, obj=obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.code == 'default':
+            return False
+        return super(SAWHSettingsAdmin, self).has_delete_permission(request, obj=obj)

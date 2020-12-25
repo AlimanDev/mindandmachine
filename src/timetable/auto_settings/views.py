@@ -3,6 +3,7 @@ import requests
 from datetime import datetime, timedelta, date
 from django.utils import timezone
 from django.conf import settings
+from django.db import transaction
 from django.db.models import F, Count, Sum, Q
 from django.db.models.functions import Coalesce, Extract
 from django.core.serializers.json import DjangoJSONEncoder
@@ -10,7 +11,6 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
-
 from src.celery.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
 from src.base.permissions import Permission
 
@@ -821,105 +821,118 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         except:
             raise ValidationError('cannot parse json')
 
-        timetable = ShopMonthStat.objects.get(id=form['timetable_id'])
+        with transaction.atomic():
+            timetable = ShopMonthStat.objects.get(id=form['timetable_id'])
 
-        shop = timetable.shop
-        # break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
-        timetable.status = data['timetable_status']
-        timetable.status_message = (data.get('status_message') or '')[:256]
-        timetable.save()
-        if timetable.status != ShopMonthStat.READY and timetable.status_message:
-            return Response(timetable.status_message)
+            shop = timetable.shop
+            # break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
+            timetable.status = data['timetable_status']
+            timetable.status_message = (data.get('status_message') or '')[:256]
+            timetable.save()
+            if timetable.status != ShopMonthStat.READY and timetable.status_message:
+                return Response(timetable.status_message)
 
-
-
-        if data['users']:
-            dt_from = date.max
-            dt_to = date.min
-            for wd in list(data['users'].values())[0]['workdays']:
-                dt = Converter.parse_date(wd['dt'])
-                dt_from = dt if dt < dt_from else dt_from
-                dt_to = dt if dt > dt_to else dt_to
-
-            employments = {
-                e.user_id: e
-                for e in Employment.objects.get_active(
-                    shop.network_id,
-                    dt_from=dt_from,
-                    dt_to=dt_to,
-                    shop=shop,
-                )
-            }
-            for uid, v in data['users'].items():
-                uid = int(uid)
-                for wd in v['workdays']:
-                    # todo: actually use a form here is better
-                    # todo: too much request to db
-
+            if data['users']:
+                dt_from = date.max
+                dt_to = date.min
+                for wd in list(data['users'].values())[0]['workdays']:
                     dt = Converter.parse_date(wd['dt'])
-                    wd_obj = WorkerDay(
-                        is_approved=False,
-                        is_fact=False,
-                        dt=dt,
-                        worker_id=uid,
-                        type=wd['type']
+                    dt_from = dt if dt < dt_from else dt_from
+                    dt_to = dt if dt > dt_to else dt_to
+
+                employments = {
+                    e.user_id: e
+                    for e in Employment.objects.get_active(
+                        shop.network_id,
+                        dt_from=dt_from,
+                        dt_to=dt_to,
+                        shop=shop,
                     )
+                }
+                for uid, v in data['users'].items():
+                    uid = int(uid)
+                    for wd in v['workdays']:
+                        # todo: actually use a form here is better
+                        # todo: too much request to db
 
-                    wdays = {w.is_approved: w for w in WorkerDay.objects.filter(
-                        is_fact=False,
-                        worker_id=uid,
-                        dt=dt,
-                    )}
+                        dt = Converter.parse_date(wd['dt'])
+                        wd_obj = WorkerDay(
+                            is_approved=False,
+                            is_fact=False,
+                            dt=dt,
+                            worker_id=uid,
+                            type=wd['type']
+                        )
 
-                    #неподтвержденная версия
-                    if False in wdays:
-                        wd_obj = wdays[False]
+                        wdays = {w.is_approved: w for w in WorkerDay.objects.filter(
+                            is_fact=False,
+                            worker_id=uid,
+                            dt=dt,
+                        )}
+
+                        #неподтвержденная версия
+                        if False in wdays:
+                            wd_obj = wdays[False]
+                            if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
+                                wd_obj.type = wd['type']
+                                wd_obj.created_by_id = None
+                                WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
+                        elif True in wdays:
+                            wd_obj.parent_worker_day=wdays[True]
+
+                        if wd['type'] == WorkerDay.TYPE_WORKDAY:
+                            wd_obj.shop = shop
+                            wd_obj.employment = employments.get(uid)
+
                         if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
-                            wd_obj.type = wd['type']
-                            wd_obj.created_by_id = None
-                            WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
-                    elif True in wdays:
-                        wd_obj.parent_worker_day=wdays[True]
+                            if WorkerDay.is_type_with_tm_range(wd_obj.type):
+                                wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
+                                wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
+                                # wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
 
-                    if wd['type'] == WorkerDay.TYPE_WORKDAY:
-                        wd_obj.shop = shop
-                        wd_obj.employment = employments.get(uid)
+                                if wd_obj.id is None:
+                                    WorkerDay.objects_with_excluded.filter(
+                                        is_approved=False,
+                                        is_fact=False,
+                                        dt=wd_obj.dt,
+                                        worker_id=wd_obj.worker_id,
+                                    ).delete()
+                                wd_obj.save()
 
-                    if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
-                        if WorkerDay.is_type_with_tm_range(wd_obj.type):
-                            wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
-                            wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
-                            # wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
-                            wd_obj.save()
+                                wdd_list = []
 
-                            wdd_list = []
+                                for wdd in wd['details']:
+                                    wdd_el = WorkerDayCashboxDetails(
+                                        worker_day=wd_obj,
+                                        work_part=wdd['percent'] / 100,
+                                        work_type_id=wdd['work_type_id'],
+                                    )
+                                    # if wdd['work_type_id'] > 0:
+                                    #     wdd_el.work_type_id = wdd['type']
+                                    # else:
+                                    #     wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
 
-                            for wdd in wd['details']:
-                                wdd_el = WorkerDayCashboxDetails(
-                                    worker_day=wd_obj,
-                                    work_part=wdd['percent'] / 100,
-                                    work_type_id=wdd['work_type_id'],
-                                )
-                                # if wdd['work_type_id'] > 0:
-                                #     wdd_el.work_type_id = wdd['type']
-                                # else:
-                                #     wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
+                                    wdd_list.append(wdd_el)
+                                WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
 
-                                wdd_list.append(wdd_el)
-                            WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
+                            else:
+                                wd_obj.dttm_work_start = None
+                                wd_obj.dttm_work_end = None
+                                wd_obj.work_hours = timedelta(hours=0)
+                                wd_obj.shop = None
+                                wd_obj.employment = None
+                                if wd_obj.id is None:
+                                    WorkerDay.objects_with_excluded.filter(
+                                        is_approved=False,
+                                        is_fact=False,
+                                        dt=wd_obj.dt,
+                                        worker_id=wd_obj.worker_id,
+                                    ).delete()
+                                wd_obj.save()
 
-                        else:
-                            wd_obj.dttm_work_start = None
-                            wd_obj.dttm_work_end = None
-                            wd_obj.work_hours = timedelta(hours=0)
-                            wd_obj.shop = None
-                            wd_obj.employment = None
-                            wd_obj.save()
-
-
-            for work_type in shop.worktype_set.all():
-                cancel_shop_vacancies.apply_async((shop.id, work_type.id))
-                create_shop_vacancies_and_notify.apply_async((shop.id, work_type.id))
+                for work_type in shop.worktype_set.all():
+                    cancel_shop_vacancies.apply_async((shop.id, work_type.id))
+                    create_shop_vacancies_and_notify.apply_async((shop.id, work_type.id))
 
         return Response({})
 

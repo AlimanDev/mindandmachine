@@ -68,7 +68,7 @@ def fill_data_test(shop_ids, work_type_name, dt_start, dt_end, is_fact=False, is
 
 
 def delete_workerdays(shop_ids, dt_start, dt_end, is_fact=False, is_approved=True):
-    WorkerDay.objects.filter(
+    WorkerDay.objects_with_excluded.filter(
         dt__gte=dt_start,
         dt__lte=dt_end,
         shop_id__in=shop_ids,
