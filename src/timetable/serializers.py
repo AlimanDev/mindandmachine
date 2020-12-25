@@ -61,6 +61,7 @@ class WorkerDayListSerializer(serializers.Serializer):
     parent_worker_day_id = serializers.IntegerField()
     shop_code = serializers.CharField(required=False, read_only=True)
     user_login = serializers.CharField(required=False, read_only=True)
+    created_by_id = serializers.IntegerField(read_only=True)
 
     def __init__(self, *args, **kwargs):
         super(WorkerDayListSerializer, self).__init__(*args, **kwargs)
@@ -206,7 +207,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     def _create_update_clean(self, validated_data, instance=None):
         worker_id = validated_data.get('worker_id', instance.worker_id if instance else None)
         if worker_id:
-            wdays_qs = WorkerDay.objects.filter(
+            wdays_qs = WorkerDay.objects_with_excluded.filter(
                 worker_id=worker_id,
                 dt=validated_data.get('dt'),
                 is_approved=validated_data.get(

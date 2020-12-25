@@ -1,11 +1,14 @@
 import datetime
 import json
+from calendar import monthrange
 
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
+from django.contrib.postgres.fields import JSONField
+from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
@@ -23,6 +26,13 @@ from src.conf.djconfig import QOS_TIME_FORMAT
 
 
 class Network(AbstractActiveModel):
+    ACCOUNTING_PERIOD_LENGTH_CHOICES = (
+        (1, 'Месяц'),
+        (3, 'Квартал'),
+        (6, 'Пол года'),
+        (12, 'Год'),
+    )
+
     class Meta:
         verbose_name = 'Сеть магазинов'
         verbose_name_plural = 'Сети магазинов'
@@ -53,6 +63,8 @@ class Network(AbstractActiveModel):
     clean_wdays_on_employment_dt_change = models.BooleanField(
         default=False, verbose_name='Запускать скрипт очистки дней при изменении дат трудойстройства',
     )
+    accounting_period_length = models.PositiveSmallIntegerField(
+        choices=ACCOUNTING_PERIOD_LENGTH_CHOICES, verbose_name='Длина учетного периода', default=1)
 
     def get_department(self):
         return None
@@ -64,6 +76,20 @@ class Network(AbstractActiveModel):
             '06:00:00',
         )
         return json.loads(self.settings_values).get('night_edges', default_night_edges)
+
+    @cached_property
+    def accounting_periods_count(self):
+        return int(12 / self.accounting_period_length)
+
+    def get_acc_period_range(self, dt):
+        period_num_within_year = dt.month // self.accounting_period_length
+        if dt.month % self.accounting_period_length > 0:
+            period_num_within_year += 1
+        end_month = period_num_within_year * self.accounting_period_length
+        start_month = end_month - (self.accounting_period_length - 1)
+
+        return datetime.date(dt.year, start_month, 1), \
+            datetime.date(dt.year, end_month, monthrange(dt.year, end_month)[1])
 
     def __str__(self):
         return f'name: {self.name}, code: {self.code}'
@@ -466,22 +492,37 @@ class ProductionDay(AbstractModel):
         return '(dt {}, type {}, id {})'.format(self.dt, self.type, self.id)
 
     @classmethod
-    def get_norm_work_hours(cls, region_id, month, year):
-        norm_work_hours = ProductionDay.objects.filter(
-            dt__month=month,
+    def get_norm_work_hours(cls, region_id, year, month=None):
+        """
+        Получение нормы часов по производственному календарю для региона.
+        Если не указывать месяц, то вернется словарь с часами для всех месяцев года.
+        :param region_id:
+        :param year:
+        :param month:
+        :return: Словарь, где ключ - номер месяца, значение - количество часов.
+        """
+        filter_kwargs = dict(
             dt__year=year,
             type__in=ProductionDay.WORK_TYPES,
             region_id=region_id,
+        )
+        if month:
+            filter_kwargs['dt__month'] = month
+
+        norm_work_hours = ProductionDay.objects.filter(
+            **filter_kwargs
         ).annotate(
             work_hours=Case(
                 When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
                 When(type=ProductionDay.TYPE_SHORT_WORK,
                      then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_SHORT_WORK])),
             )
-        ).aggregate(
+        ).values(
+            'dt__month',
+        ).annotate(
             norm_work_hours=Sum('work_hours', output_field=IntegerField())
-        )['norm_work_hours']
-        return norm_work_hours
+        ).values_list('dt__month', 'norm_work_hours')
+        return dict(norm_work_hours)
 
 
 class User(DjangoAbstractUser, AbstractModel):
@@ -580,6 +621,7 @@ class WorkerPosition(AbstractActiveNamedModel):
         blank=True,
     )
     breaks = models.ForeignKey(Break, on_delete=models.PROTECT, null=True, blank=True)
+    hours_in_a_week = models.PositiveSmallIntegerField(default=40, verbose_name='Часов в рабочей неделе')
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
@@ -732,25 +774,31 @@ class Employment(AbstractActiveModel):
                     ):
                 wd.save(update_fields=['work_hours'])
 
-        if not is_new and (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired')) and \
-                self.network.clean_wdays_on_employment_dt_change:
+        if (is_new or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
+                self.network and self.network.clean_wdays_on_employment_dt_change:
             from src.celery.tasks import clean_wdays
             from src.timetable.models import WorkerDay
             from src.util.models_converter import Converter
-            clean_wdays.apply_async(
-                kwargs={
-                    'filter_kwargs': {
-                        'type': WorkerDay.TYPE_WORKDAY,
-                        'employment_id': self.id,
-                    },
-                    'exclude_kwargs': {
-                        'dt__gte': Converter.convert_date(self.dt_hired),
-                        'dt__lt': Converter.convert_date(self.dt_fired),
-                    },
-                    'only_logging': False,
-                },
-                countdown=60 * 5,
-            )
+            kwargs = {
+                'only_logging': False,
+            }
+            if is_new:
+                kwargs['filter_kwargs'] = {
+                    'type': WorkerDay.TYPE_WORKDAY,
+                    'worker_id': self.user_id,
+                }
+                if self.dt_hired:
+                    kwargs['filter_kwargs']['dt__gte'] = Converter.convert_date(self.dt_hired)
+                if self.dt_fired:
+                    kwargs['filter_kwargs']['dt__lt'] = Converter.convert_date(self.dt_fired)
+            else:
+                kwargs['filter_kwargs'] = {
+                    'type': WorkerDay.TYPE_WORKDAY,
+                    'worker_id': self.user_id,
+                    'dt__gte': Converter.convert_date(self.dt_hired),
+                }
+
+            clean_wdays.apply_async(kwargs=kwargs)
 
         return res
 
@@ -1019,3 +1067,52 @@ class Notification(AbstractModel):
 
     is_read = models.BooleanField(default=False)
     event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True)
+
+
+def default_work_hours_by_months():
+    return {f'm{month_num}': 100 for month_num in range(1, 12 + 1)}
+
+
+class SAWHSettings(AbstractActiveNamedModel):
+    """
+    Настройки суммированного учета рабочего времени.
+    Модель нужна для распределения часов по месяцам в рамках учетного периода при автосоставлении.
+    """
+    year = models.PositiveSmallIntegerField(verbose_name='Год учетного периода')
+    work_hours_by_months = JSONField(
+        default=default_work_hours_by_months,
+        verbose_name='Распределение рабочих часов по месяцам (в процентах)',
+        help_text='Сумма часов в рамках учетного периода должна быть равна сумме часов по произв. календарю.',
+    )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
+    positions = models.ManyToManyField('base.WorkerPosition', blank=True, verbose_name='Позиции')
+    shops = models.ManyToManyField('base.Shop', blank=True, verbose_name='Подразделения')
+
+    class Meta:
+        verbose_name = 'Настройки суммированного учета рабочего времени'
+        verbose_name_plural = 'Настройки суммированного учета рабочего времени'
+        unique_together = (
+            ('code', 'year', 'network'),
+        )
+
+    def __str__(self):
+        return f'{self.name} {self.network.name}'
+
+    def clean(self):
+        if self.year and self.network.accounting_periods_count:
+            current_year = datetime.datetime.now().year
+            if self.year < current_year:
+                raise ValidationError('Нельзя создавать/менять настройки за прошедшие года')
+
+            for period_num_within_year in range(1, self.network.accounting_periods_count + 1):
+                end_month = period_num_within_year * self.network.accounting_period_length
+                start_month = end_month - (self.network.accounting_period_length - 1)
+
+                summarized_account_period_work_hours_sum = sum(
+                    v for k, v in self.work_hours_by_months.items() if start_month <= int(k.lstrip('m')) <= end_month)
+                account_period_percents_summ = self.network.accounting_period_length * 100
+                if summarized_account_period_work_hours_sum != account_period_percents_summ:
+                    raise ValidationError(
+                        f'В учетном периоде №{period_num_within_year} (месяца {start_month}-{end_month}) '
+                        f'не сходится сумма процентов. '
+                        f'Сeйчас {summarized_account_period_work_hours_sum}, должно быть {account_period_percents_summ}'
+                    )
