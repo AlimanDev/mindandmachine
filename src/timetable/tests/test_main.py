@@ -1257,7 +1257,8 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
                 type='H',
                 opens=None,
                 closes=None,
-            )
+                modified_by=self.user1,
+            ),
         )
         self._test_crop_both_bulk_and_original_save(10, 20, 8, 21, 0)
 

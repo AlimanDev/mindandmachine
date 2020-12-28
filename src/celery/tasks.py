@@ -3,13 +3,14 @@ import logging
 import os
 import time as time_in_secs
 from datetime import date, timedelta, datetime
-
+from src.util.models_converter import Converter
 import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.db.models import Q
+from django.db import transaction
 from django.utils import timezone
 from django.utils.timezone import now
 
@@ -782,6 +783,9 @@ def fill_shop_schedule(shop_id, dt_from, periods=90):
     :param periods: на сколько дней вперед заполнить расписания от dt_from
     :return:
     """
+    if isinstance(dt_from, str):
+        dt_from = Converter.parse_date(dt_from)
+
     shop = Shop.objects.get(id=shop_id)
 
     existing_shop_schedule_dict = {
@@ -796,7 +800,8 @@ def fill_shop_schedule(shop_id, dt_from, periods=90):
     to_create = []
     to_update = []
     for dt in pd.date_range(dt_from, periods=periods, normalize=True):
-        existing_shop_schedule = existing_shop_schedule_dict.get(dt.date())
+        dt = dt.date()
+        existing_shop_schedule = existing_shop_schedule_dict.get(dt)
 
         if not existing_shop_schedule:
             to_create.append(dt)
@@ -847,10 +852,10 @@ def fill_shop_schedule(shop_id, dt_from, periods=90):
                     'type': schedule_type,
                     'opens': opens,
                     'closes': closes,
-                }
+                },
             )
 
-    return {f'created: {len(to_create)}, updated: {len(to_update)}, skipped: {skipped}'}
+    return {'created': len(to_create), 'updated': len(to_update), 'skipped': skipped}
 
 
 @app.task
@@ -865,3 +870,18 @@ def fill_active_shops_schedule():
         res[shop_id] = fill_shop_schedule(shop_id, now.date())
 
     return res
+
+
+@app.task
+def recalc_wdays(shop_id, dt_from, dt_to):
+    wdays_qs = WorkerDay.objects.filter(
+        shop_id=shop_id,
+        dt__gte=dt_from,
+        dt__lte=dt_to,
+        type=WorkerDay.TYPE_WORKDAY,
+    )
+    for wd_id in wdays_qs.values_list('id', flat=True):
+        with transaction.atomic():
+            wd_obj = WorkerDay.objects.filter(id=wd_id).select_for_update().first()
+            if wd_obj:
+                wd_obj.save()

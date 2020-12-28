@@ -168,4 +168,4 @@ class ShopScheduleAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         obj.modified_by = request.user
-        return super(ShopScheduleAdmin, self).save_model(request, obj, form, change)
+        obj.save(recalc_wdays=True)

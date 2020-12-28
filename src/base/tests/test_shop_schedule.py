@@ -1,5 +1,6 @@
 from datetime import timedelta, datetime
 
+from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from src.base.models import ShopSchedule
@@ -9,6 +10,7 @@ from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 
 
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 class TestShopScheduleViewSet(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -28,13 +30,14 @@ class TestShopScheduleViewSet(TestsHelperMixin, APITestCase):
 
     def setUp(self):
         self.client.force_authenticate(user=self.user)
+        self.shop.refresh_from_db()
 
     def test_list(self):
         resp = self.client.get(
             path=self.get_url('ShopSchedule-list', department_pk=self.shop.id),
             data=dict(
                 dt__gte=Converter.convert_date(self.dt),
-                dt__lte=Converter.convert_date(self.dt + timedelta(days=31)),
+                dt__lte=Converter.convert_date(self.dt + timedelta(days=30)),
             )
         )
         resp_data = resp.json()
