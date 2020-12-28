@@ -302,7 +302,6 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             for k, v in json.loads(getattr(self, attr)).items()
         }
 
-    # TODO: разобраться в тестах с инвалидацией cached_property
     @property
     def open_times(self):
         return self._parse_times('tm_open_dict')
