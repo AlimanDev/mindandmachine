@@ -106,13 +106,13 @@ class CleanWdaysHelper:
     1.2 В остальных случаях очищаем employment_id, КОНЕЦ.
     2. Если есть активное трудоустройство:
     2.1 Если employment в дне и в активном трудоустройстве не совпадают:
-    2.1.1 Если в дне магазин не равен магазину из активного трудоустройства на этот день и is_vacancy=False,
+    2.1.1 Если clean_plan_empl=True и если в дне магазин не равен магазину из активного трудоустройства на этот день и is_vacancy=False,
         то очищаем employment, КОНЕЦ.
     2.1.2 В остальных случаях делаем employment в дне равным активному трудоустройству.
-    2.2 Если тип дня рабочий день (type == 'W'), то корректируем is_vacancy:
+    #2.2 Если тип дня рабочий день (type == 'W'), то корректируем is_vacancy:
         если магазины в дне и в активном трудоустройстве отличаются, то ставим is_vacancy=True,
         если не отличаются, то ставим False
-    2.3 Если тип не в TYPES_WITH_TM_RANGE, то корректируем удаляем shop_id и проставляем is_vacancy=False
+    #2.3 Если тип не в TYPES_WITH_TM_RANGE, то корректируем удаляем shop_id и проставляем is_vacancy=False
     КОНЕЦ.
 
     КОНЕЦ -- завершения алгоритма и переход к следующему дню сотрудника.
@@ -122,11 +122,13 @@ class CleanWdaysHelper:
             filter_kwargs: dict = None,
             exclude_kwargs: dict = None,
             only_logging=True,
+            clean_plan_empl=False,
             logger=logging.getLogger('clean_wdays'),
     ):
         self.filter_kwargs = filter_kwargs
         self.exclude_kwargs = exclude_kwargs
         self.only_logging = only_logging
+        self.clean_plan_empl = clean_plan_empl
 
         self.logger = logger
 
@@ -189,7 +191,7 @@ class CleanWdaysHelper:
                     continue
 
                 if wd.employment_id != worker_active_empl.id:
-                    if wd.is_fact is False and wd.shop_id \
+                    if self.clean_plan_empl and wd.is_fact is False and wd.shop_id \
                             and wd.shop_id != worker_active_empl.shop_id and wd.is_vacancy is False:
                         self._log_wd(wd, 'plan empl_cleaned')
                         empl_cleaned += 1
@@ -204,27 +206,27 @@ class CleanWdaysHelper:
                     }})
                     wd.employment_id = worker_active_empl.id
 
-                if wd.type == WorkerDay.TYPE_WORKDAY:
-                    if wd.is_vacancy != (not worker_active_empl.is_equal_shops):
-                        changes.update({'is_vacancy': {
-                            'from': wd.is_vacancy,
-                            'to': not worker_active_empl.is_equal_shops,
-                        }})
-                        wd.is_vacancy = not worker_active_empl.is_equal_shops
-
-                if wd.type not in WorkerDay.TYPES_WITH_TM_RANGE:
-                    if wd.shop_id is not None:
-                        changes.update({'shop_id': {
-                            'from': wd.shop_id,
-                            'to': None,
-                        }})
-                        wd.shop_id = None
-                    if wd.is_vacancy is True:
-                        changes.update({'is_vacancy': {
-                            'from': wd.is_vacancy,
-                            'to': False,
-                        }})
-                        wd.is_vacancy = False
+                # if wd.type == WorkerDay.TYPE_WORKDAY:
+                #     if wd.is_vacancy != (not worker_active_empl.is_equal_shops):
+                #         changes.update({'is_vacancy': {
+                #             'from': wd.is_vacancy,
+                #             'to': not worker_active_empl.is_equal_shops,
+                #         }})
+                #         wd.is_vacancy = not worker_active_empl.is_equal_shops
+                #
+                # if wd.type not in WorkerDay.TYPES_WITH_TM_RANGE:
+                #     if wd.shop_id is not None:
+                #         changes.update({'shop_id': {
+                #             'from': wd.shop_id,
+                #             'to': None,
+                #         }})
+                #         wd.shop_id = None
+                #     if wd.is_vacancy is True:
+                #         changes.update({'is_vacancy': {
+                #             'from': wd.is_vacancy,
+                #             'to': False,
+                #         }})
+                #         wd.is_vacancy = False
 
                 if changes:
                     self._log_wd(wd, 'changed', extra=changes)
