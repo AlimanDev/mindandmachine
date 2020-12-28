@@ -10,7 +10,7 @@ from rest_framework.validators import UniqueValidator
 
 from src.base.exceptions import MessageError
 from src.base.fields import CurrentUserNetwork
-from src.base.models import Shop
+from src.base.models import Shop, ShopSchedule
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.models_converter import Converter
 
@@ -43,6 +43,17 @@ class RestrictedTimeValidator:
                 raise serializers.ValidationError(self.error_messages['invalid_time_format'].format(format=self.format))
 
 
+class NonstandardShopScheduleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShopSchedule
+        fields = (
+            'dt',
+            'type',
+            'opens',
+            'closes',
+        )
+
+
 class ShopSerializer(serializers.ModelSerializer):
     parent_id = serializers.IntegerField(required=False)
     parent_code = serializers.CharField(required=False)
@@ -53,6 +64,7 @@ class ShopSerializer(serializers.ModelSerializer):
     settings_id = serializers.IntegerField(required=False)
     tm_open_dict = serializers.JSONField(required=False)
     tm_close_dict = serializers.JSONField(required=False)
+    nonstandard_schedule = NonstandardShopScheduleSerializer(many=True, allow_null=True, required=False)
     load_template_status = serializers.CharField(read_only=True)
     timezone = TimeZoneField(required=False)
     is_active = serializers.BooleanField(required=False, default=True)
@@ -73,7 +85,7 @@ class ShopSerializer(serializers.ModelSerializer):
                   'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id',
                   'network_id', 'restricted_start_times', 'restricted_end_times', 'exchange_settings_id',
                   'load_template_id', 'area', 'forecast_step_minutes', 'load_template_status', 'is_active',
-                  'director_code', 'latitude', 'longitude', 'director_id', 'distance']
+                  'director_code', 'latitude', 'longitude', 'director_id', 'distance', 'nonstandard_schedule']
         extra_kwargs = {
             'restricted_start_times': {
                 'validators': [RestrictedTimeValidator()]
@@ -125,6 +137,31 @@ class ShopSerializer(serializers.ModelSerializer):
             self.validated_data['tm_close_dict'] = json.dumps(self.validated_data.get('tm_close_dict'))
 
         return True
+
+    def _update_or_create_nested_data(self, instance, nonstandard_schedule):
+        for schedule_dict in nonstandard_schedule:
+            ShopSchedule.objects.update_or_create(
+                shop=instance,
+                dt=schedule_dict['dt'],
+                defaults=dict(
+                    type=schedule_dict['type'],
+                    opens=schedule_dict['opens'],
+                    closes=schedule_dict['closes'],
+                    modified_by=self.context.get('request').user if 'request' in self.context else None,
+                ),
+            )
+
+    def create(self, validated_data):
+        nonstandard_schedule = validated_data.pop('nonstandard_schedule', [])
+        shop = super(ShopSerializer, self).create(validated_data)
+        self._update_or_create_nested_data(shop, nonstandard_schedule)
+        return shop
+
+    def update(self, instance, validated_data):
+        nonstandard_schedule = validated_data.pop('nonstandard_schedule', [])
+        shop = super(ShopSerializer, self).update(instance, validated_data)
+        self._update_or_create_nested_data(shop, nonstandard_schedule)
+        return shop
 
 
 class ShopStatSerializer(serializers.Serializer):

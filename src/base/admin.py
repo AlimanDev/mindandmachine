@@ -13,6 +13,7 @@ from src.base.models import (
     Network,
     Break,
     SAWHSettings,
+    ShopSchedule,
 )
 from src.timetable.models import GroupWorkerDayPermission
 
@@ -29,7 +30,7 @@ class RegionAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerPosition)
 class WorkerPositionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('id', 'name', 'code')
     search_fields = ('name', 'code')
 
 
@@ -64,8 +65,9 @@ class QsUserAdmin(admin.ModelAdmin):
 
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
-    list_display = ('name', 'parent_title', 'id')
+    list_display = ('name', 'parent_title', 'id', 'code')
     search_fields = ('name', 'parent__name', 'id', 'code')
+    raw_id_fields = ('director',)
 
     @staticmethod
     def parent_title(instance: Shop):
@@ -123,7 +125,7 @@ class ProductionDayAdmin(admin.ModelAdmin):
 
 @admin.register(Break)
 class BreakAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('id', 'name', 'code')
     search_fields = ('name',)
 
 
@@ -155,3 +157,14 @@ class SAWHSettingsAdmin(admin.ModelAdmin):
         if obj and obj.code == 'default':
             return False
         return super(SAWHSettingsAdmin, self).has_delete_permission(request, obj=obj)
+
+
+@admin.register(ShopSchedule)
+class ShopScheduleAdmin(admin.ModelAdmin):
+    raw_id_fields = ('shop',)
+    list_filter = ('dt', 'shop',)
+    list_display = ('dt', 'shop', 'modified_by', 'type', 'opens', 'closes')
+
+    def save_model(self, request, obj, form, change):
+        obj.modified_by = request.user
+        return super(ShopScheduleAdmin, self).save_model(request, obj, form, change)

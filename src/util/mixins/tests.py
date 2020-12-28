@@ -93,3 +93,21 @@ class TestsHelperMixin:
                             day, plan_start_time) + timedelta(minutes=start_minutes)
                         kwargs['dttm_work_end'] = datetime.combine(day, plan_end_time) + timedelta(minutes=end_minutes)
                         WorkerDay.objects.create(**kwargs)
+
+    def clean_cached_props(self):
+        cached_props = (
+            ('root_shop', ['open_times', 'close_times']),
+            ('reg_shop1', ['open_times', 'close_times']),
+            ('reg_shop2', ['open_times', 'close_times']),
+            ('shop', ['open_times', 'close_times']),
+            ('shop2', ['open_times', 'close_times']),
+            ('shop3', ['open_times', 'close_times']),
+        )
+        for attr, props in cached_props:
+            if hasattr(self, attr):
+                for prop in props:
+                    try:
+                        obj = getattr(self, attr)
+                        del obj.__dict__[prop]
+                    except (KeyError, AttributeError):
+                        pass

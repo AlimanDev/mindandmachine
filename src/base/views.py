@@ -30,8 +30,15 @@ from src.base.serializers import (
     GroupSerializer,
     AutoTimetableSerializer,
     BreakSerializer,
+    ShopScheduleSerializer,
 )
-from src.base.filters import NotificationFilter, SubscribeFilter, EmploymentFilter, BaseActiveNamedModelFilter
+from src.base.filters import (
+    NotificationFilter,
+    SubscribeFilter,
+    EmploymentFilter,
+    BaseActiveNamedModelFilter,
+    ShopScheduleFilter,
+)
 from src.base.models import (
     Employment,
     FunctionGroup,
@@ -43,6 +50,7 @@ from src.base.models import (
     User,
     Group,
     Break,
+    ShopSchedule,
 )
 
 from src.base.filters import UserFilter
@@ -266,4 +274,32 @@ class BreakViewSet(BaseActiveNamedModelViewSet):
     def get_queryset(self):
         return Break.objects.filter(
             network_id=self.request.user.network_id,
+        )
+
+
+class ShopScheduleViewSet(UpdateorCreateViewSet):
+    permission_classes = [Permission]
+    serializer_class = ShopScheduleSerializer
+    filterset_class = ShopScheduleFilter
+    openapi_tags = ['ShopSchedule',]
+
+    lookup_field = 'dt'
+    lookup_url_kwarg = 'dt'
+
+    def get_queryset(self):
+        return ShopSchedule.objects.filter(
+            shop_id=self.kwargs.get('department_pk'), shop__network_id=self.request.user.network_id)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            modified_by=self.request.user,
+            shop_id=self.kwargs.get('department_pk'),
+            dt=self.kwargs.get('dt'),
+        )
+
+    def perform_update(self, serializer):
+        serializer.save(
+            modified_by=self.request.user,
+            shop_id=self.kwargs.get('department_pk'),
+            dt=self.kwargs.get('dt'),
         )

@@ -470,6 +470,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             max_work_coef += shop.settings.more_norm / 100
             min_work_coef -= shop.settings.less_norm / 100
         method_params = json.loads(shop.settings.method_params)
+
         shop_dict = {
             'shop_name': shop.name,
             'process_type': shop.settings.process_type,
@@ -481,6 +482,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'period_step': period_step,
             'tm_start_work': shop.open_times,
             'tm_end_work': shop.close_times,
+            'work_schedule': shop.get_work_schedule(dt_from, dt_to),
             'min_work_period': shop.settings.shift_start * 60,
             'max_work_period': shop.settings.shift_end * 60,
             'tm_lock_start': list(map(lambda x: x + ':00', json.loads(shop.restricted_start_times))),
