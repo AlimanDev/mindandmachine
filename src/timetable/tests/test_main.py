@@ -101,7 +101,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.shop.save()
         self.shop.settings.breaks.value = '[[0, 2000, [30, 30]]]'
         self.shop.settings.breaks.save()
-        self.clean_cached_props()
 
     def test_get_list(self):
         dt = Converter.convert_date(self.dt)
@@ -532,7 +531,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
     def _test_tabel(self, plan_start, plan_end, fact_start, fact_end, expected_start, expected_end, expected_hours,
                     extra_get_params=None, tabel_kwarg='is_tabel'):
-        self.clean_cached_props()
         plan_dttm_work_start = plan_start
         plan_dttm_work_end = plan_end
         WorkerDay.objects.filter(
@@ -1164,9 +1162,6 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
         cls.shop.settings.breaks.value = '[[0, 2000, [30, 30]]]'
         cls.shop.settings.breaks.save()
 
-    def setUp(self):
-        self.clean_cached_props()
-
     def _test_crop_hours(
             self, shop_open_h, shop_close_h, work_start_h, work_end_h, expected_work_h, bulk=False, crop=True):
         self.shop.tm_open_dict = f'{{"all":"{shop_open_h}:00:00"}}' if isinstance(shop_open_h, int) else shop_open_h
@@ -1210,7 +1205,6 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
             timedelta(hours=expected_work_h) if isinstance(expected_work_h, int) else expected_work_h,
             wd.work_hours
         )
-        self.clean_cached_props()
 
     def _test_crop_both_bulk_and_original_save(self, *args, **kwargs):
         self._test_crop_hours(*args, bulk=False, **kwargs)

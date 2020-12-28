@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, time
 
 from django.urls import reverse
 
-from src.base.models import Employment
+from src.base.models import Employment, FunctionGroup
 from src.util.utils import generate_user_token
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
 from src.util.test import create_departments_and_users
@@ -94,8 +94,8 @@ class TestsHelperMixin:
                         kwargs['dttm_work_end'] = datetime.combine(day, plan_end_time) + timedelta(minutes=end_minutes)
                         WorkerDay.objects.create(**kwargs)
 
-    def clean_cached_props(self):
-        cached_props = (
+    def clean_cached_props(self, cached_props=None):
+        cached_props = cached_props or (
             ('root_shop', ['open_times', 'close_times']),
             ('reg_shop1', ['open_times', 'close_times']),
             ('reg_shop2', ['open_times', 'close_times']),
@@ -111,3 +111,13 @@ class TestsHelperMixin:
                         del obj.__dict__[prop]
                     except (KeyError, AttributeError):
                         pass
+
+    @staticmethod
+    def add_group_perm(group, perm_name, perm_method):
+        FunctionGroup.objects.create(
+            group=group,
+            method=perm_method,
+            func=perm_name,
+            level_up=1,
+            level_down=99,
+        )
