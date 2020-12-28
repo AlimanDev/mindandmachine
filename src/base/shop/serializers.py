@@ -140,6 +140,7 @@ class ShopSerializer(serializers.ModelSerializer):
 
     def _update_or_create_nested_data(self, instance, nonstandard_schedule):
         for schedule_dict in nonstandard_schedule:
+            # TODO: оптимизировать и добавить запуск пересчета часов для дней
             ShopSchedule.objects.update_or_create(
                 shop=instance,
                 dt=schedule_dict['dt'],

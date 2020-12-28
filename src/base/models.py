@@ -3,6 +3,7 @@ import json
 from calendar import monthrange
 
 import pandas as pd
+from celery import chain
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -254,6 +255,8 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     longitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Долгота')
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
 
+    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict'])
+
     def __str__(self):
         return '{}, {}, {}'.format(
             self.name,
@@ -341,6 +344,20 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             load_template = self.load_template_id
             self.load_template_id = new_template
         super().save(*args, **kwargs)
+
+        if self.tracker.has_changed('tm_open_dict') or self.tracker.has_changed('tm_close_dict'):
+            from src.util.models_converter import Converter
+            from src.celery.tasks import fill_shop_schedule, recalc_wdays
+            dt_now = datetime.datetime.now().date()
+            ch = chain(
+                fill_shop_schedule.si(shop_id=self.id, dt_from=Converter.convert_date(dt_now)),
+                recalc_wdays.si(
+                    shop_id=self.id,
+                    dt_from=Converter.convert_date(dt_now),
+                    dt_to=Converter.convert_date(dt_now + datetime.timedelta(days=90))),
+            )
+            ch.apply_async()
+
         if False: # self.load_template_id:  # aa: todo: fixme: delete tmp False
             from src.forecast.load_template.utils import apply_load_template
             if load_template != None and load_template != new_template:
@@ -1180,6 +1197,8 @@ class ShopSchedule(AbstractModel):
     closes = models.TimeField(verbose_name='Время закрытия', null=True, blank=True)
     type = models.CharField(max_length=2, verbose_name='Тип', choices=SHOP_SCHEDULE_TYPES, default=WORKDAY_TYPE)
 
+    tracker = FieldTracker(fields=['opens', 'closes', 'type'])
+
     class Meta:
         verbose_name = 'Расписание подразделения'
         verbose_name_plural = 'Расписание подразделения'
@@ -1198,3 +1217,17 @@ class ShopSchedule(AbstractModel):
         if self.type == self.HOLIDAY_TYPE:
             self.opens = None
             self.closes = None
+
+    def save(self, *args, **kwargs):
+        recalc_wdays = kwargs.pop('recalc_wdays', False)
+
+        if recalc_wdays and any(self.tracker.has_changed(f) for f in ['opens', 'closes', 'type']):
+            from src.celery.tasks import recalc_wdays
+            from src.util.models_converter import Converter
+            dt_str = Converter.convert_date(self.dt)
+            recalc_wdays.delay(
+                shop_id=self.shop_id,
+                dt_from=dt_str,
+                dt_to=dt_str,
+            )
+        return super(ShopSchedule, self).save(*args, **kwargs)
