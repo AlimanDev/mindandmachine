@@ -303,7 +303,7 @@ class WorkerDayViewSet(viewsets.ModelViewSet):
                 worker_days_q = Q()
                 for worker_id, dates_grouper in groupby(worker_dt_pairs_list, key=lambda i: i[0]):
                     worker_days_q |= Q(worker_id=worker_id, dt__in=[i[1] for i in list(dates_grouper)])
-                WorkerDay.objects.filter(
+                WorkerDay.objects_with_excluded.filter(
                     worker_days_q, is_fact=serializer.data['is_fact'],
                 ).exclude(
                     id__in=wdays_to_approve.values_list('id', flat=True)
