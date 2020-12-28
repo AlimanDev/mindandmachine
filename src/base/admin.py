@@ -164,6 +164,7 @@ class ShopScheduleAdmin(admin.ModelAdmin):
     raw_id_fields = ('shop',)
     list_filter = ('dt', 'shop',)
     list_display = ('dt', 'shop', 'modified_by', 'type', 'opens', 'closes')
+    readonly_fields = ('modified_by',)
 
     def save_model(self, request, obj, form, change):
         obj.modified_by = request.user
