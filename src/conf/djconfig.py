@@ -470,6 +470,11 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=0),
         'options': {'queue': BACKEND_QUEUE}
     },
+    'task-fill-active-shops-schedule': {
+        'task': 'src.celery.tasks.fill_active_shops_schedule',
+        'schedule': crontab(hour=1, minute=30),
+        'options': {'queue': BACKEND_QUEUE}
+    },
 }
 
 if MDA_SYNC_USER_TO_SHOP_DAILY:

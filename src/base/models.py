@@ -2,6 +2,7 @@ import datetime
 import json
 from calendar import monthrange
 
+import pandas as pd
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -301,6 +302,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             for k, v in json.loads(getattr(self, attr)).items()
         }
 
+    # TODO: разобраться в тестах с инвалидацией cached_property
     @property
     def open_times(self):
         return self._parse_times('tm_open_dict')
@@ -365,11 +367,8 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
         return offset
 
-    def get_schedule(self, dt):
-        res = {
-            'tm_open': datetime.time(0, 0, 0),
-            'tm_close': datetime.time(0, 0, 0),
-        }
+    def get_standard_schedule(self, dt):
+        res = {}
         weekday = str(dt.weekday())
 
         if 'all' in self.open_times:
@@ -382,7 +381,51 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         elif weekday in self.close_times:
             res['tm_close'] = self.close_times.get(weekday)
 
+        return res or None
+
+    def get_schedule(self, dt):
+        schedule = ShopSchedule.objects.filter(shop=self, dt=dt).first()
+        if schedule:
+            if schedule.type == ShopSchedule.WORKDAY_TYPE:
+                return {
+                    'tm_open': schedule.opens,
+                    'tm_close': schedule.closes,
+                }
+            if schedule.type == ShopSchedule.HOLIDAY_TYPE:
+                return None
+
+        return self.get_standard_schedule(dt)
+
+    def get_period_schedule(self, dt_from, dt_to):
+        # TODO: оптимизировать
+        res = {}
+        for dt in pd.date_range(dt_from, dt_to):
+           res[dt] = self.get_schedule(dt)
+
         return res
+
+    def get_work_schedule(self, dt_from, dt_to):
+        """
+        Получения расписания в виде словаря (передается на алгоритмы)
+        :param dt_from: дата от, включительно
+        :param dt_to: дата до, включительно
+        :return:
+        """
+        from src.util.models_converter import Converter
+        work_schedule = {}
+        for dt, schedule_dict in self.get_period_schedule(dt_from=dt_from, dt_to=dt_to).items():
+            schedule = None
+            if schedule_dict:
+                schedule = (
+                    Converter.convert_time(schedule_dict['tm_open']),
+                    Converter.convert_time(schedule_dict['tm_close'])
+                )
+            work_schedule[Converter.convert_date(dt)] = schedule
+        return work_schedule
+
+    @property
+    def nonstandard_schedule(self):
+        return self.shopschedule_set.filter(modified_by__isnull=False)
 
 
 class EmploymentManager(models.Manager):
@@ -881,6 +924,7 @@ class FunctionGroup(AbstractModel):
         'ShopMonthStat',
         'ShopMonthStat_status',
         'ShopSettings',
+        'ShopSchedule',
         'VacancyBlackList',
 
         'signout',
@@ -1116,3 +1160,42 @@ class SAWHSettings(AbstractActiveNamedModel):
                         f'не сходится сумма процентов. '
                         f'Сeйчас {summarized_account_period_work_hours_sum}, должно быть {account_period_percents_summ}'
                     )
+
+
+class ShopSchedule(AbstractModel):
+    WORKDAY_TYPE = 'W'
+    HOLIDAY_TYPE = 'H'
+
+    SHOP_SCHEDULE_TYPES = (
+        (WORKDAY_TYPE, 'Рабочий день'),
+        (HOLIDAY_TYPE, 'Выходной'),
+    )
+
+    modified_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, blank=True, null=True, editable=False,
+        verbose_name='Кем внесено расписание', help_text='Если null, то это стандартное расписание',
+    )
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, verbose_name='Магазин')
+    dt = models.DateField(verbose_name='Дата')
+    opens = models.TimeField(verbose_name='Время открытия', null=True, blank=True)
+    closes = models.TimeField(verbose_name='Время закрытия', null=True, blank=True)
+    type = models.CharField(max_length=2, verbose_name='Тип', choices=SHOP_SCHEDULE_TYPES, default=WORKDAY_TYPE)
+
+    class Meta:
+        verbose_name = 'Расписание подразделения'
+        verbose_name_plural = 'Расписание подразделения'
+        unique_together = (
+            ('dt', 'shop'),
+        )
+        ordering = ['dt']
+
+    def __str__(self):
+        return f'{self.shop.name} {self.dt} {self.opens}-{self.closes}'
+
+    def clean(self):
+        if self.type == self.WORKDAY_TYPE and self.opens is None or self.closes is None:
+            raise ValidationError('opens and closes fields are required for workday type')
+
+        if self.type == self.HOLIDAY_TYPE:
+            self.opens = None
+            self.closes = None
