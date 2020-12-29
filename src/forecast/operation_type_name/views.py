@@ -102,6 +102,7 @@ class OperationTypeNameViewSet(BaseActiveNamedModelViewSet):
     serializer_class = OperationTypeNameSerializer
     pagination_class = LimitOffsetPagination
     filterset_class = OperationTypeNameFilter
+    openapi_tags = ['OperationTypeName',]
 
     def get_queryset(self):
         return OperationTypeName.objects.filter(

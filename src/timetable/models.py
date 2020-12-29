@@ -539,7 +539,9 @@ class WorkerDay(AbstractModel):
             if self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
                 from src.util.models_converter import Converter
                 dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
-                shop_schedule = self.shop.get_schedule(dt)
+                shop_schedule = self.shop.get_schedule(dt=dt)
+                if shop_schedule is None:
+                    return datetime.timedelta(0)
 
                 open_at_0 = all(getattr(shop_schedule['tm_open'], a) == 0 for a in ['hour', 'second', 'minute'])
                 close_at_0 = all(getattr(shop_schedule['tm_close'], a) == 0 for a in ['hour', 'second', 'minute'])

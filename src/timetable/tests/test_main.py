@@ -8,7 +8,7 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup, Network, Employment
+from src.base.models import FunctionGroup, Network, Employment, ShopSchedule
 from src.timetable.models import (
     WorkerDay,
     AttendanceRecords,
@@ -1154,7 +1154,7 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
-        cls.dt_now = datetime.today()
+        cls.dt_now = datetime.now().date()
         cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
         cls.work_type = WorkType.objects.create(work_type_name=cls.work_type_name, shop=cls.shop)
 
@@ -1248,6 +1248,19 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
         )
 
         # todo: ночные смены (когда-нибудь)
+
+    def test_zero_hours_for_holiday(self):
+        ShopSchedule.objects.update_or_create(
+            dt=self.dt_now,
+            shop=self.shop,
+            defaults=dict(
+                type='H',
+                opens=None,
+                closes=None,
+                modified_by=self.user1,
+            ),
+        )
+        self._test_crop_both_bulk_and_original_save(10, 20, 8, 21, 0)
 
 
 class TestWorkerDayCreateFact(APITestCase):

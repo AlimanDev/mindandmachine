@@ -2,6 +2,8 @@ import datetime
 import json
 from calendar import monthrange
 
+import pandas as pd
+from celery import chain
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -11,6 +13,7 @@ from django.contrib.postgres.fields import JSONField
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
+from django.db import transaction
 from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
@@ -253,6 +256,8 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     longitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Долгота')
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
 
+    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict'])
+
     def __str__(self):
         return '{}, {}, {}'.format(
             self.name,
@@ -318,6 +323,19 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 new_dict[key.replace('d', '')] = new_dict.pop(key)
         return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
 
+    def _handle_schedule_change(self):
+        from src.util.models_converter import Converter
+        from src.celery.tasks import fill_shop_schedule, recalc_wdays
+        dt_now = datetime.datetime.now().date()
+        ch = chain(
+            fill_shop_schedule.si(shop_id=self.id, dt_from=Converter.convert_date(dt_now)),
+            recalc_wdays.si(
+                shop_id=self.id,
+                dt_from=Converter.convert_date(dt_now),
+                dt_to=Converter.convert_date(dt_now + datetime.timedelta(days=90))),
+        )
+        ch.apply_async()
+
     def save(self, *args, **kwargs):
         if self.open_times.keys() != self.close_times.keys():
             raise MessageError(code='time_shop_differerent_keys')
@@ -339,13 +357,19 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             self.refresh_from_db(fields=['load_template_id'])
             load_template = self.load_template_id
             self.load_template_id = new_template
-        super().save(*args, **kwargs)
+        res = super().save(*args, **kwargs)
+
+        if self.tracker.has_changed('tm_open_dict') or self.tracker.has_changed('tm_close_dict'):
+            transaction.on_commit(self._handle_schedule_change)
+
         if False: # self.load_template_id:  # aa: todo: fixme: delete tmp False
             from src.forecast.load_template.utils import apply_load_template
             if load_template != None and load_template != new_template:
                 apply_load_template(new_template, self.id)
             elif load_template == None:
                 apply_load_template(self.load_template_id, self.id)
+
+        return res
 
     def get_exchange_settings(self):
         return self.exchange_settings if self.exchange_settings_id \
@@ -365,11 +389,8 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
         return offset
 
-    def get_schedule(self, dt):
-        res = {
-            'tm_open': datetime.time(0, 0, 0),
-            'tm_close': datetime.time(0, 0, 0),
-        }
+    def get_standard_schedule(self, dt):
+        res = {}
         weekday = str(dt.weekday())
 
         if 'all' in self.open_times:
@@ -382,7 +403,52 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         elif weekday in self.close_times:
             res['tm_close'] = self.close_times.get(weekday)
 
+        return res or None
+
+    def get_schedule(self, dt: datetime.date):
+        return self.get_period_schedule(dt_from=dt, dt_to=dt)[dt]
+
+    def get_period_schedule(self, dt_from: datetime.date, dt_to: datetime.date):
+        res = {}
+
+        ss_dict = {}
+        for ss in ShopSchedule.objects.filter(shop=self, dt__gte=dt_from, dt__lte=dt_to):
+            schedule = None
+            if ss.type == ShopSchedule.WORKDAY_TYPE:
+                schedule = {
+                    'tm_open': ss.opens,
+                    'tm_close': ss.closes,
+                }
+            ss_dict[ss.dt] = schedule
+
+        for dt in pd.date_range(dt_from, dt_to):
+            dt = dt.date()
+            res[dt] = ss_dict.get(dt, self.get_standard_schedule(dt))
+
         return res
+
+    def get_work_schedule(self, dt_from, dt_to):
+        """
+        Получения расписания в виде словаря (передается на алгоритмы)
+        :param dt_from: дата от, включительно
+        :param dt_to: дата до, включительно
+        :return:
+        """
+        from src.util.models_converter import Converter
+        work_schedule = {}
+        for dt, schedule_dict in self.get_period_schedule(dt_from=dt_from, dt_to=dt_to).items():
+            schedule = None  # TODO: это и "нет данных" и выходной, нормально ли?
+            if schedule_dict:
+                schedule = (
+                    Converter.convert_time(schedule_dict['tm_open']),
+                    Converter.convert_time(schedule_dict['tm_close'])
+                )
+            work_schedule[Converter.convert_date(dt)] = schedule
+        return work_schedule
+
+    @property
+    def nonstandard_schedule(self):
+        return self.shopschedule_set.filter(modified_by__isnull=False)
 
 
 class EmploymentManager(models.Manager):
@@ -881,6 +947,7 @@ class FunctionGroup(AbstractModel):
         'ShopMonthStat',
         'ShopMonthStat_status',
         'ShopSettings',
+        'ShopSchedule',
         'VacancyBlackList',
 
         'signout',
@@ -1116,3 +1183,58 @@ class SAWHSettings(AbstractActiveNamedModel):
                         f'не сходится сумма процентов. '
                         f'Сeйчас {summarized_account_period_work_hours_sum}, должно быть {account_period_percents_summ}'
                     )
+
+
+class ShopSchedule(AbstractModel):
+    WORKDAY_TYPE = 'W'
+    HOLIDAY_TYPE = 'H'
+
+    SHOP_SCHEDULE_TYPES = (
+        (WORKDAY_TYPE, 'Рабочий день'),
+        (HOLIDAY_TYPE, 'Выходной'),
+    )
+
+    modified_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, blank=True, null=True, editable=False,
+        verbose_name='Кем внесено расписание', help_text='Если null, то это стандартное расписание',
+    )
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, verbose_name='Магазин')
+    dt = models.DateField(verbose_name='Дата')
+    opens = models.TimeField(verbose_name='Время открытия', null=True, blank=True)
+    closes = models.TimeField(verbose_name='Время закрытия', null=True, blank=True)
+    type = models.CharField(max_length=2, verbose_name='Тип', choices=SHOP_SCHEDULE_TYPES, default=WORKDAY_TYPE)
+
+    tracker = FieldTracker(fields=['opens', 'closes', 'type'])
+
+    class Meta:
+        verbose_name = 'Расписание подразделения'
+        verbose_name_plural = 'Расписание подразделения'
+        unique_together = (
+            ('dt', 'shop'),
+        )
+        ordering = ['dt']
+
+    def __str__(self):
+        return f'{self.shop.name} {self.dt} {self.opens}-{self.closes}'
+
+    def clean(self):
+        if self.type == self.WORKDAY_TYPE and self.opens is None or self.closes is None:
+            raise ValidationError('opens and closes fields are required for workday type')
+
+        if self.type == self.HOLIDAY_TYPE:
+            self.opens = None
+            self.closes = None
+
+    def save(self, *args, **kwargs):
+        recalc_wdays = kwargs.pop('recalc_wdays', False)
+
+        if recalc_wdays and any(self.tracker.has_changed(f) for f in ['opens', 'closes', 'type']):
+            from src.celery.tasks import recalc_wdays
+            from src.util.models_converter import Converter
+            dt_str = Converter.convert_date(self.dt)
+            recalc_wdays.delay(
+                shop_id=self.shop_id,
+                dt_from=dt_str,
+                dt_to=dt_str,
+            )
+        return super(ShopSchedule, self).save(*args, **kwargs)

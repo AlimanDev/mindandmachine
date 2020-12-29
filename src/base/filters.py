@@ -1,7 +1,7 @@
 from django.db.models import Q
 from django_filters.rest_framework import FilterSet, DateFilter, NumberFilter, CharFilter, BooleanFilter, OrderingFilter
 
-from src.base.models import  Employment, User, Notification, Subscribe, Shop
+from src.base.models import Employment, User, Notification, Subscribe, Shop, ShopSchedule
 
 
 class BaseActiveNamedModelFilter(FilterSet):
@@ -116,4 +116,13 @@ class SubscribeFilter(FilterSet):
     shop_id = NumberFilter(field_name='employments__shop_id')
     class Meta:
         model = Subscribe
-        fields = [ 'user_id', 'shop_id']
+        fields = ('user_id', 'shop_id')
+
+
+class ShopScheduleFilter(FilterSet):
+    class Meta:
+        model = ShopSchedule
+        fields = {
+            'dt': ['exact', 'lte', 'gte'],
+            'type': ['exact', 'in'],
+        }

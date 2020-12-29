@@ -172,7 +172,7 @@ class TestWorkType(APITestCase):
         self.assertIsNotNone(WorkType.objects.get(id=self.work_type1.id).dttm_deleted)
 
     def test_get_efficiency(self):
-        dt_now = datetime.now().date()
+        dt_now = datetime.now().date().replace(day=1)
         tomorrow = dt_now + timedelta(days=1)
         after_tomorrow = dt_now + timedelta(days=2)
         after_after_tomorrow = dt_now + timedelta(days=3)

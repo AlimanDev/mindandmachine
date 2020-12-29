@@ -1,9 +1,12 @@
 from django.conf import settings
-from django.conf.urls import include
+from django.conf.urls import include, url
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path
-from rest_framework.schemas import get_schema_view
+from rest_framework import permissions
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
+from src.util.openapi.auto_schema import WFMOpenAPISchemaGenerator
 
 from src.base import urls as base_api
 from src.conf.djconfig import DEBUG
@@ -64,18 +67,39 @@ if DEBUG:
 
 from django.views.generic import TemplateView
 
-urlpatterns += [path('openapi/', get_schema_view(
-    title="WFM",
-    description="Документация REST API",
-    version="1.0.0"
-), name='openapi-schema'),
-]
-urlpatterns +=  [
-    # ...
-    # Route TemplateView to serve Swagger UI template.
-    #   * Provide `extra_context` with view name of `SchemaView`.
-    path('swagger-ui/', TemplateView.as_view(
-        template_name='swagger-ui.html',
-        extra_context={'schema_url':'openapi-schema'}
-    ), name='swagger-ui'),
+# urlpatterns += [path('openapi/', get_schema_view(
+#     title="WFM",
+#     description="Документация REST API",
+#     version="1.0.0"
+# ), name='openapi-schema'),
+# ]
+# urlpatterns +=  [
+#     # ...
+#     # Route TemplateView to serve Swagger UI template.
+#     #   * Provide `extra_context` with view name of `SchemaView`.
+#     path('swagger-ui/', TemplateView.as_view(
+#         template_name='swagger-ui.html',
+#         extra_context={'schema_url':'openapi-schema'}
+#     ), name='swagger-ui'),
+# ]
+
+
+schema_view = get_schema_view(
+   openapi.Info(
+      title="WFM",
+      default_version='v1',
+      description="Документация REST API",
+    #   terms_of_service="https://www.google.com/policies/terms/",
+    #   contact=openapi.Contact(email="contact@snippets.local"),
+    #   license=openapi.License(name="BSD License"),
+   ),
+   public=True,
+   permission_classes=(permissions.IsAdminUser,),
+   generator_class=WFMOpenAPISchemaGenerator,
+)
+
+urlpatterns += [
+   url(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
+   url(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+   url(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 ]

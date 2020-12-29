@@ -20,6 +20,7 @@ from src.base.views import (
     NetworkViewSet,
     GroupViewSet,
     BreakViewSet,
+    ShopScheduleViewSet,
 )
 
 rest_auth_urls = [
@@ -48,6 +49,8 @@ router.register(r'group', GroupViewSet, basename='Group')
 router.register(r'break', BreakViewSet, basename='Break')
 
 employment_nested_router = routers.NestedSimpleRouter(router, r'employment', lookup='employment')
+shop_nested_router = routers.NestedSimpleRouter(router, r'department', lookup='department')
+shop_nested_router.register(r'schedule', ShopScheduleViewSet, basename='ShopSchedule')
 
 # Wire up our API using automatic URL routing.
 # Additionally, we include login URLs for the browsable API.
@@ -55,4 +58,5 @@ urlpatterns = [
     url(r'^auth/', include((rest_auth_urls, 'auth'), namespace='auth')),
     url(r'^', include(router.urls)),
     url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
+    url(r'^', include(shop_nested_router.urls)),
 ]

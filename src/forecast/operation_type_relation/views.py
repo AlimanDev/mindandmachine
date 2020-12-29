@@ -4,7 +4,7 @@ from django_filters import NumberFilter
 from django_filters.rest_framework import FilterSet
 from django.utils.translation import gettext_lazy as _
 
-from rest_framework import serializers, viewsets, status
+from rest_framework import serializers, status
 from rest_framework.validators import UniqueTogetherValidator
 from rest_framework.response import Response
 
@@ -13,6 +13,7 @@ from src.forecast.operation_type_template.views import OperationTypeTemplateSeri
 from src.forecast.load_template.utils import create_operation_type_relations_dict
 from src.base.exceptions import FieldError
 from src.base.permissions import Permission
+from src.base.views_abstract import BaseModelViewSet
 
 # Serializers define the API representation.
 class OperationTypeRelationSerializer(serializers.ModelSerializer):
@@ -99,14 +100,14 @@ class OperationTypeRelationFilter(FilterSet):
         }
 
 
-class OperationTypeRelationViewSet(viewsets.ModelViewSet):
+class OperationTypeRelationViewSet(BaseModelViewSet):
     """
-
-   
+    Отношения типов операций через формулу или через прогноз   
     """
     permission_classes = [Permission]
     serializer_class = OperationTypeRelationSerializer
     filterset_class = OperationTypeRelationFilter
+    openapi_tags = ['OperationTypeRelation',]
 
     def get_queryset(self):
         return OperationTypeRelation.objects.filter(

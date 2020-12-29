@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, time
-from rest_framework import serializers, viewsets, status
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from django_filters import DateFilter, NumberFilter
@@ -15,6 +15,8 @@ from src.forecast.load_template.utils import apply_reverse_formula # чтобы 
 from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util, create_demand
 from src.util.upload import get_uploaded_file
 import json
+from src.base.views_abstract import BaseModelViewSet
+from drf_yasg.utils import swagger_auto_schema
 
 
 # Serializers define the API representation.
@@ -50,6 +52,8 @@ class PeriodClientsSerializer(serializers.ModelSerializer):
 
 class PeriodClientsCreateSerializer(serializers.Serializer):
     data = serializers.JSONField(write_only=True)
+    class Meta:
+        ref_name = 'PeriodClientsFromAlgo'
 
 
 class UploadSerializer(serializers.Serializer):
@@ -77,7 +81,7 @@ class PeriodClientsFilter(FilterSet):
         }
 
 
-class PeriodClientsViewSet(viewsets.ModelViewSet):
+class PeriodClientsViewSet(BaseModelViewSet):
     """
 
     GET /rest_api/period_clients/
@@ -167,10 +171,18 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
     permission_classes = [FilteredListPermission]
     filterset_class = PeriodClientsFilter
     serializer_class = PeriodClientsSerializer
+    openapi_tags = ['TimeSerie',]
 
     def get_queryset(self):
         return self.filter_queryset(PeriodClients.objects.all())
 
+    @swagger_auto_schema(
+        request_body=PeriodClientsCreateSerializer, 
+        responses={201:'empty response'},
+        operation_description='''
+        Ожидает от алгоритмов данные и заносит их в базу
+        ''',
+    )
     def create(self, request):
         data = PeriodClientsCreateSerializer(data=request.data)
         data.is_valid(raise_exception=True)
@@ -178,6 +190,14 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         create_demand(data)
         return Response(status=status.HTTP_201_CREATED)
 
+
+    @swagger_auto_schema(
+        request_body=PeriodClientsUpdateSerializer, 
+        responses={200: 'empty response'},
+        operation_description='''
+        Метод для внесения ручных изменений в нагрузку
+        ''',
+    )
     @action(detail=False, methods=['put'])
     def put(self, request, pk=None):
         data = PeriodClientsUpdateSerializer(data=request.data)
@@ -271,6 +291,13 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
 
         return Response(status=200)
 
+    @swagger_auto_schema(
+        request_body=PeriodClientsDeleteSerializer,
+        responses={204: 'empty response'},
+        operation_description='''
+        Удаляет нагрузку за определенный период
+        ''',
+    )
     @action(detail=False, methods=['delete'])
     def delete(self, request, pk=None):
         data = PeriodClientsDeleteSerializer(data=request.data)
@@ -299,6 +326,7 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         )
         return Response(PeriodClientsSerializer(data, many=True).data)
 
+    @swagger_auto_schema(operation_description='Метод для получения индикаторов', deprecated=True)
     @action(detail=False, methods=['get'])
     def indicators(self, request):
         clients = self.get_queryset().select_related(
@@ -329,6 +357,14 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         })
 
 
+    @swagger_auto_schema(
+        request_body=UploadSerializer, 
+        operation_description='''
+        Загружает нагрузку в систему.\n 
+        Необходимо отправить файл в формате excel в поле file
+        ''',
+        responses={200: 'empty response'}, 
+    )
     @action(detail=False, methods=['post'])
     @get_uploaded_file
     def upload(self, request, file):
@@ -336,8 +372,12 @@ class PeriodClientsViewSet(viewsets.ModelViewSet):
         data.is_valid(raise_exception=True)
         return upload_demand_util(file, data.validated_data['shop_id'], lang=request.user.lang)
 
-
-    @action(detail=False, methods=['get'])
+    @swagger_auto_schema(
+        query_serializer=DownloadSerializer, 
+        operation_description='Запрос на скачивание нагрузки',
+        responses={200: 'Файл с нагрузкой в формате excel.'},
+    )
+    @action(detail=False, methods=['get'], filterset_class=None)
     def download(self, request):
         data = DownloadSerializer(data=request.query_params)
         data.is_valid(raise_exception=True)

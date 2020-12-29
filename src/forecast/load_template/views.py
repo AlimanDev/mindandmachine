@@ -1,6 +1,6 @@
 from celery import exceptions as celery_exceptions
 
-from rest_framework import serializers, viewsets
+from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -19,9 +19,12 @@ from src.base.exceptions import FieldError
 from src.base.serializers import BaseNetworkSerializer
 from src.base.models import Shop
 from src.base.permissions import Permission
+from src.base.views_abstract import BaseModelViewSet
 
 from django.db.models import Exists, OuterRef, Case, When, CharField, Value
 from django.utils.translation import gettext_lazy as _
+
+from drf_yasg.utils import swagger_auto_schema
 
 
 # Serializers define the API representation.
@@ -51,7 +54,7 @@ class LoadTemplateFilter(FilterSet):
         }
 
 
-class LoadTemplateViewSet(viewsets.ModelViewSet):
+class LoadTemplateViewSet(BaseModelViewSet):
     """
     GET /rest_api/load_template/
     :params
@@ -166,6 +169,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
     filterset_class = LoadTemplateFilter
     serializer_class = LoadTemplateSerializer
     pagination_class = LimitOffsetPagination
+    openapi_tags = ['LoadTemplate',]
 
     def get_queryset(self):
         return LoadTemplate.objects.filter(
@@ -182,7 +186,7 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
             )
         )
     
-
+    @swagger_auto_schema(operation_description='shop_id спользуется чтобы создать load_template от магазина см. описание create_load_template_for_shop')
     def create(self, request):
         data = LoadTemplateSerializer(data=request.data, context={'request': request})
         data.is_valid(raise_exception=True)
@@ -197,6 +201,17 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
         return Response(LoadTemplateSerializer(instance=load_template).data, status=201)
 
 
+    @swagger_auto_schema(
+        request_body=LoadTemplateSpecSerializer, 
+        operation_description='''
+        применяет шаблон нагрузки к магазину 
+        см. описание src.forecast.utils.apply_load_template, 
+        если указан shop_id будет применён к этому магазину
+        в противном случае ко всем магазинам, привязанным к
+        данному load_template
+        ''',
+        responses={200: 'empty response'},
+    )
     @action(detail=False, methods=['post'])
     def apply(self, request):
         data = LoadTemplateSpecSerializer(data=request.data)
@@ -212,6 +227,16 @@ class LoadTemplateViewSet(viewsets.ModelViewSet):
         return Response(status=200)
 
 
+    @swagger_auto_schema(
+        request_body=LoadTemplateSpecSerializer, 
+        operation_description='''
+        готовит запрос для расчёта нагрузки и отправляет его на алгоритмы,
+        если указан shop_id будет расчитан этот магазин
+        в противном случае все магазины, привязанные к
+        данному load_template
+        ''',
+        responses={200: 'empty response'},
+    )
     @action(detail=False, methods=['post'])
     def calculate(self, request):
         data = LoadTemplateSpecSerializer(data=request.data)
