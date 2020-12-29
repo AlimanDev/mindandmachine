@@ -13,6 +13,7 @@ from django.contrib.postgres.fields import JSONField
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
+from django.db import transaction
 from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
@@ -322,6 +323,19 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 new_dict[key.replace('d', '')] = new_dict.pop(key)
         return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
 
+    def _handle_schedule_change(self):
+        from src.util.models_converter import Converter
+        from src.celery.tasks import fill_shop_schedule, recalc_wdays
+        dt_now = datetime.datetime.now().date()
+        ch = chain(
+            fill_shop_schedule.si(shop_id=self.id, dt_from=Converter.convert_date(dt_now)),
+            recalc_wdays.si(
+                shop_id=self.id,
+                dt_from=Converter.convert_date(dt_now),
+                dt_to=Converter.convert_date(dt_now + datetime.timedelta(days=90))),
+        )
+        ch.apply_async()
+
     def save(self, *args, **kwargs):
         if self.open_times.keys() != self.close_times.keys():
             raise MessageError(code='time_shop_differerent_keys')
@@ -343,20 +357,10 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
             self.refresh_from_db(fields=['load_template_id'])
             load_template = self.load_template_id
             self.load_template_id = new_template
-        super().save(*args, **kwargs)
+        res = super().save(*args, **kwargs)
 
         if self.tracker.has_changed('tm_open_dict') or self.tracker.has_changed('tm_close_dict'):
-            from src.util.models_converter import Converter
-            from src.celery.tasks import fill_shop_schedule, recalc_wdays
-            dt_now = datetime.datetime.now().date()
-            ch = chain(
-                fill_shop_schedule.si(shop_id=self.id, dt_from=Converter.convert_date(dt_now)),
-                recalc_wdays.si(
-                    shop_id=self.id,
-                    dt_from=Converter.convert_date(dt_now),
-                    dt_to=Converter.convert_date(dt_now + datetime.timedelta(days=90))),
-            )
-            ch.apply_async()
+            transaction.on_commit(self._handle_schedule_change)
 
         if False: # self.load_template_id:  # aa: todo: fixme: delete tmp False
             from src.forecast.load_template.utils import apply_load_template
@@ -364,6 +368,8 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 apply_load_template(new_template, self.id)
             elif load_template == None:
                 apply_load_template(self.load_template_id, self.id)
+
+        return res
 
     def get_exchange_settings(self):
         return self.exchange_settings if self.exchange_settings_id \
@@ -399,24 +405,25 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
         return res or None
 
-    def get_schedule(self, dt):
-        schedule = ShopSchedule.objects.filter(shop=self, dt=dt).first()
-        if schedule:
-            if schedule.type == ShopSchedule.WORKDAY_TYPE:
-                return {
-                    'tm_open': schedule.opens,
-                    'tm_close': schedule.closes,
-                }
-            if schedule.type == ShopSchedule.HOLIDAY_TYPE:
-                return None
+    def get_schedule(self, dt: datetime.date):
+        return self.get_period_schedule(dt_from=dt, dt_to=dt)[dt]
 
-        return self.get_standard_schedule(dt)
-
-    def get_period_schedule(self, dt_from, dt_to):
-        # TODO: оптимизировать
+    def get_period_schedule(self, dt_from: datetime.date, dt_to: datetime.date):
         res = {}
+
+        ss_dict = {}
+        for ss in ShopSchedule.objects.filter(shop=self, dt__gte=dt_from, dt__lte=dt_to):
+            schedule = None
+            if ss.type == ShopSchedule.WORKDAY_TYPE:
+                schedule = {
+                    'tm_open': ss.opens,
+                    'tm_close': ss.closes,
+                }
+            ss_dict[ss.dt] = schedule
+
         for dt in pd.date_range(dt_from, dt_to):
-           res[dt] = self.get_schedule(dt)
+            dt = dt.date()
+            res[dt] = ss_dict.get(dt, self.get_standard_schedule(dt))
 
         return res
 
@@ -430,7 +437,7 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         from src.util.models_converter import Converter
         work_schedule = {}
         for dt, schedule_dict in self.get_period_schedule(dt_from=dt_from, dt_to=dt_to).items():
-            schedule = None
+            schedule = None  # TODO: это и "нет данных" и выходной, нормально ли?
             if schedule_dict:
                 schedule = (
                     Converter.convert_time(schedule_dict['tm_open']),

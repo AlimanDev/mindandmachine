@@ -539,7 +539,7 @@ class WorkerDay(AbstractModel):
             if self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
                 from src.util.models_converter import Converter
                 dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
-                shop_schedule = self.shop.get_schedule(dt)
+                shop_schedule = self.shop.get_schedule(dt=dt)
                 if shop_schedule is None:
                     return datetime.timedelta(0)
 

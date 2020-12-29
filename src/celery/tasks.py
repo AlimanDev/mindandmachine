@@ -861,13 +861,14 @@ def fill_shop_schedule(shop_id, dt_from, periods=90):
 @app.task
 def fill_active_shops_schedule():
     res = {}
-    now = datetime.now()
+    dttm_now = datetime.now()
+    dt_now = dttm_now.date()
     active_shops_qs = Shop.objects.filter(
-        Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gt=now),
-        Q(dt_closed__isnull=True) | Q(dt_closed__gt=now.date()),
+        Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gt=dttm_now),
+        Q(dt_closed__isnull=True) | Q(dt_closed__gt=dt_now),
     )
     for shop_id in active_shops_qs.values_list('id', flat=True):
-        res[shop_id] = fill_shop_schedule(shop_id, now.date())
+        res[shop_id] = fill_shop_schedule(shop_id, dt_now)
 
     return res
 
