@@ -691,7 +691,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         operation_description='''
         Метод для копирования подтвержденных рабочих дней в черновик
         ''',
-        responses={200:WorkerDayListSerializer(many=True)},
+        responses={200:WorkerDaySerializer(many=True)},
     )
     @action(detail=False, methods=['post'])
     def copy_approved(self, request):
@@ -700,13 +700,11 @@ class WorkerDayViewSet(BaseModelViewSet):
         data = data.validated_data
         with transaction.atomic():
             list_wd = list(
-                WorkerDay.objects.exclude(
-                    is_vacancy=True,
-                ).filter(
+                WorkerDay.objects.filter(
                     dt__in=data['dates'],
                     worker_id__in=data['worker_ids'],
                     is_approved=True,
-                    is_fact=False,
+                    is_fact=data['is_fact'],
                 ).select_related(
                     'shop', 
                     'employment', 
@@ -717,13 +715,11 @@ class WorkerDayViewSet(BaseModelViewSet):
                     'worker_day_details',
                 )
             )
-            WorkerDay.objects.exclude(
-                is_vacancy=True,
-            ).filter(
+            WorkerDay.objects_with_excluded.filter(
                 dt__in=data['dates'],
                 worker_id__in=data['worker_ids'],
                 is_approved=False,
-                is_fact=False,
+                is_fact=data['is_fact'],
             ).delete()
 
             WorkerDay.objects.bulk_create(
@@ -748,13 +744,11 @@ class WorkerDayViewSet(BaseModelViewSet):
                     for wd in list_wd
                 ]
             )
-            wds = WorkerDay.objects.exclude(
-                is_vacancy=True,
-            ).filter(
+            wds = WorkerDay.objects.filter(
                 dt__in=data['dates'],
                 worker_id__in=data['worker_ids'],
                 is_approved=False,
-                is_fact=False,
+                is_fact=data['is_fact'],
             )
             search_wds = {}
             for wd in wds:
@@ -892,9 +886,16 @@ class WorkerDayViewSet(BaseModelViewSet):
         data = DeleteWorkerDaysSerializer(data=request.data, context={'request': request})
         data.is_valid(raise_exception=True)
         data = data.validated_data
-        if WorkerDay.objects.filter(is_approved=True, id__in=data.get('worker_day_ids')).exists():
-            raise ValidationError('Вы не можете удалять подтвержденные рабочие дни.')
-        WorkerDay.objects.filter(id__in=data.get('worker_day_ids')).delete()
+        filt = {}
+        if data['exclude_created_by']:
+            filt['created_by__isnull'] = True
+        WorkerDay.objects_with_excluded.filter(
+            is_approved=False,
+            is_fact=data['is_fact'], 
+            worker_id__in=data['worker_ids'],
+            dt__in=data['dates'],
+            **filt,
+        ).delete()
 
         return Response()
 
@@ -953,7 +954,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     raise ValidationError(self.error_messages['worker_days_mismatch'])
                 day_pairs.append(day_pair)
             
-            WorkerDay.objects.filter(
+            WorkerDay.objects_with_excluded.filter(
                 worker_id__in=(data['worker1_id'], data['worker2_id']),
                 dt__in=data['dates'],
                 is_approved=False,

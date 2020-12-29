@@ -1870,13 +1870,10 @@ class TestAditionalFunctions(APITestCase):
 
         url = f'{self.url}delete_worker_days/'
         data = {
-            'worker_day_ids':[
-                wd.id
-                for wd in WorkerDay.objects.filter(
-                    dt__gte=dt_from,
-                    dt__lte=dt_from + timedelta(days=2),
-                    is_approved=False,
-                )
+            'worker_ids':[self.employment2.user_id, self.employment3.user_id],
+            'dates':[
+                dt_from + timedelta(i)
+                for i in range(3)
             ]
         }
         response = self.client.post(url, data, format='json')
@@ -1885,31 +1882,35 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 8)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 2)
     
-    def test_cant_delete_approved(self):
+    def test_delete_fact(self):
         dt_from = date.today()
         self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
         self.create_worker_days(self.employment2, dt_from, 3, 16, 20, False)
         self.create_worker_days(self.employment3, dt_from, 4, 10, 21, False)
+        WorkerDay.objects.all().update(is_fact=True)
         self.update_or_create_holidays(self.employment2, dt_from + timedelta(3), 1, False)
 
         url = f'{self.url}delete_worker_days/'
         data = {
-            'worker_day_ids':[
-                wd.id
-                for wd in WorkerDay.objects.filter(
-                    dt__gte=dt_from,
-                    dt__lte=dt_from + timedelta(days=2),
-                    is_approved=True,
-                )
+            'worker_ids':[self.employment2.user_id, self.employment3.user_id],
+            'dates':[
+                dt_from + timedelta(i)
+                for i in range(3)
             ]
         }
         response = self.client.post(url, data, format='json')
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), ['Вы не можете удалять подтвержденные рабочие дни.'])
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 8)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 8)
+
+        data['is_fact'] = True
+        response = self.client.post(url, data, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 8)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 2)
 
     def test_exchange_approved(self):
         dt_from = date.today()

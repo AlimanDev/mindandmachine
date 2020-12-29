@@ -476,6 +476,7 @@ class ChangeRangeListSerializer(serializers.Serializer):
 class CopyApprovedSerializer(serializers.Serializer):
     worker_ids = serializers.ListField(child=serializers.IntegerField())
     dates = serializers.ListField(child=serializers.DateField())
+    is_fact = serializers.BooleanField(default=False)
 
 
 class DuplicateSrializer(serializers.Serializer):
@@ -494,10 +495,10 @@ class DuplicateSrializer(serializers.Serializer):
 
 
 class DeleteWorkerDaysSerializer(serializers.Serializer):
-    default_error_messages = {
-        'check_dates': _('Date start should be less then date end'),
-    }
-    worker_day_ids = serializers.ListField(child=serializers.IntegerField())
+    worker_ids = serializers.ListField(child=serializers.IntegerField())
+    dates = serializers.ListField(child=serializers.DateField())
+    is_fact = serializers.BooleanField(default=False)
+    exclude_created_by = serializers.BooleanField(default=True)
 
 
 class ExchangeSerializer(serializers.Serializer):
