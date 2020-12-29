@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     'src.celery',
     'fcm_django',
     'src.recognition',
+    'src.integration',
 ]
 
 REST_FRAMEWORK = {
@@ -315,7 +316,7 @@ MOBILE_USER_AGENTS = ('QoS_mobile_app', 'okhttp',)
 METABASE_SITE_URL = 'metabase-url'
 METABASE_SECRET_KEY = 'secret-key'
 
-CELERY_IMPORTS = ('src.celery.tasks',)
+CELERY_IMPORTS = ('src.celery.tasks', 'src.celery.inegration_tasks',)
 CELERY_BROKER_URL = 'redis://localhost:6379'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379'
 CELERY_ACCEPT_CONTENT = ['application/json']
@@ -354,6 +355,12 @@ JOD_CONVERTER_URL = 'http://localhost:8030'
 
 # docker run --restart unless-stopped -p 3001:3000 -d thecodingmachine/gotenberg:6
 GOTENBERG_URL = 'http://localhost:3001'
+
+ZKTECO_HOST = ''
+ZKTECO_KEY = ''
+
+# Используем ли интеграцию в проекте
+ZKTECO_INTEGRATION = False
 
 RECOGNITION_PARTNER = 'Tevian'
 
@@ -476,6 +483,23 @@ if MDA_SYNC_USER_TO_SHOP_DAILY:
     CELERY_BEAT_SCHEDULE['task-sync-mda-user-to-shop-relation'] = {
         'task': 'src.celery.tasks.sync_mda_user_to_shop_relation',
         'schedule': crontab(hour=1, minute=30),
+        'options': {'queue': BACKEND_QUEUE}
+    }
+
+if ZKTECO_INTEGRATION:
+    CELERY_BEAT_SCHEDULE['task-import-urv-zkteco'] = {
+        'task': 'src.celery.tasks.integration_tasks.import_urv',
+        'schedule': crontab(minute='*/5'),
+        'options': {'queue': BACKEND_QUEUE}
+    }
+    CELERY_BEAT_SCHEDULE['task-export-workers-zkteco'] = {
+        'task': 'src.celery.tasks.integration_tasks.export_workers_zkteco',
+        'schedule': crontab(minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    }
+    CELERY_BEAT_SCHEDULE['task-delete-workers-zkteco'] = {
+        'task': 'src.celery.tasks.integration_tasks.delete_workers_zkteco',
+        'schedule': crontab(minute=0),
         'options': {'queue': BACKEND_QUEUE}
     }
 
