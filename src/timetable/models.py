@@ -358,6 +358,10 @@ class WorkerDayQuerySet(QuerySet):
 
 
 class WorkerDayManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().exclude(
+            type=WorkerDay.TYPE_WORKDAY, employment_id__isnull=True, worker_id__isnull=False)
+
     def qos_current_version(self, approved_only=False):
         if approved_only:
             return super().get_queryset().filter(
@@ -536,6 +540,8 @@ class WorkerDay(AbstractModel):
                 from src.util.models_converter import Converter
                 dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
                 shop_schedule = self.shop.get_schedule(dt)
+                if shop_schedule is None:
+                    return datetime.timedelta(0)
 
                 open_at_0 = all(getattr(shop_schedule['tm_open'], a) == 0 for a in ['hour', 'second', 'minute'])
                 close_at_0 = all(getattr(shop_schedule['tm_close'], a) == 0 for a in ['hour', 'second', 'minute'])
@@ -588,7 +594,8 @@ class WorkerDay(AbstractModel):
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=True, verbose_name='Обрезать рабочие часы по времени работы магазина')
 
-    objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()
+    objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
+    objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
 
     @classmethod
     def is_type_with_tm_range(cls, t):

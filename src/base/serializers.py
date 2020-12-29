@@ -8,7 +8,21 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.db.models import Q
 
-from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop, Group, Break
+from src.base.models import (
+    Employment,
+    Network,
+    User,
+    FunctionGroup,
+    WorkerPosition,
+    Notification,
+    Subscribe,
+    Event,
+    ShopSettings,
+    Shop,
+    Group,
+    Break,
+    ShopSchedule,
+)
 from src.base.message import Message
 from src.base.fields import CurrentUserNetwork, UserworkShop
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
@@ -21,7 +35,7 @@ class BaseNetworkSerializer(serializers.ModelSerializer):
 class NetworkSerializer(serializers.ModelSerializer):
     logo = serializers.SerializerMethodField('get_logo_url')
 
-    def get_logo_url(self, obj):
+    def get_logo_url(self, obj) -> str:
         if obj.logo:
             return obj.logo.url
         return None
@@ -54,7 +68,7 @@ class UserListSerializer(serializers.Serializer):
     username = serializers.CharField()
     network_id = serializers.IntegerField()
 
-    def get_avatar_url(self, obj):
+    def get_avatar_url(self, obj) -> str:
         if obj.avatar:
             return obj.avatar.url
         return None
@@ -69,7 +83,7 @@ class UserSerializer(BaseNetworkSerializer):
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
                   'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
-    def get_avatar_url(self, obj):
+    def get_avatar_url(self, obj) -> str:
         if obj.avatar:
             return obj.avatar.url
         return None
@@ -290,6 +304,8 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
 
     def __init__(self, *args, **kwargs):
         super(WorkerPositionSerializer, self).__init__(*args, **kwargs)
+        if getattr(self.context.get('view', None), 'swagger_fake_view', False):
+            return
         self.fields['code'].validators.append(
             UniqueValidator(
                 WorkerPosition.objects.filter(network=self.context.get('request').user.network)
@@ -314,7 +330,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         fields = ['id','worker_id', 'is_read', 'event', 'message']
         read_only_fields = ['worker_id', 'event']
 
-    def get_message(self, instance):
+    def get_message(self, instance) -> str:
         lang = self.context['request'].user.lang
 
         event = instance.event
@@ -373,3 +389,28 @@ class BreakSerializer(BaseNetworkSerializer):
         data = super().to_representation(instance)
         data['value'] = instance.breaks
         return data
+
+
+class ShopScheduleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShopSchedule
+        fields = (
+            'pk',
+            'modified_by',
+            'shop_id',
+            'dt',
+            'type',
+            'opens',
+            'closes',
+        )
+        extra_kwargs = {
+            'modified_by': {
+                'read_only': True,
+            },
+            'shop_id': {
+                'read_only': True,
+            },
+            'dt': {
+                'read_only': True,
+            },
+        }

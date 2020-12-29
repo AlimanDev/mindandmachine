@@ -11,7 +11,6 @@ from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
 from requests.exceptions import HTTPError
 from rest_framework import (
-    viewsets,
     exceptions,
     permissions
 )
@@ -22,6 +21,7 @@ from rest_framework.response import Response
 
 from src.base.auth.authentication import CsrfExemptSessionAuthentication
 from src.base.models import User
+from src.base.views_abstract import BaseModelViewSet
 from src.recognition.api.recognition import Recognition
 from src.recognition.authentication import TickPointTokenAuthentication
 from src.recognition.models import Tick, TickPhoto, TickPoint, UserConnecter, TickPointToken
@@ -41,6 +41,9 @@ from src.timetable.models import (
     WorkerDay,
     Employment,
 )
+
+from drf_yasg.utils import swagger_auto_schema
+
 
 logger = logging.getLogger('django')
 recognition = Recognition()
@@ -133,10 +136,11 @@ class TickPointAuthTickViewStrategy(TickViewStrategy):
         return user_id, tick_point
 
 
-class TickViewSet(viewsets.ModelViewSet):
+class TickViewSet(BaseModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     basename = ''
+    openapi_tags = ['Tick',]
 
     def get_authenticators(self):
         return [
@@ -242,11 +246,13 @@ class TickViewSet(viewsets.ModelViewSet):
         return Response(TickSerializer(tick).data)
 
 
-class TickPhotoViewSet(viewsets.ModelViewSet):
+class TickPhotoViewSet(BaseModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     basename = ''
     serializer_class = TickPhotoSerializer
+    openapi_tags = ['TickPhoto',]
+    http_method_names = ['get', 'post', 'delete']
 
     def get_authenticators(self):
         return [
@@ -255,6 +261,10 @@ class TickPhotoViewSet(viewsets.ModelViewSet):
             TokenAuthentication()
         ]
 
+    @swagger_auto_schema(
+        request_body=PostTickPhotoSerializer,
+        responses={201:TickPhotoSerializer},
+    )
     def create(self, request, **kwargs):
         """
             POST /api/v1/tick_photos
@@ -345,6 +355,11 @@ class TickPhotoViewSet(viewsets.ModelViewSet):
             )
         return Response(TickPhotoSerializer(tick_photo).data)
 
+    @swagger_auto_schema(
+        responses={200:'Файл с отметками'},
+        operation_description='Запрос на скачивание файла с отметками',
+        query_serializer=DownloadTickPhotoExcelSerializer,
+    )
     @action(detail=False, methods=['get'])
     def download(self, request):
         if not request.user.is_superuser:

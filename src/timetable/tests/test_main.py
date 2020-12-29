@@ -8,7 +8,7 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup, Network, Employment
+from src.base.models import FunctionGroup, Network, Employment, ShopSchedule
 from src.timetable.models import (
     WorkerDay,
     AttendanceRecords,
@@ -983,7 +983,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(wd.created_by.id, self.user1.id)
 
     def test_cant_create_workday_if_user_has_no_active_employment(self):
-        WorkerDay.objects.filter(worker=self.user2).delete()
+        WorkerDay.objects_with_excluded.filter(worker=self.user2).delete()
         self.user2.employments.all().delete()
         dt = self.dt - timedelta(days=60)
         data = {
@@ -1248,6 +1248,19 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
         )
 
         # todo: ночные смены (когда-нибудь)
+
+    def test_zero_hours_for_holiday(self):
+        ShopSchedule.objects.update_or_create(
+            dt=self.dt_now,
+            shop=self.shop,
+            defaults=dict(
+                type='H',
+                opens=None,
+                closes=None,
+                modified_by=self.user1,
+            ),
+        )
+        self._test_crop_both_bulk_and_original_save(10, 20, 8, 21, 0)
 
 
 class TestWorkerDayCreateFact(APITestCase):

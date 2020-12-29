@@ -1,7 +1,7 @@
 import contextlib
 import json
 import sys
-from functools import wraps
+from functools import wraps, reduce
 from hashlib import md5
 
 from django.conf import settings
@@ -334,3 +334,7 @@ def generate_user_token(login):
 @contextlib.contextmanager
 def dummy_context_mgr():
     yield None
+
+
+def deep_get(dictionary, *keys):
+    return reduce(lambda d, key: d.get(key) if d else None, keys, dictionary)

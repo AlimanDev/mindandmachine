@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'drf_yasg',
     'corsheaders',
     'rest_framework',
     'django_filters',
@@ -287,6 +288,16 @@ MEDIA_URL = '/_i/media/'
 
 SESSION_COOKIE_SECURE = True
 
+REDOC_SETTINGS = {
+    'PATH_IN_MIDDLE': True,
+    'HIDE_HOSTNAME': True,
+}
+
+SWAGGER_SETTINGS = {
+    'TAGS_SORTER': 'alpha',
+    'OPERATIONS_SORTER': 'alpha',
+    'DEFAULT_AUTO_SCHEMA_CLASS': "src.util.openapi.auto_schema.WFMAutoSchema",
+}
 
 # DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
 
@@ -457,6 +468,11 @@ CELERY_BEAT_SCHEDULE = {
     'task-delete-inactive-employment-group': {
         'task': 'src.celery.tasks.delete_inactive_employment_groups',
         'schedule': crontab(hour=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-fill-active-shops-schedule': {
+        'task': 'src.celery.tasks.fill_active_shops_schedule',
+        'schedule': crontab(hour=1, minute=30),
         'options': {'queue': BACKEND_QUEUE}
     },
 }

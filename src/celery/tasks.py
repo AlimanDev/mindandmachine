@@ -3,13 +3,14 @@ import logging
 import os
 import time as time_in_secs
 from datetime import date, timedelta, datetime
-
+from src.util.models_converter import Converter
 import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.db.models import Q
+from django.db import transaction
 from django.utils import timezone
 from django.utils.timezone import now
 
@@ -54,6 +55,7 @@ from src.timetable.vacancy.utils import (
 )
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
 from src.util.urv.create_urv_stat import main as create_urv
+from src.base.models import ShopSchedule
 
 
 @app.task
@@ -770,3 +772,116 @@ def delete_inactive_employment_groups():
         function_group=None,
         dt_to_function_group=None,
     )
+
+
+@app.task
+def fill_shop_schedule(shop_id, dt_from, periods=90):
+    """
+    Заполнение ShopSchedule стандартным расписанием на опред. период
+    :param shop_id: id магазина
+    :param dt_from: дата от (включительно)
+    :param periods: на сколько дней вперед заполнить расписания от dt_from
+    :return:
+    """
+    if isinstance(dt_from, str):
+        dt_from = Converter.parse_date(dt_from)
+
+    shop = Shop.objects.get(id=shop_id)
+
+    existing_shop_schedule_dict = {
+        ss.dt: ss for ss in
+        ShopSchedule.objects.filter(
+            shop_id=shop_id,
+            dt__gte=dt_from,
+            dt__lte=dt_from + timedelta(days=periods),
+        )
+    }
+    skipped = 0
+    to_create = []
+    to_update = []
+    for dt in pd.date_range(dt_from, periods=periods, normalize=True):
+        dt = dt.date()
+        existing_shop_schedule = existing_shop_schedule_dict.get(dt)
+
+        if not existing_shop_schedule:
+            to_create.append(dt)
+            continue
+
+        if existing_shop_schedule.modified_by_id is not None:
+            skipped += 1
+            continue
+
+        standard_schedule = shop.get_standard_schedule(dt)
+
+        if standard_schedule is None:  # выходной по стандартному расписанию
+            if existing_shop_schedule.type != ShopSchedule.HOLIDAY_TYPE \
+                    or existing_shop_schedule.opens is not None or existing_shop_schedule.closes is not None:
+                to_update.append((dt, (ShopSchedule.HOLIDAY_TYPE, None, None)))
+                continue
+        else:
+            if standard_schedule['tm_open'] != existing_shop_schedule.opens \
+                    or standard_schedule['tm_close'] != existing_shop_schedule.closes:
+                to_update.append(
+                    (dt, (ShopSchedule.WORKDAY_TYPE, standard_schedule['tm_open'], standard_schedule['tm_close']))
+                )
+                continue
+
+        skipped += 1
+
+    if to_create:
+        shop_schedules_to_create = []
+        for dt in to_create:
+            standard_schedule = shop.get_standard_schedule(dt=dt)
+            shop_schedules_to_create.append(
+                ShopSchedule(
+                    shop_id=shop_id,
+                    dt=dt,
+                    opens=standard_schedule['tm_open'] if standard_schedule else None,
+                    closes=standard_schedule['tm_close'] if standard_schedule else None,
+                    type=ShopSchedule.WORKDAY_TYPE if standard_schedule else ShopSchedule.HOLIDAY_TYPE,
+                )
+            )
+        ShopSchedule.objects.bulk_create(shop_schedules_to_create)
+
+    if to_update:
+        for dt, (schedule_type, opens, closes) in to_update:
+            ShopSchedule.objects.update_or_create(
+                shop_id=shop_id,
+                dt=dt,
+                defaults={
+                    'type': schedule_type,
+                    'opens': opens,
+                    'closes': closes,
+                },
+            )
+
+    return {'created': len(to_create), 'updated': len(to_update), 'skipped': skipped}
+
+
+@app.task
+def fill_active_shops_schedule():
+    res = {}
+    now = datetime.now()
+    active_shops_qs = Shop.objects.filter(
+        Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gt=now),
+        Q(dt_closed__isnull=True) | Q(dt_closed__gt=now.date()),
+    )
+    for shop_id in active_shops_qs.values_list('id', flat=True):
+        res[shop_id] = fill_shop_schedule(shop_id, now.date())
+
+    return res
+
+
+@app.task
+def recalc_wdays(shop_id, dt_from, dt_to):
+    wdays_qs = WorkerDay.objects.filter(
+        shop_id=shop_id,
+        dt__gte=dt_from,
+        dt__lte=dt_to,
+        type=WorkerDay.TYPE_WORKDAY,
+    )
+    for wd_id in wdays_qs.values_list('id', flat=True):
+        with transaction.atomic():
+            wd_obj = WorkerDay.objects.filter(id=wd_id).select_for_update().first()
+            if wd_obj:
+                wd_obj.save()

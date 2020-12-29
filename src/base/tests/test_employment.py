@@ -261,7 +261,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self._test_get_empls(check_length=8)
         self._test_get_empls(extra_params={'mine': True}, check_length=1)
 
-    def test_inactive_wdays_deleted_on_save(self):
+    def test_empls_cleaned_in_wdays_without_active_employment(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             dt = datetime.today()
             self.network.clean_wdays_on_employment_dt_change = True
@@ -302,10 +302,12 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             self.employment2.dt_hired = dt
             self.employment2.dt_fired = dt + timedelta(days=30)
             self.employment2.save()
-            self.assertFalse(WorkerDay.objects.filter(id=wd1.id).exists())
+            self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd1.id).exists())
+            wd1.refresh_from_db()
+            self.assertIsNone(wd1.employment_id)
             self.assertTrue(WorkerDay.objects.filter(id=wd2.id).exists())
             self.assertTrue(WorkerDay.objects.filter(id=wd_holiday.id).exists())
-            self.assertEqual(WorkerDay.objects.count(), wd_count_before_save - 1)
+            self.assertEqual(WorkerDay.objects_with_excluded.count(), wd_count_before_save)
 
 
     def test_change_function_group_tmp(self):

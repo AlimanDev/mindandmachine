@@ -1,5 +1,4 @@
-from rest_framework import viewsets
-
+from src.base.views_abstract import BaseModelViewSet
 from src.base.permissions import EmploymentFilteredListPermission
 from src.timetable.filters import WorkerConstraintFilter
 from src.timetable.models import (
@@ -11,10 +10,11 @@ from src.timetable.serializers import (
 )
 
 
-class WorkerConstraintViewSet(viewsets.ModelViewSet):
+class WorkerConstraintViewSet(BaseModelViewSet):
     permission_classes = [EmploymentFilteredListPermission]
     serializer_class = WorkerConstraintSerializer
     filterset_class = WorkerConstraintFilter
+    openapi_tags = ['WorkerConstraint',]
 
     def get_serializer_class(self):
         if self.action == 'create':
