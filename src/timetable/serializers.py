@@ -242,8 +242,15 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             self._create_update_clean(validated_data)
 
             details = validated_data.pop('worker_day_details', None)
-            worker_day = WorkerDay.objects.create(**validated_data)
+            worker_day, _created = WorkerDay.objects.update_or_create(
+                dt=validated_data.get('dt'),
+                worker_id=validated_data.get('worker_id'),
+                is_fact=validated_data.get('is_fact'),
+                is_approved=validated_data.get('is_approved'),
+                defaults=validated_data,
+            )
             if details:
+                WorkerDayCashboxDetails.objects.filter(worker_day=worker_day).delete()
                 for wd_detail in details:
                     WorkerDayCashboxDetails.objects.create(worker_day=worker_day, **wd_detail)
 
