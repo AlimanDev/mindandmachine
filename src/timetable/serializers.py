@@ -394,6 +394,7 @@ class BaseAutoSettingsSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
+
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
 
