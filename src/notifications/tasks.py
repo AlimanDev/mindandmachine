@@ -28,6 +28,10 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
     datatuple = []
 
     for recipient in set(event_email_notification.get_recipients(user_author_id, context)):
+        # не шлем автору события (TODO: может быть сделать отдельный флаг в модели настроек?)
+        if recipient.id == user_author_id:
+            continue
+
         email = recipient.email
         if email:
             context_copy = context.copy()
