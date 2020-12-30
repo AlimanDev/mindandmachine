@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-12-16 09:37+0000\n"
+"POT-Creation-Date: 2020-12-30 13:17+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -38,32 +38,32 @@ msgstr "Невозможно войти с предоставленными уч
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
-#: src/base/serializers.py:88
+#: src/base/serializers.py:102
 msgid "Passwords are mismatched."
 msgstr "Пароли не совпадают."
 
-#: src/base/serializers.py:89
+#: src/base/serializers.py:103
 msgid "Password is wrong."
 msgstr "Неверный пароль."
 
-#: src/base/serializers.py:153
+#: src/base/serializers.py:167
 #, python-brace-format
 msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:154 src/timetable/serializers.py:87
+#: src/base/serializers.py:168 src/timetable/serializers.py:88
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
-#: src/base/serializers.py:155
+#: src/base/serializers.py:169
 #, python-brace-format
 msgid "There is {amount} models of shop with code: {code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
 
-#: src/base/serializers.py:156
+#: src/base/serializers.py:170
 #, python-brace-format
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
@@ -73,35 +73,35 @@ msgstr "Есть {amount} должностей с кодом: {code}."
 msgid "Invalid time format. Format should be {format}"
 msgstr "Неверный формат времени. Должен быть {format}"
 
-#: src/forecast/load_template/views.py:162
+#: src/forecast/load_template/views.py:165
 #, fuzzy
 #| msgid "Cannot delete template as it's used in demand calulations."
 msgid "Cannot delete template as it's used in demand calculations."
 msgstr ""
 "Данный шаблон невозможно удалить, так как используется в расчете нагрузки"
 
-#: src/forecast/operation_type_relation/views.py:20
+#: src/forecast/operation_type_relation/views.py:21
 msgid "Base and depended demand models cannot be the same."
 msgstr "Базовая и зависимая модели нагрузки не могут совпадать."
 
-#: src/forecast/operation_type_relation/views.py:21
+#: src/forecast/operation_type_relation/views.py:22
 msgid "Demand model cannot depend on itself."
 msgstr "Циклическая зависимость: операция зависит сама от себя."
 
-#: src/forecast/operation_type_relation/views.py:22
+#: src/forecast/operation_type_relation/views.py:23
 msgid "Backward dependency already exists."
 msgstr "Уже существует обратная зависимость"
 
-#: src/forecast/operation_type_relation/views.py:23
+#: src/forecast/operation_type_relation/views.py:24
 msgid "Base and depended demand models cannot have different templates."
 msgstr "Базовая и зависимая модели не могут иметь разный шаблон нагрузки"
 
-#: src/forecast/operation_type_relation/views.py:24
+#: src/forecast/operation_type_relation/views.py:25
 #, python-brace-format
 msgid "Error in formula: {formula}."
 msgstr "Ошибка в формуле: {formula}"
 
-#: src/forecast/operation_type_relation/views.py:25
+#: src/forecast/operation_type_relation/views.py:26
 #, fuzzy
 #| msgid "Base model."
 msgid "Base model not formula."
@@ -128,26 +128,26 @@ msgstr ""
 "Дистанция до магазина не должна превышать {allowed_distance_km} км (сейчас "
 "{distance_now_km} км)"
 
-#: src/timetable/auto_settings/views.py:58
+#: src/timetable/auto_settings/views.py:60
 #, python-brace-format
 msgid "Timetable should be built at least from {num} day from now."
 msgstr "Расписание можно строить не раньше чем через {num} дня от текущего"
 
-#: src/timetable/auto_settings/views.py:59
+#: src/timetable/auto_settings/views.py:61
 msgid "Timetable already exists."
 msgstr "Расписание уже существует"
 
-#: src/timetable/auto_settings/views.py:60
+#: src/timetable/auto_settings/views.py:62
 #, python-brace-format
 msgid "No work type set for users: {users}."
 msgstr "Не проставлены типы работ у пользователей: {users}."
 
-#: src/timetable/auto_settings/views.py:61
+#: src/timetable/auto_settings/views.py:63
 #, python-brace-format
 msgid "Not enough demand {period} for work type {work_type}."
 msgstr "На типе работ {work_type} не хватает объектов спроса {period}."
 
-#: src/timetable/auto_settings/views.py:62
+#: src/timetable/auto_settings/views.py:64
 #, python-brace-format
 msgid ""
 "More than one shift are selected for worker {id} {last_name} {first_name} "
@@ -156,25 +156,28 @@ msgstr ""
 "Ошибка! Работник {id} {last_name} {first_name} с фиксированными часами, но "
 "на один день выбрано больше одной смены!"
 
-#: src/timetable/auto_settings/views.py:63
+#: src/timetable/auto_settings/views.py:65
 msgid "Fail sending data to server."
 msgstr "Ошибка отправки данных на сервер."
 
-#: src/timetable/auto_settings/views.py:64
+#: src/timetable/auto_settings/views.py:66
 msgid "You can't delete timetable in the past."
 msgstr "Вы не можете удалить расписание в прошлом."
 
-#: src/timetable/serializers.py:84 
-#: src/timetable/serializers.py:389
-#: src/timetable/serializers.py:481
+#: src/timetable/auto_settings/views.py:67
+msgid "You need to select auto-scheduling settings for the department."
+msgstr "Необходимо выбрать шаблон смен."
+
+#: src/timetable/serializers.py:85 src/timetable/serializers.py:391
+#: src/timetable/serializers.py:494
 msgid "Date start should be less then date end"
 msgstr "Дата начала должна быть меньше чем дата окончания."
 
-#: src/timetable/serializers.py:85
+#: src/timetable/serializers.py:86
 msgid "Worker day already exist."
 msgstr "У сотрудника уже существует рабочий день."
 
-#: src/timetable/serializers.py:86
+#: src/timetable/serializers.py:87
 #, fuzzy, python-brace-format
 #| msgid ""
 #| "Worker day intercepts with another: {shop_name}, {work_start} - "
@@ -185,15 +188,15 @@ msgstr ""
 "Рабочий день пересекается с другим рабочим днем: {shop_name}, {work_start} - "
 "{work_end}"
 
-#: src/timetable/serializers.py:88
+#: src/timetable/serializers.py:89
 msgid "Shop in work type and in work day must match."
 msgstr "Магазин в типе работ и в рабочем дне должен совпадать."
 
-#: src/timetable/serializers.py:89
+#: src/timetable/serializers.py:90
 msgid "User in employment and in worker day must match."
 msgstr "Сотрудник в трудоустройстве и в рабочем дне должны совпадать."
 
-#: src/timetable/serializers.py:91
+#: src/timetable/serializers.py:92
 msgid ""
 "Can't create a working day in the schedule, since the user is not employed "
 "during this period"
@@ -201,37 +204,37 @@ msgstr ""
 "Невозможно создать рабочий день, так как пользователь в этот период не "
 "трудоустроен"
 
-#: src/timetable/serializers.py:408
+#: src/timetable/serializers.py:420
 msgid "Wrong dates format."
 msgstr "Неправильный формат дат."
 
-#: src/timetable/serializers.py:466 src/timetable/serializers.py:505
+#: src/timetable/serializers.py:479 src/timetable/serializers.py:518
 #, python-brace-format
 msgid "Invalid pk \"{pk_value}\" - object does not exist."
 msgstr "Недопустимый первичный ключ \"{pk_value}\" - объект не существует."
 
-#: src/timetable/worker_day/views.py:63
+#: src/timetable/worker_day/views.py:70
 msgid "Worker days mismatch."
 msgstr "Рабочие дни сотрудников не совпадают."
 
-#: src/timetable/worker_day/views.py:64
+#: src/timetable/worker_day/views.py:71
 msgid "Workers don't have timetable."
 msgstr "Отсутствует расписание у сотрудников."
 
-#: src/timetable/worker_day/views.py:65
+#: src/timetable/worker_day/views.py:72
 msgid "Cannot_delete approved version."
 msgstr "Нельзя удалить подтвержденную версию."
 
-#: src/timetable/worker_day/views.py:66
+#: src/timetable/worker_day/views.py:73
 msgid "Not approved version already exists."
 msgstr "У расписания уже есть неподтвержденная версия."
 
-#: src/timetable/worker_day/views.py:67
+#: src/timetable/worker_day/views.py:74
 #, python-brace-format
 msgid "У вас нет прав на подтверждение типа дня \"{wd_type_str}\""
 msgstr ""
 
-#: src/timetable/worker_day/views.py:68
+#: src/timetable/worker_day/views.py:75
 #, python-brace-format
 msgid ""
 "У вас нет прав на подтверждения типа дня \"{wd_type_str}\" в выбранные даты. "
