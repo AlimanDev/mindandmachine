@@ -61,7 +61,7 @@ class TickSerializer(serializers.ModelSerializer):
         ]
         fields = read_only_fields
 
-    def get_is_verified(self, obj):
+    def get_is_verified(self, obj) -> int:
         return 1 if obj.verified_score else 0
 
     # def get_worker_day_details(self, obj):
@@ -69,7 +69,7 @@ class TickSerializer(serializers.ModelSerializer):
     #         return WorkerDayDetailsSerializer(obj.worker_day.worker_day_details, many=True).data
     #     return []
 
-    def get_lateness(self, obj):
+    def get_lateness(self, obj) -> int:
         return int(obj.lateness.total_seconds())
 
 

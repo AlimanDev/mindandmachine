@@ -12,6 +12,8 @@ from src.base.models import (
     ProductionDay,
     Network,
     Break,
+    SAWHSettings,
+    ShopSchedule,
 )
 from src.timetable.models import GroupWorkerDayPermission
 
@@ -28,7 +30,7 @@ class RegionAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerPosition)
 class WorkerPositionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('id', 'name', 'code')
     search_fields = ('name', 'code')
 
 
@@ -63,8 +65,9 @@ class QsUserAdmin(admin.ModelAdmin):
 
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
-    list_display = ('name', 'parent_title', 'id')
+    list_display = ('name', 'parent_title', 'id', 'code')
     search_fields = ('name', 'parent__name', 'id', 'code')
+    raw_id_fields = ('director',)
 
     @staticmethod
     def parent_title(instance: Shop):
@@ -122,5 +125,47 @@ class ProductionDayAdmin(admin.ModelAdmin):
 
 @admin.register(Break)
 class BreakAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('id', 'name', 'code')
     search_fields = ('name',)
+
+
+@admin.register(SAWHSettings)
+class SAWHSettingsAdmin(admin.ModelAdmin):
+    list_display = (
+        'name',
+        'year',
+    )
+    list_filter = (
+        'year',
+        'shops',
+        'positions',
+    )
+    filter_horizontal = (
+        'shops',
+        'positions',
+    )
+
+    def get_queryset(self, request):
+        return super(SAWHSettingsAdmin, self).get_queryset(request).filter(network_id=request.user.network_id)
+
+    def has_change_permission(self, request, obj=None):
+        if obj and obj.code == 'default':
+            return False
+        return super(SAWHSettingsAdmin, self).has_change_permission(request, obj=obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.code == 'default':
+            return False
+        return super(SAWHSettingsAdmin, self).has_delete_permission(request, obj=obj)
+
+
+@admin.register(ShopSchedule)
+class ShopScheduleAdmin(admin.ModelAdmin):
+    raw_id_fields = ('shop',)
+    list_filter = ('dt', 'shop',)
+    list_display = ('dt', 'shop', 'modified_by', 'type', 'opens', 'closes')
+    readonly_fields = ('modified_by',)
+
+    def save_model(self, request, obj, form, change):
+        obj.modified_by = request.user
+        obj.save(recalc_wdays=True)

@@ -172,7 +172,7 @@ class TestWorkType(APITestCase):
         self.assertIsNotNone(WorkType.objects.get(id=self.work_type1.id).dttm_deleted)
 
     def test_get_efficiency(self):
-        dt_now = datetime.now().date()
+        dt_now = datetime.now().date().replace(day=1)
         tomorrow = dt_now + timedelta(days=1)
         after_tomorrow = dt_now + timedelta(days=2)
         after_after_tomorrow = dt_now + timedelta(days=3)
@@ -213,6 +213,7 @@ class TestWorkType(APITestCase):
             type=WorkerDay.TYPE_WORKDAY,
             dt=dt_now,
             worker=self.user2,
+            employment=self.employment2,
             is_approved=True,
             is_fact=False,
         )
@@ -224,6 +225,7 @@ class TestWorkType(APITestCase):
             type=WorkerDay.TYPE_SICK,
             dt=dt_now,
             worker=self.user2,
+            employment=self.employment2,
             is_approved=False,
             is_fact=False,
         )
@@ -232,6 +234,7 @@ class TestWorkType(APITestCase):
             type=WorkerDay.TYPE_HOLIDAY,
             dt=tomorrow,
             worker=self.user2,
+            employment=self.employment2,
             is_approved=True,
             is_fact=False,
         )
@@ -241,6 +244,7 @@ class TestWorkType(APITestCase):
             type=WorkerDay.TYPE_WORKDAY,
             dt=tomorrow,
             worker=self.user2,
+            employment=self.employment2,
             is_approved=False,
             is_fact=False,
         )
@@ -255,6 +259,7 @@ class TestWorkType(APITestCase):
             type=WorkerDay.TYPE_WORKDAY,
             dt=after_tomorrow,
             worker=self.user2,
+            employment=self.employment2,
             is_approved=True,
             is_fact=False,
         )
@@ -268,6 +273,7 @@ class TestWorkType(APITestCase):
             type=WorkerDay.TYPE_WORKDAY,
             dt=after_tomorrow,
             worker=self.user2,
+            employment=self.employment2,
             is_approved=False,
             is_fact=False,
         )
@@ -326,6 +332,7 @@ class TestWorkType(APITestCase):
             type=WorkerDay.TYPE_WORKDAY,
             dt=after_after_tomorrow,
             worker=self.user2,
+            employment=self.employment2,
             is_approved=True,
             is_fact=False,
         )

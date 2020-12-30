@@ -1,6 +1,7 @@
-from rest_framework import serializers, viewsets
+from rest_framework import serializers
 from django_filters.rest_framework import FilterSet
 from src.base.permissions import Permission
+from src.base.views_abstract import BaseModelViewSet
 from src.timetable.models import WorkType,WorkTypeName
 from src.timetable.work_type_name.views import WorkTypeNameSerializer
 from rest_framework.decorators import action
@@ -8,6 +9,9 @@ from src.timetable.work_type.utils import get_efficiency
 from src.conf.djconfig import QOS_DATE_FORMAT
 from rest_framework.validators import UniqueTogetherValidator
 from rest_framework.response import Response
+from drf_yasg.utils import swagger_auto_schema
+from src.util.openapi.responses import efficieny_response_schema_dict as response_schema_dict
+
 
 
 # Serializers define the API representation.
@@ -60,7 +64,7 @@ class WorkTypeFilter(FilterSet):
         }
 
 
-class WorkTypeViewSet(viewsets.ModelViewSet):
+class WorkTypeViewSet(BaseModelViewSet):
     """
 
     GET /rest_api/work_type/
@@ -168,13 +172,19 @@ class WorkTypeViewSet(viewsets.ModelViewSet):
     permission_classes = [Permission]
     serializer_class = WorkTypeSerializer
     filterset_class = WorkTypeFilter
+    openapi_tags = ['WorkType',]
 
     def get_queryset(self):
         return self.filter_queryset(
             WorkType.objects.select_related('work_type_name').filter(dttm_deleted__isnull=True)
         )
 
-    @action(detail=False, methods=['get'])
+    @swagger_auto_schema(
+        query_serializer=EfficiencySerializer,
+        operation_description='Возвращает нагрузку',
+        responses=response_schema_dict,
+    )
+    @action(detail=False, methods=['get'], filterset_class=None)
     def efficiency(self, request):
         data = EfficiencySerializer(data=request.query_params)
 

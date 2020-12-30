@@ -1,8 +1,19 @@
 import random
-
+from datetime import datetime, timedelta, time
 import factory
 
-from src.base.models import Shop, Employment, User, Region, Network, WorkerPosition, Group, Break
+from src.base.models import (
+    Shop,
+    Employment,
+    User,
+    Region,
+    Network,
+    WorkerPosition,
+    Group,
+    Break,
+    ShopSettings,
+    ShopSchedule,
+)
 from .factories_abstract import AbstractActiveNamedModelFactory
 
 
@@ -62,6 +73,7 @@ class ShopFactory(AbstractActiveNamedModelFactory):
     email = factory.Faker('email')
     latitude = factory.Faker('latitude')
     longitude = factory.Faker('longitude')
+    settings = factory.SubFactory('src.base.tests.factories.ShopSettingsFactory')
 
     class Meta:
         model = Shop
@@ -91,3 +103,22 @@ class UserFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = User
         django_get_or_create = ('username',)
+
+
+class ShopSettingsFactory(factory.django.DjangoModelFactory):
+    breaks = factory.SubFactory('src.base.tests.factories.BreakFactory')
+
+    class Meta:
+        model = ShopSettings
+
+
+class ShopScheduleFactory(factory.django.DjangoModelFactory):
+    modified_by = None
+    shop = factory.SubFactory('src.base.tests.factories.ShopFactory')
+    dt = factory.Sequence(lambda n: datetime.now().date() + timedelta(n))
+    opens = factory.LazyAttribute(lambda o: time(9) if o.type == ShopSchedule.WORKDAY_TYPE else None)
+    closes = factory.LazyAttribute(lambda o: time(21) if o.type == ShopSchedule.WORKDAY_TYPE else None)
+    type = ShopSchedule.WORKDAY_TYPE
+
+    class Meta:
+        model = ShopSchedule

@@ -8,7 +8,7 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup, Network, Employment
+from src.base.models import FunctionGroup, Network, Employment, ShopSchedule
 from src.timetable.models import (
     WorkerDay,
     AttendanceRecords,
@@ -150,8 +150,16 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         }
         response = self.client.post(self.url_approve, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # id = response.json()['id']
+        # не должен подтвердиться, т.к. нету изменений в дне
+        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).is_approved, False)
+
+        WorkerDay.objects.filter(id=self.worker_day_plan_not_approved.id).update(
+            dttm_work_start=datetime.combine(self.dt, time(8, 30, 0))
+        )
+        response = self.client.post(self.url_approve, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).is_approved, True)
+
         # self.assertIsNone(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).parent_worker_day_id)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).exists())
         # self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).parent_worker_day_id,
@@ -975,7 +983,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(wd.created_by.id, self.user1.id)
 
     def test_cant_create_workday_if_user_has_no_active_employment(self):
-        WorkerDay.objects.filter(worker=self.user2).delete()
+        WorkerDay.objects_with_excluded.filter(worker=self.user2).delete()
         self.user2.employments.all().delete()
         dt = self.dt - timedelta(days=60)
         data = {
@@ -1146,7 +1154,7 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
-        cls.dt_now = datetime.today()
+        cls.dt_now = datetime.now().date()
         cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
         cls.work_type = WorkType.objects.create(work_type_name=cls.work_type_name, shop=cls.shop)
 
@@ -1240,6 +1248,19 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
         )
 
         # todo: ночные смены (когда-нибудь)
+
+    def test_zero_hours_for_holiday(self):
+        ShopSchedule.objects.update_or_create(
+            dt=self.dt_now,
+            shop=self.shop,
+            defaults=dict(
+                type='H',
+                opens=None,
+                closes=None,
+                modified_by=self.user1,
+            ),
+        )
+        self._test_crop_both_bulk_and_original_save(10, 20, 8, 21, 0)
 
 
 class TestWorkerDayCreateFact(APITestCase):

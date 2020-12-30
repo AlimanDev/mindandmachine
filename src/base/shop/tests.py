@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import Shop, ShopSettings
+from src.base.models import Shop, ShopSettings, ShopSchedule
 from src.forecast.tests.factories import LoadTemplateFactory
 from src.timetable.models import ShopMonthStat
 from src.util.mixins.tests import TestsHelperMixin
@@ -147,11 +147,33 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         # self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_create(self):
+        nonstandard_schedule = [
+            {
+                "dt": "2021-01-01",
+                "opens": None,
+                "closes": None,
+                "type": "H",
+            },
+            {
+                "dt": "2021-01-02",
+                "opens": "09:00:00",
+                "closes": "19:00:00",
+                "type": "W",
+            },
+            {
+                "dt": "2021-01-09",
+                "opens": "00:00:00",
+                "closes": "00:00:00",
+                "type": "W",
+            },
+        ]
+
         data = {
             "parent_code": self.root_shop.code,
             "name": 'Region Shop3',
             "tm_open_dict": {"all": "07:00:00"},
             "tm_close_dict": {"all": "23:00:00"},
+            "nonstandard_schedule": nonstandard_schedule,
             "region_id": self.region.id,
             "code": None,
             "address": None,
@@ -187,12 +209,24 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['distance'] = None
         self.assertDictEqual(shop, data)
 
+        for schedule_dict in nonstandard_schedule:
+            schedule = ShopSchedule.objects.filter(
+                shop_id=shop['id'],
+                dt=schedule_dict['dt'],
+            ).first()
+            self.assertIsNotNone(schedule)
+            self.assertEqual(str(schedule.opens), str(schedule_dict['opens']))
+            self.assertEqual(str(schedule.closes), str(schedule_dict['closes']))
+            self.assertEqual(str(schedule.type), str(schedule_dict['type']))
+            self.assertEqual(schedule.modified_by_id, self.user1.id)
+
     def test_update(self):
         data = {
             "parent_id": self.root_shop.id,
             "name": 'Title 2',
             "tm_open_dict": {"all": "07:00:00"},
             "tm_close_dict": {"all": "23:00:00"},
+            "nonstandard_schedule": [],
             "region_id": self.region.id,
             "code": "10",
             "address": 'address',

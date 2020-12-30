@@ -3,6 +3,7 @@ from rest_framework.test import APITestCase
 
 from src.base.models import Network
 from src.timetable.models import WorkTypeName, WorkType
+from src.forecast.models import OperationTypeName
 from src.util.test import create_departments_and_users
 
 
@@ -58,6 +59,7 @@ class TestWorkTypeName(APITestCase):
         work_type_name = response.json()
         data['id'] = work_type_name['id']
         self.assertEqual(work_type_name, data)
+        self.assertIsNotNone(OperationTypeName.objects.filter(work_type_name_id=data['id']).first())
 
     def test_update(self):
         data = {
@@ -68,6 +70,7 @@ class TestWorkTypeName(APITestCase):
         work_type_name = response.json()
         data['id'] = self.work_type_name1.id
         self.assertEqual(work_type_name, data)
+        self.assertIsNotNone(OperationTypeName.objects.filter(work_type_name_id=data['id']).first())
 
     def test_update_code(self):
         data = {

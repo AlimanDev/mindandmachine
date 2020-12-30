@@ -66,6 +66,7 @@ class WorkerDayListSerializer(serializers.Serializer):
     parent_worker_day_id = serializers.IntegerField()
     shop_code = serializers.CharField(required=False, read_only=True)
     user_login = serializers.CharField(required=False, read_only=True)
+    created_by_id = serializers.IntegerField(read_only=True)
 
     def __init__(self, *args, **kwargs):
         super(WorkerDayListSerializer, self).__init__(*args, **kwargs)
@@ -75,7 +76,7 @@ class WorkerDayListSerializer(serializers.Serializer):
             self.fields['dttm_work_end'].source = 'tabel_dttm_work_end'
             self.fields['dttm_work_end'].source_attrs = ['tabel_dttm_work_end']
 
-    def get_work_hours(self, obj):
+    def get_work_hours(self, obj) -> float:
         work_hours = getattr(obj, 'tabel_work_hours', obj.work_hours)
 
         if isinstance(work_hours, timedelta):
@@ -117,6 +118,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                   'crop_work_hours_by_shop_schedule']
         read_only_fields = ['work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
+        ref_name = 'WorkerDaySerializer'
         extra_kwargs = {
             'is_fact': {
                 'required': False,
@@ -210,7 +212,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     def _create_update_clean(self, validated_data, instance=None):
         worker_id = validated_data.get('worker_id', instance.worker_id if instance else None)
         if worker_id:
-            wdays_qs = WorkerDay.objects.filter(
+            wdays_qs = WorkerDay.objects_with_excluded.filter(
                 worker_id=worker_id,
                 dt=validated_data.get('dt'),
                 is_approved=validated_data.get(
@@ -383,19 +385,38 @@ class VacancySerializer(serializers.Serializer):
         super(VacancySerializer, self).__init__(*args, **kwargs)
         self.fields['shop'] = ShopSerializer(context=self.context)
 
-    def get_avatar_url(self, obj):
+    def get_avatar_url(self, obj) -> str:
         if obj.worker_id and obj.worker.avatar:
             return obj.worker.avatar.url
         return None
 
 
-class AutoSettingsSerializer(serializers.Serializer):
+class BaseAutoSettingsSerializer(serializers.Serializer):
+    default_error_messages = {
+        'check_dates': _('Date start should be less then date end'),
+    }
+
     shop_id = serializers.IntegerField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
-    is_remaking = serializers.BooleanField(default=False)
-    use_not_approved = serializers.BooleanField(default=False)
-    delete_created_by = serializers.BooleanField(default=False)
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+
+        if self.validated_data.get('dt_from') > self.validated_data.get('dt_to'):
+            raise self.fail('check_dates')
+
+
+class AutoSettingsCreateSerializer(BaseAutoSettingsSerializer):
+    is_remaking = serializers.BooleanField(default=False, help_text='Пересоставление')
+    use_not_approved = serializers.BooleanField(default=False, help_text='Использовать неподтвержденную версию')
+
+
+class AutoSettingsDeleteSerializer(BaseAutoSettingsSerializer):
+    delete_created_by = serializers.BooleanField(default=False, help_text='Удалить ручные изменения')
+
+
+class AutoSettingsSetSerializer(serializers.Serializer):
+    data = serializers.JSONField(help_text='Данные в формате JSON от сервера.')
 
 
 class ListChangeSrializer(serializers.Serializer):
@@ -441,8 +462,9 @@ class ChangeRangeSerializer(serializers.Serializer):
 
     def __init__(self, *args, **kwargs):
         super(ChangeRangeSerializer, self).__init__(*args, **kwargs)
-        self.fields['worker'] = serializers.SlugRelatedField(
-            slug_field='tabel_code', queryset=User.objects.filter(network=self.context['request'].user.network))
+        if self.context.get('request'):
+            self.fields['worker'] = serializers.SlugRelatedField(
+                slug_field='tabel_code', queryset=User.objects.filter(network=self.context['request'].user.network))
 
     def validate(self, data):
         if not data['dt_to'] >= data['dt_from']:
