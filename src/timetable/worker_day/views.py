@@ -240,13 +240,13 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=False, methods=['post'])
     def approve(self, request):
-        with transaction.atomic():
-            kwargs = {'context': self.get_serializer_context()}
-            serializer = WorkerDayApproveSerializer(data=request.data, **kwargs)
-            serializer.is_valid(raise_exception=True)
-            if not serializer.validated_data['wd_types']:
-                raise PermissionDenied()
+        kwargs = {'context': self.get_serializer_context()}
+        serializer = WorkerDayApproveSerializer(data=request.data, **kwargs)
+        serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data['wd_types']:
+            raise PermissionDenied()
 
+        with transaction.atomic():
             wd_perms = GroupWorkerDayPermission.objects.filter(
                 group__in=request.user.get_group_ids(
                     request.user.network, Shop.objects.get(id=serializer.validated_data['shop_id'])),
@@ -333,101 +333,101 @@ class WorkerDayViewSet(BaseModelViewSet):
                 )
             ).filter(same_approved_exists=False)
 
-        worker_dt_pairs_list = list(wdays_to_approve.values_list(
-            'worker_id', 'dt', 'type',
-        ).order_by('worker_id', 'dt', 'type').distinct())
+            worker_dt_pairs_list = list(wdays_to_approve.values_list(
+                'worker_id', 'dt', 'type',
+            ).order_by('worker_id', 'dt', 'type').distinct())
 
-        grouped_worker_dates = {}
-        if worker_dt_pairs_list:
-            for worker_id, grouper in groupby(worker_dt_pairs_list, key=lambda i: i[0]):
-                grouped_worker_dates[worker_id] = [(Converter.convert_date(i[1]), *i[2:]) for i in list(grouper)]
-            with transaction.atomic():
-                worker_days_q = Q()
-                for worker_id, data in grouped_worker_dates.items():
-                    worker_days_q |= Q(worker_id=worker_id, dt__in=[d[0] for d in data])
-                WorkerDay.objects_with_excluded.filter(
-                    worker_days_q, is_fact=serializer.data['is_fact'],
-                ).exclude(
-                    id__in=wdays_to_approve.values_list('id', flat=True)
-                ).delete()
-                list_wd = list(
-                    wdays_to_approve.exclude(
-                        is_vacancy=True,
-                        type='W',
-                    ).select_related(
-                        'shop',
-                        'employment',
-                        'employment__position',
-                        'employment__position__breaks',
-                        'shop__settings__breaks',
-                    ).prefetch_related(
-                        'worker_day_details',
-                    ).distinct()
-                )
-
-                wdays_to_approve.update(is_approved=True)
-
-                wds = WorkerDay.objects.bulk_create(
-                    [
-                        WorkerDay(
-                            shop=wd.shop,
-                            worker_id=wd.worker_id,
-                            employment=wd.employment,
-                            dttm_work_start=wd.dttm_work_start,
-                            dttm_work_end=wd.dttm_work_end,
-                            dt=wd.dt,
-                            is_fact=wd.is_fact,
-                            is_approved=False,
-                            type=wd.type,
-                            created_by_id=wd.created_by_id,
-                            is_vacancy=wd.is_vacancy,
-                            is_outsource=wd.is_outsource,
-                            comment=wd.comment,
-                            canceled=wd.canceled,
-                            need_count_wh=True,
-                        )
-                        for wd in list_wd
-                    ]
-                )
-                search_wds = {}
-                for wd in wds:
-                    key_worker = wd.worker_id
-                    if not key_worker in search_wds:
-                        search_wds[key_worker] = {}
-                    search_wds[key_worker][wd.dt] = wd
-
-                WorkerDayCashboxDetails.objects.bulk_create(
-                    [
-                        WorkerDayCashboxDetails(
-                            work_part=details.work_part,
-                            worker_day=search_wds[wd.worker_id][wd.dt],
-                            work_type_id=details.work_type_id,
-                        )
-                        for wd in list_wd
-                        for details in wd.worker_day_details.all()
-                    ]
-                )
-
-                # если план, то отмечаем, что график подтвержден
-                if not serializer.data['is_fact']:
-                    ShopMonthStat.objects.filter(
-                        shop_id=serializer.data['shop_id'],
-                        dt=serializer.validated_data['dt_from'].replace(day=1),
-                    ).update(
-                        is_approved=True,
+            grouped_worker_dates = {}
+            if worker_dt_pairs_list:
+                for worker_id, grouper in groupby(worker_dt_pairs_list, key=lambda i: i[0]):
+                    grouped_worker_dates[worker_id] = [(Converter.convert_date(i[1]), *i[2:]) for i in list(grouper)]
+                    worker_days_q = Q()
+                    for worker_id, data in grouped_worker_dates.items():
+                        worker_days_q |= Q(worker_id=worker_id, dt__in=[d[0] for d in data])
+                    WorkerDay.objects_with_excluded.filter(
+                        worker_days_q, is_fact=serializer.data['is_fact'],
+                    ).exclude(
+                        id__in=wdays_to_approve.values_list('id', flat=True)
+                    ).delete()
+                    list_wd = list(
+                        wdays_to_approve.exclude(
+                            is_vacancy=True,
+                            type='W',
+                        ).select_related(
+                            'shop',
+                            'employment',
+                            'employment__position',
+                            'employment__position__breaks',
+                            'shop__settings__breaks',
+                        ).prefetch_related(
+                            'worker_day_details',
+                        ).distinct()
                     )
 
-        event_context = serializer.data.copy()
-        # TODO: добавлять ли дни в контекст?
-        # event_context['grouped_worker_dates'] = grouped_worker_dates
-        transaction.on_commit(lambda: event_signal.send(
-            sender=None,
-            network_id=request.user.network_id,
-            event_code=APPROVE_EVENT_TYPE,
-            user_author_id=request.user.id,
-            shop_id=serializer.data['shop_id'],
-            context=event_context,
-        ))
+                    wdays_to_approve.update(is_approved=True)
+
+                    wds = WorkerDay.objects.bulk_create(
+                        [
+                            WorkerDay(
+                                shop=wd.shop,
+                                worker_id=wd.worker_id,
+                                employment=wd.employment,
+                                dttm_work_start=wd.dttm_work_start,
+                                dttm_work_end=wd.dttm_work_end,
+                                dt=wd.dt,
+                                is_fact=wd.is_fact,
+                                is_approved=False,
+                                type=wd.type,
+                                created_by_id=wd.created_by_id,
+                                is_vacancy=wd.is_vacancy,
+                                is_outsource=wd.is_outsource,
+                                comment=wd.comment,
+                                canceled=wd.canceled,
+                                need_count_wh=True,
+                            )
+                            for wd in list_wd
+                        ]
+                    )
+                    search_wds = {}
+                    for wd in wds:
+                        key_worker = wd.worker_id
+                        if not key_worker in search_wds:
+                            search_wds[key_worker] = {}
+                        search_wds[key_worker][wd.dt] = wd
+
+                    WorkerDayCashboxDetails.objects.bulk_create(
+                        [
+                            WorkerDayCashboxDetails(
+                                work_part=details.work_part,
+                                worker_day=search_wds[wd.worker_id][wd.dt],
+                                work_type_id=details.work_type_id,
+                            )
+                            for wd in list_wd
+                            for details in wd.worker_day_details.all()
+                        ]
+                    )
+
+                    # если план, то отмечаем, что график подтвержден
+                    if not serializer.data['is_fact']:
+                        ShopMonthStat.objects.filter(
+                            shop_id=serializer.data['shop_id'],
+                            dt=serializer.validated_data['dt_from'].replace(day=1),
+                        ).update(
+                            is_approved=True,
+                        )
+
+                # TODO: нужно ли как-то разделять события подтверждения факта и плана?
+                event_context = serializer.data.copy()
+                # TODO: добавлять ли детальную информацию о подтвержденных днях в контекст?
+                # event_context['grouped_worker_dates'] = grouped_worker_dates
+                transaction.on_commit(lambda: event_signal.send(
+                    sender=None,
+                    network_id=request.user.network_id,
+                    event_code=APPROVE_EVENT_TYPE,
+                    user_author_id=request.user.id,
+                    shop_id=serializer.data['shop_id'],
+                    context=event_context,
+                ))
 
         return Response()
 
