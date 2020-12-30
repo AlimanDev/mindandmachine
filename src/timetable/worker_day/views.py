@@ -700,7 +700,9 @@ class WorkerDayViewSet(BaseModelViewSet):
         data = data.validated_data
         with transaction.atomic():
             list_wd = list(
-                WorkerDay.objects.filter(
+                WorkerDay.objects.exclude(
+                    is_vacancy=True,
+                ).filter(
                     dt__in=data['dates'],
                     worker_id__in=data['worker_ids'],
                     is_approved=True,
@@ -715,7 +717,9 @@ class WorkerDayViewSet(BaseModelViewSet):
                     'worker_day_details',
                 )
             )
-            WorkerDay.objects_with_excluded.filter(
+            WorkerDay.objects_with_excluded.exclude(
+                is_vacancy=True,
+            ).filter(
                 dt__in=data['dates'],
                 worker_id__in=data['worker_ids'],
                 is_approved=False,
@@ -744,7 +748,9 @@ class WorkerDayViewSet(BaseModelViewSet):
                     for wd in list_wd
                 ]
             )
-            wds = WorkerDay.objects.filter(
+            wds = WorkerDay.objects.exclude(
+                is_vacancy=True,
+            ).filter(
                 dt__in=data['dates'],
                 worker_id__in=data['worker_ids'],
                 is_approved=False,
