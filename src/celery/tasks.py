@@ -27,6 +27,7 @@ from src.base.models import (
 from src.celery.celery import app
 from src.conf.djconfig import EMAIL_HOST_USER
 from src.conf.djconfig import URV_STAT_EMAILS, URV_STAT_SHOP_LEVEL
+from src.events.signals import event_signal
 from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
 from src.forecast.models import (
     OperationTemplate,
@@ -886,3 +887,8 @@ def recalc_wdays(shop_id, dt_from, dt_to):
             wd_obj = WorkerDay.objects.filter(id=wd_id).select_for_update().first()
             if wd_obj:
                 wd_obj.save()
+
+
+@app.task
+def trigger_event(**kwargs):
+    event_signal.send(sender=None, **kwargs)

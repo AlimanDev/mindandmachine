@@ -88,6 +88,8 @@ INSTALLED_APPS = [
     'src.celery',
     'fcm_django',
     'src.recognition',
+    'src.events',
+    'src.notifications',
 ]
 
 REST_FRAMEWORK = {
@@ -187,6 +189,7 @@ EMAIL_PORT = 587
 # EMAIL_USE_SSL = True
 # EMAIL_PORT = 465
 
+DEFAULT_FROM_EMAIL = 'robot@mindandmachine.ru'
 EMAIL_HOST = 'smtp.yandex.ru'
 EMAIL_HOST_USER = 'robot@mindandmachine.ru'
 EMAIL_HOST_PASSWORD = 'TjP6szfJe0PpLNH'

@@ -6,9 +6,9 @@ from datetime import datetime, timedelta, time
 from django.urls import reverse
 
 from src.base.models import Employment, FunctionGroup
-from src.util.utils import generate_user_token
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
 from src.util.test import create_departments_and_users
+from src.util.utils import generate_user_token
 
 
 class TestsHelperMixin:
@@ -38,7 +38,11 @@ class TestsHelperMixin:
         return reverse(view_name, kwargs=kwargs)
 
     def print_resp(self, resp):
-        print(json.dumps(resp.json(), indent=4, ensure_ascii=False))
+        try:
+            resp_data = resp.json()
+            print(json.dumps(resp_data, indent=4, ensure_ascii=False))
+        except TypeError:
+            print(resp.content)
 
     @staticmethod
     def dump_data(data):
