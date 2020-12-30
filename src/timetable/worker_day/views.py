@@ -1,6 +1,8 @@
 import datetime
 import json
 from itertools import groupby
+from src.events.signals import event_signal
+from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE
 import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
@@ -49,6 +51,7 @@ from src.timetable.serializers import (
     DownloadTabelSerializer,
     ChangeRangeListSerializer,
     CopyApprovedSerializer,
+    RequestApproveSerializer,
 )
 from src.timetable.vacancy.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy, confirm_vacancy
 from src.timetable.worker_day.stat import count_daily_stat
@@ -58,7 +61,7 @@ from src.util.models_converter import Converter
 from src.util.upload import get_uploaded_file
 from drf_yasg.utils import swagger_auto_schema
 from src.util.openapi.responses import (
-    worker_stat_response_schema_dictionary, 
+    worker_stat_response_schema_dictionary,
     daily_stat_response_schema_dictionary,
     confirm_vacancy_response_schema_dictionary,
     change_range_response_schema_dictionary,
@@ -211,6 +214,24 @@ class WorkerDayViewSet(BaseModelViewSet):
             ).data
         return Response(data)
 
+    @action(detail=False, methods=['post'])
+    def request_approve(self, request, *args, **kwargs):
+        """
+        Запрос на подтверждении графика
+        """
+        serializer = RequestApproveSerializer(data=request.data, **kwargs)
+        serializer.is_valid(raise_exception=True)
+        event_context = serializer.data.copy()
+        transaction.on_commit(lambda: event_signal.send(
+            sender=None,
+            network_id=request.user.network_id,
+            event_code=REQUEST_APPROVE_EVENT_TYPE,
+            user_author_id=request.user.id,
+            shop_id=serializer.data['shop_id'],
+            context=event_context,
+        ))
+        return Response({})
+
     @swagger_auto_schema(
         request_body=WorkerDayApproveSerializer,
         responses={200:'empty response'},
@@ -313,12 +334,18 @@ class WorkerDayViewSet(BaseModelViewSet):
                 )
             ).filter(same_approved_exists=False)
 
-            worker_dt_pairs_list = list(
-                wdays_to_approve.values_list('worker_id', 'dt').order_by('worker_id', 'dt').distinct())
-            if worker_dt_pairs_list:
+        worker_dt_pairs_list = list(wdays_to_approve.values_list(
+            'worker_id', 'dt', 'type',
+        ).order_by('worker_id', 'dt', 'type').distinct())
+
+        grouped_worker_dates = {}
+        if worker_dt_pairs_list:
+            for worker_id, grouper in groupby(worker_dt_pairs_list, key=lambda i: i[0]):
+                grouped_worker_dates[worker_id] = [(Converter.convert_date(i[1]), *i[2:]) for i in list(grouper)]
+            with transaction.atomic():
                 worker_days_q = Q()
-                for worker_id, dates_grouper in groupby(worker_dt_pairs_list, key=lambda i: i[0]):
-                    worker_days_q |= Q(worker_id=worker_id, dt__in=[i[1] for i in list(dates_grouper)])
+                for worker_id, data in grouped_worker_dates.items():
+                    worker_days_q |= Q(worker_id=worker_id, dt__in=[d[0] for d in data])
                 WorkerDay.objects_with_excluded.filter(
                     worker_days_q, is_fact=serializer.data['is_fact'],
                 ).exclude(
@@ -390,6 +417,19 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ).update(
                         is_approved=True,
                     )
+
+        event_context = serializer.data.copy()
+        # TODO: добавлять ли дни в контекст?
+        # event_context['grouped_worker_dates'] = grouped_worker_dates
+        transaction.on_commit(lambda: event_signal.send(
+            sender=None,
+            network_id=request.user.network_id,
+            event_code=APPROVE_EVENT_TYPE,
+            user_author_id=request.user.id,
+            shop_id=serializer.data['shop_id'],
+            context=event_context,
+        ))
+
         return Response()
 
     @swagger_auto_schema(

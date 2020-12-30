@@ -1154,7 +1154,7 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
-        cls.dt_now = datetime.today()
+        cls.dt_now = datetime.now().date()
         cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
         cls.work_type = WorkType.objects.create(work_type_name=cls.work_type_name, shop=cls.shop)
 

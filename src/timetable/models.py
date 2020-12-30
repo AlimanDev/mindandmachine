@@ -15,7 +15,7 @@ from django.db.models.query import QuerySet
 from django.utils import timezone
 
 from src.base.models import Shop, Employment, User, Event, Network, Break
-from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, \
+from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
 
 
@@ -45,8 +45,8 @@ class WorkTypeManager(AbstractActiveModelManager):
             obj.delete()
 
 
-class WorkTypeName(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Название типа работ'
         verbose_name_plural = 'Названия типов работ'
 
@@ -129,8 +129,8 @@ class UserWeekdaySlot(AbstractModel):
     is_suitable = models.BooleanField(default=True)
 
 
-class Slot(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class Slot(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Слот'
         verbose_name_plural = 'Слоты'
 
@@ -179,8 +179,8 @@ class CashboxManager(models.Manager):
         ).filter(*args, **kwargs)
 
 
-class Cashbox(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class Cashbox(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Рабочее место '
         verbose_name_plural = 'Рабочие места'
 
@@ -539,7 +539,7 @@ class WorkerDay(AbstractModel):
             if self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
                 from src.util.models_converter import Converter
                 dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
-                shop_schedule = self.shop.get_schedule(dt)
+                shop_schedule = self.shop.get_schedule(dt=dt)
                 if shop_schedule is None:
                     return datetime.timedelta(0)
 
