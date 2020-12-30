@@ -1149,7 +1149,7 @@ def default_work_hours_by_months():
     return {f'm{month_num}': 100 for month_num in range(1, 12 + 1)}
 
 
-class SAWHSettings(AbstractActiveNamedModel):
+class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     """
     Настройки суммированного учета рабочего времени.
     Модель нужна для распределения часов по месяцам в рамках учетного периода при автосоставлении.
