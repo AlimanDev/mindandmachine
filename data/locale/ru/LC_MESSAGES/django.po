@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-12-30 13:17+0000\n"
+"POT-Creation-Date: 2020-12-31 07:50+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -52,7 +52,7 @@ msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:168 src/timetable/serializers.py:88
+#: src/base/serializers.py:168 src/timetable/serializers.py:93
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
@@ -73,39 +73,70 @@ msgstr "Есть {amount} должностей с кодом: {code}."
 msgid "Invalid time format. Format should be {format}"
 msgstr "Неверный формат времени. Должен быть {format}"
 
-#: src/forecast/load_template/views.py:165
+#: src/forecast/load_template/views.py:172
 #, fuzzy
 #| msgid "Cannot delete template as it's used in demand calulations."
 msgid "Cannot delete template as it's used in demand calculations."
 msgstr ""
 "Данный шаблон невозможно удалить, так как используется в расчете нагрузки"
 
-#: src/forecast/operation_type_relation/views.py:21
+#: src/forecast/load_template/views.py:173
+#, fuzzy
+#| msgid "This field is required."
+msgid "This field ins required"
+msgstr "Это поле обязательно."
+
+#: src/forecast/operation_type_relation/views.py:23
 msgid "Base and depended demand models cannot be the same."
 msgstr "Базовая и зависимая модели нагрузки не могут совпадать."
 
-#: src/forecast/operation_type_relation/views.py:22
+#: src/forecast/operation_type_relation/views.py:24
 msgid "Demand model cannot depend on itself."
 msgstr "Циклическая зависимость: операция зависит сама от себя."
 
-#: src/forecast/operation_type_relation/views.py:23
+#: src/forecast/operation_type_relation/views.py:25
 msgid "Backward dependency already exists."
 msgstr "Уже существует обратная зависимость"
 
-#: src/forecast/operation_type_relation/views.py:24
+#: src/forecast/operation_type_relation/views.py:26
 msgid "Base and depended demand models cannot have different templates."
 msgstr "Базовая и зависимая модели не могут иметь разный шаблон нагрузки"
 
-#: src/forecast/operation_type_relation/views.py:25
+#: src/forecast/operation_type_relation/views.py:27
 #, python-brace-format
 msgid "Error in formula: {formula}."
 msgstr "Ошибка в формуле: {formula}"
 
-#: src/forecast/operation_type_relation/views.py:26
+#: src/forecast/operation_type_relation/views.py:28
 #, fuzzy
 #| msgid "Base model."
 msgid "Base model not formula."
 msgstr "У базовой модели тип расчета должен быть формула"
+
+#: src/forecast/operation_type_relation/views.py:29
+msgid "Constant operation can't be base."
+msgstr "Операция с постоянным значением не может иметь зависимости."
+
+#: src/forecast/operation_type_relation/views.py:30
+msgid "Depended must have same or bigger forecast step, got {} -> {}"
+msgstr ""
+"Зависимая операция должна иметь одинаковый или больший шаг прогноза, имеется "
+"{} -> {}"
+
+#: src/forecast/operation_type_template/views.py:19
+msgid "This operation type depends on operations with less forecast steps."
+msgstr "Этот тип операции зависит от операций с меньшим шагом прогноза."
+
+#: src/forecast/operation_type_template/views.py:20
+msgid ""
+"This operation type is dependency of operations with bigger forecast steps."
+msgstr "От этого типа операций зависят операции с большим шагом прогноза."
+
+#: src/forecast/operation_type_template/views.py:21
+msgid "You cant set constant value because this operation has depndences."
+msgstr ""
+"Вы не можете указать постоянное значение, так как у данной операции есть "
+"зависимости."
 
 #: src/recognition/models.py:188
 msgid "Key"
@@ -168,16 +199,15 @@ msgstr "Вы не можете удалить расписание в прошл
 msgid "You need to select auto-scheduling settings for the department."
 msgstr "Необходимо выбрать шаблон смен."
 
-#: src/timetable/serializers.py:85 src/timetable/serializers.py:391
-#: src/timetable/serializers.py:494
+#: src/timetable/serializers.py:90 src/timetable/serializers.py:403
 msgid "Date start should be less then date end"
 msgstr "Дата начала должна быть меньше чем дата окончания."
 
-#: src/timetable/serializers.py:86
+#: src/timetable/serializers.py:91
 msgid "Worker day already exist."
 msgstr "У сотрудника уже существует рабочий день."
 
-#: src/timetable/serializers.py:87
+#: src/timetable/serializers.py:92
 #, fuzzy, python-brace-format
 #| msgid ""
 #| "Worker day intercepts with another: {shop_name}, {work_start} - "
@@ -188,15 +218,15 @@ msgstr ""
 "Рабочий день пересекается с другим рабочим днем: {shop_name}, {work_start} - "
 "{work_end}"
 
-#: src/timetable/serializers.py:89
+#: src/timetable/serializers.py:94
 msgid "Shop in work type and in work day must match."
 msgstr "Магазин в типе работ и в рабочем дне должен совпадать."
 
-#: src/timetable/serializers.py:90
+#: src/timetable/serializers.py:95
 msgid "User in employment and in worker day must match."
 msgstr "Сотрудник в трудоустройстве и в рабочем дне должны совпадать."
 
-#: src/timetable/serializers.py:92
+#: src/timetable/serializers.py:97
 msgid ""
 "Can't create a working day in the schedule, since the user is not employed "
 "during this period"
@@ -204,37 +234,37 @@ msgstr ""
 "Невозможно создать рабочий день, так как пользователь в этот период не "
 "трудоустроен"
 
-#: src/timetable/serializers.py:420
+#: src/timetable/serializers.py:432
 msgid "Wrong dates format."
 msgstr "Неправильный формат дат."
 
-#: src/timetable/serializers.py:479 src/timetable/serializers.py:518
+#: src/timetable/serializers.py:497 src/timetable/serializers.py:519
 #, python-brace-format
 msgid "Invalid pk \"{pk_value}\" - object does not exist."
 msgstr "Недопустимый первичный ключ \"{pk_value}\" - объект не существует."
 
-#: src/timetable/worker_day/views.py:70
+#: src/timetable/worker_day/views.py:74
 msgid "Worker days mismatch."
 msgstr "Рабочие дни сотрудников не совпадают."
 
-#: src/timetable/worker_day/views.py:71
+#: src/timetable/worker_day/views.py:75
 msgid "Workers don't have timetable."
 msgstr "Отсутствует расписание у сотрудников."
 
-#: src/timetable/worker_day/views.py:72
+#: src/timetable/worker_day/views.py:76
 msgid "Cannot_delete approved version."
 msgstr "Нельзя удалить подтвержденную версию."
 
-#: src/timetable/worker_day/views.py:73
+#: src/timetable/worker_day/views.py:77
 msgid "Not approved version already exists."
 msgstr "У расписания уже есть неподтвержденная версия."
 
-#: src/timetable/worker_day/views.py:74
+#: src/timetable/worker_day/views.py:78
 #, python-brace-format
 msgid "У вас нет прав на подтверждение типа дня \"{wd_type_str}\""
 msgstr ""
 
-#: src/timetable/worker_day/views.py:75
+#: src/timetable/worker_day/views.py:79
 #, python-brace-format
 msgid ""
 "У вас нет прав на подтверждения типа дня \"{wd_type_str}\" в выбранные даты. "
@@ -324,9 +354,6 @@ msgstr ""
 
 #~ msgid "Request was throttled."
 #~ msgstr "Запрос был проигнорирован."
-
-#~ msgid "This field is required."
-#~ msgstr "Это поле обязательно."
 
 #~ msgid "This field may not be null."
 #~ msgstr "Это поле не может быть null."

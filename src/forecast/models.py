@@ -48,6 +48,8 @@ class LoadTemplate(AbstractModel):
 
     name = models.CharField(max_length=64, unique=True)
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
+    forecast_params = models.TextField(default='{}')
+    round_delta = models.FloatField(default=0)
 
     def __str__(self):
         return f'id: {self.id}, name: {self.name}'
@@ -110,6 +112,7 @@ class OperationTypeTemplate(AbstractModel):
     tm_from = models.TimeField(null=True, blank=True)
     tm_to = models.TimeField(null=True, blank=True)
     forecast_step = models.DurationField(default=datetime.timedelta(hours=1))
+    const_value = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return 'id: {}, load_template: {}, operation_type_name: ({})'.format(
@@ -132,9 +135,9 @@ class OperationTypeRelation(AbstractModel):
         (TYPE_PREDICTION, 'Прогнозирование'),
     ]
 
-    base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends')
-    depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases')
-    formula = models.CharField(max_length=256)
+    base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends') # child
+    depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases') # parent
+    formula = models.CharField(max_length=512)
     type = models.CharField(max_length=1, default=TYPE_FORMULA)
 
     def __str__(self):

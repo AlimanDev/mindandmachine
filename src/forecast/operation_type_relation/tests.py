@@ -115,7 +115,8 @@ class TestOperationTypeRelation(APITestCase):
                 },
                 'tm_from': None,
                 'tm_to': None,
-                'forecast_step': '01:00:00'
+                'forecast_step': '01:00:00',
+                'const_value': None,
             }, 
             'depended': {
                 'id': self.operation_type_template2.id, 
@@ -129,7 +130,8 @@ class TestOperationTypeRelation(APITestCase):
                 },
                 'tm_from': None,
                 'tm_to': None,
-                'forecast_step': '01:00:00'
+                'forecast_step': '01:00:00',
+                'const_value': None,
             }, 
             'formula': 'a * 2',
             'type': 'F'
@@ -170,7 +172,8 @@ class TestOperationTypeRelation(APITestCase):
                 },
                 'tm_from': None,
                 'tm_to': None,
-                'forecast_step': '01:00:00'
+                'forecast_step': '01:00:00',
+                'const_value': None,
             }, 
             'depended': {
                 'id': op_temp2.id, 
@@ -184,7 +187,8 @@ class TestOperationTypeRelation(APITestCase):
                 },
                 'tm_from': None,
                 'tm_to': None,
-                'forecast_step': '01:00:00'
+                'forecast_step': '01:00:00',
+                'const_value': None,
             }, 
             'formula': 'a + a * 2',
             'type': 'F'
@@ -233,3 +237,172 @@ class TestOperationTypeRelation(APITestCase):
             OperationType.UPDATED,
         )
     
+    def test_const_cant_be_base(self):
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+            const_value=1.0,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name2,
+        )
+        data = {
+            'base_id': op_temp1.id,
+            'depended_id': op_temp2.id,
+            'formula': 'a + a * 2'
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.json(),{'base': "Операция с постоянным значением не может иметь зависимости."})
+
+
+    def test_bad_steps(self):
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name2,
+            forecast_step=timedelta(minutes=30),
+        )
+        data = {
+            'base_id': op_temp1.id,
+            'depended_id': op_temp2.id,
+            'formula': 'a + a * 2'
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.json(), {'non_field_errors': 'Зависимая операция должна иметь одинаковый или больший шаг прогноза, имеется 0:30:00 -> 1:00:00'})
+
+
+    def test_bad_formula(self):
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name2,
+        )
+        data = {
+            'base_id': op_temp1.id,
+            'depended_id': op_temp2.id,
+            'formula': 'a + a ( 2'
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.json(), {'formula': 'Ошибка в формуле: a + a ( 2'})
+
+
+    def test_base_depended_same(self):
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+        )
+        data = {
+            'base_id': op_temp1.id,
+            'depended_id': op_temp1.id,
+            'formula': 'a + a * 2'
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.json(), {'non_field_errors': 'Базовая и зависимая модели нагрузки не могут совпадать.'})
+
+
+    def test_base_not_formula(self):
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        self.operation_type_name1.do_forecast = OperationTypeName.FORECAST
+        self.operation_type_name1.save()
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name2,
+        )
+        data = {
+            'base_id': op_temp1.id,
+            'depended_id': op_temp2.id,
+            'formula': 'a + a * 2'
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.json(), {'base': 'Base model not formula.'})
+
+    def test_reversed_relation(self):
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        self.operation_type_name2.do_forecast = OperationTypeName.FORECAST_FORMULA
+        self.operation_type_name2.save()
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name2,
+        )
+        data = {
+            'base_id': op_temp1.id,
+            'depended_id': op_temp2.id,
+            'formula': 'a + a * 2'
+        }
+        response = self.client.post(self.url, data, format='json')
+        data = {
+            'base_id': op_temp2.id,
+            'depended_id': op_temp1.id,
+            'formula': 'a + a * 2'
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.json(), {'base': 'Уже существует обратная зависимость'})
+
+    def test_cycle_relation(self):
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        self.operation_type_name2.do_forecast = OperationTypeName.FORECAST_FORMULA
+        self.operation_type_name2.save()
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name2,
+        )
+        op_temp3 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name3,
+        )
+        data = {
+            'base_id': op_temp1.id,
+            'depended_id': op_temp2.id,
+            'formula': 'a + a * 2'
+        }
+        response = self.client.post(self.url, data, format='json')
+        data = {
+            'base_id': op_temp2.id,
+            'depended_id': op_temp3.id,
+            'formula': 'a + a * 2'
+        }
+        response = self.client.post(self.url, data, format='json')
+        data = {
+            'base_id': op_temp3.id,
+            'depended_id': op_temp1.id,
+            'formula': 'a + a * 2'
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.json(), {'base': 'Циклическая зависимость: операция зависит сама от себя.'})

@@ -1,5 +1,6 @@
 import datetime
 import json
+from dateutil.relativedelta import relativedelta
 from calendar import monthrange
 
 import pandas as pd
@@ -256,7 +257,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     longitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Долгота')
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
 
-    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict'])
+    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict', 'load_template'])
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(
@@ -353,23 +354,22 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         self.tm_close_dict = self.clean_time_dict(self.close_times)
         if hasattr(self, 'parent_code'):
             self.parent = get_object_or_404(Shop, code=self.parent_code)
-        load_template = None
-        if self.load_template_id and self.id:
-            new_template = self.load_template_id
-            self.refresh_from_db(fields=['load_template_id'])
-            load_template = self.load_template_id
-            self.load_template_id = new_template
+        load_template_changed = self.tracker.has_changed('load_template')
+        if load_template_changed and self.load_template_status == self.LOAD_TEMPLATE_PROCESS:
+            raise MessageError(code='cant_change_load_template')
         res = super().save(*args, **kwargs)
-
         if self.tracker.has_changed('tm_open_dict') or self.tracker.has_changed('tm_close_dict'):
             transaction.on_commit(self._handle_schedule_change)
-
-        if False: # self.load_template_id:  # aa: todo: fixme: delete tmp False
+        if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
-            if load_template != None and load_template != new_template:
-                apply_load_template(new_template, self.id)
-            elif load_template == None:
-                apply_load_template(self.load_template_id, self.id)
+            from src.celery.tasks import calculate_shops_load
+            apply_load_template(self.load_template_id, self.id)
+            calculate_shops_load.delay(
+                self.load_template_id,
+                datetime.date.today(),
+                datetime.date.today().replace(day=1) + relativedelta(months=1),
+                shop_id=self.id,
+            )
 
         return res
 
@@ -910,6 +910,8 @@ class FunctionGroup(AbstractModel):
         'LoadTemplate',
         'LoadTemplate_apply',
         'LoadTemplate_calculate',
+        'LoadTemplate_download',
+        'LoadTemplate_upload',
         'Network',
         'Notification',
         'OperationTemplate',

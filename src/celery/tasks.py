@@ -11,8 +11,10 @@ from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.db.models import Q
 from django.db import transaction
-from django.utils import timezone
 from django.utils.timezone import now
+from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
+
+from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
 from src.base.message import Message
 from src.base.models import (
@@ -25,10 +27,8 @@ from src.base.models import (
     Employment,
 )
 from src.celery.celery import app
-from src.conf.djconfig import EMAIL_HOST_USER
-from src.conf.djconfig import URV_STAT_EMAILS, URV_STAT_SHOP_LEVEL
+from src.conf.djconfig import EMAIL_HOST_USER, TIMETABLE_IP, QOS_DATETIME_FORMAT, URV_STAT_EMAILS, URV_STAT_SHOP_LEVEL
 from src.events.signals import event_signal
-from src.forecast.load_template.utils import calculate_shop_load, apply_load_template
 from src.forecast.models import (
     OperationTemplate,
     LoadTemplate,
@@ -39,7 +39,7 @@ from src.forecast.models import (
 )
 from src.main.demand.utils import create_predbills_request_function
 from src.main.operation_template.utils import build_period_clients
-from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
+from django.core.serializers.json import DjangoJSONEncoder
 from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
@@ -480,28 +480,44 @@ def upload_vacation_task():
     os.remove(localpath)
 
 
+# @app.task
+# def calculate_shops_load(lang, load_template_id, dt_from, dt_to, shop_id=None):
+#     load_template = LoadTemplate.objects.get(pk=load_template_id)
+#     root_shop = Shop.objects.filter(level=0).first()
+#     shops = [load_template.shops.get(pk=shop_id)] if shop_id else load_template.shops.all()
+#     for shop in shops:
+#         res = calculate_shop_load(shop, load_template, dt_from, dt_to, lang=lang)
+#         if res['error']:
+#             event = Event.objects.create(
+#                 type="load_template_err",
+#                 params={
+#                     'shop': shop,
+#                     'message': Message(lang=lang).get_message(res['code'], params=res.get('params', {})),
+#                 },
+#                 dttm_valid_to=datetime.now() + timedelta(days=2),
+#                 shop=root_shop,
+#             )
+#             create_notifications_for_event(event.id)
 @app.task
-def calculate_shops_load(lang, load_template_id, dt_from, dt_to, shop_id=None):
+def calculate_shops_load(load_template_id, dt_from, dt_to, shop_id=None):
+    if type(dt_from) == str:
+        dt_from = datetime.strptime(dt_from, QOS_DATETIME_FORMAT).date()
+    if type(dt_to) == str:
+        dt_to = datetime.strptime(dt_to, QOS_DATETIME_FORMAT).date()
     load_template = LoadTemplate.objects.get(pk=load_template_id)
-    root_shop = Shop.objects.filter(level=0).first()
     shops = [load_template.shops.get(pk=shop_id)] if shop_id else load_template.shops.all()
     for shop in shops:
-        res = calculate_shop_load(shop, load_template, dt_from, dt_to, lang=lang)
-        if res['error']:
-            event = Event.objects.create(
-                type="load_template_err",
-                params={
-                    'shop': shop,
-                    'message': Message(lang=lang).get_message(res['code'], params=res.get('params', {})),
-                },
-                dttm_valid_to=datetime.now() + timedelta(days=2),
-                shop=root_shop,
-            )
-            create_notifications_for_event(event.id)
+        data = prepare_load_template_request(load_template_id, shop.id, dt_from, dt_to)
+        if not (data is None):
+            data = json.dumps(data, cls=DjangoJSONEncoder)
+            response = requests.post(f'http://{TIMETABLE_IP}/calculate_shop_load/', data=data)
+
 
 
 @app.task
 def apply_load_template_to_shops(load_template_id, dt_from, shop_id=None):
+    if type(dt_from) == str:
+        dt_from = datetime.strptime(dt_from, QOS_DATETIME_FORMAT).date()
     load_template = LoadTemplate.objects.get(pk=load_template_id)
     shops = [Shop.objects.get(pk=shop_id)] if shop_id else load_template.shops.all()
     for shop in shops:
@@ -741,7 +757,7 @@ def create_mda_user_to_shop_relation(username, shop_code, debug_info=None):
 
 @app.task
 def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
-    dt = dt or timezone.now().today()
+    dt = dt or now().today()
     wdays = WorkerDay.objects.filter(
         Q(is_vacancy=True) | Q(type=WorkerDay.TYPE_QUALIFICATION),
         is_fact=False, is_approved=True,
