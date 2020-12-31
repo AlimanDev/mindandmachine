@@ -5,10 +5,10 @@ from datetime import datetime, timedelta, time
 
 from django.urls import reverse
 
-from src.base.models import Employment
-from src.util.utils import generate_user_token
+from src.base.models import Employment, FunctionGroup
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
 from src.util.test import create_departments_and_users
+from src.util.utils import generate_user_token
 
 
 class TestsHelperMixin:
@@ -38,7 +38,11 @@ class TestsHelperMixin:
         return reverse(view_name, kwargs=kwargs)
 
     def print_resp(self, resp):
-        print(json.dumps(resp.json(), indent=4, ensure_ascii=False))
+        try:
+            resp_data = resp.json()
+            print(json.dumps(resp_data, indent=4, ensure_ascii=False))
+        except TypeError:
+            print(resp.content)
 
     @staticmethod
     def dump_data(data):
@@ -93,3 +97,31 @@ class TestsHelperMixin:
                             day, plan_start_time) + timedelta(minutes=start_minutes)
                         kwargs['dttm_work_end'] = datetime.combine(day, plan_end_time) + timedelta(minutes=end_minutes)
                         WorkerDay.objects.create(**kwargs)
+
+    def clean_cached_props(self, cached_props=None):
+        cached_props = cached_props or (
+            ('root_shop', ['open_times', 'close_times']),
+            ('reg_shop1', ['open_times', 'close_times']),
+            ('reg_shop2', ['open_times', 'close_times']),
+            ('shop', ['open_times', 'close_times']),
+            ('shop2', ['open_times', 'close_times']),
+            ('shop3', ['open_times', 'close_times']),
+        )
+        for attr, props in cached_props:
+            if hasattr(self, attr):
+                for prop in props:
+                    try:
+                        obj = getattr(self, attr)
+                        del obj.__dict__[prop]
+                    except (KeyError, AttributeError):
+                        pass
+
+    @staticmethod
+    def add_group_perm(group, perm_name, perm_method):
+        FunctionGroup.objects.create(
+            group=group,
+            method=perm_method,
+            func=perm_name,
+            level_up=1,
+            level_down=99,
+        )

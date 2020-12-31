@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -13,7 +13,7 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
         model = WorkerDayCashboxDetails
         fields = ['id', 'work_type_id', 'work_part', 'name']
 
-    def get_name(self, obj):
+    def get_name(self, obj) -> str:
         if obj.work_type and obj.work_type.work_type_name:
             return obj.work_type.work_type_name.name
 
@@ -29,24 +29,24 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         model = User
         fields = ['worker_day_id', 'user_id', 'first_name', 'last_name', 'dttm_work_start', 'dttm_work_end', 'avatar']
 
-    def get_user_id(self, obj):
+    def get_user_id(self, obj) -> int:
         return obj.id
 
-    def get_avatar(self, obj):
+    def get_avatar(self, obj) -> str:
         if obj.avatar:
             return obj.avatar.url
         return None
 
-    def get_worker_day_id(self, obj):
+    def get_worker_day_id(self, obj) -> int:
         # method all() uses prefetch_related, but first() doesn't
         wd = obj.worker_day.all()
         return wd[0].id if wd else None
 
-    def get_dttm_work_start(self, obj):
+    def get_dttm_work_start(self, obj) -> datetime:
         wd = obj.worker_day.all()
         return wd[0].dttm_work_start if wd else None
 
-    def get_dttm_work_end(self, obj):
+    def get_dttm_work_end(self, obj) -> datetime:
         wd = list(obj.worker_day.all())
         return wd[0].dttm_work_end if wd else None
 
@@ -73,11 +73,11 @@ class WorkShiftSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def get_dttm_work_start(self, wd):
+    def get_dttm_work_start(self, wd) -> datetime:
         return (wd.dttm_work_start - timedelta(
             hours=wd.shop.get_tz_offset())).isoformat() if wd.dttm_work_start else None
 
-    def get_dttm_work_end(self, wd):
+    def get_dttm_work_end(self, wd) -> datetime:
         return (wd.dttm_work_end - timedelta(hours=wd.shop.get_tz_offset())).isoformat() if wd.dttm_work_end else None
 
     class Meta:

@@ -1,9 +1,10 @@
 from rest_framework.validators import UniqueTogetherValidator
-from rest_framework import serializers, viewsets
+from rest_framework import serializers
 from django_filters.rest_framework import FilterSet
 from django_filters import NumberFilter
 
 from src.base.permissions import FilteredListPermission
+from src.base.views_abstract import BaseModelViewSet
 from src.forecast.models import OperationType, OperationTypeName
 from src.forecast.operation_type_name.views import OperationTypeNameSerializer
 
@@ -41,7 +42,7 @@ class OperationTypeFilter(FilterSet):
         }
 
 
-class OperationTypeViewSet(viewsets.ModelViewSet):
+class OperationTypeViewSet(BaseModelViewSet):
     """
 
     GET /rest_api/operation_type/
@@ -119,6 +120,7 @@ class OperationTypeViewSet(viewsets.ModelViewSet):
     permission_classes = [FilteredListPermission]
     serializer_class = OperationTypeSerializer
     filterset_class = OperationTypeFilter
+    openapi_tags = ['OperationType',]
 
     def get_queryset(self):
         return OperationType.objects.select_related('operation_type_name').filter(

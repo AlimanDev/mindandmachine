@@ -3,6 +3,8 @@ import json
 from dateutil.relativedelta import relativedelta
 from calendar import monthrange
 
+import pandas as pd
+from celery import chain
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -12,6 +14,7 @@ from django.contrib.postgres.fields import JSONField
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
+from django.db import transaction
 from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
@@ -22,7 +25,7 @@ from mptt.models import MPTTModel, TreeForeignKey
 from timezone_field import TimeZoneField
 
 from src.base.exceptions import MessageError
-from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNamedModel
+from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNetworkSpecificCodeNamedModel
 from src.conf.djconfig import QOS_TIME_FORMAT
 
 
@@ -96,14 +99,14 @@ class Network(AbstractActiveModel):
         return f'name: {self.name}, code: {self.code}'
 
 
-class Region(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class Region(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Регион'
         verbose_name_plural = 'Регионы'
 
 
-class Break(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class Break(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Перерыв'
         verbose_name_plural = 'Перерывы'
     value = models.CharField(max_length=1024, default='[]')
@@ -135,8 +138,8 @@ class Break(AbstractActiveNamedModel):
         return super().save(*args, **kwargs)
 
 
-class ShopSettings(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class ShopSettings(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Настройки автосоставления'
         verbose_name_plural = 'Настройки автосоставления'
 
@@ -178,7 +181,7 @@ class ShopSettings(AbstractActiveNamedModel):
 
 
 # на самом деле это отдел
-class Shop(MPTTModel, AbstractActiveNamedModel):
+class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     class Meta:
         # unique_together = ('parent', 'title')
         verbose_name = 'Отдел'
@@ -253,13 +256,16 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
     latitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Широта')
     longitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Долгота')
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
-    tracker = FieldTracker(fields=['load_template'])
+
+    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict', 'load_template'])
 
     def __str__(self):
-        return '{}, {}, {}'.format(
+        return '{}, {}, {}, {}'.format(
             self.name,
             self.parent_title(),
-            self.id)
+            self.id,
+            self.code,
+        )
 
     def system_step_in_minutes(self):
         return self.forecast_step_minutes.hour * 60 + self.forecast_step_minutes.minute
@@ -320,6 +326,19 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 new_dict[key.replace('d', '')] = new_dict.pop(key)
         return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
 
+    def _handle_schedule_change(self):
+        from src.util.models_converter import Converter
+        from src.celery.tasks import fill_shop_schedule, recalc_wdays
+        dt_now = datetime.datetime.now().date()
+        ch = chain(
+            fill_shop_schedule.si(shop_id=self.id, dt_from=Converter.convert_date(dt_now)),
+            recalc_wdays.si(
+                shop_id=self.id,
+                dt_from=Converter.convert_date(dt_now),
+                dt_to=Converter.convert_date(dt_now + datetime.timedelta(days=90))),
+        )
+        ch.apply_async()
+
     def save(self, *args, **kwargs):
         if self.open_times.keys() != self.close_times.keys():
             raise MessageError(code='time_shop_differerent_keys')
@@ -338,7 +357,9 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         load_template_changed = self.tracker.has_changed('load_template')
         if load_template_changed and self.load_template_status == self.LOAD_TEMPLATE_PROCESS:
             raise MessageError(code='cant_change_load_template')
-        super().save(*args, **kwargs)
+        res = super().save(*args, **kwargs)
+        if self.tracker.has_changed('tm_open_dict') or self.tracker.has_changed('tm_close_dict'):
+            transaction.on_commit(self._handle_schedule_change)
         if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
             from src.celery.tasks import calculate_shops_load
@@ -349,6 +370,8 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
                 datetime.date.today().replace(day=1) + relativedelta(months=1),
                 shop_id=self.id,
             )
+
+        return res
 
     def get_exchange_settings(self):
         return self.exchange_settings if self.exchange_settings_id \
@@ -368,11 +391,8 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
 
         return offset
 
-    def get_schedule(self, dt):
-        res = {
-            'tm_open': datetime.time(0, 0, 0),
-            'tm_close': datetime.time(0, 0, 0),
-        }
+    def get_standard_schedule(self, dt):
+        res = {}
         weekday = str(dt.weekday())
 
         if 'all' in self.open_times:
@@ -385,14 +405,60 @@ class Shop(MPTTModel, AbstractActiveNamedModel):
         elif weekday in self.close_times:
             res['tm_close'] = self.close_times.get(weekday)
 
+        return res or None
+
+    def get_schedule(self, dt: datetime.date):
+        return self.get_period_schedule(dt_from=dt, dt_to=dt)[dt]
+
+    def get_period_schedule(self, dt_from: datetime.date, dt_to: datetime.date):
+        res = {}
+
+        ss_dict = {}
+        for ss in ShopSchedule.objects.filter(shop=self, dt__gte=dt_from, dt__lte=dt_to):
+            schedule = None
+            if ss.type == ShopSchedule.WORKDAY_TYPE:
+                schedule = {
+                    'tm_open': ss.opens,
+                    'tm_close': ss.closes,
+                }
+            ss_dict[ss.dt] = schedule
+
+        for dt in pd.date_range(dt_from, dt_to):
+            dt = dt.date()
+            res[dt] = ss_dict.get(dt, self.get_standard_schedule(dt))
+
         return res
+
+    def get_work_schedule(self, dt_from, dt_to):
+        """
+        Получения расписания в виде словаря (передается на алгоритмы)
+        :param dt_from: дата от, включительно
+        :param dt_to: дата до, включительно
+        :return:
+        """
+        from src.util.models_converter import Converter
+        work_schedule = {}
+        for dt, schedule_dict in self.get_period_schedule(dt_from=dt_from, dt_to=dt_to).items():
+            schedule = None  # TODO: это и "нет данных" и выходной, нормально ли?
+            if schedule_dict:
+                schedule = (
+                    Converter.convert_time(schedule_dict['tm_open']),
+                    Converter.convert_time(schedule_dict['tm_close'])
+                )
+            work_schedule[Converter.convert_date(dt)] = schedule
+        return work_schedule
+
+    @property
+    def nonstandard_schedule(self):
+        return self.shopschedule_set.filter(modified_by__isnull=False)
 
 
 class EmploymentManager(models.Manager):
-    def get_active(self, network_id, dt_from=None, dt_to=None, *args, **kwargs):
+    def get_active(self, network_id=None, dt_from=None, dt_to=None, *args, **kwargs):
         """
         hired earlier then dt_from, hired later then dt_to
-        :paramShop dt_from:
+        :param network_id:
+        :param dt_from:
         :param dt_to:
         :param args:
         :param kwargs:
@@ -402,12 +468,17 @@ class EmploymentManager(models.Manager):
         dt_from = dt_from or today
         dt_to = dt_to or today
 
-        return self.filter(
+        q = models.Q(
             models.Q(dt_hired__lte=dt_to) | models.Q(dt_hired__isnull=True),
             models.Q(dt_fired__gte=dt_from) | models.Q(dt_fired__isnull=True),
-            shop__network_id=network_id,
-            user__network_id=network_id
-        ).filter(*args, **kwargs)
+        )
+        if network_id:
+            q &= models.Q(
+                shop__network_id=network_id,
+                user__network_id=network_id,
+            )
+        qs = self.filter(q)
+        return qs.filter(*args, **kwargs)
 
     def get_active_empl_for_user(
             self, network_id, user_id, dt=None, priority_shop_id=None, priority_employment_id=None):
@@ -433,8 +504,8 @@ class EmploymentManager(models.Manager):
         return qs
 
 
-class Group(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class Group(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Группа пользователей'
         verbose_name_plural = 'Группы пользователей'
 
@@ -538,7 +609,7 @@ class User(DjangoAbstractUser, AbstractModel):
         #     ss_title = self.shop.parent.title
         # else:
         #     ss_title = None
-        return '{}, {}, {}'.format(self.first_name, self.last_name, self.id)
+        return '{}, {}, {}, {}'.format(self.first_name, self.last_name, self.id, self.username)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -607,12 +678,12 @@ class User(DjangoAbstractUser, AbstractModel):
         ).values_list('group_id', flat=True)
 
 
-class WorkerPosition(AbstractActiveNamedModel):
+class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     """
     Describe employee's position
     """
 
-    class Meta(AbstractActiveNamedModel.Meta):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Должность сотрудника'
         verbose_name_plural = 'Должности сотрудников'
 
@@ -869,8 +940,9 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_worker_stat',
         'WorkerDay_vacancy',
         'WorkerDay_change_list',
+        'WorkerDay_copy_approved',
         'WorkerDay_duplicate',
-        'WorkerDay_delete_timetable',
+        'WorkerDay_delete_worker_days',
         'WorkerDay_exchange',
         'WorkerDay_confirm_vacancy',
         'WorkerDay_upload',
@@ -879,6 +951,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_editable_vacancy',
         'WorkerDay_approve_vacancy',
         'WorkerDay_change_range',
+        'WorkerDay_request_approve',
         'WorkerPosition',
         'WorkTypeName',
         'WorkType',
@@ -886,6 +959,7 @@ class FunctionGroup(AbstractModel):
         'ShopMonthStat',
         'ShopMonthStat_status',
         'ShopSettings',
+        'ShopSchedule',
         'VacancyBlackList',
 
         'signout',
@@ -1078,7 +1152,7 @@ def default_work_hours_by_months():
     return {f'm{month_num}': 100 for month_num in range(1, 12 + 1)}
 
 
-class SAWHSettings(AbstractActiveNamedModel):
+class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     """
     Настройки суммированного учета рабочего времени.
     Модель нужна для распределения часов по месяцам в рамках учетного периода при автосоставлении.
@@ -1121,3 +1195,58 @@ class SAWHSettings(AbstractActiveNamedModel):
                         f'не сходится сумма процентов. '
                         f'Сeйчас {summarized_account_period_work_hours_sum}, должно быть {account_period_percents_summ}'
                     )
+
+
+class ShopSchedule(AbstractModel):
+    WORKDAY_TYPE = 'W'
+    HOLIDAY_TYPE = 'H'
+
+    SHOP_SCHEDULE_TYPES = (
+        (WORKDAY_TYPE, 'Рабочий день'),
+        (HOLIDAY_TYPE, 'Выходной'),
+    )
+
+    modified_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, blank=True, null=True, editable=False,
+        verbose_name='Кем внесено расписание', help_text='Если null, то это стандартное расписание',
+    )
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, verbose_name='Магазин')
+    dt = models.DateField(verbose_name='Дата')
+    opens = models.TimeField(verbose_name='Время открытия', null=True, blank=True)
+    closes = models.TimeField(verbose_name='Время закрытия', null=True, blank=True)
+    type = models.CharField(max_length=2, verbose_name='Тип', choices=SHOP_SCHEDULE_TYPES, default=WORKDAY_TYPE)
+
+    tracker = FieldTracker(fields=['opens', 'closes', 'type'])
+
+    class Meta:
+        verbose_name = 'Расписание подразделения'
+        verbose_name_plural = 'Расписание подразделения'
+        unique_together = (
+            ('dt', 'shop'),
+        )
+        ordering = ['dt']
+
+    def __str__(self):
+        return f'{self.shop.name} {self.dt} {self.opens}-{self.closes}'
+
+    def clean(self):
+        if self.type == self.WORKDAY_TYPE and self.opens is None or self.closes is None:
+            raise ValidationError('opens and closes fields are required for workday type')
+
+        if self.type == self.HOLIDAY_TYPE:
+            self.opens = None
+            self.closes = None
+
+    def save(self, *args, **kwargs):
+        recalc_wdays = kwargs.pop('recalc_wdays', False)
+
+        if recalc_wdays and any(self.tracker.has_changed(f) for f in ['opens', 'closes', 'type']):
+            from src.celery.tasks import recalc_wdays
+            from src.util.models_converter import Converter
+            dt_str = Converter.convert_date(self.dt)
+            recalc_wdays.delay(
+                shop_id=self.shop_id,
+                dt_from=dt_str,
+                dt_to=dt_str,
+            )
+        return super(ShopSchedule, self).save(*args, **kwargs)

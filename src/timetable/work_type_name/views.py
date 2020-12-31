@@ -58,6 +58,7 @@ class WorkTypeNameViewSet(BaseActiveNamedModelViewSet):
     serializer_class = WorkTypeNameSerializer
     pagination_class = LimitOffsetPagination
     filterset_class = BaseActiveNamedModelFilter
+    openapi_tags = ['WorkTypeName',]
 
     def get_queryset(self):
         return WorkTypeName.objects.filter(

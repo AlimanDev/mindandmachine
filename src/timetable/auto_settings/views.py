@@ -27,7 +27,7 @@ from src.timetable.models import (
     UserWeekdaySlot,
 )
 
-from src.timetable.serializers import AutoSettingsSerializer
+from src.timetable.serializers import AutoSettingsCreateSerializer, AutoSettingsDeleteSerializer, AutoSettingsSetSerializer
 from src.util.models_converter import (
     WorkTypeConverter,
     EmploymentConverter,
@@ -38,6 +38,8 @@ from src.util.models_converter import (
 from src.timetable.worker_day.stat import CalendarPaidDays
 from rest_framework.exceptions import ValidationError, AuthenticationFailed
 from rest_framework.authentication import BaseAuthentication
+
+from drf_yasg.utils import swagger_auto_schema
 
 
 class TokenAuthentication(BaseAuthentication):
@@ -62,15 +64,20 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         "tt_user_extra_shifts": _("More than one shift are selected for worker {id} {last_name} {first_name} with fixed hours."),
         "tt_server_error": _("Fail sending data to server."),
         "tt_delete_past": _("You can't delete timetable in the past."),
+        "settings_not_exists": _("You need to select auto-scheduling settings for the department."),
     }
-    serializer_class = AutoSettingsSerializer
+    serializer_class = AutoSettingsCreateSerializer
     permission_classes = [Permission]
     basename = 'AutoSettings'
+    openapi_tags = ['AutoSettings',]
 
+    @swagger_auto_schema(methods=['post'], request_body=AutoSettingsCreateSerializer, responses={200:'Empty response', 400: 'Fail sending data to server.'})
     @action(detail=False, methods=['post'])
     def create_timetable(self, request):
         """
-        :params: shop_id, dt_from, dt_to, is_remarking
+        Собирает данные в нужном формате и отправляет запрос на составления на алгоритмы.
+        Args:
+            shop_id, dt_from, dt_to, is_remarking            
         """
         """
         Формат данных -- v1.3
@@ -253,7 +260,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         ####################################################
 
-        serializer = AutoSettingsSerializer(data=request.data)
+        serializer = AutoSettingsCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         form = serializer.validated_data
 
@@ -281,6 +288,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             raise ValidationError(self.error_messages["tt_exists"])
 
         shop = Shop.objects.get(id=shop_id)
+
+        if shop.settings_id is None:
+            raise ValidationError(self.error_messages["settings_not_exists"])
+
         employments = Employment.objects.get_active(
             shop.network_id,    
             dt_from=dt_from,
@@ -464,6 +475,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             max_work_coef += shop.settings.more_norm / 100
             min_work_coef -= shop.settings.less_norm / 100
         method_params = json.loads(shop.settings.method_params)
+
         shop_dict = {
             'shop_name': shop.name,
             'process_type': shop.settings.process_type,
@@ -475,6 +487,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'period_step': period_step,
             'tm_start_work': shop.open_times,
             'tm_end_work': shop.close_times,
+            'work_schedule': shop.get_work_schedule(dt_from, dt_to),
             'min_work_period': shop.settings.shift_start * 60,
             'max_work_period': shop.settings.shift_end * 60,
             'tm_lock_start': list(map(lambda x: x + ':00', json.loads(shop.restricted_start_times))),
@@ -798,7 +811,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         return Response()
 
 
-    @action(detail=False, methods=['post', 'get'], authentication_classes=[TokenAuthentication])
+    @swagger_auto_schema(request_body=AutoSettingsSetSerializer, methods=['post'], responses={200: '{}', 400: 'cannot parse json'})
+    @action(detail=False, methods=['post'], authentication_classes=[TokenAuthentication])
     def set_timetable(self, request):
         """
         Ждет request'a от qos_algo. Когда получает, записывает данные по расписанию в бд
@@ -936,7 +950,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         return Response({})
 
-    @action(detail=False, methods=['post', 'get'])
+    @swagger_auto_schema(request_body=AutoSettingsDeleteSerializer, methods=['post'], responses={200: 'empty response'})
+    @action(detail=False, methods=['post'])
     def delete_timetable(self, request):
         """
         Удаляет расписание на заданный месяц. Также отправляет request на qos_algo на остановку задачи в селери
@@ -950,7 +965,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         Note:
             Отправляет уведомление о том, что расписание было удалено
         """
-        serializer = AutoSettingsSerializer(data=request.data)
+        serializer = AutoSettingsDeleteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         form = serializer.validated_data
 

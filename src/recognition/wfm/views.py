@@ -43,6 +43,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
     """
     permission_classes = [permissions.IsAuthenticated]
     basename = ''
+    openapi_tags = ['RecognitionWorkerDay',]
 
     serializer_class = WorkerDaySerializer
     # search_fields = ['first_name', 'last_name']

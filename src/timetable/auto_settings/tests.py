@@ -345,7 +345,22 @@ class TestAutoSettings(APITestCase):
 
         self.assertEqual(WorkerDay.objects.count(), 3)
 
-    
     def test_bad_dates(self):
-        response = self.client.post('/rest_api/auto_settings/create_timetable/', data={'shop_id': self.shop.id, 'dt_from': '2020-10-31', 'dt_to': '2020-10-01'})
+        response = self.client.post(
+            path='/rest_api/auto_settings/create_timetable/',
+            data={'shop_id': self.shop.id, 'dt_from': '2020-10-31', 'dt_to': '2020-10-01'},
+        )
         self.assertEqual(response.json(), ['Дата начала должна быть меньше чем дата окончания.'])
+
+    def test_no_settings(self):
+        self.shop.settings = None
+        self.shop.save()
+        response = self.client.post(
+            path='/rest_api/auto_settings/create_timetable/',
+            data={
+                'shop_id': self.shop.id,
+                'dt_from': datetime.now().date() + timedelta(days=2),
+                'dt_to': datetime.now().date() + timedelta(days=5),
+            },
+        )
+        self.assertEqual(response.json(), ['Необходимо выбрать шаблон смен.'])
