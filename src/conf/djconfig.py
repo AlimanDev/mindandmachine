@@ -358,6 +358,7 @@ GOTENBERG_URL = 'http://localhost:3001'
 
 ZKTECO_HOST = ''
 ZKTECO_KEY = ''
+ZKTECO_DEPARTMENT_CODE = 1 # код отдела из zkteco к которому привязываются новые юзеры
 
 # Используем ли интеграцию в проекте
 ZKTECO_INTEGRATION = False

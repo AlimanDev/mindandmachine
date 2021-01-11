@@ -54,7 +54,7 @@ class ZKTeco:
         return response
 
     def add_user(self, employment, pin=None, userexternalcode=None):
-        department_code = 1  # mindandmachine
+        department_code = settings.ZKTECO_DEPARTMENT_CODE
 
         url = 'person/add'
 
