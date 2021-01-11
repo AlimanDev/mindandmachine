@@ -85,7 +85,7 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
             is_vacancy=False,
         )
 
-        clean_wdays_helper = CleanWdaysHelper(only_logging=False)
+        clean_wdays_helper = CleanWdaysHelper(only_logging=False, clean_plan_empl=True)
         results = clean_wdays_helper.run()
 
         self.assertDictEqual(results, {'changed': 0, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 1})

@@ -8,7 +8,21 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.db.models import Q
 
-from src.base.models import Employment, Network, User, FunctionGroup, WorkerPosition, Notification, Subscribe, Event, ShopSettings, Shop, Group, Break
+from src.base.models import (
+    Employment,
+    Network,
+    User,
+    FunctionGroup,
+    WorkerPosition,
+    Notification,
+    Subscribe,
+    Event,
+    ShopSettings,
+    Shop,
+    Group,
+    Break,
+    ShopSchedule,
+)
 from src.base.message import Message
 from src.base.fields import CurrentUserNetwork, UserworkShop
 from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
@@ -375,3 +389,28 @@ class BreakSerializer(BaseNetworkSerializer):
         data = super().to_representation(instance)
         data['value'] = instance.breaks
         return data
+
+
+class ShopScheduleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShopSchedule
+        fields = (
+            'pk',
+            'modified_by',
+            'shop_id',
+            'dt',
+            'type',
+            'opens',
+            'closes',
+        )
+        extra_kwargs = {
+            'modified_by': {
+                'read_only': True,
+            },
+            'shop_id': {
+                'read_only': True,
+            },
+            'dt': {
+                'read_only': True,
+            },
+        }
