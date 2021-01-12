@@ -847,6 +847,7 @@ class Employment(AbstractActiveModel):
             from src.util.models_converter import Converter
             kwargs = {
                 'only_logging': False,
+                'clean_plan_empl': True,
             }
             if is_new:
                 kwargs['filter_kwargs'] = {
