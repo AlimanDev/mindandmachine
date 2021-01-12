@@ -187,7 +187,14 @@ class PeriodClientsViewSet(BaseModelViewSet):
         data = PeriodClientsCreateSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         data = data.validated_data['data']
-        create_demand(data)
+        # данные от алгоритма
+        if data.get('status', False):
+            if data.get('status') == Shop.LOAD_TEMPLATE_READY:
+                create_demand(data)
+            Shop.objects.filter(id=data.get('shop_id')).update(load_template_status=data.get('status'))
+        else:
+        # данные от клиента
+            create_demand(data)
         return Response(status=status.HTTP_201_CREATED)
 
 

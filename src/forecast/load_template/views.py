@@ -10,7 +10,7 @@ from django_filters import CharFilter
 
 
 from src.forecast.models import LoadTemplate
-from src.forecast.load_template.utils import create_load_template_for_shop
+from src.forecast.load_template.utils import create_load_template_for_shop, download_load_template, upload_load_template
 from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
 
 from src.celery.tasks import calculate_shops_load, apply_load_template_to_shops
@@ -23,6 +23,8 @@ from src.base.views_abstract import BaseModelViewSet
 
 from django.db.models import Exists, OuterRef, Case, When, CharField, Value
 from django.utils.translation import gettext_lazy as _
+from src.util.upload import get_uploaded_file
+from src.base.fields import CurrentUserNetwork
 
 from drf_yasg.utils import swagger_auto_schema
 
@@ -34,7 +36,7 @@ class LoadTemplateSerializer(BaseNetworkSerializer):
     status = serializers.CharField(read_only=True)
     class Meta:
         model = LoadTemplate
-        fields = ['id', 'name', 'shop_id', 'operation_type_templates', 'status', 'network_id']
+        fields = ['id', 'name', 'shop_id', 'operation_type_templates', 'status', 'network_id', 'round_delta']
 
 
 class LoadTemplateSpecSerializer(serializers.Serializer):
@@ -43,6 +45,11 @@ class LoadTemplateSpecSerializer(serializers.Serializer):
     id = serializers.IntegerField(write_only=True)
     shop_id = serializers.IntegerField(write_only=True, required=False)
 
+
+class LoadTemplateUploadSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    file = serializers.FileField()
+    network_id = serializers.HiddenField(default=CurrentUserNetwork())
 
 class LoadTemplateFilter(FilterSet):
     name = CharFilter(field_name='name', lookup_expr='icontains')
@@ -162,8 +169,8 @@ class LoadTemplateViewSet(BaseModelViewSet):
 
     """
     error_messages = {
-        "load_template_attached_shops": _("Cannot delete template as it's used in demand calculations.")
-
+        "load_template_attached_shops": _("Cannot delete template as it's used in demand calculations."),
+        "required": _("This field ins required")
     }
     permission_classes = [Permission]
     filterset_class = LoadTemplateFilter
@@ -250,11 +257,11 @@ class LoadTemplateViewSet(BaseModelViewSet):
                 {'dt_to': self.error_messages['required']}
             )
         try:
-            calculate_shops_load.delay(request.user.lang, load_template_id, dt_from, dt_to, shop_id=shop_id)
+            calculate_shops_load.delay(load_template_id, dt_from, dt_to, shop_id=shop_id)
         except celery_exceptions.OperationalError:
-            calculate_shops_load(request.user.lang, load_template_id, dt_from, dt_to, shop_id=shop_id)
+            calculate_shops_load(load_template_id, dt_from, dt_to, shop_id=shop_id)
 
-        return Response(200)
+        return Response("Данные для расчета нагрузки успешно отправлены на сервер.")
 
 
     def destroy(self, request, pk=None):
@@ -265,3 +272,16 @@ class LoadTemplateViewSet(BaseModelViewSet):
         load_template.delete()
 
         return Response(status=204)
+
+
+    @action(detail=False, methods=['post'])
+    @get_uploaded_file
+    def upload(self, request, file):
+        data = LoadTemplateUploadSerializer(data=request.data, context={'request': request})
+        data.is_valid(raise_exception=True)
+        return upload_load_template(file, data.validated_data, lang=request.user.lang)
+    
+
+    @action(detail=True, methods=['get'])
+    def download(self, request, pk=None):
+        return download_load_template(request, pk)

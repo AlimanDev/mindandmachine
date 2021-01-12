@@ -18,6 +18,11 @@ from src.timetable.models import (
 from src.util.models_converter import Converter
 
 
+class RequestApproveSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField(required=True)
+    comment = serializers.CharField(allow_blank=True, required=False)
+
+
 class WorkerDayApproveSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField(required=True)
     is_fact = serializers.BooleanField()
@@ -242,8 +247,15 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             self._create_update_clean(validated_data)
 
             details = validated_data.pop('worker_day_details', None)
-            worker_day = WorkerDay.objects.create(**validated_data)
+            worker_day, _created = WorkerDay.objects.update_or_create(
+                dt=validated_data.get('dt'),
+                worker_id=validated_data.get('worker_id'),
+                is_fact=validated_data.get('is_fact'),
+                is_approved=validated_data.get('is_approved'),
+                defaults=validated_data,
+            )
             if details:
+                WorkerDayCashboxDetails.objects.filter(worker_day=worker_day).delete()
                 for wd_detail in details:
                     WorkerDayCashboxDetails.objects.create(worker_day=worker_day, **wd_detail)
 
@@ -394,6 +406,7 @@ class BaseAutoSettingsSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
+
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
 
@@ -473,6 +486,12 @@ class ChangeRangeListSerializer(serializers.Serializer):
         self.fields['ranges'] = ChangeRangeSerializer(many=True, context=self.context)
 
 
+class CopyApprovedSerializer(serializers.Serializer):
+    worker_ids = serializers.ListField(child=serializers.IntegerField())
+    dates = serializers.ListField(child=serializers.DateField())
+    is_fact = serializers.BooleanField(default=False)
+
+
 class DuplicateSrializer(serializers.Serializer):
     default_error_messages = {
         'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")
@@ -488,28 +507,11 @@ class DuplicateSrializer(serializers.Serializer):
         return True
 
 
-class DeleteTimetableSerializer(serializers.Serializer):
-    default_error_messages = {
-        'check_dates': _('Date start should be less then date end'),
-    }
-    shop_id = serializers.IntegerField()
-    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
-    dt_to = serializers.DateField(format=QOS_DATE_FORMAT, required=False, default=None)
-    users = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
-    types = serializers.ListField(child=serializers.CharField(), required=False, default=[])
-    delete_all = serializers.BooleanField(default=False)
-    except_created_by = serializers.BooleanField(default=True)
-
-    def is_valid(self, *args, **kwargs):
-        super().is_valid(*args, **kwargs)
-        dt_from = self.validated_data.get('dt_from')
-        dt_to = self.validated_data.get('dt_to')
-
-        if not self.validated_data.get('delete_all') and not dt_to:
-            raise ValidationError({'dt_to': self.error_messages['required']})
-
-        if dt_to and dt_from > dt_to:
-            self.fail('check_dates')
+class DeleteWorkerDaysSerializer(serializers.Serializer):
+    worker_ids = serializers.ListField(child=serializers.IntegerField())
+    dates = serializers.ListField(child=serializers.DateField())
+    is_fact = serializers.BooleanField(default=False)
+    exclude_created_by = serializers.BooleanField(default=True)
 
 
 class ExchangeSerializer(serializers.Serializer):

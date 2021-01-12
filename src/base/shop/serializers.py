@@ -71,13 +71,12 @@ class ShopSerializer(serializers.ModelSerializer):
     director_code = serializers.CharField(required=False)
     distance = serializers.SerializerMethodField(label='Расстояние до магазина (км)')
 
-    def get_distance(self, shop) -> float:
-        if not self.context.get('request', False):
-            return 1.0
-        lat = self.context.get('request').META.get('X-LAT')
-        lon = self.context.get('request').META.get('X-LON')
-        if lat and lon and shop.latitude and shop.longitude:
-            return round(geopy.distance.distance((lat, lon), (shop.latitude, shop.longitude)).km, 2)
+    def get_distance(self, shop):
+        if self.context.get('request', False):
+            lat = self.context.get('request').META.get('X-LAT')
+            lon = self.context.get('request').META.get('X-LON')
+            if lat and lon and shop.latitude and shop.longitude:
+                return round(geopy.distance.distance((lat, lon), (shop.latitude, shop.longitude)).km, 2)
 
     class Meta:
         model = Shop
@@ -103,7 +102,7 @@ class ShopSerializer(serializers.ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         super(ShopSerializer, self).__init__(*args, **kwargs)
-        if self.context.get('request'):
+        if self.context.get('request', False):
             self.fields['code'].validators.append(
                 UniqueValidator(
                     Shop.objects.filter(network=self.context.get('request').user.network)
