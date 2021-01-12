@@ -207,6 +207,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['latitude'] = None
         data['longitude'] = None
         data['distance'] = None
+        data['email'] = None
         self.assertDictEqual(shop, data)
 
         for schedule_dict in nonstandard_schedule:
@@ -229,6 +230,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             "nonstandard_schedule": [],
             "region_id": self.region.id,
             "code": "10",
+            "email": "example@email.com",
             "address": 'address',
             "type": Shop.TYPE_REGION,
             "dt_opened": '2019-01-01',
