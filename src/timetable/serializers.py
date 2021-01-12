@@ -170,7 +170,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             else:
                 self.fail('no_user', amount=len(users), username=username)
 
-        if not wd_type == WorkerDay.TYPE_WORKDAY or is_fact:
+        if not wd_type == WorkerDay.TYPE_WORKDAY:
             attrs.pop('worker_day_details', None)
         elif not (attrs.get('worker_day_details')):
             raise ValidationError({
@@ -264,10 +264,9 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         with transaction.atomic():
             details = validated_data.pop('worker_day_details', [])
-            if not instance.is_fact:
-                WorkerDayCashboxDetails.objects.filter(worker_day=instance).delete()
-                for wd_detail in details:
-                    WorkerDayCashboxDetails.objects.create(worker_day=instance, **wd_detail)
+            WorkerDayCashboxDetails.objects.filter(worker_day=instance).delete()
+            for wd_detail in details:
+                WorkerDayCashboxDetails.objects.create(worker_day=instance, **wd_detail)
 
             self._create_update_clean(validated_data, instance=instance)
 
