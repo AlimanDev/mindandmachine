@@ -533,6 +533,18 @@ def apply_load_template_to_shops(load_template_id, dt_from, shop_id=None):
     create_notifications_for_event(event.id)
 
 
+@app.task
+def calculate_shop_load_at_night():
+    if not settings.CALCULATE_LOAD_TEMPLATE:
+        return
+    templates = LoadTemplate.objects.filter(
+        shops__isnull=False,
+    )
+    dt_now = date.today()
+    dt_to = (dt_now + relativedelta(months=1)).replace(day=1) - timedelta(days=1)
+    for template in templates:
+        calculate_shops_load(template.id, dt_now, dt_to)
+
 '''
 Исходные данные хранятся в виде json в базе данных. как именно агреггировать network.settings_values['receive_data_info']
 представлен в виде списка, каждый элемент состоит из:
