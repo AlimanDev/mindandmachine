@@ -132,6 +132,7 @@ def export_workers_zkteco():
 
     for user in users:
         employments = Employment.objects.get_active(
+            user.network_id,
             user=user,
             position__isnull=False,
         )
@@ -179,6 +180,7 @@ def delete_workers_zkteco():
 
     for user in users:
         employments = Employment.objects.get_active(
+            user.network_id,
             user=user,
             position__isnull=False
         )
