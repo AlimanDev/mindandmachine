@@ -84,7 +84,7 @@ class ShopSerializer(serializers.ModelSerializer):
                   'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id',
                   'network_id', 'restricted_start_times', 'restricted_end_times', 'exchange_settings_id',
                   'load_template_id', 'area', 'forecast_step_minutes', 'load_template_status', 'is_active',
-                  'director_code', 'latitude', 'longitude', 'director_id', 'distance', 'nonstandard_schedule']
+                  'director_code', 'latitude', 'longitude', 'director_id', 'distance', 'nonstandard_schedule', 'email']
         extra_kwargs = {
             'restricted_start_times': {
                 'validators': [RestrictedTimeValidator()]
