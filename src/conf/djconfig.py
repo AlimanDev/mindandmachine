@@ -494,17 +494,17 @@ if MDA_SYNC_USER_TO_SHOP_DAILY:
 
 if ZKTECO_INTEGRATION:
     CELERY_BEAT_SCHEDULE['task-import-urv-zkteco'] = {
-        'task': 'src.celery.tasks.integration_tasks.import_urv',
+        'task': 'src.celery.integration_tasks.import_urv',
         'schedule': crontab(minute='*/5'),
         'options': {'queue': BACKEND_QUEUE}
     }
     CELERY_BEAT_SCHEDULE['task-export-workers-zkteco'] = {
-        'task': 'src.celery.tasks.integration_tasks.export_workers_zkteco',
+        'task': 'src.celery.integration_tasks.export_workers_zkteco',
         'schedule': crontab(minute=0),
         'options': {'queue': BACKEND_QUEUE}
     }
     CELERY_BEAT_SCHEDULE['task-delete-workers-zkteco'] = {
-        'task': 'src.celery.tasks.integration_tasks.delete_workers_zkteco',
+        'task': 'src.celery.integration_tasks.delete_workers_zkteco',
         'schedule': crontab(minute=0),
         'options': {'queue': BACKEND_QUEUE}
     }
