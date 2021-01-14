@@ -1895,7 +1895,6 @@ class TestAditionalFunctions(APITestCase):
             dt = dt_from + timedelta(days=day)
             parent_worker_day = None if approved else wds.get(dt, None)
             result[dt] = WorkerDay.objects.create(
-                employment=employment,
                 worker=employment.user,
                 shop=employment.shop,
                 dt=dt,
@@ -1994,6 +1993,29 @@ class TestAditionalFunctions(APITestCase):
         url = f'{self.url}exchange/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 8)
+
+    
+    def test_exchange_with_holidays(self):
+        dt_from = date.today()
+        data = {
+            'worker1_id': self.user2.id,
+            'worker2_id': self.user3.id,
+            'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(2)],
+            'is_approved': True,
+        }
+        self.create_worker_days(self.employment2, dt_from, 1, 10, 20, True)
+        self.create_worker_days(self.employment3, dt_from + timedelta(1), 1, 9, 21, True)
+        self.update_or_create_holidays(self.employment2, dt_from + timedelta(1), 1, True)
+        self.update_or_create_holidays(self.employment3, dt_from, 1, True)
+        url = f'{self.url}exchange/'
+        response = self.client.post(url, data, format='json')
+        data = response.json()
+        self.assertEqual(len(data), 4)
+        self.assertIsNone(data[0]['employment_id'])
+        self.assertEqual(data[1]['employment_id'], self.employment3.id)
+        self.assertEqual(data[1]['shop_id'], self.employment3.shop.id)
+        self.assertEqual(data[1]['work_hours'], '08:45:00')
+
 
     def test_exchange_not_approved(self):
         dt_from = date.today()

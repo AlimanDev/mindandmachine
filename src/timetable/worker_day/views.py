@@ -956,16 +956,26 @@ class WorkerDayViewSet(BaseModelViewSet):
     def exchange(self, request):
         new_wds = []
         def create_worker_day(wd_parent, wd_swap):
+            employment = wd_parent.employment
+            if (wd_swap.type == WorkerDay.TYPE_WORKDAY and employment is None):
+                employment = Employment.objects.get_active_empl_for_user(
+                    network_id=wd_swap.worker.network_id, user_id=wd_parent.worker_id,
+                    dt=wd_swap.dt,
+                    priority_shop_id=wd_swap.shop_id,
+                ).select_related(
+                    'position__breaks',
+                ).first()
             wd_new = WorkerDay(
                 type=wd_swap.type,
                 dttm_work_start=wd_swap.dttm_work_start,
                 dttm_work_end=wd_swap.dttm_work_end,
                 worker_id=wd_parent.worker_id,
-                employment_id=wd_parent.employment_id,
+                employment=employment if wd_swap.employment_id else None,
                 dt=wd_parent.dt,
                 created_by=request.user,
                 is_approved=False,
                 is_vacancy=wd_swap.is_vacancy,
+                shop_id=wd_swap.shop_id,
             )
             wd_new.save()
             new_wds.append(wd_new)
@@ -988,7 +998,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 dt__in=data['dates'],
                 is_approved=data['is_approved'],
                 is_fact=False,
-            ).order_by('dt'))
+            ).select_related('worker', 'employment').order_by('dt'))
 
             if len(wd_parent_list) != days * 2:
                 raise ValidationError(self.error_messages['no_timetable'])
