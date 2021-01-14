@@ -855,6 +855,7 @@ class Employment(AbstractActiveModel):
             from src.util.models_converter import Converter
             kwargs = {
                 'only_logging': False,
+                'clean_plan_empl': True,
             }
             if is_new:
                 kwargs['filter_kwargs'] = {
@@ -866,10 +867,15 @@ class Employment(AbstractActiveModel):
                 if self.dt_fired:
                     kwargs['filter_kwargs']['dt__lt'] = Converter.convert_date(self.dt_fired)
             else:
+                prev_dt_hired = self.tracker.previous('dt_hired')
+                if prev_dt_hired and prev_dt_hired < self.dt_hired:
+                    dt__gte = prev_dt_hired
+                else:
+                    dt__gte = self.dt_hired
                 kwargs['filter_kwargs'] = {
                     'type': WorkerDay.TYPE_WORKDAY,
                     'worker_id': self.user_id,
-                    'dt__gte': Converter.convert_date(self.dt_hired),
+                    'dt__gte': Converter.convert_date(dt__gte),
                 }
 
             clean_wdays.apply_async(kwargs=kwargs)
