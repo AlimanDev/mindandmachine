@@ -1589,7 +1589,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         AttendanceRecords.objects.create(
             dttm=tm_start,
             type=AttendanceRecords.TYPE_COMING,
-            shop=self.shop2,
+            shop=self.shop,
             user=self.user2
         )
         fact_approved = WorkerDay.objects.get(
@@ -1602,6 +1602,36 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         plan_worker_day_details = self.worker_day_plan_approved.worker_day_details.all()
         self.assertEqual(len(fact_worker_day_details), 1)
         self.assertEqual(fact_worker_day_details[0].work_type_id, plan_worker_day_details[0].work_type_id)
+
+    def test_fact_work_type_received_from_plan_approved_when_shop_differs(self):
+        self.worker_day_fact_approved.delete()
+        tm_start = datetime.combine(self.dt, time(6, 0, 0))
+        plan_worker_day_details = self.worker_day_plan_approved.worker_day_details.select_related('work_type')
+        self.assertEqual(len(plan_worker_day_details), 1)
+        # shop2 wt
+        WorkType.objects.create(
+            shop=self.shop2,
+            work_type_name=plan_worker_day_details[0].work_type.work_type_name,
+        )
+        AttendanceRecords.objects.create(
+            dttm=tm_start,
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop2,
+            user=self.user2,
+        )
+        fact_approved = WorkerDay.objects.get(
+            is_fact=True,
+            is_approved=True,
+            worker=self.user2,
+            dt=self.dt,
+        )
+        fact_worker_day_details = fact_approved.worker_day_details.all()
+        self.assertEqual(len(fact_worker_day_details), 1)
+        self.assertNotEqual(fact_worker_day_details[0].work_type_id, plan_worker_day_details[0].work_type_id)
+        self.assertEqual(
+            fact_worker_day_details[0].work_type.work_type_name_id,
+            plan_worker_day_details[0].work_type.work_type_name_id,
+        )
 
     def test_fact_work_type_received_from_employment_if_there_is_no_plan(self):
         work_type_name = WorkTypeName.objects.create(
