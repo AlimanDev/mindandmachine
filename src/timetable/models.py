@@ -1083,16 +1083,31 @@ class AttendanceRecords(AbstractModel):
                         is_approved=True,
                     ).first()
                     if plan_approved:
-                        WorkerDayCashboxDetails.objects.bulk_create(
-                            [
-                                WorkerDayCashboxDetails(
-                                    work_part=details.work_part,
-                                    worker_day=fact_approved,
-                                    work_type_id=details.work_type_id,
-                                )
-                                for details in plan_approved.worker_day_details.all()
-                            ]
-                        )
+                        if fact_approved.shop_id == plan_approved.shop_id:
+                            WorkerDayCashboxDetails.objects.bulk_create(
+                                [
+                                    WorkerDayCashboxDetails(
+                                        work_part=details.work_part,
+                                        worker_day=fact_approved,
+                                        work_type_id=details.work_type_id,
+                                    )
+                                    for details in plan_approved.worker_day_details.all()
+                                ]
+                            )
+                        else:
+                            WorkerDayCashboxDetails.objects.bulk_create(
+                                [
+                                    WorkerDayCashboxDetails(
+                                        work_part=details.work_part,
+                                        worker_day=fact_approved,
+                                        work_type=WorkType.objects.filter(
+                                            shop_id=fact_approved.shop_id,
+                                            work_type_name_id=details.work_type.work_type_name_id,
+                                        ).first(),
+                                    )
+                                    for details in plan_approved.worker_day_details.select_related('work_type')
+                                ]
+                            )
                     elif active_user_empl:
                         employment_work_type = EmploymentWorkType.objects.filter(
                             employment=active_user_empl).order_by('-priority').first()
