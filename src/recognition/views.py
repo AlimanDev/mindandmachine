@@ -9,6 +9,7 @@ from django.http.response import HttpResponse
 from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
 from requests.exceptions import HTTPError
 from rest_framework import (
     exceptions,
@@ -21,6 +22,7 @@ from rest_framework.response import Response
 
 from src.base.auth.authentication import CsrfExemptSessionAuthentication
 from src.base.models import User
+from src.base.permissions import Permission
 from src.base.views_abstract import BaseModelViewSet
 from src.recognition.api.recognition import Recognition
 from src.recognition.authentication import TickPointTokenAuthentication
@@ -41,9 +43,6 @@ from src.timetable.models import (
     WorkerDay,
     Employment,
 )
-
-from drf_yasg.utils import swagger_auto_schema
-
 
 logger = logging.getLogger('django')
 recognition = Recognition()
@@ -407,3 +406,17 @@ class TickPhotoViewSet(BaseModelViewSet):
         )
 
         return response
+
+
+class TickPointViewSet(BaseModelViewSet):
+    permission_classes = [Permission]
+    filter_backends = [DjangoFilterBackend]
+    basename = ''
+    serializer_class = TickPointSerializer
+    openapi_tags = ['TickPoint', ]
+
+    def get_queryset(self):
+        return TickPoint.objects.filter(network_id=self.request.user.network_id)
+
+    def perform_create(self, serializer):
+        serializer.save(network_id=self.request.user.network_id)
