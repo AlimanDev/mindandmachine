@@ -110,11 +110,12 @@ class Timetable_xlsx(Tabel_xlsx):
         # right info
         self.worksheet.set_column(count_of_days + 2, count_of_days + 2, 150 / 6.23820623)
         self.worksheet.write_string(9, count_of_days, 'плановые дни', format_header_text)
-        self.worksheet.write_string(9, count_of_days + 1, 'дата', format_header_text)
-        self.worksheet.write_string(9, count_of_days + 2, 'С графиком работы ознакомлен**. На работу в праздничные дни согласен',
+        self.worksheet.write_string(9, count_of_days + 1, 'плановые часы', format_header_text)
+        self.worksheet.write_string(9, count_of_days + 2, 'дата', format_header_text)
+        self.worksheet.write_string(9, count_of_days + 3, 'С графиком работы ознакомлен**. На работу в праздничные дни согласен',
                                     format_header_text)
-        self.worksheet.write_string(9, count_of_days + 3, 'В', format_header_text)
-        self.worksheet.write_string(9, count_of_days + 4, 'ОТ', format_header_text)
+        self.worksheet.write_string(9, count_of_days + 4, 'В', format_header_text)
+        self.worksheet.write_string(9, count_of_days + 5, 'ОТ', format_header_text)
 
     def fill_table(self, workdays, employments, breaktimes, row_s, col_s):
         """
@@ -193,10 +194,12 @@ class Timetable_xlsx(Tabel_xlsx):
                                                                      WorkerDay.TYPE_HOLIDAY_WORK])),
                 format_text
             )
-
+            work_hours = timedelta(0)
+            for x in worker_days.values():
+                work_hours += x.work_hours
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 2,
-                '',
+                str(int(work_hours.total_seconds() // 3600)),
                 format_text
             )
 
@@ -208,12 +211,18 @@ class Timetable_xlsx(Tabel_xlsx):
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 4,
-                str(sum(1 for x in worker_days.values() if x.type == WorkerDay.TYPE_HOLIDAY)),
+                '',
                 format_text
             )
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 5,
+                str(sum(1 for x in worker_days.values() if x.type == WorkerDay.TYPE_HOLIDAY)),
+                format_text
+            )
+
+            self.worksheet.write_string(
+                row_s + row_shift, col_s + day + 6,
                 str(sum(1 for x in worker_days.values() if x.type == WorkerDay.TYPE_VACATION)),
                 format_text
             )
