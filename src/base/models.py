@@ -62,7 +62,7 @@ class Network(AbstractActiveModel):
     enable_camera_ticks = models.BooleanField(
         default=False, verbose_name='Включить отметки по камере в мобильной версии')
     crop_work_hours_by_shop_schedule = models.BooleanField(
-        default=True, verbose_name='Обрезать рабочие часы по времени работы магазина'
+        default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'
     )
     clean_wdays_on_employment_dt_change = models.BooleanField(
         default=False, verbose_name='Запускать скрипт очистки дней при изменении дат трудойстройства',
