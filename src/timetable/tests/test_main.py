@@ -1518,6 +1518,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             dttm_work_start=None,
             dttm_work_end=None,
         )
+        WorkerDayCashboxDetails.objects.filter(worker_day_id=self.worker_day_fact_approved.id).delete()
 
         tm_start = datetime.combine(self.dt, time(6, 0, 0))
         AttendanceRecords.objects.create(
@@ -1527,10 +1528,14 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             user=self.user2
         )
 
-        fact = WorkerDay.objects.get(id=self.worker_day_fact_approved.id)
-        self.assertEqual(fact.type, WorkerDay.TYPE_WORKDAY)
-        self.assertEqual(fact.dttm_work_start, tm_start)
-        self.assertEqual(fact.dttm_work_end, None)
+        fact_approved = WorkerDay.objects.get(id=self.worker_day_fact_approved.id)
+        self.assertEqual(fact_approved.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(fact_approved.dttm_work_start, tm_start)
+        self.assertEqual(fact_approved.dttm_work_end, None)
+        fact_worker_day_details = fact_approved.worker_day_details.all()
+        plan_worker_day_details = self.worker_day_plan_approved.worker_day_details.all()
+        self.assertEqual(len(fact_worker_day_details), 1)
+        self.assertEqual(fact_worker_day_details[0].work_type_id, plan_worker_day_details[0].work_type_id)
 
     def test_set_is_vacancy_as_True_if_shops_are_different(self):
         self.worker_day_fact_approved.delete()
