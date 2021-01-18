@@ -6,7 +6,6 @@ class AbstractModelManager(models.Manager):
     pass
 
 
-
 class AbstractModel(models.Model):
     """
     Базовая абстрактная модель. От нее должны быть наследованы все сущности (модели)
@@ -18,6 +17,13 @@ class AbstractModel(models.Model):
         abstract = True
 
     objects = AbstractModelManager()
+
+
+class NetworkSpecificModel(models.Model):
+    network = models.ForeignKey('base.Network', on_delete=models.PROTECT, null=True)
+
+    class Meta:
+        abstract = True
 
 
 class AbstractActiveModelManager(AbstractModelManager):
@@ -53,15 +59,15 @@ class AbstractActiveModel(AbstractModel):
     dttm_added = models.DateTimeField(default=timezone.now)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
 
-    def delete(self):
+    def delete(self, **kwargs):
         self.dttm_deleted = timezone.now()
         self.save()
-
         return self
 
     @property
     def is_active(self):
-        return not bool(self.dttm_deleted)
+        dttm_now = timezone.now()
+        return self.dttm_deleted is None or (self.dttm_added < dttm_now < self.dttm_deleted)
 
     @is_active.setter
     def is_active(self, val):
@@ -78,25 +84,43 @@ class AbstractActiveModel(AbstractModel):
     objects = AbstractActiveModelManager()
 
 
-class AbstractActiveNamedModelManager(AbstractModelManager):
+class AbstractNamedModel(models.Model):
+    name = models.CharField(max_length=128, verbose_name='Имя')
+
+    def __str__(self):
+        return f'name: {self.name}'
+
+    class Meta:
+        abstract = True
+
+
+class AbstractCodeNamedModel(AbstractNamedModel):
+    code = models.CharField(max_length=64, null=True, blank=True, verbose_name='Код')
+
+    def __str__(self):
+        return f'name: {self.name}, code: {self.code}'
+
+    class Meta:
+        abstract = True
+
+
+class AbstractActiveNamedModel(AbstractActiveModel, AbstractNamedModel):
+    class Meta:
+        abstract = True
+
+
+class AbstractActiveNetworkSpecificCodeNamedModelManager(models.Manager):
     pass
 
 
-class AbstractActiveNamedModel(AbstractActiveModel):
+class AbstractActiveNetworkSpecificCodeNamedModel(AbstractActiveModel, AbstractCodeNamedModel, NetworkSpecificModel):
     """
-    Именованная модель с  кодом для синхронизации
+    Именованная модель с кодом для синхронизации
+    """
 
-    """
     class Meta:
         abstract = True
         unique_together = (('code', 'network'),)
         ordering = ['name',]
 
-    name = models.CharField(max_length=128)
-    code = models.CharField(max_length=64, null=True, blank=True)
-    network = models.ForeignKey('base.Network', on_delete=models.PROTECT, null=True)
-
-    objects = AbstractActiveNamedModelManager()
-
-    def __str__(self):
-        return f'name: {self.name}, code: {self.code}'
+    objects = AbstractActiveNetworkSpecificCodeNamedModelManager()

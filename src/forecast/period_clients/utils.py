@@ -295,7 +295,6 @@ def create_demand(data):
             dttm_forecast__date__lte=dt_to,
             dttm_forecast__time__gte=min_time,
             dttm_forecast__time__lte=max_time,
-            operation_type__operation_type_name__do_forecast=OperationTypeName.FORECAST,
             operation_type__in=operation_types_to_delete,
         ).delete()
 

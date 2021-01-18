@@ -207,6 +207,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['latitude'] = None
         data['longitude'] = None
         data['distance'] = None
+        data['email'] = None
         self.assertDictEqual(shop, data)
 
         for schedule_dict in nonstandard_schedule:
@@ -229,6 +230,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             "nonstandard_schedule": [],
             "region_id": self.region.id,
             "code": "10",
+            "email": "example@email.com",
             "address": 'address',
             "type": Shop.TYPE_REGION,
             "dt_opened": '2019-01-01',
@@ -403,3 +405,10 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(response[0]['children'][0]['children'][0]['label'], 'Shop1')
         self.assertEqual(response[0]['children'][0]['children'][1]['label'], 'Shop2')
         self.assertEqual(response[0]['children'][1]['children'][0]['label'], 'Shop3')
+
+    
+    def test_cant_change_load_template(self):
+        self.shop.load_template_status = Shop.LOAD_TEMPLATE_PROCESS
+        self.shop.save()
+        response = self.client.put(f'{self.url}{self.shop.id}/', data={'load_template_id': self.load_template.id, 'name': 'Shop Test'})
+        self.assertEqual(response.json(), {'message': 'Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета.'})

@@ -64,6 +64,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         "tt_user_extra_shifts": _("More than one shift are selected for worker {id} {last_name} {first_name} with fixed hours."),
         "tt_server_error": _("Fail sending data to server."),
         "tt_delete_past": _("You can't delete timetable in the past."),
+        "settings_not_exists": _("You need to select auto-scheduling settings for the department."),
     }
     serializer_class = AutoSettingsCreateSerializer
     permission_classes = [Permission]
@@ -287,6 +288,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             raise ValidationError(self.error_messages["tt_exists"])
 
         shop = Shop.objects.get(id=shop_id)
+
+        if shop.settings_id is None:
+            raise ValidationError(self.error_messages["settings_not_exists"])
+
         employments = Employment.objects.get_active(
             shop.network_id,    
             dt_from=dt_from,

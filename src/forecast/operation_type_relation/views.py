@@ -1,5 +1,7 @@
 import re
 
+from datetime import timedelta
+
 from django_filters import NumberFilter
 from django_filters.rest_framework import FilterSet
 from django.utils.translation import gettext_lazy as _
@@ -24,6 +26,8 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         "not_same_template": _("Base and depended demand models cannot have different templates."),
         "error_in_formula": _("Error in formula: {formula}."),
         "base_not_formula": _("Base model not formula."),
+        "const_cant_be_base": _("Constant operation can\'t be base."),
+        "bad_steps":_("Depended must have same or bigger forecast step, got {} -> {}"),
     }
 
     formula = serializers.CharField()
@@ -61,6 +65,13 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         base = OperationTypeTemplate.objects.select_related('operation_type_name').get(pk=self.validated_data['base_id'])
         self.validated_data['depended'] = depended
         self.validated_data['base'] = base
+
+        if (depended.forecast_step == timedelta(hours=1) and not (base.forecast_step in [timedelta(hours=1), timedelta(minutes=30)])) or\
+           (depended.forecast_step == timedelta(minutes=30) and not (base.forecast_step in [timedelta(minutes=30)])):
+            raise FieldError(self.error_messages["bad_steps"].format(depended.forecast_step, base.forecast_step))
+
+        if not (base.const_value is None):
+            raise FieldError(self.error_messages["const_cant_be_base"], 'base')
 
         if base.operation_type_name.do_forecast != OperationTypeName.FORECAST_FORMULA:
             raise FieldError(self.error_messages["base_not_formula"], 'base')

@@ -89,6 +89,8 @@ INSTALLED_APPS = [
     'fcm_django',
     'src.recognition',
     'src.integration',
+    'src.events',
+    'src.notifications',
 ]
 
 REST_FRAMEWORK = {
@@ -188,6 +190,7 @@ EMAIL_PORT = 587
 # EMAIL_USE_SSL = True
 # EMAIL_PORT = 465
 
+DEFAULT_FROM_EMAIL = 'robot@mindandmachine.ru'
 EMAIL_HOST = 'smtp.yandex.ru'
 EMAIL_HOST_USER = 'robot@mindandmachine.ru'
 EMAIL_HOST_PASSWORD = 'TjP6szfJe0PpLNH'
@@ -375,6 +378,8 @@ TEVIAN_FR_THRESHOLD = 0.8
 TRUST_TICK_REQUEST = False
 USERS_WITH_SCHEDULE_ONLY = False
 
+CALCULATE_LOAD_TEMPLATE = False # параметр отключающий автоматический расчет нагрузки
+
 CLIENT_TIMEZONE = 3
 
 if is_config_exists('djconfig_local.py'):
@@ -481,6 +486,11 @@ CELERY_BEAT_SCHEDULE = {
     'task-fill-active-shops-schedule': {
         'task': 'src.celery.tasks.fill_active_shops_schedule',
         'schedule': crontab(hour=1, minute=30),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-calculate-shop-load-at-night': {
+        'task': 'src.celery.tasks.calculate_shop_load_at_night',
+        'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
 }

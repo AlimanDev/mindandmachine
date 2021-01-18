@@ -15,7 +15,7 @@ from django.db.models.query import QuerySet
 from django.utils import timezone
 
 from src.base.models import Shop, Employment, User, Event, Network, Break
-from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNamedModel, \
+from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
 
 
@@ -45,8 +45,8 @@ class WorkTypeManager(AbstractActiveModelManager):
             obj.delete()
 
 
-class WorkTypeName(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Название типа работ'
         verbose_name_plural = 'Названия типов работ'
 
@@ -129,8 +129,8 @@ class UserWeekdaySlot(AbstractModel):
     is_suitable = models.BooleanField(default=True)
 
 
-class Slot(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class Slot(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Слот'
         verbose_name_plural = 'Слоты'
 
@@ -179,8 +179,8 @@ class CashboxManager(models.Manager):
         ).filter(*args, **kwargs)
 
 
-class Cashbox(AbstractActiveNamedModel):
-    class Meta(AbstractActiveNamedModel.Meta):
+class Cashbox(AbstractActiveNetworkSpecificCodeNamedModel):
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Рабочее место '
         verbose_name_plural = 'Рабочие места'
 
@@ -208,7 +208,7 @@ class EmploymentWorkType(AbstractModel):
         unique_together = (('employment', 'work_type'),)
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.employment.user.last_name, self.work_type.name, self.id)
+        return '{}, {}, {}'.format(self.employment.user.last_name, self.work_type.work_type_name.name, self.id)
 
     id = models.BigAutoField(primary_key=True)
 
@@ -989,6 +989,49 @@ class AttendanceRecords(AbstractModel):
     def __str__(self):
         return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
+    def _create_wd_details(self, dt, fact_approved, active_user_empl):
+        plan_approved = WorkerDay.objects.filter(
+            dt=dt,
+            worker=self.user,
+            is_fact=False,
+            is_approved=True,
+        ).first()
+        if plan_approved:
+            if fact_approved.shop_id == plan_approved.shop_id:
+                WorkerDayCashboxDetails.objects.bulk_create(
+                    [
+                        WorkerDayCashboxDetails(
+                            work_part=details.work_part,
+                            worker_day=fact_approved,
+                            work_type_id=details.work_type_id,
+                        )
+                        for details in plan_approved.worker_day_details.all()
+                    ]
+                )
+            else:
+                WorkerDayCashboxDetails.objects.bulk_create(
+                    [
+                        WorkerDayCashboxDetails(
+                            work_part=details.work_part,
+                            worker_day=fact_approved,
+                            work_type=WorkType.objects.filter(
+                                shop_id=fact_approved.shop_id,
+                                work_type_name_id=details.work_type.work_type_name_id,
+                            ).first(),
+                        )
+                        for details in plan_approved.worker_day_details.select_related('work_type')
+                    ]
+                )
+        elif active_user_empl:
+            employment_work_type = EmploymentWorkType.objects.filter(
+                employment=active_user_empl).order_by('-priority').first()
+            if employment_work_type:
+                WorkerDayCashboxDetails.objects.create(
+                    work_part=1,
+                    worker_day=fact_approved,
+                    work_type_id=employment_work_type.work_type_id,
+                )
+
     def save(self, *args, **kwargs):
         """
         Создание WorkerDay при занесении отметок.
@@ -1008,14 +1051,18 @@ class AttendanceRecords(AbstractModel):
                 is_approved=True,
             ).select_for_update().first()
 
+            active_user_empl = Employment.objects.get_active_empl_for_user(
+                network_id=self.user.network_id, user_id=self.user_id,
+                dt=dt,
+                priority_shop_id=self.shop_id,
+            ).first()
+
             # для случаев когда сотрудник перепутал магазины, отметился сначала в одном, потом еще раз в другом
             if fact_approved and fact_approved.shop_id != self.shop_id:
+                # TODO: что будет если отметиться на приход в одном магазина, а на уход в другом?
                 fact_approved.dttm_work_start = None
                 fact_approved.dttm_work_end = None
                 fact_approved.shop_id = self.shop_id
-                active_user_empl = Employment.objects.get_active_empl_for_user(
-                    network_id=self.user.network_id, user_id=self.user_id, dt=dt, priority_shop_id=self.shop_id
-                ).first()
                 fact_approved.is_vacancy = active_user_empl.shop_id != self.shop_id if active_user_empl else False
                 fact_approved.save(update_fields=('shop_id', 'dttm_work_start', 'dttm_work_end', 'is_vacancy'))
 
@@ -1029,6 +1076,8 @@ class AttendanceRecords(AbstractModel):
 
                 setattr(fact_approved, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
                 setattr(fact_approved, 'type', WorkerDay.TYPE_WORKDAY)
+                if not fact_approved.worker_day_details.exists():
+                    self._create_wd_details(dt, fact_approved, active_user_empl)
                 fact_approved.save()
             else:
                 if self.type == self.TYPE_LEAVING:
@@ -1055,13 +1104,7 @@ class AttendanceRecords(AbstractModel):
                     if settings.MDA_SKIP_LEAVING_TICK:
                         return
 
-                active_user_empl = Employment.objects.get_active_empl_for_user(
-                    network_id=self.user.network_id, user_id=self.user_id,
-                    dt=dt,
-                    priority_shop_id=self.shop_id,
-                ).first()
-
-                WorkerDay.objects.update_or_create(
+                fact_approved, _wd_created = WorkerDay.objects.update_or_create(
                     dt=self.dttm.date(),
                     worker=self.user,
                     is_fact=True,
@@ -1074,6 +1117,8 @@ class AttendanceRecords(AbstractModel):
                         'is_vacancy': active_user_empl.shop_id != self.shop_id if active_user_empl else False,
                     }
                 )
+                if _wd_created or not fact_approved.worker_day_details.exists():
+                    self._create_wd_details(dt, fact_approved, active_user_empl)
 
         return res
 
