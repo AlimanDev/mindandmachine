@@ -1,9 +1,9 @@
 from django.db import models
 from src.base.models import Shop, User
-from src.base.models_abstract import AbstractModel, AbstractActiveNamedModel
+from src.base.models_abstract import AbstractModel, AbstractCodeNamedModel
 
 
-class ExternalSystem(AbstractActiveNamedModel):
+class ExternalSystem(AbstractCodeNamedModel):
     class Meta:
         verbose_name = 'Связь с внешними системами'
         verbose_name_plural = 'Связи с внешними системами'
