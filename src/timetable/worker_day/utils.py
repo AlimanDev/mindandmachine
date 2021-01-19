@@ -23,6 +23,7 @@ import json
 from src.base.exceptions import MessageError
 from rest_framework.response import Response
 from src.conf.djconfig import UPLOAD_TT_MATCH_EMPLOYMENT
+from src.timetable.worker_day.stat import WorkersStatsGetter
 
 
 WORK_TYPES = {
@@ -279,6 +280,13 @@ def download_timetable_util(request, workbook, form):
         shop=shop,
     ).order_by('user__last_name', 'user__first_name', 'user__middle_name', 'user_id')
     users = employments.values_list('user_id', flat=True)
+    stat = WorkersStatsGetter(
+        dt_from=timetable.prod_days[0].dt,
+        dt_to=timetable.prod_days[-1].dt,
+        shop_id=shop.id,
+        worker_id__in=users,
+    ).run()
+    stat_type = 'approved' if form['is_approved'] else 'not_approved'
 
     default_breaks = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), shop.settings.breaks.breaks))
     breaktimes = {
@@ -325,7 +333,7 @@ def download_timetable_util(request, workbook, form):
     timetable.construnts_users_info(employments, 11, 0, ['code', 'fio', 'position'])
 
     # fill page 1
-    timetable.fill_table(workdays, employments, breaktimes, 11, 4)
+    timetable.fill_table(workdays, employments, breaktimes, stat, 11, 4, stat_type=stat_type)
 
     # fill page 2
     timetable.fill_table2(shop, timetable.prod_days[-1].dt, workdays)
