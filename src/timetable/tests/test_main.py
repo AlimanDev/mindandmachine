@@ -1682,6 +1682,43 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(len(fact_worker_day_details), 1)
         self.assertEqual(fact_worker_day_details[0].work_type_id, work_type.id)
 
+    def test_work_type_created_for_holiday(self):
+        work_type_name = WorkTypeName.objects.create(
+            name='Повар',
+        )
+        work_type = WorkType.objects.create(
+            shop=self.shop2,
+            work_type_name=work_type_name,
+        )
+        EmploymentWorkType.objects.create(
+            employment=self.employment2,
+            work_type=work_type,
+            priority=10,
+        )
+        self.worker_day_fact_approved.delete()
+        self.worker_day_plan_approved.worker_day_details.all().delete()
+        WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).update(
+            type=WorkerDay.TYPE_HOLIDAY,
+            dttm_work_start=None,
+            dttm_work_end=None,
+        )
+        tm_start = datetime.combine(self.dt, time(6, 0, 0))
+        AttendanceRecords.objects.create(
+            dttm=tm_start,
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop2,
+            user=self.user2
+        )
+        fact_approved = WorkerDay.objects.get(
+            is_fact=True,
+            is_approved=True,
+            worker=self.user2,
+            dt=self.dt,
+        )
+        fact_worker_day_details = fact_approved.worker_day_details.all()
+        self.assertEqual(len(fact_worker_day_details), 1)
+        self.assertEqual(fact_worker_day_details[0].work_type_id, work_type.id)
+
 
 class TestVacancy(TestsHelperMixin, APITestCase):
     @classmethod
