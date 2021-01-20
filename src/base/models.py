@@ -952,6 +952,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_exchange',
         'WorkerDay_confirm_vacancy',
         'WorkerDay_upload',
+        'WorkerDay_upload_fact',
         'WorkerDay_download_timetable',
         'WorkerDay_download_tabel',
         'WorkerDay_editable_vacancy',
