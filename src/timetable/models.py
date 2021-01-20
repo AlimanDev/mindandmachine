@@ -995,6 +995,7 @@ class AttendanceRecords(AbstractModel):
             worker=self.user,
             is_fact=False,
             is_approved=True,
+            work_types__isnull=False,
         ).first()
         if plan_approved:
             if fact_approved.shop_id == plan_approved.shop_id:
