@@ -201,7 +201,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 format_text
             )
             
-            plan_hours = int(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0))
+            plan_hours = int(round(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 2,
@@ -209,7 +209,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 format_text
             )
 
-            norm_hours = int(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('norm_hours_curr_month', {}).get('value', 0))
+            norm_hours = int(round(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('norm_hours_curr_month', {}).get('value', 0)))
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 3,
