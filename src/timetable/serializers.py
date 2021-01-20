@@ -80,7 +80,7 @@ class WorkerDayListSerializer(serializers.Serializer):
         work_hours = getattr(obj, 'tabel_work_hours', obj.work_hours)
 
         if isinstance(work_hours, timedelta):
-            return round(obj.work_hours.total_seconds() / 3600, 2)
+            return obj.rounded_work_hours
 
         return work_hours
 

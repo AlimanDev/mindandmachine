@@ -8,11 +8,11 @@ from django.contrib.auth.models import (
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, F, Max, Q, Case, When, Value, DateTimeField, FloatField, DecimalField, CharField, TimeField,
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField,
 )
-from django.db.models.functions import Extract, Coalesce, Cast, Greatest, TruncSecond
 from django.db.models.query import QuerySet
 from django.utils import timezone
+from model_utils import FieldTracker
 
 from src.base.models import Shop, Employment, User, Event, Network, Break
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
@@ -289,72 +289,19 @@ class WorkerDayQuerySet(QuerySet):
     def get_fact_edit(self, **kwargs):
         raise NotImplementedError
 
-    def get_tabel(self, network, fact_only=True, **kwargs):
-        qs = self.filter(is_fact=False, is_approved=True, worker__isnull=False)
-        fact_approved_wdays_subq = WorkerDay.objects.filter(
-            Q(type=WorkerDay.TYPE_WORKDAY, shop_id=OuterRef('shop_id')) | Q(type=WorkerDay.TYPE_QUALIFICATION),
-            # type=OuterRef('type'),  нужно? обучения и командировки в факт. графике должны заноситься как обучения или как рд?
+    def get_tabel(self, **kwargs):
+        ordered_subq = self.filter(
             dt=OuterRef('dt'),
             worker_id=OuterRef('worker_id'),
-            is_fact=True,
             is_approved=True,
-        ).order_by('-id')
-        qs = qs.annotate(
-            plan_dttm_work_start=F('dttm_work_start'),
-            plan_dttm_work_end=F('dttm_work_end'),
-            plan_work_start=Cast(TruncSecond('plan_dttm_work_start', output_field=TimeField()), output_field=CharField()),
-            plan_work_end=Cast(TruncSecond('plan_dttm_work_end', output_field=TimeField()), output_field=CharField()),
-            fact_dttm_work_start=Subquery(fact_approved_wdays_subq.values('dttm_work_start')[:1]),
-            fact_dttm_work_end=Subquery(fact_approved_wdays_subq.values('dttm_work_end')[:1]),
-            fact_work_start=Cast(TruncSecond('fact_dttm_work_start', output_field=TimeField()), output_field=CharField()),
-            fact_work_end=Cast(TruncSecond('fact_dttm_work_end', output_field=TimeField()), output_field=CharField()),
-            tabel_dttm_work_start=Case(
-                When(fact_dttm_work_start__isnull=True, then=F('fact_dttm_work_start')),
-                When(plan_dttm_work_start__lt=F('fact_dttm_work_start') - network.allowed_interval_for_late_arrival,
-                     then=F('fact_dttm_work_start')),
-                default=F('plan_dttm_work_start'), output_field=DateTimeField()
-            ),
-            tabel_dttm_work_end=Case(
-                When(fact_dttm_work_end__isnull=True, then=F('fact_dttm_work_end')),
-                When(plan_dttm_work_end__gt=F('fact_dttm_work_end') + network.allowed_interval_for_early_departure,
-                     then=F('fact_dttm_work_end')),
-                default=F('plan_dttm_work_end'), output_field=DateTimeField()
-            ),
-            tabel_work_interval=Coalesce(
-                F('tabel_dttm_work_end') - F('tabel_dttm_work_start'),
-                datetime.timedelta(hours=0)
-            ),
-            tabel_total_work_seconds=Cast(Extract(F('tabel_work_interval'), 'epoch'), FloatField()),
-            tabel_breaktime_seconds=WorkerDay.get_breaktime(
-                network_id=network.id, break_calc_field_name='tabel_total_work_seconds'),  # TODO: для обучений тоже учитывать перерывы?
-            tabel_work_hours=Cast(Greatest(
-                F('tabel_total_work_seconds') - F('tabel_breaktime_seconds'), 0, output_field=FloatField()
-            ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=2)),
+        ).exclude(type=WorkerDay.TYPE_EMPTY).order_by('-is_fact', '-work_hours').values_list('id')[:1]
+        return self.filter(
+            Q(is_fact=True) |
+            Q(~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE), is_fact=False),
+            is_approved=True,
+            id=Subquery(ordered_subq),
+            **kwargs,
         )
-
-        if fact_only:
-            qs = qs.filter(
-                Q(
-                    type__in=WorkerDay.TYPES_WITH_TM_RANGE,
-                    fact_dttm_work_start__isnull=False,
-                    fact_dttm_work_end__isnull=False,
-                ) | ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
-            )
-        else:
-            qs = qs.annotate(
-                plan_work_interval=Coalesce(
-                    F('plan_dttm_work_end') - F('plan_dttm_work_start'),
-                    datetime.timedelta(hours=0)
-                ),
-                plan_total_work_seconds=Cast(Extract(F('plan_work_interval'), 'epoch'), FloatField()),
-                plan_breaktime_seconds=WorkerDay.get_breaktime(
-                    network_id=network.id, break_calc_field_name='plan_total_work_seconds'),
-                plan_work_hours=Cast(Greatest(
-                    F('plan_total_work_seconds') - F('plan_breaktime_seconds'), 0, output_field=FloatField()
-                ) / 3600.0, output_field=DecimalField(max_digits=10, decimal_places=2)),
-            )
-
-        return qs.filter(**kwargs)
 
 
 class WorkerDayManager(models.Manager):
@@ -557,6 +504,24 @@ class WorkerDay(AbstractModel):
                     if self.dttm_work_end > dttm_shop_close:
                         dttm_work_end = dttm_shop_close
 
+            if self.shop.network.only_fact_hours_that_in_approved_plan and \
+                    self.type in WorkerDay.TYPES_WITH_TM_RANGE and self.is_fact:
+                plan_approved = WorkerDay.objects.filter(
+                    dt=self.dt,
+                    worker_id=self.worker_id,
+                    is_fact=False,
+                    is_approved=True,
+                    type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                    dttm_work_start__isnull=False,
+                    dttm_work_end__isnull=False,
+                ).first()
+                if not plan_approved:
+                    return datetime.timedelta(0)
+                else:
+                    # TODO: не учитывать опоздания и ранние уходы менее n минут (allowed_interval_for_late_arrival и allowed_interval_for_early_departure)
+                    dttm_work_start = max(dttm_work_start, plan_approved.dttm_work_start)
+                    dttm_work_end = min(dttm_work_end, plan_approved.dttm_work_end)
+
             return self.count_work_hours(breaks, dttm_work_start, dttm_work_end)
 
         return datetime.timedelta(0)
@@ -596,6 +561,20 @@ class WorkerDay(AbstractModel):
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
+
+    tracker = FieldTracker(fields=('work_hours',))
+
+    @property
+    def rounded_work_hours(self):
+        return round(self.work_hours.total_seconds() / 3600, 2)
+
+    @property
+    def is_plan(self):
+        return not self.is_fact
+
+    @property
+    def is_draft(self):
+        return not self.is_approved
 
     @classmethod
     def is_type_with_tm_range(cls, t):
@@ -649,6 +628,25 @@ class WorkerDay(AbstractModel):
 
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         self.work_hours = self._calc_wh()
+
+        # запускаем пересчет часов для факта, если изменились часы в подтвержденном плане
+        if self.shop and self.shop.network.only_fact_hours_that_in_approved_plan and \
+                self.tracker.has_changed('work_hours') and \
+                self.type in WorkerDay.TYPES_WITH_TM_RANGE and self.is_plan and self.is_approved:
+            fact_qs = WorkerDay.objects.filter(
+                dt=self.dt,
+                worker_id=self.worker_id,
+                is_fact=True,
+                type__in=WorkerDay.TYPES_WITH_TM_RANGE
+            ).select_related(
+                'shop',
+                'employment',
+                'employment__position',
+                'employment__position__breaks',
+                'shop__settings__breaks',
+            )
+            for fact in fact_qs:
+                fact.save(update_fields=('work_hours'))
 
         is_new = self.id is None
 
@@ -1248,3 +1246,52 @@ class GroupWorkerDayPermission(AbstractModel):
             worker_day_permission__graph_type=graph_type,
             worker_day_permission__wd_type=wd_type,
         ).exists()
+
+
+class PlanAndFactHours(models.Model):
+    id = models.CharField(max_length=256, primary_key=True)
+    dt = models.DateField()
+    shop = models.ForeignKey('base.Shop', on_delete=models.DO_NOTHING)
+    shop_name = models.CharField(max_length=512)
+    shop_code = models.CharField(max_length=512)
+    worker = models.ForeignKey('base.User', on_delete=models.DO_NOTHING)
+    wd_type = models.CharField(max_length=4, choices=WorkerDay.TYPES)
+    worker_fio = models.CharField(max_length=512, choices=WorkerDay.TYPES)
+    fact_work_hours = models.DecimalField(max_digits=4, decimal_places=2)
+    plan_work_hours = models.DecimalField(max_digits=4, decimal_places=2)
+    late_arrival = models.PositiveSmallIntegerField()
+    early_departure = models.PositiveSmallIntegerField()
+    is_vacancy = models.BooleanField()
+    ticks_fact_count = models.PositiveSmallIntegerField()
+    ticks_plan_count = models.PositiveSmallIntegerField()
+    worker_username = models.CharField(max_length=512)
+    work_type_name = models.CharField(max_length=512)
+    dttm_work_start_plan = models.DateTimeField()
+    dttm_work_end_plan = models.DateTimeField()
+    dttm_work_start_fact = models.DateTimeField()
+    dttm_work_end_fact = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = 'timetable_plan_and_fact_hours'
+
+    @property
+    def dt_as_str(self):
+        from src.util.models_converter import Converter
+        return Converter.convert_date(self.dt)
+
+    @property
+    def tm_work_start_plan_str(self):
+        return str(self.dttm_work_start_plan.time()) if self.dttm_work_start_plan else ''
+
+    @property
+    def tm_work_end_plan_str(self):
+        return str(self.dttm_work_end_plan.time()) if self.dttm_work_end_plan else ''
+
+    @property
+    def tm_work_start_fact_str(self):
+        return str(self.dttm_work_start_fact.time()) if self.dttm_work_start_fact else ''
+
+    @property
+    def tm_work_end_fact_str(self):
+        return str(self.dttm_work_end_fact.time()) if self.dttm_work_end_fact else ''

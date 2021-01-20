@@ -1,6 +1,11 @@
-import pandas as pd
-import time
 import datetime
+import time
+
+import pandas as pd
+from django.db.models import Q, F
+from rest_framework.response import Response
+
+from src.base.exceptions import MessageError
 from src.base.models import (
     User,
     Shop,
@@ -8,22 +13,18 @@ from src.base.models import (
     WorkerPosition,
     Group,
 )
+from src.conf.djconfig import UPLOAD_TT_MATCH_EMPLOYMENT
 from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     WorkType,
 )
-from src.util.models_converter import Converter
-from django.db.models import Q, F
-from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
-from src.timetable.worker_day.xlsx_utils.tabel import Tabel_xlsx
-from src.util.download import xlsx_method
 from src.timetable.utils import wd_stat_count
-import json
-from src.base.exceptions import MessageError
-from rest_framework.response import Response
-from src.conf.djconfig import UPLOAD_TT_MATCH_EMPLOYMENT
-
+from src.timetable.worker_day.xlsx_utils.tabel import Tabel_xlsx
+from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
+from src.util.dg.helpers import MONTH_NAMES
+from src.util.download import xlsx_method
+from src.util.models_converter import Converter
 
 WORK_TYPES = {
     'в': WorkerDay.TYPE_HOLIDAY,
@@ -346,7 +347,7 @@ def download_tabel_util(request, workbook, form):
     Returns:
         Табель
     """
-    ws = workbook.add_worksheet(Tabel_xlsx.MONTH_NAMES[form['dt_from'].month])
+    ws = workbook.add_worksheet(MONTH_NAMES[form['dt_from'].month])
 
     shop = Shop.objects.get(pk=form['shop_id'])
 

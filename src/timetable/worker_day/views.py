@@ -1,12 +1,7 @@
 import datetime
-import json
 from itertools import groupby
-from src.events.signals import event_signal
-from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE
+
 import pandas as pd
-import requests
-from dateutil.relativedelta import relativedelta
-from django.conf import settings
 from django.db import transaction
 from django.db.models import OuterRef, Subquery, Q, F, Exists
 from django.http import HttpResponse
@@ -14,6 +9,7 @@ from django.utils import timezone
 from django.utils.encoding import escape_uri_path
 from django.utils.translation import gettext_lazy as _
 from django_filters import utils
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
@@ -22,16 +18,16 @@ from rest_framework.response import Response
 from src.base.exceptions import FieldError
 from src.base.exceptions import MessageError
 from src.base.message import Message
-from src.base.models import Employment, Shop, User, ProductionDay
+from src.base.models import Employment, Shop, ProductionDay
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseModelViewSet
-from src.main.timetable.auto_settings.utils import set_timetable_date_from
+from src.events.signals import event_signal
 from src.timetable.backends import MultiShopsFilterBackend
+from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
-    WorkType,
     ShopMonthStat,
     WorkerDayPermission,
     GroupWorkerDayPermission,
@@ -41,7 +37,6 @@ from src.timetable.serializers import (
     WorkerDayApproveSerializer,
     WorkerDayWithParentSerializer,
     VacancySerializer,
-    ListChangeSrializer,
     DuplicateSrializer,
     DeleteWorkerDaysSerializer,
     ExchangeSerializer,
@@ -53,19 +48,18 @@ from src.timetable.serializers import (
     CopyApprovedSerializer,
     RequestApproveSerializer,
 )
-from src.timetable.vacancy.utils import cancel_vacancies, create_vacancies_and_notify, cancel_vacancy, confirm_vacancy
+from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
 from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
-from src.util.upload import get_uploaded_file
-from drf_yasg.utils import swagger_auto_schema
 from src.util.openapi.responses import (
     worker_stat_response_schema_dictionary,
     daily_stat_response_schema_dictionary,
     confirm_vacancy_response_schema_dictionary,
     change_range_response_schema_dictionary,
 )
+from src.util.upload import get_uploaded_file
 from .stat import WorkersStatsGetter
 
 
@@ -336,10 +330,13 @@ class WorkerDayViewSet(BaseModelViewSet):
 
             worker_dt_pairs_list = list(
                 wdays_to_approve.values_list('worker_id', 'dt').order_by('worker_id', 'dt').distinct())
+            worker_dates_dict = {}
+            for worker_id, dates_grouper in groupby(worker_dt_pairs_list, key=lambda i: i[0]):
+                worker_dates_dict[worker_id] = [i[1] for i in list(dates_grouper)]
             if worker_dt_pairs_list:
                 worker_days_q = Q()
-                for worker_id, dates_grouper in groupby(worker_dt_pairs_list, key=lambda i: i[0]):
-                    worker_days_q |= Q(worker_id=worker_id, dt__in=[i[1] for i in list(dates_grouper)])
+                for worker_id, dates in worker_dates_dict.items():
+                    worker_days_q |= Q(worker_id=worker_id, dt__in=dates)
                 WorkerDay.objects_with_excluded.filter(
                     worker_days_q, is_fact=serializer.data['is_fact'],
                 ).exclude(
@@ -405,12 +402,23 @@ class WorkerDayViewSet(BaseModelViewSet):
 
                 # если план, то отмечаем, что график подтвержден
                 if not serializer.data['is_fact']:
+                    from src.celery.tasks import recalc_wdays
+
                     ShopMonthStat.objects.filter(
                         shop_id=serializer.data['shop_id'],
                         dt=serializer.validated_data['dt_from'].replace(day=1),
                     ).update(
                         is_approved=True,
                     )
+
+                    for worker_id, dates in worker_dates_dict.items():
+                        transaction.on_commit(
+                            lambda worker_id=worker_id, dates=tuple(dates): recalc_wdays.delay(
+                                worker_id=worker_id,
+                                dt__in=dates,
+                                is_fact=True,
+                            ),
+                        )
 
                 # TODO: нужно ли как-то разделять события подтверждения факта и плана?
                 event_context = serializer.data.copy()
@@ -1064,10 +1072,13 @@ class WorkerDayViewSet(BaseModelViewSet):
         dt_from = serializer.validated_data.get('dt_from')
         dt_to = serializer.validated_data.get('dt_to')
         convert_to = serializer.validated_data.get('convert_to')
+        tabel_generator_cls = get_tabel_generator_cls(tabel_format=shop.network.download_tabel_template)
+        tabel_generator = tabel_generator_cls(shop, dt_from, dt_to)
         response = HttpResponse(
-            get_tabel_generator_cls()(shop, dt_from, dt_to).generate(convert_to=convert_to),
+            tabel_generator.generate(convert_to=shop.network.convert_tabel_to or convert_to),
             content_type='application/octet-stream',
         )
-        filename = f'Табель_для_подразделения_{shop.code}_от_{timezone.now().strftime("%Y-%m-%d")}.{convert_to}'
+        filename = f'Табель_для_подразделения_{shop.code}_от_{timezone.now().strftime("%Y-%m-%d")}.' \
+                   f'{shop.network.convert_tabel_to or convert_to}'
         response['Content-Disposition'] = f'attachment; filename={escape_uri_path(filename)}'
         return response
