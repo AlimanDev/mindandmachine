@@ -520,7 +520,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         get_params = {
             'shop_id': self.shop.id,
             'limit': 100,
-            'is_tabel': 'true',
+            'fact_tabel': 'true',
             'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
             'dt__lte': self.dt.strftime('%Y-%m-%d'),
         }
@@ -530,8 +530,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(len(resp_data), 1)
         self.assertEqual(resp_data[0]['type'], 'S')
 
-    def _test_tabel(self, plan_start, plan_end, fact_start, fact_end, expected_start, expected_end, expected_hours,
-                    extra_get_params=None, tabel_kwarg='is_tabel'):
+    def _test_tabel(self, plan_start, plan_end, fact_start, fact_end, expected_hours,
+                    extra_get_params=None, tabel_kwarg='fact_tabel'):
         plan_dttm_work_start = plan_start
         plan_dttm_work_end = plan_end
         WorkerDay.objects.filter(
@@ -554,8 +554,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         resp_data = response.json()
         self.assertEqual(len(resp_data), 1)
         self.assertEqual(resp_data[0]['type'], 'W')
-        self.assertEqual(resp_data[0]['dttm_work_start'], Converter.convert_datetime(expected_start))
-        self.assertEqual(resp_data[0]['dttm_work_end'], Converter.convert_datetime(expected_end))
         self.assertEqual(resp_data[0]['work_hours'], expected_hours)
         return resp_data
 
@@ -570,8 +568,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             plan_end=plan_dttm_work_end,
             fact_start=fact_dttm_work_start,
             fact_end=fact_dttm_work_end,
-            expected_start=plan_dttm_work_start,
-            expected_end=plan_dttm_work_end,
             expected_hours=7.0,
         )
 
@@ -586,8 +582,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             plan_end=plan_dttm_work_end,
             fact_start=fact_dttm_work_start,
             fact_end=fact_dttm_work_end,
-            expected_start=fact_dttm_work_start,
-            expected_end=plan_dttm_work_end,
             expected_hours=8.0,
         )
 
@@ -602,8 +596,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             plan_end=plan_dttm_work_end,
             fact_start=fact_dttm_work_start,
             fact_end=fact_dttm_work_end,
-            expected_start=plan_dttm_work_start,
-            expected_end=fact_dttm_work_end,
             expected_hours=8.0,
         )
 
@@ -618,8 +610,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             plan_end=plan_dttm_work_end,
             fact_start=fact_dttm_work_start,
             fact_end=fact_dttm_work_end,
-            expected_start=plan_dttm_work_start,
-            expected_end=fact_dttm_work_end,
             expected_hours=8.75,
         )
 
@@ -634,8 +624,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             plan_end=plan_dttm_work_end,
             fact_start=fact_dttm_work_start,
             fact_end=fact_dttm_work_end,
-            expected_start=plan_dttm_work_start,
-            expected_end=plan_dttm_work_end,
             expected_hours=9.75,
         )
 
@@ -656,8 +644,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             plan_end=plan_dttm_work_end,
             fact_start=fact_dttm_work_start,
             fact_end=fact_dttm_work_end,
-            expected_start=plan_dttm_work_start,
-            expected_end=fact_dttm_work_end,
             expected_hours=9.63,
         )
 
@@ -672,8 +658,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             plan_end=plan_dttm_work_end,
             fact_start=fact_dttm_work_start,
             fact_end=fact_dttm_work_end,
-            expected_start=fact_dttm_work_start,
-            expected_end=plan_dttm_work_end,
             expected_hours=9.09,
             extra_get_params=dict(
                 hours_details=True,
@@ -716,8 +700,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             plan_end=plan_dttm_work_end,
             fact_start=fact_dttm_work_start,
             fact_end=fact_dttm_work_end,
-            expected_start=fact_dttm_work_start,
-            expected_end=fact_dttm_work_end,
             expected_hours=8.76,
             extra_get_params=dict(
                 hours_details=True,
@@ -739,8 +721,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             plan_end=plan_dttm_work_end,
             fact_start=fact_dttm_work_start,
             fact_end=fact_dttm_work_end,
-            expected_start=fact_dttm_work_start,
-            expected_end=fact_dttm_work_end,
             expected_hours=4.5,
             extra_get_params=dict(
                 hours_details=True,
@@ -762,8 +742,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             plan_end=plan_dttm_work_end,
             fact_start=fact_dttm_work_start,
             fact_end=fact_dttm_work_end,
-            expected_start=fact_dttm_work_start,
-            expected_end=fact_dttm_work_end,
             expected_hours=13.76,
             extra_get_params=dict(
                 hours_details=True,

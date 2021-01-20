@@ -68,21 +68,11 @@ class WorkerDayListSerializer(serializers.Serializer):
     user_login = serializers.CharField(required=False, read_only=True)
     created_by_id = serializers.IntegerField(read_only=True)
 
-    def __init__(self, *args, **kwargs):
-        super(WorkerDayListSerializer, self).__init__(*args, **kwargs)
-        if self.context.get('request').query_params.get('is_tabel'):
-            self.fields['dttm_work_start'].source = 'tabel_dttm_work_start'
-            self.fields['dttm_work_start'].source_attrs = ['tabel_dttm_work_start']
-            self.fields['dttm_work_end'].source = 'tabel_dttm_work_end'
-            self.fields['dttm_work_end'].source_attrs = ['tabel_dttm_work_end']
-
     def get_work_hours(self, obj) -> float:
-        work_hours = getattr(obj, 'tabel_work_hours', obj.work_hours)
-
-        if isinstance(work_hours, timedelta):
+        if isinstance(obj.work_hours, timedelta):
             return obj.rounded_work_hours
 
-        return work_hours
+        return obj.work_hours
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):

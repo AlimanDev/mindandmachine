@@ -629,6 +629,10 @@ class WorkerDay(AbstractModel):
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         self.work_hours = self._calc_wh()
 
+        is_new = self.id is None
+
+        res = super().save(*args, **kwargs)
+
         # запускаем пересчет часов для факта, если изменились часы в подтвержденном плане
         if self.shop and self.shop.network.only_fact_hours_that_in_approved_plan and \
                 self.tracker.has_changed('work_hours') and \
@@ -646,11 +650,7 @@ class WorkerDay(AbstractModel):
                 'shop__settings__breaks',
             )
             for fact in fact_qs:
-                fact.save(update_fields=('work_hours'))
-
-        is_new = self.id is None
-
-        res = super().save(*args, **kwargs)
+                fact.save(update_fields=('work_hours',))
 
         if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and \
                 (self.is_vacancy or self.type == WorkerDay.TYPE_QUALIFICATION) and self.worker and self.shop:

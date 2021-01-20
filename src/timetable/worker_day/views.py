@@ -128,9 +128,8 @@ class WorkerDayViewSet(BaseModelViewSet):
             raise FieldError(self.error_messages['cannot_delete'])
         super().perform_destroy(worker_day)
 
-    def list(self, request):
+    def list(self, request, *args, **kwargs):
         if request.query_params.get('hours_details', False):
-            is_tabel = request.query_params.get('is_tabel', False)
             data = []
             def _time_to_float(t):
                 return t.hour + t.minute / 60 + t.second / 3600
@@ -147,17 +146,14 @@ class WorkerDayViewSet(BaseModelViewSet):
             for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 if worker_day.type in WorkerDay.TYPES_WITH_TM_RANGE:
-                    if is_tabel:
-                        work_seconds = worker_day.tabel_work_hours * 3600
+                    if worker_day.work_hours > datetime.timedelta(0):
+                        work_seconds = worker_day.work_hours.seconds
                     else:
-                        if worker_day.work_hours > datetime.timedelta(0):
-                            work_seconds = worker_day.work_hours.seconds
-                        else:
-                            wd_dict['work_hours'] = 0.0
-                            data.append(wd_dict)
-                            continue
-                    work_start = (worker_day.tabel_dttm_work_start if is_tabel else worker_day.dttm_work_start)
-                    work_end = (worker_day.tabel_dttm_work_end if is_tabel else worker_day.dttm_work_end)
+                        wd_dict['work_hours'] = 0.0
+                        data.append(wd_dict)
+                        continue
+                    work_start = worker_day.dttm_work_start
+                    work_end = worker_day.dttm_work_end
                     if not (work_start and work_end):
                         wd_dict['work_hours'] = 0.0
                         data.append(wd_dict)
@@ -189,10 +185,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
                         total_seconds = (work_end - work_start).total_seconds()
 
-                        if is_tabel:
-                            break_time_seconds = worker_day.tabel_breaktime_seconds or 0
-                        else:
-                            break_time_seconds = total_seconds - work_seconds
+                        break_time_seconds = total_seconds - work_seconds
 
                         wd_dict['work_hours_details']['D'] = round(
                             (total_seconds - night_seconds - break_time_seconds / 2) / 3600, 2)
