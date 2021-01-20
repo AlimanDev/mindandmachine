@@ -34,7 +34,7 @@ WORK_TYPES = {
 
 SKIP_SYMBOLS = ['nan', '']
 
-def upload_timetable_util(form, timetable_file):
+def upload_timetable_util(form, timetable_file, is_fact=False):
     """
     Принимает от клиента экселевский файл и создает расписание (на месяц)
     """
@@ -162,15 +162,19 @@ def upload_timetable_util(form, timetable_file):
                 employment.tabel_code = tabel_code
                 employment.save()
         else:
-            employment, emp_created = Employment.objects.update_or_create(
-                shop_id=shop_id,
+            employment = Employment.objects.get_active(
+                network_id=user.network_id,
                 user=user,
-                defaults={
-                    'position': position,
-                }
-            )
-            if emp_created:
-                employment.function_group = func_group
+            ).first()
+            if not employment:
+                employment = Employment.objects.create(
+                    shop_id=shop_id,
+                    user=user,
+                    position=position,
+                    function_group=func_group,
+                )
+            else:
+                employment.position = position
                 employment.save()
         users.append([
             user,
@@ -238,13 +242,13 @@ def upload_timetable_util(form, timetable_file):
             except:
                 raise MessageError(code='xlsx_undefined_cell', lang=form.get('lang', 'ru'), params={'user': user, 'dt': dt, 'value': str(data[i + 3])})
 
-            WorkerDay.objects.filter(dt=dt, worker=user, is_fact=False, is_approved=False).delete()
+            WorkerDay.objects.filter(dt=dt, worker=user, is_fact=is_fact, is_approved=False).delete()
           
             new_wd = WorkerDay.objects.create(
                 worker=user,
                 shop_id=shop_id,
                 dt=dt,
-                is_fact=False,
+                is_fact=is_fact,
                 is_approved=False,
                 employment=employment,
                 dttm_work_start=dttm_work_start,

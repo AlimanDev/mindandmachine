@@ -1023,7 +1023,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         request_body=UploadTimetableSerializer,
         responses={200: 'empty response'},
         operation_description='''
-        Загружает расписание в систему.\n
+        Загружает плановое расписание в систему.\n
         Должен быть прикреплён файл с расписанием в формате excel в поле file.
         ''',
     )
@@ -1035,6 +1035,23 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.validated_data['lang'] = request.user.lang
         data.validated_data['network_id'] = request.user.network_id
         return upload_timetable_util(data.validated_data, file)
+
+    @swagger_auto_schema(
+        request_body=UploadTimetableSerializer,
+        responses={200: 'empty response'},
+        operation_description='''
+        Загружает фактическое расписание в систему.\n
+        Должен быть прикреплён файл с расписанием в формате excel в поле file.
+        ''',
+    )
+    @action(detail=False, methods=['post'])
+    @get_uploaded_file
+    def upload_fact(self, request, file):
+        data = UploadTimetableSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        data.validated_data['lang'] = request.user.lang
+        data.validated_data['network_id'] = request.user.network_id
+        return upload_timetable_util(data.validated_data, file, is_fact=True)
 
     @swagger_auto_schema(
         query_serializer=DownloadSerializer,
