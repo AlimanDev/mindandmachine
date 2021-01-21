@@ -404,13 +404,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                         is_approved=True,
                     )
 
-                    wd_ids = list(WorkerDay.objects.filter(
-                        worker_days_q,
-                        is_fact=True,
-                        type__in=WorkerDay.TYPES_WITH_TM_RANGE,
-                    ).values_list('id', flat=True))
-                    if wd_ids:
-                        transaction.on_commit(lambda wd_ids=wd_ids: recalc_wdays.delay(id__in=wd_ids))
+                    if request.user.network.only_fact_hours_that_in_approved_plan:
+                        wd_ids = list(WorkerDay.objects.filter(
+                            worker_days_q,
+                            is_fact=True,
+                            type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                        ).values_list('id', flat=True))
+                        if wd_ids:
+                            transaction.on_commit(lambda wd_ids=wd_ids: recalc_wdays.delay(id__in=wd_ids))
 
                 # TODO: нужно ли как-то разделять события подтверждения факта и плана?
                 event_context = serializer.data.copy()
