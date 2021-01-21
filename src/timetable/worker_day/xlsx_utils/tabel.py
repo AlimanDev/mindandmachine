@@ -32,7 +32,7 @@ class Tabel_xlsx(Xlsx_base):
         WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: (COLOR_BLACK, COLOR_GREEN2),
         WorkerDay.TYPE_ETC: (COLOR_GREY, COLOR_GREY),
         WorkerDay.TYPE_EMPTY: (COLOR_GREY, COLOR_GREY),
-        WorkerDay.TYPE_QUALIFICATION: (COLOR_GREY, COLOR_GREY),
+        WorkerDay.TYPE_QUALIFICATION: (COLOR_BLACK, COLOR_DARK_BLUE),
 
         'night_work': (COLOR_BLACK, COLOR_PINK2),
 

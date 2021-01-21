@@ -110,15 +110,23 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.write_string(9, 3, '', format_header_text)
         count_of_days = len(self.prod_days) + 4
         # right info
-        self.worksheet.set_column(count_of_days + 2, count_of_days + 2, 150 / 6.23820623)
+        self.worksheet.set_column(count_of_days, count_of_days, 75 / 6.23820623)
+        self.worksheet.set_column(count_of_days + 1, count_of_days + 1, 75 / 6.23820623)
+        self.worksheet.set_column(count_of_days + 2, count_of_days + 2, 100 / 6.23820623)
+        self.worksheet.set_column(count_of_days + 3, count_of_days + 3, 75 / 6.23820623)
+        self.worksheet.set_column(count_of_days + 4, count_of_days + 4, 75 / 6.23820623)
+        self.worksheet.set_column(count_of_days + 5, count_of_days + 5, 150 / 6.23820623)
         self.worksheet.write_string(9, count_of_days, 'плановые дни', format_header_text)
-        self.worksheet.write_string(9, count_of_days + 1, 'дата', format_header_text)
-        self.worksheet.write_string(9, count_of_days + 2, 'С графиком работы ознакомлен**. На работу в праздничные дни согласен',
+        self.worksheet.write_string(9, count_of_days + 1, 'плановые часы', format_header_text)
+        self.worksheet.write_string(9, count_of_days + 2, 'норма часов на месяц', format_header_text)
+        self.worksheet.write_string(9, count_of_days + 3, 'переработка', format_header_text)
+        self.worksheet.write_string(9, count_of_days + 4, 'дата', format_header_text)
+        self.worksheet.write_string(9, count_of_days + 5, 'С графиком работы ознакомлен**. На работу в праздничные дни согласен',
                                     format_header_text)
-        self.worksheet.write_string(9, count_of_days + 3, 'В', format_header_text)
-        self.worksheet.write_string(9, count_of_days + 4, 'ОТ', format_header_text)
+        self.worksheet.write_string(9, count_of_days + 6, 'В', format_header_text)
+        self.worksheet.write_string(9, count_of_days + 7, 'ОТ', format_header_text)
 
-    def fill_table(self, workdays, employments, breaktimes, row_s, col_s):
+    def fill_table(self, workdays, employments, breaktimes, stat, row_s, col_s, stat_type='approved'):
         """
         одинаковая сортировка у workdays и users должна быть
         :param workdays:
@@ -191,32 +199,53 @@ class Timetable_xlsx(Tabel_xlsx):
             format_text = self.workbook.add_format(fmt(font_size=12, border=1, bold=True))
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 1,
-                str(sum(1 for x in worker_days.values() if x.type in [WorkerDay.TYPE_WORKDAY,
-                                                                     WorkerDay.TYPE_HOLIDAY_WORK])),
+                str(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('work_days', {}).get('total', 0)),
                 format_text
             )
+            
+            plan_hours = int(round(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 2,
-                '',
+                str(plan_hours),
                 format_text
             )
 
+            norm_hours = int(round(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('norm_hours_curr_month', {}).get('value', 0)))
+
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 3,
-                '',
+                str(norm_hours),
                 format_text
             )
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 4,
-                str(sum(1 for x in worker_days.values() if x.type == WorkerDay.TYPE_HOLIDAY)),
+                str(int(plan_hours - norm_hours)),
                 format_text
             )
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 5,
-                str(sum(1 for x in worker_days.values() if x.type == WorkerDay.TYPE_VACATION)),
+                '',
+                format_text
+            )
+
+            self.worksheet.write_string(
+                row_s + row_shift, col_s + day + 6,
+                '',
+                format_text
+            )
+
+            self.worksheet.write_string(
+                row_s + row_shift, col_s + day + 7,
+                str(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('H', 0)),
+                format_text
+            )
+
+            self.worksheet.write_string(
+                row_s + row_shift, col_s + day + 8,
+                str(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('V', 0)),
                 format_text
             )
 

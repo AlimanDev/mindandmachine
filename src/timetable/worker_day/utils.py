@@ -35,7 +35,7 @@ WORK_TYPES = {
 
 SKIP_SYMBOLS = ['nan', '']
 
-def upload_timetable_util(form, timetable_file):
+def upload_timetable_util(form, timetable_file, is_fact=False):
     """
     Принимает от клиента экселевский файл и создает расписание (на месяц)
     """
@@ -163,15 +163,19 @@ def upload_timetable_util(form, timetable_file):
                 employment.tabel_code = tabel_code
                 employment.save()
         else:
-            employment, emp_created = Employment.objects.update_or_create(
-                shop_id=shop_id,
+            employment = Employment.objects.get_active(
+                network_id=user.network_id,
                 user=user,
-                defaults={
-                    'position': position,
-                }
-            )
-            if emp_created:
-                employment.function_group = func_group
+            ).first()
+            if not employment:
+                employment = Employment.objects.create(
+                    shop_id=shop_id,
+                    user=user,
+                    position=position,
+                    function_group=func_group,
+                )
+            else:
+                employment.position = position
                 employment.save()
         users.append([
             user,
@@ -239,13 +243,13 @@ def upload_timetable_util(form, timetable_file):
             except:
                 raise MessageError(code='xlsx_undefined_cell', lang=form.get('lang', 'ru'), params={'user': user, 'dt': dt, 'value': str(data[i + 3])})
 
-            WorkerDay.objects.filter(dt=dt, worker=user, is_fact=False, is_approved=False).delete()
+            WorkerDay.objects.filter(dt=dt, worker=user, is_fact=is_fact, is_approved=False).delete()
           
             new_wd = WorkerDay.objects.create(
                 worker=user,
                 shop_id=shop_id,
                 dt=dt,
-                is_fact=False,
+                is_fact=is_fact,
                 is_approved=False,
                 employment=employment,
                 dttm_work_start=dttm_work_start,
@@ -280,6 +284,13 @@ def download_timetable_util(request, workbook, form):
         shop=shop,
     ).order_by('user__last_name', 'user__first_name', 'user__middle_name', 'user_id')
     users = employments.values_list('user_id', flat=True)
+    stat = WorkersStatsGetter(
+        dt_from=timetable.prod_days[0].dt,
+        dt_to=timetable.prod_days[-1].dt,
+        shop_id=shop.id,
+        worker_id__in=users,
+    ).run()
+    stat_type = 'approved' if form['is_approved'] else 'not_approved'
 
     default_breaks = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), shop.settings.breaks.breaks))
     breaktimes = {
@@ -326,7 +337,7 @@ def download_timetable_util(request, workbook, form):
     timetable.construnts_users_info(employments, 11, 0, ['code', 'fio', 'position'])
 
     # fill page 1
-    timetable.fill_table(workdays, employments, breaktimes, 11, 4)
+    timetable.fill_table(workdays, employments, breaktimes, stat, 11, 4, stat_type=stat_type)
 
     # fill page 2
     timetable.fill_table2(shop, timetable.prod_days[-1].dt, workdays)

@@ -73,7 +73,7 @@ class Network(AbstractActiveModel):
     enable_camera_ticks = models.BooleanField(
         default=False, verbose_name='Включить отметки по камере в мобильной версии')
     crop_work_hours_by_shop_schedule = models.BooleanField(
-        default=True, verbose_name='Обрезать рабочие часы по времени работы магазина'
+        default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'
     )
     clean_wdays_on_employment_dt_change = models.BooleanField(
         default=False, verbose_name='Запускать скрипт очистки дней при изменении дат трудойстройства',
@@ -977,6 +977,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_exchange',
         'WorkerDay_confirm_vacancy',
         'WorkerDay_upload',
+        'WorkerDay_upload_fact',
         'WorkerDay_download_timetable',
         'WorkerDay_download_tabel',
         'WorkerDay_editable_vacancy',
