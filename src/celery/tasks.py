@@ -541,7 +541,7 @@ def calculate_shop_load_at_night():
         shops__isnull=False,
     )
     dt_now = date.today()
-    dt_to = (dt_now + relativedelta(months=1)).replace(day=1) - timedelta(days=1)
+    dt_to = (dt_now + relativedelta(months=2)).replace(day=1) - timedelta(days=1)
     for template in templates:
         calculate_shops_load(template.id, dt_now, dt_to)
 
