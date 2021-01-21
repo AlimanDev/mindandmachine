@@ -20,6 +20,7 @@ from src.timetable.models import (
     WorkType,
 )
 from src.timetable.utils import wd_stat_count
+from src.timetable.worker_day.stat import WorkersStatsGetter
 from src.timetable.worker_day.xlsx_utils.tabel import Tabel_xlsx
 from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
 from src.util.dg.helpers import MONTH_NAMES
