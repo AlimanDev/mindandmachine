@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='network',
             name='download_tabel_template',
-            field=models.CharField(choices=[(('mts', 'MTSTabelGenerator'), ('t13_custom', 'CustomT13TabelGenerator'),)], default='mts', max_length=64, verbose_name='Шаблон для табеля'),
+            field=models.CharField(choices=[('mts', 'MTSTabelGenerator'), ('t13_custom', 'CustomT13TabelGenerator'), ('aigul', 'AigulTabelGenerator')], default='mts', max_length=64, verbose_name='Шаблон для табеля'),
         ),
         migrations.AddField(
             model_name='network',

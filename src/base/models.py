@@ -86,7 +86,7 @@ class Network(AbstractActiveModel):
     )
     download_tabel_template = models.CharField(
         max_length=64, verbose_name='Шаблон для табеля',
-        choices=TABEL_FORMAT_CHOICES, default='default',
+        choices=TABEL_FORMAT_CHOICES, default='mts',
     )
     convert_tabel_to = models.CharField(
         max_length=64, verbose_name='Конвертировать табель в',

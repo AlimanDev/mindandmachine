@@ -522,7 +522,6 @@ class WorkerDayViewSet(BaseModelViewSet):
                     is_approved=True,
                 ).exclude(id=vacancy.id).delete()
 
-            # TODO: нужно ли оставлять вакансию в неподтвержденной версии?
             vacancy.is_approved = True
             vacancy.save()
 
