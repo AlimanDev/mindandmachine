@@ -488,7 +488,7 @@ class WorkerDay(AbstractModel):
                 dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
                 shop_schedule = self.shop.get_schedule(dt=dt)
                 if shop_schedule is None:
-                    return datetime.timedelta(0)
+                    return dttm_work_start, dttm_work_end, datetime.timedelta(0)
 
                 open_at_0 = all(getattr(shop_schedule['tm_open'], a) == 0 for a in ['hour', 'second', 'minute'])
                 close_at_0 = all(getattr(shop_schedule['tm_close'], a) == 0 for a in ['hour', 'second', 'minute'])
@@ -515,21 +515,37 @@ class WorkerDay(AbstractModel):
                     dttm_work_start__isnull=False,
                     dttm_work_end__isnull=False,
                 ).first()
-                if not plan_approved:
-                    return datetime.timedelta(0)
+                if plan_approved:
+                    late_arrival_delta = self.shop.network.allowed_interval_for_late_arrival
+                    allowed_late_arrival_cond = late_arrival_delta and \
+                        dttm_work_start > plan_approved.dttm_work_start and \
+                        (dttm_work_start - plan_approved.dttm_work_start).total_seconds() < \
+                                                             late_arrival_delta.total_seconds()
+                    if allowed_late_arrival_cond:
+                        dttm_work_start = plan_approved.dttm_work_start
+                    else:
+                        dttm_work_start = max(dttm_work_start, plan_approved.dttm_work_start)
+
+                    early_departure_delta = self.shop.network.allowed_interval_for_early_departure
+                    allowed_early_departure_cond = early_departure_delta and \
+                                                dttm_work_end < plan_approved.dttm_work_end and \
+                                                (plan_approved.dttm_work_end - dttm_work_end).total_seconds() < \
+                                                early_departure_delta.total_seconds()
+                    if allowed_early_departure_cond:
+                        dttm_work_end = plan_approved.dttm_work_end
+                    else:
+                        dttm_work_end = min(dttm_work_end, plan_approved.dttm_work_end)
                 else:
-                    # TODO: не учитывать опоздания и ранние уходы менее n минут (allowed_interval_for_late_arrival и allowed_interval_for_early_departure)
-                    dttm_work_start = max(dttm_work_start, plan_approved.dttm_work_start)
-                    dttm_work_end = min(dttm_work_end, plan_approved.dttm_work_end)
+                    return dttm_work_start, dttm_work_end, datetime.timedelta(0)
 
-            return self.count_work_hours(breaks, dttm_work_start, dttm_work_end)
+            return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end)
 
-        return datetime.timedelta(0)
+        return self.dttm_work_start, self.dttm_work_end, datetime.timedelta(0)
 
     def __init__(self, *args, need_count_wh=False, **kwargs):
         super().__init__(*args, **kwargs)
         if need_count_wh:
-            self.work_hours = self._calc_wh()
+            self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours = self._calc_wh()
 
     id = models.BigAutoField(primary_key=True, db_index=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
@@ -538,6 +554,8 @@ class WorkerDay(AbstractModel):
     dt = models.DateField()  # todo: make immutable
     dttm_work_start = models.DateTimeField(null=True, blank=True)
     dttm_work_end = models.DateTimeField(null=True, blank=True)
+    dttm_work_start_tabel = models.DateTimeField(null=True, blank=True)
+    dttm_work_end_tabel = models.DateTimeField(null=True, blank=True)
 
     worker = models.ForeignKey(User, null=True, on_delete=models.PROTECT, related_name='worker_day', related_query_name='worker_day')  # todo: make immutable
     type = models.CharField(choices=TYPES, max_length=2, default=TYPE_EMPTY)
@@ -627,7 +645,7 @@ class WorkerDay(AbstractModel):
         return self.get_type_display()
 
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
-        self.work_hours = self._calc_wh()
+        self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours  = self._calc_wh()
 
         is_new = self.id is None
 
@@ -650,7 +668,7 @@ class WorkerDay(AbstractModel):
                 'shop__settings__breaks',
             )
             for fact in fact_qs:
-                fact.save(update_fields=('work_hours',))
+                fact.save()
 
         if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and \
                 (self.is_vacancy or self.type == WorkerDay.TYPE_QUALIFICATION) and self.worker and self.shop:

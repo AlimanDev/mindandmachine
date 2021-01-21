@@ -58,6 +58,8 @@ class WorkerDayListSerializer(serializers.Serializer):
     dt = serializers.DateField()
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
+    dttm_work_start_tabel = serializers.DateTimeField(default=None)
+    dttm_work_end_tabel = serializers.DateTimeField(default=None)
     comment = serializers.CharField()
     is_approved = serializers.BooleanField()
     worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True)
@@ -105,7 +107,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by',
-                  'crop_work_hours_by_shop_schedule']
+                  'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel']
         read_only_fields = ['work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'

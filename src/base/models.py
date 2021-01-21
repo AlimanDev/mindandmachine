@@ -871,7 +871,7 @@ class Employment(AbstractActiveModel):
                         dt__gt=dt,
                         type__in=WorkerDay.TYPES_WITH_TM_RANGE,
                     ):
-                wd.save(update_fields=['work_hours'])
+                wd.save()
 
         if (is_new or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
                 self.network and self.network.clean_wdays_on_employment_dt_change:

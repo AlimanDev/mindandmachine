@@ -152,8 +152,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                         wd_dict['work_hours'] = 0.0
                         data.append(wd_dict)
                         continue
-                    work_start = worker_day.dttm_work_start
-                    work_end = worker_day.dttm_work_end
+                    work_start = worker_day.dttm_work_start_tabel or worker_day.dttm_work_start
+                    work_end = worker_day.dttm_work_end_tabel or worker_day.dttm_work_end
                     if not (work_start and work_end):
                         wd_dict['work_hours'] = 0.0
                         data.append(wd_dict)
@@ -404,14 +404,13 @@ class WorkerDayViewSet(BaseModelViewSet):
                         is_approved=True,
                     )
 
-                    for worker_id, dates in worker_dates_dict.items():
-                        transaction.on_commit(
-                            lambda worker_id=worker_id, dates=tuple(dates): recalc_wdays.delay(
-                                worker_id=worker_id,
-                                dt__in=dates,
-                                is_fact=True,
-                            ),
-                        )
+                    wd_ids = list(WorkerDay.objects.filter(
+                        worker_days_q,
+                        is_fact=True,
+                        type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                    ).values_list('id', flat=True))
+                    if wd_ids:
+                        transaction.on_commit(lambda wd_ids=wd_ids: recalc_wdays.delay(id__in=wd_ids))
 
                 # TODO: нужно ли как-то разделять события подтверждения факта и плана?
                 event_context = serializer.data.copy()
