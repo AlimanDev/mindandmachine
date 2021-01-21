@@ -539,7 +539,7 @@ def calculate_shop_load_at_night():
         return
     templates = LoadTemplate.objects.filter(
         shops__isnull=False,
-    )
+    ).distinct('id')
     dt_now = date.today()
     dt_to = (dt_now + relativedelta(months=1)).replace(day=1) - timedelta(days=1)
     for template in templates:
