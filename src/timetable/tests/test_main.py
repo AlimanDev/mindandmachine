@@ -95,6 +95,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.client.force_authenticate(user=self.user1)
         self.network.allowed_interval_for_late_arrival = timedelta(minutes=15)
         self.network.allowed_interval_for_early_departure = timedelta(minutes=15)
+        self.network.crop_work_hours_by_shop_schedule = False
+        self.network.only_fact_hours_that_in_approved_plan = True
         self.network.save()
 
         self.shop.tm_open_dict = f'{{"all":"00:00:00"}}'
@@ -102,6 +104,9 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.shop.save()
         self.shop.settings.breaks.value = '[[0, 2000, [30, 30]]]'
         self.shop.settings.breaks.save()
+
+        self.shop.network.refresh_from_db()
+        self.shop.settings.refresh_from_db()
 
     def test_get_list(self):
         dt = Converter.convert_date(self.dt)
@@ -130,7 +135,9 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             'comment': None,
             'dt': Converter.convert_date(self.dt),
             'dttm_work_start': Converter.convert_datetime(datetime.combine(self.dt, time(8, 0, 0))),
+            'dttm_work_start_tabel': Converter.convert_datetime(datetime.combine(self.dt, time(8, 0, 0))),
             'dttm_work_end': Converter.convert_datetime(datetime.combine(self.dt, time(20, 0, 0))),
+            'dttm_work_end_tabel': Converter.convert_datetime(datetime.combine(self.dt, time(20, 0, 0))),
             'work_hours': '10:45:00',
             'worker_day_details': [],
             'is_outsource': False,
@@ -520,7 +527,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         get_params = {
             'shop_id': self.shop.id,
             'limit': 100,
-            'is_tabel': 'true',
+            'fact_tabel': 'true',
             'dt__gte': (self.dt - timedelta(days=5)).strftime('%Y-%m-%d'),
             'dt__lte': self.dt.strftime('%Y-%m-%d'),
         }
@@ -531,15 +538,16 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(resp_data[0]['type'], 'S')
 
     def _test_tabel(self, plan_start, plan_end, fact_start, fact_end, expected_start, expected_end, expected_hours,
-                    extra_get_params=None, tabel_kwarg='is_tabel'):
+                    extra_get_params=None, tabel_kwarg='fact_tabel'):
+        self.worker_day_plan_approved.shop.network.refresh_from_db()
+        self.worker_day_fact_approved.shop.network.refresh_from_db()
+
         plan_dttm_work_start = plan_start
         plan_dttm_work_end = plan_end
-        WorkerDay.objects.filter(
-            id=self.worker_day_plan_approved.id,
-        ).update(
-            dttm_work_start=plan_dttm_work_start,
-            dttm_work_end=plan_dttm_work_end,
-        )
+        self.worker_day_plan_approved.dttm_work_start = plan_dttm_work_start
+        self.worker_day_plan_approved.dttm_work_end = plan_dttm_work_end
+        self.worker_day_plan_approved.save()
+
         fact_dttm_work_start = fact_start
         fact_dttm_work_end = fact_end
         self.worker_day_fact_approved.dttm_work_start = fact_dttm_work_start
@@ -554,8 +562,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         resp_data = response.json()
         self.assertEqual(len(resp_data), 1)
         self.assertEqual(resp_data[0]['type'], 'W')
-        self.assertEqual(resp_data[0]['dttm_work_start'], Converter.convert_datetime(expected_start))
-        self.assertEqual(resp_data[0]['dttm_work_end'], Converter.convert_datetime(expected_end))
+        self.assertEqual(resp_data[0]['dttm_work_start_tabel'], Converter.convert_datetime(expected_start))
+        self.assertEqual(resp_data[0]['dttm_work_end_tabel'], Converter.convert_datetime(expected_end))
         self.assertEqual(resp_data[0]['work_hours'], expected_hours)
         return resp_data
 

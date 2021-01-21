@@ -1,6 +1,6 @@
-from src.timetable.worker_day.xlsx_utils.colors import *
 from datetime import datetime, timedelta
 from math import ceil
+
 from dateutil.relativedelta import relativedelta
 
 from src.base.models import (
@@ -8,12 +8,14 @@ from src.base.models import (
     User,
     ProductionDay,
 )
+from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
 from src.timetable.models import (
     WorkerDay,
 )
-
+from src.timetable.worker_day.xlsx_utils.colors import *
 from src.timetable.worker_day.xlsx_utils.tabel import Tabel_xlsx
-from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
+from src.util.dg.helpers import MONTH_NAMES
+
 
 class Cell(object):
     def __init__(self, dttm, format=None):
@@ -95,7 +97,7 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.write_string(2, 1, 'Магазин: {}'.format(self.shop.name), format_meta_bold)
         self.worksheet.write_rich_string(3, 1, 'График работы сотрудников', format_meta_bold_bottom_2)
         self.worksheet.write_rich_string(3, 2, format_meta_bold,
-                                         '{}  {}г.'.format(self.MONTH_NAMES[self.month.month].upper(), self.month.year))
+                                         '{}  {}г.'.format(MONTH_NAMES[self.month.month].upper(), self.month.year))
         self.worksheet.write_string(6, 2, '', format_meta_bold_bottom)
         self.worksheet.write_string(6, 1, 'Составил: ', format_meta_bold_bottom)
         self.worksheet.write_string(7, 1, 'подпись', format_meta_bold_right_small)
