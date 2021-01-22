@@ -6,7 +6,7 @@ from src.forecast.models import (
     OperationTypeRelation,
     OperationTypeName,
 )
-from src.base.models import Shop
+from src.base.models import Shop, ShopSchedule
 from src.timetable.models import WorkType
 from src.main.demand.utils import create_predbills_request_function
 import numpy as np
@@ -15,6 +15,7 @@ import datetime
 from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
 from src.base.shop.serializers import ShopSerializer
 from django.db.models import F
+from django.db.models.functions import Least, Greatest
 from src.util.models_converter import Converter
 from src.conf.djconfig import HOST
 import json
@@ -403,23 +404,34 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
         datetime.timedelta(minutes=30): '30min',
         datetime.timedelta(days=1): '1d',
     }
-    def get_times(times_shop, time_operation_type, t_from=True):
-        if times_shop.get('all'):
-            time = Converter.convert_time(
-                time_operation_type if (not time_operation_type == None) and \
-                ((times_shop.get('all') < time_operation_type and t_from) or \
-                (times_shop.get('all') > time_operation_type and not t_from)) \
-                else times_shop.get('all')
-            )
-            return {
-                str(i): time
-                for i in range(7)
-            }
-        else:
-            result = {}
-            for k, v in times_shop.items():
-                result[k] = Converter.convert_time(time_operation_type if (not time_operation_type == None) and ((v < time_operation_type and t_from) or (v > time_operation_type and not t_from)) else v)
-            return result
+    def get_times(tm_from, tm_to):
+        times = ShopSchedule.objects.filter(
+            shop_id=shop_id,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+            type=ShopSchedule.WORKDAY_TYPE,
+        ).annotate(
+            start=Greatest(F('opens'), tm_from),
+            end=Least(F('closes'), tm_to),
+        )
+        return times.values('dt', 'start', 'end')
+    # def get_times(times_shop, time_operation_type, t_from=True):
+    #     if times_shop.get('all'):
+    #         time = Converter.convert_time(
+    #             time_operation_type if (not time_operation_type == None) and \
+    #             ((times_shop.get('all') < time_operation_type and t_from) or \
+    #             (times_shop.get('all') > time_operation_type and not t_from)) \
+    #             else times_shop.get('all')
+    #         )
+    #         return {
+    #             str(i): time
+    #             for i in range(7)
+    #         }
+    #     else:
+    #         result = {}
+    #         for k, v in times_shop.items():
+    #             result[k] = Converter.convert_time(time_operation_type if (not time_operation_type == None) and ((v < time_operation_type and t_from) or (v > time_operation_type and not t_from)) else v)
+    #         return result
 
     data = {
         'dt_from': dt_from,
@@ -448,8 +460,8 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
         {
             'operation_type_name': o.operation_type_name_id,
             'work_type_name': o.operation_type_name.work_type_name_id,
-            'tm_from': get_times(shop.open_times, o.tm_from),
-            'tm_to': get_times(shop.close_times, o.tm_to, t_from=False),
+            'times': get_times(o.tm_from, o.tm_to),
+            # 'tm_to': get_times(shop.close_times, o.tm_to, t_from=False),
             'forecast_step': forecast_steps.get(o.forecast_step),
             'dependences': relations.get(o.operation_type_name_id, {}),
             'const_value': o.const_value,
