@@ -14,7 +14,7 @@ from django.utils import timezone
 import datetime
 from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
 from src.base.shop.serializers import ShopSerializer
-from django.db.models import F
+from django.db.models import F, Case, When, TimeField
 from django.db.models.functions import Least, Greatest
 from src.util.models_converter import Converter
 from src.conf.djconfig import HOST
@@ -412,7 +412,11 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             type=ShopSchedule.WORKDAY_TYPE,
         ).annotate(
             start=Greatest(F('opens'), tm_from),
-            end=Least(F('closes'), tm_to),
+            end=Case(
+                When(closes=datetime.time(0), then=Least(F('closes') - datetime.timedelta(microseconds=1), tm_to)),
+                default=Least(F('closes'), tm_to),
+                output_field=TimeField(),
+            )
         )
         return list(times.values('dt', 'start', 'end'))
     # def get_times(times_shop, time_operation_type, t_from=True):
