@@ -414,7 +414,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             start=Greatest(F('opens'), tm_from),
             end=Least(F('closes'), tm_to),
         )
-        return times.values('dt', 'start', 'end')
+        return list(times.values('dt', 'start', 'end'))
     # def get_times(times_shop, time_operation_type, t_from=True):
     #     if times_shop.get('all'):
     #         time = Converter.convert_time(
