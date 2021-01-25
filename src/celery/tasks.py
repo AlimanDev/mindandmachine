@@ -533,6 +533,18 @@ def apply_load_template_to_shops(load_template_id, dt_from, shop_id=None):
     create_notifications_for_event(event.id)
 
 
+@app.task
+def calculate_shop_load_at_night():
+    if not settings.CALCULATE_LOAD_TEMPLATE:
+        return
+    templates = LoadTemplate.objects.filter(
+        shops__isnull=False,
+    ).distinct('id')
+    dt_now = date.today()
+    dt_to = (dt_now + relativedelta(months=2)).replace(day=1) - timedelta(days=1)
+    for template in templates:
+        calculate_shops_load(template.id, dt_now, dt_to)
+
 '''
 Исходные данные хранятся в виде json в базе данных. как именно агреггировать network.settings_values['receive_data_info']
 представлен в виде списка, каждый элемент состоит из:
@@ -771,11 +783,12 @@ def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
 
 
 @app.task
-def clean_wdays(filter_kwargs: dict = None, exclude_kwargs: dict = None, only_logging=True):
+def clean_wdays(filter_kwargs: dict = None, exclude_kwargs: dict = None, only_logging=True, clean_plan_empl=False):
     clean_wdays_helper = CleanWdaysHelper(
         filter_kwargs=filter_kwargs,
         exclude_kwargs=exclude_kwargs,
         only_logging=only_logging,
+        clean_plan_empl=clean_plan_empl,
     )
     clean_wdays_helper.run()
 
@@ -891,13 +904,8 @@ def fill_active_shops_schedule():
 
 
 @app.task
-def recalc_wdays(shop_id, dt_from, dt_to):
-    wdays_qs = WorkerDay.objects.filter(
-        shop_id=shop_id,
-        dt__gte=dt_from,
-        dt__lte=dt_to,
-        type=WorkerDay.TYPE_WORKDAY,
-    )
+def recalc_wdays(**kwargs):
+    wdays_qs = WorkerDay.objects.filter(type__in=WorkerDay.TYPES_WITH_TM_RANGE, **kwargs)
     for wd_id in wdays_qs.values_list('id', flat=True):
         with transaction.atomic():
             wd_obj = WorkerDay.objects.filter(id=wd_id).select_for_update().first()

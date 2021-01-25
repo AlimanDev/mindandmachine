@@ -2,11 +2,12 @@ import os
 from calendar import monthrange
 
 from django.conf import settings
-from django.db.models import Q, F, Prefetch
+from django.db.models import Prefetch
 from django.utils.functional import cached_property
 
 from src.base.models import Employment
-from src.timetable.models import WorkerDay
+from src.timetable.models import WorkerDay, PlanAndFactHours
+from src.util.dg.helpers import MONTH_NAMES
 from .base import BaseDocGenerator
 
 
@@ -31,6 +32,8 @@ class T13WdTypeMapper(BaseWdTypeMapper):
         WorkerDay.TYPE_HOLIDAY: 'В',
         WorkerDay.TYPE_BUSINESS_TRIP: 'К',
         WorkerDay.TYPE_VACATION: 'ОТ',
+        WorkerDay.TYPE_MATERNITY: 'ОЖ',
+        WorkerDay.TYPE_SICK: 'Б',
         # TODO: добавить оставльные
     }
 
@@ -54,27 +57,14 @@ class BaseTabelDataGetter:
     def _get_tabel_type(self, wd_type):
         return self.wd_type_mapper.get_tabel_type(wd_type)
 
-    def _get_tabel_wdays_qs(self, fact_only=True):
-        tabel_wdays = WorkerDay.objects.get_tabel(
-            network=self.shop.network,
-            fact_only=fact_only,
-        ).filter(
-            Q(
-                type=WorkerDay.TYPE_WORKDAY,
-                worker_day_details__work_type__shop=self.shop,
-            ) |
-            Q(
-                type=WorkerDay.TYPE_QUALIFICATION,
-                shop=self.shop,
-            ) |
-            Q(
-                ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
-                Q(
-                    Q(dt__lte=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True),
-                    Q(dt__gte=F('employment__dt_hired')),
-                    employment__shop=self.shop,
-                ),
-            ),
+    def _get_tabel_wdays_qs(self):
+        tabel_wdays = WorkerDay.objects.get_tabel().filter(
+            worker__in=Employment.objects.get_active(
+                network_id=self.network.id,
+                dt_from=self.dt_from,
+                dt_to=self.dt_to,
+                user__employments__shop=self.shop,
+            ).distinct().values_list('user', flat=True),
             dt__gte=self.dt_from,
             dt__lte=self.dt_to,
         )
@@ -88,6 +78,11 @@ class BaseTabelDataGetter:
 class T13TabelDataGetter(BaseTabelDataGetter):
     wd_type_mapper_cls = T13WdTypeMapper
 
+    def set_day_data(self, day_data, wday):
+        day_data['code'] = self._get_tabel_type(wday.type) if wday else ''
+        day_data['value'] = wday.rounded_work_hours if \
+            (wday and wday.type in WorkerDay.TYPES_WITH_TM_RANGE) else ''
+
     def get_data(self):
         tabel_wdays = self._get_tabel_wdays_qs()
         tabel_employments = Employment.objects.filter(
@@ -100,7 +95,7 @@ class T13TabelDataGetter(BaseTabelDataGetter):
             'user__first_name',
         ).prefetch_related(
             Prefetch(
-                'workerday_set',
+                'user__worker_day',
                 queryset=tabel_wdays.order_by(),
                 to_attr='tabel_worker_days'
             )
@@ -109,7 +104,7 @@ class T13TabelDataGetter(BaseTabelDataGetter):
         users = []
 
         for num, empl in enumerate(tabel_employments, start=1):
-            wdays = {_get_day_key(wd.dt.day): wd for wd in empl.tabel_worker_days}
+            wdays = {_get_day_key(wd.dt.day): wd for wd in empl.user.tabel_worker_days}
 
             days = {}
             _weekday, days_in_month = monthrange(year=self.year, month=self.month)
@@ -122,24 +117,24 @@ class T13TabelDataGetter(BaseTabelDataGetter):
                 day_key = _get_day_key(day_num)
                 day_data = days.setdefault(day_key, {})
                 wday = wdays.get(day_key)
-                day_data['code'] = self._get_tabel_type(wday.type) if wday else ''
-                day_data['value'] = wday.tabel_work_hours if \
-                    (wday and (WorkerDay.TYPE_WORKDAY or WorkerDay.TYPE_QUALIFICATION)) else ''
+                self.set_day_data(day_data, wday)
                 days[day_key] = day_data
                 if wday:
-                    if wday.type == WorkerDay.TYPE_WORKDAY or WorkerDay.TYPE_QUALIFICATION:
+                    if wday.type in WorkerDay.TYPES_WITH_TM_RANGE:
                         if day_num <= 15:  # первая половина месяца
                             first_half_month_wdays += 1
-                            first_half_month_whours += wday.tabel_work_hours
+                            first_half_month_whours += wday.rounded_work_hours
                         else:
                             second_half_month_wdays += 1
-                            second_half_month_whours += wday.tabel_work_hours
+                            second_half_month_whours += wday.rounded_work_hours
 
             user_data = {
                 'num': num,
                 'last_name': empl.user.last_name,
                 'tabel_code': empl.user.tabel_code,
                 'fio_and_position': empl.get_short_fio_and_position(),
+                'fio': empl.user.fio,
+                'position': empl.position.name if empl.position else '',
                 'days': days,
                 'first_half_month_wdays': first_half_month_wdays,
                 'first_half_month_whours': first_half_month_whours,
@@ -155,11 +150,20 @@ class T13TabelDataGetter(BaseTabelDataGetter):
 
 class MtsTabelDataGetter(BaseTabelDataGetter):
     def get_data(self):
-        tabel_wdays = self._get_tabel_wdays_qs(fact_only=False)
-        tabel_wdays = tabel_wdays.filter(
-            type__in=WorkerDay.TYPES_WITH_TM_RANGE,
-        )
-        return {'tabel_wdays': tabel_wdays.select_related('worker', 'shop')}
+        return {
+            'plan_and_fact_hours': PlanAndFactHours.objects.filter(
+                shop=self.shop,
+                wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                dt__gte=self.dt_from,
+                dt__lte=self.dt_to,
+            ).distinct(),
+        }
+
+
+class AigulTabelDataGetter(T13TabelDataGetter):
+    def set_day_data(self, day_data, wday):
+        day_data['value'] = wday.rounded_work_hours if \
+            (wday and wday.type in WorkerDay.TYPES_WITH_TM_RANGE) else self._get_tabel_type(wday.type) if wday else ''
 
 
 class BaseTabelGenerator(BaseDocGenerator):
@@ -189,14 +193,21 @@ class BaseTabelGenerator(BaseDocGenerator):
         raise NotImplementedError
 
     def get_data(self):
+        dt_from = self.dt_from.strftime('%d.%m.%Y')
+        dt_to = self.dt_to.strftime('%d.%m.%Y')
+        month_name = MONTH_NAMES[self.dt_from.month]
+        year = self.dt_from.year
         data = {
             'data': self.get_tabel_data(),
             'department_name': self.shop.name,
             'network_name': self.network.name,
             'network_okpo': self.network.okpo,
-            'dt_from': self.dt_from.strftime('%d.%m.%Y'),
-            'dt_to': self.dt_to.strftime('%d.%m.%Y'),
+            'dt_from': dt_from,
+            'dt_to': dt_to,
             'doc_num': f'{self.dt_to.month + 1}',
+            'month_name': month_name,
+            'year': year,
+            'tabel_text': f'Табель учета рабочего времени за {month_name} {year}г',
         }
         return data
 
@@ -245,11 +256,23 @@ class MTSTabelGenerator(BaseTabelGenerator):
         return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_mts.ods')
 
 
+class AigulTabelGenerator(BaseTabelGenerator):
+    """
+    Шаблон табеля для Айгуль
+    """
+
+    tabel_data_getter_cls = AigulTabelDataGetter
+
+    def get_template_path(self):
+        return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_aigul.ods')
+
+
 tabel_formats = {
     'default': MTSTabelGenerator,
     'mts': MTSTabelGenerator,
     't13': T13TabelGenerator,
     't13_custom': CustomT13TabelGenerator,
+    'aigul': AigulTabelGenerator,
 }
 
 

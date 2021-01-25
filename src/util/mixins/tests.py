@@ -77,26 +77,32 @@ class TestsHelperMixin:
                     kwargs['shop_id'] = shop.id
                     kwargs['dttm_work_start'] = datetime.combine(day, plan_start_time)
                     kwargs['dttm_work_end'] = datetime.combine(day, plan_end_time)
-
-                wd = WorkerDay.objects.create(**kwargs)
-                WorkerDayCashboxDetails.objects.create(
-                    worker_day=wd,
-                    work_type=work_type,
+                wd, _wd_created = WorkerDay.objects.get_or_create(
+                    dt=day,
+                    is_fact=False,
+                    is_approved=True,
+                    worker_id=empl.user_id,
+                    defaults=kwargs
                 )
+                if _wd_created:
+                    WorkerDayCashboxDetails.objects.create(
+                        worker_day=wd,
+                        work_type=work_type,
+                    )
 
-                if is_workday:
-                    is_absenteeism = random.randint(1, 100) < 10  # прогул
-                    if not is_absenteeism:
-                        signs = [1, -1]
-                        start_delta_sign = random.choice(signs)
-                        end_delta_sign = random.choice(signs)
-                        start_minutes = random.randrange(0, 90) * start_delta_sign
-                        end_minutes = random.randrange(0, 90) * end_delta_sign
-                        kwargs['is_fact'] = True
-                        kwargs['dttm_work_start'] = datetime.combine(
-                            day, plan_start_time) + timedelta(minutes=start_minutes)
-                        kwargs['dttm_work_end'] = datetime.combine(day, plan_end_time) + timedelta(minutes=end_minutes)
-                        WorkerDay.objects.create(**kwargs)
+                    if is_workday:
+                        is_absenteeism = random.randint(1, 100) < 10  # прогул
+                        if not is_absenteeism:
+                            signs = [1, -1]
+                            start_delta_sign = random.choice(signs)
+                            end_delta_sign = random.choice(signs)
+                            start_minutes = random.randrange(0, 90) * start_delta_sign
+                            end_minutes = random.randrange(0, 90) * end_delta_sign
+                            kwargs['is_fact'] = True
+                            kwargs['dttm_work_start'] = datetime.combine(
+                                day, plan_start_time) + timedelta(minutes=start_minutes)
+                            kwargs['dttm_work_end'] = datetime.combine(day, plan_end_time) + timedelta(minutes=end_minutes)
+                            WorkerDay.objects.create(**kwargs)
 
     def clean_cached_props(self, cached_props=None):
         cached_props = cached_props or (

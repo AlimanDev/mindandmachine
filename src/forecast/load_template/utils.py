@@ -476,6 +476,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             'forecast_step': forecast_steps.get(o.forecast_step),
             'dependences': relations.get(o.operation_type_name_id, {}),
             'const_value': o.const_value,
+            'type': o.operation_type_name.do_forecast,
         }
         for o in templates
     ]
@@ -520,7 +521,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
     # }
     data['timeserie'] = timeseries
     for o_type in data['operation_types']:
-        if str(o_type['operation_type_name']) in timeseries.keys():
+        if str(o_type['operation_type_name']) in timeseries.keys() or o_type['type'] == 'H':
             o_type['type'] = 'F'
         else:
             o_type['type'] = 'O'

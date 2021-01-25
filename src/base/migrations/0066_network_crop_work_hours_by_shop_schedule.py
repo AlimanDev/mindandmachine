@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='network',
             name='crop_work_hours_by_shop_schedule',
-            field=models.BooleanField(default=True, verbose_name='Обрезать рабочие часы по времени работы магазина'),
+            field=models.BooleanField(default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'),
         ),
     ]

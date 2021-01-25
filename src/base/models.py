@@ -37,6 +37,17 @@ class Network(AbstractActiveModel):
         (12, 'Год'),
     )
 
+    TABEL_FORMAT_CHOICES = (
+        ('mts', 'MTSTabelGenerator'),
+        ('t13_custom', 'CustomT13TabelGenerator'),
+        ('aigul', 'AigulTabelGenerator'),
+    )
+
+    CONVERT_TABEL_TO_CHOICES = (
+        ('xlsx', 'xlsx'),
+        ('pdf', 'PDF'),
+    )
+
     class Meta:
         verbose_name = 'Сеть магазинов'
         verbose_name_plural = 'Сети магазинов'
@@ -62,13 +73,27 @@ class Network(AbstractActiveModel):
     enable_camera_ticks = models.BooleanField(
         default=False, verbose_name='Включить отметки по камере в мобильной версии')
     crop_work_hours_by_shop_schedule = models.BooleanField(
-        default=True, verbose_name='Обрезать рабочие часы по времени работы магазина'
+        default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'
     )
     clean_wdays_on_employment_dt_change = models.BooleanField(
         default=False, verbose_name='Запускать скрипт очистки дней при изменении дат трудойстройства',
     )
     accounting_period_length = models.PositiveSmallIntegerField(
         choices=ACCOUNTING_PERIOD_LENGTH_CHOICES, verbose_name='Длина учетного периода', default=1)
+    only_fact_hours_that_in_approved_plan = models.BooleanField(
+        default=False,
+        verbose_name='Считать только те фактические часы, которые есть в подтвержденном плановом графике',
+    )
+    download_tabel_template = models.CharField(
+        max_length=64, verbose_name='Шаблон для табеля',
+        choices=TABEL_FORMAT_CHOICES, default='mts',
+    )
+    convert_tabel_to = models.CharField(
+        max_length=64, verbose_name='Конвертировать табель в',
+        null=True, blank=True,
+        choices=CONVERT_TABEL_TO_CHOICES,
+        default='xlsx',
+    )
 
     def get_department(self):
         return None
@@ -846,7 +871,7 @@ class Employment(AbstractActiveModel):
                         dt__gt=dt,
                         type__in=WorkerDay.TYPES_WITH_TM_RANGE,
                     ):
-                wd.save(update_fields=['work_hours'])
+                wd.save()
 
         if (is_new or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
                 self.network and self.network.clean_wdays_on_employment_dt_change:
@@ -855,6 +880,7 @@ class Employment(AbstractActiveModel):
             from src.util.models_converter import Converter
             kwargs = {
                 'only_logging': False,
+                'clean_plan_empl': True,
             }
             if is_new:
                 kwargs['filter_kwargs'] = {
@@ -866,10 +892,15 @@ class Employment(AbstractActiveModel):
                 if self.dt_fired:
                     kwargs['filter_kwargs']['dt__lt'] = Converter.convert_date(self.dt_fired)
             else:
+                prev_dt_hired = self.tracker.previous('dt_hired')
+                if prev_dt_hired and prev_dt_hired < self.dt_hired:
+                    dt__gte = prev_dt_hired
+                else:
+                    dt__gte = self.dt_hired
                 kwargs['filter_kwargs'] = {
                     'type': WorkerDay.TYPE_WORKDAY,
                     'worker_id': self.user_id,
-                    'dt__gte': Converter.convert_date(self.dt_hired),
+                    'dt__gte': Converter.convert_date(dt__gte),
                 }
 
             clean_wdays.apply_async(kwargs=kwargs)
@@ -946,6 +977,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_exchange',
         'WorkerDay_confirm_vacancy',
         'WorkerDay_upload',
+        'WorkerDay_upload_fact',
         'WorkerDay_download_timetable',
         'WorkerDay_download_tabel',
         'WorkerDay_editable_vacancy',
