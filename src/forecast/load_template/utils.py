@@ -426,23 +426,6 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             )
         )
         return list(times.values('dt', 'start', 'end'))
-    # def get_times(times_shop, time_operation_type, t_from=True):
-    #     if times_shop.get('all'):
-    #         time = Converter.convert_time(
-    #             time_operation_type if (not time_operation_type == None) and \
-    #             ((times_shop.get('all') < time_operation_type and t_from) or \
-    #             (times_shop.get('all') > time_operation_type and not t_from)) \
-    #             else times_shop.get('all')
-    #         )
-    #         return {
-    #             str(i): time
-    #             for i in range(7)
-    #         }
-    #     else:
-    #         result = {}
-    #         for k, v in times_shop.items():
-    #             result[k] = Converter.convert_time(time_operation_type if (not time_operation_type == None) and ((v < time_operation_type and t_from) or (v > time_operation_type and not t_from)) else v)
-    #         return result
 
     data = {
         'dt_from': dt_from,
@@ -472,7 +455,6 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             'operation_type_name': o.operation_type_name_id,
             'work_type_name': o.operation_type_name.work_type_name_id,
             'times': get_times(o.tm_from, o.tm_to),
-            # 'tm_to': get_times(shop.close_times, o.tm_to, t_from=False),
             'forecast_step': forecast_steps.get(o.forecast_step),
             'dependences': relations.get(o.operation_type_name_id, {}),
             'const_value': o.const_value,
@@ -480,7 +462,6 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
         }
         for o in templates
     ]
-    # templates = {str(o.operation_type_name_id): o for o in templates}
     timeseries = {}
     values = list(PeriodClients.objects.select_related('operation_type').filter(
         operation_type__shop_id=shop_id,
@@ -499,26 +480,6 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
                 'dttm': timeserie.dttm_forecast,
             }
         )
-    # for timeserie in values:
-    #     key = str(timeserie.operation_type.operation_type_name_id)
-    #     if not key in timeseries:
-    #         timeseries[key] = {}
-    #     second_key = timeserie.dttm_forecast.replace(hour=0, minute=0, second=0)
-    #     if templates[key].forecast_step == datetime.timedelta(hours=1):
-    #         second_key = timeserie.dttm_forecast.replace(minute=0, second=0)
-    #     elif templates[key].forecast_step == datetime.timedelta(minutes=30):
-    #         second_key = timeserie.dttm_forecast.replace(minute=30, second=0) if timeserie.dttm_forecast.minute >= 30 else timeserie.dttm_forecast.replace(minute=0, second=0)
-    #     timeseries[key][second_key] = timeseries[key].get(second_key, 0) + timeserie.value
-    # timeseries = {
-    #     o_type: [
-    #         {
-    #             'value': value,
-    #             'dttm': dttm,
-    #         }
-    #         for dttm, value in values.items()
-    #     ]
-    #     for o_type, values in timeseries.items()
-    # }
     data['timeserie'] = timeseries
     for o_type in data['operation_types']:
         if str(o_type['operation_type_name']) in timeseries.keys() or o_type['type'] == 'H':
