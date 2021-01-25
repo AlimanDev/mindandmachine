@@ -82,7 +82,7 @@ class BaseTabelDataGetter:
             dt__lte=self.dt_to,
         )
 
-        return tabel_wdays.select_related('worker', 'shop').order_by('worker_id', 'dt')
+        return tabel_wdays.select_related('worker', 'shop').order_by('worker__last_name', 'worker__first_name', 'dt')
 
     def get_data(self):
         raise NotImplementedError
@@ -107,6 +107,9 @@ class T13TabelDataGetter(BaseTabelDataGetter):
             user__id__in=tabel_wdays.values_list('worker', flat=True),
         ).annotate_value_equality(
             'is_equal_shops', 'shop_id', self.shop.id,
+        ).select_related(
+            'user',
+            'position',
         ).order_by('-is_equal_shops')
         for e in empls_qs:
             empls.setdefault(e.user_id, []).append(e)
@@ -114,6 +117,7 @@ class T13TabelDataGetter(BaseTabelDataGetter):
         num = 1
         worker_id = None
         position_id = None
+        prev_empl = None
         empl = None
         first_half_month_wdays = 0
         first_half_month_whours = 0
@@ -130,7 +134,8 @@ class T13TabelDataGetter(BaseTabelDataGetter):
             ))
             if not worker_empls:
                 continue
-            prev_empl = empl
+            if empl != worker_empls[0]:
+                prev_empl = empl
             empl = worker_empls[0]
             if worker_id != wd.worker_id or position_id != empl.position_id:
                 if prev_empl and days:
@@ -172,6 +177,24 @@ class T13TabelDataGetter(BaseTabelDataGetter):
                 else:
                     second_half_month_wdays += 1
                     second_half_month_whours += wd.rounded_work_hours
+
+        if empl != prev_empl and days:
+            user_data = {
+                'num': num,
+                'last_name': empl.user.last_name,
+                'tabel_code': empl.user.tabel_code,
+                'fio_and_position': empl.get_short_fio_and_position(),
+                'fio': empl.user.fio,
+                'position': empl.position.name if empl.position else '',
+                'days': days,
+                'first_half_month_wdays': first_half_month_wdays,
+                'first_half_month_whours': first_half_month_whours,
+                'second_half_month_wdays': second_half_month_wdays,
+                'second_half_month_whours': second_half_month_whours,
+                'full_month_wdays': first_half_month_wdays + second_half_month_wdays,
+                'full_month_whours': first_half_month_whours + second_half_month_whours,
+            }
+            users.append(user_data)
 
         _weekday, days_in_month = monthrange(year=self.year, month=self.month)
         for user_data in users:
