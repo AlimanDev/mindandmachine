@@ -237,8 +237,10 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
                     )
                     if dttm_work_end < dttm_work_start:
                         dttm_work_end += datetime.timedelta(days=1)
-                else:
+                elif not is_fact:
                     type_of_work = WORK_TYPES[cell_data]
+                else:
+                    continue
             except:
                 raise MessageError(code='xlsx_undefined_cell', lang=form.get('lang', 'ru'), params={'user': user, 'dt': dt, 'value': str(data[i + 3])})
 
