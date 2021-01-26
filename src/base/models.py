@@ -1,10 +1,11 @@
 import datetime
 import json
-from dateutil.relativedelta import relativedelta
+import re
 from calendar import monthrange
 
 import pandas as pd
 from celery import chain
+from dateutil.relativedelta import relativedelta
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -25,7 +26,12 @@ from mptt.models import MPTTModel, TreeForeignKey
 from timezone_field import TimeZoneField
 
 from src.base.exceptions import MessageError
-from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNetworkSpecificCodeNamedModel
+from src.base.models_abstract import (
+    AbstractActiveModel,
+    AbstractModel,
+    AbstractActiveNetworkSpecificCodeNamedModel,
+    NetworkSpecificModel,
+)
 from src.conf.djconfig import QOS_TIME_FORMAT
 
 
@@ -724,6 +730,43 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
+
+    @cached_property
+    def wp_defaults(self):
+        wp_defaults_dict = settings.WORKER_POSITION_DEFAULT_VALUES.get(self.network.code)
+        if wp_defaults_dict:
+            for re_pattern, wp_defaults in wp_defaults_dict.items():
+                if re.search(re_pattern, self.name, re.IGNORECASE):
+                    return wp_defaults
+
+    def _set_plain_defaults(self):
+        if self.wp_defaults:
+            hours_in_a_week = self.wp_defaults.get('hours_in_a_week')
+            if hours_in_a_week:
+                self.hours_in_a_week = hours_in_a_week
+            breaks_code = self.wp_defaults.get('breaks_code')
+            if breaks_code:
+                self.breaks = Break.objects.filter(network_id=self.network_id, code=breaks_code).first()
+            group_code = self.wp_defaults.get('group_code')
+            if group_code:
+                self.group = Group.objects.filter(network_id=self.network_id, code=group_code).first()
+
+    def _set_m2m_defaults(self):
+        if self.wp_defaults:
+            default_work_type_names_codes = self.wp_defaults.get('default_work_type_names_codes')
+            if default_work_type_names_codes:
+                from src.timetable.models import WorkTypeName
+                self.default_work_type_names.set(
+                    WorkTypeName.objects.filter(network=self.network, code__in=default_work_type_names_codes))
+
+    def save(self, *args, **kwargs):
+        is_new = self.id is None
+        if is_new:
+            self._set_plain_defaults()
+        res = super(WorkerPosition, self).save(*args, **kwargs)
+        if is_new:
+            self._set_m2m_defaults()
+        return res
 
     def get_department(self):
         return None

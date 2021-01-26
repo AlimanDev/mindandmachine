@@ -383,8 +383,8 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
 def create_departments_and_users(self):
     dt = now().date() - relativedelta(months=1)
-    self.network = Network.objects.first()
-    self.region, _created = Region.objects.update_or_create(
+    self.network, _n_created = Network.objects.get_or_create(code='default', name='По умолчанию')
+    self.region, _r_created = Region.objects.update_or_create(
         id=1,
         defaults=dict(
             network=self.network,
@@ -393,7 +393,7 @@ def create_departments_and_users(self):
         ),
     )
     # admin_group
-    self.admin_group = Group.objects.create(name='Администратор')
+    self.admin_group = Group.objects.create(name='Администратор', code='admin', network=self.network)
     FunctionGroup.objects.bulk_create([
         FunctionGroup(
             group=self.admin_group,
@@ -424,7 +424,7 @@ def create_departments_and_users(self):
     #         )
 
     # chiefs
-    self.chief_group = Group.objects.create(name='Руководитель')
+    self.chief_group = Group.objects.create(name='Руководитель', code='director', network=self.network)
     FunctionGroup.objects.bulk_create([
         FunctionGroup(
             group=self.chief_group,
@@ -443,7 +443,7 @@ def create_departments_and_users(self):
     )
 
     # employee
-    self.employee_group = Group.objects.create(name='Сотрудник')
+    self.employee_group = Group.objects.create(name='Сотрудник', code='worker', network=self.network)
     FunctionGroup.objects.bulk_create([
         FunctionGroup(
             group=self.employee_group,
