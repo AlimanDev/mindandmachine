@@ -80,7 +80,7 @@ def upload_demand_util_v2(new_workload, shop_id, lang):
     for worktype in set(new_workload.columns) - {'dttm'}:
         operation = op_types.get(worktype)
         if not operation:
-            raise MessageError(code='xlsx_undefined_work_type', lang=lang, params={'work_type': work_type})
+            raise MessageError(code='xlsx_undefined_work_type', lang=lang, params={'work_type': worktype})
         period_clients += [
             PeriodClients(
                 dttm_forecast=row['dttm'],
