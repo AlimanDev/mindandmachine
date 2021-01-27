@@ -208,6 +208,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['longitude'] = None
         data['distance'] = None
         data['email'] = None
+        data.pop('nonstandard_schedule')
         self.assertDictEqual(shop, data)
 
         for schedule_dict in nonstandard_schedule:
@@ -259,6 +260,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['exchange_settings_id'] = None
         data['distance'] = None
         data['load_template_status'] = 'R'
+        data.pop('nonstandard_schedule')
         self.assertEqual(shop, data)
         self.assertIsNotNone(Shop.objects.get(id=shop['id']).dttm_deleted)
 
