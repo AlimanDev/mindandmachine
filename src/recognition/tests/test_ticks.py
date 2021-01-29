@@ -15,22 +15,26 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
     def setUp(self):
         self._set_authorization_token(self.user2.username)
 
-    def test_create_tick(self):
-        resp = self.client.post(
+    def test_create_and_update_and_list_ticks(self):
+        resp_coming = self.client.post(
             self.get_url('Tick-list'),
             data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop2.code}),
             content_type='application/json',
         )
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp_coming.status_code, status.HTTP_200_OK)
 
-        resp = self.client.post(
+        resp_leaving = self.client.post(
             self.get_url('Tick-list'),
             data=self.dump_data({'type': Tick.TYPE_LEAVING, 'shop_code': self.shop2.code}),
             content_type='application/json',
         )
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp_leaving.status_code, status.HTTP_200_OK)
 
         self.assertEqual(Tick.objects.count(), 2)
+
+        resp_list = self.client.get(self.get_url('Tick-list'))
+        self.assertEqual(resp_list.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp_list.json()), 2)
 
     def _test_geo(self, allowed_distance, shop_lat, shop_lon, user_lat, user_lon):
         self.shop2.latitude = shop_lat
