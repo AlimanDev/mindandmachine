@@ -36,7 +36,7 @@ class WorkerDayApproveSerializer(serializers.Serializer):
 
 
 class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
-    work_type_id = serializers.IntegerField(required=False)
+    work_type_id = serializers.IntegerField(required=True)
 
     class Meta:
         model = WorkerDayCashboxDetails
