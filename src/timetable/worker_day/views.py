@@ -993,7 +993,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 dt__in=data['dates'],
                 is_approved=data['is_approved'],
                 is_fact=False,
-            ).select_related('worker', 'employment').order_by('dt'))
+            ).prefetch_related('worker_day_details').select_related('worker', 'employment').order_by('dt'))
 
             if len(wd_parent_list) != days * 2:
                 raise ValidationError(self.error_messages['no_timetable'])
