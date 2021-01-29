@@ -153,7 +153,7 @@ class WorkerDayConverter(Converter):
     @classmethod
     def convert_function(cls, obj, need_percentage=False):
         def __work_tm(__field):
-            return cls.convert_time(__field) if obj.type == WorkerDay.TYPE_WORKDAY else None
+            return cls.convert_time(__field) if obj.type in WorkerDay.TYPES_WITH_TM_RANGE else None
 
         data = {
             'id': obj.id,
