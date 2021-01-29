@@ -580,7 +580,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 employment_stat_dict[employment.id]['required_coupled_hol_in_hol'] = 0 if coupled_weekdays else 1
 
         ########### Корректировка рабочих ###########
-        dates = [dt_from + timedelta(days=i) for i in range((dt_to - dt_from).days)]
+        dates = [dt_from + timedelta(days=i) for i in range((dt_to - dt_from).days + 1)]
         for employment in employments:
             # Для уволенных сотрудников
             if employment.dt_fired:
