@@ -8,6 +8,7 @@ from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkType, W
 
 
 class WorkTypeNameFactory(AbstractActiveNamedModelFactory):
+    network = factory.SubFactory('src.base.tests.factories.NetworkFactory')
     name = factory.LazyFunction(lambda: random.choice(['Кассир', 'Директор']))
 
     class Meta:

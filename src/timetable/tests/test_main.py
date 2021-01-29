@@ -1172,6 +1172,9 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
         cls.work_type = WorkType.objects.create(work_type_name=cls.work_type_name, shop=cls.shop)
 
         # всегда 1 ч перерыв, чтобы было легче считать
+        cls.shop.network.crop_work_hours_by_shop_schedule = True
+        cls.shop.network.only_fact_hours_that_in_approved_plan = False
+        cls.shop.network.save()
         cls.shop.settings.breaks.value = '[[0, 2000, [30, 30]]]'
         cls.shop.settings.breaks.save()
 
