@@ -2069,13 +2069,14 @@ class TestAditionalFunctions(APITestCase):
             'worker1_id': self.user2.id,
             'worker2_id': self.user3.id,
             'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
-            'is_approved': True,
         }
         self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
-        url = f'{self.url}exchange/'
+        url = f'{self.url}exchange_approved/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 8)
+        self.assertEqual(response.json()[0]['is_approved'], True)
+        self.assertEqual(WorkerDay.objects.count(), 8)
 
     
     def test_exchange_with_holidays(self):
@@ -2084,13 +2085,12 @@ class TestAditionalFunctions(APITestCase):
             'worker1_id': self.user2.id,
             'worker2_id': self.user3.id,
             'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(2)],
-            'is_approved': True,
         }
         self.create_worker_days(self.employment2, dt_from, 1, 10, 20, True)
         self.create_worker_days(self.employment3, dt_from + timedelta(1), 1, 9, 21, True)
         self.update_or_create_holidays(self.employment2, dt_from + timedelta(1), 1, True)
         self.update_or_create_holidays(self.employment3, dt_from, 1, True)
-        url = f'{self.url}exchange/'
+        url = f'{self.url}exchange_approved/'
         response = self.client.post(url, data, format='json')
         data = response.json()
         self.assertEqual(len(data), 4)
@@ -2106,7 +2106,6 @@ class TestAditionalFunctions(APITestCase):
             'worker1_id': self.user2.id,
             'worker2_id': self.user3.id,
             'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
-            'is_approved': False,
         }
         self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
@@ -2115,6 +2114,7 @@ class TestAditionalFunctions(APITestCase):
         url = f'{self.url}exchange/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 8)
+        self.assertEqual(WorkerDay.objects.count(), 16)
 
     def test_duplicate_full(self):
         dt_from = date.today()

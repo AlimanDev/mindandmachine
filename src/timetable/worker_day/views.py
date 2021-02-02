@@ -50,7 +50,7 @@ from src.timetable.serializers import (
 )
 from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
 from src.timetable.worker_day.stat import count_daily_stat
-from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util
+from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util, exchange
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.openapi.responses import (
@@ -943,81 +943,34 @@ class WorkerDayViewSet(BaseModelViewSet):
     @swagger_auto_schema(
         request_body=ExchangeSerializer,
         operation_description='''
-        Метод для обмена рабочими сменами
+        Метод для обмена рабочими сменами в черновике
         ''',
         responses={200:WorkerDaySerializer(many=True)},
     )
     @action(detail=False, methods=['post'])
     def exchange(self, request):
-        new_wds = []
-        def create_worker_day(wd_parent, wd_swap):
-            employment = wd_parent.employment
-            if (wd_swap.type == WorkerDay.TYPE_WORKDAY and employment is None):
-                employment = Employment.objects.get_active_empl_for_user(
-                    network_id=wd_swap.worker.network_id, user_id=wd_parent.worker_id,
-                    dt=wd_swap.dt,
-                    priority_shop_id=wd_swap.shop_id,
-                ).select_related(
-                    'position__breaks',
-                ).first()
-            wd_new = WorkerDay(
-                type=wd_swap.type,
-                dttm_work_start=wd_swap.dttm_work_start,
-                dttm_work_end=wd_swap.dttm_work_end,
-                worker_id=wd_parent.worker_id,
-                employment=employment if wd_swap.employment_id else None,
-                dt=wd_parent.dt,
-                created_by=request.user,
-                is_approved=False,
-                is_vacancy=wd_swap.is_vacancy,
-                shop_id=wd_swap.shop_id,
-            )
-            wd_new.save()
-            new_wds.append(wd_new)
-            WorkerDayCashboxDetails.objects.bulk_create([
-                WorkerDayCashboxDetails(
-                    worker_day_id=wd_new.id,
-                    work_type_id=wd_cashbox_details_parent.work_type_id,
-                    work_part=wd_cashbox_details_parent.work_part,
-                )
-                for wd_cashbox_details_parent in wd_swap.worker_day_details.all()
-            ])
-
         data = ExchangeSerializer(data=request.data, context={'request': request})
         data.is_valid(raise_exception=True)
         data = data.validated_data
-        days = len(data['dates'])
-        with transaction.atomic():
-            wd_parent_list = list(WorkerDay.objects.filter(
-                worker_id__in=(data['worker1_id'], data['worker2_id']),
-                dt__in=data['dates'],
-                is_approved=data['is_approved'],
-                is_fact=False,
-            ).prefetch_related('worker_day_details').select_related('worker', 'employment').order_by('dt'))
+        data['is_approved'] = False
+        data['user'] = request.user
+        return Response(WorkerDaySerializer(exchange(data, self.error_messages), many=True).data)
 
-            if len(wd_parent_list) != days * 2:
-                raise ValidationError(self.error_messages['no_timetable'])
-
-            day_pairs = []
-            for day_ind in range(days):
-                day_pair = [wd_parent_list[day_ind * 2], wd_parent_list[day_ind * 2 + 1]]
-                if day_pair[0].dt != day_pair[1].dt:
-                    raise ValidationError(self.error_messages['worker_days_mismatch'])
-                day_pairs.append(day_pair)
-            
-            WorkerDay.objects_with_excluded.filter(
-                worker_id__in=(data['worker1_id'], data['worker2_id']),
-                dt__in=data['dates'],
-                is_approved=False,
-                is_fact=False,
-            ).delete()
-
-            for day_pair in day_pairs:
-                create_worker_day(day_pair[0], day_pair[1])
-                create_worker_day(day_pair[1], day_pair[0])
-
-        return Response(WorkerDaySerializer(new_wds, many=True).data)
-
+    @swagger_auto_schema(
+        request_body=ExchangeSerializer,
+        operation_description='''
+        Метод для обмена подтвержденными рабочими сменами
+        ''',
+        responses={200:WorkerDaySerializer(many=True)},
+    )
+    @action(detail=False, methods=['post'])
+    def exchange_approved(self, request):
+        data = ExchangeSerializer(data=request.data, context={'request': request})
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        data['is_approved'] = True
+        data['user'] = request.user
+        return Response(WorkerDaySerializer(exchange(data, self.error_messages), many=True).data)
 
     @swagger_auto_schema(
         request_body=UploadTimetableSerializer,
