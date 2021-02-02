@@ -513,7 +513,6 @@ class ExchangeSerializer(serializers.Serializer):
     worker1_id = serializers.IntegerField()
     worker2_id = serializers.IntegerField()
     dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
-    is_approved = serializers.BooleanField(default=False)
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
