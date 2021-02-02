@@ -450,7 +450,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         worker_days_db = WorkerDay.objects.get_last_plan(
             worker_id__in=user_ids,
             dt__gte=dt_from - timedelta(days=7),
-            dt__lte=dt_from,
+            dt__lt=dt_from, # не должны попадать дни за начало периода
             **new_worker_days_filter,
         ).exclude(
             type=WorkerDay.TYPE_EMPTY,
@@ -706,7 +706,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         ##################################################################
         breaks = {
             str(w.id): w.breaks.breaks if w.breaks else shop.settings.breaks.breaks
-            for w in WorkerPosition.objects.filter(network_id=shop.network_id)
+            for w in WorkerPosition.objects.filter(
+                network_id=shop.network_id,
+                id__in=employments.values_list('position_id', flat=True), # чтобы не отправлять огромный словарь перерывов
+            )
         }
         breaks['default'] = shop.settings.breaks.breaks
         data = {
