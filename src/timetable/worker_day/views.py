@@ -304,7 +304,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     if limit_days_in_past:
                         q &= Q(dt__gte=today - datetime.timedelta(days=limit_days_in_past))
                     if limit_days_in_future:
-                        q &= Q(dt__lte=today + datetime.timedelta(days=limit_days_in_past))
+                        q &= Q(dt__lte=today + datetime.timedelta(days=limit_days_in_future))
                 wd_types_q |= q
 
             approve_condition = Q(
