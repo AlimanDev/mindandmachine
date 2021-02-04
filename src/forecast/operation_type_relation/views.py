@@ -2,13 +2,14 @@ import re
 
 from datetime import timedelta
 
-from django_filters import NumberFilter
+from django_filters import NumberFilter, OrderingFilter, CharFilter, DurationFilter
 from django_filters.rest_framework import FilterSet
 from django.utils.translation import gettext_lazy as _
 
 from rest_framework import serializers, status
 from rest_framework.validators import UniqueTogetherValidator
 from rest_framework.response import Response
+from rest_framework.pagination import LimitOffsetPagination
 
 from src.forecast.models import OperationTypeTemplate, OperationTypeRelation, OperationType, OperationTypeName
 from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
@@ -103,6 +104,19 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
 
 class OperationTypeRelationFilter(FilterSet):
     load_template = NumberFilter(field_name='base__load_template_id')
+    base_name_id = NumberFilter(field_name='base__operation_type_name_id')
+    base_name = CharFilter(field_name='base__operation_type_name__name', lookup_expr='icontains')
+    depended_name_id = NumberFilter(field_name='depended__operation_type_name_id')
+    depended_name = CharFilter(field_name='depended__operation_type_name__name', lookup_expr='icontains')
+    forecast_step = DurationFilter(field_name='base__forecast_step')
+    formula = CharFilter(field_name='formula', lookup_expr='icontains')
+    ordering = OrderingFilter(
+        fields=(
+            'base__operation_type_name__name', 
+            'depended__operation_type_name__name', 
+            'base__forecast_step',
+        ),
+    )
     class Meta:
         model = OperationTypeRelation
         fields = {
@@ -119,11 +133,12 @@ class OperationTypeRelationViewSet(BaseModelViewSet):
     serializer_class = OperationTypeRelationSerializer
     filterset_class = OperationTypeRelationFilter
     openapi_tags = ['OperationTypeRelation',]
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
         return OperationTypeRelation.objects.filter(
             base__load_template__network_id=self.request.user.network_id,
-        )
+        ).select_related('depended', 'base')
 
 
     def update(self, request, pk=None):

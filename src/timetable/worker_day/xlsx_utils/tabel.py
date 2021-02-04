@@ -1,13 +1,14 @@
-from .base_class import Xlsx_base
+import datetime
+import json
 from math import ceil
-from src.base.models import ProductionDay
 
+from src.base.models import ProductionDay
 from src.timetable.models import (
     WorkerDay,
 )
 from src.timetable.worker_day.xlsx_utils.colors import *
-import datetime
-import json
+from src.util.dg.helpers import MONTH_NAMES
+from .base_class import Xlsx_base
 
 
 class Tabel_xlsx(Xlsx_base):
@@ -31,7 +32,7 @@ class Tabel_xlsx(Xlsx_base):
         WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: (COLOR_BLACK, COLOR_GREEN2),
         WorkerDay.TYPE_ETC: (COLOR_GREY, COLOR_GREY),
         WorkerDay.TYPE_EMPTY: (COLOR_GREY, COLOR_GREY),
-        WorkerDay.TYPE_QUALIFICATION: (COLOR_GREY, COLOR_GREY),
+        WorkerDay.TYPE_QUALIFICATION: (COLOR_BLACK, COLOR_DARK_BLUE),
 
         'night_work': (COLOR_BLACK, COLOR_PINK2),
 
@@ -121,7 +122,7 @@ class Tabel_xlsx(Xlsx_base):
         self.worksheet.write_rich_string(3, 1,
                                          text_top, 'ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ ',
                                          text_top_red, '{}  {}г.'.format(
-                self.MONTH_NAMES[self.month.month].upper(),
+                MONTH_NAMES[self.month.month].upper(),
                 self.month.year
             )
                                          )

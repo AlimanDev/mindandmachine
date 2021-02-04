@@ -2,11 +2,12 @@ import os
 from calendar import monthrange
 
 from django.conf import settings
-from django.db.models import Q, F, Prefetch
+from django.db.models import Q
 from django.utils.functional import cached_property
 
 from src.base.models import Employment
-from src.timetable.models import WorkerDay
+from src.timetable.models import WorkerDay, PlanAndFactHours
+from src.util.dg.helpers import MONTH_NAMES
 from .base import BaseDocGenerator
 
 
@@ -31,6 +32,9 @@ class T13WdTypeMapper(BaseWdTypeMapper):
         WorkerDay.TYPE_HOLIDAY: 'В',
         WorkerDay.TYPE_BUSINESS_TRIP: 'К',
         WorkerDay.TYPE_VACATION: 'ОТ',
+        WorkerDay.TYPE_SELF_VACATION: 'ДО',
+        WorkerDay.TYPE_MATERNITY: 'ОЖ',
+        WorkerDay.TYPE_SICK: 'Б',
         # TODO: добавить оставльные
     }
 
@@ -54,26 +58,25 @@ class BaseTabelDataGetter:
     def _get_tabel_type(self, wd_type):
         return self.wd_type_mapper.get_tabel_type(wd_type)
 
-    def _get_tabel_wdays_qs(self, fact_only=True):
-        tabel_wdays = WorkerDay.objects.get_tabel(
-            network=self.shop.network,
-            fact_only=fact_only,
-        ).filter(
+    def _get_tabel_wdays_qs(self):
+        tabel_wdays = WorkerDay.objects.get_tabel().filter(
             Q(
-                type=WorkerDay.TYPE_WORKDAY,
+                type__in=WorkerDay.TYPE_WORKDAY,
+                shop=self.shop,
                 worker_day_details__work_type__shop=self.shop,
             ) |
             Q(
-                type=WorkerDay.TYPE_QUALIFICATION,
+                type__in=[WorkerDay.TYPE_QUALIFICATION, WorkerDay.TYPE_BUSINESS_TRIP],
                 shop=self.shop,
             ) |
             Q(
                 ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
-                Q(
-                    Q(dt__lte=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True),
-                    Q(dt__gte=F('employment__dt_hired')),
-                    employment__shop=self.shop,
-                ),
+                Q(worker__in=Employment.objects.get_active(
+                    network_id=self.network.id,
+                    dt_from=self.dt_from,
+                    dt_to=self.dt_to,
+                    shop=self.shop,
+                ).distinct().values_list('user', flat=True))
             ),
             dt__gte=self.dt_from,
             dt__lte=self.dt_to,
@@ -88,58 +91,101 @@ class BaseTabelDataGetter:
 class T13TabelDataGetter(BaseTabelDataGetter):
     wd_type_mapper_cls = T13WdTypeMapper
 
+    def set_day_data(self, day_data, wday):
+        day_data['code'] = self._get_tabel_type(wday.type) if wday else ''
+        day_data['value'] = wday.rounded_work_hours if \
+            (wday and wday.type in WorkerDay.TYPES_WITH_TM_RANGE) else ''
+
     def get_data(self):
         tabel_wdays = self._get_tabel_wdays_qs()
-        tabel_employments = Employment.objects.filter(
-            id__in=tabel_wdays.values_list('employment', flat=True).distinct()
+
+        empls = {}
+        empls_qs = Employment.objects.get_active(
+            network_id=self.shop.network_id,
+            dt_from=self.dt_from,
+            dt_to=self.dt_to,
+            user__id__in=tabel_wdays.values_list('worker', flat=True),
+        ).annotate_value_equality(
+            'is_equal_shops', 'shop_id', self.shop.id,
         ).select_related(
             'user',
             'position',
-        ).order_by(
-            'user__last_name',
-            'user__first_name',
-        ).prefetch_related(
-            Prefetch(
-                'workerday_set',
-                queryset=tabel_wdays.order_by(),
-                to_attr='tabel_worker_days'
-            )
-        )
+        ).order_by('-is_equal_shops')
+        for e in empls_qs:
+            empls.setdefault(e.user_id, []).append(e)
+
+        num = 1
+        worker_id = None
+        position_id = None
+        prev_empl = None
+        empl = None
+        first_half_month_wdays = 0
+        first_half_month_whours = 0
+        second_half_month_wdays = 0
+        second_half_month_whours = 0
 
         users = []
+        days = {}
 
-        for num, empl in enumerate(tabel_employments, start=1):
-            wdays = {_get_day_key(wd.dt.day): wd for wd in empl.tabel_worker_days}
+        for wd in tabel_wdays:
+            worker_empls = list(filter(
+                lambda e: (e.dt_hired is None or e.dt_hired <= wd.dt) and (e.dt_fired is None or wd.dt <= e.dt_fired),
+                empls.get(wd.worker_id, []),
+            ))
+            if not worker_empls:
+                continue
+            if empl != worker_empls[0]:
+                prev_empl = empl
+            empl = worker_empls[0]
+            if worker_id != wd.worker_id or position_id != empl.position_id:
+                if prev_empl and days:
+                    user_data = {
+                        'num': num,
+                        'last_name': prev_empl.user.last_name,
+                        'tabel_code': prev_empl.user.tabel_code,
+                        'fio_and_position': prev_empl.get_short_fio_and_position(),
+                        'fio': prev_empl.user.fio,
+                        'position': prev_empl.position.name if prev_empl.position else '',
+                        'days': days,
+                        'first_half_month_wdays': first_half_month_wdays,
+                        'first_half_month_whours': first_half_month_whours,
+                        'second_half_month_wdays': second_half_month_wdays,
+                        'second_half_month_whours': second_half_month_whours,
+                        'full_month_wdays': first_half_month_wdays + second_half_month_wdays,
+                        'full_month_whours': first_half_month_whours + second_half_month_whours,
+                    }
+                    users.append(user_data)
+                    num += 1
 
-            days = {}
-            _weekday, days_in_month = monthrange(year=self.year, month=self.month)
-            first_half_month_wdays = 0
-            first_half_month_whours = 0
-            second_half_month_wdays = 0
-            second_half_month_whours = 0
+                worker_id = empl.user_id
+                position_id = empl.position_id
 
-            for day_num in range(1, days_in_month + 1):
-                day_key = _get_day_key(day_num)
-                day_data = days.setdefault(day_key, {})
-                wday = wdays.get(day_key)
-                day_data['code'] = self._get_tabel_type(wday.type) if wday else ''
-                day_data['value'] = wday.tabel_work_hours if \
-                    (wday and (WorkerDay.TYPE_WORKDAY or WorkerDay.TYPE_QUALIFICATION)) else ''
-                days[day_key] = day_data
-                if wday:
-                    if wday.type == WorkerDay.TYPE_WORKDAY or WorkerDay.TYPE_QUALIFICATION:
-                        if day_num <= 15:  # первая половина месяца
-                            first_half_month_wdays += 1
-                            first_half_month_whours += wday.tabel_work_hours
-                        else:
-                            second_half_month_wdays += 1
-                            second_half_month_whours += wday.tabel_work_hours
+                days = {}
+                first_half_month_wdays = 0
+                first_half_month_whours = 0
+                second_half_month_wdays = 0
+                second_half_month_whours = 0
 
+            day_key = _get_day_key(wd.dt.day)
+            day_data = days.setdefault(day_key, {})
+            self.set_day_data(day_data, wd)
+            days[day_key] = day_data
+            if wd.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                if wd.dt.day <= 15:  # первая половина месяца
+                    first_half_month_wdays += 1
+                    first_half_month_whours += wd.rounded_work_hours
+                else:
+                    second_half_month_wdays += 1
+                    second_half_month_whours += wd.rounded_work_hours
+
+        if empl != prev_empl and days:
             user_data = {
                 'num': num,
                 'last_name': empl.user.last_name,
                 'tabel_code': empl.user.tabel_code,
                 'fio_and_position': empl.get_short_fio_and_position(),
+                'fio': empl.user.fio,
+                'position': empl.position.name if empl.position else '',
                 'days': days,
                 'first_half_month_wdays': first_half_month_wdays,
                 'first_half_month_whours': first_half_month_whours,
@@ -150,16 +196,33 @@ class T13TabelDataGetter(BaseTabelDataGetter):
             }
             users.append(user_data)
 
+        _weekday, days_in_month = monthrange(year=self.year, month=self.month)
+        for user_data in users:
+            for day_num in range(1, days_in_month + 1):
+                day_key = _get_day_key(day_num)
+                if day_key not in user_data['days']:
+                    day_data = user_data['days'].setdefault(day_key, {})
+                    self.set_day_data(day_data, None)
+
         return {'users': users}
 
 
 class MtsTabelDataGetter(BaseTabelDataGetter):
     def get_data(self):
-        tabel_wdays = self._get_tabel_wdays_qs(fact_only=False)
-        tabel_wdays = tabel_wdays.filter(
-            type__in=WorkerDay.TYPES_WITH_TM_RANGE,
-        )
-        return {'tabel_wdays': tabel_wdays.select_related('worker', 'shop')}
+        return {
+            'plan_and_fact_hours': PlanAndFactHours.objects.filter(
+                shop=self.shop,
+                wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                dt__gte=self.dt_from,
+                dt__lte=self.dt_to,
+            ).distinct(),
+        }
+
+
+class AigulTabelDataGetter(T13TabelDataGetter):
+    def set_day_data(self, day_data, wday):
+        day_data['value'] = wday.rounded_work_hours if \
+            (wday and wday.type in WorkerDay.TYPES_WITH_TM_RANGE) else self._get_tabel_type(wday.type) if wday else ''
 
 
 class BaseTabelGenerator(BaseDocGenerator):
@@ -189,14 +252,21 @@ class BaseTabelGenerator(BaseDocGenerator):
         raise NotImplementedError
 
     def get_data(self):
+        dt_from = self.dt_from.strftime('%d.%m.%Y')
+        dt_to = self.dt_to.strftime('%d.%m.%Y')
+        month_name = MONTH_NAMES[self.dt_from.month]
+        year = self.dt_from.year
         data = {
             'data': self.get_tabel_data(),
             'department_name': self.shop.name,
             'network_name': self.network.name,
             'network_okpo': self.network.okpo,
-            'dt_from': self.dt_from.strftime('%d.%m.%Y'),
-            'dt_to': self.dt_to.strftime('%d.%m.%Y'),
+            'dt_from': dt_from,
+            'dt_to': dt_to,
             'doc_num': f'{self.dt_to.month + 1}',
+            'month_name': month_name,
+            'year': year,
+            'tabel_text': f'Табель учета рабочего времени за {month_name} {year}г',
         }
         return data
 
@@ -245,11 +315,23 @@ class MTSTabelGenerator(BaseTabelGenerator):
         return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_mts.ods')
 
 
+class AigulTabelGenerator(BaseTabelGenerator):
+    """
+    Шаблон табеля для Айгуль
+    """
+
+    tabel_data_getter_cls = AigulTabelDataGetter
+
+    def get_template_path(self):
+        return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_aigul.ods')
+
+
 tabel_formats = {
     'default': MTSTabelGenerator,
     'mts': MTSTabelGenerator,
     't13': T13TabelGenerator,
     't13_custom': CustomT13TabelGenerator,
+    'aigul': AigulTabelGenerator,
 }
 
 

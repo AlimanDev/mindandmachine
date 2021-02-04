@@ -4,7 +4,7 @@ from drf_yasg.utils import swagger_auto_schema
 
 from dateutil.relativedelta import relativedelta
 from django.db.models import Q, Sum
-from django_filters.rest_framework import NumberFilter
+from django_filters.rest_framework import NumberFilter, OrderingFilter
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
@@ -20,7 +20,7 @@ from src.util.openapi.responses import shop_tree_response_schema_dict as tree_re
 
 class ShopFilter(BaseActiveNamedModelFilter):
     id = NumberFilter(field_name='id', lookup_expr='exact')
-
+    ordering = OrderingFilter(fields=('name', 'code'))
     class Meta:
         model = Shop
         fields = {

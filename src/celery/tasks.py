@@ -539,9 +539,9 @@ def calculate_shop_load_at_night():
         return
     templates = LoadTemplate.objects.filter(
         shops__isnull=False,
-    )
+    ).distinct('id')
     dt_now = date.today()
-    dt_to = (dt_now + relativedelta(months=1)).replace(day=1) - timedelta(days=1)
+    dt_to = (dt_now + relativedelta(months=2)).replace(day=1) - timedelta(days=1)
     for template in templates:
         calculate_shops_load(template.id, dt_now, dt_to)
 
@@ -904,13 +904,8 @@ def fill_active_shops_schedule():
 
 
 @app.task
-def recalc_wdays(shop_id, dt_from, dt_to):
-    wdays_qs = WorkerDay.objects.filter(
-        shop_id=shop_id,
-        dt__gte=dt_from,
-        dt__lte=dt_to,
-        type=WorkerDay.TYPE_WORKDAY,
-    )
+def recalc_wdays(**kwargs):
+    wdays_qs = WorkerDay.objects.filter(type__in=WorkerDay.TYPES_WITH_TM_RANGE, **kwargs)
     for wd_id in wdays_qs.values_list('id', flat=True):
         with transaction.atomic():
             wd_obj = WorkerDay.objects.filter(id=wd_id).select_for_update().first()
