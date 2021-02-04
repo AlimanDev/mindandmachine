@@ -480,7 +480,7 @@ class ChangeRangeListSerializer(serializers.Serializer):
 class CopyApprovedSerializer(serializers.Serializer):
     worker_ids = serializers.ListField(child=serializers.IntegerField())
     dates = serializers.ListField(child=serializers.DateField())
-    is_fact = serializers.BooleanField(default=False)
+    to_fact = serializers.BooleanField(default=False)
 
 
 class DuplicateSrializer(serializers.Serializer):

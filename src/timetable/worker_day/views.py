@@ -734,6 +734,9 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
         data = data.validated_data
         with transaction.atomic():
+            fact_filter = {}
+            if data['to_fact']:
+                fact_filter['type__in'] = WorkerDay.TYPES_WITH_TM_RANGE
             list_wd = list(
                 WorkerDay.objects.exclude(
                     is_vacancy=True,
@@ -741,7 +744,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     dt__in=data['dates'],
                     worker_id__in=data['worker_ids'],
                     is_approved=True,
-                    is_fact=data['is_fact'],
+                    **fact_filter,
                 ).select_related(
                     'shop', 
                     'employment', 
@@ -752,13 +755,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                     'worker_day_details',
                 )
             )
+            fact_filter['is_fact'] = data['to_fact']
             WorkerDay.objects_with_excluded.exclude(
                 is_vacancy=True,
             ).filter(
                 dt__in=data['dates'],
                 worker_id__in=data['worker_ids'],
                 is_approved=False,
-                is_fact=data['is_fact'],
+                **fact_filter,
             ).delete()
 
             WorkerDay.objects.bulk_create(
@@ -770,7 +774,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         dttm_work_start=wd.dttm_work_start,
                         dttm_work_end=wd.dttm_work_end,
                         dt=wd.dt,
-                        is_fact=wd.is_fact,
+                        is_fact=data['to_fact'],
                         is_approved=False,
                         type=wd.type,
                         created_by_id=wd.created_by_id,
@@ -789,7 +793,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 dt__in=data['dates'],
                 worker_id__in=data['worker_ids'],
                 is_approved=False,
-                is_fact=data['is_fact'],
+                **fact_filter,
             )
             search_wds = {}
             for wd in wds:
