@@ -478,9 +478,19 @@ class ChangeRangeListSerializer(serializers.Serializer):
 
 
 class CopyApprovedSerializer(serializers.Serializer):
+    TYPE_PLAN_TO_PLAN = 'PP'
+    TYPE_PLAN_TO_FACT = 'PF'
+    TYPE_FACT_TO_FACT = 'FF'
+    TYPES = [
+        (TYPE_PLAN_TO_PLAN, 'План в план'),
+        (TYPE_PLAN_TO_FACT, 'План в факт'),
+        (TYPE_FACT_TO_FACT, 'Факт в факт'),
+    ]
+
     worker_ids = serializers.ListField(child=serializers.IntegerField())
     dates = serializers.ListField(child=serializers.DateField())
-    is_fact = serializers.BooleanField(default=False)
+    type = serializers.ChoiceField(choices=TYPES, default=TYPE_PLAN_TO_PLAN)
+    to_fact = serializers.BooleanField(default=False)
 
 
 class DuplicateSrializer(serializers.Serializer):
