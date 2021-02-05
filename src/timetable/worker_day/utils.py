@@ -1,6 +1,13 @@
-import pandas as pd
-import time
 import datetime
+import time
+
+import pandas as pd
+from django.db.models import Q, F
+from django.db import transaction
+from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
+
+from src.base.exceptions import MessageError
 from src.base.models import (
     User,
     Shop,
@@ -8,22 +15,19 @@ from src.base.models import (
     WorkerPosition,
     Group,
 )
+from src.conf.djconfig import UPLOAD_TT_MATCH_EMPLOYMENT
 from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     WorkType,
 )
-from src.util.models_converter import Converter
-from django.db.models import Q, F
-from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
-from src.timetable.worker_day.xlsx_utils.tabel import Tabel_xlsx
-from src.util.download import xlsx_method
 from src.timetable.utils import wd_stat_count
-import json
-from src.base.exceptions import MessageError
-from rest_framework.response import Response
-from src.conf.djconfig import UPLOAD_TT_MATCH_EMPLOYMENT
-
+from src.timetable.worker_day.stat import WorkersStatsGetter
+from src.timetable.worker_day.xlsx_utils.tabel import Tabel_xlsx
+from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
+from src.util.dg.helpers import MONTH_NAMES
+from src.util.download import xlsx_method
+from src.util.models_converter import Converter
 
 WORK_TYPES = {
     'в': WorkerDay.TYPE_HOLIDAY,
@@ -34,7 +38,7 @@ WORK_TYPES = {
 
 SKIP_SYMBOLS = ['nan', '']
 
-def upload_timetable_util(form, timetable_file):
+def upload_timetable_util(form, timetable_file, is_fact=False):
     """
     Принимает от клиента экселевский файл и создает расписание (на месяц)
     """
@@ -162,15 +166,19 @@ def upload_timetable_util(form, timetable_file):
                 employment.tabel_code = tabel_code
                 employment.save()
         else:
-            employment, emp_created = Employment.objects.update_or_create(
-                shop_id=shop_id,
+            employment = Employment.objects.get_active(
+                network_id=user.network_id,
                 user=user,
-                defaults={
-                    'position': position,
-                }
-            )
-            if emp_created:
-                employment.function_group = func_group
+            ).first()
+            if not employment:
+                employment = Employment.objects.create(
+                    shop_id=shop_id,
+                    user=user,
+                    position=position,
+                    function_group=func_group,
+                )
+            else:
+                employment.position = position
                 employment.save()
         users.append([
             user,
@@ -233,18 +241,20 @@ def upload_timetable_util(form, timetable_file):
                     )
                     if dttm_work_end < dttm_work_start:
                         dttm_work_end += datetime.timedelta(days=1)
-                else:
+                elif not is_fact:
                     type_of_work = WORK_TYPES[cell_data]
+                else:
+                    continue
             except:
                 raise MessageError(code='xlsx_undefined_cell', lang=form.get('lang', 'ru'), params={'user': user, 'dt': dt, 'value': str(data[i + 3])})
 
-            WorkerDay.objects.filter(dt=dt, worker=user, is_fact=False, is_approved=False).delete()
+            WorkerDay.objects.filter(dt=dt, worker=user, is_fact=is_fact, is_approved=False).delete()
           
             new_wd = WorkerDay.objects.create(
                 worker=user,
                 shop_id=shop_id,
                 dt=dt,
-                is_fact=False,
+                is_fact=is_fact,
                 is_approved=False,
                 employment=employment,
                 dttm_work_start=dttm_work_start,
@@ -279,6 +289,13 @@ def download_timetable_util(request, workbook, form):
         shop=shop,
     ).order_by('user__last_name', 'user__first_name', 'user__middle_name', 'user_id')
     users = employments.values_list('user_id', flat=True)
+    stat = WorkersStatsGetter(
+        dt_from=timetable.prod_days[0].dt,
+        dt_to=timetable.prod_days[-1].dt,
+        shop_id=shop.id,
+        worker_id__in=users,
+    ).run()
+    stat_type = 'approved' if form['is_approved'] else 'not_approved'
 
     default_breaks = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), shop.settings.breaks.breaks))
     breaktimes = {
@@ -325,7 +342,7 @@ def download_timetable_util(request, workbook, form):
     timetable.construnts_users_info(employments, 11, 0, ['code', 'fio', 'position'])
 
     # fill page 1
-    timetable.fill_table(workdays, employments, breaktimes, 11, 4)
+    timetable.fill_table(workdays, employments, breaktimes, stat, 11, 4, stat_type=stat_type)
 
     # fill page 2
     timetable.fill_table2(shop, timetable.prod_days[-1].dt, workdays)
@@ -346,7 +363,7 @@ def download_tabel_util(request, workbook, form):
     Returns:
         Табель
     """
-    ws = workbook.add_worksheet(Tabel_xlsx.MONTH_NAMES[form['dt_from'].month])
+    ws = workbook.add_worksheet(MONTH_NAMES[form['dt_from'].month])
 
     shop = Shop.objects.get(pk=form['shop_id'])
 
@@ -414,3 +431,70 @@ def download_tabel_util(request, workbook, form):
     tabel.add_sign(16 + len(employments) * 2 + 2)
 
     return workbook, 'Tabel'
+
+
+def exchange(data, error_messages):
+    new_wds = []
+    def create_worker_day(wd_parent, wd_swap):
+        employment = wd_parent.employment
+        if (wd_swap.type == WorkerDay.TYPE_WORKDAY and employment is None):
+            employment = Employment.objects.get_active_empl_for_user(
+                network_id=wd_swap.worker.network_id, user_id=wd_parent.worker_id,
+                dt=wd_swap.dt,
+                priority_shop_id=wd_swap.shop_id,
+            ).select_related(
+                'position__breaks',
+            ).first()
+        wd_new = WorkerDay(
+            type=wd_swap.type,
+            dttm_work_start=wd_swap.dttm_work_start,
+            dttm_work_end=wd_swap.dttm_work_end,
+            worker_id=wd_parent.worker_id,
+            employment=employment if wd_swap.employment_id else None,
+            dt=wd_parent.dt,
+            created_by=data['user'],
+            is_approved=data['is_approved'],
+            is_vacancy=wd_swap.is_vacancy,
+            shop_id=wd_swap.shop_id,
+        )
+        wd_new.save()
+        new_wds.append(wd_new)
+        WorkerDayCashboxDetails.objects.bulk_create([
+            WorkerDayCashboxDetails(
+                worker_day_id=wd_new.id,
+                work_type_id=wd_cashbox_details_parent.work_type_id,
+                work_part=wd_cashbox_details_parent.work_part,
+            )
+            for wd_cashbox_details_parent in wd_swap.worker_day_details.all()
+        ])
+
+    days = len(data['dates'])
+    with transaction.atomic():
+        wd_parent_list = list(WorkerDay.objects.filter(
+            worker_id__in=(data['worker1_id'], data['worker2_id']),
+            dt__in=data['dates'],
+            is_approved=data['is_approved'],
+            is_fact=False,
+        ).prefetch_related('worker_day_details').select_related('worker', 'employment').order_by('dt'))
+
+        if len(wd_parent_list) != days * 2:
+            raise ValidationError(error_messages['no_timetable'])
+
+        day_pairs = []
+        for day_ind in range(days):
+            day_pair = [wd_parent_list[day_ind * 2], wd_parent_list[day_ind * 2 + 1]]
+            if day_pair[0].dt != day_pair[1].dt:
+                raise ValidationError(error_messages['worker_days_mismatch'])
+            day_pairs.append(day_pair)
+        
+        WorkerDay.objects_with_excluded.filter(
+            worker_id__in=(data['worker1_id'], data['worker2_id']),
+            dt__in=data['dates'],
+            is_approved=data['is_approved'],
+            is_fact=False,
+        ).delete()
+
+        for day_pair in day_pairs:
+            create_worker_day(day_pair[0], day_pair[1])
+            create_worker_day(day_pair[1], day_pair[0])
+    return new_wds

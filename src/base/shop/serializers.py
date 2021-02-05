@@ -64,7 +64,8 @@ class ShopSerializer(serializers.ModelSerializer):
     settings_id = serializers.IntegerField(required=False)
     tm_open_dict = serializers.JSONField(required=False)
     tm_close_dict = serializers.JSONField(required=False)
-    nonstandard_schedule = NonstandardShopScheduleSerializer(many=True, allow_null=True, required=False)
+    nonstandard_schedule = NonstandardShopScheduleSerializer(
+        many=True, allow_null=True, required=False, write_only=True)
     load_template_status = serializers.CharField(read_only=True)
     timezone = TimeZoneField(required=False)
     is_active = serializers.BooleanField(required=False, default=True)

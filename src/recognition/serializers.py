@@ -39,7 +39,12 @@ class HashSigninSerializer(serializers.Serializer):
 class TickPointSerializer(serializers.ModelSerializer):
     class Meta:
         model = TickPoint
-        fields = ['id', 'shop_id', 'name']
+        fields = ['id', 'shop_id', 'name', 'code', 'key']
+        extra_kwargs = {
+            'key': {
+                'read_only': True,
+            },
+        }
 
 
 class TickSerializer(serializers.ModelSerializer):

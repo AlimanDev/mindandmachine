@@ -1,10 +1,11 @@
 import datetime
 import json
-from dateutil.relativedelta import relativedelta
+import re
 from calendar import monthrange
 
 import pandas as pd
 from celery import chain
+from dateutil.relativedelta import relativedelta
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -25,7 +26,12 @@ from mptt.models import MPTTModel, TreeForeignKey
 from timezone_field import TimeZoneField
 
 from src.base.exceptions import MessageError
-from src.base.models_abstract import AbstractActiveModel, AbstractModel, AbstractActiveNetworkSpecificCodeNamedModel
+from src.base.models_abstract import (
+    AbstractActiveModel,
+    AbstractModel,
+    AbstractActiveNetworkSpecificCodeNamedModel,
+    NetworkSpecificModel,
+)
 from src.conf.djconfig import QOS_TIME_FORMAT
 
 
@@ -35,6 +41,17 @@ class Network(AbstractActiveModel):
         (3, 'Квартал'),
         (6, 'Пол года'),
         (12, 'Год'),
+    )
+
+    TABEL_FORMAT_CHOICES = (
+        ('mts', 'MTSTabelGenerator'),
+        ('t13_custom', 'CustomT13TabelGenerator'),
+        ('aigul', 'AigulTabelGenerator'),
+    )
+
+    CONVERT_TABEL_TO_CHOICES = (
+        ('xlsx', 'xlsx'),
+        ('pdf', 'PDF'),
     )
 
     class Meta:
@@ -62,13 +79,27 @@ class Network(AbstractActiveModel):
     enable_camera_ticks = models.BooleanField(
         default=False, verbose_name='Включить отметки по камере в мобильной версии')
     crop_work_hours_by_shop_schedule = models.BooleanField(
-        default=True, verbose_name='Обрезать рабочие часы по времени работы магазина'
+        default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'
     )
     clean_wdays_on_employment_dt_change = models.BooleanField(
         default=False, verbose_name='Запускать скрипт очистки дней при изменении дат трудойстройства',
     )
     accounting_period_length = models.PositiveSmallIntegerField(
         choices=ACCOUNTING_PERIOD_LENGTH_CHOICES, verbose_name='Длина учетного периода', default=1)
+    only_fact_hours_that_in_approved_plan = models.BooleanField(
+        default=False,
+        verbose_name='Считать только те фактические часы, которые есть в подтвержденном плановом графике',
+    )
+    download_tabel_template = models.CharField(
+        max_length=64, verbose_name='Шаблон для табеля',
+        choices=TABEL_FORMAT_CHOICES, default='mts',
+    )
+    convert_tabel_to = models.CharField(
+        max_length=64, verbose_name='Конвертировать табель в',
+        null=True, blank=True,
+        choices=CONVERT_TABEL_TO_CHOICES,
+        default='xlsx',
+    )
 
     def get_department(self):
         return None
@@ -700,6 +731,43 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
 
+    @cached_property
+    def wp_defaults(self):
+        wp_defaults_dict = settings.WORKER_POSITION_DEFAULT_VALUES.get(self.network.code)
+        if wp_defaults_dict:
+            for re_pattern, wp_defaults in wp_defaults_dict.items():
+                if re.search(re_pattern, self.name, re.IGNORECASE):
+                    return wp_defaults
+
+    def _set_plain_defaults(self):
+        if self.wp_defaults:
+            hours_in_a_week = self.wp_defaults.get('hours_in_a_week')
+            if hours_in_a_week:
+                self.hours_in_a_week = hours_in_a_week
+            breaks_code = self.wp_defaults.get('breaks_code')
+            if breaks_code:
+                self.breaks = Break.objects.filter(network_id=self.network_id, code=breaks_code).first()
+            group_code = self.wp_defaults.get('group_code')
+            if group_code:
+                self.group = Group.objects.filter(network_id=self.network_id, code=group_code).first()
+
+    def _set_m2m_defaults(self):
+        if self.wp_defaults:
+            default_work_type_names_codes = self.wp_defaults.get('default_work_type_names_codes')
+            if default_work_type_names_codes:
+                from src.timetable.models import WorkTypeName
+                self.default_work_type_names.set(
+                    WorkTypeName.objects.filter(network=self.network, code__in=default_work_type_names_codes))
+
+    def save(self, *args, **kwargs):
+        is_new = self.id is None
+        if is_new:
+            self._set_plain_defaults()
+        res = super(WorkerPosition, self).save(*args, **kwargs)
+        if is_new:
+            self._set_m2m_defaults()
+        return res
+
     def get_department(self):
         return None
 
@@ -846,7 +914,7 @@ class Employment(AbstractActiveModel):
                         dt__gt=dt,
                         type__in=WorkerDay.TYPES_WITH_TM_RANGE,
                     ):
-                wd.save(update_fields=['work_hours'])
+                wd.save()
 
         if (is_new or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
                 self.network and self.network.clean_wdays_on_employment_dt_change:
@@ -950,8 +1018,10 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_duplicate',
         'WorkerDay_delete_worker_days',
         'WorkerDay_exchange',
+        'WorkerDay_exchange_approved',
         'WorkerDay_confirm_vacancy',
         'WorkerDay_upload',
+        'WorkerDay_upload_fact',
         'WorkerDay_download_timetable',
         'WorkerDay_download_tabel',
         'WorkerDay_editable_vacancy',

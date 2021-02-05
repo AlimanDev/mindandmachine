@@ -1,11 +1,16 @@
 import json
 from datetime import datetime, time, date, timedelta
+from dateutil.relativedelta import relativedelta
 
 from django.test import override_settings
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
+from unittest.mock import patch
+import requests
 
-from src.timetable.models import ShopMonthStat, WorkerDay, WorkerDayCashboxDetails, WorkType, WorkTypeName
+from src.timetable.models import ShopMonthStat, WorkerDay, WorkerDayCashboxDetails, WorkType, WorkTypeName, EmploymentWorkType
+from src.forecast.models import OperationType, OperationTypeName
+from src.base.models import Break, WorkerPosition
 from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
 
@@ -25,12 +30,43 @@ class TestAutoSettings(APITestCase):
         create_departments_and_users(self)
         self.work_type_name = WorkTypeName.objects.create(name='Магазин')
         self.work_type_name2 = WorkTypeName.objects.create(name='Ломбард')
+        self.operation_type_name = OperationTypeName.objects.create(name='Магазин', work_type_name=self.work_type_name)
+        self.operation_type_name2 = OperationTypeName.objects.create(name='Ломбард', work_type_name=self.work_type_name2)
         self.work_type = WorkType.objects.create(
             work_type_name=self.work_type_name,
             shop=self.shop)
         self.work_type2 = WorkType.objects.create(
             work_type_name=self.work_type_name2,
             shop=self.shop)
+
+        self.operation_type = OperationType.objects.create(
+            work_type=self.work_type,
+            operation_type_name=self.operation_type_name,
+            shop=self.shop,
+        )
+        self.operation_type2 = OperationType.objects.create(
+            work_type=self.work_type2,
+            operation_type_name=self.operation_type_name2,
+            shop=self.shop,
+        )
+
+        self.breaks = Break.objects.create(
+            network=self.network,
+            name='Перерывы для должности',
+            value='[[0, 540, [30]]'
+        )
+
+        self.position = WorkerPosition.objects.create(
+            name='Должность',
+            network=self.network,
+            breaks=self.breaks,
+        )
+
+        self.unused_position = WorkerPosition.objects.create(
+            name='Не используемая должность',
+            network=self.network,
+            breaks=self.breaks,
+        )
 
         self.client.force_authenticate(user=self.user1)
 
@@ -364,3 +400,80 @@ class TestAutoSettings(APITestCase):
             },
         )
         self.assertEqual(response.json(), ['Необходимо выбрать шаблон смен.'])
+
+    def test_create_tt(self):
+        dt_from = date.today() + timedelta(days=1)
+
+        for day in range(4):
+            dt_from = dt_from + timedelta(days=1)
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt_from,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt_from, time(9)),
+                dttm_work_end=datetime.combine(dt_from, time(22)),
+                is_approved=False,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd
+            )
+        for day in range(3):
+            dt_from = dt_from + timedelta(days=1)
+            WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt_from,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_approved=False,
+            )
+        self.employment6.position = self.position
+        self.employment6.save()
+        EmploymentWorkType.objects.create(employment=self.employment2, work_type=self.work_type)
+        EmploymentWorkType.objects.create(employment=self.employment3, work_type=self.work_type)
+        EmploymentWorkType.objects.create(employment=self.employment4, work_type=self.work_type)
+        EmploymentWorkType.objects.create(employment=self.employment6, work_type=self.work_type)
+        EmploymentWorkType.objects.create(employment=self.employment7, work_type=self.work_type)
+        dt_to = (date.today() + relativedelta(months=1)).replace(day=1) - timedelta(days=1)
+        wd = WorkerDay.objects.create(
+            employment=self.employment3,
+            worker=self.employment3.user,
+            shop=self.employment3.shop,
+            dt=dt_to,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt_from, time(9)),
+            dttm_work_end=datetime.combine(dt_from, time(22)),
+            is_approved=False,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            work_type=self.work_type,
+            worker_day=wd
+        )
+        class res:
+            def json(self):
+                return {'task_id': 1}
+        with patch.object(requests, 'post', return_value=res()) as mock_post:
+            response = self.client.post(
+                '/rest_api/auto_settings/create_timetable/',
+                {
+                    'shop_id': self.shop.id,
+                    'dt_from': date.today() + timedelta(days=2),
+                    'dt_to': dt_to,
+                    'use_not_approved': True,
+                }
+            )
+            data = json.loads(mock_post.call_args.kwargs['data'])
+            self.assertEqual(response.status_code, 200)
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id,data['cashiers']))[0]
+        employment3Info = list(filter(lambda x: x['general_info']['id'] == self.user3.id,data['cashiers']))[0]
+        self.assertEqual(len(data['work_types']), 2)
+        self.assertEqual(len(data['cashiers']), 5)
+        self.assertEqual(len(employment2Info['workdays']), 4)
+        self.assertEqual(employment2Info['workdays'][0]['dt'], (date.today() + timedelta(days=2)).strftime('%Y-%m-%d'))
+        self.assertEqual(employment3Info['workdays'][-1]['dt'], dt_to.strftime('%Y-%m-%d'))
+        self.assertEqual(len(data['algo_params']['breaks_triplets']), 2)
+        self.assertIsNotNone(data['algo_params']['breaks_triplets'].get(str(self.position.id)))
+        self.assertIsNone(data['algo_params']['breaks_triplets'].get(str(self.unused_position.id)))

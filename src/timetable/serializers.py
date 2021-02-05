@@ -58,6 +58,8 @@ class WorkerDayListSerializer(serializers.Serializer):
     dt = serializers.DateField()
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
+    dttm_work_start_tabel = serializers.DateTimeField(default=None)
+    dttm_work_end_tabel = serializers.DateTimeField(default=None)
     comment = serializers.CharField()
     is_approved = serializers.BooleanField()
     worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True)
@@ -68,21 +70,11 @@ class WorkerDayListSerializer(serializers.Serializer):
     user_login = serializers.CharField(required=False, read_only=True)
     created_by_id = serializers.IntegerField(read_only=True)
 
-    def __init__(self, *args, **kwargs):
-        super(WorkerDayListSerializer, self).__init__(*args, **kwargs)
-        if self.context.get('request').query_params.get('is_tabel'):
-            self.fields['dttm_work_start'].source = 'tabel_dttm_work_start'
-            self.fields['dttm_work_start'].source_attrs = ['tabel_dttm_work_start']
-            self.fields['dttm_work_end'].source = 'tabel_dttm_work_end'
-            self.fields['dttm_work_end'].source_attrs = ['tabel_dttm_work_end']
-
     def get_work_hours(self, obj) -> float:
-        work_hours = getattr(obj, 'tabel_work_hours', obj.work_hours)
+        if isinstance(obj.work_hours, timedelta):
+            return obj.rounded_work_hours
 
-        if isinstance(work_hours, timedelta):
-            return round(obj.work_hours.total_seconds() / 3600, 2)
-
-        return work_hours
+        return obj.work_hours
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):
@@ -115,7 +107,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by',
-                  'crop_work_hours_by_shop_schedule']
+                  'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel']
         read_only_fields = ['work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
@@ -486,9 +478,19 @@ class ChangeRangeListSerializer(serializers.Serializer):
 
 
 class CopyApprovedSerializer(serializers.Serializer):
+    TYPE_PLAN_TO_PLAN = 'PP'
+    TYPE_PLAN_TO_FACT = 'PF'
+    TYPE_FACT_TO_FACT = 'FF'
+    TYPES = [
+        (TYPE_PLAN_TO_PLAN, 'План в план'),
+        (TYPE_PLAN_TO_FACT, 'План в факт'),
+        (TYPE_FACT_TO_FACT, 'Факт в факт'),
+    ]
+
     worker_ids = serializers.ListField(child=serializers.IntegerField())
     dates = serializers.ListField(child=serializers.DateField())
-    is_fact = serializers.BooleanField(default=False)
+    type = serializers.ChoiceField(choices=TYPES, default=TYPE_PLAN_TO_PLAN)
+    to_fact = serializers.BooleanField(default=False)
 
 
 class DuplicateSrializer(serializers.Serializer):
@@ -521,7 +523,6 @@ class ExchangeSerializer(serializers.Serializer):
     worker1_id = serializers.IntegerField()
     worker2_id = serializers.IntegerField()
     dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
-    is_approved = serializers.BooleanField(default=False)
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
