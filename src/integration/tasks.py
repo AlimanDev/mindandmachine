@@ -27,7 +27,10 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "src.conf.djconfig")
 @app.task()
 def import_urv_zkteco():
     zkteco = ZKTeco()
-    ext_system = ExternalSystem.objects.get(code='zkteco')
+    try:
+        ext_system = ExternalSystem.objects.get(code='zkteco')
+    except:
+        raise ValueError('You need to create external system with code \'zkteco\'')
 
     max_date = AttendanceRecords.objects.aggregate(m=Max(F('dttm')))['m']
     if max_date:
@@ -127,7 +130,10 @@ def import_urv_zkteco():
 @app.task()
 def export_workers_zkteco():
     zkteco=ZKTeco()
-    ext_system = ExternalSystem.objects.get(code='zkteco')
+    try:
+        ext_system = ExternalSystem.objects.get(code='zkteco')
+    except:
+        raise ValueError('You need to create external system with code \'zkteco\'')
     users = User.objects.all().exclude(userexternalcode__external_system=ext_system)
 
     for user in users:
@@ -173,7 +179,10 @@ def export_workers_zkteco():
 @app.task()
 def delete_workers_zkteco():
     zkteco = ZKTeco()
-    ext_system = ExternalSystem.objects.get(code='zkteco')
+    try:
+        ext_system = ExternalSystem.objects.get(code='zkteco')
+    except:
+        raise ValueError('You need to create external system with code \'zkteco\'')
     users = User.objects.filter(userexternalcode__external_system=ext_system)
 
     dt_max = now().date()
