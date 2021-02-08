@@ -592,7 +592,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 for dt in dates:
                     if (workers_month_days[wd_index].dt if \
                             wd_index < len(
-                                workers_month_days) else None) and dt < employment.dt_fired:  # Если вернется пустой список, нужно исключать ошибку out of range
+                                workers_month_days) else None) == dt and dt < employment.dt_fired:  # Если вернется пустой список, нужно исключать ошибку out of range
                         workers_month_days_new.append(workers_month_days[wd_index])
                         wd_index += 1
                     elif dt < employment.dt_fired and employment.auto_timetable:
