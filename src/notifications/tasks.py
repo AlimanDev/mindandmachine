@@ -25,6 +25,7 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
     template = event_email_notification.get_email_template()
     enrich_context(context)
     subject = Template(event_email_notification.get_subject_template()).render(Context(context))
+    attach_file = event_email_notification.get_file(user_author_id, context)
     datatuple = []
 
     for recipient in set(event_email_notification.get_recipients(user_author_id, context)):
@@ -42,6 +43,7 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
                     subject,
                     textify(message_content),
                     message_content,
+                    attach_file,
                     None,
                     [email]
                 )
@@ -56,6 +58,7 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
                     subject,
                     textify(message_content),
                     message_content,
+                    attach_file,
                     None,
                     [email]
                 )
