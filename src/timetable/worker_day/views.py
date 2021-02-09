@@ -739,6 +739,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                 fact_filter['type__in'] = WorkerDay.TYPES_WITH_TM_RANGE
             if data['type'] == CopyApprovedSerializer.TYPE_FACT_TO_FACT:
                 fact_filter['is_fact'] = True
+            else:
+                fact_filter['is_fact'] = False
             list_wd = list(
                 WorkerDay.objects.exclude(
                     is_vacancy=True,

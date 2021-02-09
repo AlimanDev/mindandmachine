@@ -2220,6 +2220,14 @@ class TestAditionalFunctions(APITestCase):
         dt_now = date.today()
         self.create_worker_days(self.employment1, dt_now, 3, 10, 20, True)
         self.update_or_create_holidays(self.employment1, dt_now + timedelta(days=3), 3, True)
+        WorkerDay.objects.create(
+            worker_id=self.employment1.user_id,
+            employment=self.employment1,
+            type=WorkerDay.TYPE_WORKDAY,
+            is_fact=True,
+            is_approved=True,
+            dt=dt_now + timedelta(1),
+        )
         self.create_worker_days(self.employment2, dt_now, 5, 10, 20, True)
         self.update_or_create_holidays(self.employment2, dt_now + timedelta(days=5), 2, True)
         self.create_worker_days(self.employment3, dt_now, 4, 10, 20, True)
