@@ -103,7 +103,7 @@ class ZKTeco:
             "pins": [userexternalcode.code],
             "code": shopexternalcode.code,
         }
-        return self.call('DELETE', url, json=json)
+        return self.call('POST', url, json=json)
 
     def call(self, method, url, data=None, params={}, json=None):
         params.update({'access_token': settings.ZKTECO_KEY})
