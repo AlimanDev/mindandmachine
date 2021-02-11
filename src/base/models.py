@@ -365,8 +365,8 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             fill_shop_schedule.si(shop_id=self.id, dt_from=Converter.convert_date(dt_now)),
             recalc_wdays.si(
                 shop_id=self.id,
-                dt_from=Converter.convert_date(dt_now),
-                dt_to=Converter.convert_date(dt_now + datetime.timedelta(days=90))),
+                dt__gte=Converter.convert_date(dt_now),
+                dt__lte=Converter.convert_date(dt_now + datetime.timedelta(days=90))),
         )
         ch.apply_async()
 
@@ -1322,7 +1322,7 @@ class ShopSchedule(AbstractModel):
             dt_str = Converter.convert_date(self.dt)
             recalc_wdays.delay(
                 shop_id=self.shop_id,
-                dt_from=dt_str,
-                dt_to=dt_str,
+                dt__gte=dt_str,
+                dt__lte=dt_str,
             )
         return super(ShopSchedule, self).save(*args, **kwargs)
