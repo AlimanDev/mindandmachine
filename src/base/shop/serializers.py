@@ -12,6 +12,7 @@ from src.base.exceptions import MessageError
 from src.base.fields import CurrentUserNetwork
 from src.base.models import Shop, ShopSchedule
 from src.conf.djconfig import QOS_TIME_FORMAT
+from src.util.drf.fields import RoundingDecimalField
 from src.util.models_converter import Converter
 
 POSSIBLE_KEYS = [
@@ -71,6 +72,8 @@ class ShopSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(required=False, default=True)
     director_code = serializers.CharField(required=False)
     distance = serializers.SerializerMethodField(label='Расстояние до магазина (км)')
+    latitude = RoundingDecimalField(decimal_places=6, max_digits=12, allow_null=True, required=False)
+    longitude = RoundingDecimalField(decimal_places=6, max_digits=12, allow_null=True, required=False)
 
     def get_distance(self, shop):
         if self.context.get('request', False):

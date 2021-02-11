@@ -2260,7 +2260,14 @@ class TestAditionalFunctions(APITestCase):
         self.update_or_create_holidays(self.employment2, dt_now + timedelta(days=5), 2, True)
         self.create_worker_days(self.employment3, dt_now, 4, 10, 20, True)
         self.update_or_create_holidays(self.employment3, dt_now + timedelta(days=4), 2, True)
-
+        WorkerDay.objects.create(
+            worker_id=self.employment1.user_id,
+            employment=self.employment1,
+            dt=dt_now,
+            type=WorkerDay.TYPE_EMPTY,
+            shop_id=self.employment1.shop_id,
+            is_fact=True,
+        )
         data = {
             'worker_ids': [
                 self.employment1.user_id,
@@ -2272,7 +2279,7 @@ class TestAditionalFunctions(APITestCase):
             ],
             'type': 'PF',
         }
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 1)
         response = self.client.post(self.url + 'copy_approved/', data=data)
 
         self.assertEqual(len(response.json()), 7)
