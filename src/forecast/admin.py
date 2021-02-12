@@ -27,8 +27,8 @@ class OperationTypeAdmin(admin.ModelAdmin):
 @admin.register(WorkType)
 class WorkTypeAdmin(admin.ModelAdmin):
     list_display = ('work_type_name', 'shop_title', 'parent_title', 'dttm_added', 'id')
-    search_fields = ('work_type_name__name', 'shop__title', 'shop__parent__title', 'id')
-    list_filter = ('shop', )
+    search_fields = ('work_type_name__name', 'shop__name', 'shop__parent__name', 'id')
+    list_filter = ('work_type_name', 'shop', )
 
     @staticmethod
     def shop_title(instance: WorkType):
@@ -53,7 +53,7 @@ class PeriodClientsAdmin(admin.ModelAdmin):
 @admin.register(PeriodDemandChangeLog)
 class PeriodDemandChangeLogAdmin(admin.ModelAdmin):
     list_display = ('operation_type_name', 'dttm_from', 'dttm_to')
-    search_fields = ('operation_type_name', 'operation_type__shop__title', 'id')
+    search_fields = ('operation_type_name', 'operation_type__shop__name', 'id')
     list_filter = ('operation_type__shop', )
 
     @staticmethod
