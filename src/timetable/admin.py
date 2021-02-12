@@ -35,7 +35,7 @@ class SlotAdmin(admin.ModelAdmin):
     @staticmethod
     def work_type_name(instance: Slot):
         if instance.work_type:
-            return instance.work_type.name
+            return instance.work_type.work_type_name.name
 
 
 @admin.register(UserWeekdaySlot)
@@ -99,7 +99,7 @@ class WorkerCashboxInfoAdmin(admin.ModelAdmin):
 
     @staticmethod
     def work_type_name(instance: EmploymentWorkType):
-        return instance.work_type.name
+        return instance.work_type.work_type_name.name
 
 
 @admin.register(WorkerConstraint)
@@ -160,7 +160,7 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
 
     @staticmethod
     def on_work_type(instance: WorkerDayCashboxDetails):
-        return instance.work_type.name if instance.work_type else ''
+        return instance.work_type.work_type_name.name if instance.work_type else ''
 
 
 @admin.register(Notifications)
