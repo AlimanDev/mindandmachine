@@ -21,7 +21,10 @@ text = {
 }
 
 
-def urv_violators_report(network_id, dt_from=date.today() - timedelta(1), dt_to=date.today() - timedelta(1)):
+def urv_violators_report(network_id, dt_from=None, dt_to=None):
+    if not dt_from or not dt_to:
+        dt_from = date.today() - timedelta(1)
+        dt_to = date.today() - timedelta(1)
     data = {}
     user_ids = Employment.objects.get_active(
         network_id,
@@ -56,16 +59,10 @@ def urv_violators_report(network_id, dt_from=date.today() - timedelta(1), dt_to=
     )
     users_wds = {}
     for wd in worker_days:
-        first_key = wd.worker_id
-        if not first_key in users_wds:
-            users_wds[first_key] = {}
-        second_key = wd.dt
-        users_wds[first_key][second_key] = wd
+        users_wds.setdefault(wd.worker_id, {})[wd.dt] = wd
     
     for record in bad_records:
         first_key = record['user_id']
-        if not first_key in data:
-            data[first_key] = {}
         second_key = record['dt'].date()
         if users_wds.get(first_key, {}).get(second_key):
             t = NO_COMMING if record['comming'] == 0 else NO_LEAVING
@@ -82,7 +79,7 @@ def urv_violators_report(network_id, dt_from=date.today() - timedelta(1), dt_to=
                 if att_record.dttm > wd.dttm_work_start and second_cond:
                     t = NO_COMING_PROBABLY
 
-            data[first_key][second_key] = {
+            data.setdefault(first_key, {})[second_key] = {
                 'shop_id': wd.shop_id,
                 'type': t,
             }
@@ -99,10 +96,8 @@ def urv_violators_report(network_id, dt_from=date.today() - timedelta(1), dt_to=
     )
     for record in no_records:
         first_key = record.worker_id
-        if not first_key in data:
-            data[first_key] = {}
         second_key = record.dt
-        data[first_key][second_key] = {
+        data.setdefault(first_key, {})[second_key] = {
             'shop_id': record.shop_id,
             'type': NO_RECORDS,
         } 
@@ -112,7 +107,9 @@ def urv_violators_report(network_id, dt_from=date.today() - timedelta(1), dt_to=
 
 
 
-def urv_violators_report_xlsx(network_id, dt=date.today() - timedelta(1), title=f'URV_violators_report_{date.today() - timedelta(1)}.xlsx', in_memory=False):
+def urv_violators_report_xlsx(network_id, dt=None, title=f'URV_violators_report_{date.today() - timedelta(1)}.xlsx', in_memory=False):
+    if not dt:
+        dt = date.today() - timedelta(1)
     SHOP = 0
     FIO = 1
     REASON = 2
