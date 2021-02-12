@@ -299,8 +299,8 @@ class ShopScheduleViewSet(UpdateorCreateViewSet):
         )
         recalc_wdays.delay(
             shop_id=self.kwargs.get('department_pk'),
-            dt_from=self.kwargs.get('dt'),
-            dt_to=self.kwargs.get('dt'),
+            dt__gte=self.kwargs.get('dt'),
+            dt__lte=self.kwargs.get('dt'),
         )
 
     def perform_create(self, serializer):

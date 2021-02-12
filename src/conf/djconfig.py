@@ -37,23 +37,8 @@ DOMAIN = ''
 SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
 MDAUDIT_AUTHTOKEN_SALT = 'DLKAXGKFPP57B2NEQ4NLB2TLDT3QR20I7QKAGE8I'
 
-'''
-Переменная хранящая почты для рассылки отчетов по УРВ. Если None то отчеты не рассылаются
-Формат
-{
-    'network_code': [
-        'email@example.com', 
-        'email2@example.com'
-    ]
-}
-'''
-URV_STAT_EMAILS = None
 
-URV_STAT_SEND_HOUR = 1
-URV_STAT_SEND_MINUTE = 0
-URV_STAT_SHOP_LEVEL = 2
-URV_STAT_SEND_TODAY_HOUR = 3
-URV_STAT_SEND_TODAY_MINUTE = 0
+URV_STAT_SHOP_LEVEL = 1
 MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE = False  # отправлять ли запрос по связке юзера и магазина при сохранении workerday
 MDA_SYNC_USER_TO_SHOP_DAILY = False  # запускать таск, который будет отправлять все связки на текущий день
 MDA_PUBLIC_API_HOST = 'https://example.com'
@@ -464,14 +449,9 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
-    'task-send-urv-stat': {
-        'task': 'src.celery.tasks.send_urv_stat',
-        'schedule': crontab(hour=URV_STAT_SEND_HOUR, minute=URV_STAT_SEND_MINUTE),
-        'options': {'queue': BACKEND_QUEUE}
-    },
-    'task-send-urv-stat-today': {
-        'task': 'src.celery.tasks.send_urv_stat_today',
-        'schedule': crontab(hour=URV_STAT_SEND_TODAY_HOUR, minute=URV_STAT_SEND_TODAY_MINUTE),
+    'task-trigger-cron-event': {
+        'task': 'src.celery.tasks.cron_event',
+        'schedule': crontab(minute='*/1'),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-delete-inactive-employment-group': {

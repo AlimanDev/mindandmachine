@@ -9,7 +9,7 @@ COLOR_GREEN = '#00FF00'
 COLOR_RED = '#FF0000'
 COLOR_YELLOW = '#FFFF00'
 COLOR_HEADER = '#CBF2E0'
-def main(dt_from, dt_to, title=None, shop_codes=None, shop_level=2, comming_only=False, network_id=None):
+def main(dt_from, dt_to, title=None, shop_codes=None, shop_level=2, comming_only=False, network_id=None, in_memory=False):
     SHOP = 0
     DATE = 1
     PLAN_COMMING = 2
@@ -22,7 +22,11 @@ def main(dt_from, dt_to, title=None, shop_codes=None, shop_level=2, comming_only
     FACT_HOURS = 9
     DIFF_HOURS = 10
 
-    workbook = xlsxwriter.Workbook(f'URV_stat_{dt_from}_{dt_to}.xlsx' if not title else title)
+    if in_memory:
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    else:
+        workbook = xlsxwriter.Workbook(f'URV_stat_{dt_from}_{dt_to}.xlsx' if not title else title)
     worksheet = workbook.add_worksheet('{}-{}'.format(dt_from.strftime('%Y.%m.%d'), dt_to.strftime('%Y.%m.%d')))
     shops = Shop.objects.filter(level__gte=shop_level).filter(dttm_deleted__isnull=True, network_id=network_id)
     if shop_codes:
@@ -103,3 +107,10 @@ def main(dt_from, dt_to, title=None, shop_codes=None, shop_level=2, comming_only
 
             row += 1
     workbook.close()
+    if in_memory:
+        output.seek(0)
+        return {
+            'name': f'URV_stat_{dt_from}_{dt_to}.xlsx' if not title else title,
+            'file': output,
+            'type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }

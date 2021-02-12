@@ -180,8 +180,8 @@ class ShopSerializer(serializers.ModelSerializer):
                     dt_str = Converter.convert_date(sch_dict['dt'])
                     recalc_wdays.delay(
                         shop_id=instance.id,
-                        dt_from=dt_str,
-                        dt_to=dt_str,
+                        dt__gte=dt_str,
+                        dt__lte=dt_str,
                     )
 
     def create(self, validated_data):
