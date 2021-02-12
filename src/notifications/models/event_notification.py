@@ -3,10 +3,13 @@ from django.db import models
 from django.db.models import Q
 from django.template import loader as template_loader, Template
 
+from django_celery_beat.models import CrontabSchedule
+
 from src.base.models import User, Employment, Shop
 from src.base.models_abstract import AbstractModel
 from src.events.registry import EventRegistryHolder
 from src.notifications.templates import SYSTEM_EMAIL_TEMPLATES
+from uuid import uuid4
 
 
 class AbstractEventNotification(AbstractModel):
@@ -36,9 +39,25 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
         'base.Group', blank=True, verbose_name='Оповещать пользователей магазина, имеющих выбранные группы',
         related_name='+',
     )
+    shops = models.ManyToManyField(
+        'base.Shop', blank=True, verbose_name='Оповещать по почте магазина',
+    )
 
     class Meta:
         abstract = True
+
+
+    def get_file(self, user_author_id: int, context: dict):
+        event_cls = EventRegistryHolder.get_registry().get(self.event_type.code)
+        if event_cls:
+            return event_cls(
+                network_id=self.event_type.network_id,
+                user_author_id=user_author_id,
+                context=context,
+            ).get_file()
+        else:
+            return None
+
 
     def get_recipients(self, user_author_id: int, context: dict):
         """
@@ -51,6 +70,7 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
             event_cls = EventRegistryHolder.get_registry().get(self.event_type.code)
             if event_cls:
                 event = event_cls(
+                    network_id=self.event_type.network_id,
                     user_author_id=user_author_id,
                     context=context,
                 )
@@ -87,6 +107,18 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
                 ))
             )
 
+        shops = list(self.shops.all())
+        if shops:
+            recipients.extend(
+                [
+                    User(
+                        pk=uuid4(),
+                        email=s.email,
+                    )
+                    for s in shops
+                ]
+            )
+    
         return recipients
 
 
@@ -103,6 +135,11 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
     subject = models.CharField(
         max_length=256, verbose_name='Тема письма', null=True, blank=True,
         help_text='По умолчанию берется из названия "Системный E-mail шаблон"'
+    )
+
+    cron = models.ForeignKey(
+        CrontabSchedule, null=True, blank=True,
+        verbose_name='Расписание для отправки', on_delete=models.PROTECT,
     )
 
     class Meta:
