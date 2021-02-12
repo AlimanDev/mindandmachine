@@ -9,11 +9,15 @@ from django.db.models.functions import Trunc
 NO_RECORDS = 'R'
 NO_COMMING = 'C'
 NO_LEAVING = 'L'
+NO_COMING_PROBABLY = 'CP'
+
+NO_COMMING_HOURS = 4
 
 text = {
     NO_RECORDS: 'Нет отметок',
     NO_COMMING: 'Нет отметки о приходе',
     NO_LEAVING: 'Нет отметки об уходе',
+    NO_COMING_PROBABLY: 'Предположительно нет отметки о приходе',
 }
 
 
@@ -64,9 +68,23 @@ def urv_violators_report(network_id, dt_from=date.today() - timedelta(1), dt_to=
             data[first_key] = {}
         second_key = record['dt'].date()
         if users_wds.get(first_key, {}).get(second_key):
+            t = NO_COMMING if record['comming'] == 0 else NO_LEAVING
+            if t == NO_LEAVING:
+                wd = users_wds.get(first_key, {}).get(second_key)
+                att_record = AttendanceRecords.objects.filter(
+                    dttm__date=second_key,
+                    shop_id=wd.shop_id,
+                    user_id=first_key,
+                ).first()
+                if not att_record:
+                    continue
+                second_cond = (att_record.dttm > wd.dttm_work_end or (att_record.dttm - wd.dttm_work_start).total_seconds() / 3600 >= NO_COMMING_HOURS)
+                if att_record.dttm > wd.dttm_work_start and second_cond:
+                    t = NO_COMING_PROBABLY
+
             data[first_key][second_key] = {
-                'shop_id': users_wds.get(first_key, {}).get(second_key).shop_id,
-                'type': NO_COMMING if record['comming'] == 0 else NO_LEAVING,
+                'shop_id': wd.shop_id,
+                'type': t,
             }
     
     no_records = worker_days.annotate(
