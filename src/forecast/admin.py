@@ -18,6 +18,8 @@ class OperationTypeAdmin(admin.ModelAdmin):
     list_display = ('id', 'work_type_name', 'operation_type_name', 'period_demand_params', 'shop')
     list_filter = ('shop',)
     search_fields = ('shop', 'name')
+    raw_id_fields = ('shop', 'work_type', 'operation_type_name')
+    save_as = True
 
     @staticmethod
     def work_type_name(instance: OperationType):
@@ -29,6 +31,8 @@ class WorkTypeAdmin(admin.ModelAdmin):
     list_display = ('work_type_name', 'shop_title', 'parent_title', 'dttm_added', 'id')
     search_fields = ('work_type_name__name', 'shop__title', 'shop__parent__title', 'id')
     list_filter = ('shop', )
+    raw_id_fields = ('shop', 'work_type_name')
+    save_as = True
 
     @staticmethod
     def shop_title(instance: WorkType):
