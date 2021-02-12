@@ -95,6 +95,7 @@ class GroupAdmin(admin.ModelAdmin):
     inlines = (
         GroupWorkerDayPermissionInline,
     )
+    save_as = True
 
     def get_actions(self, request):
         from src.util.wd_perms.utils import WdPermsHelper
