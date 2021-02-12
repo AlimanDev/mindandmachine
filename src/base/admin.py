@@ -13,6 +13,7 @@ from src.base.models import (
     Network,
     Break,
     SAWHSettings,
+    SAWHSettingsMapping,
     ShopSchedule,
 )
 from src.timetable.models import GroupWorkerDayPermission
@@ -129,34 +130,25 @@ class BreakAdmin(admin.ModelAdmin):
     search_fields = ('name',)
 
 
+class SAWHSettingsMappingInline(admin.StackedInline):
+    model = SAWHSettingsMapping
+    extra = 0
+
+    filter_horizontal = ('shops', 'positions', 'exclude_positions')
+
 @admin.register(SAWHSettings)
 class SAWHSettingsAdmin(admin.ModelAdmin):
     list_display = (
         'name',
-        'year',
+        'code',
     )
-    list_filter = (
-        'year',
-        'shops',
-        'positions',
-    )
-    filter_horizontal = (
-        'shops',
-        'positions',
+
+    inlines = (
+        SAWHSettingsMappingInline,
     )
 
     def get_queryset(self, request):
         return super(SAWHSettingsAdmin, self).get_queryset(request).filter(network_id=request.user.network_id)
-
-    def has_change_permission(self, request, obj=None):
-        if obj and obj.code == 'default':
-            return False
-        return super(SAWHSettingsAdmin, self).has_change_permission(request, obj=obj)
-
-    def has_delete_permission(self, request, obj=None):
-        if obj and obj.code == 'default':
-            return False
-        return super(SAWHSettingsAdmin, self).has_delete_permission(request, obj=obj)
 
 
 @admin.register(ShopSchedule)

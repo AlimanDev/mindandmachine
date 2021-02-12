@@ -86,7 +86,7 @@ def fill_days(from_date, to_date, region_id, file_name='etc/scripts/work_data.cs
     for year in range(from_year, to_year + 1):
         year_data = data.loc[year]
         for month_num, month_name in month_dict.items():
-            month_data = year_data[month_name.title()].split(',')
+            month_data = year_data[month_name.title()].replace('+', '').split(',')
             total_days = monthrange(year, month_num)[1]
             short_days = [day.replace('*', '') for day in month_data if '*' in day]
             for day in range(total_days):
