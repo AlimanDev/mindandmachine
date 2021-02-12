@@ -107,9 +107,11 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None):
 
 
 
-def urv_violators_report_xlsx(network_id, dt=None, title=f'URV_violators_report_{date.today() - timedelta(1)}.xlsx', in_memory=False):
+def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
     if not dt:
         dt = date.today() - timedelta(1)
+    if not title:
+        title = f'URV_violators_report_{dt}.xlsx'
     SHOP = 0
     FIO = 1
     REASON = 2

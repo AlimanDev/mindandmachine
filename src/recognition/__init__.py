@@ -1,2 +1,2 @@
 default_app_config = 'src.recognition.apps.RecognitionConfig'
-from .events import UrvStatEvent, UrvStatTodayEvent
+from .events import UrvStatEvent, UrvStatTodayEvent, UrvViolatorsReportEvent
