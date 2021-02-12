@@ -21,7 +21,7 @@ from src.timetable.models import (
 @admin.register(Slot)
 class SlotAdmin(admin.ModelAdmin):
     list_display = ('name', 'work_type_name', 'shop_title', 'parent_title', 'tm_start', 'tm_end', 'id')
-    search_fields = ('name', 'shop__title', 'shop__parent__title', 'id')
+    search_fields = ('name', 'shop__name', 'shop__parent__name', 'id')
     list_filter = ('shop',)
 
     @staticmethod
@@ -42,7 +42,7 @@ class SlotAdmin(admin.ModelAdmin):
 class UserWeekDaySlotAdmin(admin.ModelAdmin):
     list_display = ('worker_first_name', 'worker_last_name', 'shop_title', 'parent_title', 'slot_name',
                     'weekday', 'id')
-    search_fields = ('worker__first_name', 'worker__last_name', 'slot__shop__title', 'slot__shop__parent__title',
+    search_fields = ('worker__first_name', 'worker__last_name', 'slot__shop__name', 'slot__shop__parent__name',
                      'slot__name', 'id')
     list_filter = ('slot__shop',)
 
@@ -70,7 +70,7 @@ class UserWeekDaySlotAdmin(admin.ModelAdmin):
 @admin.register(Cashbox)
 class CashboxAdmin(admin.ModelAdmin):
     list_display = ('type_name', 'shop_title', 'parent_title', 'id', 'name')
-    search_fields = ('type__name', 'type__shop__title', 'type__shop__parent__title', 'id')
+    search_fields = ('type__name', 'type__shop__name', 'type__shop__parent__name', 'id')
     list_filter = ('type__shop',)
 
     @staticmethod
@@ -140,7 +140,7 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
     # todo: upd: сервак просто падает если туда зайти
     list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_work_type', 'id')
-    search_fields = ('worker_day__worker__last_name', 'worker_day__shop__title', 'id')
+    search_fields = ('worker_day__worker__last_name', 'worker_day__shop__name', 'id')
     list_filter = ('worker_day__shop',)
     raw_id_fields = ('worker_day',)
     list_select_related = (
@@ -186,7 +186,7 @@ class NotificationsAdmin(admin.ModelAdmin):
 class TimetableAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop_title', 'parent_title', 'dt', 'status', 'dttm_status_change',
                     'fot', 'idle', 'lack', 'workers_amount', 'revenue', 'fot_revenue',)
-    search_fields = ('shop__title', 'shop__parent__title')
+    search_fields = ('shop__name', 'shop__parent__name')
     list_filter = ('shop',)
 
     @staticmethod
