@@ -20,7 +20,6 @@ from django.utils.functional import cached_property
 from src.base.models import Employment, Shop, ProductionDay, Network, SAWHSettings
 from src.forecast.models import PeriodClients
 from src.timetable.models import WorkerDay, ProdCal
-from src.util.profiling import timing
 from src.util.utils import deep_get
 
 
@@ -289,7 +288,6 @@ def get_month_range(year, month_num, return_days_in_month=False):
 class WorkerProdCalMeanHoursGetter(ProdCalcMeanMixin, WorkerIterateWorkDaysParamGetter):
     empls_norms = None
 
-    @timing
     def get_initial_res(self):
         worker_norm_hours = 0
         self.empls_norms = {}
@@ -317,7 +315,6 @@ class WorkerProdCalMeanHoursGetter(ProdCalcMeanMixin, WorkerIterateWorkDaysParam
 class WorkerProdCalExactHoursGetter(ProdCalcExactMixin, WorkerIterateWorkDaysParamGetter):
     empls_norms = None
 
-    @timing
     def get_initial_res(self):
         worker_norm_hours = 0
         self.empls_norms = {}
@@ -352,14 +349,12 @@ class WorkerSawhHoursGetter(ProdCalcMeanMixin, WorkerIterateWorkDaysParamGetter)
         super(WorkerSawhHoursGetter, self).__init__(*args, **kwargs)
 
     @cached_property
-    @timing
     def sawh_settings_mapping(self):
         if self._sawh_settings_mapping is None:
             self._sawh_settings_mapping = SAWHSettings.get_sawh_settings_mapping(network_id=self.network.id)
 
         return self._sawh_settings_mapping
 
-    @timing
     def _get_sawh_settings_hours(self, empls):
         hours = {}
         acc_period_start, acc_period_end = self.network.get_acc_period_range(dt=self.dt_from)
@@ -417,7 +412,6 @@ class WorkerSawhHoursGetter(ProdCalcMeanMixin, WorkerIterateWorkDaysParamGetter)
 
         return hours
 
-    @timing
     def get_initial_res(self):
         sawh_hours = 0
         self.empls_norms = {}

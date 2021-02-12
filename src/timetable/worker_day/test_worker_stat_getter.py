@@ -195,6 +195,6 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         self.assertDictEqual(
             stats[str(self.user.id)]['plan']['approved']['norm_hours_curr_month'],
             {
-                'value': 178.42499999999998,
+                'value': 178.4,
             }
         )

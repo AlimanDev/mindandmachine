@@ -161,7 +161,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "value": 183.0
                     },
                     "norm_hours_prev_months": {
-                        "value": 0.0
+                        "value": 0
                     },
                     "norm_hours_curr_month_end": {
                         "value": 183.0
@@ -176,8 +176,9 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "value": -161.5
                     },
                     "overtime_prev_months": {
-                        "value": 0.0
+                        "value": 0
                     },
+                    'sawh_hours_curr_month': {'value': 183.0},
                     "overtime_acc_period": {
                         "value": -161.5
                     }
@@ -222,7 +223,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "value": 183.0
                     },
                     "norm_hours_prev_months": {
-                        "value": 0.0
+                        "value": 0
                     },
                     "norm_hours_curr_month_end": {
                         "value": 183.0
@@ -237,8 +238,9 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "value": -150.75
                     },
                     "overtime_prev_months": {
-                        "value": 0.0
+                        "value": 0
                     },
+                    'sawh_hours_curr_month': {'value': 183.0},
                     "overtime_acc_period": {
                         "value": -150.75
                     }
@@ -283,7 +285,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "value": 183.0
                     },
                     "norm_hours_prev_months": {
-                        "value": 0.0
+                        "value": 0
                     },
                     "norm_hours_curr_month_end": {
                         "value": 183.0
@@ -298,8 +300,9 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "value": -161.5
                     },
                     "overtime_prev_months": {
-                        "value": 0.0
+                        "value": 0
                     },
+                    'sawh_hours_curr_month': {'value': 183.0},
                     "overtime_acc_period": {
                         "value": -161.5
                     }
@@ -345,12 +348,15 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "value": 183.0
                     },
                     "norm_hours_prev_months": {
-                        "value": 0.0
+                        "value": 0
                     },
                     "norm_hours_curr_month_end": {
                         "value": 183.0
                     },
                     "norm_hours_acc_period": {
+                        "value": 183.0
+                    },
+                    "sawh_hours_curr_month": {
                         "value": 183.0
                     },
                     "overtime_curr_month": {
@@ -360,7 +366,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "value": -161.5
                     },
                     "overtime_prev_months": {
-                        "value": 0.0
+                        "value": 0
                     },
                     "overtime_acc_period": {
                         "value": -161.5
@@ -405,7 +411,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "value": 183.0
                     },
                     "norm_hours_prev_months": {
-                        "value": 0.0
+                        "value": 0
                     },
                     "norm_hours_curr_month_end": {
                         "value": 183.0
@@ -420,8 +426,9 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "value": -129.25
                     },
                     "overtime_prev_months": {
-                        "value": 0.0
+                        "value": 0
                     },
+                    'sawh_hours_curr_month': {'value': 183.0},
                     "overtime_acc_period": {
                         "value": -129.25
                     }
@@ -465,7 +472,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "value": 183.0
                     },
                     "norm_hours_prev_months": {
-                        "value": 0.0
+                        "value": 0
                     },
                     "norm_hours_curr_month_end": {
                         "value": 183.0
@@ -480,8 +487,9 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         "value": -150.75
                     },
                     "overtime_prev_months": {
-                        "value": 0.0
+                        "value": 0
                     },
+                    'sawh_hours_curr_month': {'value': 183.0},
                     "overtime_acc_period": {
                         "value": -150.75
                     }
