@@ -41,8 +41,8 @@ class QsUserAdmin(admin.ModelAdmin):
 
     # list_filter = ('employment__shop', )
 
-    # list_display = ('first_name', 'last_name', 'employment__shop__title', 'parent_title', 'work_type_name', 'id')
-    # search_fields = ('first_name', 'last_name', 'employment__shop__parent__title', 'workercashboxinfo__work_type__name', 'id')
+    # list_display = ('first_name', 'last_name', 'employment__shop__name', 'parent_title', 'work_type_name', 'id')
+    # search_fields = ('first_name', 'last_name', 'employment__shop__parent__name', 'workercashboxinfo__work_type__name', 'id')
 
     # @staticmethod
     # def parent_title(instance: User):
