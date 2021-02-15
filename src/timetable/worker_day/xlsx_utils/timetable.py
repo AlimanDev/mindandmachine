@@ -126,12 +126,11 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.write_string(9, count_of_days + 6, 'В', format_header_text)
         self.worksheet.write_string(9, count_of_days + 7, 'ОТ', format_header_text)
 
-    def fill_table(self, workdays, employments, breaktimes, stat, row_s, col_s, stat_type='approved'):
+    def fill_table(self, workdays, employments, stat, row_s, col_s, stat_type='approved'):
         """
         одинаковая сортировка у workdays и users должна быть
         :param workdays:
         :param employments:
-        :param breaktimes:
         :return:
         """
 
@@ -139,26 +138,16 @@ class Timetable_xlsx(Tabel_xlsx):
         cell_format = dict(self.day_type)
         n_workdays = len(workdays)
         for row_shift, employment in enumerate(employments):
-            triplets = breaktimes.get(employment.position_id) or breaktimes.get('default')
-            night_hours = 0
             for day in range(len(self.prod_days)):
                 if (it < n_workdays) and (workdays[it].worker_id == employment.user_id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
 
                     if wd.type == WorkerDay.TYPE_WORKDAY:
-                        total_h, night_h = self._count_time(
-                            wd.dttm_work_start.time(), wd.dttm_work_end.time(), (0, 0), triplets)
-                        if night_h == 'all':  # night_work
-                            wd.type = 'night_work'
-                        if (type(night_h) != str) and (night_h > 0):
-                            text = '{}-\n{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
-                                                    wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
-                        else:
-                            text = '{}-\n{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
-                                                    wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
+                        text = '{}-\n{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
+                                                wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
 
                     elif wd.type == WorkerDay.TYPE_HOLIDAY_WORK:
-                        total_h = ceil(self._time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), triplets))
+                        total_h = ceil(wd.work_hours)
                         text = 'В{}'.format(total_h)
 
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
@@ -188,7 +177,6 @@ class Timetable_xlsx(Tabel_xlsx):
                     self.workbook.add_format(cell_format)
                 )
 
-            worker_days = {x.dt: x for x in workdays if x.worker_id == employment.user_id}
             format_holiday_debt = self.workbook.add_format(fmt(font_size=10, border=1, bg_color='#FEFF99'))
 
             self.worksheet.write_string(
