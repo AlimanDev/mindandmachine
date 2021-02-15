@@ -1,7 +1,5 @@
 from src.events.registry import BaseRegisteredEvent
 
-from src.conf.djconfig import URV_STAT_SHOP_LEVEL
-
 from datetime import date, timedelta
 
 
@@ -19,7 +17,7 @@ class UrvStatEvent(BaseRegisteredEvent):
         dt = date.today() - timedelta(days=1)
         title = f'URV_{dt}.xlsx'
 
-        return create_urv(dt, dt, title=title, shop_level=URV_STAT_SHOP_LEVEL, network_id=self.network_id, in_memory=True)
+        return create_urv(dt, dt, title=title, network_id=self.network_id, in_memory=True)
         
 
 class UrvStatTodayEvent(BaseRegisteredEvent):
@@ -32,4 +30,4 @@ class UrvStatTodayEvent(BaseRegisteredEvent):
         dt = date.today()
         title = f'URV_today_{dt}.xlsx'
 
-        return create_urv(dt, dt, title=title, shop_level=URV_STAT_SHOP_LEVEL, network_id=self.network_id, in_memory=True)
+        return create_urv(dt, dt, title=title, network_id=self.network_id, in_memory=True)
