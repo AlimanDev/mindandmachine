@@ -14,6 +14,8 @@ from django.db import transaction
 from django.utils.timezone import now
 from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
 
+from django_celery_beat.models import CrontabSchedule
+
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
 from src.base.message import Message
