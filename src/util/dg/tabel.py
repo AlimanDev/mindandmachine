@@ -196,9 +196,8 @@ class T13TabelDataGetter(BaseTabelDataGetter):
             }
             users.append(user_data)
 
-        _weekday, days_in_month = monthrange(year=self.year, month=self.month)
         for user_data in users:
-            for day_num in range(1, days_in_month + 1):
+            for day_num in range(1, 31 + 1):
                 day_key = _get_day_key(day_num)
                 if day_key not in user_data['days']:
                     day_data = user_data['days'].setdefault(day_key, {})
