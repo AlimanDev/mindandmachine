@@ -23,6 +23,7 @@ def main(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comming_onl
     DIFF_HOURS = 10
 
     shops = Shop.objects.filter(
+        Q(dttm_deleted__isnull=True) | Q(dttm_deleted_gte=dt_to),
         id__in=WorkerDay.objects.filter(
             dt=dt,
             shop__network_id=network_id,
@@ -30,7 +31,6 @@ def main(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comming_onl
             is_approved=True,
             is_fact=False,
         ).values_list('shop_id', flat=True),
-        dttm_deleted__lte=dt_to,
     )
 
     if in_memory:
