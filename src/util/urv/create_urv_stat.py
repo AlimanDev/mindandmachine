@@ -25,7 +25,8 @@ def main(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comming_onl
     shops = Shop.objects.filter(
         Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=dt_to),
         id__in=WorkerDay.objects.filter(
-            dt=dt,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
             shop__network_id=network_id,
             type=WorkerDay.TYPE_WORKDAY,
             is_approved=True,
