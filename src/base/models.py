@@ -357,6 +357,17 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                 new_dict[key.replace('d', '')] = new_dict.pop(key)
         return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
 
+    def _handle_new_shop_created(self):
+        from src.util.models_converter import Converter
+        from src.celery.tasks import fill_shop_schedule
+        dt_now = datetime.datetime.now().date()
+        if self.open_times and self.close_times:
+            fill_shop_schedule.delay(
+                shop_id=self.id,
+                dt_from=Converter.convert_date(dt_now - datetime.timedelta(days=30)),
+                periods=120,
+            )
+
     def _handle_schedule_change(self):
         from src.util.models_converter import Converter
         from src.celery.tasks import fill_shop_schedule, recalc_wdays
@@ -371,6 +382,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         ch.apply_async()
 
     def save(self, *args, **kwargs):
+        is_new = self.id is None
         if self.open_times.keys() != self.close_times.keys():
             raise MessageError(code='time_shop_differerent_keys')
         if self.open_times.get('all') and len(self.open_times) != 1:
@@ -389,7 +401,9 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         if load_template_changed and self.load_template_status == self.LOAD_TEMPLATE_PROCESS:
             raise MessageError(code='cant_change_load_template')
         res = super().save(*args, **kwargs)
-        if self.tracker.has_changed('tm_open_dict') or self.tracker.has_changed('tm_close_dict'):
+        if is_new:
+            transaction.on_commit(self._handle_new_shop_created)
+        elif self.tracker.has_changed('tm_open_dict') or self.tracker.has_changed('tm_close_dict'):
             transaction.on_commit(self._handle_schedule_change)
         if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
