@@ -86,16 +86,15 @@ class TickAdmin(admin.ModelAdmin):
     raw_id_fields = ("user", "tick_point")
     list_display = [
         'id',
-        'user',
         'type',
-        'tick_point',
-        'tick_point',
         'dttm',
         'verified_score',
         'min_liveness_prop',
         'image_tag_self',
         'image_tag_first',
         'image_tag_last',
+        'user',
+        'tick_point',
     ]
 
     list_filter = [
