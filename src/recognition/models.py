@@ -83,7 +83,7 @@ class Tick(AbstractActiveModel):
             return self.min_liveness
 
         if hasattr(self, 'tickphotos_list'):
-            liveness_list = [tickphoto.liveness for tickphoto in self.tickphotos_list if tickphoto.liveness is not None]
+            liveness_list = [tickphoto.liveness for tickphoto in self.tickphotos_list if tickphoto.liveness]
             if liveness_list:
                 return min(liveness_list)
             return
