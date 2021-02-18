@@ -1,6 +1,7 @@
 import json
 import requests
 from datetime import datetime, timedelta, date
+from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from django.conf import settings
 from django.db import transaction
@@ -693,14 +694,16 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 ProductionDay.WORK_NORM_HOURS[wd.type]
                 for wd in work_days
             ]
-        ) * (dt_to - dt_from).days / len(work_days) # норма рабочего времени за оставшийся период период (за месяц)
+        ) 
+        #* (dt_to - dt_from).days / len(work_days) # норма рабочего времени за оставшийся период период (за месяц)
         work_hours = shop.settings.fot if shop.settings.fot else work_hours  # fixme: tmp, special for 585
         init_params['n_working_days_optimal'] = len(work_days)
+        days_in_month = ((dt_first + relativedelta(day=31)) - dt_first).days
 
         for e in employments:
             fot = work_hours * e.norm_work_hours / 100
-            fot = fot * (init_params['n_working_days_optimal'] - (month_stat[e.id]['vacations'] + month_stat_prev[e.id]['vacations'])) / init_params['n_working_days_optimal']
-            employment_stat_dict[e.id]['norm_work_amount'] = (fot - month_stat_prev[e.id]['paid_hours']) * (init_params['n_working_days_optimal'] - month_stat_prev[e.id]['no_data']) / init_params['n_working_days_optimal']
+            fot = fot * (days_in_month - (month_stat[e.id]['vacations'] + month_stat_prev[e.id]['vacations'])) / days_in_month
+            employment_stat_dict[e.id]['norm_work_amount'] = (fot - month_stat_prev[e.id]['paid_hours']) * (days_in_month - month_stat_prev[e.id]['no_data']) / days_in_month
 
 
         ##################################################################
