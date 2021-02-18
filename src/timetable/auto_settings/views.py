@@ -698,7 +698,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         #* (dt_to - dt_from).days / len(work_days) # норма рабочего времени за оставшийся период период (за месяц)
         work_hours = shop.settings.fot if shop.settings.fot else work_hours  # fixme: tmp, special for 585
         init_params['n_working_days_optimal'] = len(work_days)
-        days_in_month = ((dt_first + relativedelta(day=31)) - dt_first).days
+        days_in_month = ((dt_first + relativedelta(day=31)) - dt_first).days + 1
 
         for e in employments:
             fot = work_hours * e.norm_work_hours / 100
