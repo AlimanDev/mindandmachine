@@ -7,7 +7,7 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup, Network, Employment, ShopSchedule
+from src.base.models import FunctionGroup, Network, Employment, ShopSchedule, Shop
 from src.timetable.models import (
     WorkerDay,
     AttendanceRecords,
@@ -2321,6 +2321,21 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, worker_id=self.employment2.user_id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
     
+    def test_network_breaks(self):
+        Employment.objects.all().update(position=None)
+        Shop.objects.all().update(settings=None)
+        dt = date.today()
+        wd = WorkerDay.objects.create(
+            shop=self.shop,
+            worker_id=self.employment2.user_id,
+            employment=self.employment2,
+            dt=dt,
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            type=WorkerDay.TYPE_WORKDAY,
+        )
+        self.assertEqual(wd.work_hours, timedelta(hours=10, minutes=45))
+
     # def test_change_list(self):
     #     dt_from = date.today()
     #     data = {

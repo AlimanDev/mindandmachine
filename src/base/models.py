@@ -100,6 +100,14 @@ class Network(AbstractActiveModel):
         choices=CONVERT_TABEL_TO_CHOICES,
         default='xlsx',
     )
+    breaks = models.ForeignKey(
+        'base.Break',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        verbose_name='Перерывы по умолчанию',
+        related_name='networks',
+    )
 
     def get_department(self):
         return None

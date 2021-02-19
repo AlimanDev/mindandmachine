@@ -479,8 +479,8 @@ class WorkerDay(AbstractModel):
     def _calc_wh(self):
         position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
         if self.dttm_work_end and self.dttm_work_start and self.shop and (
-                self.shop.settings or position_break_triplet_cond):
-            breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks
+                self.shop.settings or position_break_triplet_cond or self.shop.network.breaks):
+            breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks if self.shop.settings else self.shop.network.breaks.breaks
             dttm_work_start = self.dttm_work_start
             dttm_work_end = self.dttm_work_end
             if self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
