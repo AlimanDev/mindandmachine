@@ -121,6 +121,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
     list_filter = ('shop', 'type')
     raw_id_fields = ('parent_worker_day',)
     list_select_related = ('worker', 'shop')
+    change_list_template = 'worker_day_change_list.html'
 
     @staticmethod
     def worker_last_name(instance: WorkerConstraint):

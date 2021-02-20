@@ -1,0 +1,44 @@
+{% extends 'admin/base_site.html' %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block extrahead %}{{ block.super }}
+<script src="{% url 'admin:jsi18n' %}"></script>
+{{ media }}
+{% endblock %}
+
+{% block extrastyle %}{{ block.super }}
+<link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}">{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %} &rsaquo;</a>
+    <a href="{% url 'admin:app_list' app_label='timetable' %}">Timetable &rsaquo;</a>
+    <a href="/admin/timetable/workerday/">Рабочие дни сотрудников &rsaquo;</a>
+
+    Пересчет рабочих часов
+</div>
+{% endblock %}
+
+{% block content %}
+<form action="" method="post">
+    {% csrf_token %}
+    {{ form.media }}
+    <fieldset class="module aligned">
+        {% for field in form %}
+        <div class="form-row">
+            <div>
+                <label class="required">{{field.label}}</label>
+                {{field}}
+            </div>
+        </div>
+        {% endfor %}
+    </fieldset>
+    <input type="submit" value="Пересчитать">
+</form>
+<script type="text/javascript" src="{% static "admin/js/core.js" %}"></script>
+<script type="text/javascript" src="{% static "admin/js/admin/RelatedObjectLookups.js" %}"></script>
+<script type="text/javascript" src="{% static "admin/js/jquery.init.js" %}"></script>
+<script type="text/javascript" src="{% static "admin/js/actions.min.js" %}"></script>
+<script type="text/javascript" src="{% static "admin/js/calendar.js" %}"></script>
+<script type="text/javascript" src="{% static "admin/js/admin/DateTimeShortcuts.js" %}"></script>
+{% endblock %}
