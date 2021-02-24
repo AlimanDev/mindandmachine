@@ -866,7 +866,6 @@ def fill_active_shops_schedule():
 @app.task
 def recalc_wdays(**kwargs):
     wdays_qs = WorkerDay.objects.filter(type__in=WorkerDay.TYPES_WITH_TM_RANGE, **kwargs)
-    print('saved')
     for wd_id in wdays_qs.values_list('id', flat=True):
         with transaction.atomic():
             wd_obj = WorkerDay.objects.filter(id=wd_id).select_for_update().first()
