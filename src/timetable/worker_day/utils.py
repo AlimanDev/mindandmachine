@@ -185,7 +185,7 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
             employment,
         ])
     if len(error_users):
-        return Response('\n'.join(error_users), status=400)
+        return Response({"message": '\n'.join(error_users)}, status=400)
     dates = []
     for dt in df.columns[3:]:
         if not isinstance(dt, datetime.datetime):
