@@ -134,3 +134,4 @@ wrapt==1.10.11
 xlrd==1.2.0
 XlsxWriter==1.2.6
 zipp==0.6.0
+git+https://devxplorer@bitbucket.org/devxplorer/relatorio.git@89e7e2d37a27d81088ce3d7e40e09682bb39ade0
