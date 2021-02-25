@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'admin_numeric_filter',
     'rest_auth',
     'rest_framework.authtoken',
+    'django_json_widget',
     'src',
     'src.base',
     'src.forecast',
@@ -368,9 +369,6 @@ CALCULATE_LOAD_TEMPLATE = False # параметр отключающий авт
 
 CLIENT_TIMEZONE = 3
 
-# при создании новой должности будут проставляться соотв. значения
-# пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
-WORKER_POSITION_DEFAULT_VALUES = {}
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
