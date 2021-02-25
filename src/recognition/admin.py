@@ -110,7 +110,7 @@ class TickAdmin(admin.ModelAdmin):
 
     @staticmethod
     def dttm_tick(instance: Tick):
-        return instance.dttm.strftime("%Y-%m-%d %H:%M:%S")
+        return instance.dttm.strftime("%d %b %Y %H:%M:%S")
 
     def get_queryset(self, request):
         return super(TickAdmin, self).get_queryset(request).prefetch_related(
