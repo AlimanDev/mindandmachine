@@ -88,7 +88,7 @@ class TickAdmin(admin.ModelAdmin):
     list_display = [
         'id',
         'type',
-        'dttm',
+        'dttm_tick',
         'verified_score',
         'min_liveness_prop',
         'image_tag_self',
@@ -107,6 +107,10 @@ class TickAdmin(admin.ModelAdmin):
     ]
 
     actions = ['download_old', 'ticks_report_xlsx', 'ticks_report_docx']
+
+    @staticmethod
+    def dttm_tick(instance: Tick):
+        return instance.dttm.strftime("%d %b %Y %H:%M:%S")
 
     def get_queryset(self, request):
         return super(TickAdmin, self).get_queryset(request).prefetch_related(
