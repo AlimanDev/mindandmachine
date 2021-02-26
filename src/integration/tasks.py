@@ -19,12 +19,12 @@ from src.integration.models import (
 from src.timetable.models import AttendanceRecords, WorkerDay
 
 from src.celery.celery import app
+from django.conf import settings
 
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "src.conf.djconfig")
 
 
-MAX_DIFF_IN_SECONDS = 3600 * 5
 
 
 @app.task()
@@ -117,8 +117,32 @@ def import_urv_zkteco():
 
             min_diff = min((prev_dttm_start_diff, prev_dttm_end_diff, dttm_start_diff, dttm_end_diff))
 
-            if min_diff > MAX_DIFF_IN_SECONDS:
-                continue # нет смены или она слишком "далеко" от отметки, тут можно создать отметку за сегодня
+            if min_diff > settings.ZKTECO_MAX_DIFF_IN_SECONDS:
+                # нет смены или она слишком "далеко" от отметки, тут можно создать отметку за сегодня
+                if not settings.ZKTECO_IGNORE_TICKS_WITHOUT_WORKER_DAY:
+                    comming = AttendanceRecords.objects.filter(
+                        dttm__date=dttm.date(),
+                        shop=shop,
+                        user_id=user_id,
+                        type=AttendanceRecords.TYPE_COMING,
+                    ).first()
+                    if comming and comming.dttm < dttm:
+                        AttendanceRecords.objects.create(
+                            dttm=dttm,
+                            shop=shop,
+                            user_id=user_id,
+                            type=AttendanceRecords.TYPE_LEAVING,
+                        )
+                        print(f"create leaving record {dttm} for {user_id} {shop} without worker day")
+                    else:
+                        AttendanceRecords.objects.create(
+                            dttm=dttm,
+                            shop=shop,
+                            user_id=user_id,
+                            type=AttendanceRecords.TYPE_COMING,
+                        )
+                        print(f"create comming record {dttm} for {user_id} {shop} without worker day")
+                continue
 
             if min_diff == prev_dttm_start_diff or min_diff == dttm_start_diff:
                 comming = AttendanceRecords.objects.filter(

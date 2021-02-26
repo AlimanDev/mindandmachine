@@ -20,64 +20,66 @@ dttm_first = datetime.combine(date.today(), time(10, 48))
 dttm_second = datetime.combine(date.today(), time(12, 34))
 dttm_third = datetime.combine(date.today(), time(15, 56))
 
+default_transaction_response = {
+    1:{
+        "code": 0,
+        "message": "success",
+        "data": [
+            {
+                "id": "8a8080847322cd7f017323a7df9e0dc2",
+                "eventTime": dttm_second.strftime('%Y-%m-%d %H:%M:%S'),
+                "pin": "1",
+                "name": "User",
+                "lastName": "User",
+                "deptName": "Area Name",
+                "areaName": "Area Name",
+                "devSn": "CGXH201360029",
+                "verifyModeName": "15",
+                "accZone": "1",
+            },
+        ],
+    },
+    2:{
+        "code": 0,
+        "message": "success",
+        "data":[
+            {
+                "id": "8a8080847322cd7f017323a7df9e0dc3",
+                "eventTime": dttm_third.strftime('%Y-%m-%d %H:%M:%S'),
+                "pin": "1",
+                "name": "User",
+                "lastName": "User",
+                "deptName": "Area Name",
+                "areaName": "Area Name",
+                "devSn": "CGXH201360029",
+                "verifyModeName": "15",
+                "accZone": "1",
+            },
+        ],
+    },
+    3:{
+        "code": 0,
+        "message": "success",
+        "data":[
+            {
+                "id": "8a8080847322cd7f017323a7df9e0dc4",
+                "eventTime": dttm_first.strftime('%Y-%m-%d %H:%M:%S'),
+                "pin": "1",
+                "name": "User",
+                "lastName": "User",
+                "deptName": "Area Name",
+                "areaName": "Area Name",
+                "devSn": "CGXH201360029",
+                "verifyModeName": "15",
+                "accZone": "1",
+            },
+        ],
+    }
+}
+
 class TestRequestMock:
     responses = {
-        "/transaction/listAttTransaction": {
-                1:{
-                    "code": 0,
-                    "message": "success",
-                    "data": [
-                        {
-                            "id": "8a8080847322cd7f017323a7df9e0dc2",
-                            "eventTime": dttm_second.strftime('%Y-%m-%d %H:%M:%S'),
-                            "pin": "1",
-                            "name": "User",
-                            "lastName": "User",
-                            "deptName": "Area Name",
-                            "areaName": "Area Name",
-                            "devSn": "CGXH201360029",
-                            "verifyModeName": "15",
-                            "accZone": "1",
-                        },
-                    ],
-                },
-                2:{
-                    "code": 0,
-                    "message": "success",
-                    "data":[
-                        {
-                            "id": "8a8080847322cd7f017323a7df9e0dc3",
-                            "eventTime": dttm_third.strftime('%Y-%m-%d %H:%M:%S'),
-                            "pin": "1",
-                            "name": "User",
-                            "lastName": "User",
-                            "deptName": "Area Name",
-                            "areaName": "Area Name",
-                            "devSn": "CGXH201360029",
-                            "verifyModeName": "15",
-                            "accZone": "1",
-                        },
-                    ],
-                },
-                3:{
-                    "code": 0,
-                    "message": "success",
-                    "data":[
-                        {
-                            "id": "8a8080847322cd7f017323a7df9e0dc4",
-                            "eventTime": dttm_first.strftime('%Y-%m-%d %H:%M:%S'),
-                            "pin": "1",
-                            "name": "User",
-                            "lastName": "User",
-                            "deptName": "Area Name",
-                            "areaName": "Area Name",
-                            "devSn": "CGXH201360029",
-                            "verifyModeName": "15",
-                            "accZone": "1",
-                        },
-                    ],
-                }
-        },
+        "/transaction/listAttTransaction": default_transaction_response
     }
     
     def __init__(self, *args, **kwargs):
@@ -152,6 +154,7 @@ class TestIntegration(APITestCase):
         self.assertEqual(UserExternalCode.objects.count(), 4)
     
     def test_import_urv(self):
+        TestRequestMock.responses["/transaction/listAttTransaction"] = default_transaction_response
         ShopExternalCode.objects.create(
             external_system=self.ext_system,
             shop=self.shop,
@@ -271,3 +274,27 @@ class TestIntegration(APITestCase):
         self.assertEqual(AttendanceRecords.objects.count(), 2)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today() - timedelta(1)).first().dttm_work_start, dttm_first)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today() - timedelta(1)).first().dttm_work_end, dttm_second)
+
+    @override_settings(ZKTECO_IGNORE_TICKS_WITHOUT_WORKER_DAY=False)
+    def test_import_urv_without_worker_day(self):
+        TestRequestMock.responses["/transaction/listAttTransaction"] = default_transaction_response
+        ShopExternalCode.objects.create(
+            external_system=self.ext_system,
+            shop=self.shop,
+            code='1',
+        )
+        UserExternalCode.objects.create(
+            external_system=self.ext_system,
+            user_id=self.employment2.user_id,
+            code='1',
+        )
+
+        with patch('src.integration.zkteco.requests', new_callable=TestRequestMock) as mock_request:
+            import_urv_zkteco()
+
+        self.assertEqual(WorkerDay.objects.count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
+        self.assertEqual(AttendanceRecords.objects.count(), 3)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_start, dttm_first)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_end, dttm_third)
+
