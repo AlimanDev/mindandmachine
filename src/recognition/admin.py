@@ -4,7 +4,8 @@ import xlsxwriter
 from admin_numeric_filter.admin import RangeNumericFilter
 from django.contrib import admin
 from django.contrib.auth.models import Group
-from django.db.models import Prefetch, Min
+from django.db.models import Prefetch, Min, Q
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.utils.html import format_html
 from django.utils.timezone import now
@@ -76,7 +77,7 @@ class TickMinLivenessFilter(RangeNumericFilter):
 
     def queryset(self, request, queryset):
         queryset = queryset.annotate(
-            min_liveness=Min('tickphoto__liveness'),
+            min_liveness=Coalesce(Min('tickphoto__liveness', filter=Q(tickphoto__liveness__gt=0)), 0),
         )
         return super(TickMinLivenessFilter, self).queryset(request, queryset)
 
@@ -86,16 +87,15 @@ class TickAdmin(admin.ModelAdmin):
     raw_id_fields = ("user", "tick_point")
     list_display = [
         'id',
-        'user',
         'type',
-        'tick_point',
-        'tick_point',
         'dttm',
         'verified_score',
         'min_liveness_prop',
         'image_tag_self',
         'image_tag_first',
         'image_tag_last',
+        'user',
+        'tick_point',
     ]
 
     list_filter = [
@@ -211,6 +211,7 @@ class TickPhotoAdmin(admin.ModelAdmin):
                    ]
     list_display = ['id', 'user', 'type', 'tick_point', 'liveness', 'verified_score', 'dttm', 'image_tag']
     readonly_fields = ['image_tag', 'tick']
+    save_as = True
 
     def user(self, obj):
         return obj.tick.user

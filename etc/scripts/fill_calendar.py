@@ -102,7 +102,7 @@ def fill_days(from_date, to_date, region_id, file_name='etc/scripts/work_data.cs
                     region_id=region_id,
                     defaults={
                         'type': day_type,
-                        'is_celebration': False,
+                        'is_celebration': False,  # нужно проставлять?
                     }
                 )
 

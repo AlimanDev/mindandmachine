@@ -9,7 +9,7 @@ COLOR_GREEN = '#00FF00'
 COLOR_RED = '#FF0000'
 COLOR_YELLOW = '#FFFF00'
 COLOR_HEADER = '#CBF2E0'
-def main(dt_from, dt_to, title=None, shop_codes=None, shop_level=2, comming_only=False, network_id=None):
+def main(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comming_only=False, network_id=None, in_memory=False):
     SHOP = 0
     DATE = 1
     PLAN_COMMING = 2
@@ -22,11 +22,28 @@ def main(dt_from, dt_to, title=None, shop_codes=None, shop_level=2, comming_only
     FACT_HOURS = 9
     DIFF_HOURS = 10
 
-    workbook = xlsxwriter.Workbook(f'URV_stat_{dt_from}_{dt_to}.xlsx' if not title else title)
+    shops = Shop.objects.filter(
+        Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=dt_to),
+        id__in=WorkerDay.objects.filter(
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+            shop__network_id=network_id,
+            type=WorkerDay.TYPE_WORKDAY,
+            is_approved=True,
+            is_fact=False,
+        ).values_list('shop_id', flat=True),
+    )
+
+    if in_memory:
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    else:
+        workbook = xlsxwriter.Workbook(f'URV_stat_{dt_from}_{dt_to}.xlsx' if not title else title)
     worksheet = workbook.add_worksheet('{}-{}'.format(dt_from.strftime('%Y.%m.%d'), dt_to.strftime('%Y.%m.%d')))
-    shops = Shop.objects.filter(level__gte=shop_level).filter(dttm_deleted__isnull=True, network_id=network_id)
     if shop_codes:
         shops = shops.filter(code__in=shop_codes)
+    if shop_ids:
+        shops = shops.filter(id__in=shop_ids)
     dates = [dt_from + datetime.timedelta(days=i) for i in range((dt_to -  dt_from).days + 1)]
     def_format = {
         'border': 1,
@@ -103,3 +120,10 @@ def main(dt_from, dt_to, title=None, shop_codes=None, shop_level=2, comming_only
 
             row += 1
     workbook.close()
+    if in_memory:
+        output.seek(0)
+        return {
+            'name': f'URV_stat_{dt_from}_{dt_to}.xlsx' if not title else title,
+            'file': output,
+            'type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }

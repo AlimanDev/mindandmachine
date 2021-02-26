@@ -37,23 +37,7 @@ DOMAIN = ''
 SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
 MDAUDIT_AUTHTOKEN_SALT = 'DLKAXGKFPP57B2NEQ4NLB2TLDT3QR20I7QKAGE8I'
 
-'''
-Переменная хранящая почты для рассылки отчетов по УРВ. Если None то отчеты не рассылаются
-Формат
-{
-    'network_code': [
-        'email@example.com', 
-        'email2@example.com'
-    ]
-}
-'''
-URV_STAT_EMAILS = None
 
-URV_STAT_SEND_HOUR = 1
-URV_STAT_SEND_MINUTE = 0
-URV_STAT_SHOP_LEVEL = 2
-URV_STAT_SEND_TODAY_HOUR = 3
-URV_STAT_SEND_TODAY_MINUTE = 0
 MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE = False  # отправлять ли запрос по связке юзера и магазина при сохранении workerday
 MDA_SYNC_USER_TO_SHOP_DAILY = False  # запускать таск, который будет отправлять все связки на текущий день
 MDA_PUBLIC_API_HOST = 'https://example.com'
@@ -79,6 +63,7 @@ INSTALLED_APPS = [
     'admin_numeric_filter',
     'rest_auth',
     'rest_framework.authtoken',
+    'django_json_widget',
     'src',
     'src.base',
     'src.forecast',
@@ -88,6 +73,7 @@ INSTALLED_APPS = [
     'src.celery',
     'fcm_django',
     'src.recognition',
+    'src.integration',
     'src.events',
     'src.notifications',
 ]
@@ -280,6 +266,8 @@ USE_L10N = False
 
 USE_TZ = False
 
+DATETIME_FORMAT = "d b, Y, H:i:s"
+
 LOCALE_PATHS = [
     os.path.join(BASE_DIR,  'data/locale')
 ]
@@ -318,7 +306,7 @@ MOBILE_USER_AGENTS = ('QoS_mobile_app', 'okhttp',)
 METABASE_SITE_URL = 'metabase-url'
 METABASE_SECRET_KEY = 'secret-key'
 
-CELERY_IMPORTS = ('src.celery.tasks',)
+CELERY_IMPORTS = ('src.celery.tasks', 'src.integration.tasks',)
 CELERY_BROKER_URL = 'redis://localhost:6379'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379'
 CELERY_ACCEPT_CONTENT = ['application/json']
@@ -358,6 +346,13 @@ JOD_CONVERTER_URL = 'http://localhost:8030'
 # docker run --restart unless-stopped -p 3001:3000 -d thecodingmachine/gotenberg:6
 GOTENBERG_URL = 'http://localhost:3001'
 
+ZKTECO_HOST = ''
+ZKTECO_KEY = ''
+ZKTECO_DEPARTMENT_CODE = 1 # код отдела из zkteco к которому привязываются новые юзеры
+
+# Используем ли интеграцию в проекте
+ZKTECO_INTEGRATION = False
+
 RECOGNITION_PARTNER = 'Tevian'
 
 TEVIAN_URL = "https://backend.facecloud.tevian.ru/api/v1/"
@@ -374,9 +369,6 @@ CALCULATE_LOAD_TEMPLATE = False # параметр отключающий авт
 
 CLIENT_TIMEZONE = 3
 
-# при создании новой должности будут проставляться соотв. значения
-# пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
-WORKER_POSITION_DEFAULT_VALUES = {}
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 
@@ -466,14 +458,9 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
-    'task-send-urv-stat': {
-        'task': 'src.celery.tasks.send_urv_stat',
-        'schedule': crontab(hour=URV_STAT_SEND_HOUR, minute=URV_STAT_SEND_MINUTE),
-        'options': {'queue': BACKEND_QUEUE}
-    },
-    'task-send-urv-stat-today': {
-        'task': 'src.celery.tasks.send_urv_stat_today',
-        'schedule': crontab(hour=URV_STAT_SEND_TODAY_HOUR, minute=URV_STAT_SEND_TODAY_MINUTE),
+    'task-trigger-cron-event': {
+        'task': 'src.celery.tasks.cron_event',
+        'schedule': crontab(minute='*/1'),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-delete-inactive-employment-group': {
@@ -497,6 +484,23 @@ if MDA_SYNC_USER_TO_SHOP_DAILY:
     CELERY_BEAT_SCHEDULE['task-sync-mda-user-to-shop-relation'] = {
         'task': 'src.celery.tasks.sync_mda_user_to_shop_relation',
         'schedule': crontab(hour=1, minute=30),
+        'options': {'queue': BACKEND_QUEUE}
+    }
+
+if ZKTECO_INTEGRATION:
+    CELERY_BEAT_SCHEDULE['task-import-urv-zkteco'] = {
+        'task': 'src.celery.integration_tasks.import_urv_zkteco',
+        'schedule': crontab(minute='*/5'),
+        'options': {'queue': BACKEND_QUEUE}
+    }
+    CELERY_BEAT_SCHEDULE['task-export-workers-zkteco'] = {
+        'task': 'src.celery.integration_tasks.export_workers_zkteco',
+        'schedule': crontab(minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    }
+    CELERY_BEAT_SCHEDULE['task-delete-workers-zkteco'] = {
+        'task': 'src.celery.integration_tasks.delete_workers_zkteco',
+        'schedule': crontab(minute=0),
         'options': {'queue': BACKEND_QUEUE}
     }
 

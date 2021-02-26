@@ -185,7 +185,7 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
             employment,
         ])
     if len(error_users):
-        return Response('\n'.join(error_users), status=400)
+        return Response({"message": '\n'.join(error_users)}, status=400)
     dates = []
     for dt in df.columns[3:]:
         if not isinstance(dt, datetime.datetime):
@@ -297,15 +297,6 @@ def download_timetable_util(request, workbook, form):
     ).run()
     stat_type = 'approved' if form['is_approved'] else 'not_approved'
 
-    default_breaks = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), shop.settings.breaks.breaks))
-    breaktimes = {
-        w.id: list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), w.breaks.breaks)) if w.breaks else default_breaks
-        for w in WorkerPosition.objects.filter(network_id=shop.network_id)
-    }
-    breaktimes['default'] = default_breaks
-    # breaktimes = shop.settings.breaks.breaks
-    # breaktimes = list(map(lambda x: (x[0] / 60, x[1] / 60, sum(x[2]) / 60), breaktimes))
-
     workdays = WorkerDay.objects.select_related('worker', 'shop').filter(
         Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
         (Q(dt__gte=F('employment__dt_hired')) | Q(employment__isnull=True)) & Q(dt__gte=timetable.prod_days[0].dt),
@@ -342,7 +333,7 @@ def download_timetable_util(request, workbook, form):
     timetable.construnts_users_info(employments, 11, 0, ['code', 'fio', 'position'])
 
     # fill page 1
-    timetable.fill_table(workdays, employments, breaktimes, stat, 11, 4, stat_type=stat_type)
+    timetable.fill_table(workdays, employments, stat, 11, 4, stat_type=stat_type)
 
     # fill page 2
     timetable.fill_table2(shop, timetable.prod_days[-1].dt, workdays)
