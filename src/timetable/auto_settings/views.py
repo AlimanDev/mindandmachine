@@ -302,6 +302,15 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         user_ids = employments.values_list('user_id', flat=True)
 
+        from src.timetable.worker_day.stat import WorkersStatsGetter
+        worker_stats_cls = WorkersStatsGetter(
+            shop_id=shop_id,
+            dt_from=dt_from,
+            dt_to=dt_to,
+            worker_id__in=list(user_ids),
+        )
+        stats = worker_stats_cls.run()
+
         users = User.objects.filter(id__in=user_ids)
         user_dict = {u.id: u for u in users}
 
@@ -688,20 +697,13 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             type__in=ProductionDay.WORK_TYPES,
             region_id=shop.region_id,
         ))
-        work_hours = sum(
-            [
-                ProductionDay.WORK_NORM_HOURS[wd.type]
-                for wd in work_days
-            ]
-        ) * (dt_to - dt_from).days / len(work_days) # норма рабочего времени за оставшийся период период (за месяц)
-        work_hours = shop.settings.fot if shop.settings.fot else work_hours  # fixme: tmp, special for 585
         init_params['n_working_days_optimal'] = len(work_days)
 
         for e in employments:
-            fot = work_hours * e.norm_work_hours / 100
-            fot = fot * (init_params['n_working_days_optimal'] - (month_stat[e.id]['vacations'] + month_stat_prev[e.id]['vacations'])) / init_params['n_working_days_optimal']
-            employment_stat_dict[e.id]['norm_work_amount'] = (fot - month_stat_prev[e.id]['paid_hours']) * (init_params['n_working_days_optimal'] - month_stat_prev[e.id]['no_data']) / init_params['n_working_days_optimal']
-
+            norm_work_amount = stats[e.user_id]['employments'][e.id]['sawh_hours_plan_not_approved_selected_period'
+                if form['use_not_approved'] else 'sawh_hours_plan_approved_selected_period']
+            # TODO: сделать учет отработанных часов за предыдущий период ?
+            employment_stat_dict[e.id]['norm_work_amount'] = norm_work_amount
 
         ##################################################################
         breaks = {

@@ -31,7 +31,6 @@ def add_prod_cal(apps, schema_editor):
                  JOIN base_user u ON e.user_id = u.id
                  JOIN base_shop s ON e.shop_id = s.id and pd.region_id = s.region_id
                  LEFT JOIN base_workerposition wp ON e.position_id = wp.id
-        where pd.type in ('W', 'S')
           and pd.dt >= '2020-01-01'
         GROUP BY pd.id, pd.dt, e.user_id, e.id, u.username, e.shop_id, s.code, pd.region_id;
         """

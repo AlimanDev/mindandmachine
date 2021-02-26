@@ -378,6 +378,8 @@ CLIENT_TIMEZONE = 3
 # пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
 WORKER_POSITION_DEFAULT_VALUES = {}
 
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
 

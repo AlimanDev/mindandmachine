@@ -48,14 +48,6 @@ class Network(AbstractActiveModel):
         (ACC_PERIOD_YEAR, 'Год'),
     )
 
-    DAY_NORM_HOURS_CALC_ALG_PROD_CAL_EXACT = 1
-    DAY_NORM_HOURS_CALC_ALG_PROD_CAL_MEAN = 2
-
-    DAY_NORM_HOURS_CALC_ALG_CHOICES = (
-        (DAY_NORM_HOURS_CALC_ALG_PROD_CAL_EXACT, 'Непостредственно по производственному календарю'),
-        (DAY_NORM_HOURS_CALC_ALG_PROD_CAL_MEAN, 'Среднее значение в месяц по произв. календарю'),
-    )
-
     TABEL_FORMAT_CHOICES = (
         ('mts', 'MTSTabelGenerator'),
         ('t13_custom', 'CustomT13TabelGenerator'),
@@ -99,12 +91,6 @@ class Network(AbstractActiveModel):
     )
     accounting_period_length = models.PositiveSmallIntegerField(
         choices=ACCOUNTING_PERIOD_LENGTH_CHOICES, verbose_name='Длина учетного периода', default=1)
-    norm_hours_calc_alg = models.PositiveSmallIntegerField(
-        verbose_name='Способ расчета нормы часов за день (только для расчета нормы по произв. календарю)',
-        help_text='Используется также при вычете из нормы часов отпусков и больничных',
-        choices=DAY_NORM_HOURS_CALC_ALG_CHOICES,
-        default=DAY_NORM_HOURS_CALC_ALG_PROD_CAL_MEAN,
-    )
     only_fact_hours_that_in_approved_plan = models.BooleanField(
         default=False,
         verbose_name='Считать только те фактические часы, которые есть в подтвержденном плановом графике',
@@ -1260,7 +1246,6 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
 
     work_hours_by_months = JSONField(
         verbose_name='Настройки по распределению часов в рамках уч. периода',
-        help_text='Сумма часов в рамках учетного периода не должна быть больше суммы часов по произв. календарю.',
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
 
     class Meta:
@@ -1269,26 +1254,6 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
 
     def __str__(self):
         return f'{self.name} {self.network.name}'
-
-    @classmethod
-    def get_sawh_settings_mapping(cls, network_id):
-        mapping = {}
-        qs = cls.objects.filter(
-            network_id=network_id,
-        ).order_by(
-            '-sawhsettingsmapping__priority',
-        ).values(
-            'sawhsettingsmapping__shops__id',
-            'sawhsettingsmapping__positions__id',
-            'sawhsettingsmapping__exclude_positions__id',
-            'sawhsettingsmapping__priority',
-            'work_hours_by_months',
-        )
-        for sawh_dict in qs:
-            k = (sawh_dict['sawhsettingsmapping__shops__id'], sawh_dict['sawhsettingsmapping__positions__id'])
-            mapping[k] = sawh_dict
-
-        return mapping
 
 
 class SAWHSettingsMapping(AbstractModel):
