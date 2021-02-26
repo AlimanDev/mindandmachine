@@ -16,9 +16,9 @@ from src.integration.models import ExternalSystem, UserExternalCode, ShopExterna
 from src.integration.tasks import import_urv_zkteco, export_workers_zkteco, delete_workers_zkteco
 from src.util.test import create_departments_and_users
 
-dttm_first = (datetime.now() - timedelta(hours=2)).replace(microsecond=0)
-dttm_second = datetime.now().replace(microsecond=0)
-dttm_third = (datetime.now() + timedelta(hours=2)).replace(microsecond=0)
+dttm_first = datetime.combine(date.today(), time(10, 48))
+dttm_second = datetime.combine(date.today(), time(12, 34))
+dttm_third = datetime.combine(date.today(), time(15, 56))
 
 class TestRequestMock:
     responses = {
@@ -162,12 +162,112 @@ class TestIntegration(APITestCase):
             user_id=self.employment2.user_id,
             code='1',
         )
+        WorkerDay.objects.create(
+            shop_id=self.employment2.shop_id,
+            worker_id=self.employment2.user_id,
+            employment=self.employment2,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=date.today(),
+            dttm_work_start=datetime.combine(date.today(), time(10)),
+            dttm_work_end=datetime.combine(date.today(), time(20)),
+            is_approved=True,
+        )
+        WorkerDay.objects.create(
+            shop_id=self.employment2.shop_id,
+            worker_id=self.employment2.user_id,
+            employment=self.employment2,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=date.today() - timedelta(1),
+            dttm_work_start=datetime.combine(date.today(), time(10)),
+            dttm_work_end=datetime.combine(date.today(), time(20)),
+            is_approved=True,
+        )
         with patch('src.integration.zkteco.requests', new_callable=TestRequestMock) as mock_request:
             import_urv_zkteco()
 
-        self.assertEqual(WorkerDay.objects.count(), 1)
+        self.assertEqual(WorkerDay.objects.count(), 3)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
+        self.assertEqual(AttendanceRecords.objects.count(), 3)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_start, dttm_first)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_end, dttm_third)
+
+
+    def test_import_urv_night_shift(self):
+        ShopExternalCode.objects.create(
+            external_system=self.ext_system,
+            shop=self.shop,
+            code='1',
+        )
+        UserExternalCode.objects.create(
+            external_system=self.ext_system,
+            user_id=self.employment2.user_id,
+            code='1',
+        )
+        WorkerDay.objects.create(
+            shop_id=self.employment2.shop_id,
+            worker_id=self.employment2.user_id,
+            employment=self.employment2,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=date.today(),
+            dttm_work_start=datetime.combine(date.today(), time(10)),
+            dttm_work_end=datetime.combine(date.today(), time(20)),
+            is_approved=True,
+        )
+        WorkerDay.objects.create(
+            shop_id=self.employment2.shop_id,
+            worker_id=self.employment2.user_id,
+            employment=self.employment2,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=date.today() - timedelta(1),
+            dttm_work_start=datetime.combine(date.today() - timedelta(1), time(18)),
+            dttm_work_end=datetime.combine(date.today(), time(2)),
+            is_approved=True,
+        )
+        dttm_first = datetime.combine(date.today() - timedelta(1), time(18, 48))
+        dttm_second = datetime.combine(date.today(), time(2, 56))
+        TestRequestMock.responses["/transaction/listAttTransaction"] = {
+                1:{
+                    "code": 0,
+                    "message": "success",
+                    "data":[
+                        {
+                            "id": "8a8080847322cd7f017323a7df9e0dc3",
+                            "eventTime": dttm_second.strftime('%Y-%m-%d %H:%M:%S'),
+                            "pin": "1",
+                            "name": "User",
+                            "lastName": "User",
+                            "deptName": "Area Name",
+                            "areaName": "Area Name",
+                            "devSn": "CGXH201360029",
+                            "verifyModeName": "15",
+                            "accZone": "1",
+                        },
+                    ],
+                },
+                2:{
+                    "code": 0,
+                    "message": "success",
+                    "data":[
+                        {
+                            "id": "8a8080847322cd7f017323a7df9e0dc4",
+                            "eventTime": dttm_first.strftime('%Y-%m-%d %H:%M:%S'),
+                            "pin": "1",
+                            "name": "User",
+                            "lastName": "User",
+                            "deptName": "Area Name",
+                            "areaName": "Area Name",
+                            "devSn": "CGXH201360029",
+                            "verifyModeName": "15",
+                            "accZone": "1",
+                        },
+                    ],
+                }
+        }
+        with patch('src.integration.zkteco.requests', new_callable=TestRequestMock) as mock_request:
+            import_urv_zkteco()
+
+        self.assertEqual(WorkerDay.objects.count(), 3)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
         self.assertEqual(AttendanceRecords.objects.count(), 2)
-        self.assertEqual(AttendanceRecords.objects.filter(type=AttendanceRecords.TYPE_LEAVING).count(), 1)
-        self.assertEqual(AttendanceRecords.objects.filter(type=AttendanceRecords.TYPE_COMING).first().dttm, dttm_first)
-        self.assertEqual(AttendanceRecords.objects.filter(type=AttendanceRecords.TYPE_LEAVING).first().dttm, dttm_third)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today() - timedelta(1)).first().dttm_work_start, dttm_first)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today() - timedelta(1)).first().dttm_work_end, dttm_second)

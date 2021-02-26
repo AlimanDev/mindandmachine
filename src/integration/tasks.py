@@ -1,6 +1,6 @@
 import os
 from django.utils.timezone import now
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from src.integration.zkteco import ZKTeco
 
@@ -16,12 +16,15 @@ from src.integration.models import (
     UserExternalCode,
     ShopExternalCode,
 )
-from src.timetable.models import AttendanceRecords
+from src.timetable.models import AttendanceRecords, WorkerDay
 
 from src.celery.celery import app
 
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "src.conf.djconfig")
+
+
+MAX_DIFF_IN_SECONDS = 3600 * 5
 
 
 @app.task()
@@ -69,62 +72,85 @@ def import_urv_zkteco():
             user = user_token.user
 
             dttm = datetime.strptime(event['eventTime'], "%Y-%m-%d %H:%M:%S")
-            date = dttm.date()
 
             if user.id not in users:
-                users[user.id] = {}
-            if date not in users[user.id]:
-                users[user.id][date] = {}
-            if shop.id not in users[user.id][date]:
-                users[user.id][date][shop.id] = {
-                    'coming': dttm,
-                    'leaving': dttm,
-                }
-            else:
-                if users[user.id][date][shop.id]['coming'] > dttm:
-                    users[user.id][date][shop.id]['coming'] = dttm
-                if users[user.id][date][shop.id]['leaving'] < dttm:
-                    users[user.id][date][shop.id]['leaving'] = dttm
+                users[user.id] = []
+            users[user.id].append((dttm, shop))
 
-    for user_id, dates in users.items():
-        for date, vals in dates.items():
-            for shop_id, times in vals.items():
-                coming = AttendanceRecords.objects.filter(
-                    dttm__date=date,
+    wds = WorkerDay.objects.filter(
+        worker_id__in=users.keys(),
+        dt__gte=max_date - timedelta(1),
+        dt__lte=date.today(),
+        is_fact=False,
+        is_approved=True,
+    )
+
+    worker_days = {}
+    for wd in wds:
+        worker_days.setdefault(wd.worker_id, {})[wd.dt] = wd
+
+    attrs = AttendanceRecords.objects.filter(
+        user_id__in=users.keys(),
+        dttm__date__gte=max_date - timedelta(1),
+        dttm__date__lte=date.today(),
+    )
+    attendance_records = {}
+    for attr in attrs:
+        attendance_records.setdefault(attr.user_id, {}).setdefault(attr.shop_id, {})[attr.dttm] = attr
+
+    for user_id, dttms in users.items():
+        dttms = sorted(dttms, key=lambda x: x[0])
+        for dttm, shop in dttms:
+            record = attendance_records.get(user_id, {}).get(shop.id, {}).get(dttm)
+            if record: # если отметка уже внесена игнорируем
+                continue
+            prev_worker_day = worker_days.get(user_id, {}).get(dttm.date() - timedelta(1))
+            worker_day = worker_days.get(user_id, {}).get(dttm.date())
+            prev_dttm_work_start = prev_worker_day.dttm_work_start if prev_worker_day else datetime.min
+            prev_dttm_work_end = prev_worker_day.dttm_work_end if prev_worker_day else datetime.min
+            prev_dttm_start_diff = abs((dttm - prev_dttm_work_start).total_seconds())
+            prev_dttm_end_diff = abs((dttm - prev_dttm_work_end).total_seconds())
+            dttm_work_start = worker_day.dttm_work_start if worker_day else datetime.min
+            dttm_work_end = worker_day.dttm_work_end if worker_day else datetime.min
+            dttm_start_diff = abs((dttm - dttm_work_start).total_seconds())
+            dttm_end_diff = abs((dttm - dttm_work_end).total_seconds())
+
+            min_diff = min((prev_dttm_start_diff, prev_dttm_end_diff, dttm_start_diff, dttm_end_diff))
+
+            if min_diff > MAX_DIFF_IN_SECONDS:
+                continue # нет смены или она слишком "далеко" от отметки, тут можно создать отметку за сегодня
+
+            if min_diff == prev_dttm_start_diff or min_diff == dttm_start_diff:
+                comming = AttendanceRecords.objects.filter(
+                    dttm__date=dttm.date(),
+                    shop=shop,
+                    user_id=user_id,
                     type=AttendanceRecords.TYPE_COMING,
-                    user_id=user_id,
-                    shop_id=shop_id,
                 ).first()
-                leaving = AttendanceRecords.objects.filter(
-                    dttm__date=date,
-                    type=AttendanceRecords.TYPE_LEAVING,
-                    user_id=user_id,
-                    shop_id=shop_id,
-                ).first()
-                if not coming:
-                    print(f"create coming record {times['coming']} for {user_id} {shop_id}")
+                if comming and comming.dttm < dttm: # отметка о приходе уже есть, возможно следующая об уходе
                     AttendanceRecords.objects.create(
-                        dttm=times['coming'],
-                        type=AttendanceRecords.TYPE_COMING,
+                        dttm=dttm,
+                        shop=shop,
                         user_id=user_id,
-                        shop_id=shop_id,
+                        type=AttendanceRecords.TYPE_LEAVING,
                     )
-                elif coming.dttm > times['coming']:
-                    coming.dttm = times['coming']
-                    coming.save()
-
-                if times['leaving'] > times['coming']:
-                    if not leaving:
-                        print(f"create leaving record {times['leaving']} for {user_id} {shop_id}")
-                        AttendanceRecords.objects.create(
-                            dttm=times['leaving'],
-                            type=AttendanceRecords.TYPE_LEAVING,
-                            user_id=user_id,
-                            shop_id=shop_id,
-                        )
-                    elif leaving.dttm < times['leaving']:
-                        leaving.dttm = times['leaving']
-                        leaving.save()
+                    print(f"create leaving record {dttm} for {user_id} {shop}")
+                    continue
+                AttendanceRecords.objects.create(
+                    dttm=dttm,
+                    shop=shop,
+                    user_id=user_id,
+                    type=AttendanceRecords.TYPE_COMING,
+                )
+                print(f"create coming record {dttm} for {user_id} {shop}")
+            elif min_diff == prev_dttm_end_diff or min_diff == dttm_end_diff:
+                print(f"create leaving record {dttm} for {user_id} {shop}")
+                AttendanceRecords.objects.create(
+                    dttm=dttm,
+                    shop=shop,
+                    user_id=user_id,
+                    type=AttendanceRecords.TYPE_LEAVING,
+                )
 
 
 @app.task()
