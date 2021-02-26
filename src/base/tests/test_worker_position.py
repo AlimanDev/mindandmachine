@@ -1,5 +1,4 @@
 from django.test import TestCase
-from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from src.base.models import WorkerPosition
@@ -7,21 +6,23 @@ from src.base.tests.factories import GroupFactory, NetworkFactory, BreakFactory
 from src.timetable.models import WorkTypeName
 from src.timetable.tests.factories import WorkTypeNameFactory
 from src.util.mixins.tests import TestsHelperMixin
+import json
 
 
-@override_settings(WORKER_POSITION_DEFAULT_VALUES={
-    'default': {
-        r'(.*)?Врач(.*)?': {
-            'hours_in_a_week': 39,
-            'group_code': 'worker',
-            'breaks_code': None
-        },
-    }
-})
 class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
+        cls.network.worker_position_default_values = json.dumps(
+           {
+                r'(.*)?Врач(.*)?': {
+                    'hours_in_a_week': 39,
+                    'group_code': 'worker',
+                    'breaks_code': None
+                },
+            }
+        )
+        cls.network.save()
         WorkerPosition.objects.bulk_create(
             [
                 WorkerPosition(
@@ -100,38 +101,39 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
             WorkerPosition.objects.filter(dttm_deleted__isnull=True).count(), self.worker_positions_count - 1)
 
 
-@override_settings(WORKER_POSITION_DEFAULT_VALUES={
-    'default': {
-        r'(.*)?врач|травматолог|ортопед(.*)?': {
-            'default_work_type_names_codes': ('doctor',),
-            'hours_in_a_week': 39,
-            'group_code': 'worker',
-            'breaks_code': 'doctor'
-        },
-        r'(.*)?продавец|кассир|менеджер|консультант(.*)?': {
-            'default_work_type_names_codes': ('consult',),
-            'hours_in_a_week': 40,
-            'group_code': 'worker',
-            'breaks_code': 'consult'
-        },
-        r'(.*)?директор|управляющий(.*)?': {
-            'default_work_type_names_codes': ('consult',),
-            'hours_in_a_week': 40,
-            'group_code': 'director',
-            'breaks_code': 'director'
-        },
-        r'(.*)?кладовщик|уборщик|курьер(.*)?': {
-            'default_work_type_names_codes': ('other',),
-            'hours_in_a_week': 40,
-            'group_code': 'worker',
-            'breaks_code': None
-        },
-    }
-})
 class TestSetWorkerPositionDefaultsModel(TestsHelperMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.network.worker_position_default_values = json.dumps(
+           {
+                r'(.*)?врач|травматолог|ортопед(.*)?': {
+                    'default_work_type_names_codes': ('doctor',),
+                    'hours_in_a_week': 39,
+                    'group_code': 'worker',
+                    'breaks_code': 'doctor'
+                },
+                r'(.*)?продавец|кассир|менеджер|консультант(.*)?': {
+                    'default_work_type_names_codes': ('consult',),
+                    'hours_in_a_week': 40,
+                    'group_code': 'worker',
+                    'breaks_code': 'consult'
+                },
+                r'(.*)?директор|управляющий(.*)?': {
+                    'default_work_type_names_codes': ('consult',),
+                    'hours_in_a_week': 40,
+                    'group_code': 'director',
+                    'breaks_code': 'director'
+                },
+                r'(.*)?кладовщик|уборщик|курьер(.*)?': {
+                    'default_work_type_names_codes': ('other',),
+                    'hours_in_a_week': 40,
+                    'group_code': 'worker',
+                    'breaks_code': None
+                },
+            }
+        )
+        cls.network.save()
         cls.group_director = GroupFactory(name='Директор', code='director')
         cls.group_worker = GroupFactory(name='Сотрудник', code='worker')
         cls.work_type_name_consult = WorkTypeNameFactory(

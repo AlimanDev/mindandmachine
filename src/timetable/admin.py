@@ -116,11 +116,13 @@ class WorkerConstraintAdmin(admin.ModelAdmin):
 @admin.register(WorkerDay)
 class WorkerDayAdmin(admin.ModelAdmin):
     list_display = ('worker_last_name', 'shop_title', 'parent_title', 'dt', 'type', 'id', 'dttm_work_start',
-                    'dttm_work_end')
-    search_fields = ('worker__last_name', 'shop_title', 'parent_title', 'id', 'dt')
-    list_filter = ('shop', 'type')
-    raw_id_fields = ('parent_worker_day',)
-    list_select_related = ('worker', 'shop')
+                    'dttm_work_end', 'dttm_modified')
+    search_fields = ('worker__last_name', 'shop__name', 'shop__parent__name', 'id', 'dt')
+    list_filter = ('shop', 'type', 'dttm_modified')
+    raw_id_fields = ('parent_worker_day', 'employment', 'created_by', 'worker', 'shop')
+    list_select_related = ('worker', 'shop', 'shop__parent')
+    readonly_fields = ('dttm_modified',)
+    change_list_template = 'worker_day_change_list.html'
 
     @staticmethod
     def worker_last_name(instance: WorkerConstraint):

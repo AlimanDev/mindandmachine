@@ -108,9 +108,17 @@ class Network(AbstractActiveModel):
         verbose_name='Перерывы по умолчанию',
         related_name='networks',
     )
+    # при создании новой должности будут проставляться соотв. значения
+    # пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
+    worker_position_default_values = models.TextField(verbose_name='Параметры должностей по умолчанию', default='{}')
 
     def get_department(self):
         return None
+
+    @cached_property
+    def position_default_values(self):
+        return json.loads(self.worker_position_default_values)
+
 
     @cached_property
     def night_edges(self):
@@ -755,7 +763,7 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
 
     @cached_property
     def wp_defaults(self):
-        wp_defaults_dict = settings.WORKER_POSITION_DEFAULT_VALUES.get(self.network.code)
+        wp_defaults_dict = self.network.position_default_values
         if wp_defaults_dict:
             for re_pattern, wp_defaults in wp_defaults_dict.items():
                 if re.search(re_pattern, self.name, re.IGNORECASE):

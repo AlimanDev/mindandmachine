@@ -31,7 +31,7 @@ class UrvStatTodayEvent(BaseRegisteredEvent):
         dt = date.today()
         title = f'URV_today_{dt}.xlsx'
 
-        return create_urv(dt, dt, title=title, network_id=self.network_id, in_memory=True)
+        return create_urv(dt, dt, title=title, network_id=self.network_id, comming_only=True, in_memory=True)
 
 class UrvViolatorsReportEvent(BaseRegisteredEvent):
     name = 'Отправка отчета по нарушителям УРВ за вчерашний день'

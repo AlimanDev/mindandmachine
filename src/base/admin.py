@@ -16,11 +16,12 @@ from src.base.models import (
     ShopSchedule,
 )
 from src.timetable.models import GroupWorkerDayPermission
-
+from src.base.forms import NetworkAdminForm, ShopAdminForm, ShopSettingsAdminForm, BreakAdminForm
 
 @admin.register(Network)
 class NetworkAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'code', 'logo')
+    form = NetworkAdminForm
 
 
 @admin.register(Region)
@@ -68,6 +69,7 @@ class ShopAdmin(admin.ModelAdmin):
     list_display = ('name', 'parent_title', 'id', 'code')
     search_fields = ('name', 'parent__name', 'id', 'code')
     raw_id_fields = ('director',)
+    form = ShopAdminForm
 
     @staticmethod
     def parent_title(instance: Shop):
@@ -78,6 +80,7 @@ class ShopAdmin(admin.ModelAdmin):
 class ShopSettingsAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('id', 'name')
+    form = ShopSettingsAdminForm
 
 
 class GroupWorkerDayPermissionInline(admin.TabularInline):
@@ -128,6 +131,7 @@ class ProductionDayAdmin(admin.ModelAdmin):
 class BreakAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'code')
     search_fields = ('name',)
+    form = BreakAdminForm
 
 
 @admin.register(SAWHSettings)
