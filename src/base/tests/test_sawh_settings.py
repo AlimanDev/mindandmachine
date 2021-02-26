@@ -17,12 +17,10 @@ from src.base.tests.factories import (
     GroupFactory,
     WorkerPositionFactory,
 )
-from src.timetable.models import WorkerDay, Employment
+from src.timetable.models import WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
 from src.timetable.worker_day.stat import (
-    WorkerProdCalExactHoursGetter,
-    WorkerProdCalMeanHoursGetter,
-    WorkerSawhHoursGetter,
+    WorkersStatsGetter,
 )
 from src.util.mixins.tests import TestsHelperMixin
 
@@ -78,46 +76,23 @@ class SawhSettingsHelperMixin(TestsHelperMixin):
     def _set_network_settings(self, **data):
         self._set_obj_data(self.network, **data)
 
-    def _test_norm_hours_for_period(
-            self, dt_from, dt_to, expected_res, norm_hours_cls=WorkerProdCalExactHoursGetter):
-        acc_period_start, acc_period_end = self.network.get_acc_period_range(dt_from)
-        norm_hours_getter = norm_hours_cls(
+    def _test_hours_for_period(
+            self, dt_from, dt_to, expected_norm_hours, hours_k='sawh_hours', plan_fact_k='plan',
+            approved_k='approved', period_k='selected_period'):
+        workers_stats_getter = WorkersStatsGetter(
             worker_id=self.worker.id,
-            network=self.network,
-            worker_days=list(WorkerDay.objects.filter(
-                worker_id=self.worker.id,
-                type__in=WorkerDay.TYPES_USED,
-                dt__gte=dt_from,
-                dt__lte=dt_to,
-                is_fact=False,
-                is_approved=True,
-            ).exclude(
-                Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) &
-                Q(
-                    Q(dttm_work_start__isnull=True) |
-                    Q(dttm_work_end__isnull=True)
-                )
-            ).select_related(
-                'employment',
-            )),
-            employments_list=list(Employment.objects.get_active(
-                dt_from=acc_period_start,
-                dt_to=acc_period_end,
-                user_id=self.worker.id,
-            ).select_related('position')),
-            region_id=self.shop.region_id,
+            shop_id=self.shop.id,
             dt_from=dt_from,
             dt_to=dt_to,
-            acc_period_start=acc_period_start,
-            acc_period_end=acc_period_end,
         )
-        res = norm_hours_getter.run()
-        self.assertDictEqual(res, expected_res)
-        return res
+        workers_stats = workers_stats_getter.run()
+        norm_hours = workers_stats[self.worker.id][plan_fact_k][approved_k][hours_k][period_k]
+        self.assertEqual(norm_hours, expected_norm_hours)
+        return norm_hours
 
-    def _test_norm_hours_for_acc_period(self, dt, expected_res, **kwargs):
+    def _test_hours_for_acc_period(self, dt, expected_norm_hours, **kwargs):
         dt_from, dt_to = self.network.get_acc_period_range(dt)
-        self._test_norm_hours_for_period(dt_from=dt_from, dt_to=dt_to, expected_res=expected_res, **kwargs)
+        self._test_hours_for_period(dt_from=dt_from, dt_to=dt_to, expected_norm_hours=expected_norm_hours, **kwargs)
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
@@ -125,42 +100,27 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
     acc_period = Network.ACC_PERIOD_MONTH
 
     def test_norm_hours_for_acc_period(self):
-        for norm_hours_cls in [WorkerProdCalExactHoursGetter, WorkerProdCalMeanHoursGetter]:
-            self._test_norm_hours_for_acc_period(dt=date(2021, 1, 1), expected_res={'value': 120.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 2, 1), expected_res={'value': 151.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 3, 1), expected_res={'value': 176.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 4, 1), expected_res={'value': 175.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 5, 1), expected_res={'value': 152.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 6, 1), expected_res={'value': 167.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 7, 1), expected_res={'value': 176.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 8, 1), expected_res={'value': 176.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 9, 1), expected_res={'value': 176.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 10, 1), expected_res={'value': 168.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 11, 1), expected_res={'value': 159.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 12, 1), expected_res={'value': 176.0},
-                                                 norm_hours_cls=norm_hours_cls)
+        self._test_hours_for_acc_period(dt=date(2021, 1, 1), expected_norm_hours=120.0)
+        self._test_hours_for_acc_period(dt=date(2021, 2, 1), expected_norm_hours=151.0)
+        self._test_hours_for_acc_period(dt=date(2021, 3, 1), expected_norm_hours=176.0)
+        self._test_hours_for_acc_period(dt=date(2021, 4, 1), expected_norm_hours=175.0)
+        self._test_hours_for_acc_period(dt=date(2021, 5, 1), expected_norm_hours=152.0)
+        self._test_hours_for_acc_period(dt=date(2021, 6, 1), expected_norm_hours=167.0)
+        self._test_hours_for_acc_period(dt=date(2021, 7, 1), expected_norm_hours=176.0)
+        self._test_hours_for_acc_period(dt=date(2021, 8, 1), expected_norm_hours=176.0)
+        self._test_hours_for_acc_period(dt=date(2021, 9, 1), expected_norm_hours=176.0)
+        self._test_hours_for_acc_period(dt=date(2021, 10, 1), expected_norm_hours=168.0)
+        self._test_hours_for_acc_period(dt=date(2021, 11, 1), expected_norm_hours=159.0)
+        self._test_hours_for_acc_period(dt=date(2021, 12, 1), expected_norm_hours=176.0)
 
     def test_norm_for_36_hours_week(self):
         self.worker_position.hours_in_a_week = 36
         self.worker_position.save()
-        for norm_hours_cls in [WorkerProdCalExactHoursGetter, WorkerProdCalMeanHoursGetter]:
-            self._test_norm_hours_for_period(
-                dt_from=date(2021, 2, 1),
-                dt_to=date(2021, 2, 28),
-                expected_res={'value': 135.8},
-                norm_hours_cls=norm_hours_cls,
-            )
+        self._test_hours_for_period(
+            dt_from=date(2021, 2, 1),
+            dt_to=date(2021, 2, 28),
+            expected_norm_hours=135.8,
+        )
 
     def test_subtract_sick_days_from_norm_hours_exact(self):
         # часть новогодн. праздников
@@ -187,9 +147,8 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
                 is_approved=True,
             )
 
-        self._test_norm_hours_for_acc_period(
-            dt=date(2021, 1, 1), expected_res={'value': 120.0},
-            norm_hours_cls=WorkerProdCalExactHoursGetter)
+        self._test_hours_for_acc_period(
+            dt=date(2021, 1, 1), expected_norm_hours=120.0, hours_k='norm_hours', period_k='acc_period')
 
         # рабочая неделя
         for day_num in range(25, 30):
@@ -203,9 +162,8 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
                 is_approved=True,
             )
 
-        self._test_norm_hours_for_acc_period(
-            dt=date(2021, 1, 1), expected_res={'value': 80.0},
-            norm_hours_cls=WorkerProdCalExactHoursGetter)
+        self._test_hours_for_acc_period(
+            dt=date(2021, 1, 1), expected_norm_hours=80.0, hours_k='norm_hours', period_k='acc_period')
 
     def test_subtract_sick_days_from_norm_hours_mean(self):
         # часть новогодн. праздников
@@ -220,10 +178,9 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
                 is_approved=True,
             )
 
-        self._test_norm_hours_for_acc_period(
+        self._test_hours_for_acc_period(
             dt=date(2021, 1, 1),
-            expected_res={'value': 104.51612903225805},
-            norm_hours_cls=WorkerProdCalMeanHoursGetter,
+            expected_norm_hours=104.51612903225806,
         )
 
 
@@ -232,37 +189,29 @@ class TestSAWGSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
     acc_period = Network.ACC_PERIOD_QUARTER
 
     def test_norm_hours_for_acc_period(self):
-        for norm_hours_cls in [WorkerProdCalExactHoursGetter, WorkerProdCalMeanHoursGetter]:
-            self._test_norm_hours_for_acc_period(dt=date(2021, 1, 1), expected_res={'value': 447.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 4, 1), expected_res={'value': 494.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 7, 1), expected_res={'value': 528.0},
-                                                 norm_hours_cls=norm_hours_cls)
-            self._test_norm_hours_for_acc_period(dt=date(2021, 10, 1), expected_res={'value': 503.0},
-                                                 norm_hours_cls=norm_hours_cls)
+        self._test_hours_for_acc_period(dt=date(2021, 1, 1), expected_norm_hours=447.0)
+        self._test_hours_for_acc_period(dt=date(2021, 4, 1), expected_norm_hours=494.0)
+        self._test_hours_for_acc_period(dt=date(2021, 7, 1), expected_norm_hours=528.0)
+        self._test_hours_for_acc_period(dt=date(2021, 10, 1), expected_norm_hours=503.0)
 
     def test_equal_distribution_by_months(self):
         self.sawh_settings.work_hours_by_months = {
-            f'm{month_num}': 100 / self.network.accounting_period_length for month_num in range(1, 12 + 1)}
+            f'm{month_num}': 1 for month_num in range(1, 12 + 1)}
         self.sawh_settings.save(update_fields=['work_hours_by_months'])
-        self._test_norm_hours_for_period(
+        self._test_hours_for_period(
             dt_from=date(2021, 1, 1),
             dt_to=date(2021, 1, 31),
-            expected_res={'value': 149.00000000000003},
-            norm_hours_cls=WorkerSawhHoursGetter,
+            expected_norm_hours=149,
         )
-        self._test_norm_hours_for_period(
+        self._test_hours_for_period(
             dt_from=date(2021, 2, 1),
             dt_to=date(2021, 2, 28),
-            expected_res={'value': 149.00000000000003},
-            norm_hours_cls=WorkerSawhHoursGetter,
+            expected_norm_hours=149
         )
-        self._test_norm_hours_for_period(
+        self._test_hours_for_period(
             dt_from=date(2021, 3, 1),
             dt_to=date(2021, 3, 31),
-            expected_res={'value': 149.00000000000003},
-            norm_hours_cls=WorkerSawhHoursGetter,
+            expected_norm_hours=149
         )
 
     def test_two_employments_case_one(self):
@@ -290,25 +239,22 @@ class TestSAWGSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         EmploymentFactory(
             dt_hired='2021-02-10', dt_fired='3999-12-12',
             network=self.network, user=self.worker, shop=self.shop, position=worker_position2)
-        res = self._test_norm_hours_for_period(
+        res = self._test_hours_for_period(
             dt_from=date(2021, 1, 1),
             dt_to=date(2021, 1, 31),
-            expected_res={'value': 136.93654266958424},
-            norm_hours_cls=WorkerSawhHoursGetter,
+            expected_norm_hours=127.0103092783505,
         )
-        res2 = self._test_norm_hours_for_period(
+        res2 = self._test_hours_for_period(
             dt_from=date(2021, 2, 1),
             dt_to=date(2021, 2, 28),
-            expected_res={'value': 145.73960612691468},
-            norm_hours_cls=WorkerSawhHoursGetter,
+            expected_norm_hours=146.87942456195367,
         )
-        res3 = self._test_norm_hours_for_period(
+        res3 = self._test_hours_for_period(
             dt_from=date(2021, 3, 1),
             dt_to=date(2021, 3, 31),
-            expected_res={'value': 164.32385120350108},
-            norm_hours_cls=WorkerSawhHoursGetter,
+            expected_norm_hours=173.1102661596958,
         )
-        self.assertEqual(res['value'] + res2['value'] + res3['value'], 447)
+        self.assertEqual(res + res2 + res3, 447)
 
     def test_two_employments_case_two(self):
         self.sawh_settings.work_hours_by_months['m1'] = 0.3
@@ -335,25 +281,22 @@ class TestSAWGSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         EmploymentFactory(
             dt_hired='2021-02-10', dt_fired='2021-03-20',
             network=self.network, user=self.worker, shop=self.shop, position=worker_position2)
-        res = self._test_norm_hours_for_period(
+        res = self._test_hours_for_period(
             dt_from=date(2021, 1, 1),
             dt_to=date(2021, 1, 31),
-            expected_res={'value': 134.7791479441873},
-            norm_hours_cls=WorkerSawhHoursGetter,
+            expected_norm_hours=133.1891891891892,
         )
-        res2 = self._test_norm_hours_for_period(
+        res2 = self._test_hours_for_period(
             dt_from=date(2021, 2, 1),
             dt_to=date(2021, 2, 28),
-            expected_res={'value': 157.64346768471904},
-            norm_hours_cls=WorkerSawhHoursGetter,
+            expected_norm_hours=158.3046535642052,
         )
-        res3 = self._test_norm_hours_for_period(
+        res3 = self._test_hours_for_period(
             dt_from=date(2021, 3, 1),
             dt_to=date(2021, 3, 31),
-            expected_res={'value': 90.5773843710936},
-            norm_hours_cls=WorkerSawhHoursGetter,
+            expected_norm_hours=91.50615724660561,
         )
-        self.assertEqual(res['value'] + res2['value'] + res3['value'], 382.99999999999994)
+        self.assertEqual(res + res2 + res3, 383.0)
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
@@ -361,17 +304,14 @@ class TestSAWGSettingsHalfYearAccPeriod(SawhSettingsHelperMixin, TestCase):
     acc_period = Network.ACC_PERIOD_HALF_YEAR
 
     def test_norm_hours_for_acc_period(self):
-        for norm_hours_cls in [WorkerProdCalExactHoursGetter, WorkerProdCalMeanHoursGetter]:
-            self._test_norm_hours_for_acc_period(
-                dt=date(2021, 1, 1),
-                expected_res={'value': 941.0},
-                norm_hours_cls=norm_hours_cls,
-            )
-            self._test_norm_hours_for_acc_period(
-                dt=date(2021, 7, 1),
-                expected_res={'value': 1031.0},
-                norm_hours_cls=norm_hours_cls,
-            )
+        self._test_hours_for_acc_period(
+            dt=date(2021, 1, 1),
+            expected_norm_hours=941.0000000000001,
+        )
+        self._test_hours_for_acc_period(
+            dt=date(2021, 7, 1),
+            expected_norm_hours=1031.0,
+        )
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
@@ -379,9 +319,7 @@ class TestSAWGSettingsYearAccPeriod(SawhSettingsHelperMixin, TestCase):
     acc_period = Network.ACC_PERIOD_YEAR
 
     def test_norm_hours_for_acc_period(self):
-        for norm_hours_cls in [WorkerProdCalExactHoursGetter, WorkerProdCalMeanHoursGetter]:
-            self._test_norm_hours_for_acc_period(
-                dt=date(2021, 1, 1),
-                expected_res={'value': 1972.0},
-                norm_hours_cls=norm_hours_cls,
-            )
+        self._test_hours_for_acc_period(
+            dt=date(2021, 1, 1),
+            expected_norm_hours=1971.9999999999993,
+        )

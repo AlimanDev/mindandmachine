@@ -700,8 +700,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         init_params['n_working_days_optimal'] = len(work_days)
 
         for e in employments:
-            norm_work_amount = stats[e.user_id]['employments'][e.id]['sawh_hours_plan_not_approved_selected_period'
-                if form['use_not_approved'] else 'sawh_hours_plan_approved_selected_period']
+            norm_work_amount = shop.settings.norm_hours_coeff * stats[e.user_id]['employments'][e.id][
+                'sawh_hours_plan_not_approved_selected_period' if form[
+                    'use_not_approved'] else 'sawh_hours_plan_approved_selected_period']
             # TODO: сделать учет отработанных часов за предыдущий период ?
             employment_stat_dict[e.id]['norm_work_amount'] = norm_work_amount
 

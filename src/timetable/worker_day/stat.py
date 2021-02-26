@@ -684,12 +684,18 @@ class WorkersStatsGetter:
                                     sawh_hours.get('by_months', {}).get(month_num, 0) + \
                                     empl_dict.get('sawh_hours_by_months_plan_not_approved', {}).get(month_num, 0)
 
+                            sawh_hours['selected_period'] = sawh_hours.get('selected_period', 0) + \
+                                empl_dict.get('sawh_hours_plan_not_approved_selected_period', 0)
+
                     else:
                         for empl_id, empl_dict in worker_dict.get('employments', {}).items():
                             for month_num in acc_period_months:
                                 sawh_hours.setdefault('by_months', {})[month_num] = \
                                     sawh_hours.get('by_months', {}).get(month_num, 0) + \
                                     empl_dict.get('sawh_hours_by_months_plan_approved', {}).get(month_num, 0)
+
+                            sawh_hours['selected_period'] = sawh_hours.get('selected_period', 0) + \
+                                empl_dict.get('sawh_hours_plan_approved_selected_period', 0)
 
                     sawh_hours['curr_month'] = sawh_hours['by_months'].get(curr_month)
                     work_hours_curr_month = worker_dict.get(
