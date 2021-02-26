@@ -11,6 +11,7 @@ from src.forecast.models import (
     OperationTypeRelation,
     Receipt,
 )
+from src.forecast.forms import LoadTemplateAdminForm
 
 
 @admin.register(OperationType)
@@ -86,6 +87,7 @@ class OperationTypeNameAdmin(admin.ModelAdmin):
 class LoadTemplateAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('name',)
+    form = LoadTemplateAdminForm
 
 
 @admin.register(OperationTypeTemplate)
