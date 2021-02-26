@@ -280,6 +280,8 @@ USE_L10N = False
 
 USE_TZ = False
 
+DATETIME_FORMAT = "d b, Y, H:i:s"
+
 LOCALE_PATHS = [
     os.path.join(BASE_DIR,  'data/locale')
 ]
