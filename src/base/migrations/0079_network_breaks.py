@@ -8,11 +8,12 @@ def set_breaks(apps, schema_editor):
     Break = apps.get_model('base', 'Break')
     Network = apps.get_model('base', 'Network')
     for n in Network.objects.all():
-        Break.objects.create(
+        n.breaks = Break.objects.create(
             name=f'По умолчанию для сети {n.name}',
             network=n,
             value='[[0, 360, [30]], [360, 540, [30, 30]], [540, 780, [30, 30, 15]]]',
         )
+        n.save()
 
 
 

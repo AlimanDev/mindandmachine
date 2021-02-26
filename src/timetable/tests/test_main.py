@@ -1162,6 +1162,27 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(
             response.json()['dt'][0], 'Поле дата не может быть пустым.')
 
+    def test_network_breaks(self):
+        Employment.objects.all().update(position=None)
+        Shop.objects.all().update(settings=None)
+        dt = date.today()
+        WorkerDay.objects.all().delete()
+        self.employment2.refresh_from_db()
+        self.shop.refresh_from_db()
+        self.network.breaks = self.breaks
+        self.network.save()
+        wd = WorkerDay.objects.create(
+            shop=self.shop,
+            worker_id=self.employment2.user_id,
+            employment=self.employment2,
+            dt=dt,
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            type=WorkerDay.TYPE_WORKDAY,
+        )
+        self.assertEqual(wd.work_hours, timedelta(hours=10, minutes=45))
+
+
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod
@@ -2321,21 +2342,6 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, worker_id=self.employment2.user_id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
     
-    def test_network_breaks(self):
-        Employment.objects.all().update(position=None)
-        Shop.objects.all().update(settings=None)
-        dt = date.today()
-        wd = WorkerDay.objects.create(
-            shop=self.shop,
-            worker_id=self.employment2.user_id,
-            employment=self.employment2,
-            dt=dt,
-            dttm_work_start=datetime.combine(dt, time(8)),
-            dttm_work_end=datetime.combine(dt, time(20)),
-            type=WorkerDay.TYPE_WORKDAY,
-        )
-        self.assertEqual(wd.work_hours, timedelta(hours=10, minutes=45))
-
     # def test_change_list(self):
     #     dt_from = date.today()
     #     data = {
