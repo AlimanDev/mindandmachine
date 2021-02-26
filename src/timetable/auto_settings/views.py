@@ -560,8 +560,12 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             prev_data[key].append(worker_d)
 
         employment_stat_dict = count_prev_paid_days(dt_from - timedelta(days=1), employments, shop.region_id)
+        # статистика за период до даты составления в текущем месяце
         month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_start=dt_from, is_approved=not form['use_not_approved'])
+        # статистика за период составления графика
         month_stat_prev = count_prev_paid_days(dt_from, employments, shop.region_id, dt_start=dt_first, is_approved=not form['use_not_approved'])
+        # статистика за период после даты составления в текущем месяце
+        month_stat_next = count_prev_paid_days(dt_first + relativedelta(day=31), employments, shop.region_id, dt_start=dt_to + timedelta(days=1), is_approved=not form['use_not_approved'])
 
         ##################################################################
 
@@ -702,8 +706,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         for e in employments:
             fot = work_hours * e.norm_work_hours / 100
-            fot = fot * (days_in_month - (month_stat[e.id]['vacations'] + month_stat_prev[e.id]['vacations'])) / days_in_month
-            employment_stat_dict[e.id]['norm_work_amount'] = (fot - month_stat_prev[e.id]['paid_hours']) * (days_in_month - month_stat_prev[e.id]['no_data']) / days_in_month
+            fot = fot * (days_in_month - (month_stat[e.id]['vacations'] + month_stat_prev[e.id]['vacations'] + month_stat_next[e.id]['vacations'])) / days_in_month
+            employment_stat_dict[e.id]['norm_work_amount'] = \
+            (fot - (month_stat_prev[e.id]['paid_hours'] + month_stat_next[e.id]['paid_hours'])) * \
+            (days_in_month - (month_stat_prev[e.id]['no_data'] + month_stat_next[e.id]['no_data'])) / days_in_month
 
 
         ##################################################################
