@@ -208,6 +208,7 @@ class ShopSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     # added on 21.12.2018
     idle = models.SmallIntegerField(default=0)  # percents
     fot = models.IntegerField(default=0)
+    norm_hours_coeff = models.FloatField(default=1.0, verbose_name='Коэфф. нормы часов')
     less_norm = models.SmallIntegerField(default=0)  # percents
     more_norm = models.SmallIntegerField(default=0)  # percents
     shift_start = models.SmallIntegerField(default=6)
