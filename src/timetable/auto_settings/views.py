@@ -565,7 +565,13 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         # статистика за период составления графика
         month_stat_prev = count_prev_paid_days(dt_from, employments, shop.region_id, dt_start=dt_first, is_approved=not form['use_not_approved'])
         # статистика за период после даты составления в текущем месяце
-        month_stat_next = count_prev_paid_days(dt_first + relativedelta(day=31), employments, shop.region_id, dt_start=dt_to + timedelta(days=1), is_approved=not form['use_not_approved'])
+        month_stat_next = count_prev_paid_days(
+            (dt_first + relativedelta(day=31)) + timedelta(1), 
+            employments, 
+            shop.region_id, 
+            dt_start=dt_to + timedelta(days=1), 
+            is_approved=not form['use_not_approved'],
+        )
 
         ##################################################################
 
