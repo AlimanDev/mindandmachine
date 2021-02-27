@@ -995,6 +995,7 @@ class AttendanceRecords(AbstractModel):
         TYPE_LEAVING: 'dttm_work_end',
     }
 
+    dt = models.DateField()  # TODO-devx: может быть лучше сделать fk на WorkerDay?
     dttm = models.DateTimeField()
     type = models.CharField(max_length=1, choices=RECORD_TYPES)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
@@ -1056,13 +1057,12 @@ class AttendanceRecords(AbstractModel):
         При создании отметки время о приходе или уходе заносится в фактический подтвержденный график WorkerDay.
         Если подтвержденного факта нет - создаем новый подтвержденный факт.
         """
+        self.dt = self.dt or self.dttm.date()
         res = super(AttendanceRecords, self).save(*args, **kwargs)
 
         with transaction.atomic():
-            dt = self.dttm.date()
-
             fact_approved = WorkerDay.objects.filter(
-                dt=dt,
+                dt=self.dt,
                 worker=self.user,
                 is_fact=True,
                 is_approved=True,
@@ -1070,7 +1070,7 @@ class AttendanceRecords(AbstractModel):
 
             active_user_empl = Employment.objects.get_active_empl_for_user(
                 network_id=self.user.network_id, user_id=self.user_id,
-                dt=dt,
+                dt=self.dt,
                 priority_shop_id=self.shop_id,
             ).first()
 
@@ -1094,14 +1094,14 @@ class AttendanceRecords(AbstractModel):
                 setattr(fact_approved, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
                 setattr(fact_approved, 'type', WorkerDay.TYPE_WORKDAY)
                 if not fact_approved.worker_day_details.exists():
-                    self._create_wd_details(dt, fact_approved, active_user_empl)
+                    self._create_wd_details(self.dt, fact_approved, active_user_empl)
                 fact_approved.save()
             else:
                 if self.type == self.TYPE_LEAVING:
                     prev_fa_wd = WorkerDay.objects.filter(
                         shop_id=self.shop_id,
                         worker=self.user,
-                        dt__lt=self.dttm.date(),
+                        dt__lt=self.dt,
                         is_fact=True,
                         is_approved=True,
                     ).order_by('dt').last()
@@ -1109,7 +1109,7 @@ class AttendanceRecords(AbstractModel):
                     # Если предыдущая смена не закрыта.
                     if prev_fa_wd and prev_fa_wd.dttm_work_start and prev_fa_wd.dttm_work_end is None:
                         close_prev_work_shift_cond = (
-                                                             self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
+                            self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
                         # Если с момента открытия предыдущей смены прошло менее MAX_WORK_SHIFT_SECONDS,
                         # то закрываем предыдущую смену.
                         if close_prev_work_shift_cond:
@@ -1122,7 +1122,7 @@ class AttendanceRecords(AbstractModel):
                         return
 
                 fact_approved, _wd_created = WorkerDay.objects.update_or_create(
-                    dt=self.dttm.date(),
+                    dt=self.dt,
                     worker=self.user,
                     is_fact=True,
                     is_approved=True,
@@ -1135,7 +1135,7 @@ class AttendanceRecords(AbstractModel):
                     }
                 )
                 if _wd_created or not fact_approved.worker_day_details.exists():
-                    self._create_wd_details(dt, fact_approved, active_user_empl)
+                    self._create_wd_details(self.dt, fact_approved, active_user_empl)
 
         return res
 
