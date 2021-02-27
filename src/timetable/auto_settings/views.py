@@ -1,21 +1,25 @@
 import json
-import requests
 from datetime import datetime, timedelta, date
-from django.utils import timezone
+
+import requests
 from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.db.models import F, Count, Sum, Q
 from django.db.models.functions import Coalesce, Extract
-from django.core.serializers.json import DjangoJSONEncoder
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets
-from rest_framework.response import Response
+from rest_framework.authentication import BaseAuthentication
 from rest_framework.decorators import action
-from src.celery.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
-from src.base.permissions import Permission
+from rest_framework.exceptions import ValidationError, AuthenticationFailed
+from rest_framework.response import Response
 
-from src.forecast.models import PeriodClients
 from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings, WorkerPosition
+from src.base.permissions import Permission
+from src.celery.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
+from src.forecast.models import PeriodClients
 from src.timetable.models import (
     ShopMonthStat,
     WorkType,
@@ -26,20 +30,15 @@ from src.timetable.models import (
     Slot,
     UserWeekdaySlot,
 )
-
-from src.timetable.serializers import AutoSettingsCreateSerializer, AutoSettingsDeleteSerializer, AutoSettingsSetSerializer
+from src.timetable.serializers import AutoSettingsCreateSerializer, AutoSettingsDeleteSerializer, \
+    AutoSettingsSetSerializer
+from src.timetable.worker_day.stat import CalendarPaidDays, WorkersStatsGetter
 from src.util.models_converter import (
     WorkTypeConverter,
     EmploymentConverter,
     WorkerDayConverter,
     Converter,
 )
-
-from src.timetable.worker_day.stat import CalendarPaidDays
-from rest_framework.exceptions import ValidationError, AuthenticationFailed
-from rest_framework.authentication import BaseAuthentication
-
-from drf_yasg.utils import swagger_auto_schema
 
 
 class TokenAuthentication(BaseAuthentication):
@@ -54,6 +53,7 @@ class TokenAuthentication(BaseAuthentication):
             raise AuthenticationFailed('No such user')
 
         return (user, None)
+
 
 class AutoSettingsViewSet(viewsets.ViewSet):
     error_messages = {
@@ -302,7 +302,6 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         user_ids = employments.values_list('user_id', flat=True)
 
-        from src.timetable.worker_day.stat import WorkersStatsGetter
         worker_stats_cls = WorkersStatsGetter(
             shop_id=shop_id,
             dt_from=dt_from,

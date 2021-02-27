@@ -149,8 +149,6 @@ class TestAutoSettings(APITestCase):
             dttm_work_end__isnull=True
         ).count(), 1)
 
-
-
     def test_set_timetable_change_existed(self):
         timetable = ShopMonthStat.objects.create(
             shop=self.shop,

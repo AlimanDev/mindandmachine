@@ -185,7 +185,7 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
-class TestSAWGSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
+class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
     acc_period = Network.ACC_PERIOD_QUARTER
 
     def test_norm_hours_for_acc_period(self):
@@ -300,7 +300,7 @@ class TestSAWGSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
-class TestSAWGSettingsHalfYearAccPeriod(SawhSettingsHelperMixin, TestCase):
+class TestSAWHSettingsHalfYearAccPeriod(SawhSettingsHelperMixin, TestCase):
     acc_period = Network.ACC_PERIOD_HALF_YEAR
 
     def test_norm_hours_for_acc_period(self):
@@ -315,7 +315,7 @@ class TestSAWGSettingsHalfYearAccPeriod(SawhSettingsHelperMixin, TestCase):
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
-class TestSAWGSettingsYearAccPeriod(SawhSettingsHelperMixin, TestCase):
+class TestSAWHSettingsYearAccPeriod(SawhSettingsHelperMixin, TestCase):
     acc_period = Network.ACC_PERIOD_YEAR
 
     def test_norm_hours_for_acc_period(self):
