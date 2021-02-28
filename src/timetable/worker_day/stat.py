@@ -405,10 +405,6 @@ class WorkersStatsGetter:
                                           filter=Q(selected_period_q, work_hours__gte=timedelta(0),
                                                    type__in=WorkerDay.TYPES_WITH_TM_RANGE),
                                           output_field=FloatField()), 0),
-            work_hours_acc_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
-                                               filter=Q(work_hours__gte=timedelta(0),
-                                                        type__in=WorkerDay.TYPES_WITH_TM_RANGE),
-                                               output_field=FloatField()), 0),
             work_hours_prev_months=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                 filter=Q(prev_months_q, work_hours__gte=timedelta(0),
                                                          type__in=WorkerDay.TYPES_WITH_TM_RANGE),
@@ -435,7 +431,6 @@ class WorkersStatsGetter:
             work_hours['selected_shop'] = wd_dict['work_hours_selected_shop']
             work_hours['other_shops'] = wd_dict['work_hours_other_shops']
             work_hours['total'] = wd_dict['work_hours_total']
-            work_hours['acc_period'] = wd_dict['work_hours_acc_period']
             work_hours['until_acc_period_end'] = wd_dict['work_hours_until_acc_period_end']
 
             # за прошлые месяцы отработанные часы берем из факта подтвержденного
@@ -445,6 +440,8 @@ class WorkersStatsGetter:
                 work_hours['prev_months'] = res.get(
                     wd_dict['worker_id'], {}).get('fact', {}).get('approved', {}).get('work_hours', {}).get(
                     'prev_months', 0)
+
+            work_hours['acc_period'] = work_hours['prev_months'] + work_hours['until_acc_period_end']
 
         work_days = WorkerDay.objects.filter(
             dt__gte=acc_period_dt_from,

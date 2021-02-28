@@ -175,7 +175,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         )
         self.assertEqual(
             stats[self.user.id]['plan']['approved']['work_hours']['acc_period'],
-            18.0
+            27.0
         )
         self.assertEqual(
             stats[self.user.id]['fact']['approved']['overtime']['acc_period'],
