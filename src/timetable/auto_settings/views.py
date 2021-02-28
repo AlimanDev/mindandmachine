@@ -773,8 +773,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     # ),
                     'workdays': WorkerDayConverter.convert(worker_day.get(e.user_id, []), out_array=True),
                     'prev_data': WorkerDayConverter.convert(prev_data.get(e.user_id, []), out_array=True),
-                    'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),
-                    'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),
+                    'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),  # не учитывается
+                    'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),  # не учитывается
                     'norm_work_amount': employment_stat_dict[e.id]['norm_work_amount'],
                     'required_coupled_hol_in_hol': employment_stat_dict[e.id].get('required_coupled_hol_in_hol', 0),
                     'min_shift_len': e.shift_hours_length_min if e.shift_hours_length_min else 0,
