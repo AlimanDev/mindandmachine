@@ -4,11 +4,11 @@ from datetime import timedelta, date, datetime, time
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from src.base.models import WorkerPosition, Employment, Break, Group
+from src.base.models import WorkerPosition, Employment, Break
+from src.celery.tasks import delete_inactive_employment_groups
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
-from src.celery.tasks import delete_inactive_employment_groups
 
 
 class TestEmploymentAPI(TestsHelperMixin, APITestCase):
@@ -28,6 +28,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
         self.employment2.network.refresh_from_db()
+        self.user1.network.refresh_from_db()
 
     def _create_employment(self):
         data = {
@@ -326,7 +327,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.json()['function_group_id'], self.chief_group.id)
         self.assertEqual(resp.json()['dt_to_function_group'], (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'))
 
-
     def test_change_function_group_tmp_through_position(self):
         self.admin_group.subordinates.add(self.chief_group)
         self.admin_group.subordinates.add(self.employee_group)
@@ -349,7 +349,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.json()['function_group_id'], self.chief_group.id)
         self.assertEqual(resp.json()['dt_to_function_group'], (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'))
 
-
     def test_delete_function_group_tmp(self):
         self.admin_group.subordinates.add(self.chief_group)
         self.admin_group.subordinates.add(self.employee_group)
@@ -364,7 +363,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             content_type='application/json',
         )
         self.assertIsNone(resp.json()['function_group_id'])
-
 
     def test_change_function_group_tmp_no_perm(self):
         self.admin_group.subordinates.add(self.employee_group)
@@ -382,14 +380,12 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 403)
         self.assertEqual(resp.json(), {'detail': 'У вас нет прав для выполнения этой операции.'})
 
-
     def test_delete_inactive_function_groups(self):
         self.employment2.dt_to_function_group = date.today() - timedelta(days=5)
         self.employment2.save()
         delete_inactive_employment_groups()
         self.assertIsNone(Employment.objects.get(id=self.employment2.id).function_group_id)
         self.assertIsNotNone(Employment.objects.get(id=self.employment1.id).function_group_id)
-
 
     def test_timetable_permissions(self):
         data = {
@@ -398,17 +394,18 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'is_fixed_hours': True,
             'is_visible': False,
         }
-        response = self.client.put(f'/rest_api/employment/{self.employment3.id}/timetable/', data=self.dump_data(data), content_type='application/json') 
+        response = self.client.put(f'/rest_api/employment/{self.employment3.id}/timetable/', data=self.dump_data(data),
+                                   content_type='application/json')
         data = {
-            'is_fixed_hours': True, 
-            'salary': '150.00', 
-            'week_availability': 7, 
-            'norm_work_hours': 100, 
-            'min_time_btw_shifts': None, 
-            'shift_hours_length_min': None, 
-            'shift_hours_length_max': None, 
-            'tabel_code': None, 
-            'is_ready_for_overworkings': False, 
+            'is_fixed_hours': True,
+            'salary': '150.00',
+            'week_availability': 7,
+            'norm_work_hours': 100,
+            'min_time_btw_shifts': None,
+            'shift_hours_length_min': None,
+            'shift_hours_length_max': None,
+            'tabel_code': None,
+            'is_ready_for_overworkings': False,
             'is_visible': False,
             'function_group_id': self.employee_group.id,
         }
@@ -416,3 +413,36 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.employment3.refresh_from_db()
         self.assertIsNone(self.employment3.position_id)
         self.assertIsNone(self.employment3.dt_fired)
+
+    def test_descrease_employment_dt_hired_if_setting_is_enabled(self):
+        self.user1.network.descrease_employment_dt_fired_in_api = True
+        self.user1.network.save()
+
+        put_data = {
+            'position_id': self.worker_position.id,
+            'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
+            'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
+            'shop_id': self.shop2.id,
+            'user_id': self.user2.id,
+        }
+
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk='not_used'),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertTrue(Employment.objects.filter(
+            shop_id=put_data['shop_id'],
+            dt_hired=put_data['dt_hired'],
+            dt_fired=put_data['dt_fired'],
+            user_id=put_data['user_id'],
+            position_id=put_data['position_id'],
+        ).count() == 0)
+        self.assertTrue(Employment.objects.filter(
+            shop_id=put_data['shop_id'],
+            dt_hired=put_data['dt_hired'],
+            dt_fired=date(2021, 5, 24).strftime('%Y-%m-%d'),
+            user_id=put_data['user_id'],
+            position_id=put_data['position_id'],
+        ).count() == 1)
