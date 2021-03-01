@@ -1,13 +1,15 @@
-from django.utils.translation import gettext_lazy as _
-
-from rest_framework import serializers
-from rest_framework.exceptions import ValidationError, PermissionDenied
-from rest_framework.validators import UniqueValidator
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError, PermissionDenied
+from rest_framework.validators import UniqueValidator
 
+from src.base.fields import CurrentUserNetwork, UserworkShop
+from src.base.message import Message
 from src.base.models import (
     Employment,
     Network,
@@ -23,9 +25,8 @@ from src.base.models import (
     Break,
     ShopSchedule,
 )
-from src.base.message import Message
-from src.base.fields import CurrentUserNetwork, UserworkShop
-from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
+from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, \
+    WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
 
 
 class BaseNetworkSerializer(serializers.ModelSerializer):
@@ -234,6 +235,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 attrs['shop_id'] = shops[0].id
             else:
                 self.fail('no_shop', amount=len(shops), code=shop['code'])
+
+        if self.context['request'].user.network.descrease_employment_dt_fired_in_api:
+            if 'dt_hired' in attrs and attrs['dt_fired']:
+                attrs['dt_fired'] = attrs['dt_fired'] - timedelta(1)
 
         return attrs
 
