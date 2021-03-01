@@ -137,11 +137,11 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
 
 
 def urv_stat_v2(dt_from, dt_to, title=None, network_id=None, in_memory=False):
-    SHOP_CODE = 0
-    SHOP = 1
-    DTTM = 2
-    USER_CODE = 3
-    USER = 4
+    DTTM = 0
+    SHOP_CODE = 1
+    SHOP = 2
+    USER = 3
+    USER_CODE = 4
     TYPE = 5
 
     if in_memory:
