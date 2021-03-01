@@ -33,18 +33,6 @@ class EventTypeAdmin(admin.ModelAdmin):
         EventWebhookNotificationInline,
     )
 
-    def has_delete_permission(self, request, obj=None):
-        has_perm = super(EventTypeAdmin, self).has_change_permission(request, obj=obj)
-        if has_perm is False:
-            return has_perm
-        return getattr(obj, 'code', None) not in EventRegistryHolder.get_registry().keys()
-
-    def has_change_permission(self, request, obj=None):
-        has_perm = super(EventTypeAdmin, self).has_change_permission(request, obj=obj)
-        if has_perm is False:
-            return has_perm
-        return getattr(obj, 'code', None) not in EventRegistryHolder.get_registry().keys()
-
     def get_queryset(self, request):
         return super(EventTypeAdmin, self).get_queryset(request).filter(network_id=request.user.network_id)
 
