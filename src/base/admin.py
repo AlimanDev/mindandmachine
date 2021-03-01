@@ -16,11 +16,12 @@ from src.base.models import (
     ShopSchedule,
 )
 from src.timetable.models import GroupWorkerDayPermission
-
+from src.base.forms import NetworkAdminForm, ShopAdminForm, ShopSettingsAdminForm, BreakAdminForm
 
 @admin.register(Network)
 class NetworkAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'code', 'logo')
+    form = NetworkAdminForm
 
 
 @admin.register(Region)
@@ -41,8 +42,8 @@ class QsUserAdmin(admin.ModelAdmin):
 
     # list_filter = ('employment__shop', )
 
-    # list_display = ('first_name', 'last_name', 'employment__shop__title', 'parent_title', 'work_type_name', 'id')
-    # search_fields = ('first_name', 'last_name', 'employment__shop__parent__title', 'workercashboxinfo__work_type__name', 'id')
+    # list_display = ('first_name', 'last_name', 'employment__shop__name', 'parent_title', 'work_type_name', 'id')
+    # search_fields = ('first_name', 'last_name', 'employment__shop__parent__name', 'workercashboxinfo__work_type__name', 'id')
 
     # @staticmethod
     # def parent_title(instance: User):
@@ -68,6 +69,7 @@ class ShopAdmin(admin.ModelAdmin):
     list_display = ('name', 'parent_title', 'id', 'code')
     search_fields = ('name', 'parent__name', 'id', 'code')
     raw_id_fields = ('director',)
+    form = ShopAdminForm
 
     @staticmethod
     def parent_title(instance: Shop):
@@ -78,6 +80,7 @@ class ShopAdmin(admin.ModelAdmin):
 class ShopSettingsAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('id', 'name')
+    form = ShopSettingsAdminForm
 
 
 class GroupWorkerDayPermissionInline(admin.TabularInline):
@@ -95,6 +98,7 @@ class GroupAdmin(admin.ModelAdmin):
     inlines = (
         GroupWorkerDayPermissionInline,
     )
+    save_as = True
 
     def get_actions(self, request):
         from src.util.wd_perms.utils import WdPermsHelper
@@ -127,6 +131,7 @@ class ProductionDayAdmin(admin.ModelAdmin):
 class BreakAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'code')
     search_fields = ('name',)
+    form = BreakAdminForm
 
 
 @admin.register(SAWHSettings)

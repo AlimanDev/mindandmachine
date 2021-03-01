@@ -9,7 +9,14 @@ COLOR_GREEN = '#00FF00'
 COLOR_RED = '#FF0000'
 COLOR_YELLOW = '#FFFF00'
 COLOR_HEADER = '#CBF2E0'
-def main(dt_from, dt_to, title=None, shop_codes=None, shop_level=2, comming_only=False, network_id=None):
+
+RECORD_TYPES = {
+    AttendanceRecords.TYPE_COMING: 'Приход',
+    AttendanceRecords.TYPE_LEAVING: 'Уход',
+}
+
+
+def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comming_only=False, network_id=None, in_memory=False):
     SHOP = 0
     DATE = 1
     PLAN_COMMING = 2
@@ -22,11 +29,28 @@ def main(dt_from, dt_to, title=None, shop_codes=None, shop_level=2, comming_only
     FACT_HOURS = 9
     DIFF_HOURS = 10
 
-    workbook = xlsxwriter.Workbook(f'URV_stat_{dt_from}_{dt_to}.xlsx' if not title else title)
+    shops = Shop.objects.filter(
+        Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=dt_to),
+        id__in=WorkerDay.objects.filter(
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+            shop__network_id=network_id,
+            type=WorkerDay.TYPE_WORKDAY,
+            is_approved=True,
+            is_fact=False,
+        ).values_list('shop_id', flat=True),
+    )
+
+    if in_memory:
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    else:
+        workbook = xlsxwriter.Workbook(f'URV_stat_{dt_from}_{dt_to}.xlsx' if not title else title)
     worksheet = workbook.add_worksheet('{}-{}'.format(dt_from.strftime('%Y.%m.%d'), dt_to.strftime('%Y.%m.%d')))
-    shops = Shop.objects.filter(level__gte=shop_level).filter(dttm_deleted__isnull=True, network_id=network_id)
     if shop_codes:
         shops = shops.filter(code__in=shop_codes)
+    if shop_ids:
+        shops = shops.filter(id__in=shop_ids)
     dates = [dt_from + datetime.timedelta(days=i) for i in range((dt_to -  dt_from).days + 1)]
     def_format = {
         'border': 1,
@@ -103,3 +127,80 @@ def main(dt_from, dt_to, title=None, shop_codes=None, shop_level=2, comming_only
 
             row += 1
     workbook.close()
+    if in_memory:
+        output.seek(0)
+        return {
+            'name': f'URV_stat_{dt_from}_{dt_to}.xlsx' if not title else title,
+            'file': output,
+            'type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }
+
+
+def urv_stat_v2(dt_from, dt_to, title=None, network_id=None, in_memory=False):
+    DTTM = 0
+    SHOP_CODE = 1
+    SHOP = 2
+    USER = 3
+    USER_CODE = 4
+    TYPE = 5
+
+    if in_memory:
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    else:
+        workbook = xlsxwriter.Workbook(f'URV_users_stat_{dt_from}_{dt_to}.xlsx' if not title else title)
+    worksheet = workbook.add_worksheet('{}-{}'.format(dt_from.strftime('%Y.%m.%d'), dt_to.strftime('%Y.%m.%d')))
+   
+    def_format = {
+        'border': 1,
+        'bold': True,
+        'text_wrap': True,
+        'valign': 'top',
+    }
+    worksheet.write_string(0, SHOP_CODE, 'Код магазина', workbook.add_format(def_format))
+    worksheet.set_column(SHOP_CODE, SHOP_CODE, 12)
+    worksheet.write_string(0, SHOP, 'Магазин', workbook.add_format(def_format))
+    worksheet.set_column(SHOP, SHOP, 25)
+    worksheet.write_string(0, DTTM, 'Время события', workbook.add_format(def_format))
+    worksheet.set_column(DTTM, DTTM, 20)
+    worksheet.write_string(0, USER_CODE, 'Табельный номер сотрудника', workbook.add_format(def_format))
+    worksheet.set_column(USER_CODE, USER_CODE, 12)
+    worksheet.write_string(0, USER, 'ФИО сотрудника', workbook.add_format(def_format))
+    worksheet.set_column(USER, USER, 30)
+    worksheet.write_string(0, TYPE, 'Тип события', workbook.add_format(def_format))
+    worksheet.set_column(TYPE, TYPE, 11)
+    
+    records = AttendanceRecords.objects.select_related(
+        'shop',
+        'user',
+    ).filter(
+        dttm__date__gte=dt_from,
+        dttm__date__lte=dt_to,
+        shop__network_id=network_id,
+    ).order_by(
+        'shop_id',
+        'dttm',
+    )
+
+    employments = {}
+    for e in Employment.objects.get_active(network_id, dt_from=dt_from, dt_to=dt_to):
+        employments.setdefault(e.user_id, {})[e.shop_id] = e
+
+    row = 1
+    for record in records:
+        worksheet.write(row, SHOP_CODE, record.shop.code or 'Без кода')
+        worksheet.write(row, SHOP, record.shop.name)
+        worksheet.write(row, DTTM, str(record.dttm.replace(microsecond=0)))
+        worksheet.write(row, USER_CODE, employments.get(record.user_id, {}).get(record.shop_id, Employment()).tabel_code or 'Без табельного номера')
+        worksheet.write(row, USER, f'{record.user.last_name} {record.user.first_name} {record.user.middle_name or ""}')
+        worksheet.write(row, TYPE, RECORD_TYPES.get(record.type, 'Неизвестно'))
+        row += 1
+
+    workbook.close()
+    if in_memory:
+        output.seek(0)
+        return {
+            'name': f'URV_users_stat_{dt_from}_{dt_to}.xlsx' if not title else title,
+            'file': output,
+            'type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }

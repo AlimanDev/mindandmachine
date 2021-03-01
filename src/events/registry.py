@@ -45,3 +45,6 @@ class BaseRegisteredEvent(metaclass=EventRegistryHolder):
 
     def get_recipients(self):
         return []
+
+    def get_file(self):
+        return None

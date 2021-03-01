@@ -25,6 +25,7 @@ from src.main.urv import urls as urv_urls
 from src.misc import urls as misc_api
 from src.recognition.urls import router as recognition_router
 from src.timetable import urls as timetable_api
+from src.timetable.views import RecalcWhAdminView
 
 api_urlpatterns = [
     path('auth/', include(auth_urls)),
@@ -44,6 +45,7 @@ api_urlpatterns = [
 
 urlpatterns = [
     path('api/', include(api_urlpatterns)),
+    path('admin/timetable/workerday/recalc_wh/', RecalcWhAdminView.as_view(), name='recalc_wh'),
     path('admin/', admin.site.urls),
     path('rest_api/recognition/', include(recognition_router.get_urls())),
     path('rest_api/', include(

@@ -384,8 +384,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             if employment.is_fixed_hours:
                 availability_info = availabilities.get(user_id, [])
                 if not (len(availability_info)):
-                    print(f'Warning! User {user_id} {user.last_name} {user.first_name} с фиксированными часами, '
-                          f'но нет набора смен, на которых может работать!')
+                    print(f'Warning! User {user_id} {user.last_name} {user.first_name} with fixed hours, '
+                          f'but he does not have a set of shifts he can work on!'.encode('utf-8'))
                 mask = [0 for _ in range(len(availability_info))]
                 for info_day in availability_info:
                     mask[info_day.weekday] += 1

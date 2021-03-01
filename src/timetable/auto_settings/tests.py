@@ -465,13 +465,13 @@ class TestAutoSettings(APITestCase):
                     'use_not_approved': True,
                 }
             )
-            data = json.loads(mock_post.call_args.kwargs['data'])
+            data = json.loads(mock_post.call_args[1]['data'])
             self.assertEqual(response.status_code, 200)
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id,data['cashiers']))[0]
         employment3Info = list(filter(lambda x: x['general_info']['id'] == self.user3.id,data['cashiers']))[0]
         self.assertEqual(len(data['work_types']), 2)
         self.assertEqual(len(data['cashiers']), 5)
-        self.assertEqual(len(employment2Info['workdays']), 4)
+        self.assertEqual(len(employment2Info['workdays']), min(4, (dt_to - (date.today() + timedelta(days=1))).days))
         self.assertEqual(employment2Info['workdays'][0]['dt'], (date.today() + timedelta(days=2)).strftime('%Y-%m-%d'))
         self.assertEqual(employment3Info['workdays'][-1]['dt'], dt_to.strftime('%Y-%m-%d'))
         self.assertEqual(len(data['algo_params']['breaks_triplets']), 2)

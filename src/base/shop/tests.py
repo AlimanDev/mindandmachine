@@ -1,6 +1,8 @@
 from datetime import datetime
+from unittest import mock
 
 from dateutil.relativedelta import relativedelta
+from django.db import transaction
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -18,7 +20,6 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         cls.url = '/rest_api/department/'
 
         cls.create_departments_and_users()
-        cls.settings = ShopSettings.objects.first()
         cls.load_template = LoadTemplateFactory(network=cls.network)
 
         cls.root_shop.code = "main"
@@ -414,3 +415,17 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.shop.save()
         response = self.client.put(f'{self.url}{self.shop.id}/', data={'load_template_id': self.load_template.id, 'name': 'Shop Test'})
         self.assertEqual(response.json(), {'message': 'Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета.'})
+
+    def test_shop_schedule_filled_on_shop_creating(self):
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                shop = Shop.objects.create(
+                    parent=self.reg_shop1,
+                    name='New shop',
+                    tm_open_dict='{"all":"07:00:00"}',
+                    tm_close_dict='{"all":"23:00:00"}',
+                    region=self.region,
+                    settings=self.shop_settings,
+                    network=self.network,
+                )
+        self.assertEqual(ShopSchedule.objects.filter(shop=shop).count(), 120)

@@ -14,6 +14,8 @@ from django.db import transaction
 from django.utils.timezone import now
 from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
 
+from django_celery_beat.models import CrontabSchedule
+
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
 from src.base.message import Message
@@ -27,7 +29,7 @@ from src.base.models import (
     Employment,
 )
 from src.celery.celery import app
-from src.conf.djconfig import EMAIL_HOST_USER, TIMETABLE_IP, QOS_DATETIME_FORMAT, URV_STAT_EMAILS, URV_STAT_SHOP_LEVEL
+from src.conf.djconfig import EMAIL_HOST_USER, TIMETABLE_IP, QOS_DATETIME_FORMAT
 from src.events.signals import event_signal
 from src.forecast.models import (
     OperationTemplate,
@@ -55,9 +57,10 @@ from src.timetable.vacancy.utils import (
     workers_exchange,
 )
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
-from src.util.urv.create_urv_stat import main as create_urv
 from src.base.models import ShopSchedule
 
+from src.notifications.models import EventEmailNotification
+from src.notifications.tasks import send_event_email_notifications
 
 @app.task
 def create_notifications_for_event(event_id):
@@ -708,49 +711,6 @@ def clean_timeserie_actions():
                     for operation_type in operations_type:
                         Receipt.objects.filter(shop=operation_type.shop, dttm__lt=dttm_for_delete).delete()
 
-@app.task
-def send_urv_stat():
-    if not URV_STAT_EMAILS:
-        return
-    dt = date.today() - timedelta(days=1)
-    title = f'URV_{dt}.xlsx'
-
-    for network_code, emails in URV_STAT_EMAILS.items():
-        create_urv(dt, dt, title=title, shop_level=URV_STAT_SHOP_LEVEL, network_id=Network.objects.get(code=network_code).id)
-        msg = EmailMultiAlternatives(
-            subject=f'Отчёт УРВ {dt}',
-            body=f'Отчёт УРВ {dt}',
-            from_email=EMAIL_HOST_USER,
-            to=emails,
-        )
-        msg.attach_file(title)
-        os.remove(title)
-        result = msg.send()
-
-    return
-
-
-@app.task
-def send_urv_stat_today():
-    if not URV_STAT_EMAILS:
-        return
-    dt = date.today()
-    title = f'URV_today_{dt}.xlsx'
-
-    for network_code, emails in URV_STAT_EMAILS.items():
-        create_urv(dt, dt, title=title, shop_level=URV_STAT_SHOP_LEVEL, comming_only=True, network_id=Network.objects.get(code=network_code).id)
-        msg = EmailMultiAlternatives(
-            subject=f'Отчёт УРВ {dt}',
-            body=f'Отчёт УРВ {dt}',
-            from_email=EMAIL_HOST_USER,
-            to=emails,
-        )      
-        msg.attach_file(title)
-        os.remove(title)    
-        result = msg.send()
-
-    return
-
 
 @app.task
 def create_mda_user_to_shop_relation(username, shop_code, debug_info=None):
@@ -916,3 +876,29 @@ def recalc_wdays(**kwargs):
 @app.task
 def trigger_event(**kwargs):
     event_signal.send(sender=None, **kwargs)
+
+
+@app.task
+def cron_event():
+    dttm = datetime.now()
+    crons = CrontabSchedule.objects.all()
+    posible_crons = []
+    for cron in crons:
+        schedule = cron.schedule
+        if (
+            dttm.minute in schedule.minute and
+            dttm.hour in schedule.hour and
+            dttm.weekday() in schedule.day_of_week and
+            dttm.day in schedule.day_of_month and
+            dttm.month in schedule.month_of_year
+        ):
+            posible_crons.append(cron)
+    events = EventEmailNotification.objects.filter(
+        cron__in=posible_crons,
+    )
+    for event_email_notification in events:
+        send_event_email_notifications.delay(
+            event_email_notification_id=event_email_notification.id,
+            user_author_id=None,
+            context={},
+        )
