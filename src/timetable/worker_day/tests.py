@@ -723,6 +723,6 @@ class TestUploadDownload(APITestCase):
             f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(tabel[tabel.columns[1]][1], 'Магазин: Shop1')
-        self.assertEqual(tabel[tabel.columns[1]][13], 'Иванов Иван Иванович')
-        self.assertEqual(tabel[tabel.columns[29]][16], 'В')
+        self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
+        self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
+        self.assertEqual(tabel[tabel.columns[29]][15], 'В')

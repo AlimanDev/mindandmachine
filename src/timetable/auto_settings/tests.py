@@ -465,7 +465,7 @@ class TestAutoSettings(APITestCase):
                     'use_not_approved': True,
                 }
             )
-            data = json.loads(mock_post.call_args.kwargs['data'])
+            data = json.loads(mock_post.call_args[1]['data'])
             self.assertEqual(response.status_code, 200)
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id,data['cashiers']))[0]
         employment3Info = list(filter(lambda x: x['general_info']['id'] == self.user3.id,data['cashiers']))[0]
