@@ -862,3 +862,75 @@ class TestIntegration(APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today() - timedelta(1)).first().dttm_work_end, dttm_second)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_start, dttm_third)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_end, dttm_fourth)
+
+    @override_settings(ZKTECO_MAX_DIFF_IN_SECONDS=4*60*60)
+    def test_import_urv_tick_in_middle_of_shift_with_bad_diff(self):
+        ShopExternalCode.objects.create(
+            external_system=self.ext_system,
+            shop=self.shop,
+            code='1',
+        )
+        UserExternalCode.objects.create(
+            external_system=self.ext_system,
+            user_id=self.employment2.user_id,
+            code='1',
+        )
+        WorkerDay.objects.create(
+            shop_id=self.employment2.shop_id,
+            worker_id=self.employment2.user_id,
+            employment=self.employment2,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=date.today(),
+            dttm_work_start=datetime.combine(date.today(), time(10)),
+            dttm_work_end=datetime.combine(date.today(), time(20)),
+            is_approved=True,
+        )
+
+        dttm_first = datetime.combine(date.today(), time(9, 15))
+        dttm_second = datetime.combine(date.today(), time(14, 40))
+        TestRequestMock.responses["/transaction/listAttTransaction"] = {
+                1:{
+                    "code": 0,
+                    "message": "success",
+                    "data":[
+                        {
+                            "id": "8a8080847322cd7f017323a7df9e0dc1",
+                            "eventTime": dttm_second.strftime('%Y-%m-%d %H:%M:%S'),
+                            "pin": "1",
+                            "name": "User",
+                            "lastName": "User",
+                            "deptName": "Area Name",
+                            "areaName": "Area Name",
+                            "devSn": "CGXH201360029",
+                            "verifyModeName": "15",
+                            "accZone": "1",
+                        },
+                    ],
+                },
+                2:{
+                    "code": 0,
+                    "message": "success",
+                    "data":[
+                        {
+                            "id": "8a8080847322cd7f017323a7df9e0dc2",
+                            "eventTime": dttm_first.strftime('%Y-%m-%d %H:%M:%S'),
+                            "pin": "1",
+                            "name": "User",
+                            "lastName": "User",
+                            "deptName": "Area Name",
+                            "areaName": "Area Name",
+                            "devSn": "CGXH201360029",
+                            "verifyModeName": "15",
+                            "accZone": "1",
+                        },
+                    ],
+                },
+        }
+        with patch('src.integration.zkteco.requests', new_callable=TestRequestMock) as mock_request:
+            import_urv_zkteco()
+
+        self.assertEqual(WorkerDay.objects.count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
+        self.assertEqual(AttendanceRecords.objects.count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_start, dttm_first)
+        self.assertIsNone(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_end)
