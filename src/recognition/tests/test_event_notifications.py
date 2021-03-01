@@ -15,6 +15,7 @@ from src.timetable.models import WorkerDay, AttendanceRecords
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.celery.tasks import cron_event
+from xlrd import open_workbook
 
 
 class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
@@ -85,7 +86,8 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            df = pd.read_excel(mail.outbox[0].attachments[0][1])
+            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
+            df = pd.read_excel(data, engine='xlrd')
             data = {
                 'Магазин': 'SHOP_NAME', 
                 'Дата': self.dt.strftime('%d.%m.%Y'), 
@@ -170,7 +172,8 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            df = pd.read_excel(mail.outbox[0].attachments[0][1])
+            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
+            df = pd.read_excel(data, engine='xlrd')
             data = {
                 'Магазин': 'SHOP_NAME', 
                 'Дата': self.dt.strftime('%d.%m.%Y'), 
@@ -265,7 +268,8 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            df = pd.read_excel(mail.outbox[0].attachments[0][1])
+            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
+            df = pd.read_excel(data, engine='xlrd')
             data = [
                 {
                     'Магазин': 'SHOP_NAME', 
