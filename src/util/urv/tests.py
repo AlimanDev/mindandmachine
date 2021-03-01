@@ -1,5 +1,5 @@
 from rest_framework.test import APITestCase
-from src.util.urv.create_urv_stat import main
+from src.util.urv.create_urv_stat import urv_stat_v1
 from src.util.urv.urv_violators import urv_violators_report, urv_violators_report_xlsx
 from src.util.test import create_departments_and_users
 import pandas as pd
@@ -50,7 +50,7 @@ class TestUrvFiles(APITestCase):
 
 
     def test_urv_stat(self):
-        data = main(self.dt, self.dt, network_id=self.network.id, in_memory=True)
+        data = urv_stat_v1(self.dt, self.dt, network_id=self.network.id, in_memory=True)
         df = pd.read_excel(data['file'])
         self.assertEqual(len(df.iloc[:,:]), 1)
         data = {
