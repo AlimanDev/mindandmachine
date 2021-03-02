@@ -352,6 +352,11 @@ ZKTECO_DEPARTMENT_CODE = 1 # код отдела из zkteco к которому
 
 # Используем ли интеграцию в проекте
 ZKTECO_INTEGRATION = False
+# Максимальная разность между временем начала 
+# или окончания для "притягивания" к рабочему дню
+ZKTECO_MAX_DIFF_IN_SECONDS = 3600 * 5
+# Игнорировать отметки без подтвержденного планового рабочего дня
+ZKTECO_IGNORE_TICKS_WITHOUT_WORKER_DAY = True
 
 RECOGNITION_PARTNER = 'Tevian'
 

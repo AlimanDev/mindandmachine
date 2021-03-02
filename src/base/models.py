@@ -105,9 +105,21 @@ class Network(AbstractActiveModel):
         choices=CONVERT_TABEL_TO_CHOICES,
         default='xlsx',
     )
+    breaks = models.ForeignKey(
+        'base.Break',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        verbose_name='Перерывы по умолчанию',
+        related_name='networks',
+    )
     # при создании новой должности будут проставляться соотв. значения
     # пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
     worker_position_default_values = models.TextField(verbose_name='Параметры должностей по умолчанию', default='{}')
+    descrease_employment_dt_fired_in_api = models.BooleanField(
+        default=False, verbose_name='Уменьшать дату окончания трудоустройства',
+        help_text='Актуально для данных, получаемых через api',
+    )
 
     def get_department(self):
         return None

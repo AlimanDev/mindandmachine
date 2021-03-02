@@ -34,8 +34,8 @@ class RecalcWhAdminView(SuperuserRequiredMixin, FormView):
             return super().form_valid(form)
 
         kwargs = {
-            'dt__gte': dt_from,
-            'dt__lte': dt_to,
+            'dt__gte': dt_from.strftime('%Y-%m-%d'),
+            'dt__lte': dt_to.strftime('%Y-%m-%d'),
         }
 
         if users:

@@ -35,8 +35,6 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None):
         user_id__in=user_ids,
         dttm__date__gte=dt_from,
         dttm__date__lte=dt_to,
-    ).annotate(
-        dt=Trunc('dttm', 'day'),
     ).values(
         'user_id',
         'dt',
@@ -63,7 +61,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None):
     
     for record in bad_records:
         first_key = record['user_id']
-        second_key = record['dt'].date()
+        second_key = record['dt']
         if users_wds.get(first_key, {}).get(second_key):
             t = NO_COMMING if record['comming'] == 0 else NO_LEAVING
             if t == NO_LEAVING:

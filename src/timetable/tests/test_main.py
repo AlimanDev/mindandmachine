@@ -7,7 +7,7 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup, Network, Employment, ShopSchedule
+from src.base.models import FunctionGroup, Network, Employment, ShopSchedule, Shop
 from src.timetable.models import (
     WorkerDay,
     AttendanceRecords,
@@ -1161,6 +1161,27 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
             response.json()['dt'][0], 'Поле дата не может быть пустым.')
+
+    def test_network_breaks(self):
+        Employment.objects.all().update(position=None)
+        Shop.objects.all().update(settings=None)
+        dt = date.today()
+        WorkerDay.objects.all().delete()
+        self.employment2.refresh_from_db()
+        self.shop.refresh_from_db()
+        self.network.breaks = self.breaks
+        self.network.save()
+        wd = WorkerDay.objects.create(
+            shop=self.shop,
+            worker_id=self.employment2.user_id,
+            employment=self.employment2,
+            dt=dt,
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            type=WorkerDay.TYPE_WORKDAY,
+        )
+        self.assertEqual(wd.work_hours, timedelta(hours=10, minutes=45))
+
 
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):

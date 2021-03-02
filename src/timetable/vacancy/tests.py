@@ -315,7 +315,7 @@ class TestAutoWorkerExchange(TestCase):
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 2)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
-        vacancies = WorkerDay.objects.filter(is_vacancy=True).order_by('dttm_work_start')
+        vacancies = WorkerDay.objects.filter(is_vacancy=True).order_by('dttm_work_start', 'dttm_work_end')
         self.assertEqual([vacancies[0].dttm_work_start.time(), vacancies[0].dttm_work_end.time()],
                          [datetime.time(9, 0), datetime.time(20, 0)])
         self.assertEqual([vacancies[1].dttm_work_start.time(), vacancies[1].dttm_work_end.time()],
