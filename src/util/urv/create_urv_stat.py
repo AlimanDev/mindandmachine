@@ -174,8 +174,8 @@ def urv_stat_v2(dt_from, dt_to, title=None, network_id=None, in_memory=False):
         'shop',
         'user',
     ).filter(
-        dttm__date__gte=dt_from,
-        dttm__date__lte=dt_to,
+        dt__gte=dt_from,
+        dt__lte=dt_to,
         shop__network_id=network_id,
     ).order_by(
         'shop_id',
