@@ -100,8 +100,8 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
                     hours_count_plan=Sum('work_hours', filter=Q(is_approved=True, is_fact=False)),
                     hours_count_fact=Sum('work_hours', filter=Q(is_fact=True, is_approved=True)),
                 )
-                leaving_count = AttendanceRecords.objects.filter(shop=shop, dttm__date=date, type=AttendanceRecords.TYPE_LEAVING, user_id__in=user_ids).distinct('user').count()
-            coming_count = AttendanceRecords.objects.filter(shop=shop, dttm__date=date, type=AttendanceRecords.TYPE_COMING, user_id__in=user_ids).distinct('user').count()
+                leaving_count = AttendanceRecords.objects.filter(shop=shop, dt=date, type=AttendanceRecords.TYPE_LEAVING, user_id__in=user_ids).distinct('user').count()
+            coming_count = AttendanceRecords.objects.filter(shop=shop, dt=date, type=AttendanceRecords.TYPE_COMING, user_id__in=user_ids).distinct('user').count()
             worksheet.write_string(row, DATE, date.strftime('%d.%m.%Y'), workbook.add_format(def_format))
             worksheet.write_string(row, PLAN_COMMING, str(wd_count), workbook.add_format(def_format))
             worksheet.write_string(row, FACT_COMMING, str(coming_count), workbook.add_format(def_format))
@@ -174,8 +174,8 @@ def urv_stat_v2(dt_from, dt_to, title=None, network_id=None, in_memory=False):
         'shop',
         'user',
     ).filter(
-        dttm__date__gte=dt_from,
-        dttm__date__lte=dt_to,
+        dt__gte=dt_from,
+        dt__lte=dt_to,
         shop__network_id=network_id,
     ).order_by(
         'shop_id',
