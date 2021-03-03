@@ -81,6 +81,7 @@ def import_urv_zkteco():
         dt__lte=date.today() + timedelta(1),
         is_fact=False,
         is_approved=True,
+        type__in=WorkerDay.TYPES_WITH_TM_RANGE,
     )
 
     worker_days = {}
