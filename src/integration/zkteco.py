@@ -64,7 +64,7 @@ class ZKTeco:
             if userexternalcode:
                 pin = userexternalcode.code
             else:
-                pin = user.id + 10000
+                pin = user.id + settings.ZKTECO_USER_ID_SHIFT
 
         json = {
             "pin": pin,

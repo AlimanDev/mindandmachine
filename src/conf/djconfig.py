@@ -357,6 +357,8 @@ ZKTECO_INTEGRATION = False
 ZKTECO_MAX_DIFF_IN_SECONDS = 3600 * 5
 # Игнорировать отметки без подтвержденного планового рабочего дня
 ZKTECO_IGNORE_TICKS_WITHOUT_WORKER_DAY = True
+# смещение id пользователя в ZKTeco чтобы не пересекались
+ZKTECO_USER_ID_SHIFT = 10000
 
 RECOGNITION_PARTNER = 'Tevian'
 

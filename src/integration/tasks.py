@@ -231,7 +231,7 @@ def export_workers_zkteco():
             shop_id=shop_code.shop_id,
         ).first()
 
-        pin = user.id + 10000  # Чтобы не пересекалось с уже заведенными
+        pin = user.id + settings.ZKTECO_USER_ID_SHIFT  # Чтобы не пересекалось с уже заведенными
         res = zkteco.add_user(e, pin)
         if 'code' in res and res['code'] == 0:
             user_code = UserExternalCode.objects.create(
