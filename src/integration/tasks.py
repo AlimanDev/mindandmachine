@@ -90,8 +90,8 @@ def import_urv_zkteco():
 
     attrs = AttendanceRecords.objects.filter(
         user_id__in=users.keys(),
-        dttm__date__gte=max_date - timedelta(1),
-        dttm__date__lte=date.today(),
+        dt__gte=max_date - timedelta(1),
+        dt__lte=date.today(),
     )
     attendance_records = {}
     for attr in attrs:
