@@ -1017,3 +1017,46 @@ class TestAutoSettings(APITestCase):
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
         # TODO: правильный результат?
         self.assertEqual(employment2Info['norm_work_amount'], 73.03333333333333)  # {3: 43.86666666666666, 4: 29.166666666666664}
+
+    def test_create_tt_part_of_month_with_workdays_and_vacation_in_prev_month_part(self):
+        for dt in (date(2021, 3, 2), date(2021, 3, 4)):
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(19)),
+                is_approved=True,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd,
+            )
+
+        for dt in (date(2021, 3, 1), date(2021, 3, 5)):
+            WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_approved=True,
+            )
+
+        WorkerDay.objects.create(
+            employment=self.employment2,
+            worker=self.employment2.user,
+            shop=self.employment2.shop,
+            dt=date(2021, 3, 3),
+            type=WorkerDay.TYPE_VACATION,
+            is_approved=True,
+        )
+
+        dt_from = date(2021, 3, 6)
+        dt_to = date(2021, 3, 31)
+        data = self._test_create_tt(dt_from, dt_to, use_not_approved=False)
+
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
+        self.assertEqual(employment2Info['norm_work_amount'], 154.3225806451613)

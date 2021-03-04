@@ -494,6 +494,8 @@ class WorkersStatsGetter:
             'dt__month',
         ).annotate(
             day_type_count=Count('type', filter=selected_period_q),
+            any_day_count_outside_of_selected_period=Count(
+                'type', filter=outside_of_selected_period_q),
             workdays_count_outside_of_selected_period=Count(
                 'type', filter=Q(outside_of_selected_period_q, Q(type__in=WorkerDay.TYPES_PAID + [WorkerDay.TYPE_HOLIDAY]))),
         )
@@ -513,6 +515,9 @@ class WorkersStatsGetter:
                 days_count_outside_of_selected_period = data.setdefault('workdays_count_outside_of_selected_period', {})
                 days_count_outside_of_selected_period[wd_dict['dt__month']] = days_count_outside_of_selected_period.get(
                     wd_dict['dt__month'], 0) + wd_dict['workdays_count_outside_of_selected_period']
+                any_day_count_outside_of_selected_period = data.setdefault('any_day_count_outside_of_selected_period', {})
+                any_day_count_outside_of_selected_period[wd_dict['dt__month']] = any_day_count_outside_of_selected_period.get(
+                    wd_dict['dt__month'], 0) + wd_dict['any_day_count_outside_of_selected_period']
 
         prod_cal_qs = ProdCal.objects.filter(
             dt__gte=acc_period_dt_from,
@@ -729,7 +734,9 @@ class WorkersStatsGetter:
                         # approved
                         workdays_count_outside_of_selected_period_pa = res.get(worker_id, {}).get('plan', {}).get(
                             'approved', {}).get('workdays_count_outside_of_selected_period', {}).get(month_num, 0)
-                        empty_days_pa = empl_dict['empl_days_count_outside_of_selected_period'][month_num] - workdays_count_outside_of_selected_period_pa
+                        any_day_count_outside_of_selected_period_pa = res.get(worker_id, {}).get('plan', {}).get(
+                            'approved', {}).get('any_day_count_outside_of_selected_period', {}).get(month_num, 0)
+                        empty_days_pa = empl_dict['empl_days_count_outside_of_selected_period'][month_num] - any_day_count_outside_of_selected_period_pa
                         vacations_or_sick_count_selected_period_pa = empl_dict.get(
                             'vacation_or_sick_plan_approved_count_selected_period', {}).get(month_num, 0)
                         vacations_or_sick_count_outside_of_selected_period_pa = empl_dict.get(
@@ -755,8 +762,10 @@ class WorkersStatsGetter:
                         # not approved
                         workdays_count_outside_of_selected_period_npa = res.get(worker_id, {}).get('plan', {}).get(
                             'not_approved', {}).get('workdays_count_outside_of_selected_period', {}).get(month_num, 0)
+                        any_day_count_outside_of_selected_period_npa = res.get(worker_id, {}).get('plan', {}).get(
+                            'not_approved', {}).get('any_day_count_outside_of_selected_period', {}).get(month_num, 0)
                         empty_days_npa = empl_dict['empl_days_count_outside_of_selected_period'][
-                                            month_num] - workdays_count_outside_of_selected_period_npa
+                                            month_num] - any_day_count_outside_of_selected_period_npa
                         vacations_or_sick_count_selected_period_npa = empl_dict.get(
                             'vacation_or_sick_plan_not_approved_count_selected_period', {}).get(month_num, 0)
                         vacations_or_sick_count_outside_of_selected_period_npa = empl_dict.get(
