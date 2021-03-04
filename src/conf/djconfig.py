@@ -369,6 +369,8 @@ TEVIAN_FR_THRESHOLD = 0.8
 
 TRUST_TICK_REQUEST = False
 USERS_WITH_SCHEDULE_ONLY = False
+# игнорировать отметку без активного трудоустройства или вакансии
+USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY = False
 
 CALCULATE_LOAD_TEMPLATE = False # параметр отключающий автоматический расчет нагрузки
 

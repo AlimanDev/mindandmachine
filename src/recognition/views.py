@@ -213,7 +213,7 @@ class TickViewSet(BaseModelViewSet):
             shop_id=tick_point.shop_id
         ).first()
 
-        if not employment:
+        if (not employment) and settings.USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY:
             # есть ли вакансия в этом магазине
             wd = WorkerDay.objects.filter(
                 worker_id=user_id,

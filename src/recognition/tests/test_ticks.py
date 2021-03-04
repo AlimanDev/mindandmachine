@@ -77,14 +77,14 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         resp = self._test_geo(10, 52.2296756, 21.0122287, 52.306374, 21.0122287)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
-    
     def test_create_without_employment(self):
         self.employment2.dt_fired = date(2020, 2, 1)
         self.employment2.save()
-        resp_coming = self.client.post(
-            self.get_url('Tick-list'),
-            data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop.code}),
-            content_type='application/json',
-        )
+        with override_settings(USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY=True):
+            resp_coming = self.client.post(
+                self.get_url('Tick-list'),
+                data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop.code}),
+                content_type='application/json',
+            )
         self.assertEqual(resp_coming.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(resp_coming.json(), {"error": "Действие невозможно, обратитесь к вашему руководителю"})
