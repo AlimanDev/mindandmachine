@@ -4,6 +4,8 @@ from rest_framework.test import APITestCase
 
 from src.recognition.models import Tick
 from src.util.mixins.tests import TestsHelperMixin
+from src.timetable.models import WorkerDay
+from datetime import date
 
 
 @override_settings(TRUST_TICK_REQUEST=True)
@@ -11,6 +13,15 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
+        WorkerDay.objects.create(
+            dt=date.today(),
+            type=WorkerDay.TYPE_WORKDAY,
+            worker=cls.user2,
+            employment=cls.employment2,
+            shop=cls.shop2,
+            is_approved=True,
+            is_vacancy=True,
+        )
 
     def setUp(self):
         self._set_authorization_token(self.user2.username)
@@ -65,3 +76,15 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
     def test_geoposition_check_passed(self):
         resp = self._test_geo(10, 52.2296756, 21.0122287, 52.306374, 21.0122287)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+    def test_create_without_employment(self):
+        self.employment2.dt_fired = date(2020, 2, 1)
+        self.employment2.save()
+        with override_settings(USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY=True):
+            resp_coming = self.client.post(
+                self.get_url('Tick-list'),
+                data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop.code}),
+                content_type='application/json',
+            )
+        self.assertEqual(resp_coming.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp_coming.json(), {"error": "Действие невозможно, обратитесь к вашему руководителю"})

@@ -218,6 +218,21 @@ class TickViewSet(BaseModelViewSet):
             shop_id=tick_point.shop_id
         ).first()
 
+        if (not employment) and settings.USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY:
+            # есть ли вакансия в этом магазине
+            wd = WorkerDay.objects.filter(
+                worker_id=user_id,
+                shop_id=tick_point.shop_id,
+                dt__gte=dttm_from - timedelta(1),
+                dt__lte=dttm_to.date(),
+                type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                is_approved=True,
+                is_fact=False,
+                is_vacancy=True,
+            ).first()
+            if not wd:
+                return Response({"error": "Действие невозможно, обратитесь к вашему руководителю"}, 400)
+
         wd = WorkerDay.objects.all().filter(
             worker_id=user_id,
             shop_id=tick_point.shop_id,
@@ -228,7 +243,7 @@ class TickViewSet(BaseModelViewSet):
         ).first()
 
         if not wd and USERS_WITH_SCHEDULE_ONLY:
-            return Response({"error": "Сотрудник не работает в этом магазине"}, 404)
+            return Response({"error": "Сегодня у сотрудника нет рабочего дня в данном магазине"}, 404)
 
         tick = Tick.objects.create(
             user_id=user_id,
