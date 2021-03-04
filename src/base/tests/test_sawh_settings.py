@@ -198,6 +198,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         self.sawh_settings.work_hours_by_months = {
             f'm{month_num}': 1 for month_num in range(1, 12 + 1)}
         self.sawh_settings.save(update_fields=['work_hours_by_months'])
+
         self._test_hours_for_period(
             dt_from=date(2021, 1, 1),
             dt_to=date(2021, 1, 31),
@@ -242,7 +243,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         res = self._test_hours_for_period(
             dt_from=date(2021, 1, 1),
             dt_to=date(2021, 1, 31),
-            expected_norm_hours=127.0103092783505,
+            expected_norm_hours=127.01030927835052,
         )
         res2 = self._test_hours_for_period(
             dt_from=date(2021, 2, 1),

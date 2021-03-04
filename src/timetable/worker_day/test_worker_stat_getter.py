@@ -100,7 +100,6 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             {
                 'acc_period': 27.0,
                 'other_shops': 9.0,
-                'prev_months': 0.0,
                 'selected_shop': 18.0,
                 'total': 27.0,
                 'until_acc_period_end': 27.0

@@ -219,7 +219,7 @@ def get_month_range(year, month_num, return_days_in_month=False):
 
 
 class WorkersStatsGetter:
-    def __init__(self, shop_id, dt_from, dt_to, worker_id=None, worker_id__in=None):
+    def __init__(self, shop_id, dt_from, dt_to, worker_id=None, worker_id__in=None, calc_selected_period=False):
         self.shop_id = shop_id
         self.dt_from = dt_from
         self.dt_to = dt_to
@@ -370,9 +370,12 @@ class WorkersStatsGetter:
         curr_month_end_q = Q(dt__gte=curr_month_end_dt_from, dt__lte=curr_month_end_dt_to)
         until_acc_period_end_dt_from, until_acc_period_end_dt_to = self.until_acc_period_end_range
         until_acc_period_end_q = Q(dt__gte=until_acc_period_end_dt_from, dt__lte=until_acc_period_end_dt_to)
+        outside_of_selected_period_q = Q(Q(dt__lt=self.dt_from) | Q(dt__gt=self.dt_to))
 
         selected_period_months = self._get_selected_period_months()
+        prev_months = list(range(prev_months_dt_from.month, prev_months_dt_to.month + 1))
         curr_month = self.dt_from.month
+        months_until_acc_period_end = list(range(until_acc_period_end_dt_from.month, until_acc_period_end_dt_to.month + 1))
 
         work_days = WorkerDay.objects.filter(
             dt__gte=acc_period_dt_from,
@@ -380,8 +383,10 @@ class WorkersStatsGetter:
             worker_id__in=self.workers_dict.keys(),
         ).values(
             'worker_id',
+            'employment_id',
             'is_fact',
             'is_approved',
+            'dt__month',
         ).annotate(
             work_days_selected_shop=Coalesce(Count('id', filter=Q(selected_period_q, shop_id=self.shop_id,
                                                                   work_hours__gte=timedelta(0),
@@ -389,7 +394,7 @@ class WorkersStatsGetter:
             work_days_other_shops=Coalesce(Count('id', filter=Q(selected_period_q, ~Q(shop_id=self.shop_id),
                                                                 work_hours__gte=timedelta(0),
                                                                 type__in=WorkerDay.TYPES_WITH_TM_RANGE)), 0),
-            work_days_total=Coalesce(Count('id', filter=Q(selected_period_q, work_hours__gte=timedelta(0),
+            work_days_selected_period=Coalesce(Count('id', filter=Q(selected_period_q, work_hours__gte=timedelta(0),
                                                           type__in=WorkerDay.TYPES_WITH_TM_RANGE)), 0),
             work_hours_selected_shop=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                   filter=Q(selected_period_q, shop_id=self.shop_id,
@@ -401,20 +406,26 @@ class WorkersStatsGetter:
                                                          work_hours__gte=timedelta(0),
                                                          type__in=WorkerDay.TYPES_WITH_TM_RANGE),
                                                 output_field=FloatField()), 0),
-            work_hours_total=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
+            work_hours_selected_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                           filter=Q(selected_period_q, work_hours__gte=timedelta(0),
                                                    type__in=WorkerDay.TYPES_WITH_TM_RANGE),
                                           output_field=FloatField()), 0),
-            work_hours_prev_months=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
-                                                filter=Q(prev_months_q, work_hours__gte=timedelta(0),
+            work_hours_total=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
+                                                filter=Q(work_hours__gte=timedelta(0),
                                                          type__in=WorkerDay.TYPES_WITH_TM_RANGE),
                                                 output_field=FloatField()), 0),
             work_hours_until_acc_period_end=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                          filter=Q(until_acc_period_end_q, work_hours__gte=timedelta(0),
                                                                   type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                                                         output_field=FloatField()), 0),
+            work_hours_outside_of_selected_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
+                                                         filter=Q(outside_of_selected_period_q, work_hours__gte=timedelta(0),
+                                                                  type__in=WorkerDay.TYPES_WITH_TM_RANGE),
                                                          output_field=FloatField()), 0)
-        ).order_by('worker_id', '-is_fact', '-is_approved')  # нужно для work_hours_prev_months
+        ).order_by('worker_id', '-is_fact', '-is_approved')  # такая сортировка нужна для work_hours_prev_months
         for wd_dict in work_days:
+            empl_dict = res.setdefault(
+                wd_dict['worker_id'], {}).setdefault('employments', {}).setdefault(wd_dict['employment_id'], {})
             data = res.setdefault(
                 wd_dict['worker_id'], {}
             ).setdefault(
@@ -423,25 +434,53 @@ class WorkersStatsGetter:
                 self._get_is_approved_key(wd_dict['is_approved']), {}
             )
             work_days = data.setdefault('work_days', {})
-            work_days['selected_shop'] = wd_dict['work_days_selected_shop']
-            work_days['other_shops'] = wd_dict['work_days_other_shops']
-            work_days['total'] = wd_dict['work_days_total']
+            work_days['selected_shop'] = work_days.get('selected_shop', 0) + wd_dict['work_days_selected_shop']
+            work_days['other_shops'] = work_days.get('other_shops', 0) + wd_dict['work_days_other_shops']
+            work_days['total'] = work_days.get('total', 0) + wd_dict['work_days_selected_period']
 
             work_hours = data.setdefault('work_hours', {})
-            work_hours['selected_shop'] = wd_dict['work_hours_selected_shop']
-            work_hours['other_shops'] = wd_dict['work_hours_other_shops']
-            work_hours['total'] = wd_dict['work_hours_total']
-            work_hours['until_acc_period_end'] = wd_dict['work_hours_until_acc_period_end']
+            work_hours['selected_shop'] = work_hours.get('selected_shop', 0) + wd_dict['work_hours_selected_shop']
+            work_hours['other_shops'] = work_hours.get('other_shops', 0) + wd_dict['work_hours_other_shops']
+            work_hours['total'] = work_hours.get('total', 0) + wd_dict['work_hours_selected_period']
+            work_hours['until_acc_period_end'] = work_hours.get(
+                'until_acc_period_end', 0) + wd_dict['work_hours_until_acc_period_end']
 
             # за прошлые месяцы отработанные часы берем из факта подтвержденного
-            if wd_dict['is_fact'] and wd_dict['is_approved']:
-                work_hours['prev_months'] = wd_dict['work_hours_prev_months']
-            else:
-                work_hours['prev_months'] = res.get(
-                    wd_dict['worker_id'], {}).get('fact', {}).get('approved', {}).get('work_hours', {}).get(
-                    'prev_months', 0)
+            if wd_dict['is_fact'] and wd_dict['is_approved'] and wd_dict['dt__month'] in prev_months:
+                work_hours['prev_months'] = work_hours.get(
+                'prev_months', 0) + wd_dict['work_hours_total']
+                empl_dict['work_hours_prev_months'] = empl_dict.get(
+                'work_hours_prev_months', 0) + wd_dict['work_hours_total']
 
-            work_hours['acc_period'] = work_hours['prev_months'] + work_hours['until_acc_period_end']
+            if not wd_dict['is_fact'] and wd_dict['is_approved']:
+                empl_dict.setdefault('work_hours_outside_of_selected_period_plan_approved', {})[wd_dict['dt__month']] = empl_dict.get(
+                    'work_hours_outside_of_selected_period_plan_approved', {}).get(wd_dict['dt__month'], 0) + wd_dict['work_hours_outside_of_selected_period']
+
+            if not wd_dict['is_fact'] and not wd_dict['is_approved']:
+                empl_dict.setdefault('work_hours_outside_of_selected_period_plan_not_approved', {})[wd_dict['dt__month']] = empl_dict.get(
+                    'work_hours_outside_of_selected_period_plan_not_approved', {}).get(wd_dict['dt__month'], 0) + wd_dict['work_hours_outside_of_selected_period']
+
+        for worker_id in self.workers_dict.keys():
+            worker_dict = res.setdefault(
+                worker_id, {}
+            )
+            work_hours_prev_months = worker_dict.get(
+                'fact', {}).get('approved', {}).get('work_hours', {}).get('prev_months', 0)
+
+            for is_fact_key in ['plan', 'fact']:
+                for is_approved_key in ['approved', 'not_approved']:
+                    data = worker_dict.setdefault(
+                        is_fact_key, {}
+                    ).setdefault(
+                        is_approved_key, {}
+                    )
+                    work_hours = data.setdefault('work_hours', {})
+
+                    if is_fact_key == 'fact' and is_approved_key == 'approved':
+                        pass
+                    else:
+                        work_hours['prev_months'] = work_hours_prev_months
+                    work_hours['acc_period'] = work_hours_prev_months + work_hours.get('until_acc_period_end', 0)
 
         work_days = WorkerDay.objects.filter(
             dt__gte=acc_period_dt_from,
@@ -452,8 +491,11 @@ class WorkersStatsGetter:
             'is_fact',
             'is_approved',
             'type',
+            'dt__month',
         ).annotate(
             day_type_count=Count('type', filter=selected_period_q),
+            workdays_count_outside_of_selected_period=Count(
+                'type', filter=Q(outside_of_selected_period_q, Q(type__in=WorkerDay.TYPES_PAID + [WorkerDay.TYPE_HOLIDAY]))),
         )
         for wd_dict in work_days:
             data = res.setdefault(
@@ -463,8 +505,14 @@ class WorkersStatsGetter:
             ).setdefault(
                 self._get_is_approved_key(wd_dict['is_approved']), {}
             )
-            day_type = data.setdefault('day_type', {})
-            day_type[wd_dict['type']] = wd_dict['day_type_count']
+            if wd_dict['dt__month'] == curr_month:
+                day_type = data.setdefault('day_type', {})
+                day_type[wd_dict['type']] = wd_dict['day_type_count']
+
+            if not wd_dict['is_fact']:
+                days_count_outside_of_selected_period = data.setdefault('workdays_count_outside_of_selected_period', {})
+                days_count_outside_of_selected_period[wd_dict['dt__month']] = days_count_outside_of_selected_period.get(
+                    wd_dict['dt__month'], 0) + wd_dict['workdays_count_outside_of_selected_period']
 
         prod_cal_qs = ProdCal.objects.filter(
             dt__gte=acc_period_dt_from,
@@ -531,6 +579,7 @@ class WorkersStatsGetter:
                 Sum('norm_hours', filter=curr_month_end_q), 0),
             empl_days_count=Count('dt'),
             empl_days_count_selected_period=Count('dt', filter=selected_period_q),
+            empl_days_count_outside_of_selected_period=Count('dt', filter=outside_of_selected_period_q),
         )
 
         for pc_dict in prod_cal_qs:
@@ -564,6 +613,10 @@ class WorkersStatsGetter:
                         empl_dict.setdefault('vacation_or_sick_plan_not_approved_count_selected_period', {})[pc_dict['dt__month']] = \
                             norm_hours.get('vacation_or_sick_plan_not_approved_count_selected_period', 0) + \
                             pc_dict['vacation_or_sick_plan_not_approved_count_selected_period']
+                        empl_dict.setdefault('vacation_or_sick_plan_not_approved_count_outside_of_selected_period', {})[
+                            pc_dict['dt__month']] = empl_dict.setdefault('vacation_or_sick_plan_not_approved_count', {})[
+                                                        pc_dict['dt__month']] - empl_dict.setdefault(
+                            'vacation_or_sick_plan_not_approved_count_selected_period', {})[pc_dict['dt__month']]
                     else:
                         if pc_dict['has_vacation_or_sick_plan_approved'] is False:
                             norm_hours['acc_period'] = norm_hours.get('acc_period', 0) + pc_dict[
@@ -581,21 +634,31 @@ class WorkersStatsGetter:
                         empl_dict.setdefault('vacation_or_sick_plan_approved_count_selected_period', {})[pc_dict['dt__month']] = \
                             norm_hours.get('vacation_or_sick_plan_approved_count_selected_period', 0) + \
                             pc_dict['vacation_or_sick_plan_approved_count_selected_period']
+                        empl_dict.setdefault('vacation_or_sick_plan_approved_count_outside_of_selected_period', {})[
+                            pc_dict['dt__month']] = empl_dict.setdefault('vacation_or_sick_plan_approved_count', {})[
+                                                        pc_dict['dt__month']] - empl_dict.setdefault(
+                            'vacation_or_sick_plan_approved_count_selected_period', {})[pc_dict['dt__month']]
 
                     if is_fact_key == 'plan' and is_approved_key == 'approved':  # считаем только 1 раз
                         norm_hours_by_months = empl_dict.setdefault('norm_hours_by_months', {})
                         empl_days_count = empl_dict.setdefault('empl_days_count', {})
                         empl_days_count_selected_period = empl_dict.setdefault('empl_days_count_selected_period', {})
+                        empl_days_count_outside_of_selected_period = empl_dict.setdefault('empl_days_count_outside_of_selected_period', {})
                         norm_hours_by_months[pc_dict['dt__month']] = norm_hours_by_months.get(
                             pc_dict['dt__month'], 0) + pc_dict['norm_hours_acc_period']
                         empl_dict['norm_hours_total'] = empl_dict.get(
                             'norm_hours_total', 0) + pc_dict['norm_hours_acc_period']
                         empl_days_count[pc_dict['dt__month']] = empl_days_count.get(
                             pc_dict['dt__month'], 0) + pc_dict['empl_days_count']
-                        empl_days_count_selected_period[pc_dict['dt__month']] = empl_days_count_selected_period.get(
+                        empl_days_count_selected_period[
+                            pc_dict['dt__month']] = empl_days_count_selected_period.get(
                             pc_dict['dt__month'], 0) + pc_dict['empl_days_count_selected_period']
+                        empl_days_count_outside_of_selected_period[pc_dict['dt__month']] = empl_days_count_outside_of_selected_period.get(
+                            pc_dict['dt__month'], 0) + pc_dict['empl_days_count_outside_of_selected_period']
                         empl_dict['period_start'] = pc_dict['period_start']
                         empl_dict['period_end'] = pc_dict['period_end']
+                        empl_dict['norm_hours_until_acc_period_end'] = empl_dict[
+                           'norm_hours_total'] - empl_dict.get('work_hours_prev_months', 0)
 
         for worker_id, worker_dict in res.items():
             acc_period_months = list(range(self.acc_period_start.month, self.acc_period_end.month + 1))
@@ -611,14 +674,14 @@ class WorkersStatsGetter:
                         for k, v in empl.sawh_hours_by_months.items() if int(k[1:]) in acc_period_months}
                     empl_dict['sawh_settings_base'] = sawh_settings_base
 
-                    for month_num, empl_norm_hours in norm_hours_by_months.items():
+                    for month_num in norm_hours_by_months.keys():
                         _month_start, _month_end, days_in_month = get_month_range(
                             self.year, month_num, return_days_in_month=True)
                         empl_days_count = empl_dict.get('empl_days_count').get(month_num)
                         empl_dict.setdefault('sawh_settings_empl', {})[month_num] = \
                             empl_days_count / days_in_month * empl_dict['sawh_settings_base'][month_num] / sum(empl_dict['sawh_settings_base'].values())
 
-                    for month_num, empl_norm_hours in norm_hours_by_months.items():
+                    for month_num in norm_hours_by_months.keys():
                         sawh_settings_empl_sum = sum(empl_dict['sawh_settings_empl'].values())
                         empl_dict.setdefault('sawh_settings_empl_normalized', {})[month_num] = empl_dict['sawh_settings_empl'][month_num] / sawh_settings_empl_sum
                         empl_dict.setdefault('sawh_hours_by_months', {})[month_num] = \
@@ -626,28 +689,97 @@ class WorkersStatsGetter:
                 else:
                     empl_dict['sawh_hours_by_months'] = norm_hours_by_months
 
-                for month_num, _norm_hours in norm_hours_by_months.items():
-                    sawh_hours_by_months = empl_dict['sawh_hours_by_months'][month_num]
-                    empl_dict.setdefault('one_day_value', {})[month_num] = \
-                        sawh_hours_by_months / empl_dict.get('empl_days_count').get(month_num)
-                    empl_dict.setdefault('sawh_hours_by_months_plan_approved', {})[month_num] = empl_dict['sawh_hours_by_months'][month_num] - (
-                            empl_dict['one_day_value'][month_num] *
-                            empl_dict.get('vacation_or_sick_plan_approved_count', {}).get(month_num, 0))
-                    empl_dict.setdefault('sawh_hours_by_months_plan_not_approved', {})[month_num] = empl_dict['sawh_hours_by_months'][
-                        month_num] - (empl_dict['one_day_value'][month_num] * empl_dict.get(
-                        'vacation_or_sick_plan_not_approved_count', {}).get(month_num, 0))
+                for month_num in [m for m in months_until_acc_period_end if m in empl_dict['sawh_hours_by_months']]:
+                    if self.network.consider_remaining_hours_in_prev_months_when_calc_norm_hours:
+                        sawh_settings_empl_sum = sum(
+                            v for k, v in empl_dict['sawh_hours_by_months'].items() if k in months_until_acc_period_end)
+                        empl_dict.setdefault('sawh_settings_empl_normalized', {})[month_num] = \
+                            empl_dict['sawh_hours_by_months'][month_num] / sawh_settings_empl_sum
+                        empl_dict.setdefault('sawh_hours_by_months', {})[month_num] = \
+                            empl_dict['sawh_settings_empl_normalized'][month_num] * empl_dict[
+                                'norm_hours_until_acc_period_end']
+                        empl_dict.setdefault('one_day_value', {})[month_num] = empl_dict['sawh_hours_by_months'][month_num] / empl_dict['empl_days_count'][month_num]
+                        empl_dict.setdefault('sawh_hours_by_months_plan_approved', {})[month_num] = \
+                        empl_dict['sawh_hours_by_months'][month_num] - (
+                                empl_dict['one_day_value'][month_num] *
+                                empl_dict.get('vacation_or_sick_plan_approved_count', {}).get(month_num, 0))
+                        empl_dict.setdefault('sawh_hours_by_months_plan_not_approved', {})[month_num] = \
+                        empl_dict['sawh_hours_by_months'][
+                            month_num] - (empl_dict['one_day_value'][month_num] * empl_dict.get(
+                            'vacation_or_sick_plan_not_approved_count', {}).get(month_num, 0))
+                    else:
+                        sawh_hours_by_months = empl_dict['sawh_hours_by_months'][month_num]
+                        empl_dict.setdefault('one_day_value', {})[month_num] = \
+                            sawh_hours_by_months / empl_dict.get('empl_days_count').get(month_num)
+                        empl_dict.setdefault('sawh_hours_by_months_plan_approved', {})[month_num] = \
+                        empl_dict['sawh_hours_by_months'][month_num] - (
+                                empl_dict['one_day_value'][month_num] *
+                                empl_dict.get('vacation_or_sick_plan_approved_count', {}).get(month_num, 0))
+                        empl_dict.setdefault('sawh_hours_by_months_plan_not_approved', {})[month_num] = \
+                        empl_dict['sawh_hours_by_months'][
+                            month_num] - (empl_dict['one_day_value'][month_num] * empl_dict.get(
+                            'vacation_or_sick_plan_not_approved_count', {}).get(month_num, 0))
 
                     if month_num in selected_period_months:
-                        selected_period_hours = \
-                            empl_dict['one_day_value'][month_num] * empl_dict['empl_days_count_selected_period'][month_num]
-                        empl_dict.setdefault('sawh_hours_by_months_plan_approved_selected_period', {})[month_num] = \
-                         selected_period_hours - (
-                                empl_dict['one_day_value'][month_num] *
-                                empl_dict.get('vacation_or_sick_plan_approved_count_selected_period', {}).get(month_num, 0))
-                        empl_dict.setdefault('sawh_hours_by_months_plan_not_approved_selected_period', {})[month_num] = \
-                        selected_period_hours - (
-                                empl_dict['one_day_value'][month_num] *
-                                empl_dict.get('vacation_or_sick_plan_not_approved_count_selected_period', {}).get(month_num, 0))
+                        days_count_in_month = empl_dict['empl_days_count'][month_num]
+                        month_sawh_hours = empl_dict['sawh_hours_by_months'][month_num]
+                        days_count_selected_period = empl_dict['empl_days_count_selected_period'][month_num]
+                        days_count_outside_of_selected_period = empl_dict['empl_days_count_outside_of_selected_period'][month_num]
+
+                        # approved
+                        workdays_count_outside_of_selected_period_pa = res.get(worker_id, {}).get('plan', {}).get(
+                            'approved', {}).get('workdays_count_outside_of_selected_period', {}).get(month_num, 0)
+                        empty_days_pa = empl_dict['empl_days_count_outside_of_selected_period'][month_num] - workdays_count_outside_of_selected_period_pa
+                        vacations_or_sick_count_selected_period_pa = empl_dict.get(
+                            'vacation_or_sick_plan_approved_count_selected_period', {}).get(month_num, 0)
+                        vacations_or_sick_count_outside_of_selected_period_pa = empl_dict.get(
+                            'vacation_or_sick_plan_approved_count_outside_of_selected_period', {}).get(month_num, 0)
+                        work_hours_outside_of_selected_period_pa = empl_dict.setdefault(
+                            'work_hours_outside_of_selected_period_plan_approved', {}).get(month_num, 0)
+
+                        fot1 = month_sawh_hours
+                        fot2 = fot1 * ((days_count_selected_period - vacations_or_sick_count_selected_period_pa) / days_count_in_month)
+                        fot3 = fot1 * (days_count_outside_of_selected_period - vacations_or_sick_count_outside_of_selected_period_pa) / days_count_in_month
+
+                        if workdays_count_outside_of_selected_period_pa == 0:
+                            norm_work_amount = fot2
+                        else:
+                            had_to_work_outside_of_period = fot3 * (
+                                workdays_count_outside_of_selected_period_pa / (workdays_count_outside_of_selected_period_pa + empty_days_pa))
+                            remaining_work_outside_of_period = had_to_work_outside_of_period - work_hours_outside_of_selected_period_pa
+
+                            norm_work_amount = fot2 + (remaining_work_outside_of_period * (
+                                days_count_selected_period / (days_count_selected_period + empty_days_pa)))
+                        empl_dict.setdefault('sawh_hours_by_months_plan_approved_selected_period', {})[month_num] = norm_work_amount
+
+                        # not approved
+                        workdays_count_outside_of_selected_period_npa = res.get(worker_id, {}).get('plan', {}).get(
+                            'not_approved', {}).get('workdays_count_outside_of_selected_period', {}).get(month_num, 0)
+                        empty_days_npa = empl_dict['empl_days_count_outside_of_selected_period'][
+                                            month_num] - workdays_count_outside_of_selected_period_npa
+                        vacations_or_sick_count_selected_period_npa = empl_dict.get(
+                            'vacation_or_sick_plan_not_approved_count_selected_period', {}).get(month_num, 0)
+                        vacations_or_sick_count_outside_of_selected_period_npa = empl_dict.get(
+                            'vacation_or_sick_plan_not_approved_count_outside_of_selected_period', {}).get(month_num, 0)
+                        work_hours_outside_of_selected_period_npa = empl_dict.setdefault(
+                            'work_hours_outside_of_selected_period_plan_not_approved', {}).get(month_num, 0)
+
+                        fot1 = month_sawh_hours
+                        fot2 = fot1 * ((days_count_selected_period - vacations_or_sick_count_selected_period_npa) / days_count_in_month)
+                        fot3 = fot1 * (
+                                    days_count_outside_of_selected_period - vacations_or_sick_count_outside_of_selected_period_npa) / days_count_in_month
+
+                        if workdays_count_outside_of_selected_period_npa == 0:
+                            norm_work_amount = fot2
+                        else:
+                            had_to_work_outside_of_period = fot3 * (
+                                    workdays_count_outside_of_selected_period_npa / (workdays_count_outside_of_selected_period_npa + empty_days_npa))
+                            remaining_work_outside_of_period = had_to_work_outside_of_period - work_hours_outside_of_selected_period_npa
+
+                            norm_work_amount = fot2 + (remaining_work_outside_of_period * (
+                                days_count_selected_period / (days_count_selected_period + empty_days_npa)))
+                        empl_dict.setdefault('sawh_hours_by_months_plan_not_approved_selected_period', {})[
+                            month_num] = norm_work_amount
 
                 empl_dict['sawh_hours_plan_approved_selected_period'] = sum(
                     empl_dict.setdefault('sawh_hours_by_months_plan_approved_selected_period', {}).values())

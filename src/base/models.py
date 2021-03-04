@@ -120,6 +120,9 @@ class Network(AbstractActiveModel):
         default=False, verbose_name='Уменьшать дату окончания трудоустройства',
         help_text='Актуально для данных, получаемых через api',
     )
+    consider_remaining_hours_in_prev_months_when_calc_norm_hours = models.BooleanField(
+        default=False, verbose_name='Учитывать неотработанные часы за предыдущие месяца при расчете нормы часов',
+    )
 
     def get_department(self):
         return None

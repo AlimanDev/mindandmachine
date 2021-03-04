@@ -593,9 +593,7 @@ class TestAutoSettings(APITestCase):
     def test_create_tt_second_part_of_month_with_vacations_in_first_part_or_month(self):
         dt_from = date(2021, 2, 15)
         dt_to = date(2021, 2, 28)
-        dt = date(2021, 2, 1)
-        for day in range(3):
-            dt = dt + timedelta(days=1)
+        for dt in pd.date_range(date(2021, 2, 1), date(2021, 2, 3)):
             WorkerDay.objects.create(
                 employment=self.employment2,
                 worker=self.employment2.user,
@@ -608,7 +606,7 @@ class TestAutoSettings(APITestCase):
 
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
         employment3Info = list(filter(lambda x: x['general_info']['id'] == self.user3.id, data['cashiers']))[0]
-        self.assertEqual(employment2Info['norm_work_amount'], 75.5)  # в прошлом варианте 81.85587, почему получалось больше?
+        self.assertEqual(employment2Info['norm_work_amount'], 75.5)
         self.assertEqual(employment3Info['norm_work_amount'], 75.5)
 
     def test_create_tt_second_part_of_month_with_vacations_in_second_part_or_month(self):
@@ -629,12 +627,11 @@ class TestAutoSettings(APITestCase):
 
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
         employment3Info = list(filter(lambda x: x['general_info']['id'] == self.user3.id, data['cashiers']))[0]
-        self.assertEqual(employment2Info['norm_work_amount'], 59.32142857142857)  # в прошлом варианте 67.41071428571429, какой вариант правильнее?
+        self.assertEqual(employment2Info['norm_work_amount'], 59.32142857142857)
         self.assertEqual(employment3Info['norm_work_amount'], 75.5)
 
     def test_create_tt_sum_for_first_and_second_parts_of_month_equal_to_full_month_norm(self):
-        dt = date(2021, 2, 15)
-        for day in range(3):
+        for dt in pd.date_range(date(2021, 2, 15), date(2021, 2, 18)):
             dt = dt + timedelta(days=1)
             WorkerDay.objects.create(
                 employment=self.employment2,
@@ -656,17 +653,17 @@ class TestAutoSettings(APITestCase):
         data = self._test_create_tt(dt_from, dt_to)
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
         seconds_month_part_norm_work_amount = employment2Info['norm_work_amount']
-        self.assertEqual(seconds_month_part_norm_work_amount, 59.32142857142857)
+        self.assertEqual(seconds_month_part_norm_work_amount, 53.92857142857143)
 
         dt_from = date(2021, 2, 1)
         dt_to = date(2021, 2, 28)
         data = self._test_create_tt(dt_from, dt_to)
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
         full_month_norm_work_amount = employment2Info['norm_work_amount']
-        self.assertEqual(full_month_norm_work_amount, 134.82142857142856)
+        self.assertEqual(full_month_norm_work_amount, 129.42857142857142)
 
         self.assertEqual(
-            first_month_part_norm_work_amount + seconds_month_part_norm_work_amount, full_month_norm_work_amount)
+            round(first_month_part_norm_work_amount + seconds_month_part_norm_work_amount, 5), round(full_month_norm_work_amount, 5))
 
     def test_create_tt_second_part_of_month_with_holidays_in_fist_part(self):
         for dt in pd.date_range(date(2021, 2, 1), date(2021, 2, 14)):
@@ -676,6 +673,7 @@ class TestAutoSettings(APITestCase):
                 shop=self.employment2.shop,
                 dt=dt,
                 type=WorkerDay.TYPE_HOLIDAY,
+                is_approved=True,
             )
 
         dt_from = date(2021, 2, 15)
@@ -683,8 +681,8 @@ class TestAutoSettings(APITestCase):
         data = self._test_create_tt(dt_from, dt_to)
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
         employment3Info = list(filter(lambda x: x['general_info']['id'] == self.user3.id, data['cashiers']))[0]
-        self.assertEqual(employment2Info['norm_work_amount'], 75.5)  # старый вариант 151.0 (новый вариант не учитывает неотработанные часы) # TODO: надо сделать так, чтобы учитывал
-        self.assertEqual(employment3Info['norm_work_amount'], 75.5)  # старый вариант 75.5 (сколько должно быть? как должно учитываться отсутствие данных?)
+        self.assertEqual(employment2Info['norm_work_amount'], 75.5)  # TODO: в это случае должно быть 150?
+        self.assertEqual(employment3Info['norm_work_amount'], 75.5)
 
     def test_create_tt_second_part_of_month_with_work_days_in_fist_part(self):
         for dt in pd.date_range(date(2021, 2, 1), date(2021, 2, 14)):
@@ -708,8 +706,7 @@ class TestAutoSettings(APITestCase):
         data = self._test_create_tt(dt_from, dt_to)
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
         employment3Info = list(filter(lambda x: x['general_info']['id'] == self.user3.id, data['cashiers']))[0]
-        # TODO: сделать учет часов, отработанных за пред. период (откуда брать часы или плана или из факта?)
-        self.assertEqual(employment2Info['norm_work_amount'], 75.5)  # старый вариант -13 -- это правильно?
+        self.assertEqual(employment2Info['norm_work_amount'], -13.5)  # TODO: минусовая норма это ок?
         self.assertEqual(employment3Info['norm_work_amount'], 75.5)
 
     def test_create_tt_full_month_for_employment_hired_in_middle_of_the_month(self):
@@ -747,7 +744,276 @@ class TestAutoSettings(APITestCase):
         dt_to = date(2021, 2, 28)
         data = self._test_create_tt(dt_from, dt_to)
 
-        # не 151.0 + 75.5 т.к. час в сокращенном дне вычитается полностью, а не как доля от ставки
+        # 75.0, а не 75.5 т.к. час в сокращенном дне вычитается полностью, а не как доля от ставки
         self.assertEqual(
             sum(i['norm_work_amount'] for i in
                 filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers'])), 151.0 + 75.0)
+
+    def test_create_tt_full_month_with_acc_period_3_months_and_fact_work_hours_in_prev_month(self):
+        self.network.accounting_period_length = 3
+        self.network.consider_remaining_hours_in_prev_months_when_calc_norm_hours = True
+        self.network.save()
+
+        for dt in pd.date_range(date(2021, 1, 1), date(2021, 1, 15)):
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(21, 15)),
+                is_approved=True,
+                is_fact=True,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd,
+            )
+
+        dt_from = date(2021, 2, 1)
+        dt_to = date(2021, 2, 28)
+        data = self._test_create_tt(dt_from, dt_to)
+
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
+        self.assertEqual(employment2Info['norm_work_amount'], 137.14678899082568)
+
+    def test_create_tt_first_part_of_month_with_vacations_work_days_and_holidays_in_second_part(self):
+        self.network.accounting_period_length = 3
+        self.network.save()
+
+        for dt in pd.date_range(date(2021, 1, 1), date(2021, 1, 12)):
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(21, 15)),
+                is_approved=True,
+                is_fact=True,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd,
+            )
+
+        for dt in pd.date_range(date(2021, 2, 15), date(2021, 2, 21)):
+            WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_VACATION,
+                is_approved=True,
+                is_fact=False,
+            )
+
+        for dt in pd.date_range(date(2021, 1, 22), date(2021, 1, 26)):
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(21, 15)),
+                is_approved=True,
+                is_fact=False,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd,
+            )
+
+        for dt in pd.date_range(date(2021, 1, 27), date(2021, 1, 28)):
+            WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_approved=True,
+                is_fact=False,
+            )
+
+        dt_from = date(2021, 2, 1)
+        dt_to = date(2021, 2, 14)
+        data = self._test_create_tt(dt_from, dt_to)
+
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
+        self.assertEqual(employment2Info['norm_work_amount'], 75.5)
+
+    def test_create_tt_first_part_of_month_with_vacations_work_days_and_no_data_in_second_part(self):
+        self.network.accounting_period_length = 3
+        self.network.save()
+
+        for dt in pd.date_range(date(2021, 1, 1), date(2021, 1, 12)):
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(21, 15)),
+                is_approved=True,
+                is_fact=True,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd,
+            )
+
+        for dt in pd.date_range(date(2021, 2, 15), date(2021, 2, 21)):
+            WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_VACATION,
+                is_approved=True,
+                is_fact=False,
+            )
+
+        for dt in pd.date_range(date(2021, 1, 22), date(2021, 1, 26)):
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(21, 15)),
+                is_approved=True,
+                is_fact=False,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd,
+            )
+
+        for dt in pd.date_range(date(2021, 1, 27), date(2021, 1, 28)):
+            WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_approved=True,
+                is_fact=False,
+            )
+
+        dt_from = date(2021, 2, 1)
+        dt_to = date(2021, 2, 14)
+        data = self._test_create_tt(dt_from, dt_to)
+
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
+        self.assertEqual(employment2Info['norm_work_amount'], 75.5)
+
+    def test_create_tt_start_in_one_month_end_in_the_other(self):
+        self.network.accounting_period_length = 6
+        self.network.save()
+
+        for dt in pd.date_range(date(2021, 1, 1), date(2021, 1, 12)):
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(21, 15)),
+                is_approved=True,
+                is_fact=True,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd,
+            )
+
+        for dt in pd.date_range(date(2021, 2, 1), date(2021, 2, 14)):
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(21, 15)),
+                is_approved=True,
+                is_fact=True,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd,
+            )
+
+        wd = WorkerDay.objects.create(
+            employment=self.employment2,
+            worker=self.employment2.user,
+            shop=self.employment2.shop,
+            dt=date(2021, 2, 15),
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(date(2021, 2, 15), time(10)),
+            dttm_work_end=datetime.combine(date(2021, 2, 15), time(22, 15)),
+            is_approved=True,
+            is_fact=True,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            work_type=self.work_type,
+            worker_day=wd,
+        )
+
+        for dt in pd.date_range(date(2021, 3, 1), date(2021, 3, 7)):
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(21, 15)),
+                is_approved=True,
+                is_fact=False,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd,
+            )
+
+        wd = WorkerDay.objects.create(
+            employment=self.employment2,
+            worker=self.employment2.user,
+            shop=self.employment2.shop,
+            dt=date(2021, 3, 8),
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(date(2021, 3, 8), time(10)),
+            dttm_work_end=datetime.combine(date(2021, 3, 8), time(23, 15)),
+            is_approved=True,
+            is_fact=False,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            work_type=self.work_type,
+            worker_day=wd,
+        )
+
+        for dt in pd.date_range(date(2021, 3, 9), date(2021, 3, 16)):
+            WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_approved=True,
+                is_fact=False,
+            )
+
+        dt_from = date(2021, 3, 25)
+        dt_to = date(2021, 4, 5)
+        data = self._test_create_tt(dt_from, dt_to, use_not_approved=False)
+
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
+        # TODO: правильный результат?
+        self.assertEqual(employment2Info['norm_work_amount'], 73.03333333333333)  # {3: 43.86666666666666, 4: 29.166666666666664}
