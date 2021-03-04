@@ -5,6 +5,7 @@ import io
 from datetime import date, datetime, timedelta
 from django.db.models import Sum, Q, Count, Exists, OuterRef
 from django.db.models.functions import Trunc
+from dateutil.relativedelta import relativedelta
 
 NO_RECORDS = 'R'
 NO_COMMING = 'C'
@@ -103,8 +104,6 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None):
     return data
 
 
-
-
 def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
     if not dt:
         dt = date.today() - timedelta(1)
@@ -174,3 +173,106 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
             'type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         }
     
+
+def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=None, in_memory=False):
+    if not dt_from:
+        dt_from = date.today().replace(day=1)
+    if not dt_to:
+        dt_to = dt_from + relativedelta(day=31)
+    if not title:
+        title = f'URV_violators_report_{dt_from}-{dt_to}.xlsx'
+    SHOP_CODE = 0
+    SHOP = 1
+    TABEL_CODE = 2
+    FIO = 3
+    POSITION = 4
+    shops = { 
+        s.id: s for s in Shop.objects.all()
+    }
+    data = urv_violators_report(network_id, dt_from=dt_from, dt_to=dt_to)
+
+    users = {
+        u.id: f"{u.last_name} {u.first_name} {u.middle_name if u.middle_name else ''}" for u in User.objects.filter(
+            id__in=data.keys(),
+        )
+    }
+
+    if in_memory:
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    else:
+        workbook = xlsxwriter.Workbook(title)
+    
+    rows = []
+
+    for user_id, records in data.items():
+        empl = Employment.objects.get_active(
+            network_id,
+            dt_from,
+            dt_to,
+            user_id=user_id,
+        ).select_related('position').first()
+        rows.append(
+            {
+                'shop': shops.get(empl.shop_id if empl else None, Shop()).name or '',
+                'shop_code': shops.get(empl.shop_id if empl else None, Shop()).code or '',
+                'empl': empl,
+                'fio': users.get(user_id),
+                'records': records, 
+            }
+        ) 
+
+    rows = sorted(rows, key=lambda x: x['shop'])
+
+
+    worksheet = workbook.add_worksheet('{}-{}'.format(dt_from.strftime('%Y.%m.%d'), dt_to.strftime('%Y.%m.%d')))
+    def_format = {
+        'border': 1,
+        'valign': 'vcenter',
+        'align': 'center',
+        'text_wrap': True,
+    }
+    header_format = {
+        'border': 1,
+        'bold': True,
+        'text_wrap': True,
+        'valign': 'vcenter',
+        'align': 'center',
+    }
+    worksheet.write_string(0, SHOP_CODE, 'Код магазина', workbook.add_format(header_format))
+    worksheet.write_string(0, SHOP, 'Магазин', workbook.add_format(header_format))
+    worksheet.write_string(0, TABEL_CODE, 'Табельный номер', workbook.add_format(header_format))
+    worksheet.write_string(0, FIO, 'ФИО', workbook.add_format(header_format))
+    worksheet.write_string(0, POSITION, 'Должность', workbook.add_format(header_format))
+    worksheet.set_column(SHOP_CODE, SHOP_CODE, 15)
+    worksheet.set_column(SHOP, SHOP, 15)
+    worksheet.set_column(FIO, FIO, 20)
+    worksheet.set_column(POSITION, POSITION, 20)
+    worksheet.set_column(TABEL_CODE, TABEL_CODE, 15)
+    dates = [dt_from + timedelta(i) for i in range((dt_to - dt_from).days + 1)]
+    col = POSITION
+    for dt in dates:
+        col += 1
+        worksheet.write_string(0, col, dt.strftime('%d.%m.%Y'), workbook.add_format(header_format))
+        worksheet.set_column(col, col, 10)
+    row = 1
+    for record in rows:
+        worksheet.write_string(row, SHOP_CODE, record['shop_code'] or '', workbook.add_format(def_format))
+        worksheet.write_string(row, SHOP, record['shop'], workbook.add_format(def_format))
+        worksheet.write_string(row, TABEL_CODE, record['empl'].tabel_code or '' if record['empl'] else '', workbook.add_format(def_format))
+        worksheet.write_string(row, FIO, record['fio'], workbook.add_format(def_format))
+        worksheet.write_string(row, POSITION, record['empl'].position.name if record['empl'] and record['empl'].position else '', workbook.add_format(def_format))
+        col = POSITION
+        for dt in dates:
+            col += 1
+            worksheet.write_string(row, col, text.get(record['records'].get(dt, {}).get('type', ''), ''), workbook.add_format(def_format))
+        row += 1
+
+    workbook.close()
+    if in_memory:
+        output.seek(0)
+        return {
+            'name': title,
+            'file': output,
+            'type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }

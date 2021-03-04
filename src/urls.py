@@ -26,6 +26,7 @@ from src.misc import urls as misc_api
 from src.recognition.urls import router as recognition_router
 from src.timetable import urls as timetable_api
 from src.timetable.views import RecalcWhAdminView
+from src.recognition.views import DownloadViolatorsReportAdminView
 
 api_urlpatterns = [
     path('auth/', include(auth_urls)),
@@ -46,6 +47,7 @@ api_urlpatterns = [
 urlpatterns = [
     path('api/', include(api_urlpatterns)),
     path('admin/timetable/workerday/recalc_wh/', RecalcWhAdminView.as_view(), name='recalc_wh'),
+    path('admin/recognition/ticks/download_violators/', DownloadViolatorsReportAdminView.as_view(), name='download_violators'),
     path('admin/', admin.site.urls),
     path('rest_api/recognition/', include(recognition_router.get_urls())),
     path('rest_api/', include(
