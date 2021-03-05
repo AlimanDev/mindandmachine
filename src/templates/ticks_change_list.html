@@ -1,0 +1,8 @@
+{% extends 'admin/change_list.html' %}
+
+{% block object-tools-items %}
+    <li>
+        <a href="{% url 'download_violators' %}" class="btn btn-high btn-success">Скачать отчет о нарушителях</a>
+    </li>
+    {{ block.super }}
+{% endblock %}

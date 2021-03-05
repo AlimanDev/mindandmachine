@@ -81,6 +81,7 @@ def import_urv_zkteco():
         dt__lte=date.today() + timedelta(1),
         is_fact=False,
         is_approved=True,
+        type__in=WorkerDay.TYPES_WITH_TM_RANGE,
     )
 
     worker_days = {}
@@ -89,8 +90,8 @@ def import_urv_zkteco():
 
     attrs = AttendanceRecords.objects.filter(
         user_id__in=users.keys(),
-        dttm__date__gte=max_date - timedelta(1),
-        dttm__date__lte=date.today(),
+        dt__gte=max_date - timedelta(1),
+        dt__lte=date.today(),
     )
     attendance_records = {}
     for attr in attrs:
@@ -230,7 +231,7 @@ def export_workers_zkteco():
             shop_id=shop_code.shop_id,
         ).first()
 
-        pin = user.id + 10000  # Чтобы не пересекалось с уже заведенными
+        pin = user.id + settings.ZKTECO_USER_ID_SHIFT  # Чтобы не пересекалось с уже заведенными
         res = zkteco.add_user(e, pin)
         if 'code' in res and res['code'] == 0:
             user_code = UserExternalCode.objects.create(

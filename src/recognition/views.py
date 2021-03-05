@@ -44,6 +44,11 @@ from src.timetable.models import (
     WorkerDay,
     Employment,
 )
+from src.recognition.forms import DownloadViolatorsReportForm
+from src.timetable.mixins import SuperuserRequiredMixin
+from django.views.generic.edit import FormView
+
+
 
 logger = logging.getLogger('django')
 recognition = Recognition()
@@ -443,3 +448,33 @@ class TickPointViewSet(BaseModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(network_id=self.request.user.network_id)
+
+
+class DownloadViolatorsReportAdminView(SuperuserRequiredMixin, FormView):
+    form_class = DownloadViolatorsReportForm
+    template_name = 'download_violators.html'
+    success_url = '/admin/recognition/tick/'
+
+
+    def get(self, request):
+        form = self.form_class(request.GET)
+        if form.is_valid():
+            return self.form_valid(form)
+        else:
+            return super().get(request)
+
+    def form_valid(self, form):
+        network = form.cleaned_data['network']
+        dt_from = form.cleaned_data['dt_from']
+        dt_to = form.cleaned_data['dt_to']
+        
+        return form.get_file(network=network, dt_from=dt_from, dt_to=dt_to)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        context['title'] = 'Скачать отчет о нарушителях'
+        context['has_permission'] = True
+
+        return context
+
