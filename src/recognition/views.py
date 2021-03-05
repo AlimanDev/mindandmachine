@@ -226,7 +226,13 @@ class TickViewSet(BaseModelViewSet):
                 is_vacancy=True,
             ).first()
             if not wd:
-                return Response({"error": "Действие невозможно, обратитесь к вашему руководителю"}, 400)
+                return Response(
+                    {
+                        "error": "У вас нет трудоустройства на текущий момент, "\
+                        "действие выполнить невозможно, пожалуйста, обратитесь к вашему руководству"
+                    }, 
+                    400
+                )
 
         wd = WorkerDay.objects.all().filter(
             worker_id=user_id,
