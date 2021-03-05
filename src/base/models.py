@@ -20,6 +20,7 @@ from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, Out
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.functional import cached_property
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
@@ -31,6 +32,7 @@ from src.base.models_abstract import (
     AbstractModel,
     AbstractActiveNetworkSpecificCodeNamedModel,
     NetworkSpecificModel,
+    AbstractCodeNamedModel,
 )
 from src.conf.djconfig import QOS_TIME_FORMAT
 
@@ -318,6 +320,25 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             self.code,
         )
 
+    @property
+    def is_active(self):
+        dttm_now = timezone.now()
+        dt_now = dttm_now.date()
+        is_not_deleted = self.dttm_deleted is None or (self.dttm_added < dttm_now < self.dttm_deleted)
+        is_not_closed = (self.dt_opened or datetime.date(1000, 1, 1)) <= dt_now <= (
+                    self.dt_closed or datetime.date(3999, 1, 1))
+        return is_not_deleted and is_not_closed
+
+    @is_active.setter
+    def is_active(self, val):
+        # TODO: нужно ли тут проставлять dt_closed?
+        if val:
+            if self.dttm_deleted:
+                self.dttm_deleted = None
+        else:
+            if not self.dttm_deleted:
+                self.dttm_deleted = timezone.now()
+
     def system_step_in_minutes(self):
         return self.forecast_step_minutes.hour * 60 + self.forecast_step_minutes.minute
 
@@ -516,6 +537,14 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     @property
     def nonstandard_schedule(self):
         return self.shopschedule_set.filter(modified_by__isnull=False)
+
+    @cached_property
+    def is_all_day(self):
+        if self.open_times and self.close_times:
+            open_at_0 = all(getattr(d, a) == 0 for a in ['hour', 'second', 'minute'] for d in self.open_times.values())
+            close_at_0 = all(getattr(d, a) == 0 for a in ['hour', 'second', 'minute'] for d in self.close_times.values())
+            shop_24h_open = open_at_0 and close_at_0
+            return shop_24h_open
 
 
 class EmploymentManager(models.Manager):
