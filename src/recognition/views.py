@@ -213,7 +213,7 @@ class TickViewSet(BaseModelViewSet):
         # Проверка на принадлежность пользователя правильному магазину
         employment = Employment.objects.get_active(
             request.user.network.id,
-            dttm_from, dttm_to,
+            dttm_from.date(), dttm_from.date(),
             user_id=user_id,
             shop_id=tick_point.shop_id
         ).first()
