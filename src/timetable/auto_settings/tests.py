@@ -427,8 +427,6 @@ class TestAutoSettings(APITestCase):
                         'use_not_approved': use_not_approved,
                     }
                 )
-                print(response.status_code)
-                print(response.content.decode())
                 data = json.loads(mock_post.call_args[1]['data'])
                 self.assertEqual(response.status_code, 200)
 
@@ -1134,3 +1132,22 @@ class TestAutoSettings(APITestCase):
 
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
         self.assertEqual(employment2Info['norm_work_amount'], 59.70161290322581)
+
+    def test_create_tt_error_for_months_from_different_acc_periods(self):
+        dt_from = date(2021, 3, 25)
+        dt_to = date(2021, 4, 5)
+
+        with patch.object(requests, 'post'):
+            response = self.client.post(
+                '/rest_api/auto_settings/create_timetable/',
+                {
+                    'shop_id': self.shop.id,
+                    'dt_from': dt_from,
+                    'dt_to': dt_to,
+                }
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), [
+                'Небходимо выбрать интервал в рамках одного учетного периода.'
+            ]
+        )

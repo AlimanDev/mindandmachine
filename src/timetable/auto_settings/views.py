@@ -65,6 +65,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         "tt_server_error": _("Fail sending data to server."),
         "tt_delete_past": _("You can't delete timetable in the past."),
         "settings_not_exists": _("You need to select auto-scheduling settings for the department."),
+        "tt_different_acc_periods": _("Небходимо выбрать интервал в рамках одного учетного периода."),
     }
     serializer_class = AutoSettingsCreateSerializer
     permission_classes = [Permission]
@@ -267,6 +268,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         shop_id = form['shop_id']
         dt_from = form['dt_from']
         dt_to = form['dt_to']
+
+        if not (self.request.user.network.get_acc_period_range(dt_to) == self.request.user.network.get_acc_period_range(dt_from)):
+            raise ValidationError(self.error_messages["tt_different_acc_periods"])
 
         dt_min = datetime.now().date() + timedelta(days=settings.REBUILD_TIMETABLE_MIN_DELTA)
 
