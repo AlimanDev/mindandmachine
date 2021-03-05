@@ -87,4 +87,10 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
                 content_type='application/json',
             )
         self.assertEqual(resp_coming.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(resp_coming.json(), {"error": "Действие невозможно, обратитесь к вашему руководителю"})
+        self.assertEqual(
+            resp_coming.json(), 
+            {
+                "error": "У вас нет трудоустройства на текущий момент, "\
+                "действие выполнить невозможно, пожалуйста, обратитесь к вашему руководству"
+            },
+        )

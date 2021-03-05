@@ -238,7 +238,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             shop=cls.shop,
             type=AttendanceRecords.TYPE_COMING,
             user=cls.user_dir,
-            dttm=datetime.combine(cls.dt, datetime.now().time())
+            dttm=datetime.combine(cls.dt, time(8))
         )
 
     def setUp(self):
