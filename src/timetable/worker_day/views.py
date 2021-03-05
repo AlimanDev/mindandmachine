@@ -821,8 +821,6 @@ class WorkerDayViewSet(BaseModelViewSet):
         
         return Response(WorkerDayListSerializer(wds.prefetch_related('worker_day_details'), many=True, context={'request':request}).data)
 
-
-
     @swagger_auto_schema(
         request_body=DuplicateSrializer,
         operation_description='''
@@ -844,7 +842,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             ).select_related(
                 'worker',
                 'shop__settings__breaks',
-            ))
+            ).order_by('dt'))
             main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
                 worker_day__in=main_worker_days,
             ).select_related('work_type'))

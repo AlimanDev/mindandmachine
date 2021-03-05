@@ -2236,6 +2236,47 @@ class TestAditionalFunctions(APITestCase):
         )
         self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False).count(), 0)
 
+    def test_the_order_of_days_is_determined_by_day_date_not_by_the_date_of_creation(self):
+        dt_now = date.today()
+        dt_tomorrow = dt_now + timedelta(days=1)
+        dt_to = dt_now + timedelta(days=5)
+
+        wd_dt_tomorrow = WorkerDay.objects.create(
+            shop=self.shop,
+            worker=self.user2,
+            employment=self.employment2,
+            dt=dt_tomorrow,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt_now, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(dt_now, time(20, 0, 0)),
+            is_fact=False,
+            is_approved=False,
+        )
+        wd_dt_now = WorkerDay.objects.create(
+            shop=self.shop,
+            worker=self.user2,
+            employment=self.employment2,
+            dt=dt_now,
+            type=WorkerDay.TYPE_HOLIDAY,
+            is_fact=False,
+            is_approved=False,
+        )
+
+        data = {
+            'from_workerday_ids': [wd_dt_now.id, wd_dt_tomorrow.id],
+            'to_worker_id': self.user3.id,
+            'to_dates': [Converter.convert_date(dt_to + timedelta(days=i)) for i in range(2)],
+        }
+        url = f'{self.url}duplicate/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertEqual(WorkerDay.objects.filter(
+            worker=self.user3, is_approved=False, dt=dt_to, type='H'
+        ).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(
+            worker=self.user3, is_approved=False, dt=dt_to + timedelta(days=1), type='W'
+        ).count(), 1)
 
     def test_copy_approved(self):
         dt_now = date.today()
