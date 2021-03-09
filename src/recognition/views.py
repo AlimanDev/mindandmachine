@@ -213,7 +213,7 @@ class TickViewSet(BaseModelViewSet):
         # Проверка на принадлежность пользователя правильному магазину
         employment = Employment.objects.get_active(
             request.user.network.id,
-            dttm_from, dttm_to,
+            dttm_from.date(), dttm_from.date(),
             user_id=user_id,
             shop_id=tick_point.shop_id
         ).first()
@@ -231,7 +231,13 @@ class TickViewSet(BaseModelViewSet):
                 is_vacancy=True,
             ).first()
             if not wd:
-                return Response({"error": "Действие невозможно, обратитесь к вашему руководителю"}, 400)
+                return Response(
+                    {
+                        "error": "У вас нет трудоустройства на текущий момент, "\
+                        "действие выполнить невозможно, пожалуйста, обратитесь к вашему руководству"
+                    }, 
+                    400
+                )
 
         wd = WorkerDay.objects.all().filter(
             worker_id=user_id,
