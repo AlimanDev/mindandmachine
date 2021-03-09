@@ -5,7 +5,7 @@ import pandas as pd
 from django.db.models import Q, F
 from django.db import transaction
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 
 from src.base.exceptions import MessageError
 from src.base.models import (
@@ -477,7 +477,25 @@ def exchange(data, error_messages):
             if day_pair[0].dt != day_pair[1].dt:
                 raise ValidationError(error_messages['worker_days_mismatch'])
             day_pairs.append(day_pair)
-        
+
+        # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
+        # что в списке изменяемых дней нету защищенных дней, если есть, то выдаем ошибку
+        has_permission_to_change_protected_wdays = Group.objects.filter(
+            id__in=data['user'].get_group_ids(
+                data['user'].network, day_pairs[0][0].shop),
+            has_perm_to_change_protected_wdays=True,
+        ).exists()
+        if not has_permission_to_change_protected_wdays:
+            protected_wdays_exists = WorkerDay.objects.filter(
+                worker_id__in=(data['worker1_id'], data['worker2_id']),
+                dt__in=data['dates'],
+                is_approved=data['is_approved'],
+                is_fact=False,
+                is_protected=True,
+            ).exists()
+            if protected_wdays_exists:
+                raise PermissionDenied(error_messages['has_no_perm_to_approve_protected_wdays'])
+
         WorkerDay.objects_with_excluded.filter(
             worker_id__in=(data['worker1_id'], data['worker2_id']),
             dt__in=data['dates'],

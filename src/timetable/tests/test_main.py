@@ -2008,7 +2008,7 @@ class TestAditionalFunctions(APITestCase):
             )
         return result
 
-    def create_worker_days(self, employment, dt_from, count, from_tm, to_tm, approved, wds={}):
+    def create_worker_days(self, employment, dt_from, count, from_tm, to_tm, approved, wds={}, is_protected=False):
         result = {}
         for day in range(count):
             date = dt_from + timedelta(days=day)
@@ -2023,6 +2023,7 @@ class TestAditionalFunctions(APITestCase):
                 dttm_work_end=datetime.combine(date, time(to_tm)),
                 is_approved=approved,
                 parent_worker_day=parent_worker_day,
+                is_protected=is_protected,
             )
             result[date] = wd
 
@@ -2099,6 +2100,39 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(response.json()[0]['is_approved'], True)
         self.assertEqual(WorkerDay.objects.count(), 8)
 
+    def test_cant_exchange_approved_and_protected_without_perm(self):
+        dt_from = date.today()
+        data = {
+            'worker1_id': self.user2.id,
+            'worker2_id': self.user3.id,
+            'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
+        }
+        self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True, is_protected=True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True, is_protected=True)
+        url = f'{self.url}exchange_approved/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()['detail'], 'У вас нет прав на подтверждение защищенных рабочих дней.'
+                                                    ' Обратитесь, пожалуйста, к администратору системы.')
+
+    def test_can_exchange_approved_and_protected_with_perm(self):
+        self.admin_group.has_perm_to_change_protected_wdays = True
+        self.admin_group.save()
+
+        dt_from = date.today()
+        data = {
+            'worker1_id': self.user2.id,
+            'worker2_id': self.user3.id,
+            'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
+        }
+        self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True, is_protected=True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True, is_protected=True)
+        url = f'{self.url}exchange_approved/'
+        url = f'{self.url}exchange_approved/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(len(response.json()), 8)
+        self.assertEqual(response.json()[0]['is_approved'], True)
+        self.assertEqual(WorkerDay.objects.count(), 8)
     
     def test_exchange_with_holidays(self):
         dt_from = date.today()

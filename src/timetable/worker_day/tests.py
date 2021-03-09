@@ -38,7 +38,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.client.force_authenticate(user=self.user1)
 
     def create_worker_day(self, type='W', shop=None, dt=None, user=None, employment=None, is_fact=False,
-                          is_approved=False, parent_worker_day=None, is_vacancy=False):
+                          is_approved=False, parent_worker_day=None, is_vacancy=False, is_protected=False):
         shop = shop if shop else self.shop
         if type == 'W':
             employment = employment if employment else self.employment2
@@ -60,7 +60,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
             parent_worker_day=parent_worker_day,
             work_hours=datetime.combine(dt, time(20, 0, 0)) - datetime.combine(dt, time(8, 0, 0)),
-            is_vacancy=is_vacancy
+            is_vacancy=is_vacancy,
+            is_protected=is_protected,
         )
 
     def create_vacancy(self, shop=None, dt=None, is_approved=False, parent_worker_day=None):
@@ -672,6 +673,44 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             self.assertEqual(wd_from_db.is_approved, True)
             self.assertIsNotNone(wd_from_db_not_approved)
             self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
+
+    def test_cant_approve_protected_day_without_perm(self):
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt,
+            'is_fact': False,
+        }
+
+        self.create_worker_day(shop=self.shop2, dt=self.dt, is_protected=True, is_approved=True)
+        self.create_worker_day(shop=self.shop2, dt=self.dt, type=WorkerDay.TYPE_HOLIDAY)
+
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()['detail'], 'У вас нет прав на подтверждение защищенных рабочих дней. '
+                                                   'Обратитесь, пожалуйста, к администратору системы.')
+
+    def test_can_approve_protected_day_with_perm(self):
+        self.admin_group.has_perm_to_change_protected_wdays = True
+        self.admin_group.save()
+
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt,
+            'is_fact': False,
+        }
+
+        protected_day = self.create_worker_day(shop=self.shop2, dt=self.dt, is_protected=True, is_approved=True)
+        day_to_approve = self.create_worker_day(shop=self.shop2, dt=self.dt, type=WorkerDay.TYPE_HOLIDAY)
+
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertFalse(WorkerDay.objects.filter(id=protected_day.id).exists())
+        self.assertTrue(WorkerDay.objects.get(id=day_to_approve.id).is_approved)
 
 
 class TestUploadDownload(APITestCase):
