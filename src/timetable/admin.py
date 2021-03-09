@@ -125,15 +125,15 @@ class WorkerDayAdmin(admin.ModelAdmin):
     change_list_template = 'worker_day_change_list.html'
 
     @staticmethod
-    def worker_last_name(instance: WorkerConstraint):
-        return instance.worker.last_name
+    def worker_last_name(instance: WorkerDay):
+        return instance.worker.last_name if instance.worker else 'Нет работника'
 
     @staticmethod
     def shop_title(instance: WorkerDay):
         return instance.shop.name if instance.shop else ''
 
     @staticmethod
-    def parent_title(instance: ShopMonthStat):
+    def parent_title(instance: WorkerDay):
         return instance.shop.parent_title() if instance.shop else ''
 
 
