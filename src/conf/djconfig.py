@@ -40,6 +40,8 @@ MDAUDIT_AUTHTOKEN_SALT = 'DLKAXGKFPP57B2NEQ4NLB2TLDT3QR20I7QKAGE8I'
 
 MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE = False  # отправлять ли запрос по связке юзера и магазина при сохранении workerday
 MDA_SYNC_USER_TO_SHOP_DAILY = False  # запускать таск, который будет отправлять все связки на текущий день
+MDA_SYNC_DEPARTMENTS = False
+MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS = (60 * 60) + 10  # 1 час + 10 сек
 MDA_PUBLIC_API_HOST = 'https://example.com'
 MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
 
@@ -486,6 +488,20 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
 }
+
+if MDA_SYNC_DEPARTMENTS:
+    CELERY_BEAT_SCHEDULE['task-sync-mda-departments-all-time'] = {
+        'task': 'src.celery.tasks.sync_mda_user_to_shop_relation',
+        'schedule': crontab(hour=1, minute=59),
+        'options': {'queue': BACKEND_QUEUE},
+        'kwargs': {'threshold_seconds': None},
+    }
+    CELERY_BEAT_SCHEDULE['task-sync-mda-departments-last_hour'] = {
+        'task': 'src.celery.tasks.sync_mda_user_to_shop_relation',
+        'schedule': crontab(minute=49),
+        'options': {'queue': BACKEND_QUEUE},
+        'kwargs': {'threshold_seconds': MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS},
+    }
 
 if MDA_SYNC_USER_TO_SHOP_DAILY:
     CELERY_BEAT_SCHEDULE['task-sync-mda-user-to-shop-relation'] = {

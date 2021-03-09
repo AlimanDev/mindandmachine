@@ -15,9 +15,6 @@ from .serializers import (
     DivisionDTOSerializer,
 )
 
-DEFAULT_THRESHOLD_SECONDS = 60 * 60  # 1 час
-DEFAULT_THRESHOLD_SECONDS += 10  # небольшой нахлест на случай лагов
-
 
 class MdaIntegrationHelper:
     def __init__(self, logger=None):
@@ -72,7 +69,7 @@ class MdaIntegrationHelper:
             'shops': ShopDTOSerializer(self._get_shops_queryset(threshold_seconds), many=True).data,
         }
 
-    def sync_mda_data(self, threshold_seconds=DEFAULT_THRESHOLD_SECONDS):
+    def sync_mda_data(self, threshold_seconds=settings.MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS):
         resp = requests.post(
             url=settings.MDA_PUBLIC_API_HOST,  # TODO: какой адрес?
             data=self._get_data(threshold_seconds=threshold_seconds),

@@ -3,22 +3,21 @@ import logging
 import os
 import time as time_in_secs
 from datetime import date, timedelta, datetime
-from src.util.models_converter import Converter
+
 import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
-from django.db.models import Q
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
+from django.db.models import Q
 from django.utils.timezone import now
-from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
-
 from django_celery_beat.models import CrontabSchedule
-
+from src.main.demand.utils import create_predbills_request_function
+from src.main.operation_template.utils import build_period_clients
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
-from src.base.message import Message
 from src.base.models import (
     Shop,
     User,
@@ -28,9 +27,11 @@ from src.base.models import (
     Network,
     Employment,
 )
+from src.base.models import ShopSchedule
 from src.celery.celery import app
 from src.conf.djconfig import EMAIL_HOST_USER, TIMETABLE_IP, QOS_DATETIME_FORMAT
 from src.events.signals import event_signal
+from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
 from src.forecast.models import (
     OperationTemplate,
     LoadTemplate,
@@ -39,9 +40,8 @@ from src.forecast.models import (
     OperationType,
     OperationTypeName
 )
-from src.main.demand.utils import create_predbills_request_function
-from src.main.operation_template.utils import build_period_clients
-from django.core.serializers.json import DjangoJSONEncoder
+from src.notifications.models import EventEmailNotification
+from src.notifications.tasks import send_event_email_notifications
 from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
@@ -57,10 +57,9 @@ from src.timetable.vacancy.utils import (
     workers_exchange,
 )
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
-from src.base.models import ShopSchedule
+from src.util.mda.integration import MdaIntegrationHelper
+from src.util.models_converter import Converter
 
-from src.notifications.models import EventEmailNotification
-from src.notifications.tasks import send_event_email_notifications
 
 @app.task
 def create_notifications_for_event(event_id):
@@ -902,3 +901,9 @@ def cron_event():
             user_author_id=None,
             context={},
         )
+
+
+@app.task
+def sync_mda_departments(threshold_seconds=settings.MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS):
+    mda = MdaIntegrationHelper()
+    mda.sync_mda_data(threshold_seconds=threshold_seconds)
