@@ -125,40 +125,39 @@ class WorkerDayAdmin(admin.ModelAdmin):
     change_list_template = 'worker_day_change_list.html'
 
     @staticmethod
-    def worker_last_name(instance: WorkerConstraint):
-        return instance.worker.last_name
+    def worker_last_name(instance: WorkerDay):
+        return instance.worker.last_name if instance.worker else 'Нет работника'
 
     @staticmethod
     def shop_title(instance: WorkerDay):
         return instance.shop.name if instance.shop else ''
 
     @staticmethod
-    def parent_title(instance: ShopMonthStat):
+    def parent_title(instance: WorkerDay):
         return instance.shop.parent_title() if instance.shop else ''
 
 
 @admin.register(WorkerDayCashboxDetails)
 class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
-    # todo: upd: сервак просто падает если туда зайти
     list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_work_type', 'id')
     search_fields = ('worker_day__worker__last_name', 'worker_day__shop__name', 'id')
     list_filter = ('worker_day__shop',)
-    raw_id_fields = ('worker_day',)
+    raw_id_fields = ('worker_day', 'work_type')
     list_select_related = (
         'worker_day__worker', 'worker_day__shop', 'work_type')
 
     @staticmethod
     def worker_last_name(instance: WorkerDayCashboxDetails):
-        return instance.worker_day.worker.last_name if instance.worker_day else ''
+        return instance.worker_day.worker.last_name if instance.worker_day and instance.worker_day.worker else ''
 
     @staticmethod
     def shop_title(instance: WorkerDayCashboxDetails):
-        return instance.worker_day.worker.shop.name if instance.worker_day else ''
+        return instance.worker_day.shop.name if instance.worker_day and instance.worker_day.shop else ''
 
     @staticmethod
     def worker_day_dt(instance: WorkerDayCashboxDetails):
-        return instance.worker_day.dt if instance.worker_day else instance.dttm_from.date()
+        return instance.worker_day.dt if instance.worker_day else ''
 
     @staticmethod
     def on_work_type(instance: WorkerDayCashboxDetails):
