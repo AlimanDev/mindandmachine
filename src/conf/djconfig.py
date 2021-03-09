@@ -380,6 +380,8 @@ CALCULATE_LOAD_TEMPLATE = False # параметр отключающий авт
 
 CLIENT_TIMEZONE = 3
 
+DADATA_TOKEN = None
+FILL_SHOP_CITY_FROM_DADATA = False
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

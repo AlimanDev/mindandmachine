@@ -309,8 +309,9 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     latitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Широта')
     longitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Долгота')
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
+    city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
 
-    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict', 'load_template'])
+    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude'])
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(
@@ -398,6 +399,11 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                 new_dict[key.replace('d', '')] = new_dict.pop(key)
         return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
 
+    def _fill_city_from_dadata(self):
+        if not self.city and self.latitude and self.longitude and settings.DADATA_TOKEN:
+            from src.celery.tasks import fill_shop_city
+            fill_shop_city.delay(shop_id=self.id)
+
     def _handle_new_shop_created(self):
         from src.util.models_converter import Converter
         from src.celery.tasks import fill_shop_schedule
@@ -456,6 +462,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                 datetime.date.today().replace(day=1) + relativedelta(months=1),
                 shop_id=self.id,
             )
+
+        if is_new or (self.tracker.has_changed('latitude') or self.tracker.has_changed('longitude')) and \
+                settings.FILL_SHOP_CITY_FROM_DADATA:
+            transaction.on_commit(self._fill_city_from_dadata)
 
         return res
 

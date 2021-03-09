@@ -848,6 +848,18 @@ def fill_shop_schedule(shop_id, dt_from, periods=90):
 
 
 @app.task
+def fill_shop_city(shop_id):
+    shop = Shop.objects.filter(id=shop_id).first()
+    if shop and shop.latitude and shop.longitude and settings.DADATA_TOKEN:
+        from dadata import Dadata
+        dadata = Dadata(settings.DADATA_TOKEN)
+        result = dadata.geolocate(name="address", lat=float(shop.latitude), lon=float(shop.longitude))
+        if result and result[0].get('data') and result[0].get('data').get('city'):
+            shop.city = result[0]['data']['city']
+            shop.save(update_fields=['city'])
+
+
+@app.task
 def fill_active_shops_schedule():
     res = {}
     dttm_now = datetime.now()
