@@ -47,10 +47,11 @@ from src.timetable.serializers import (
     ChangeRangeListSerializer,
     CopyApprovedSerializer,
     RequestApproveSerializer,
+    CopyRangeSerializer,
 )
 from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
 from src.timetable.worker_day.stat import count_daily_stat
-from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util, exchange
+from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util, exchange, copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.openapi.responses import (
@@ -843,80 +844,56 @@ class WorkerDayViewSet(BaseModelViewSet):
                 'worker',
                 'shop__settings__breaks',
             ).order_by('dt'))
-            main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
-                worker_day__in=main_worker_days,
-            ).select_related('work_type'))
-
-            main_worker_days_details = {}
-            for detail in main_worker_days_details_set:
-                key = detail.worker_day_id
-                if key not in main_worker_days_details:
-                    main_worker_days_details[key] = []
-                main_worker_days_details[key].append(detail)
-
-            trainee_worker_days = WorkerDay.objects_with_excluded.filter(
-                worker_id=to_worker_id,
-                dt__in=data['to_dates'],
-                is_approved=False,
-                is_fact=False,
+            created_wds, work_types = copy_as_excel_cells(
+                main_worker_days, 
+                to_worker_id, 
+                data['to_dates'], 
+                created_by=request.user.id
             )
-            trainee_worker_days.delete()
+            for shop_id, work_type in set(work_types):
+                cancel_vacancies(shop_id, work_type)
 
-            created_wds = []
-            wdcds_list_to_create = []
-            length_main_wds = len(main_worker_days)
-            for i, dt in enumerate(data['to_dates']):
-                i = i % length_main_wds
-                blank_day = main_worker_days[i]
+        return Response(WorkerDaySerializer(created_wds, many=True).data)
 
-                worker_active_empl = Employment.objects.get_active_empl_for_user(
-                    network_id=blank_day.worker.network_id, user_id=to_worker_id,
-                    dt=dt,
-                    priority_shop_id=blank_day.shop_id,
-                ).select_related(
-                    'position__breaks',
-                ).first()
-
-                # не создавать день, если нету активного трудоустройства на эту дату
-                if not worker_active_empl:
-                    raise ValidationError(
-                        'Невозможно создать дни в выбранные даты. '
-                        'Пожалуйста, проверьте наличие активного трудоустройства у сотрудника.'
-                    )
-
-                new_wd = WorkerDay.objects.create(
-                    worker_id=to_worker_id,
-                    employment=worker_active_empl,
-                    dt=dt,
-                    shop=blank_day.shop,
-                    type=blank_day.type,
-                    dttm_work_start=datetime.datetime.combine(
-                        dt, blank_day.dttm_work_start.timetz()) if blank_day.dttm_work_start else None,
-                    dttm_work_end=datetime.datetime.combine(
-                        dt, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
-                    is_approved=False,
+    @swagger_auto_schema(
+        request_body=CopyRangeSerializer,
+        operation_description='''
+        Метод для копирования рабочих дней
+        ''',
+        responses={200:WorkerDaySerializer(many=True)},
+    )
+    @action(detail=False, methods=['post'])
+    def copy_range(self, request):
+        data = CopyRangeSerializer(data=request.data, context={'request': request})
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        from_dates = [
+            data['from_copy_dt_from'] + datetime.timedelta(i) 
+            for i in range((data['from_copy_dt_to'] - data['from_copy_dt_from']).days + 1)
+        ]
+        to_dates = [
+            data['to_copy_dt_from'] + datetime.timedelta(i) 
+            for i in range((data['to_copy_dt_to'] - data['to_copy_dt_from']).days + 1)
+        ]
+        worker_ids = data.get('worker_ids')
+        created_wds = []
+        work_types = []
+        with transaction.atomic():
+            for worker_id in worker_ids:
+                main_worker_days = list(WorkerDay.objects.filter(
+                    worker_id=worker_id,
+                    dt__in=from_dates,
                     is_fact=False,
-                    created_by=request.user,
-                )
-                created_wds.append(new_wd)
-
-                new_wdcds = main_worker_days_details.get(blank_day.id, [])
-                for new_wdcd in new_wdcds:
-                    wdcds_list_to_create.append(
-                        WorkerDayCashboxDetails(
-                            worker_day=new_wd,
-                            work_type_id=new_wdcd.work_type_id,
-                            work_part=new_wdcd.work_part,
-                        )
-                    )
-
-            WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
-
-            work_types = [
-                (wdcds.work_type.shop_id, wdcds.work_type_id)
-                for wdcds in main_worker_days_details_set
-            ]
-
+                    is_approved=data['is_approved'],
+                ).select_related(
+                    'worker',
+                    'shop__settings__breaks',
+                ).order_by('dt'))
+                wds, w_types = copy_as_excel_cells(main_worker_days, worker_id, to_dates, created_by=request.user.id)
+                
+                created_wds.extend(wds)
+                work_types.extend(w_types)
+                
             for shop_id, work_type in set(work_types):
                 cancel_vacancies(shop_id, work_type)
 

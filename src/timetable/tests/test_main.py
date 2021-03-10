@@ -1,5 +1,6 @@
 import uuid
 from datetime import timedelta, time, datetime, date
+from dateutil.relativedelta import relativedelta
 
 from django.test import override_settings
 from django.urls import reverse
@@ -2382,7 +2383,103 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type=WorkerDay.TYPE_HOLIDAY).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, worker_id=self.employment2.user_id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
+
     
+    def test_copy_range(self):
+        dt_from_first = date.today().replace(day=1)
+        dt_from_last = dt_from_first + relativedelta(day=31)
+        dt_to_first = dt_from_first + relativedelta(months=1)
+        dt_to_last = dt_to_first + relativedelta(day=31)
+
+        for i in range((dt_from_last - dt_from_first).days + 1):
+            dt = dt_from_first + timedelta(i)
+            type = WorkerDay.TYPE_WORKDAY if i % 3 != 0 else WorkerDay.TYPE_HOLIDAY
+            WorkerDay.objects.create(
+                dt=dt,
+                shop_id=self.employment2.shop_id,
+                worker_id=self.employment2.user_id,
+                employment=self.employment2 if type == WorkerDay.TYPE_WORKDAY else None,
+                type=type,
+                is_approved=True,
+            )
+            if i % 2 == 0 and i < 28:
+                WorkerDay.objects.create(
+                    dt=dt,
+                    shop_id=self.employment2.shop_id,
+                    worker_id=self.employment2.user_id,
+                    employment=self.employment2,
+                    type=WorkerDay.TYPE_WORKDAY,
+                    is_approved=True,
+                    is_fact=True,
+                )
+            WorkerDay.objects.create(
+                dt=dt,
+                shop_id=self.employment3.shop_id,
+                worker_id=self.employment3.user_id,
+                employment=self.employment3 if type == WorkerDay.TYPE_WORKDAY else None,
+                type=type,
+                is_approved=True,
+            )
+            WorkerDay.objects.create(
+                dt=dt,
+                shop_id=self.employment4.shop_id,
+                worker_id=self.employment4.user_id,
+                employment=self.employment4 if type == WorkerDay.TYPE_WORKDAY else None,
+                type=type,
+                is_approved=True,
+            )
+
+        data = {
+            'worker_ids': [
+                self.employment2.user_id,
+                self.employment4.user_id,
+            ],
+            'from_copy_dt_from': dt_from_first,
+            'from_copy_dt_to': dt_from_last,
+            'to_copy_dt_from': dt_to_first,
+            'to_copy_dt_to': dt_to_last,
+        }
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), ((dt_from_last - dt_from_first).days + 1) * 3 + 14)
+        response = self.client.post(self.url + 'copy_range/', data=data)
+        response_data = response.json()
+
+        self.assertEqual(len(response_data), ((dt_to_last - dt_to_first).days + 1) * 2)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False, dt__gte=dt_to_first, dt__lte=dt_to_last).count(), ((dt_to_last - dt_to_first).days + 1) * 2)
+        self.assertEqual(
+            list(WorkerDay.objects.filter(
+                is_fact=False, 
+                is_approved=False, 
+                dt__gte=dt_to_first, 
+                dt__lte=dt_to_last,
+            ).order_by(
+                'worker_id',
+            ).values_list(
+                'worker_id',
+                flat=True,
+            ).distinct()), 
+            [self.employment2.user_id, self.employment4.user_id],
+        )
+
+
+    def test_copy_range_bad_dates(self):
+        dt_from_first = date.today().replace(day=1)
+        dt_from_last = dt_from_first + relativedelta(day=31)
+        dt_to_first = dt_from_first - timedelta(1)
+        dt_to_last = dt_to_first + relativedelta(day=31)
+        data = {
+            'worker_ids': [
+                self.employment2.user_id,
+                self.employment4.user_id,
+            ],
+            'from_copy_dt_from': dt_from_first,
+            'from_copy_dt_to': dt_from_last,
+            'to_copy_dt_from': dt_to_first,
+            'to_copy_dt_to': dt_to_last,
+        }
+        response = self.client.post(self.url + 'copy_range/', data=data)
+        self.assertEqual(response.json(), ['Начало периода с которого копируются дни не может быть больше начала периода куда копируются дни.'])
+
     # def test_change_list(self):
     #     dt_from = date.today()
     #     data = {
