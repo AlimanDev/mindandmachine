@@ -378,6 +378,7 @@ CALCULATE_LOAD_TEMPLATE = False # параметр отключающий авт
 
 CLIENT_TIMEZONE = 3
 
+SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE = False  # посылать в МИС событийно расписание врачей при его изменении
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

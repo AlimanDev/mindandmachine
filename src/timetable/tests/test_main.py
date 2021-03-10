@@ -1,5 +1,7 @@
+import json
 import uuid
 from datetime import timedelta, time, datetime, date
+from unittest import mock
 
 from django.test import override_settings
 from django.urls import reverse
@@ -29,6 +31,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
+
+    maxDiff = None
 
     def setUp(self):
         super().setUp()
@@ -1980,6 +1984,8 @@ class TestAditionalFunctions(APITestCase):
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
+    maxDiff = None
+
     def setUp(self):
         from src.timetable.models import ExchangeSettings
         super().setUp()
@@ -2099,6 +2105,186 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(response.json()[0]['is_approved'], True)
         self.assertEqual(WorkerDay.objects.count(), 8)
 
+    def test_doctors_schedule_send_on_exchange_approved(self):
+        with self.settings(SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE=True, CELERY_TASK_ALWAYS_EAGER=True):
+            from src.celery.tasks import send_doctors_schedule_to_mis
+            with mock.patch.object(send_doctors_schedule_to_mis, 'delay') as send_doctors_schedule_to_mis_delay:
+                dt_from = date.today()
+                data = {
+                    'worker1_id': self.user2.id,
+                    'worker2_id': self.user3.id,
+                    'dates': [
+                        Converter.convert_date(dt_from + timedelta(i)) for i in range(-2, 4)
+                    ],
+                }
+                # другой тип работ -- не отправляется
+                WorkerDayFactory(
+                    employment=self.employment2,
+                    worker=self.user2,
+                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from - timedelta(days=2), is_approved=True,
+                    cashbox_details__work_type__work_type_name__name='Продавец-кассир',
+                    cashbox_details__work_type__work_type_name__code='consult',
+                )
+                WorkerDayFactory(
+                    employment=self.employment3,
+                    worker=self.user3,
+                    type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from - timedelta(days=2), is_approved=True,
+                )
+
+                wd_create_user3_and_delete_user2 = WorkerDayFactory(
+                    employment=self.employment2,
+                    worker=self.user2,
+                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from - timedelta(days=1), is_approved=True,
+                    cashbox_details__work_type__work_type_name__name='Врач',
+                    cashbox_details__work_type__work_type_name__code='doctor',
+                )
+                WorkerDayFactory(
+                    employment=self.employment3,
+                    worker=self.user3,
+                    type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from - timedelta(days=1), is_approved=True,
+                )
+
+                wd_update_user3 = WorkerDayFactory(
+                    employment=self.employment2,
+                    worker=self.user2,
+                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from, is_approved=True,
+                    dttm_work_start=datetime.combine(dt_from, time(8, 0, 0)),
+                    dttm_work_end=datetime.combine(dt_from, time(21, 0, 0)),
+                    cashbox_details__work_type__work_type_name__name='Врач',
+                    cashbox_details__work_type__work_type_name__code='doctor',
+                )
+                wd_update_user2 = WorkerDayFactory(
+                    employment=self.employment3,
+                    worker=self.user3,
+                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from, is_approved=True,
+                    dttm_work_start=datetime.combine(dt_from, time(8, 0, 0)),
+                    dttm_work_end=datetime.combine(dt_from, time(20, 0, 0)),
+                    cashbox_details__work_type__work_type_name__name='Врач',
+                    cashbox_details__work_type__work_type_name__code='doctor',
+                )
+
+                WorkerDayFactory(
+                    employment=self.employment2,
+                    worker=self.user2,
+                    type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from + timedelta(days=1), is_approved=True,
+                )
+                wd_create_user2_and_delete_user3 = WorkerDayFactory(
+                    employment=self.employment3,
+                    worker=self.user3,
+                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=1), is_approved=True,
+                    dttm_work_start=datetime.combine(dt_from, time(11, 0, 0)),
+                    dttm_work_end=datetime.combine(dt_from, time(21, 0, 0)),
+                    cashbox_details__work_type__work_type_name__name='Врач',
+                    cashbox_details__work_type__work_type_name__code='doctor',
+                )
+
+                # не рабочие дни -- не отправляется
+                WorkerDayFactory(
+                    employment=self.employment2,
+                    worker=self.user2,
+                    type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from + timedelta(days=2), is_approved=True,
+                )
+                WorkerDayFactory(
+                    employment=self.employment3,
+                    worker=self.user3,
+                    type=WorkerDay.TYPE_VACATION, shop=self.shop, dt=dt_from + timedelta(days=2), is_approved=True,
+                )
+
+                wd_create_user3_and_delete_user2_diff_work_types = WorkerDayFactory(
+                    employment=self.employment2,
+                    worker=self.user2,
+                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=3), is_approved=True,
+                    dttm_work_start=datetime.combine(dt_from + timedelta(days=3), time(8, 0, 0)),
+                    dttm_work_end=datetime.combine(dt_from + timedelta(days=3), time(21, 0, 0)),
+                    cashbox_details__work_type__work_type_name__name='Врач',
+                    cashbox_details__work_type__work_type_name__code='doctor',
+                )
+                WorkerDayFactory(
+                    employment=self.employment3,
+                    worker=self.user3,
+                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=3), is_approved=True,
+                    dttm_work_start=datetime.combine(dt_from + timedelta(days=3), time(8, 0, 0)),
+                    dttm_work_end=datetime.combine(dt_from + timedelta(days=3), time(20, 0, 0)),
+                    cashbox_details__work_type__work_type_name__name='Продавец-кассир',
+                    cashbox_details__work_type__work_type_name__code='consult',
+                )
+
+                url = f'{self.url}exchange_approved/'
+                response = self.client.post(url, data, format='json')
+                send_doctors_schedule_to_mis_delay.assert_called_once()
+                json_data = json.loads(send_doctors_schedule_to_mis_delay.call_args[1]['json_data'])
+                self.assertListEqual(
+                    sorted(json_data, key=lambda i: (i['dt'], i['worker__username'])),
+                    sorted([
+                        {
+                            "dt": Converter.convert_date(wd_create_user3_and_delete_user2.dt),
+                            "worker__username": "user2",
+                            "shop__code": self.shop.code,
+                            "dttm_work_start": Converter.convert_datetime(wd_create_user3_and_delete_user2.dttm_work_start),
+                            "dttm_work_end": Converter.convert_datetime(wd_create_user3_and_delete_user2.dttm_work_end),
+                            "action": "delete"
+                        },
+                        {
+                            "dt": Converter.convert_date(wd_create_user3_and_delete_user2.dt),
+                            "worker__username": "user3",
+                            "shop__code": self.shop.code,
+                            "dttm_work_start": Converter.convert_datetime(wd_create_user3_and_delete_user2.dttm_work_start),
+                            "dttm_work_end": Converter.convert_datetime(wd_create_user3_and_delete_user2.dttm_work_end),
+                            "action": "create"
+                        },
+                        {
+                            "dt": Converter.convert_date(wd_update_user2.dt),
+                            "worker__username": "user2",
+                            "shop__code": self.shop.code,
+                            "dttm_work_start": Converter.convert_datetime(wd_update_user2.dttm_work_start),
+                            "dttm_work_end": Converter.convert_datetime(wd_update_user2.dttm_work_end),
+                            "action": "update"
+                        },
+                        {
+                            "dt": Converter.convert_date(wd_update_user3.dt),
+                            "worker__username": "user3",
+                            "shop__code": self.shop.code,
+                            "dttm_work_start": Converter.convert_datetime(wd_update_user3.dttm_work_start),
+                            "dttm_work_end": Converter.convert_datetime(wd_update_user3.dttm_work_end),
+                            "action": "update"
+                        },
+                        {
+                            "dt": Converter.convert_date(wd_create_user2_and_delete_user3.dt),
+                            "worker__username": "user2",
+                            "shop__code": self.shop.code,
+                            "dttm_work_start": Converter.convert_datetime(wd_create_user2_and_delete_user3.dttm_work_start),
+                            "dttm_work_end": Converter.convert_datetime(wd_create_user2_and_delete_user3.dttm_work_end),
+                            "action": "create"
+                        },
+                        {
+                            "dt": Converter.convert_date(wd_create_user2_and_delete_user3.dt),
+                            "worker__username": "user3",
+                            "shop__code": self.shop.code,
+                            "dttm_work_start": Converter.convert_datetime(wd_create_user2_and_delete_user3.dttm_work_start),
+                            "dttm_work_end": Converter.convert_datetime(wd_create_user2_and_delete_user3.dttm_work_end),
+                            "action": "delete"
+                        },
+                        {
+                            "dt": Converter.convert_date(wd_create_user3_and_delete_user2_diff_work_types.dt),
+                            "worker__username": "user2",
+                            "shop__code": self.shop.code,
+                            "dttm_work_start": Converter.convert_datetime(wd_create_user3_and_delete_user2_diff_work_types.dttm_work_start),
+                            "dttm_work_end": Converter.convert_datetime(wd_create_user3_and_delete_user2_diff_work_types.dttm_work_end),
+                            "action": "delete"
+                        },
+                        {
+                            "dt": Converter.convert_date(wd_create_user3_and_delete_user2_diff_work_types.dt),
+                            "worker__username": "user3",
+                            "shop__code": self.shop.code,
+                            "dttm_work_start": Converter.convert_datetime(wd_create_user3_and_delete_user2_diff_work_types.dttm_work_start),
+                            "dttm_work_end": Converter.convert_datetime(wd_create_user3_and_delete_user2_diff_work_types.dttm_work_end),
+                            "action": "create"
+                        },
+                    ], key=lambda i: (i['dt'], i['worker__username']))
+                )
+
+                self.assertEqual(len(response.json()), 12)
+                self.assertEqual(WorkerDay.objects.count(), 12)
     
     def test_exchange_with_holidays(self):
         dt_from = date.today()

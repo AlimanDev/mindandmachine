@@ -902,3 +902,41 @@ def cron_event():
             user_author_id=None,
             context={},
         )
+
+
+@app.task
+def send_doctors_schedule_to_mis(json_data):
+    """
+    Таск для отправки расписания по врачам в МИС
+    :param json_data: json строка
+    Пример данных:
+    [
+        {
+            "dt": "2021-03-09",
+            "worker__username": "user2",
+            "shop__code": "code-237",
+            "dttm_work_start": "2021-03-09T10:00:00",
+            "dttm_work_end": "2021-03-09T20:00:00",
+            "action": "create"
+        },
+        {
+            "dt": "2021-03-10",
+            "worker__username": "user2",
+            "shop__code": "code-237",
+            "dttm_work_start": "2021-03-10T08:00:00",
+            "dttm_work_end": "2021-03-10T21:00:00",
+            "action": "update"
+        },
+        {
+            "dt": "2021-03-11",
+            "worker__username": "user2",
+            "shop__code": "code-237",
+            "dttm_work_start": null,
+            "dttm_work_end": null,
+            "action": "delete"
+        }
+    ]
+    :return:
+    """
+    print('send_doctors_schedule_to_mis', json_data)
+    # TODO: реализовать отправку данных после согласования формата
