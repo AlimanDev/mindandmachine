@@ -109,8 +109,8 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
         worksheet.set_column(DIFF_HOURS_PERCENT, DIFF_HOURS_PERCENT, 10)
     row = 1
     for shop in shops:
-        user_ids = list(Employment.objects.get_active(shop.network_id, dt_from=dt_from, dt_to=dt_to).values_list('user_id', flat=True))
         for date in dates:
+            user_ids = list(Employment.objects.get_active(shop.network_id, dt_from=date, dt_to=date).values_list('user_id', flat=True))
             worksheet.write_string(row, SHOP, shop.name, def_format)
             plan_worker_days = WorkerDay.objects.filter(
                 shop=shop, 
@@ -141,9 +141,10 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
                     type=WorkerDay.TYPE_WORKDAY,
                     dt=date,
                     worker_id__in=user_ids,
+                    is_approved=True,
                 ).aggregate(
-                    hours_count_plan=Sum('work_hours', filter=Q(is_approved=True, is_fact=False)),
-                    hours_count_fact=Sum('work_hours', filter=Q(is_fact=True, is_approved=True)),
+                    hours_count_plan=Sum('work_hours', filter=Q(is_fact=False)),
+                    hours_count_fact=Sum('work_hours', filter=Q(is_fact=True)),
                 )
                 leaving_count = AttendanceRecords.objects.filter(shop=shop, dt=date, type=AttendanceRecords.TYPE_LEAVING, user_id__in=user_ids).distinct('user').count()
                 worksheet.write_string(row, LATE, str(plan_and_fact['lates']), def_format)
