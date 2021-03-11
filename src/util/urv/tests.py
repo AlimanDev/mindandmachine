@@ -37,7 +37,7 @@ class TestUrvFiles(APITestCase):
         )
         AttendanceRecords.objects.create(
             shop_id=self.employment2.shop_id,
-            dttm=datetime.combine(self.dt, time(20, 13)),
+            dttm=datetime.combine(self.dt, time(19, 13)),
             user_id=self.employment2.user_id,
             type=AttendanceRecords.TYPE_LEAVING,
         )
@@ -56,15 +56,18 @@ class TestUrvFiles(APITestCase):
         data = {
             'Магазин': 'Shop1', 
             'Дата': self.dt.strftime('%d.%m.%Y'), 
-            'Плановое кол-во отметок, ПРИХОД': 2, 
-            'Фактическое кол-во отметок, ПРИХОД': 2, 
+            'Кол-во отметок план, ПРИХОД': 2, 
+            'Опоздания': 1,
+            'Ранний уход': 1,
+            'Кол-во отметок факт, ПРИХОД': 2, 
             'Разница, ПРИХОД': 0, 
-            'Плановое кол-во отметок, УХОД': 2, 
-            'Фактическое кол-во отметок, УХОД': 1, 
+            'Кол-во отметок план, УХОД': 2, 
+            'Кол-во отметок факт, УХОД': 1, 
             'Разница, УХОД': 1, 
-            'Плановое кол-во часов': '21:30:00', 
-            'Фактическое кол-во часов': '11:04:00', 
-            'Разница, ЧАСЫ': '10:26:00'
+            'Кол-во часов план': '21:30:00', 
+            'Кол-во часов факт': '10:04:00', 
+            'Разница, ЧАСЫ': '11:26:00',
+            'Разница, ПРОЦЕНТЫ': '47%',
         }
         self.assertEqual(dict(df.iloc[0]), data)
 
@@ -84,11 +87,13 @@ class TestUrvFiles(APITestCase):
 
     def test_urv_violators_report_xlsx(self):
         data = urv_violators_report_xlsx(self.network.id, dt=self.dt, in_memory=True)
-        df = pd.read_excel(data['file'])
+        df = pd.read_excel(data['file']).fillna('')
         data = {
-            'Магазин': 'Shop1', 
-            'ФИО': 'Сидоров Иван3', 
-            'Нарушение': 'Нет отметки об уходе'
+            'Код объекта': self.shop.code,
+            'Название объекта': self.shop.name, 
+            'Табельный номер': '',
+            'ФИО': 'Сидоров Иван3 ', 
+            'Нарушение': 'Нет ухода'
         }
         self.assertEqual(len(df.iloc[:,:]), 1)
         self.assertEqual(dict(df.iloc[0]), data)

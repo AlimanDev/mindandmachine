@@ -15,8 +15,8 @@ NO_COMMING_HOURS = 4
 
 text = {
     NO_RECORDS: 'Нет отметок',
-    NO_COMMING: 'Нет отметки о приходе',
-    NO_LEAVING: 'Нет отметки об уходе',
+    NO_COMMING: 'Нет прихода',
+    NO_LEAVING: 'Нет ухода',
     NO_COMING_PROBABLY: 'Предположительно нет отметки о приходе',
 }
 
@@ -55,32 +55,44 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None):
         is_fact=False,
         worker_id__in=user_ids,
     )
-    users_wds = {}
-    for wd in worker_days:
-        users_wds.setdefault(wd.worker_id, {})[wd.dt] = wd
+    # users_wds = {}
+    # for wd in worker_days:
+    #     users_wds.setdefault(wd.worker_id, {})[wd.dt] = wd
+
+    records = AttendanceRecords.objects.filter(
+        dt__gte=dt_from,
+        dt__lte=dt_to,
+        shop__network_id=network_id,
+        user_id__in=user_ids,
+    )
+
+    users_records = {}
+    for record in records:
+        users_records.setdefault(record.user_id, {})[record.dt] = record
     
     for record in bad_records:
         first_key = record['user_id']
         second_key = record['dt']
-        if users_wds.get(first_key, {}).get(second_key):
-            t = NO_COMMING if record['comming'] == 0 else NO_LEAVING
-            if t == NO_LEAVING:
-                wd = users_wds.get(first_key, {}).get(second_key)
-                att_record = AttendanceRecords.objects.filter(
-                    dttm__date=second_key,
-                    shop_id=wd.shop_id,
-                    user_id=first_key,
-                ).first()
-                if not att_record:
-                    continue
-                second_cond = (att_record.dttm > wd.dttm_work_end or (att_record.dttm - wd.dttm_work_start).total_seconds() / 3600 >= NO_COMMING_HOURS)
-                if att_record.dttm > wd.dttm_work_start and second_cond:
-                    t = NO_COMING_PROBABLY
+        t = NO_COMMING if record['comming'] == 0 else NO_LEAVING
+        # Было сделано временно для терминалов, но может ещё пригодиться
+        # if users_wds.get(first_key, {}).get(second_key):
+        #     if t == NO_LEAVING:
+        #         wd = users_wds.get(first_key, {}).get(second_key)
+        #         att_record = AttendanceRecords.objects.filter(
+        #             dttm__date=second_key,
+        #             shop_id=wd.shop_id,
+        #             user_id=first_key,
+        #         ).first()
+        #         if not att_record:
+        #             continue
+        #         second_cond = (att_record.dttm > wd.dttm_work_end or (att_record.dttm - wd.dttm_work_start).total_seconds() / 3600 >= NO_COMMING_HOURS)
+        #         if att_record.dttm > wd.dttm_work_start and second_cond:
+        #             t = NO_COMING_PROBABLY
 
-            data.setdefault(first_key, {})[second_key] = {
-                'shop_id': wd.shop_id,
-                'type': t,
-            }
+        data.setdefault(first_key, {})[second_key] = {
+            'shop_id': users_records.get(first_key, {}).get(second_key, AttendanceRecords()).shop_id,
+            'type': t,
+        }
     
     no_records = worker_days.annotate(
         exist_records=Exists(
@@ -110,24 +122,27 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
         dt = date.today() - timedelta(1)
     if not title:
         title = f'URV_violators_report_{dt}.xlsx'
-    SHOP = 0
-    FIO = 1
-    REASON = 2
+    SHOP_CODE = 0
+    SHOP = 1
+    TABEL_CODE = 2
+    FIO = 3
+    REASON = 4
     shops = { 
-        s.id: s.name for s in Shop.objects.filter(
-            id__in=WorkerDay.objects.filter(
-                dt=dt,
-                shop__network_id=network_id,
-                type=WorkerDay.TYPE_WORKDAY,
-                is_approved=True,
-                is_fact=False,
-            ).values_list('shop_id', flat=True),
-        )
+        s.id: s for s in Shop.objects.all()
     }
     data = urv_violators_report(network_id, dt_from=dt, dt_to=dt)
     users = {
-        u.id: f"{u.last_name} {u.first_name}" for u in User.objects.filter(
+        u.id: f"{u.last_name} {u.first_name} {u.middle_name if u.middle_name else ''}" for u in User.objects.filter(
             id__in=data.keys(),
+        )
+    }
+    employments = {
+        e.user_id: e for e in Employment.objects.get_active(
+            network_id, 
+            dt_from=dt, 
+            dt_to=dt,
+        ).filter(
+            user_id__in=users.keys(),
         )
     }
 
@@ -139,7 +154,9 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
     
     rows = [
         {
-            'shop': shops.get(reason['shop_id'], ''),
+            'shop': shops.get(reason['shop_id'], Shop()).name or '',
+            'shop_code': shops.get(reason['shop_id'], Shop()).code or '',
+            'tabel': employments.get(user_id, Employment()).tabel_code or '',
             'fio': users.get(user_id),
             'reason': text.get(reason['type']),
         }
@@ -149,20 +166,36 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
     rows = sorted(rows, key=lambda x: x['shop'])
 
     worksheet = workbook.add_worksheet('{}'.format(dt.strftime('%Y.%m.%d')))
-    def_format = {
+    def_format = workbook.add_format({
         'border': 1,
-    }
-    worksheet.write(0, SHOP, 'Магазин')
-    worksheet.write(0, FIO, 'ФИО')
-    worksheet.write(0, REASON, 'Нарушение')
-    worksheet.set_column(0, SHOP, 15)
-    worksheet.set_column(0, FIO, 20)
-    worksheet.set_column(0, REASON, 20)
+        'valign': 'vcenter',
+        'align': 'center',
+        'text_wrap': True,
+    })
+    header_format = workbook.add_format({
+        'border': 1,
+        'bold': True,
+        'text_wrap': True,
+        'valign': 'vcenter',
+        'align': 'center',
+    })
+    worksheet.write_string(0, SHOP_CODE, 'Код объекта', header_format)
+    worksheet.write_string(0, SHOP, 'Название объекта', header_format)
+    worksheet.write_string(0, TABEL_CODE, 'Табельный номер', header_format)
+    worksheet.write_string(0, FIO, 'ФИО', header_format)
+    worksheet.write_string(0, REASON, 'Нарушение', header_format)
+    worksheet.set_column(SHOP_CODE, SHOP_CODE, 10)
+    worksheet.set_column(SHOP, SHOP, 12)
+    worksheet.set_column(TABEL_CODE, TABEL_CODE, 15)
+    worksheet.set_column(FIO, FIO, 20)
+    worksheet.set_column(REASON, REASON, 15)
     row = 1
     for record in rows:
-        worksheet.write(row, SHOP, record['shop'])
-        worksheet.write_string(row, FIO, record['fio'], workbook.add_format(def_format))
-        worksheet.write_string(row, REASON, record['reason'], workbook.add_format(def_format))
+        worksheet.write_string(row, SHOP_CODE, record['shop_code'], def_format)
+        worksheet.write_string(row, SHOP, record['shop'], def_format)
+        worksheet.write_string(row, TABEL_CODE, record['tabel'], def_format)
+        worksheet.write_string(row, FIO, record['fio'], def_format)
+        worksheet.write_string(row, REASON, record['reason'], def_format)
         row += 1
 
     workbook.close()
