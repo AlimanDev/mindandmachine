@@ -152,8 +152,10 @@ class WorkerDayConverter(Converter):
 
     @classmethod
     def convert_function(cls, obj, need_percentage=False):
+        with_tm_range = list(WorkerDay.TYPES_WITH_TM_RANGE)
+        with_tm_range.append('R') # дни отработанные в других магазинах
         def __work_tm(__field):
-            return cls.convert_time(__field) if obj.type in WorkerDay.TYPES_WITH_TM_RANGE else None
+            return cls.convert_time(__field) if obj.type in with_tm_range else None
 
         data = {
             'id': obj.id,
@@ -169,7 +171,7 @@ class WorkerDayConverter(Converter):
                     'percent': wdds.work_part * 100,
                 }
                 for wdds in obj.worker_day_details.filter(work_part__gt=0)
-            ] if obj.id and WorkerDay.is_type_with_tm_range(obj.type) else [],
+            ] if obj.id and obj.type in with_tm_range else [],
             'work_type': obj.work_type_id if hasattr(obj, 'work_type_id') else None,
             'created_by': obj.created_by_id,
             'comment': obj.comment,
