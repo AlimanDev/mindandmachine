@@ -128,12 +128,7 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
     FIO = 3
     REASON = 4
     shops = { 
-        s.id: s for s in Shop.objects.filter(
-            id__in=AttendanceRecords.objects.filter(
-                dt=dt,
-                shop__network_id=network_id,
-            ).values_list('shop_id', flat=True),
-        )
+        s.id: s for s in Shop.objects.all()
     }
     data = urv_violators_report(network_id, dt_from=dt, dt_to=dt)
     users = {
