@@ -911,7 +911,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         if False in wdays:
                             wd_obj = wdays[False]
                             # дни отработанные в других магазинах
-                            if wd_obj.shop_id and wd_obj.shop_id != shop.id:
+                            if wd_obj.shop_id and wd_obj.shop_id != shop.id and wd_obj.type != WorkerDay.TYPE_EMPTY:
                                 continue
                             if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
                                 wd_obj.type = wd['type']

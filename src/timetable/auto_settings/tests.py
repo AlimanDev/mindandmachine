@@ -600,10 +600,11 @@ class TestAutoSettings(APITestCase):
         )
 
         self.wd4 = WorkerDay.objects.create(
+            shop=self.shop2,
             worker=self.user2,
             employment=self.employment2,
             dt=self.dt + timedelta(3),
-            type=WorkerDay.TYPE_HOLIDAY,
+            type=WorkerDay.TYPE_EMPTY,
         )
 
         response = self.client.post(self.url, {
