@@ -1117,8 +1117,7 @@ class AttendanceRecords(AbstractModel):
                             setattr(prev_fa_wd, 'type', WorkerDay.TYPE_WORKDAY)
                             prev_fa_wd.save()
                             self.dt = prev_fa_wd.dt # логично дату предыдущую ставить, так как это значение в отчетах используется
-                            kwargs['force_insert'] = False
-                            super(AttendanceRecords, self).save(*args, **kwargs)
+                            super(AttendanceRecords, self).save(update_fields=['dt',])
                             return
 
                     if settings.MDA_SKIP_LEAVING_TICK:
