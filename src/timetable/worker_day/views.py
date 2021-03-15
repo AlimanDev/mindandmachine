@@ -47,6 +47,7 @@ from src.timetable.serializers import (
     ChangeRangeListSerializer,
     CopyApprovedSerializer,
     RequestApproveSerializer,
+    BlockOrUnblockWorkerDaySerializer,
 )
 from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
 from src.timetable.worker_day.stat import count_daily_stat
@@ -344,7 +345,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 if not has_permission_to_change_protected_wdays:
                     protected_wdays_exists = WorkerDay.objects.filter(
                         worker_days_q, is_fact=serializer.data['is_fact'],
-                        is_protected=True,
+                        is_blocked=True,
                     ).exclude(
                         id__in=wdays_to_approve.values_list('id', flat=True),
                     ).exists()
@@ -1072,3 +1073,45 @@ class WorkerDayViewSet(BaseModelViewSet):
                    f'{shop.network.convert_tabel_to or convert_to}'
         response['Content-Disposition'] = f'attachment; filename={escape_uri_path(filename)}'
         return response
+
+    @swagger_auto_schema(
+        request_body=BlockOrUnblockWorkerDaySerializer,
+        responses={200: None},
+        operation_description='''
+            Заблокировать рабочий день.
+            '''
+    )
+    @action(detail=False, methods=['post'], filterset_class=None)
+    def block(self, request):
+        serializer = BlockOrUnblockWorkerDaySerializer(
+            data=request.data, many=True, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        for dict_to_block in serializer.validated_data:
+            WorkerDay.objects.filter(
+                worker_id=dict_to_block['worker_id'],
+                shop_id=dict_to_block['shop_id'],
+                dt=dict_to_block['dt'],
+                is_fact=dict_to_block['is_fact'],
+            ).update(is_blocked=True)
+        return Response()
+
+    @swagger_auto_schema(
+        request_body=BlockOrUnblockWorkerDaySerializer,
+        responses={200: None},
+        operation_description='''
+            Разблокировать рабочий день.
+            '''
+    )
+    @action(detail=False, methods=['post'], filterset_class=None)
+    def unblock(self, request):
+        serializer = BlockOrUnblockWorkerDaySerializer(
+            data=request.data, many=True, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        for dict_to_block in serializer.validated_data:
+            WorkerDay.objects.filter(
+                worker_id=dict_to_block['worker_id'],
+                shop_id=dict_to_block['shop_id'],
+                dt=dict_to_block['dt'],
+                is_fact=dict_to_block['is_fact'],
+            ).update(is_blocked=False)
+        return Response()

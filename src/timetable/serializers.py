@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, NotFound
 
 from src.base.models import Employment, User, Shop
 from src.base.shop.serializers import ShopSerializer
@@ -69,7 +69,7 @@ class WorkerDayListSerializer(serializers.Serializer):
     shop_code = serializers.CharField(required=False, read_only=True)
     user_login = serializers.CharField(required=False, read_only=True)
     created_by_id = serializers.IntegerField(read_only=True)
-    is_protected = serializers.BooleanField(read_only=True)
+    is_blocked = serializers.BooleanField(read_only=True)
 
     def get_work_hours(self, obj) -> float:
         if isinstance(obj.work_hours, timedelta):
@@ -108,8 +108,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by',
-                  'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_protected']
-        read_only_fields = ['work_hours', 'parent_worker_day_id', 'is_protected']
+                  'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked']
+        read_only_fields = ['work_hours', 'parent_worker_day_id', 'is_blocked']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
         extra_kwargs = {
@@ -119,7 +119,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             'is_approved': {
                 'default': False,
             },
-            'is_protected': {
+            'is_blocked': {
                 'read_only': True,
             }
         }
@@ -570,3 +570,38 @@ class WsPermissionDataSerializer(serializers.ModelSerializer):
                 },
             },
         }
+
+
+class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
+    worker_username = serializers.CharField(required=False)
+    shop_code = serializers.CharField(required=False)
+
+    class Meta:
+        model = WorkerDay
+        fields = (
+            'worker_id',
+            'worker_username',
+            'shop_id',
+            'shop_code',
+            'dt',
+            'is_fact',
+        )
+
+    def validate(self, attrs):
+        if (attrs.get('shop_id') is None) and ('shop_code' in attrs):
+            shop_code = attrs.pop('shop_code')
+            shops = list(Shop.objects.filter(code=shop_code, network_id=self.context['request'].user.network_id))
+            if len(shops) == 1:
+                attrs['shop_id'] = shops[0].id
+            else:
+                raise NotFound(detail=f'Подразделение с кодом "{shop_code}" не найдено')
+
+        if (attrs.get('worker_id') is None) and ('worker_username' in attrs):
+            username = attrs.pop('worker_username')
+            users = list(User.objects.filter(username=username, network_id=self.context['request'].user.network_id))
+            if len(users) == 1:
+                attrs['worker_id'] = users[0].id
+            else:
+                raise NotFound(detail=f'Пользователь "{username}" не найден')
+
+        return attrs

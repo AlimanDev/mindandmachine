@@ -38,7 +38,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.client.force_authenticate(user=self.user1)
 
     def create_worker_day(self, type='W', shop=None, dt=None, user=None, employment=None, is_fact=False,
-                          is_approved=False, parent_worker_day=None, is_vacancy=False, is_protected=False):
+                          is_approved=False, parent_worker_day=None, is_vacancy=False, is_blocked=False):
         shop = shop if shop else self.shop
         if type == 'W':
             employment = employment if employment else self.employment2
@@ -61,7 +61,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             parent_worker_day=parent_worker_day,
             work_hours=datetime.combine(dt, time(20, 0, 0)) - datetime.combine(dt, time(8, 0, 0)),
             is_vacancy=is_vacancy,
-            is_protected=is_protected,
+            is_blocked=is_blocked,
         )
 
     def create_vacancy(self, shop=None, dt=None, is_approved=False, parent_worker_day=None):
@@ -682,7 +682,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             'is_fact': False,
         }
 
-        self.create_worker_day(shop=self.shop2, dt=self.dt, is_protected=True, is_approved=True)
+        self.create_worker_day(shop=self.shop2, dt=self.dt, is_blocked=True, is_approved=True)
         self.create_worker_day(shop=self.shop2, dt=self.dt, type=WorkerDay.TYPE_HOLIDAY)
 
         response = self.client.post(f"{self.url_approve}", data, format='json')
@@ -702,7 +702,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             'is_fact': False,
         }
 
-        protected_day = self.create_worker_day(shop=self.shop2, dt=self.dt, is_protected=True, is_approved=True)
+        protected_day = self.create_worker_day(shop=self.shop2, dt=self.dt, is_blocked=True, is_approved=True)
         day_to_approve = self.create_worker_day(shop=self.shop2, dt=self.dt, type=WorkerDay.TYPE_HOLIDAY)
 
         response = self.client.post(f"{self.url_approve}", data, format='json')

@@ -1064,6 +1064,8 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_approve_vacancy',
         'WorkerDay_change_range',
         'WorkerDay_request_approve',
+        'WorkerDay_block',
+        'WorkerDay_unblock',
         'WorkerPosition',
         'WorkTypeName',
         'WorkType',

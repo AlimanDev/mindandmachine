@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import timedelta, time, datetime, date
 
@@ -130,6 +131,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             'employment_id': self.employment2.id,
             'is_fact': False,
             'is_approved': False,
+            'is_blocked': False,
             'type': WorkerDay.TYPE_WORKDAY,
             'parent_worker_day_id': self.worker_day_plan_approved.id,
             'comment': None,
@@ -2008,7 +2010,7 @@ class TestAditionalFunctions(APITestCase):
             )
         return result
 
-    def create_worker_days(self, employment, dt_from, count, from_tm, to_tm, approved, wds={}, is_protected=False):
+    def create_worker_days(self, employment, dt_from, count, from_tm, to_tm, approved, wds={}, is_blocked=False):
         result = {}
         for day in range(count):
             date = dt_from + timedelta(days=day)
@@ -2023,7 +2025,7 @@ class TestAditionalFunctions(APITestCase):
                 dttm_work_end=datetime.combine(date, time(to_tm)),
                 is_approved=approved,
                 parent_worker_day=parent_worker_day,
-                is_protected=is_protected,
+                is_blocked=is_blocked,
             )
             result[date] = wd
 
@@ -2107,8 +2109,8 @@ class TestAditionalFunctions(APITestCase):
             'worker2_id': self.user3.id,
             'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
         }
-        self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True, is_protected=True)
-        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True, is_protected=True)
+        self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True, is_blocked=True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True, is_blocked=True)
         url = f'{self.url}exchange_approved/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, 403)
@@ -2125,8 +2127,8 @@ class TestAditionalFunctions(APITestCase):
             'worker2_id': self.user3.id,
             'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
         }
-        self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True, is_protected=True)
-        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True, is_protected=True)
+        self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True, is_blocked=True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True, is_blocked=True)
         url = f'{self.url}exchange_approved/'
         url = f'{self.url}exchange_approved/'
         response = self.client.post(url, data, format='json')
@@ -2416,7 +2418,50 @@ class TestAditionalFunctions(APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type=WorkerDay.TYPE_HOLIDAY).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, worker_id=self.employment2.user_id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
-    
+
+    def test_block_worker_day(self):
+        dt_now = date.today()
+        wd = WorkerDayFactory(
+            dt=dt_now,
+            type=WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+            is_fact=True,
+        )
+        data = [
+            {
+                'worker_username': wd.worker.username,
+                'shop_code': wd.shop.code,
+                'dt': Converter.convert_date(dt_now),
+                'is_fact': True,
+            },
+        ]
+        response = self.client.post(self.url + 'block/', data=json.dumps(data), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        wd.refresh_from_db()
+        self.assertTrue(wd.is_blocked)
+
+    def test_unblock_worker_day(self):
+        dt_now = date.today()
+        wd = WorkerDayFactory(
+            dt=dt_now,
+            type=WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+            is_fact=True,
+            is_blocked=True,
+        )
+        data = [
+            {
+                'worker_username': wd.worker.username,
+                'shop_code': wd.shop.code,
+                'dt': Converter.convert_date(dt_now),
+                'is_fact': True,
+            },
+        ]
+        response = self.client.post(self.url + 'unblock/', data=json.dumps(data), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        wd.refresh_from_db()
+        self.assertFalse(wd.is_blocked)
+
     # def test_change_list(self):
     #     dt_from = date.today()
     #     data = {

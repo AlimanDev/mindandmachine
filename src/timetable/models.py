@@ -576,7 +576,7 @@ class WorkerDay(AbstractModel):
     is_outsource = models.BooleanField(default=False)
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=True, verbose_name='Обрезать рабочие часы по времени работы магазина')
-    is_protected = models.BooleanField(
+    is_blocked = models.BooleanField(
         default=False,
         verbose_name='Защищенный день',
         help_text='Доступен для изменения/подтверждения только определенным группам доступа (настраивается)',

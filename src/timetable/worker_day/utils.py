@@ -491,7 +491,7 @@ def exchange(data, error_messages):
                 dt__in=data['dates'],
                 is_approved=data['is_approved'],
                 is_fact=False,
-                is_protected=True,
+                is_blocked=True,
             ).exists()
             if protected_wdays_exists:
                 raise PermissionDenied(error_messages['has_no_perm_to_approve_protected_wdays'])
