@@ -3,10 +3,12 @@ from src.util.urv.create_urv_stat import urv_stat_v1
 from src.util.urv.urv_violators import urv_violators_report, urv_violators_report_xlsx
 from src.util.test import create_departments_and_users
 import pandas as pd
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from src.timetable.models import WorkerDay, AttendanceRecords
+from django.test import override_settings
 
 
+@override_settings(MDA_SKIP_LEAVING_TICK=True)
 class TestUrvFiles(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -17,27 +19,43 @@ class TestUrvFiles(APITestCase):
         create_departments_and_users(self)
         self.dt = date.today()
 
-        for e in [self.employment2, self.employment3]:
-            WorkerDay.objects.create(
-                worker_id=e.user_id,
-                employment=e,
-                shop_id=e.shop_id,
-                dt=self.dt,
-                dttm_work_start=datetime.combine(self.dt, time(8)),
-                dttm_work_end=datetime.combine(self.dt, time(20)),
-                is_approved=True,
-                type=WorkerDay.TYPE_WORKDAY,
-            )
+        WorkerDay.objects.create(
+            worker_id=self.employment2.user_id,
+            employment=self.employment2,
+            shop_id=self.employment2.shop_id,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(13)),
+            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(1)),
+            is_approved=True,
+            type=WorkerDay.TYPE_WORKDAY,
+        )
+        
+        WorkerDay.objects.create(
+            worker_id=self.employment3.user_id,
+            employment=self.employment3,
+            shop_id=self.employment3.shop_id,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(8)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
+            is_approved=True,
+            type=WorkerDay.TYPE_WORKDAY,
+        )
         
         AttendanceRecords.objects.create(
             shop_id=self.employment2.shop_id,
-            dttm=datetime.combine(self.dt, time(7, 54)),
+            dttm=datetime.combine(self.dt, time(12, 54)),
             user_id=self.employment2.user_id,
             type=AttendanceRecords.TYPE_COMING,
         )
         AttendanceRecords.objects.create(
             shop_id=self.employment2.shop_id,
-            dttm=datetime.combine(self.dt, time(19, 13)),
+            dttm=datetime.combine(self.dt + timedelta(1), time(0, 13)),
+            user_id=self.employment2.user_id,
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+        AttendanceRecords.objects.create(
+            shop_id=self.employment2.shop_id,
+            dttm=datetime.combine(self.dt + timedelta(1), time(0, 14)),
             user_id=self.employment2.user_id,
             type=AttendanceRecords.TYPE_LEAVING,
         )

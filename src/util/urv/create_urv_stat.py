@@ -146,10 +146,12 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
                     hours_count_plan=Sum('work_hours', filter=Q(is_fact=False)),
                     hours_count_fact=Sum('work_hours', filter=Q(is_fact=True)),
                 )
-                leaving_count = AttendanceRecords.objects.filter(shop=shop, dt=date, type=AttendanceRecords.TYPE_LEAVING, user_id__in=user_ids).distinct('user').count()
+                # leaving_count = AttendanceRecords.objects.filter(shop=shop, dt=date, type=AttendanceRecords.TYPE_LEAVING, user_id__in=user_ids).distinct('user').count()
+                leaving_count = WorkerDay.objects.filter(shop=shop, dt=date, type=WorkerDay.TYPE_WORKDAY, worker_id__in=user_ids, is_fact=True, is_approved=True, dttm_work_end__isnull=False).count()
                 worksheet.write_string(row, LATE, str(plan_and_fact['lates']), def_format)
                 worksheet.write_string(row, EARLY, str(plan_and_fact['earlies']), def_format)
-            coming_count = AttendanceRecords.objects.filter(shop=shop, dt=date, type=AttendanceRecords.TYPE_COMING, user_id__in=user_ids).distinct('user').count()
+            # coming_count = AttendanceRecords.objects.filter(shop=shop, dt=date, type=AttendanceRecords.TYPE_COMING, user_id__in=user_ids).distinct('user').count()
+            coming_count = WorkerDay.objects.filter(shop=shop, dt=date, type=WorkerDay.TYPE_WORKDAY, worker_id__in=user_ids, is_fact=True, is_approved=True, dttm_work_start__isnull=False).count()
             worksheet.write_string(row, PLAN_COMMING, str(wd_count), def_format)
             worksheet.write_string(row, FACT_COMMING, str(coming_count), def_format)
             worksheet.write_string(row, DIFF_COMMING, str(wd_count - coming_count), def_format if wd_count - coming_count == 0 else red_format)
@@ -170,11 +172,12 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
                 worksheet.write_string(row, PLAN_HOURS, get_str_timedelta(wd_hours['hours_count_plan'] or datetime.timedelta(0)), def_format)
                 worksheet.write_string(row, FACT_HOURS, get_str_timedelta(wd_hours['hours_count_fact'] or datetime.timedelta(0)), def_format)
                 worksheet.write_string(row, DIFF_HOURS, get_str_timedelta((wd_hours['hours_count_plan'] or datetime.timedelta(0)) - (wd_hours['hours_count_fact'] or datetime.timedelta(0))), def_format)
+                percent_diff = round((wd_hours['hours_count_fact'] or datetime.timedelta(0)) / (wd_hours['hours_count_plan'] or datetime.timedelta(seconds=1)) * 100)
                 worksheet.write_string(
                     row, 
                     DIFF_HOURS_PERCENT, 
-                    str(round((wd_hours['hours_count_fact'] or datetime.timedelta(0)) / (wd_hours['hours_count_plan'] or datetime.timedelta(seconds=1)) * 100)) + '%', 
-                    def_format if round((wd_hours['hours_count_fact'] or datetime.timedelta(0)) / (wd_hours['hours_count_plan'] or datetime.timedelta(seconds=1)) * 100) >= 100 else red_format,
+                    str(percent_diff) + '%', 
+                    def_format if percent_diff >= 100 and percent_diff != 0 else red_format,
                 )
 
             row += 1
