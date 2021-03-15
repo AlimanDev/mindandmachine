@@ -31,20 +31,21 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None):
         dt_from=dt_from,
         dt_to=dt_to,
     ).values_list('user_id', flat=True)
-    bad_records = AttendanceRecords.objects.filter(
-        user_id__in=user_ids,
-        dttm__date__gte=dt_from,
-        dttm__date__lte=dt_to,
-    ).values(
-        'user_id',
-        'dt',
-    ).annotate(
-        comming=Count('dt', filter=Q(type=AttendanceRecords.TYPE_COMING)),
-        leaving=Count('dt', filter=Q(type=AttendanceRecords.TYPE_LEAVING)),
-    ).filter(
-        Q(comming=0) | Q(leaving=0),
-    ).values(
-        'user_id', 'dt', 'comming', 'leaving',
+    no_comming =  bad_records = WorkerDay.objects.filter(
+        worker_id__in=user_ids,
+        dt__gte=dt_from,
+        dt__lte=dt_to,
+        is_fact=True,
+        is_approved=True,
+        dttm_work_start__isnull=True,
+    )
+    no_leaving =  bad_records = WorkerDay.objects.filter(
+        worker_id__in=user_ids,
+        dt__gte=dt_from,
+        dt__lte=dt_to,
+        is_fact=True,
+        is_approved=True,
+        dttm_work_end__isnull=True,
     )
     worker_days = WorkerDay.objects.filter(
         dt__gte=dt_from,
@@ -55,43 +56,17 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None):
         is_fact=False,
         worker_id__in=user_ids,
     )
-    # users_wds = {}
-    # for wd in worker_days:
-    #     users_wds.setdefault(wd.worker_id, {})[wd.dt] = wd
-
-    records = AttendanceRecords.objects.filter(
-        dt__gte=dt_from,
-        dt__lte=dt_to,
-        shop__network_id=network_id,
-        user_id__in=user_ids,
-    )
-
-    users_records = {}
-    for record in records:
-        users_records.setdefault(record.user_id, {})[record.dt] = record
     
-    for record in bad_records:
-        first_key = record['user_id']
-        second_key = record['dt']
-        t = NO_COMMING if record['comming'] == 0 else NO_LEAVING
-        # Было сделано временно для терминалов, но может ещё пригодиться
-        # if users_wds.get(first_key, {}).get(second_key):
-        #     if t == NO_LEAVING:
-        #         wd = users_wds.get(first_key, {}).get(second_key)
-        #         att_record = AttendanceRecords.objects.filter(
-        #             dttm__date=second_key,
-        #             shop_id=wd.shop_id,
-        #             user_id=first_key,
-        #         ).first()
-        #         if not att_record:
-        #             continue
-        #         second_cond = (att_record.dttm > wd.dttm_work_end or (att_record.dttm - wd.dttm_work_start).total_seconds() / 3600 >= NO_COMMING_HOURS)
-        #         if att_record.dttm > wd.dttm_work_start and second_cond:
-        #             t = NO_COMING_PROBABLY
+    for record in no_comming:
+        data.setdefault(record.worker_id, {})[record.dt] = {
+            'shop_id': record.shop_id,
+            'type': NO_COMMING,
+        }
 
-        data.setdefault(first_key, {})[second_key] = {
-            'shop_id': users_records.get(first_key, {}).get(second_key, AttendanceRecords()).shop_id,
-            'type': t,
+    for record in no_leaving:
+        data.setdefault(record.worker_id, {})[record.dt] = {
+            'shop_id': record.shop_id,
+            'type': NO_LEAVING,
         }
     
     no_records = worker_days.annotate(
