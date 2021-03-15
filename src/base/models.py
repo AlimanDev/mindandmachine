@@ -187,7 +187,7 @@ class Break(AbstractActiveNetworkSpecificCodeNamedModel):
     def save(self, *args, **kwargs):
         breaks = self.breaks
         for b in breaks:
-            if len(b) != 3 or (not isinstance(b[0], int)) or (not isinstance(b[1], int)) or (not isinstance(b[3], list)):
+            if len(b) != 3 or ((not isinstance(b[0], int)) or (not isinstance(b[1], int)) or (not isinstance(b[2], list))):
                 raise MessageError(code='triplet_bad_type', params={'triplet': b})
 
             if b[0] > b[1]:
