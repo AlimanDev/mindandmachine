@@ -1107,7 +1107,7 @@ class AttendanceRecords(AbstractModel):
                     ).order_by('dt').last()
 
                     # Если предыдущая смена не закрыта.
-                    if prev_fa_wd and prev_fa_wd.dttm_work_start and prev_fa_wd.dttm_work_end is None:
+                    if prev_fa_wd and prev_fa_wd.dttm_work_start:
                         close_prev_work_shift_cond = (
                             self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
                         # Если с момента открытия предыдущей смены прошло менее MAX_WORK_SHIFT_SECONDS,

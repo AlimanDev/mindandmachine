@@ -1752,6 +1752,20 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(len(fact_worker_day_details), 1)
         self.assertEqual(fact_worker_day_details[0].work_type_id, work_type.id)
 
+    
+    def test_create_second_record_for_prev_day_when_prev_fact_closed(self):
+        self.worker_day_fact_approved.dttm_work_start = datetime.combine(self.dt - timedelta(1), time(18, 34))
+        self.worker_day_fact_approved.dttm_work_end = datetime.combine(self.dt, time(1, 2))
+        self.worker_day_fact_approved.save()
+        AttendanceRecords.objects.create(
+            shop_id=self.worker_day_fact_approved.shop_id,
+            user_id=self.worker_day_fact_approved.worker_id,
+            dttm=datetime.combine(self.dt, time(1, 5)),
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).first().dttm_work_end, datetime.combine(self.dt, time(1, 5)))
+
 
 class TestVacancy(TestsHelperMixin, APITestCase):
     @classmethod
