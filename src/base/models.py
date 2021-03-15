@@ -185,6 +185,20 @@ class Break(AbstractActiveNetworkSpecificCodeNamedModel):
         return json.dumps(value)
 
     def save(self, *args, **kwargs):
+        breaks = self.breaks
+        for b in breaks:
+            if len(b) != 3 or ((not isinstance(b[0], int)) or (not isinstance(b[1], int)) or (not isinstance(b[2], list))):
+                raise MessageError(code='triplet_bad_type', params={'triplet': b})
+
+            if b[0] > b[1]:
+                raise MessageError(code='triplet_bad_value_gt', params={'triplet': b})
+            
+            if not all([isinstance(v, int) for v in b[2]]):
+                raise MessageError(code='triplet_bad_type', params={'triplet': b})
+            
+            if any([v > b[1] for v in b[2]]):
+                raise MessageError(code='triplet_bad_value', params={'triplet': b})
+
         self.value = self.clean_value(self.breaks)
         return super().save(*args, **kwargs)
 
