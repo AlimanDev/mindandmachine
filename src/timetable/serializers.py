@@ -531,6 +531,31 @@ class ExchangeSerializer(serializers.Serializer):
                 raise ValidationError({key: self.error_messages['not_exist'].format(pk_value=self.validated_data[key])})
 
 
+class CopyRangeSerializer(serializers.Serializer):
+    default_error_messages = {
+        'check_dates': _('Date start should be less then date end'),
+        'check_periods': _('Start of first period can\'t be greater than start of second period'),
+    }
+
+    worker_ids = serializers.ListField(child=serializers.IntegerField())
+    from_copy_dt_from = serializers.DateField()
+    from_copy_dt_to = serializers.DateField()
+    to_copy_dt_from = serializers.DateField()
+    to_copy_dt_to = serializers.DateField()
+    is_approved = serializers.BooleanField(default=True)
+
+    def is_valid(self, *args, **kwargs):
+        super().is_valid(*args, **kwargs)
+        if self.validated_data['from_copy_dt_from'] > self.validated_data['from_copy_dt_to'] or\
+        self.validated_data['to_copy_dt_from'] > self.validated_data['to_copy_dt_to']:
+            raise serializers.ValidationError(self.error_messages['check_dates'])
+
+        if self.validated_data['from_copy_dt_from'] > self.validated_data['to_copy_dt_from']:
+            raise serializers.ValidationError(self.error_messages['check_periods'])
+        
+        return True
+
+
 class UploadTimetableSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField()
     file = serializers.FileField()

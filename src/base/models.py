@@ -1063,6 +1063,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_vacancy',
         'WorkerDay_change_list',
         'WorkerDay_copy_approved',
+        'WorkerDay_copy_range',
         'WorkerDay_duplicate',
         'WorkerDay_delete_worker_days',
         'WorkerDay_exchange',
