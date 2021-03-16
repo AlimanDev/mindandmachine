@@ -69,12 +69,18 @@ class WorkerDayListSerializer(serializers.Serializer):
     shop_code = serializers.CharField(required=False, read_only=True)
     user_login = serializers.CharField(required=False, read_only=True)
     created_by_id = serializers.IntegerField(read_only=True)
+    last_edited_by = serializers.SerializerMethodField(read_only=True)
+    dttm_modified = serializers.DateTimeField(read_only=True)
 
     def get_work_hours(self, obj) -> float:
         if isinstance(obj.work_hours, timedelta):
             return obj.rounded_work_hours
 
         return obj.work_hours
+
+    def get_last_edited_by(self, obj):
+        if obj.last_edited_by:
+            return f'{obj.last_edited_by.last_name} {obj.last_edited_by.first_name}'
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):
@@ -101,13 +107,14 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     user_login = serializers.CharField(required=False, read_only=True)
     username = serializers.CharField(required=False, write_only=True)
     created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    last_edited_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:
         model = WorkerDay
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
-                  'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by',
-                  'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel']
+                  'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by', 'last_edited_by',
+                  'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel',]
         read_only_fields = ['work_hours', 'parent_worker_day_id']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
@@ -256,6 +263,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         with transaction.atomic():
             details = validated_data.pop('worker_day_details', [])
+            validated_data.pop('created_by', None)
             WorkerDayCashboxDetails.objects.filter(worker_day=instance).delete()
             for wd_detail in details:
                 WorkerDayCashboxDetails.objects.create(worker_day=instance, **wd_detail)

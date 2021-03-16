@@ -564,6 +564,7 @@ class WorkerDay(AbstractModel):
 
     is_approved = models.BooleanField(default=False)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
+    last_edited_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_edited')
 
     comment = models.TextField(null=True, blank=True)
     parent_worker_day = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child') # todo: remove
@@ -646,6 +647,9 @@ class WorkerDay(AbstractModel):
 
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours  = self._calc_wh()
+
+        if self.last_edited_by is None:
+            self.last_edited_by = self.created_by
 
         is_new = self.id is None
 
