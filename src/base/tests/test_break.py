@@ -71,6 +71,18 @@ class TestBreakValidation(TestsHelperMixin, APITestCase):
 
         self.assertIsNone(b)
 
+        # некорректный формат
+        try:
+            b = Break.objects.create(
+                network=self.network,
+                name='Перерыв',
+                value='[0, 100, [30]]',
+            )
+        except ValidationError as e:
+            self.assertEqual(e.detail, {'message': 'Некорректный формат перерыва 0, должно быть [[int, int, [int, int,]],].'})
+
+        self.assertIsNone(b)
+
     def test_bad_periods(self):
         b = None
         try:
