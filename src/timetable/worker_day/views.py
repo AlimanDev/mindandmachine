@@ -517,7 +517,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 raise MessageError(code='no_vacancy_or_approved', lang=request.user.lang)
 
             if vacancy.worker_id:
-                WorkerDay.objects.filter(
+                WorkerDay.objects_with_excluded.filter(
                     dt=vacancy.dt,
                     worker_id=vacancy.worker_id,
                     is_fact=vacancy.is_fact,
