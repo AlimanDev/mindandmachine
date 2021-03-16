@@ -1063,7 +1063,7 @@ class AttendanceRecords(AbstractModel):
         res = super(AttendanceRecords, self).save(*args, **kwargs)
 
         if self.type == self.TYPE_NO_TYPE:
-            return
+            return res
 
         with transaction.atomic():
             fact_approved = WorkerDay.objects.filter(
