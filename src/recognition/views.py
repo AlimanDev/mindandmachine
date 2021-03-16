@@ -165,7 +165,7 @@ class TickViewSet(BaseModelViewSet):
         raise NotImplementedError
 
     def get_serializer_class(self):
-        if self.request.method == 'POST':
+        if self.request.method == 'POST' or self.request.method == 'PUT':
             return self.strategy.get_serializer_class()
         else:
             return TickSerializer
@@ -272,6 +272,33 @@ class TickViewSet(BaseModelViewSet):
 
         return Response(TickSerializer(tick).data)
 
+    def update(self, request, *args, **kwargs):
+        try:
+            tick = Tick.objects.get(pk=kwargs['pk'])
+        except Tick.DoesNotExist as e:
+            return Response({"error": "Отметка не существует"}, 404)
+
+        data = self.get_serializer_class()(data=request.data, context=self.get_serializer_context())
+        data.is_valid(raise_exception=True)
+
+        type = data.validated_data.get('type', Tick.TYPE_NO_TYPE)
+
+        if tick.type == Tick.TYPE_NO_TYPE:
+            tick.type = type
+            tick.save()
+            if settings.TRUST_TICK_REQUEST:
+                record, _ = AttendanceRecords.objects.get_or_create(
+                    user_id=tick.user_id,
+                    dttm=tick.dttm,
+                    verified=True,
+                    shop_id=tick.tick_point.shop_id,
+                    type=AttendanceRecords.TYPE_NO_TYPE,
+                )
+                record.type = type
+                record.save()
+        
+        return Response(TickSerializer(tick).data)
+
 
 class TickPhotoViewSet(BaseModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -375,7 +402,7 @@ class TickPhotoViewSet(BaseModelViewSet):
         if (type == TickPhoto.TYPE_SELF) and (tick_photo.verified_score > 0):
             AttendanceRecords.objects.create(
                 user_id=tick.user_id,
-                dttm=check_time,
+                dttm=tick.dttm,
                 verified=True,
                 shop_id=tick.tick_point.shop_id,
                 type=tick.type,
