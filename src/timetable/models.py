@@ -982,12 +982,14 @@ class AttendanceRecords(AbstractModel):
     TYPE_LEAVING = 'L'
     TYPE_BREAK_START = 'S'
     TYPE_BREAK_END = 'E'
+    TYPE_NO_TYPE = 'N'
 
     RECORD_TYPES = (
         (TYPE_COMING, 'coming'),
         (TYPE_LEAVING, 'leaving'),
         (TYPE_BREAK_START, 'break start'),
-        (TYPE_BREAK_END, 'break_end')
+        (TYPE_BREAK_END, 'break_end'),
+        (TYPE_NO_TYPE, 'no_type')
     )
 
     TYPE_2_DTTM_FIELD = {
@@ -1059,6 +1061,9 @@ class AttendanceRecords(AbstractModel):
         """
         self.dt = self.dt or self.dttm.date()
         res = super(AttendanceRecords, self).save(*args, **kwargs)
+
+        if self.type == self.TYPE_NO_TYPE:
+            return res
 
         with transaction.atomic():
             fact_approved = WorkerDay.objects.filter(
