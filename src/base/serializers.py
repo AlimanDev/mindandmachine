@@ -25,8 +25,8 @@ from src.base.models import (
     Break,
     ShopSchedule,
 )
-from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, \
-    WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
+from src.timetable.serializers import EmploymentWorkTypeSerializer, EmploymentWorkTypeListSerializer
+from src.timetable.worker_constraint.serializers import WorkerConstraintSerializer, WorkerConstraintListSerializer
 
 
 class BaseNetworkSerializer(serializers.ModelSerializer):

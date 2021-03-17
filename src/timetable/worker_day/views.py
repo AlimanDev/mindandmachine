@@ -32,7 +32,7 @@ from src.timetable.models import (
     WorkerDayPermission,
     GroupWorkerDayPermission,
 )
-from src.timetable.serializers import (
+from src.timetable.worker_day.serializers import (
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
     WorkerDayWithParentSerializer,

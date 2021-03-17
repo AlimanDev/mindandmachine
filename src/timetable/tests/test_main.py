@@ -535,7 +535,23 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.get(id=plan_id).created_by_id, self.user1.id)
         self.assertEqual(WorkerDay.objects.get(id=plan_id).last_edited_by_id, self.user2.id)
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&dt={dt}')
-        self.assertEqual(response.json()[0]['last_edited_by'], 'Иванов Иван2')
+        self.assertEqual(
+            response.json()[0]['last_edited_by'], 
+            {
+                'id': self.user2.id, 
+                'first_name': self.user2.first_name, 
+                'last_name': self.user2.last_name, 
+                'middle_name': None, 
+                'birthday': None, 
+                'sex': 'F', 
+                'avatar': None, 
+                'email': self.user2.email, 
+                'phone_number': None, 
+                'tabel_code': self.user2.tabel_code, 
+                'username': self.user2.username, 
+                'network_id': self.network.id,
+            }
+        )
 
 
     def test_delete(self):
