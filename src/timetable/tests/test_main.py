@@ -293,9 +293,15 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                 worker_day_permission=wdp,
             )
 
+        data_approve['wd_types'] = [WorkerDay.TYPE_HOLIDAY]
         response = self.client.post(self.url_approve, data_approve, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # день не должен подтвердиться, т.к. передан тип только выходной, а у нас рабочий день
+        self.assertEqual(WorkerDay.objects.get(id=plan_id).is_approved, False)
 
+        data_approve['wd_types'] = WorkerDay.TYPES_USED
+        response = self.client.post(self.url_approve, data_approve, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(WorkerDay.objects.get(id=plan_id).is_approved, True)
 
         # create not approved fact
