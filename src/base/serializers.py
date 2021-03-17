@@ -52,6 +52,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'secondary_color',
             'allowed_geo_distance_km',
             'enable_camera_ticks',
+            'show_worker_day_additional_info',
         ]
 
 
