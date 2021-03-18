@@ -44,6 +44,7 @@ MDA_SYNC_DEPARTMENTS = False
 MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS = (60 * 60) + 10  # 1 час + 10 сек
 MDA_PUBLIC_API_HOST = 'https://example.com'
 MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
+MDA_USER_API_AUTH_TOKEN = None  # нужно временно, пока МДА не переделает api интеграции на public токен
 
 DEBUG = True
 
