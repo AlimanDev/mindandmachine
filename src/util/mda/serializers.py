@@ -7,7 +7,7 @@ class ShopDTOSerializer(serializers.ModelSerializer):
     active = serializers.BooleanField(source='is_active')
     sap = serializers.CharField(source='code')
     locality = serializers.CharField(source='name')
-    city = serializers.CharField(source='city')
+    city = serializers.CharField()
     regionId = serializers.IntegerField(source='parent_id')
     allDay = serializers.BooleanField(source='is_all_day')
     directorLogin = serializers.SerializerMethodField()
