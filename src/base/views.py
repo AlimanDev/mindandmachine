@@ -185,7 +185,7 @@ class FunctionGroupView(BaseModelViewSet):
         return Response(FunctionGroup.FUNCS)
 
 
-class WorkerPositionViewSet(BaseActiveNamedModelViewSet):
+class WorkerPositionViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = WorkerPositionSerializer
     pagination_class = LimitOffsetPagination
