@@ -1,10 +1,10 @@
-from src.timetable.models import AttendanceRecords, WorkerDay
-from src.base.models import Shop, Employment, Network
+from src.timetable.models import AttendanceRecords, WorkerDay, PlanAndFactHours
+from src.base.models import Shop, Employment
 import xlsxwriter
 import io
 import datetime
-from django.db.models import Sum, Q, F, Min, Max, Count, DurationField, DateTimeField
-from django.db.models.functions import Cast
+from django.db.models import Sum, Q
+
 
 COLOR_GREEN = '#00FF00'
 COLOR_RED = '#fc6c58'
@@ -47,8 +47,6 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
             is_fact=False,
         ).values_list('shop_id', flat=True),
     )
-
-    network = Network.objects.get(id=network_id)
 
     if in_memory:
         output = io.BytesIO()
@@ -112,52 +110,31 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
         for date in dates:
             user_ids = list(Employment.objects.get_active(shop.network_id, dt_from=date, dt_to=date).values_list('user_id', flat=True))
             worksheet.write_string(row, SHOP, shop.name, def_format)
-            plan_worker_days = WorkerDay.objects.filter(
+            worker_days_stat = PlanAndFactHours.objects.filter(
                 shop=shop, 
-                type=WorkerDay.TYPE_WORKDAY, 
                 dt=date,
                 worker_id__in=user_ids,
-                is_approved=True,
-                is_fact=False,
+                wd_type=WorkerDay.TYPE_WORKDAY,
+            ).values('shop_id', 'dt').aggregate(
+                plan_ticks=Sum('ticks_plan_count'),
+                fact_comming_ticks=Sum('ticks_comming_fact_count'),
+                fact_leaving_ticks=Sum('ticks_leaving_fact_count'),
+                lates=Sum('late_arrival'),
+                earlies=Sum('early_departure'),
+                hours_count_plan=Sum('plan_work_hours'),
+                hours_count_fact=Sum('fact_work_hours'),
             )
-            wd_count = plan_worker_days.count()
+            wd_count = worker_days_stat['plan_ticks'] // 2
             worksheet.write_string(row, DATE, date.strftime('%d.%m.%Y'), def_format)
             if not comming_only:
-                plan_and_fact = WorkerDay.objects.filter(
-                    shop=shop, 
-                    type=WorkerDay.TYPE_WORKDAY, 
-                    dt=date,
-                    worker_id__in=user_ids,
-                    is_approved=True,
-                ).values('shop', 'worker', 'dt').annotate(
-                    late=Cast(Min('dttm_work_start', filter=Q(is_fact=True)) - Min('dttm_work_start', filter=Q(is_fact=False)), output_field=DurationField()),
-                    early=Cast(Max('dttm_work_end', filter=Q(is_fact=False)) - Max('dttm_work_end', filter=Q(is_fact=True)), output_field=DurationField()),
-                ).aggregate(
-                    lates=Count('dt', filter=Q(late__gt=network.allowed_interval_for_late_arrival)),
-                    earlies=Count('dt', filter=Q(early__gt=network.allowed_interval_for_early_departure)),
-                )
-                wd_hours = WorkerDay.objects.filter(
-                    shop=shop,
-                    type=WorkerDay.TYPE_WORKDAY,
-                    dt=date,
-                    worker_id__in=user_ids,
-                    is_approved=True,
-                ).aggregate(
-                    hours_count_plan=Sum('work_hours', filter=Q(is_fact=False)),
-                    hours_count_fact=Sum('work_hours', filter=Q(is_fact=True)),
-                )
-                # leaving_count = AttendanceRecords.objects.filter(shop=shop, dt=date, type=AttendanceRecords.TYPE_LEAVING, user_id__in=user_ids).distinct('user').count()
-                leaving_count = WorkerDay.objects.filter(shop=shop, dt=date, type=WorkerDay.TYPE_WORKDAY, worker_id__in=user_ids, is_fact=True, is_approved=True, dttm_work_end__isnull=False).count()
-                worksheet.write_string(row, LATE, str(plan_and_fact['lates']), def_format)
-                worksheet.write_string(row, EARLY, str(plan_and_fact['earlies']), def_format)
-            # coming_count = AttendanceRecords.objects.filter(shop=shop, dt=date, type=AttendanceRecords.TYPE_COMING, user_id__in=user_ids).distinct('user').count()
-            coming_count = WorkerDay.objects.filter(shop=shop, dt=date, type=WorkerDay.TYPE_WORKDAY, worker_id__in=user_ids, is_fact=True, is_approved=True, dttm_work_start__isnull=False).count()
+                worksheet.write_string(row, LATE, str(worker_days_stat['lates'] or 0), def_format)
+                worksheet.write_string(row, EARLY, str(worker_days_stat['earlies'] or 0), def_format)
             worksheet.write_string(row, PLAN_COMMING, str(wd_count), def_format)
-            worksheet.write_string(row, FACT_COMMING, str(coming_count), def_format)
-            worksheet.write_string(row, DIFF_COMMING, str(wd_count - coming_count), def_format if wd_count - coming_count == 0 else red_format)
+            worksheet.write_string(row, FACT_COMMING, str(worker_days_stat['fact_comming_ticks']), def_format)
+            worksheet.write_string(row, DIFF_COMMING, str(wd_count - worker_days_stat['fact_comming_ticks']), def_format if wd_count - worker_days_stat['fact_comming_ticks'] == 0 else red_format)
             if not comming_only:
-                plan_hours = wd_hours['hours_count_plan'] or datetime.timedelta(0)
-                fact_hours = wd_hours['hours_count_fact'] or datetime.timedelta(0)
+                plan_hours = datetime.timedelta(seconds=int(worker_days_stat['hours_count_plan'] * 60 * 60)) or datetime.timedelta(0)
+                fact_hours = datetime.timedelta(seconds=int(worker_days_stat['hours_count_fact'] * 60 * 60)) or datetime.timedelta(0)
                 def get_str_timedelta(tm):
                     c = 1
                     if tm.days < 0:
@@ -167,12 +144,12 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
                     seconds = int(tm.total_seconds() - hours * 3600 - minutes * 60)
                     return f'{hours:02}:{c * minutes:02}:{c * seconds:02}'
                 worksheet.write_string(row, PLAN_LEAVING, str(wd_count), def_format)
-                worksheet.write_string(row, FACT_LEAVING, str(leaving_count), def_format)
-                worksheet.write_string(row, DIFF_LEAVING, str(wd_count - leaving_count), def_format if wd_count - leaving_count == 0 else red_format)
-                worksheet.write_string(row, PLAN_HOURS, get_str_timedelta(wd_hours['hours_count_plan'] or datetime.timedelta(0)), def_format)
-                worksheet.write_string(row, FACT_HOURS, get_str_timedelta(wd_hours['hours_count_fact'] or datetime.timedelta(0)), def_format)
-                worksheet.write_string(row, DIFF_HOURS, get_str_timedelta((wd_hours['hours_count_plan'] or datetime.timedelta(0)) - (wd_hours['hours_count_fact'] or datetime.timedelta(0))), def_format)
-                percent_diff = round((wd_hours['hours_count_fact'] or datetime.timedelta(0)) / (wd_hours['hours_count_plan'] or datetime.timedelta(seconds=1)) * 100)
+                worksheet.write_string(row, FACT_LEAVING, str(worker_days_stat['fact_leaving_ticks']), def_format)
+                worksheet.write_string(row, DIFF_LEAVING, str(wd_count - worker_days_stat['fact_leaving_ticks']), def_format if wd_count - worker_days_stat['fact_leaving_ticks'] == 0 else red_format)
+                worksheet.write_string(row, PLAN_HOURS, get_str_timedelta(plan_hours), def_format)
+                worksheet.write_string(row, FACT_HOURS, get_str_timedelta(fact_hours), def_format)
+                worksheet.write_string(row, DIFF_HOURS, get_str_timedelta(plan_hours - fact_hours), def_format)
+                percent_diff = round(fact_hours / (plan_hours or datetime.timedelta(seconds=1)) * 100)
                 worksheet.write_string(
                     row, 
                     DIFF_HOURS_PERCENT, 
