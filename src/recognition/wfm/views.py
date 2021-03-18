@@ -68,12 +68,12 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
         )
         emp_cond = Employment.objects.get_active(
             self.request.user.network_id,
-            dt_from, dt_to,
+            dt_from, dt_from, # чтобы не попались трудоустройства с завтрашнего дня
             user_id=OuterRef('pk'),
         )
         shop_emp_cond = Employment.objects.get_active(
             self.request.user.network_id,
-            dt_from, dt_to,
+            dt_from, dt_from, # чтобы не попались трудоустройства с завтрашнего дня
             user_id=OuterRef('pk'),
             shop_id=tick_point.shop_id,
         )
