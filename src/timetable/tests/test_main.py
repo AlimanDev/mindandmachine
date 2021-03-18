@@ -502,6 +502,64 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day_id=plan_id).count(), 2)
 
+    
+    def test_edit_worker_day_last_edited_by(self):
+        dt = self.dt + timedelta(days=1)
+
+        data = {
+            "shop_id": self.shop.id,
+            "username": self.user2.username,
+            "employment_id": self.employment2.id,
+            "dt": dt,
+            "is_fact": False,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(dt, time(8, 0, 0)),
+            "dttm_work_end": datetime.combine(dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+
+        # create not approved plan
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        plan_id = response.json()['id']
+        self.assertEqual(WorkerDay.objects.get(id=plan_id).created_by_id, self.user1.id)
+        self.assertEqual(WorkerDay.objects.get(id=plan_id).last_edited_by_id, self.user1.id)
+        data["worker_day_details"] = [{
+            "work_part": 0.5,
+            "work_type_id": self.work_type.id},
+            {
+                "work_part": 0.5,
+                "work_type_id": self.work_type.id}]
+        self.client.force_authenticate(user=self.user2)
+        self.employment2.function_group = self.admin_group
+        self.employment2.save()
+        response = self.client.put(f"{self.url}{plan_id}/", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(WorkerDay.objects.get(id=plan_id).created_by_id, self.user1.id)
+        self.assertEqual(WorkerDay.objects.get(id=plan_id).last_edited_by_id, self.user2.id)
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&dt={dt}')
+        self.assertEqual(
+            response.json()[0]['last_edited_by'], 
+            {
+                'id': self.user2.id, 
+                'first_name': self.user2.first_name, 
+                'last_name': self.user2.last_name, 
+                'middle_name': None, 
+                'birthday': None, 
+                'sex': 'F', 
+                'avatar': None, 
+                'email': self.user2.email, 
+                'phone_number': None, 
+                'tabel_code': self.user2.tabel_code, 
+                'username': self.user2.username, 
+                'network_id': self.network.id,
+            }
+        )
+
+
     def test_delete(self):
         # План подтвержденный
         response = self.client.delete(f'{self.url}{self.worker_day_plan_approved.id}/')

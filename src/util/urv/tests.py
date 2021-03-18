@@ -83,8 +83,8 @@ class TestUrvFiles(APITestCase):
             'Кол-во отметок факт, УХОД': 1, 
             'Разница, УХОД': 1, 
             'Кол-во часов план': '21:30:00', 
-            'Кол-во часов факт': '10:04:00', 
-            'Разница, ЧАСЫ': '11:26:00',
+            'Кол-во часов факт': '10:05:00', 
+            'Разница, ЧАСЫ': '11:25:00',
             'Разница, ПРОЦЕНТЫ': '47%',
         }
         self.assertEqual(dict(df.iloc[0]), data)
@@ -127,7 +127,7 @@ class TestUrvFiles(APITestCase):
             'Табельный номер': '', 
             'ФИО': 'Сидоров Иван3 ', 
             'Должность': '',
-            self.dt.strftime('%d.%m.%Y'): 'Нет отметки об уходе'
+            self.dt.strftime('%d.%m.%Y'): 'Нет ухода'
         }
         self.assertEqual(len(df.iloc[:,:]), 1)
         self.assertEqual(dict(df.iloc[0, :6]), data)

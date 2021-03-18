@@ -78,6 +78,9 @@ class Network(AbstractActiveModel):
     )
     enable_camera_ticks = models.BooleanField(
         default=False, verbose_name='Включить отметки по камере в мобильной версии')
+    show_worker_day_additional_info = models.BooleanField(
+        default=False, verbose_name='Отображать доп. информацию в подтвержденных факте и плане', 
+        help_text='Отображение при наведении на уголок информации о том, кто и когда последний раз редактировал рабочий день')
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'
     )

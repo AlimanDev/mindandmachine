@@ -32,7 +32,7 @@ from src.timetable.models import (
     WorkerDayPermission,
     GroupWorkerDayPermission,
 )
-from src.timetable.serializers import (
+from src.timetable.worker_day.serializers import (
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
     WorkerDayWithParentSerializer,
@@ -144,7 +144,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             celebration_dates = ProductionDay.objects.filter(**prod_day_filter).values_list('dt', flat=True)
 
             night_edges = [Converter.parse_time(t) for t in request.user.network.night_edges]
-            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')):
+            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details').select_related('last_edited_by')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 if worker_day.type in WorkerDay.TYPES_WITH_TM_RANGE:
                     if worker_day.work_hours > datetime.timedelta(0):
@@ -197,7 +197,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 data.append(wd_dict)
         else:
             data = WorkerDayListSerializer(
-                self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details')),
+                self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details').select_related('last_edited_by')),
                 many=True, context=self.get_serializer_context()
             ).data
         return Response(data)
@@ -822,7 +822,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 ]
             )
         
-        return Response(WorkerDayListSerializer(wds.prefetch_related('worker_day_details'), many=True, context={'request':request}).data)
+        return Response(WorkerDayListSerializer(wds.prefetch_related('worker_day_details').select_related('last_edited_by'), many=True, context={'request':request}).data)
 
     @swagger_auto_schema(
         request_body=DuplicateSrializer,

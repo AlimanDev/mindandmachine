@@ -28,7 +28,7 @@ from src.timetable.models import (
     UserWeekdaySlot,
 )
 
-from src.timetable.serializers import AutoSettingsCreateSerializer, AutoSettingsDeleteSerializer, AutoSettingsSetSerializer
+from src.timetable.auto_settings.serializers import AutoSettingsCreateSerializer, AutoSettingsDeleteSerializer, AutoSettingsSetSerializer
 from src.util.models_converter import (
     WorkTypeConverter,
     EmploymentConverter,

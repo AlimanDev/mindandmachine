@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from src.base.models import Shop
-from src.timetable.models import WorkerDayPermission, GroupWorkerDayPermission
+from src.timetable.models import WorkerDayPermission, GroupWorkerDayPermission, WorkerDay
 
 
 class WorkerDayPermissionSerializer(serializers.ModelSerializer):
@@ -40,3 +40,20 @@ class WorkerDayPermissionQueryStringSerializer(serializers.Serializer):
                 network=self.context['request'].user.network,
             ).select_related('network'),
         )
+
+class WsPermissionDataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkerDay
+        fields = (
+            'dt',
+            'type',
+            'is_fact',
+        )
+        extra_kwargs = {
+            "dt": {
+                "error_messages": {
+                    "required": "Поле дата не может быть пустым.",
+                    "null": "Поле дата не может быть пустым.",
+                },
+            },
+        }
