@@ -283,7 +283,9 @@ class WorkerDayViewSet(BaseModelViewSet):
 
             wd_types_grouped_by_limit = {}
             for wd_type, limit_days_in_past, limit_days_in_future in wd_perms:
-                wd_types_grouped_by_limit.setdefault((limit_days_in_past, limit_days_in_future), []).append(wd_type)
+                # фильтруем только по тем типам, которые переданы
+                if wd_type in serializer.validated_data['wd_types']:
+                    wd_types_grouped_by_limit.setdefault((limit_days_in_past, limit_days_in_future), []).append(wd_type)
             wd_types_q = Q()
             for (limit_days_in_past, limit_days_in_future), wd_types in wd_types_grouped_by_limit.items():
                 q = Q(type__in=wd_types)
