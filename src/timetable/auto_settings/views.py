@@ -28,7 +28,7 @@ from src.timetable.models import (
     UserWeekdaySlot,
 )
 
-from src.timetable.serializers import AutoSettingsCreateSerializer, AutoSettingsDeleteSerializer, AutoSettingsSetSerializer
+from src.timetable.auto_settings.serializers import AutoSettingsCreateSerializer, AutoSettingsDeleteSerializer, AutoSettingsSetSerializer
 from src.util.models_converter import (
     WorkTypeConverter,
     EmploymentConverter,
@@ -417,6 +417,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
                     created_by_id=wd['created_by_id'],
+                    shop_id=wd.get('shop_id'),
                 )
                 wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
                 array.append(wd_mod)
@@ -444,6 +445,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'dttm_work_end',
             'work_types__id',
             'created_by_id',
+            'shop_id',
         )
         fill_wd_array(worker_days_db, new_worker_days, prev_data=form.get('is_remaking', False))
 
@@ -549,6 +551,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             key = worker_d.worker_id
             if key not in worker_day:
                 worker_day[key] = []
+            # дни отработанные в других отделах
+            if worker_d.shop_id and worker_d.shop_id != shop_id:
+                worker_d.type = 'R'
             worker_day[key].append(worker_d)
 
         # Расписание за прошлую неделю от даты составления
@@ -905,6 +910,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         #неподтвержденная версия
                         if False in wdays:
                             wd_obj = wdays[False]
+                            # дни отработанные в других магазинах
+                            if wd_obj.shop_id and wd_obj.shop_id != shop.id and wd_obj.type != WorkerDay.TYPE_EMPTY:
+                                continue
                             if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
                                 wd_obj.type = wd['type']
                                 wd_obj.created_by_id = None

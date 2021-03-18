@@ -564,6 +564,7 @@ class WorkerDay(AbstractModel):
 
     is_approved = models.BooleanField(default=False)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
+    last_edited_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_edited')
 
     comment = models.TextField(null=True, blank=True)
     parent_worker_day = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child') # todo: remove
@@ -646,6 +647,9 @@ class WorkerDay(AbstractModel):
 
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours  = self._calc_wh()
+
+        if self.last_edited_by is None:
+            self.last_edited_by = self.created_by
 
         is_new = self.id is None
 
@@ -982,12 +986,14 @@ class AttendanceRecords(AbstractModel):
     TYPE_LEAVING = 'L'
     TYPE_BREAK_START = 'S'
     TYPE_BREAK_END = 'E'
+    TYPE_NO_TYPE = 'N'
 
     RECORD_TYPES = (
         (TYPE_COMING, 'coming'),
         (TYPE_LEAVING, 'leaving'),
         (TYPE_BREAK_START, 'break start'),
-        (TYPE_BREAK_END, 'break_end')
+        (TYPE_BREAK_END, 'break_end'),
+        (TYPE_NO_TYPE, 'no_type')
     )
 
     TYPE_2_DTTM_FIELD = {
@@ -1060,6 +1066,9 @@ class AttendanceRecords(AbstractModel):
         self.dt = self.dt or self.dttm.date()
         res = super(AttendanceRecords, self).save(*args, **kwargs)
 
+        if self.type == self.TYPE_NO_TYPE:
+            return res
+
         with transaction.atomic():
             fact_approved = WorkerDay.objects.filter(
                 dt=self.dt,
@@ -1107,7 +1116,7 @@ class AttendanceRecords(AbstractModel):
                     ).order_by('dt').last()
 
                     # Если предыдущая смена не закрыта.
-                    if prev_fa_wd and prev_fa_wd.dttm_work_start and prev_fa_wd.dttm_work_end is None:
+                    if prev_fa_wd and prev_fa_wd.dttm_work_start:
                         close_prev_work_shift_cond = (
                             self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
                         # Если с момента открытия предыдущей смены прошло менее MAX_WORK_SHIFT_SECONDS,
@@ -1116,6 +1125,8 @@ class AttendanceRecords(AbstractModel):
                             setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
                             setattr(prev_fa_wd, 'type', WorkerDay.TYPE_WORKDAY)
                             prev_fa_wd.save()
+                            self.dt = prev_fa_wd.dt # логично дату предыдущую ставить, так как это значение в отчетах используется
+                            super(AttendanceRecords, self).save(update_fields=['dt',])
                             return
 
                     if settings.MDA_SKIP_LEAVING_TICK:
