@@ -1,6 +1,7 @@
 import logging
 from datetime import timedelta
 
+import pandas as pd
 import requests
 from django.conf import settings
 from django.db.models import Q
@@ -68,6 +69,24 @@ class MdaIntegrationHelper:
             'regions': RegionDTOSerializer(self._get_regions_queryset(threshold_seconds), many=True).data,
             'shops': ShopDTOSerializer(self._get_shops_queryset(threshold_seconds), many=True).data,
         }
+
+    def export_data(self, export_path, threshold_seconds=None):
+        """
+        from src.util.mda.integration import MdaIntegrationHelper
+        MdaIntegrationHelper().export_data(export_path='orgstruct.xlsx')
+        """
+        data = self._get_data(threshold_seconds=threshold_seconds)
+        divisions_df = pd.DataFrame(data['divisions'])
+        regions_df = pd.DataFrame(data['regions'])
+        shops_df = pd.DataFrame(data['shops'])
+
+        writer = pd.ExcelWriter(export_path, engine='xlsxwriter')
+
+        divisions_df.to_excel(writer, sheet_name='Дивизионы')
+        regions_df.to_excel(writer, sheet_name='Регионы')
+        shops_df.to_excel(writer, sheet_name='Магазины')
+
+        writer.save()
 
     def sync_mda_data(self, threshold_seconds=settings.MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS):
         headers = {}
