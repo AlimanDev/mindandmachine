@@ -1293,6 +1293,8 @@ class PlanAndFactHours(models.Model):
     is_vacancy = models.BooleanField()
     ticks_fact_count = models.PositiveSmallIntegerField()
     ticks_plan_count = models.PositiveSmallIntegerField()
+    ticks_comming_fact_count = models.PositiveSmallIntegerField()
+    ticks_leaving_fact_count = models.PositiveSmallIntegerField()
     worker_username = models.CharField(max_length=512)
     work_type_name = models.CharField(max_length=512)
     dttm_work_start_plan = models.DateTimeField()
@@ -1324,3 +1326,12 @@ class PlanAndFactHours(models.Model):
     @property
     def tm_work_end_fact_str(self):
         return str(self.dttm_work_end_fact.time()) if self.dttm_work_end_fact else ''
+
+    
+    @property
+    def plan_work_hours_timedelta(self):
+        return datetime.timedelta(seconds=int(self.plan_work_hours * 60 * 60))
+
+    @property
+    def fact_work_hours_timedelta(self):
+        return datetime.timedelta(seconds=int(self.fact_work_hours * 60 * 60))
