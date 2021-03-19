@@ -76,7 +76,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
-    openapi_tags = ['Employment',]
+    openapi_tags = ['Employment', 'Integration',]
 
     def perform_create(self, serializer):
         serializer.save(network=self.request.user.network)
@@ -120,7 +120,7 @@ class UserViewSet(UpdateorCreateViewSet):
     serializer_class = UserSerializer
     filterset_class = UserFilter
     get_object_field = 'username'
-    openapi_tags = ['User',]
+    openapi_tags = ['User', 'Integration',]
 
     def get_queryset(self):
         user = self.request.user
@@ -190,7 +190,7 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
     serializer_class = WorkerPositionSerializer
     pagination_class = LimitOffsetPagination
     filterset_class = BaseActiveNamedModelFilter
-    openapi_tags = ['WorkerPosition',]
+    openapi_tags = ['WorkerPosition', 'Integration',]
 
     def get_queryset(self):
         return WorkerPosition.objects.filter(

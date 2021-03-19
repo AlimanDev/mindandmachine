@@ -74,7 +74,7 @@ class ShopViewSet(UpdateorCreateViewSet):
 
     @swagger_auto_schema(responses={200: ShopSerializer}, request_body=ShopSerializer, operation_description='PUT /rest_api/department/{id}/')
     def update(self, *args, **kwargs):
-       return super().update(*args, **kwargs)
+        return super().update(*args, **kwargs)
 
     @swagger_auto_schema(operation_description='DELETE /rest_api/department/{id}/')
     def destroy(self, *args, **kwargs):

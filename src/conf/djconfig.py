@@ -290,6 +290,14 @@ SWAGGER_SETTINGS = {
     'DEFAULT_AUTO_SCHEMA_CLASS': "src.util.openapi.auto_schema.WFMAutoSchema",
 }
 
+# какие методы и модели могут попасть в описание интеграции
+OPENAPI_INTEGRATION_MODELS_METHODS = [
+    ('user', 'update'),
+    ('department', 'update'),
+    ('employment', 'update'),
+    ('worker_position', 'update'),
+]
+
 # DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
 
 QOS_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S" #'%H:%M:%S %d.%m.%Y'
