@@ -115,7 +115,7 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
                 dt=date,
                 worker_id__in=user_ids,
                 wd_type=WorkerDay.TYPE_WORKDAY,
-            ).values('shop_id', 'dt').aggregate(
+            ).aggregate(
                 plan_ticks=Sum('ticks_plan_count'),
                 fact_comming_ticks=Sum('ticks_comming_fact_count'),
                 fact_leaving_ticks=Sum('ticks_leaving_fact_count'),
