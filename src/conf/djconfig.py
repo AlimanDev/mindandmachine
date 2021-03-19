@@ -494,13 +494,13 @@ CELERY_BEAT_SCHEDULE = {
 
 if MDA_SYNC_DEPARTMENTS:
     CELERY_BEAT_SCHEDULE['task-sync-mda-departments-all-time'] = {
-        'task': 'src.celery.tasks.sync_mda_user_to_shop_relation',
+        'task': 'src.celery.tasks.sync_mda_departments',
         'schedule': crontab(hour=1, minute=59),
         'options': {'queue': BACKEND_QUEUE},
         'kwargs': {'threshold_seconds': None},
     }
-    CELERY_BEAT_SCHEDULE['task-sync-mda-departments-last_hour'] = {
-        'task': 'src.celery.tasks.sync_mda_user_to_shop_relation',
+    CELERY_BEAT_SCHEDULE['task-sync-mda-departments-last-changes'] = {
+        'task': 'src.celery.tasks.sync_mda_departments',
         'schedule': crontab(minute=49),
         'options': {'queue': BACKEND_QUEUE},
         'kwargs': {'threshold_seconds': MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS},
