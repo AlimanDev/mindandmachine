@@ -64,8 +64,8 @@ class MdaIntegrationHelper:
 
     def _get_data(self, threshold_seconds=None):
         return {
-            'division': DivisionDTOSerializer(self._get_divisions_queryset(threshold_seconds), many=True).data,
-            'region': RegionDTOSerializer(self._get_regions_queryset(threshold_seconds), many=True).data,
+            'divisions': DivisionDTOSerializer(self._get_divisions_queryset(threshold_seconds), many=True).data,
+            'regions': RegionDTOSerializer(self._get_regions_queryset(threshold_seconds), many=True).data,
             'shops': ShopDTOSerializer(self._get_shops_queryset(threshold_seconds), many=True).data,
         }
 
