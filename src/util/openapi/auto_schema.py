@@ -1,9 +1,9 @@
 from drf_yasg.inspectors import SwaggerAutoSchema
 from drf_yasg.generators import OpenAPISchemaGenerator
-from drf_yasg.openapi import Parameter
+from drf_yasg import openapi
 from django.test import override_settings
 from src.conf.djconfig import OPENAPI_INTEGRATION_MODELS_METHODS
-from src.util.openapi.overrides import overrides_info
+from src.util.openapi.overrides import overrides_info, overrides_pk
 
 
 class WFMAutoSchema(SwaggerAutoSchema):
@@ -16,16 +16,11 @@ class WFMAutoSchema(SwaggerAutoSchema):
 
 
 class WFMAutoSchemaIntegration(WFMAutoSchema):
-    def __init__(self, view, path, method, components, request, overrides, operation_keys=None):
-        if tuple(operation_keys[1:3]) in OPENAPI_INTEGRATION_MODELS_METHODS:
-            path = overrides_info.get(operation_keys[1], {}).get(operation_keys[2], {}).get('path', path)
-        super(WFMAutoSchemaIntegration, self).__init__(view, path, method, components, request, overrides)
     def get_operation(self, operation_keys=None):
         if not tuple(operation_keys[1:3]) in OPENAPI_INTEGRATION_MODELS_METHODS:
             return None
         else:
             self.overrides['request_body'] = overrides_info.get(operation_keys[1], {}).get(operation_keys[2], {}).get('request_body', self.get_request_serializer())
-            self.overrides['manual_parameters'] = [Parameter('code', 'path', required=True, type='string'),]
             operation = super().get_operation(operation_keys=operation_keys)
             operation.tags = ['Integration',]
             operation.description = overrides_info.get(operation_keys[1], {}).get(operation_keys[2], {}).get('description', operation.description)
@@ -86,3 +81,23 @@ class WFMIntegrationAPISchemaGenerator(OpenAPISchemaGenerator):
             ]
 
             return swagger
+
+    def get_path_parameters(self, path, view_cls):
+        parameters = super().get_path_parameters(path, view_cls)
+        for p in parameters:
+            if p.in_ == openapi.IN_PATH and p.type == openapi.TYPE_STRING:
+                p.type = openapi.TYPE_STRING
+        return parameters
+
+    def coerce_path(self, path, view):
+        """Coerce {pk} path arguments into the name of the model field, where possible. This is cleaner for an
+        external representation (i.e. "this is an identifier", not "this is a database primary key").
+
+        :param str path: the path
+        :param rest_framework.views.APIView view: associated view
+        :rtype: str
+        """
+        if '{pk}' not in path:
+            return path
+        
+        return path.replace('{pk}', '{%s}' % overrides_pk.get(path.replace('{pk}/', ''),'code'))
