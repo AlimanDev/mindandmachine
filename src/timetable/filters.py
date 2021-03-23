@@ -32,6 +32,7 @@ class WorkerDayFilter(FilterSet):
             # 'shop_id':['exact'],
             'worker_id': ['in', 'exact'],
             'worker__username': ['in', 'exact'],
+            'employment__tabel_code': ['in', 'exact'],  # TODO: пока простой вариант, надо подумать что с этим делать
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
             'is_fact': ['exact'],
