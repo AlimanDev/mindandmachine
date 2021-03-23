@@ -16,16 +16,32 @@ class WFMAutoSchema(SwaggerAutoSchema):
 
 
 class WFMAutoSchemaIntegration(WFMAutoSchema):
+    override_filter = True
     def get_operation(self, operation_keys=None):
         if not tuple(operation_keys[1:3]) in OPENAPI_INTEGRATION_MODELS_METHODS:
             return None
         else:
-            self.overrides['request_body'] = overrides_info.get(operation_keys[1], {}).get(operation_keys[2], {}).get('request_body', self.get_request_serializer())
+            if operation_keys[2] in ('list', 'retrieve'):
+                self.overrides['query_serializer'] = overrides_info.get(operation_keys[1], {}).get(operation_keys[2], {}).get('query_serializer')
+                if self.overrides['query_serializer']:
+                    self.override_filter = False
+                else:
+                    self.overrides['query_serializer'] = self.get_query_serializer()
+            else:    
+                self.overrides['request_body'] = overrides_info.get(operation_keys[1], {}).get(operation_keys[2], {}).get('request_body', self.get_request_serializer())
+            self.overrides['responses'] = overrides_info.get(operation_keys[1], {}).get(operation_keys[2], {}).get('responses', self.get_default_responses())
             operation = super().get_operation(operation_keys=operation_keys)
             operation.tags = ['Integration',]
             operation.description = overrides_info.get(operation_keys[1], {}).get(operation_keys[2], {}).get('description', operation.description)
             operation.operation_id = overrides_info.get(operation_keys[1], {}).get(operation_keys[2], {}).get('id', operation.operation_id)
             return operation
+    
+    def should_filter(self):
+        """Determine whether filter backend parameters should be included for this request.
+
+        :rtype: bool
+        """
+        return getattr(self.view, 'filter_backends', None) and self.has_list_response() and self.override_filter
 
 
 class WFMOpenAPISchemaGenerator(OpenAPISchemaGenerator):
@@ -99,5 +115,5 @@ class WFMIntegrationAPISchemaGenerator(OpenAPISchemaGenerator):
         """
         if '{pk}' not in path:
             return path
-        
+
         return path.replace('{pk}', '{%s}' % overrides_pk.get(path.replace('{pk}/', ''),'code'))

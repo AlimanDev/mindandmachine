@@ -560,3 +560,86 @@ change_range_response_schema_dictionary = {
         }
     )
 }
+
+
+worker_day_list_integration = {
+    "200": openapi.Response(
+        description='OK',
+        examples={
+            "application/json":[
+                {
+                    "id": 37165,
+                    "worker_username": 111,
+                    "shop_code": "200-01",
+                    "type": "W",
+                    "dt": "2020-07-20",
+                    "dttm_work_start": "2020-07-20T05:11:30.712Z",
+                    "dttm_work_end": "2020-07-20T05:22:19.712Z",
+                    "comment": "string", 
+                    "is_approved": True,
+                    "worker_day_details": [
+                    {
+                        "id": 47664,
+                        "work_type_id": 0,
+                        "work_part": 0
+                    }
+                    ],
+                    "is_fact": True,  
+                    "work_hours": 10.5,
+                    "work_hours_details": {
+                        "D": 8,
+                        "N": 2.5,
+                    },
+                    "parent_worker_day_id": 0,
+                    "is_outsource": True,
+                    "is_vacancy": True
+                },
+                {
+                    "id": 37165,
+                    "worker_username": 111,
+                    "shop_code": "200-01",
+                    "type": "H",
+                    "dt": "2020-07-20",
+                    "dttm_work_start": None,
+                    "dttm_work_end": None,
+                    "comment": "string", 
+                    "is_approved": True,
+                    "worker_day_details": None,
+                    "is_fact": True,  
+                    "work_hours": 0,
+                    "parent_worker_day_id": 0,
+                    "is_outsource": True,
+                    "is_vacancy": False
+                }
+            ]
+        }
+    )
+}
+
+receipt_integration = {
+    "200": openapi.Response(
+        description='OK',
+        examples={
+            "application/json":{
+                "shop_code": 1234,
+                "dttm": "2020-07-20T11:00:00.000Z",
+                "GUID": "…",
+                "value": 2.3,
+                "another_field": {},
+            },
+        }
+    ),
+    "201": openapi.Response(
+        description='Created',
+        examples={
+            "application/json":{
+                "shop_code": 1234,
+                "dttm": "2020-07-20T11:00:00.000Z",
+                "GUID": "…",
+                "value": 2.3,
+                "another_field": {},
+            },
+        }
+    )
+}
+

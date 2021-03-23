@@ -288,6 +288,21 @@ SWAGGER_SETTINGS = {
     'TAGS_SORTER': 'alpha',
     'OPERATIONS_SORTER': 'alpha',
     'DEFAULT_AUTO_SCHEMA_CLASS': "src.util.openapi.auto_schema.WFMAutoSchema",
+    'DEFAULT_FIELD_INSPECTORS': [
+        'src.util.openapi.inspectors.OverrideExampleInspector',
+        'drf_yasg.inspectors.CamelCaseJSONFilter',
+        'drf_yasg.inspectors.ReferencingSerializerInspector',
+        'drf_yasg.inspectors.RelatedFieldInspector',
+        'drf_yasg.inspectors.ChoiceFieldInspector',
+        'drf_yasg.inspectors.FileFieldInspector',
+        'drf_yasg.inspectors.DictFieldInspector',
+        'drf_yasg.inspectors.JSONFieldInspector',
+        'drf_yasg.inspectors.HiddenFieldInspector',
+        'drf_yasg.inspectors.RecursiveFieldInspector',
+        'drf_yasg.inspectors.SerializerMethodFieldInspector',
+        'drf_yasg.inspectors.SimpleFieldInspector',
+        'drf_yasg.inspectors.StringDefaultFieldInspector',
+    ]
 }
 
 # какие методы и модели могут попасть в описание интеграции
@@ -296,6 +311,8 @@ OPENAPI_INTEGRATION_MODELS_METHODS = [
     ('department', 'update'),
     ('employment', 'update'),
     ('worker_position', 'update'),
+    ('worker_day', 'list'),
+    ('receipt', 'update'),
 ]
 
 # DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
