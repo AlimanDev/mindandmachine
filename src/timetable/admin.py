@@ -119,7 +119,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
                     'dttm_work_end', 'dttm_modified')
     search_fields = ('worker__last_name', 'shop__name', 'shop__parent__name', 'id', 'dt')
     list_filter = ('shop', 'type', 'dttm_modified')
-    raw_id_fields = ('parent_worker_day', 'employment', 'created_by', 'worker', 'shop')
+    raw_id_fields = ('parent_worker_day', 'employment', 'created_by', 'last_edited_by', 'worker', 'shop')
     list_select_related = ('worker', 'shop', 'shop__parent')
     readonly_fields = ('dttm_modified',)
     change_list_template = 'worker_day_change_list.html'

@@ -1,12 +1,13 @@
-from src.timetable.models import AttendanceRecords, WorkerDay
+from src.timetable.models import AttendanceRecords, WorkerDay, PlanAndFactHours
 from src.base.models import Shop, Employment
 import xlsxwriter
 import io
 import datetime
 from django.db.models import Sum, Q
 
+
 COLOR_GREEN = '#00FF00'
-COLOR_RED = '#FF0000'
+COLOR_RED = '#fc6c58'
 COLOR_YELLOW = '#FFFF00'
 COLOR_HEADER = '#CBF2E0'
 
@@ -19,15 +20,21 @@ RECORD_TYPES = {
 def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comming_only=False, network_id=None, in_memory=False):
     SHOP = 0
     DATE = 1
-    PLAN_COMMING = 2
-    FACT_COMMING = 3
-    DIFF_COMMING = 4
-    PLAN_LEAVING = 5
-    FACT_LEAVING = 6
-    DIFF_LEAVING = 7
-    PLAN_HOURS = 8
-    FACT_HOURS = 9
-    DIFF_HOURS = 10
+    shift = 0
+    if not comming_only:
+        shift = 2
+        LATE = 2
+        EARLY = 3
+    PLAN_COMMING = 2 + shift
+    FACT_COMMING = 3 + shift
+    DIFF_COMMING = 4 + shift
+    PLAN_LEAVING = 5 + shift
+    FACT_LEAVING = 6 + shift
+    DIFF_LEAVING = 7 + shift
+    PLAN_HOURS = 8 + shift
+    FACT_HOURS = 9 + shift
+    DIFF_HOURS = 10 + shift
+    DIFF_HOURS_PERCENT = 11 + shift
 
     shops = Shop.objects.filter(
         Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=dt_to),
@@ -52,63 +59,82 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
     if shop_ids:
         shops = shops.filter(id__in=shop_ids)
     dates = [dt_from + datetime.timedelta(days=i) for i in range((dt_to -  dt_from).days + 1)]
-    def_format = {
+    def_dict_format = {
         'border': 1,
+        'valign': 'vcenter',
+        'align': 'center',
+        'text_wrap': True,
     }
-    worksheet.write(0, SHOP, 'Магазин')
-    worksheet.write(0, DATE, 'Дата')
-    worksheet.write(0, PLAN_COMMING, 'Плановое кол-во отметок, ПРИХОД')
-    worksheet.set_column(0, PLAN_COMMING, 15)
-    worksheet.write(0, FACT_COMMING, 'Фактическое кол-во отметок, ПРИХОД')
-    worksheet.set_column(0, FACT_COMMING, 20)
-    worksheet.write(0, DIFF_COMMING, 'Разница, ПРИХОД')
-    worksheet.set_column(0, DIFF_COMMING, 20)
+    red_format_dict = def_dict_format.copy()
+    red_format_dict['bg_color'] = COLOR_RED
+    def_format = workbook.add_format(def_dict_format)
+    red_format = workbook.add_format(red_format_dict)
+    header_format = workbook.add_format({
+        'border': 1,
+        'bold': True,
+        'text_wrap': True,
+        'valign': 'vcenter',
+        'align': 'center',
+    })
+    worksheet.write_string(0, SHOP, 'Магазин', header_format)
+    worksheet.set_column(SHOP, SHOP, 12)
+    worksheet.write_string(0, DATE, 'Дата', header_format)
+    worksheet.write_string(0, PLAN_COMMING, 'Кол-во отметок план, ПРИХОД', header_format)
+    worksheet.set_column(DATE, DATE, 10)
+    worksheet.set_column(PLAN_COMMING, PLAN_COMMING, 10)
+    worksheet.write_string(0, FACT_COMMING, 'Кол-во отметок факт, ПРИХОД', header_format)
+    worksheet.set_column(FACT_COMMING, FACT_COMMING, 10)
+    worksheet.write_string(0, DIFF_COMMING, 'Разница, ПРИХОД', header_format)
+    worksheet.set_column(DIFF_COMMING, DIFF_COMMING, 10)
     if not comming_only:
-        worksheet.write(0, PLAN_LEAVING, 'Плановое кол-во отметок, УХОД')
-        worksheet.set_column(0, PLAN_LEAVING, 20)
-        worksheet.write(0, FACT_LEAVING, 'Фактическое кол-во отметок, УХОД')
-        worksheet.set_column(0, FACT_LEAVING, 20)
-        worksheet.write(0, DIFF_LEAVING, 'Разница, УХОД')
-        worksheet.set_column(0, DIFF_LEAVING, 20)
-        worksheet.write(0, PLAN_HOURS, 'Плановое кол-во часов')
-        worksheet.set_column(0, PLAN_HOURS, 20)
-        worksheet.write(0, FACT_HOURS, 'Фактическое кол-во часов')
-        worksheet.set_column(0, FACT_HOURS, 20)
-        worksheet.write(0, DIFF_HOURS, 'Разница, ЧАСЫ')
-        worksheet.set_column(0, DIFF_HOURS, 20)
+        worksheet.write_string(0, LATE, 'Опоздания', header_format)
+        worksheet.write_string(0, EARLY, 'Ранний уход', header_format)
+        worksheet.set_column(LATE, LATE, 10)
+        worksheet.set_column(EARLY, EARLY, 10)
+        worksheet.write_string(0, PLAN_LEAVING, 'Кол-во отметок план, УХОД', header_format)
+        worksheet.set_column(PLAN_LEAVING, PLAN_LEAVING, 10)
+        worksheet.write_string(0, FACT_LEAVING, 'Кол-во отметок факт, УХОД', header_format)
+        worksheet.set_column(FACT_LEAVING, FACT_LEAVING, 10)
+        worksheet.write_string(0, DIFF_LEAVING, 'Разница, УХОД', header_format)
+        worksheet.set_column(DIFF_LEAVING, DIFF_LEAVING, 10)
+        worksheet.write_string(0, PLAN_HOURS, 'Кол-во часов план', header_format)
+        worksheet.set_column(PLAN_HOURS, PLAN_HOURS, 10)
+        worksheet.write_string(0, FACT_HOURS, 'Кол-во часов факт', header_format)
+        worksheet.set_column(FACT_HOURS, FACT_HOURS, 10)
+        worksheet.write_string(0, DIFF_HOURS, 'Разница, ЧАСЫ', header_format)
+        worksheet.set_column(DIFF_HOURS, DIFF_HOURS, 10)
+        worksheet.write_string(0, DIFF_HOURS_PERCENT, 'Разница, ПРОЦЕНТЫ', header_format)
+        worksheet.set_column(DIFF_HOURS_PERCENT, DIFF_HOURS_PERCENT, 10)
     row = 1
     for shop in shops:
-        worksheet.write(row, SHOP, shop.name)
-        user_ids = list(Employment.objects.get_active(shop.network_id, dt_from=dt_from, dt_to=dt_to).values_list('user_id', flat=True))
         for date in dates:
-            plan_worker_days = WorkerDay.objects.filter(
+            user_ids = list(Employment.objects.get_active(shop.network_id, dt_from=date, dt_to=date).values_list('user_id', flat=True))
+            worksheet.write_string(row, SHOP, shop.name, def_format)
+            worker_days_stat = PlanAndFactHours.objects.filter(
                 shop=shop, 
-                type=WorkerDay.TYPE_WORKDAY, 
                 dt=date,
                 worker_id__in=user_ids,
-                is_approved=True,
-                is_fact=False,
+                wd_type=WorkerDay.TYPE_WORKDAY,
+            ).aggregate(
+                plan_ticks=Sum('ticks_plan_count'),
+                fact_comming_ticks=Sum('ticks_comming_fact_count'),
+                fact_leaving_ticks=Sum('ticks_leaving_fact_count'),
+                lates=Sum('late_arrival'),
+                earlies=Sum('early_departure'),
+                hours_count_plan=Sum('plan_work_hours'),
+                hours_count_fact=Sum('fact_work_hours'),
             )
-            wd_count = plan_worker_days.count()
+            wd_count = worker_days_stat['plan_ticks'] // 2
+            worksheet.write_string(row, DATE, date.strftime('%d.%m.%Y'), def_format)
             if not comming_only:
-                wd_hours = WorkerDay.objects.filter(
-                    shop=shop,
-                    type=WorkerDay.TYPE_WORKDAY,
-                    dt=date,
-                    worker_id__in=user_ids,
-                ).aggregate(
-                    hours_count_plan=Sum('work_hours', filter=Q(is_approved=True, is_fact=False)),
-                    hours_count_fact=Sum('work_hours', filter=Q(is_fact=True, is_approved=True)),
-                )
-                leaving_count = AttendanceRecords.objects.filter(shop=shop, dt=date, type=AttendanceRecords.TYPE_LEAVING, user_id__in=user_ids).distinct('user').count()
-            coming_count = AttendanceRecords.objects.filter(shop=shop, dt=date, type=AttendanceRecords.TYPE_COMING, user_id__in=user_ids).distinct('user').count()
-            worksheet.write_string(row, DATE, date.strftime('%d.%m.%Y'), workbook.add_format(def_format))
-            worksheet.write_string(row, PLAN_COMMING, str(wd_count), workbook.add_format(def_format))
-            worksheet.write_string(row, FACT_COMMING, str(coming_count), workbook.add_format(def_format))
-            worksheet.write_string(row, DIFF_COMMING, str(wd_count - coming_count), workbook.add_format(def_format))
+                worksheet.write_string(row, LATE, str(worker_days_stat['lates'] or 0), def_format)
+                worksheet.write_string(row, EARLY, str(worker_days_stat['earlies'] or 0), def_format)
+            worksheet.write_string(row, PLAN_COMMING, str(wd_count), def_format)
+            worksheet.write_string(row, FACT_COMMING, str(worker_days_stat['fact_comming_ticks']), def_format)
+            worksheet.write_string(row, DIFF_COMMING, str(wd_count - worker_days_stat['fact_comming_ticks']), def_format if wd_count - worker_days_stat['fact_comming_ticks'] == 0 else red_format)
             if not comming_only:
-                plan_hours = wd_hours['hours_count_plan'] or datetime.timedelta(0)
-                fact_hours = wd_hours['hours_count_fact'] or datetime.timedelta(0)
+                plan_hours = datetime.timedelta(seconds=int(worker_days_stat['hours_count_plan'] * 60 * 60)) or datetime.timedelta(0)
+                fact_hours = datetime.timedelta(seconds=int(worker_days_stat['hours_count_fact'] * 60 * 60)) or datetime.timedelta(0)
                 def get_str_timedelta(tm):
                     c = 1
                     if tm.days < 0:
@@ -117,13 +143,19 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
                     minutes = int((tm.total_seconds() - hours * 3600) / 60)
                     seconds = int(tm.total_seconds() - hours * 3600 - minutes * 60)
                     return f'{hours:02}:{c * minutes:02}:{c * seconds:02}'
-                worksheet.write_string(row, PLAN_LEAVING, str(wd_count), workbook.add_format(def_format))
-                worksheet.write_string(row, FACT_LEAVING, str(leaving_count), workbook.add_format(def_format))
-                worksheet.write_string(row, DIFF_LEAVING, str(wd_count - leaving_count), workbook.add_format(def_format))
-                worksheet.write_string(row, PLAN_HOURS, get_str_timedelta(wd_hours['hours_count_plan'] or datetime.timedelta(0)), workbook.add_format(def_format))
-                worksheet.write_string(row, FACT_HOURS, get_str_timedelta(wd_hours['hours_count_fact'] or datetime.timedelta(0)), workbook.add_format(def_format))
-                worksheet.write_string(row, DIFF_HOURS, get_str_timedelta((wd_hours['hours_count_plan'] or datetime.timedelta(0)) - (wd_hours['hours_count_fact'] or datetime.timedelta(0))), workbook.add_format(def_format))
-
+                worksheet.write_string(row, PLAN_LEAVING, str(wd_count), def_format)
+                worksheet.write_string(row, FACT_LEAVING, str(worker_days_stat['fact_leaving_ticks']), def_format)
+                worksheet.write_string(row, DIFF_LEAVING, str(wd_count - worker_days_stat['fact_leaving_ticks']), def_format if wd_count - worker_days_stat['fact_leaving_ticks'] == 0 else red_format)
+                worksheet.write_string(row, PLAN_HOURS, get_str_timedelta(plan_hours), def_format)
+                worksheet.write_string(row, FACT_HOURS, get_str_timedelta(fact_hours), def_format)
+                worksheet.write_string(row, DIFF_HOURS, get_str_timedelta(plan_hours - fact_hours), def_format)
+                percent_diff = round(fact_hours / (plan_hours or datetime.timedelta(seconds=1)) * 100)
+                worksheet.write_string(
+                    row, 
+                    DIFF_HOURS_PERCENT, 
+                    str(percent_diff) + '%', 
+                    def_format if percent_diff >= 100 and percent_diff != 0 else red_format,
+                )
 
             row += 1
     workbook.close()

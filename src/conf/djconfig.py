@@ -40,6 +40,8 @@ MDAUDIT_AUTHTOKEN_SALT = 'DLKAXGKFPP57B2NEQ4NLB2TLDT3QR20I7QKAGE8I'
 
 MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE = False  # отправлять ли запрос по связке юзера и магазина при сохранении workerday
 MDA_SYNC_USER_TO_SHOP_DAILY = False  # запускать таск, который будет отправлять все связки на текущий день
+MDA_SYNC_DEPARTMENTS = False
+MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS = (60 * 60) + 10  # 1 час + 10 сек
 MDA_PUBLIC_API_HOST = 'https://example.com'
 MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
 
@@ -306,7 +308,7 @@ MOBILE_USER_AGENTS = ('QoS_mobile_app', 'okhttp',)
 METABASE_SITE_URL = 'metabase-url'
 METABASE_SECRET_KEY = 'secret-key'
 
-CELERY_IMPORTS = ('src.celery.tasks', 'src.integration.tasks',)
+CELERY_IMPORTS = ('src.celery.tasks', 'src.integration.tasks', 'src.integration.mda.tasks')
 CELERY_BROKER_URL = 'redis://localhost:6379'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379'
 CELERY_ACCEPT_CONTENT = ['application/json']
@@ -378,6 +380,10 @@ CALCULATE_LOAD_TEMPLATE = False # параметр отключающий авт
 
 CLIENT_TIMEZONE = 3
 
+DADATA_TOKEN = None
+FILL_SHOP_CITY_FROM_DADATA = False
+
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
@@ -487,9 +493,23 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+if MDA_SYNC_DEPARTMENTS:
+    CELERY_BEAT_SCHEDULE['task-sync-mda-departments-all-time'] = {
+        'task': 'src.integration.mda.tasks.sync_mda_departments',
+        'schedule': crontab(hour=1, minute=59),
+        'options': {'queue': BACKEND_QUEUE},
+        'kwargs': {'threshold_seconds': None},
+    }
+    CELERY_BEAT_SCHEDULE['task-sync-mda-departments-last-changes'] = {
+        'task': 'src.integration.mda.tasks.sync_mda_departments',
+        'schedule': crontab(minute=49),
+        'options': {'queue': BACKEND_QUEUE},
+        'kwargs': {'threshold_seconds': MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS},
+    }
+
 if MDA_SYNC_USER_TO_SHOP_DAILY:
     CELERY_BEAT_SCHEDULE['task-sync-mda-user-to-shop-relation'] = {
-        'task': 'src.celery.tasks.sync_mda_user_to_shop_relation',
+        'task': 'src.integration.mda.tasks.sync_mda_user_to_shop_relation',
         'schedule': crontab(hour=1, minute=30),
         'options': {'queue': BACKEND_QUEUE}
     }

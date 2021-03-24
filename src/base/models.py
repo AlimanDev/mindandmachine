@@ -20,6 +20,7 @@ from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, Out
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.functional import cached_property
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
@@ -31,16 +32,22 @@ from src.base.models_abstract import (
     AbstractModel,
     AbstractActiveNetworkSpecificCodeNamedModel,
     NetworkSpecificModel,
+    AbstractCodeNamedModel,
 )
 from src.conf.djconfig import QOS_TIME_FORMAT
 
 
 class Network(AbstractActiveModel):
+    ACC_PERIOD_MONTH = 1
+    ACC_PERIOD_QUARTER = 3
+    ACC_PERIOD_HALF_YEAR = 6
+    ACC_PERIOD_YEAR = 12
+
     ACCOUNTING_PERIOD_LENGTH_CHOICES = (
-        (1, 'Месяц'),
-        (3, 'Квартал'),
-        (6, 'Пол года'),
-        (12, 'Год'),
+        (ACC_PERIOD_MONTH, 'Месяц'),
+        (ACC_PERIOD_QUARTER, 'Квартал'),
+        (ACC_PERIOD_HALF_YEAR, 'Пол года'),
+        (ACC_PERIOD_YEAR, 'Год'),
     )
 
     TABEL_FORMAT_CHOICES = (
@@ -78,6 +85,9 @@ class Network(AbstractActiveModel):
     )
     enable_camera_ticks = models.BooleanField(
         default=False, verbose_name='Включить отметки по камере в мобильной версии')
+    show_worker_day_additional_info = models.BooleanField(
+        default=False, verbose_name='Отображать доп. информацию в подтвержденных факте и плане', 
+        help_text='Отображение при наведении на уголок информации о том, кто и когда последний раз редактировал рабочий день')
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'
     )
@@ -115,6 +125,9 @@ class Network(AbstractActiveModel):
         default=False, verbose_name='Уменьшать дату окончания трудоустройства',
         help_text='Актуально для данных, получаемых через api',
     )
+    consider_remaining_hours_in_prev_months_when_calc_norm_hours = models.BooleanField(
+        default=False, verbose_name='Учитывать неотработанные часы за предыдущие месяца при расчете нормы часов',
+    )
 
     def get_department(self):
         return None
@@ -136,15 +149,20 @@ class Network(AbstractActiveModel):
     def accounting_periods_count(self):
         return int(12 / self.accounting_period_length)
 
-    def get_acc_period_range(self, dt):
-        period_num_within_year = dt.month // self.accounting_period_length
-        if dt.month % self.accounting_period_length > 0:
-            period_num_within_year += 1
+    def get_acc_period_range(self, dt=None, year=None, period_num=None):
+        assert dt or (year and period_num)
+        if dt:
+            period_num_within_year = dt.month // self.accounting_period_length
+            if dt.month % self.accounting_period_length > 0:
+                period_num_within_year += 1
+            year = dt.year
+        if period_num:
+            period_num_within_year = period_num
         end_month = period_num_within_year * self.accounting_period_length
         start_month = end_month - (self.accounting_period_length - 1)
 
-        return datetime.date(dt.year, start_month, 1), \
-            datetime.date(dt.year, end_month, monthrange(dt.year, end_month)[1])
+        return datetime.date(year, start_month, 1), \
+            datetime.date(year, end_month, monthrange(year, end_month)[1])
 
     def __str__(self):
         return f'name: {self.name}, code: {self.code}'
@@ -185,6 +203,20 @@ class Break(AbstractActiveNetworkSpecificCodeNamedModel):
         return json.dumps(value)
 
     def save(self, *args, **kwargs):
+        breaks = self.breaks
+        for b in breaks:
+            if not isinstance(b, list) or len(b) != 3 or ((not isinstance(b[0], int)) or (not isinstance(b[1], int)) or (not isinstance(b[2], list))):
+                raise MessageError(code='triplet_bad_type', params={'triplet': b})
+
+            if b[0] > b[1]:
+                raise MessageError(code='triplet_bad_value_gt', params={'triplet': b})
+            
+            if not all([isinstance(v, int) for v in b[2]]):
+                raise MessageError(code='triplet_bad_type', params={'triplet': b})
+            
+            if any([v > b[1] for v in b[2]]):
+                raise MessageError(code='triplet_bad_value', params={'triplet': b})
+
         self.value = self.clean_value(self.breaks)
         return super().save(*args, **kwargs)
 
@@ -210,6 +242,7 @@ class ShopSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     # added on 21.12.2018
     idle = models.SmallIntegerField(default=0)  # percents
     fot = models.IntegerField(default=0)
+    norm_hours_coeff = models.FloatField(default=1.0, verbose_name='Коэфф. нормы часов')
     less_norm = models.SmallIntegerField(default=0)  # percents
     more_norm = models.SmallIntegerField(default=0)  # percents
     shift_start = models.SmallIntegerField(default=6)
@@ -307,8 +340,9 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     latitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Широта')
     longitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Долгота')
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
+    city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
 
-    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict', 'load_template'])
+    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude'])
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(
@@ -317,6 +351,25 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             self.id,
             self.code,
         )
+
+    @property
+    def is_active(self):
+        dttm_now = timezone.now()
+        dt_now = dttm_now.date()
+        is_not_deleted = self.dttm_deleted is None or (self.dttm_added < dttm_now < self.dttm_deleted)
+        is_not_closed = (self.dt_opened or datetime.date(1000, 1, 1)) <= dt_now <= (
+                    self.dt_closed or datetime.date(3999, 1, 1))
+        return is_not_deleted and is_not_closed
+
+    @is_active.setter
+    def is_active(self, val):
+        # TODO: нужно ли тут проставлять dt_closed?
+        if val:
+            if self.dttm_deleted:
+                self.dttm_deleted = None
+        else:
+            if not self.dttm_deleted:
+                self.dttm_deleted = timezone.now()
 
     def system_step_in_minutes(self):
         return self.forecast_step_minutes.hour * 60 + self.forecast_step_minutes.minute
@@ -377,6 +430,11 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                 new_dict[key.replace('d', '')] = new_dict.pop(key)
         return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
 
+    def _fill_city_from_dadata(self):
+        if not self.city and self.latitude and self.longitude and settings.DADATA_TOKEN:
+            from src.celery.tasks import fill_shop_city
+            fill_shop_city.delay(shop_id=self.id)
+
     def _handle_new_shop_created(self):
         from src.util.models_converter import Converter
         from src.celery.tasks import fill_shop_schedule
@@ -435,6 +493,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                 datetime.date.today().replace(day=1) + relativedelta(months=1),
                 shop_id=self.id,
             )
+
+        if is_new or (self.tracker.has_changed('latitude') or self.tracker.has_changed('longitude')) and \
+                settings.FILL_SHOP_CITY_FROM_DADATA:
+            transaction.on_commit(self._fill_city_from_dadata)
 
         return res
 
@@ -516,6 +578,14 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     @property
     def nonstandard_schedule(self):
         return self.shopschedule_set.filter(modified_by__isnull=False)
+
+    @cached_property
+    def is_all_day(self):
+        if self.open_times and self.close_times:
+            open_at_0 = all(getattr(d, a) == 0 for a in ['hour', 'second', 'minute'] for d in self.open_times.values())
+            close_at_0 = all(getattr(d, a) == 0 for a in ['hour', 'second', 'minute'] for d in self.close_times.values())
+            shop_24h_open = open_at_0 and close_at_0
+            return shop_24h_open
 
 
 class EmploymentManager(models.Manager):
@@ -1051,6 +1121,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_vacancy',
         'WorkerDay_change_list',
         'WorkerDay_copy_approved',
+        'WorkerDay_copy_range',
         'WorkerDay_duplicate',
         'WorkerDay_delete_worker_days',
         'WorkerDay_exchange',
@@ -1262,8 +1333,8 @@ class Notification(AbstractModel):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True)
 
 
-def default_work_hours_by_months():
-    return {f'm{month_num}': 100 for month_num in range(1, 12 + 1)}
+def current_year():
+    return datetime.datetime.now().year
 
 
 class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
@@ -1271,44 +1342,30 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     Настройки суммированного учета рабочего времени.
     Модель нужна для распределения часов по месяцам в рамках учетного периода при автосоставлении.
     """
-    year = models.PositiveSmallIntegerField(verbose_name='Год учетного периода')
+
     work_hours_by_months = JSONField(
-        default=default_work_hours_by_months,
-        verbose_name='Распределение рабочих часов по месяцам (в процентах)',
-        help_text='Сумма часов в рамках учетного периода должна быть равна сумме часов по произв. календарю.',
+        verbose_name='Настройки по распределению часов в рамках уч. периода',
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
-    positions = models.ManyToManyField('base.WorkerPosition', blank=True, verbose_name='Позиции')
-    shops = models.ManyToManyField('base.Shop', blank=True, verbose_name='Подразделения')
 
     class Meta:
         verbose_name = 'Настройки суммированного учета рабочего времени'
         verbose_name_plural = 'Настройки суммированного учета рабочего времени'
-        unique_together = (
-            ('code', 'year', 'network'),
-        )
 
     def __str__(self):
         return f'{self.name} {self.network.name}'
 
-    def clean(self):
-        if self.year and self.network.accounting_periods_count:
-            current_year = datetime.datetime.now().year
-            if self.year < current_year:
-                raise ValidationError('Нельзя создавать/менять настройки за прошедшие года')
 
-            for period_num_within_year in range(1, self.network.accounting_periods_count + 1):
-                end_month = period_num_within_year * self.network.accounting_period_length
-                start_month = end_month - (self.network.accounting_period_length - 1)
+class SAWHSettingsMapping(AbstractModel):
+    sawh_settings = models.ForeignKey('base.SAWHSettings', on_delete=models.CASCADE, verbose_name='Настройки СУРВ')
+    year = models.PositiveSmallIntegerField(verbose_name='Год учетного периода', default=current_year)
+    shops = models.ManyToManyField('base.Shop', blank=True)
+    positions = models.ManyToManyField('base.WorkerPosition', blank=True, related_name='+')
+    exclude_positions = models.ManyToManyField('base.WorkerPosition', blank=True, related_name='+')
+    priority = models.PositiveSmallIntegerField(default=0)
 
-                summarized_account_period_work_hours_sum = sum(
-                    v for k, v in self.work_hours_by_months.items() if start_month <= int(k.lstrip('m')) <= end_month)
-                account_period_percents_summ = self.network.accounting_period_length * 100
-                if summarized_account_period_work_hours_sum != account_period_percents_summ:
-                    raise ValidationError(
-                        f'В учетном периоде №{period_num_within_year} (месяца {start_month}-{end_month}) '
-                        f'не сходится сумма процентов. '
-                        f'Сeйчас {summarized_account_period_work_hours_sum}, должно быть {account_period_percents_summ}'
-                    )
+    class Meta:
+        verbose_name = 'Настройки суммированного учета рабочего времени'
+        verbose_name_plural = 'Настройки суммированного учета рабочего времени'
 
 
 class ShopSchedule(AbstractModel):
