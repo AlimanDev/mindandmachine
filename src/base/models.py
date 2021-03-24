@@ -20,6 +20,7 @@ from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, Out
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.functional import cached_property
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
@@ -31,6 +32,7 @@ from src.base.models_abstract import (
     AbstractModel,
     AbstractActiveNetworkSpecificCodeNamedModel,
     NetworkSpecificModel,
+    AbstractCodeNamedModel,
 )
 from src.conf.djconfig import QOS_TIME_FORMAT
 
@@ -338,8 +340,9 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     latitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Широта')
     longitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Долгота')
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
+    city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
 
-    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict', 'load_template'])
+    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude'])
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(
@@ -348,6 +351,25 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             self.id,
             self.code,
         )
+
+    @property
+    def is_active(self):
+        dttm_now = timezone.now()
+        dt_now = dttm_now.date()
+        is_not_deleted = self.dttm_deleted is None or (self.dttm_added < dttm_now < self.dttm_deleted)
+        is_not_closed = (self.dt_opened or datetime.date(1000, 1, 1)) <= dt_now <= (
+                    self.dt_closed or datetime.date(3999, 1, 1))
+        return is_not_deleted and is_not_closed
+
+    @is_active.setter
+    def is_active(self, val):
+        # TODO: нужно ли тут проставлять dt_closed?
+        if val:
+            if self.dttm_deleted:
+                self.dttm_deleted = None
+        else:
+            if not self.dttm_deleted:
+                self.dttm_deleted = timezone.now()
 
     def system_step_in_minutes(self):
         return self.forecast_step_minutes.hour * 60 + self.forecast_step_minutes.minute
@@ -408,6 +430,11 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                 new_dict[key.replace('d', '')] = new_dict.pop(key)
         return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
 
+    def _fill_city_from_dadata(self):
+        if not self.city and self.latitude and self.longitude and settings.DADATA_TOKEN:
+            from src.celery.tasks import fill_shop_city
+            fill_shop_city.delay(shop_id=self.id)
+
     def _handle_new_shop_created(self):
         from src.util.models_converter import Converter
         from src.celery.tasks import fill_shop_schedule
@@ -466,6 +493,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                 datetime.date.today().replace(day=1) + relativedelta(months=1),
                 shop_id=self.id,
             )
+
+        if is_new or (self.tracker.has_changed('latitude') or self.tracker.has_changed('longitude')) and \
+                settings.FILL_SHOP_CITY_FROM_DADATA:
+            transaction.on_commit(self._fill_city_from_dadata)
 
         return res
 
@@ -547,6 +578,14 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     @property
     def nonstandard_schedule(self):
         return self.shopschedule_set.filter(modified_by__isnull=False)
+
+    @cached_property
+    def is_all_day(self):
+        if self.open_times and self.close_times:
+            open_at_0 = all(getattr(d, a) == 0 for a in ['hour', 'second', 'minute'] for d in self.open_times.values())
+            close_at_0 = all(getattr(d, a) == 0 for a in ['hour', 'second', 'minute'] for d in self.close_times.values())
+            shop_24h_open = open_at_0 and close_at_0
+            return shop_24h_open
 
 
 class EmploymentManager(models.Manager):
