@@ -11,6 +11,7 @@ class ShopDTOSerializer(serializers.ModelSerializer):
     regionId = serializers.IntegerField(source='parent_id')
     allDay = serializers.BooleanField(source='is_all_day')
     directorLogin = serializers.SerializerMethodField()
+    timeZone = serializers.CharField(source='timezone')
 
     def get_directorLogin(self, shop):
         if shop.director_id:
@@ -31,6 +32,7 @@ class ShopDTOSerializer(serializers.ModelSerializer):
             'latitude',
             'longitude',
             'email',  # TODO: нужно ли искать email директора салона, если нету в самом салоне?
+            'timeZone',
         )
 
 

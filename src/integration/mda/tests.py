@@ -26,8 +26,8 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
     def test_get_data(self):
         mda_integration_helper = MdaIntegrationHelper()
         data = mda_integration_helper._get_data()
-        self.assertEqual(len(data['division']), 1)
-        self.assertEqual(len(data['region']), 1)
+        self.assertEqual(len(data['divisions']), 1)
+        self.assertEqual(len(data['regions']), 1)
         self.assertEqual(len(data['shops']), 2)
         s1_data = list(filter(lambda s: self.shop1.id == s['id'], data['shops']))[0]
         self.assertEqual(s1_data['active'], True)

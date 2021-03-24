@@ -89,17 +89,12 @@ class MdaIntegrationHelper:
         writer.save()
 
     def sync_mda_data(self, threshold_seconds=settings.MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS):
-        headers = {}
-
-        if settings.MDA_USER_API_AUTH_TOKEN:
-            headers['x-auth-token'] = settings.MDA_USER_API_AUTH_TOKEN
-        else:
-            headers['x-public-token'] = settings.MDA_PUBLIC_API_AUTH_TOKEN
-
         resp = requests.post(
             url=settings.MDA_PUBLIC_API_HOST + '/api/integration/mindandmachine/loadOrgstruct/',
             json=self._get_data(threshold_seconds=threshold_seconds),
-            headers=headers,
+            headers={
+                'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN,
+            },
             timeout=(5, 30),
         )
         try:
