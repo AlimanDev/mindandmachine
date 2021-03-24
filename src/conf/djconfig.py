@@ -309,7 +309,7 @@ MOBILE_USER_AGENTS = ('QoS_mobile_app', 'okhttp',)
 METABASE_SITE_URL = 'metabase-url'
 METABASE_SECRET_KEY = 'secret-key'
 
-CELERY_IMPORTS = ('src.celery.tasks', 'src.integration.tasks',)
+CELERY_IMPORTS = ('src.celery.tasks', 'src.integration.tasks', 'src.integration.mda.tasks')
 CELERY_BROKER_URL = 'redis://localhost:6379'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379'
 CELERY_ACCEPT_CONTENT = ['application/json']
@@ -494,13 +494,13 @@ CELERY_BEAT_SCHEDULE = {
 
 if MDA_SYNC_DEPARTMENTS:
     CELERY_BEAT_SCHEDULE['task-sync-mda-departments-all-time'] = {
-        'task': 'src.celery.tasks.sync_mda_departments',
+        'task': 'src.integration.mda.tasks.sync_mda_departments',
         'schedule': crontab(hour=1, minute=59),
         'options': {'queue': BACKEND_QUEUE},
         'kwargs': {'threshold_seconds': None},
     }
     CELERY_BEAT_SCHEDULE['task-sync-mda-departments-last-changes'] = {
-        'task': 'src.celery.tasks.sync_mda_departments',
+        'task': 'src.integration.mda.tasks.sync_mda_departments',
         'schedule': crontab(minute=49),
         'options': {'queue': BACKEND_QUEUE},
         'kwargs': {'threshold_seconds': MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS},
@@ -508,7 +508,7 @@ if MDA_SYNC_DEPARTMENTS:
 
 if MDA_SYNC_USER_TO_SHOP_DAILY:
     CELERY_BEAT_SCHEDULE['task-sync-mda-user-to-shop-relation'] = {
-        'task': 'src.celery.tasks.sync_mda_user_to_shop_relation',
+        'task': 'src.integration.mda.tasks.sync_mda_user_to_shop_relation',
         'schedule': crontab(hour=1, minute=30),
         'options': {'queue': BACKEND_QUEUE}
     }

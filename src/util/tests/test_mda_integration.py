@@ -6,7 +6,7 @@ from src.base.tests.factories import (
     EmploymentFactory,
     ShopFactory,
 )
-from src.util.mda.integration import MdaIntegrationHelper
+from src.integration.mda.integration import MdaIntegrationHelper
 from src.util.mixins.tests import TestsHelperMixin
 
 

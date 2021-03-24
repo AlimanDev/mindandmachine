@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import time as time_in_secs
 from datetime import date, timedelta, datetime
@@ -57,7 +56,6 @@ from src.timetable.vacancy.utils import (
     workers_exchange,
 )
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
-from src.util.mda.integration import MdaIntegrationHelper
 from src.util.models_converter import Converter
 
 
@@ -712,36 +710,6 @@ def clean_timeserie_actions():
 
 
 @app.task
-def create_mda_user_to_shop_relation(username, shop_code, debug_info=None):
-    logger = logging.getLogger('django.request')
-    resp = requests.post(
-        url=settings.MDA_PUBLIC_API_HOST + '/api/public/v1/mindandmachine/userToShop/',
-        json={'login': username, 'sap': shop_code},
-        headers={'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN},
-        timeout=(3, 5),
-    )
-    try:
-        resp.raise_for_status()
-    except requests.RequestException:
-        logger.exception(f'text:{resp.text}, headers: {resp.headers}, debug_info: {debug_info}')
-
-
-@app.task
-def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
-    dt = dt or now().today()
-    wdays = WorkerDay.objects.filter(
-        Q(is_vacancy=True) | Q(type=WorkerDay.TYPE_QUALIFICATION),
-        is_fact=False, is_approved=True,
-        shop__isnull=False, worker__isnull=False,
-        dt=dt,
-    ).values('worker__username', 'shop__code').distinct()
-    for wd in wdays:
-        create_mda_user_to_shop_relation(username=wd['worker__username'], shop_code=wd['shop__code'])
-        if delay_sec:
-            time_in_secs.sleep(delay_sec)
-
-
-@app.task
 def clean_wdays(filter_kwargs: dict = None, exclude_kwargs: dict = None, only_logging=True, clean_plan_empl=False):
     clean_wdays_helper = CleanWdaysHelper(
         filter_kwargs=filter_kwargs,
@@ -913,9 +881,3 @@ def cron_event():
             user_author_id=None,
             context={},
         )
-
-
-@app.task
-def sync_mda_departments(threshold_seconds=settings.MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS):
-    mda = MdaIntegrationHelper()
-    mda.sync_mda_data(threshold_seconds=threshold_seconds)
