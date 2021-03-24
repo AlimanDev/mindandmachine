@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from src.timetable.models import EmploymentWorkType
 
+
 class EmploymentWorkTypeListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     work_type_id = serializers.IntegerField()

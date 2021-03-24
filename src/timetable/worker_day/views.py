@@ -18,7 +18,7 @@ from rest_framework.response import Response
 from src.base.exceptions import FieldError
 from src.base.exceptions import MessageError
 from src.base.message import Message
-from src.base.models import Employment, Shop, ProductionDay
+from src.base.models import Employment, Shop, ProductionDay, Group
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
@@ -48,6 +48,7 @@ from src.timetable.worker_day.serializers import (
     CopyApprovedSerializer,
     RequestApproveSerializer,
     CopyRangeSerializer,
+    BlockOrUnblockWorkerDaySerializer,
 )
 from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
 from src.timetable.worker_day.stat import count_daily_stat
@@ -75,6 +76,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                                                'в выбранные даты. '
                                                'Необходимо изменить интервал для подтверждения. '
                                                'Разрешенный интевал для подтверждения: {dt_interval}'),
+        'has_no_perm_to_approve_protected_wdays': _('У вас нет прав на подтверждение защищенных рабочих дней. '
+                                                   'Обратитесь, пожалуйста, к администратору системы.'),
     }
 
     permission_classes = [WdPermission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
@@ -306,6 +309,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 is_fact=serializer.data['is_fact'],
                 is_approved=False,
             )
+
             wdays_to_approve = WorkerDay.objects.filter(
                 approve_condition,
             ).annotate(
@@ -320,8 +324,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                         is_fact=OuterRef('is_fact'),
                         type=OuterRef('type'),
                         is_approved=True,
-                    )
-                )
+                    ),
+                ),
             ).filter(same_approved_exists=False)
 
             worker_dt_pairs_list = list(
@@ -333,6 +337,24 @@ class WorkerDayViewSet(BaseModelViewSet):
                 worker_days_q = Q()
                 for worker_id, dates in worker_dates_dict.items():
                     worker_days_q |= Q(worker_id=worker_id, dt__in=dates)
+
+                # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
+                # что в списке подтверждаемых дней нету защищенных дней, если есть, то выдаем ошибку
+                has_permission_to_change_protected_wdays = Group.objects.filter(
+                    id__in=request.user.get_group_ids(
+                        request.user.network, Shop.objects.get(id=serializer.validated_data['shop_id'])),
+                    has_perm_to_change_protected_wdays=True,
+                ).exists()
+                if not has_permission_to_change_protected_wdays:
+                    protected_wdays_exists = WorkerDay.objects.filter(
+                        worker_days_q, is_fact=serializer.data['is_fact'],
+                        is_blocked=True,
+                    ).exclude(
+                        id__in=wdays_to_approve.values_list('id', flat=True),
+                    ).exists()
+                    if protected_wdays_exists:
+                        raise PermissionDenied(self.error_messages['has_no_perm_to_approve_protected_wdays'])
+
                 WorkerDay.objects_with_excluded.filter(
                     worker_days_q, is_fact=serializer.data['is_fact'],
                 ).exclude(
@@ -847,9 +869,9 @@ class WorkerDayViewSet(BaseModelViewSet):
                 'shop__settings__breaks',
             ).order_by('dt'))
             created_wds, work_types = copy_as_excel_cells(
-                main_worker_days, 
-                to_worker_id, 
-                data['to_dates'], 
+                main_worker_days,
+                to_worker_id,
+                data['to_dates'],
                 created_by=request.user.id
             )
             for shop_id, work_type in set(work_types):
@@ -870,11 +892,11 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
         data = data.validated_data
         from_dates = [
-            data['from_copy_dt_from'] + datetime.timedelta(i) 
+            data['from_copy_dt_from'] + datetime.timedelta(i)
             for i in range((data['from_copy_dt_to'] - data['from_copy_dt_from']).days + 1)
         ]
         to_dates = [
-            data['to_copy_dt_from'] + datetime.timedelta(i) 
+            data['to_copy_dt_from'] + datetime.timedelta(i)
             for i in range((data['to_copy_dt_to'] - data['to_copy_dt_from']).days + 1)
         ]
         worker_ids = data.get('worker_ids')
@@ -892,10 +914,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                     'shop__settings__breaks',
                 ).order_by('dt'))
                 wds, w_types = copy_as_excel_cells(main_worker_days, worker_id, to_dates, created_by=request.user.id)
-                
+
                 created_wds.extend(wds)
                 work_types.extend(w_types)
-                
+
             for shop_id, work_type in set(work_types):
                 cancel_vacancies(shop_id, work_type)
 
@@ -1030,3 +1052,45 @@ class WorkerDayViewSet(BaseModelViewSet):
                    f'{shop.network.convert_tabel_to or convert_to}'
         response['Content-Disposition'] = f'attachment; filename={escape_uri_path(filename)}'
         return response
+
+    @swagger_auto_schema(
+        request_body=BlockOrUnblockWorkerDaySerializer,
+        responses={200: None},
+        operation_description='''
+            Заблокировать рабочий день.
+            '''
+    )
+    @action(detail=False, methods=['post'], filterset_class=None)
+    def block(self, request):
+        serializer = BlockOrUnblockWorkerDaySerializer(
+            data=request.data, many=True, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        for dict_to_block in serializer.validated_data:
+            WorkerDay.objects.filter(
+                worker_id=dict_to_block['worker_id'],
+                shop_id=dict_to_block['shop_id'],
+                dt=dict_to_block['dt'],
+                is_fact=dict_to_block['is_fact'],
+            ).update(is_blocked=True)
+        return Response()
+
+    @swagger_auto_schema(
+        request_body=BlockOrUnblockWorkerDaySerializer,
+        responses={200: None},
+        operation_description='''
+            Разблокировать рабочий день.
+            '''
+    )
+    @action(detail=False, methods=['post'], filterset_class=None)
+    def unblock(self, request):
+        serializer = BlockOrUnblockWorkerDaySerializer(
+            data=request.data, many=True, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        for dict_to_block in serializer.validated_data:
+            WorkerDay.objects.filter(
+                worker_id=dict_to_block['worker_id'],
+                shop_id=dict_to_block['shop_id'],
+                dt=dict_to_block['dt'],
+                is_fact=dict_to_block['is_fact'],
+            ).update(is_blocked=False)
+        return Response()
