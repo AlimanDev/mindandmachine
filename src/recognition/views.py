@@ -44,6 +44,11 @@ from src.timetable.models import (
     WorkerDay,
     Employment,
 )
+from src.recognition.forms import DownloadViolatorsReportForm
+from src.timetable.mixins import SuperuserRequiredMixin
+from django.views.generic.edit import FormView
+
+
 
 logger = logging.getLogger('django')
 recognition = Recognition()
@@ -160,7 +165,7 @@ class TickViewSet(BaseModelViewSet):
         raise NotImplementedError
 
     def get_serializer_class(self):
-        if self.request.method == 'POST':
+        if self.request.method == 'POST' or self.request.method == 'PUT':
             return self.strategy.get_serializer_class()
         else:
             return TickSerializer
@@ -208,10 +213,31 @@ class TickViewSet(BaseModelViewSet):
         # Проверка на принадлежность пользователя правильному магазину
         employment = Employment.objects.get_active(
             request.user.network.id,
-            dttm_from, dttm_to,
+            dttm_from.date(), dttm_from.date(),
             user_id=user_id,
             shop_id=tick_point.shop_id
         ).first()
+
+        if (not employment) and settings.USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY:
+            # есть ли вакансия в этом магазине
+            wd = WorkerDay.objects.filter(
+                worker_id=user_id,
+                shop_id=tick_point.shop_id,
+                dt__gte=dttm_from - timedelta(1),
+                dt__lte=dttm_to.date(),
+                type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                is_approved=True,
+                is_fact=False,
+                is_vacancy=True,
+            ).first()
+            if not wd:
+                return Response(
+                    {
+                        "error": "У вас нет трудоустройства на текущий момент, "\
+                        "действие выполнить невозможно, пожалуйста, обратитесь к вашему руководству"
+                    }, 
+                    400
+                )
 
         wd = WorkerDay.objects.all().filter(
             worker_id=user_id,
@@ -223,7 +249,7 @@ class TickViewSet(BaseModelViewSet):
         ).first()
 
         if not wd and USERS_WITH_SCHEDULE_ONLY:
-            return Response({"error": "Сотрудник не работает в этом магазине"}, 404)
+            return Response({"error": "Сегодня у сотрудника нет рабочего дня в данном магазине"}, 404)
 
         tick = Tick.objects.create(
             user_id=user_id,
@@ -244,6 +270,33 @@ class TickViewSet(BaseModelViewSet):
                 type=tick.type,
             )
 
+        return Response(TickSerializer(tick).data)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            tick = Tick.objects.get(pk=kwargs['pk'])
+        except Tick.DoesNotExist as e:
+            return Response({"error": "Отметка не существует"}, 404)
+
+        data = self.get_serializer_class()(data=request.data, context=self.get_serializer_context())
+        data.is_valid(raise_exception=True)
+
+        type = data.validated_data.get('type', Tick.TYPE_NO_TYPE)
+
+        if tick.type == Tick.TYPE_NO_TYPE:
+            tick.type = type
+            tick.save()
+            if settings.TRUST_TICK_REQUEST:
+                record, _ = AttendanceRecords.objects.get_or_create(
+                    user_id=tick.user_id,
+                    dttm=tick.dttm,
+                    verified=True,
+                    shop_id=tick.tick_point.shop_id,
+                    type=AttendanceRecords.TYPE_NO_TYPE,
+                )
+                record.type = type
+                record.save()
+        
         return Response(TickSerializer(tick).data)
 
 
@@ -349,7 +402,7 @@ class TickPhotoViewSet(BaseModelViewSet):
         if (type == TickPhoto.TYPE_SELF) and (tick_photo.verified_score > 0):
             AttendanceRecords.objects.create(
                 user_id=tick.user_id,
-                dttm=check_time,
+                dttm=tick.dttm,
                 verified=True,
                 shop_id=tick.tick_point.shop_id,
                 type=tick.type,
@@ -422,3 +475,33 @@ class TickPointViewSet(BaseModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(network_id=self.request.user.network_id)
+
+
+class DownloadViolatorsReportAdminView(SuperuserRequiredMixin, FormView):
+    form_class = DownloadViolatorsReportForm
+    template_name = 'download_violators.html'
+    success_url = '/admin/recognition/tick/'
+
+
+    def get(self, request):
+        form = self.form_class(request.GET)
+        if form.is_valid():
+            return self.form_valid(form)
+        else:
+            return super().get(request)
+
+    def form_valid(self, form):
+        network = form.cleaned_data['network']
+        dt_from = form.cleaned_data['dt_from']
+        dt_to = form.cleaned_data['dt_to']
+        
+        return form.get_file(network=network, dt_from=dt_from, dt_to=dt_to)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        context['title'] = 'Скачать отчет о нарушителях'
+        context['has_permission'] = True
+
+        return context
+

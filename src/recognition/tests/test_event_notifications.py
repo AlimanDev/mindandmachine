@@ -91,15 +91,18 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             data = {
                 'Магазин': 'SHOP_NAME', 
                 'Дата': self.dt.strftime('%d.%m.%Y'), 
-                'Плановое кол-во отметок, ПРИХОД': 1, 
-                'Фактическое кол-во отметок, ПРИХОД': 0, 
+                'Кол-во отметок план, ПРИХОД': 1, 
+                'Опоздания': 0,
+                'Ранний уход': 0,
+                'Кол-во отметок факт, ПРИХОД': 0, 
                 'Разница, ПРИХОД': 1, 
-                'Плановое кол-во отметок, УХОД': 1, 
-                'Фактическое кол-во отметок, УХОД': 0, 
+                'Кол-во отметок план, УХОД': 1, 
+                'Кол-во отметок факт, УХОД': 0, 
                 'Разница, УХОД': 1, 
-                'Плановое кол-во часов': '08:45:00', 
-                'Фактическое кол-во часов': '00:00:00', 
-                'Разница, ЧАСЫ': '08:45:00'
+                'Кол-во часов план': '08:45:00', 
+                'Кол-во часов факт': '00:00:00', 
+                'Разница, ЧАСЫ': '08:45:00',
+                'Разница, ПРОЦЕНТЫ': '0%',
             }
             self.assertEqual(dict(df.iloc[0]), data)
 
@@ -177,8 +180,8 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             data = {
                 'Магазин': 'SHOP_NAME', 
                 'Дата': self.dt.strftime('%d.%m.%Y'), 
-                'Плановое кол-во отметок, ПРИХОД': 1, 
-                'Фактическое кол-во отметок, ПРИХОД': 0, 
+                'Кол-во отметок план, ПРИХОД': 1, 
+                'Кол-во отметок факт, ПРИХОД': 0, 
                 'Разница, ПРИХОД': 1, 
             }
             self.assertEqual(dict(df.iloc[0]), data)
@@ -238,7 +241,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             shop=cls.shop,
             type=AttendanceRecords.TYPE_COMING,
             user=cls.user_dir,
-            dttm=datetime.combine(cls.dt, datetime.now().time())
+            dttm=datetime.combine(cls.dt, time(8))
         )
 
     def setUp(self):
@@ -269,16 +272,20 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
             data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(data, engine='xlrd').fillna('')
             data = [
                 {
-                    'Магазин': 'SHOP_NAME', 
-                    'ФИО': f'{self.user_dir.last_name} {self.user_dir.first_name}', 
-                    'Нарушение': 'Нет отметки об уходе',
+                    'Код объекта': self.shop.code,
+                    'Название объекта': self.shop.name,
+                    'Табельный номер': '',  
+                    'ФИО': f'{self.user_dir.last_name} {self.user_dir.first_name} {self.user_dir.middle_name}', 
+                    'Нарушение': 'Нет ухода',
                 }, 
                 {
-                    'Магазин': 'SHOP_NAME', 
-                    'ФИО': f'{self.user_worker.last_name} {self.user_worker.first_name}', 
+                    'Код объекта': self.shop.code,
+                    'Название объекта': self.shop.name, 
+                    'Табельный номер': '',
+                    'ФИО': f'{self.user_worker.last_name} {self.user_worker.first_name} {self.user_worker.middle_name}', 
                     'Нарушение': 'Нет отметок',
                 },
             ]

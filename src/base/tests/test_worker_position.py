@@ -77,6 +77,26 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json()['code'], ['Это поле должно быть уникально.'])
 
+    def test_create_and_update_with_put_by_code(self):
+        data = {
+            'name': 'Врач',
+            'network_id': self.network.id,
+            'code': 'doctor',
+            'by_code': True,
+        }
+
+        resp = self.client.put(
+            self.get_url('WorkerPosition-detail', pk=data['code']), data=self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 201)
+        wp = WorkerPosition.objects.get(id=resp.json()['id'])
+        data['name'] = 'Доктор'
+        resp = self.client.put(
+            self.get_url('WorkerPosition-detail', pk=data['code']), data=self.dump_data(data),
+            content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        wp.refresh_from_db()
+        self.assertEqual(wp.name, data['name'])
+
     def test_retrieve(self):
         resp = self.client.get(self.get_url('WorkerPosition-detail', pk=self.worker_position.id))
         self.assertEqual(resp.status_code, 200)

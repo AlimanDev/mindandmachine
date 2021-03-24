@@ -83,6 +83,9 @@ class Network(AbstractActiveModel):
     )
     enable_camera_ticks = models.BooleanField(
         default=False, verbose_name='Включить отметки по камере в мобильной версии')
+    show_worker_day_additional_info = models.BooleanField(
+        default=False, verbose_name='Отображать доп. информацию в подтвержденных факте и плане', 
+        help_text='Отображение при наведении на уголок информации о том, кто и когда последний раз редактировал рабочий день')
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'
     )
@@ -198,6 +201,20 @@ class Break(AbstractActiveNetworkSpecificCodeNamedModel):
         return json.dumps(value)
 
     def save(self, *args, **kwargs):
+        breaks = self.breaks
+        for b in breaks:
+            if not isinstance(b, list) or len(b) != 3 or ((not isinstance(b[0], int)) or (not isinstance(b[1], int)) or (not isinstance(b[2], list))):
+                raise MessageError(code='triplet_bad_type', params={'triplet': b})
+
+            if b[0] > b[1]:
+                raise MessageError(code='triplet_bad_value_gt', params={'triplet': b})
+            
+            if not all([isinstance(v, int) for v in b[2]]):
+                raise MessageError(code='triplet_bad_type', params={'triplet': b})
+            
+            if any([v > b[1] for v in b[2]]):
+                raise MessageError(code='triplet_bad_value', params={'triplet': b})
+
         self.value = self.clean_value(self.breaks)
         return super().save(*args, **kwargs)
 
@@ -1063,6 +1080,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_vacancy',
         'WorkerDay_change_list',
         'WorkerDay_copy_approved',
+        'WorkerDay_copy_range',
         'WorkerDay_duplicate',
         'WorkerDay_delete_worker_days',
         'WorkerDay_exchange',

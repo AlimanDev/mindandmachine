@@ -493,6 +493,199 @@ class TestAutoSettings(APITestCase):
         self.assertIsNotNone(data['algo_params']['breaks_triplets'].get(str(self.position.id)))
         self.assertIsNone(data['algo_params']['breaks_triplets'].get(str(self.unused_position.id)))
 
+    def test_create_tt_wd_in_other_shops(self):
+        dt_from = date.today() + timedelta(days=1)
+
+        for day in range(2):
+            dt_from = dt_from + timedelta(days=1)
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop if day % 2 == 0 else self.shop2,
+                dt=dt_from,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt_from, time(9)),
+                dttm_work_end=datetime.combine(dt_from, time(22)),
+                is_approved=False,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd
+            )
+        for day in range(3):
+            dt_from = dt_from + timedelta(days=1)
+            WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt_from,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_approved=False,
+            )
+        self.employment6.position = self.position
+        self.employment6.save()
+        EmploymentWorkType.objects.create(employment=self.employment2, work_type=self.work_type)
+        EmploymentWorkType.objects.create(employment=self.employment3, work_type=self.work_type)
+        EmploymentWorkType.objects.create(employment=self.employment4, work_type=self.work_type)
+        EmploymentWorkType.objects.create(employment=self.employment6, work_type=self.work_type)
+        EmploymentWorkType.objects.create(employment=self.employment7, work_type=self.work_type)
+        dt_to = date.today() + timedelta(31)
+        wd = WorkerDay.objects.create(
+            employment=self.employment3,
+            worker=self.employment3.user,
+            shop=self.employment3.shop,
+            dt=dt_to,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt_from, time(9)),
+            dttm_work_end=datetime.combine(dt_from, time(22)),
+            is_approved=False,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            work_type=self.work_type,
+            worker_day=wd
+        )
+        class res:
+            def json(self):
+                return {'task_id': 1}
+        with patch.object(requests, 'post', return_value=res()) as mock_post:
+            response = self.client.post(
+                '/rest_api/auto_settings/create_timetable/',
+                {
+                    'shop_id': self.shop.id,
+                    'dt_from': date.today() + timedelta(days=2),
+                    'dt_to': dt_to,
+                    'use_not_approved': True,
+                }
+            )
+            data = json.loads(mock_post.call_args[1]['data'])
+            self.assertEqual(response.status_code, 200)
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id,data['cashiers']))[0]
+        self.assertEqual(len(employment2Info['workdays']), 2)
+        self.assertEqual(employment2Info['workdays'][0]['dt'], (date.today() + timedelta(days=2)).strftime('%Y-%m-%d'))
+        self.assertEqual(employment2Info['workdays'][1]['type'], 'R')
+
+    def test_set_timetable_not_replace_wds_in_other_shops(self):
+        timetable = ShopMonthStat.objects.create(
+            shop=self.shop,
+            dt=now().date().replace(day=1),
+            status=ShopMonthStat.PROCESSING,
+            dttm_status_change=now()
+        )
+
+        dt = now().date()
+        tm_from = time(10, 0, 0)
+        tm_to = time(20, 0, 0)
+
+        dttm_from = Converter.convert_datetime(
+            datetime.combine(dt, tm_from),
+        )
+
+        dttm_to = Converter.convert_datetime(
+            datetime.combine(dt, tm_to),
+        )
+
+
+        self.wd1 = WorkerDay.objects.create(
+            shop=self.shop,
+            worker=self.user2,
+            employment=self.employment2,
+            dt=self.dt,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, tm_from),
+            dttm_work_end = datetime.combine(self.dt, tm_to),
+        )
+        self.wd2 = WorkerDay.objects.create(
+            worker=self.user2,
+            employment=self.employment2,
+            dt=self.dt + timedelta(1),
+            is_fact=False,
+            type=WorkerDay.TYPE_HOLIDAY,
+        )
+
+        self.wd3 = WorkerDay.objects.create(
+            shop=self.shop2,
+            worker=self.user2,
+            employment=self.employment2,
+            dt=self.dt + timedelta(2),
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, tm_from),
+            dttm_work_end = datetime.combine(self.dt, tm_to),
+        )
+
+        self.wd4 = WorkerDay.objects.create(
+            shop=self.shop2,
+            worker=self.user2,
+            employment=self.employment2,
+            dt=self.dt + timedelta(3),
+            type=WorkerDay.TYPE_EMPTY,
+        )
+
+        response = self.client.post(self.url, {
+            'timetable_id': timetable.id,
+            'data': json.dumps({
+                'timetable_status': 'R',
+                'users': {
+                    self.user2.id: {
+                        'workdays': [
+                            {
+                                'dt': Converter.convert_date(dt),
+                                'type': 'W',
+                                'dttm_work_start': dttm_from,
+                                'dttm_work_end': dttm_to,
+                                'details': [{
+                                    'work_type_id': self.work_type2.id,
+                                    'percent': 100,
+                                }]
+                            },
+                            {
+                                'dt': Converter.convert_date(dt + timedelta(1)),
+                                'type': 'H',
+                                'dttm_work_start': None,
+                                'dttm_work_end': None,
+                                'details': [],
+                            },
+                            {
+                                'dt': Converter.convert_date(dt + timedelta(2)),
+                                'type': 'W',
+                                'dttm_work_start': dttm_from,
+                                'dttm_work_end': dttm_to,
+                                'details': [{
+                                    'work_type_id': self.work_type2.id,
+                                    'percent': 100,
+                                }]
+                            },
+                            {
+                                'dt': Converter.convert_date(dt + timedelta(3)),
+                                'type': 'W',
+                                'dttm_work_start': dttm_from,
+                                'dttm_work_end': dttm_to,
+                                'details': [{
+                                    'work_type_id': self.work_type2.id,
+                                    'percent': 100,
+                                }]
+                            },
+                        ]
+                    },
+                }
+            })
+        })
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(WorkerDay.objects.filter(
+            shop=self.shop,
+            is_fact=False,
+            type=WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+        ).count(), 2)
+
+        self.assertEqual(WorkerDay.objects.filter(
+            shop=self.shop2,
+            is_fact=False,
+            type=WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+        ).first().dt, self.dt + timedelta(2))
+
     def test_create_tt_full_month(self):
         dt_from = date(2021, 2, 1)
         dt_to = date(2021, 2, 28)
