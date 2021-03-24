@@ -72,7 +72,7 @@ class MdaIntegrationHelper:
 
     def export_data(self, export_path, threshold_seconds=None):
         """
-        from src.util.mda.integration import MdaIntegrationHelper
+        from src.integration.mda.integration import MdaIntegrationHelper
         MdaIntegrationHelper().export_data(export_path='orgstruct.xlsx')
         """
         data = self._get_data(threshold_seconds=threshold_seconds)
@@ -90,7 +90,7 @@ class MdaIntegrationHelper:
 
     def sync_mda_data(self, threshold_seconds=settings.MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS):
         resp = requests.post(
-            url=settings.MDA_PUBLIC_API_HOST + '/api/integration/mindandmachine/loadOrgstruct/',
+            url=settings.MDA_PUBLIC_API_HOST + '/api/public/v1/mindandmachine/loadOrgstruct',
             json=self._get_data(threshold_seconds=threshold_seconds),
             headers={
                 'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN,
