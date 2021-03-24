@@ -33,9 +33,11 @@ from src.timetable.models import (
     UserWeekdaySlot,
 )
 
-from src.timetable.auto_settings.serializers import AutoSettingsCreateSerializer, AutoSettingsDeleteSerializer, AutoSettingsSetSerializer
-from src.timetable.serializers import AutoSettingsCreateSerializer, AutoSettingsDeleteSerializer, \
-    AutoSettingsSetSerializer
+from src.timetable.auto_settings.serializers import (
+    AutoSettingsCreateSerializer,
+    AutoSettingsDeleteSerializer,
+    AutoSettingsSetSerializer,
+)
 from src.timetable.worker_day.stat import CalendarPaidDays, WorkersStatsGetter
 from src.util.models_converter import (
     WorkTypeConverter,
