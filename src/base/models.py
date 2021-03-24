@@ -36,11 +36,16 @@ from src.conf.djconfig import QOS_TIME_FORMAT
 
 
 class Network(AbstractActiveModel):
+    ACC_PERIOD_MONTH = 1
+    ACC_PERIOD_QUARTER = 3
+    ACC_PERIOD_HALF_YEAR = 6
+    ACC_PERIOD_YEAR = 12
+
     ACCOUNTING_PERIOD_LENGTH_CHOICES = (
-        (1, 'Месяц'),
-        (3, 'Квартал'),
-        (6, 'Пол года'),
-        (12, 'Год'),
+        (ACC_PERIOD_MONTH, 'Месяц'),
+        (ACC_PERIOD_QUARTER, 'Квартал'),
+        (ACC_PERIOD_HALF_YEAR, 'Пол года'),
+        (ACC_PERIOD_YEAR, 'Год'),
     )
 
     TABEL_FORMAT_CHOICES = (
@@ -118,6 +123,9 @@ class Network(AbstractActiveModel):
         default=False, verbose_name='Уменьшать дату окончания трудоустройства',
         help_text='Актуально для данных, получаемых через api',
     )
+    consider_remaining_hours_in_prev_months_when_calc_norm_hours = models.BooleanField(
+        default=False, verbose_name='Учитывать неотработанные часы за предыдущие месяца при расчете нормы часов',
+    )
 
     def get_department(self):
         return None
@@ -139,15 +147,20 @@ class Network(AbstractActiveModel):
     def accounting_periods_count(self):
         return int(12 / self.accounting_period_length)
 
-    def get_acc_period_range(self, dt):
-        period_num_within_year = dt.month // self.accounting_period_length
-        if dt.month % self.accounting_period_length > 0:
-            period_num_within_year += 1
+    def get_acc_period_range(self, dt=None, year=None, period_num=None):
+        assert dt or (year and period_num)
+        if dt:
+            period_num_within_year = dt.month // self.accounting_period_length
+            if dt.month % self.accounting_period_length > 0:
+                period_num_within_year += 1
+            year = dt.year
+        if period_num:
+            period_num_within_year = period_num
         end_month = period_num_within_year * self.accounting_period_length
         start_month = end_month - (self.accounting_period_length - 1)
 
-        return datetime.date(dt.year, start_month, 1), \
-            datetime.date(dt.year, end_month, monthrange(dt.year, end_month)[1])
+        return datetime.date(year, start_month, 1), \
+            datetime.date(year, end_month, monthrange(year, end_month)[1])
 
     def __str__(self):
         return f'name: {self.name}, code: {self.code}'
@@ -227,6 +240,7 @@ class ShopSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     # added on 21.12.2018
     idle = models.SmallIntegerField(default=0)  # percents
     fot = models.IntegerField(default=0)
+    norm_hours_coeff = models.FloatField(default=1.0, verbose_name='Коэфф. нормы часов')
     less_norm = models.SmallIntegerField(default=0)  # percents
     more_norm = models.SmallIntegerField(default=0)  # percents
     shift_start = models.SmallIntegerField(default=6)
@@ -1276,8 +1290,8 @@ class Notification(AbstractModel):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True)
 
 
-def default_work_hours_by_months():
-    return {f'm{month_num}': 100 for month_num in range(1, 12 + 1)}
+def current_year():
+    return datetime.datetime.now().year
 
 
 class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
@@ -1285,44 +1299,30 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     Настройки суммированного учета рабочего времени.
     Модель нужна для распределения часов по месяцам в рамках учетного периода при автосоставлении.
     """
-    year = models.PositiveSmallIntegerField(verbose_name='Год учетного периода')
+
     work_hours_by_months = JSONField(
-        default=default_work_hours_by_months,
-        verbose_name='Распределение рабочих часов по месяцам (в процентах)',
-        help_text='Сумма часов в рамках учетного периода должна быть равна сумме часов по произв. календарю.',
+        verbose_name='Настройки по распределению часов в рамках уч. периода',
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
-    positions = models.ManyToManyField('base.WorkerPosition', blank=True, verbose_name='Позиции')
-    shops = models.ManyToManyField('base.Shop', blank=True, verbose_name='Подразделения')
 
     class Meta:
         verbose_name = 'Настройки суммированного учета рабочего времени'
         verbose_name_plural = 'Настройки суммированного учета рабочего времени'
-        unique_together = (
-            ('code', 'year', 'network'),
-        )
 
     def __str__(self):
         return f'{self.name} {self.network.name}'
 
-    def clean(self):
-        if self.year and self.network.accounting_periods_count:
-            current_year = datetime.datetime.now().year
-            if self.year < current_year:
-                raise ValidationError('Нельзя создавать/менять настройки за прошедшие года')
 
-            for period_num_within_year in range(1, self.network.accounting_periods_count + 1):
-                end_month = period_num_within_year * self.network.accounting_period_length
-                start_month = end_month - (self.network.accounting_period_length - 1)
+class SAWHSettingsMapping(AbstractModel):
+    sawh_settings = models.ForeignKey('base.SAWHSettings', on_delete=models.CASCADE, verbose_name='Настройки СУРВ')
+    year = models.PositiveSmallIntegerField(verbose_name='Год учетного периода', default=current_year)
+    shops = models.ManyToManyField('base.Shop', blank=True)
+    positions = models.ManyToManyField('base.WorkerPosition', blank=True, related_name='+')
+    exclude_positions = models.ManyToManyField('base.WorkerPosition', blank=True, related_name='+')
+    priority = models.PositiveSmallIntegerField(default=0)
 
-                summarized_account_period_work_hours_sum = sum(
-                    v for k, v in self.work_hours_by_months.items() if start_month <= int(k.lstrip('m')) <= end_month)
-                account_period_percents_summ = self.network.accounting_period_length * 100
-                if summarized_account_period_work_hours_sum != account_period_percents_summ:
-                    raise ValidationError(
-                        f'В учетном периоде №{period_num_within_year} (месяца {start_month}-{end_month}) '
-                        f'не сходится сумма процентов. '
-                        f'Сeйчас {summarized_account_period_work_hours_sum}, должно быть {account_period_percents_summ}'
-                    )
+    class Meta:
+        verbose_name = 'Настройки суммированного учета рабочего времени'
+        verbose_name_plural = 'Настройки суммированного учета рабочего времени'
 
 
 class ShopSchedule(AbstractModel):

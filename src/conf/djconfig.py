@@ -379,6 +379,8 @@ CALCULATE_LOAD_TEMPLATE = False # параметр отключающий авт
 CLIENT_TIMEZONE = 3
 
 
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
 

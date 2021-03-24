@@ -10,11 +10,14 @@ from django.db import transaction
 from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField,
 )
+from django.db.models import (
+    Sum,
+)
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from model_utils import FieldTracker
 
-from src.base.models import Shop, Employment, User, Event, Network, Break
+from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
 
@@ -459,6 +462,14 @@ class WorkerDay(AbstractModel):
         TYPE_WORKDAY,
         TYPE_QUALIFICATION,
         TYPE_BUSINESS_TRIP,
+    )
+
+    TYPES_REDUCING_NORM_HOURS = (
+        TYPE_VACATION,
+        TYPE_SICK,
+        TYPE_SELF_VACATION,
+        TYPE_MATERNITY,
+        TYPE_MATERNITY_CARE,
     )
 
     def __str__(self):
@@ -1327,7 +1338,6 @@ class PlanAndFactHours(models.Model):
     def tm_work_end_fact_str(self):
         return str(self.dttm_work_end_fact.time()) if self.dttm_work_end_fact else ''
 
-    
     @property
     def plan_work_hours_timedelta(self):
         return datetime.timedelta(seconds=int(self.plan_work_hours * 60 * 60))
@@ -1335,3 +1345,32 @@ class PlanAndFactHours(models.Model):
     @property
     def fact_work_hours_timedelta(self):
         return datetime.timedelta(seconds=int(self.fact_work_hours * 60 * 60))
+
+
+class ProdCal(models.Model):
+    id = models.CharField(max_length=256, primary_key=True)
+    dt = models.DateField()
+    shop = models.ForeignKey('base.Shop', on_delete=models.DO_NOTHING)
+    user = models.ForeignKey('base.User', on_delete=models.DO_NOTHING)
+    employment = models.ForeignKey('base.Employment', on_delete=models.DO_NOTHING)
+    norm_hours = models.FloatField()
+
+    class Meta:
+        managed = False
+        db_table = 'prod_cal'
+
+    @classmethod
+    def get_workers_prod_cal_hours(cls, user_ids, dt_from, dt_to):
+        prod_cal_qs = cls.objects.filter(
+            user__id__in=user_ids,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+        ).values(
+            'user_id',
+            'employment_id',
+            'dt__month',
+        ).annotate(
+            norm_hours_sum=Sum('norm_hours'),
+        ).order_by()
+
+        return {(pc['user_id'], pc['employment_id'], pc['dt__month']): pc['norm_hours_sum'] for pc in prod_cal_qs}

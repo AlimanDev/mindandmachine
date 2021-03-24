@@ -69,8 +69,8 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
                          shop=self.shop, dt=date(2020, 12, 8), type='S')
         stats = self._get_worker_stats()
 
-        self.assertDictEqual(
-            stats[str(self.user.id)]['plan']['approved']['work_days'],
+        self.assertEqual(
+            stats[self.user.id]['plan']['approved']['work_days'],
             {
                 'total': 3,
                 'selected_shop': 2,
@@ -78,8 +78,8 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             }
         )
 
-        self.assertDictEqual(
-            stats[str(self.user.id)]['fact']['approved']['work_days'],
+        self.assertEqual(
+            stats[self.user.id]['fact']['approved']['work_days'],
             {
                 'total': 2,
                 'selected_shop': 2,
@@ -95,12 +95,14 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         WorkerDayFactory(is_fact=True, is_approved=True, worker=self.user, employment=self.employment,
                          shop=self.shop2, dt=date(2020, 12, 3), type='W')
         stats = self._get_worker_stats()
-        self.assertDictEqual(
-            stats[str(self.user.id)]['fact']['approved']['work_hours'],
+        self.assertEqual(
+            stats[self.user.id]['fact']['approved']['work_hours'],
             {
-                'total': 27.0,
-                'selected_shop': 18.0,
+                'acc_period': 27.0,
                 'other_shops': 9.0,
+                'selected_shop': 18.0,
+                'total': 27.0,
+                'until_acc_period_end': 27.0
             }
         )
 
@@ -116,8 +118,8 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         WorkerDayFactory(is_fact=False, is_approved=True, worker=self.user, employment=self.employment,
                          shop=self.shop2, dt=date(2020, 12, 5), type='S')
         stats = self._get_worker_stats()
-        self.assertDictEqual(
-            stats[str(self.user.id)]['plan']['approved']['day_type'],
+        self.assertEqual(
+            stats[self.user.id]['plan']['approved']['day_type'],
             {
                 'W': 3,
                 'H': 1,
@@ -127,11 +129,9 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
 
     def test_norm_hours_curr_month(self):
         stats = self._get_worker_stats()
-        self.assertDictEqual(
-            stats[str(self.user.id)]['plan']['approved']['norm_hours_curr_month'],
-            {
-                'value': 183.0,
-            }
+        self.assertEqual(
+            stats[self.user.id]['plan']['approved']['norm_hours']['curr_month'],
+            183.0,
         )
 
     def test_overtime_curr_month(self):
@@ -140,11 +140,9 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         WorkerDayFactory(is_fact=True, is_approved=True, worker=self.user, employment=self.employment,
                          shop=self.shop, dt=date(2020, 12, 2), type='W')
         stats = self._get_worker_stats()
-        self.assertDictEqual(
-            stats[str(self.user.id)]['fact']['approved']['overtime_curr_month'],
-            {
-                'value': -165.0,
-            }
+        self.assertEqual(
+            stats[self.user.id]['fact']['approved']['overtime']['curr_month'],
+            -165.0,
         )
 
     def test_work_hours_for_prev_months_counted_from_fact(self):
@@ -162,29 +160,29 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
                          shop=self.shop, dt=date(2020, 12, 1), type='W')
 
         stats = self._get_worker_stats()
-        self.assertDictEqual(
-            stats[str(self.user.id)]['fact']['approved']['work_hours_prev_months'],
-            {'other_shops': 0, 'selected_shop': 18.0, 'total': 18.0}
+        self.assertEqual(
+            stats[self.user.id]['fact']['approved']['work_hours']['prev_months'],
+            18.0
         )
-        self.assertDictEqual(
-            stats[str(self.user.id)]['plan']['approved']['work_hours_prev_months'],
-            {'other_shops': 0, 'selected_shop': 18.0, 'total': 18.0}
+        self.assertEqual(
+            stats[self.user.id]['plan']['approved']['work_hours']['prev_months'],
+            18.0
         )
-        self.assertDictEqual(
-            stats[str(self.user.id)]['fact']['approved']['work_hours_acc_period'],
-            {'value': 27}
+        self.assertEqual(
+            stats[self.user.id]['fact']['approved']['work_hours']['acc_period'],
+            27.0
         )
-        self.assertDictEqual(
-            stats[str(self.user.id)]['plan']['approved']['work_hours_acc_period'],
-            {'value': 27}
+        self.assertEqual(
+            stats[self.user.id]['plan']['approved']['work_hours']['acc_period'],
+            27.0
         )
-        self.assertDictEqual(
-            stats[str(self.user.id)]['fact']['approved']['overtime_acc_period'],
-            {'value': -491.0}
+        self.assertEqual(
+            stats[self.user.id]['fact']['approved']['overtime']['acc_period'],
+            -491.0
         )
-        self.assertDictEqual(
-            stats[str(self.user.id)]['plan']['approved']['overtime_acc_period'],
-            {'value': -491.0}
+        self.assertEqual(
+            stats[self.user.id]['plan']['approved']['overtime']['acc_period'],
+            -491.0
         )
 
     def test_hours_in_a_week_affect_norm_hours(self):
@@ -192,9 +190,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         self.position.save()
 
         stats = self._get_worker_stats()
-        self.assertDictEqual(
-            stats[str(self.user.id)]['plan']['approved']['norm_hours_curr_month'],
-            {
-                'value': 178.42499999999998,
-            }
+        self.assertEqual(
+            stats[self.user.id]['plan']['approved']['norm_hours']['curr_month'],
+            178.4,
         )
