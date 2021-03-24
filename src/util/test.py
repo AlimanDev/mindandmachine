@@ -381,8 +381,8 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         return worker_day
 
 
-def create_departments_and_users(self):
-    dt = now().date() - relativedelta(months=1)
+def create_departments_and_users(self, dt=None):
+    dt = dt or now().date() - relativedelta(months=1)
     self.network, _n_created = Network.objects.get_or_create(code='default', name='По умолчанию')
     self.region, _r_created = Region.objects.update_or_create(
         id=1,
@@ -559,7 +559,6 @@ def create_departments_and_users(self):
         user=self.user2,
         shop=self.shop,
         function_group=self.employee_group,
-        dt_hired=dt,
         salary=100,
     )
     self.user3 = User.objects.create_user(
@@ -577,7 +576,6 @@ def create_departments_and_users(self):
         shop=self.shop,
         auto_timetable=False,
         function_group=self.employee_group,
-        dt_hired=dt,
         salary=150,
     )
 

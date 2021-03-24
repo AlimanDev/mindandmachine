@@ -40,13 +40,14 @@ def import_urv_zkteco():
         max_date=(datetime.now().date() - timedelta(days=30))
 
     dt_from=max_date.strftime("%Y-%m-%d 00:00:00")
+    dt_to=(max_date + timedelta(31)).strftime("%Y-%m-%d 00:00:00") # в zkteco обязательна дата окончания
 
     page = 0
     users = {}
 
     while True:
         page += 1
-        events = zkteco.get_events(page=page, dt_from=dt_from)
+        events = zkteco.get_events(page=page, dt_from=dt_from, dt_to=dt_to)
         if not events['data']:
             break
 

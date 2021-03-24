@@ -4,7 +4,7 @@ from src.timetable.filters import WorkerConstraintFilter
 from src.timetable.models import (
     WorkerConstraint,
 )
-from src.timetable.serializers import (
+from src.timetable.worker_constraint.serializers import (
     WorkerConstraintSerializer,
     WrappedWorkerConstraintSerializer,
 )

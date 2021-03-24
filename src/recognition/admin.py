@@ -107,6 +107,7 @@ class TickAdmin(admin.ModelAdmin):
     ]
 
     actions = ['download_old', 'ticks_report_xlsx', 'ticks_report_docx']
+    change_list_template = 'ticks_change_list.html'
 
     def get_queryset(self, request):
         return super(TickAdmin, self).get_queryset(request).prefetch_related(
