@@ -531,6 +531,28 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             vacancy.employment = active_employment
             vacancy.save(update_fields=('worker', 'employment'))
 
+            WorkerDay.objects_with_excluded.filter(
+                dt=vacancy.dt,
+                worker_id=vacancy.worker_id,
+                is_fact=vacancy.is_fact,
+                is_approved=False,
+            ).delete()
+
+            vacancy_details = WorkerDayCashboxDetails.objects.filter(
+                worker_day=vacancy).values('work_type_id', 'work_part')
+
+            vacancy.id = None
+            vacancy.is_approved = False
+            vacancy.save()
+
+            WorkerDayCashboxDetails.objects.bulk_create(
+                WorkerDayCashboxDetails(
+                    worker_day=vacancy,
+                    work_type_id=details['work_type_id'],
+                    work_part=details['work_part'],
+                ) for details in vacancy_details
+            )
+
             # TODO: создать событие об отклике на вакансию,
             # TODO: сделать возможность отправки email на почту подразделения через систему уведомлений о событиях
 
