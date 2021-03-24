@@ -375,7 +375,7 @@ class TickPhotoViewSet(BaseModelViewSet):
                     partner_id = recognition.create_person({"id": tick.user_id})
                     photo_id = recognition.upload_photo(partner_id, image)
                 except HTTPError as e:
-                    return Response({"error": str(e)}, e.response.status_code)
+                    return Response({"error": "Сервис распознавания временно недоступен. Пожалуйста, обратитесь к администратору системы."}, e.response.status_code)
 
                 user_connecter = UserConnecter.objects.create(
                     user_id=tick.user_id,
@@ -388,7 +388,7 @@ class TickPhotoViewSet(BaseModelViewSet):
             try:
                 res = recognition.detect_and_match(user_connecter.partner_id, image)
             except HTTPError as e:
-                r = Response({"error": str(e)})
+                r = Response({"error": "Сервис распознавания временно недоступен. Пожалуйста, обратитесь к администратору системы."})
                 r.status_code = e.response.status_code
                 return r
 
