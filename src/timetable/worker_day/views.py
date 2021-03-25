@@ -361,10 +361,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     id__in=wdays_to_approve.values_list('id', flat=True)
                 ).delete()
                 list_wd = list(
-                    wdays_to_approve.exclude(
-                        is_vacancy=True,
-                        type='W',
-                    ).select_related(
+                    wdays_to_approve.select_related(
                         'shop',
                         'employment',
                         'employment__position',
@@ -500,10 +497,22 @@ class WorkerDayViewSet(BaseModelViewSet):
         
         paginator = LimitOffsetPagination()
         queryset = filterset_class.filter_queryset(
-            self.get_queryset().filter(is_vacancy=True).select_related('shop', 'worker').prefetch_related('worker_day_details').annotate(
+            self.get_queryset().filter(
+                is_vacancy=True,
+            ).select_related(
+                'shop',
+                'worker',
+            ).prefetch_related(
+                'worker_day_details',
+            ).annotate(
                 first_name=F('worker__first_name'),
                 last_name=F('worker__last_name'),
-                worker_shop=Subquery(Employment.objects.get_active(OuterRef('worker__network_id'),user_id=OuterRef('worker_id')).values('shop_id')[:1]),
+                worker_shop=Subquery(
+                    Employment.objects.get_active(
+                        OuterRef('worker__network_id'),
+                        user_id=OuterRef('worker_id')
+                    ).values('shop_id')[:1]
+                ),
             ),
         )
         data = paginator.paginate_queryset(queryset, request)
@@ -547,9 +556,26 @@ class WorkerDayViewSet(BaseModelViewSet):
                     is_fact=vacancy.is_fact,
                     is_approved=True,
                 ).exclude(id=vacancy.id).delete()
+                vacancy.is_approved = True
+                vacancy.save()
 
-            vacancy.is_approved = True
-            vacancy.save()
+                vacancy_details = WorkerDayCashboxDetails.objects.filter(
+                    worker_day=vacancy).values('work_type_id', 'work_part')
+
+                vacancy.id = None
+                vacancy.is_approved = False
+                vacancy.save()
+
+                WorkerDayCashboxDetails.objects.bulk_create(
+                    WorkerDayCashboxDetails(
+                        worker_day=vacancy,
+                        work_type_id=details['work_type_id'],
+                        work_part=details['work_part'],
+                    ) for details in vacancy_details
+                )
+            else:
+                vacancy.is_approved = True
+                vacancy.save()
 
         return Response(WorkerDaySerializer(vacancy).data)
 
@@ -768,9 +794,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             else:
                 fact_filter['is_fact'] = False
             list_wd = list(
-                WorkerDay.objects.exclude(
-                    is_vacancy=True,
-                ).filter(
+                WorkerDay.objects.filter(
                     dt__in=data['dates'],
                     worker_id__in=data['worker_ids'],
                     is_approved=True,
@@ -786,9 +810,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 )
             )
             fact_filter['is_fact'] = True if data['type'] in (CopyApprovedSerializer.TYPE_PLAN_TO_FACT, CopyApprovedSerializer.TYPE_FACT_TO_FACT) else False
-            WorkerDay.objects_with_excluded.exclude(
-                is_vacancy=True,
-            ).filter(
+            WorkerDay.objects_with_excluded.filter(
                 dt__in=data['dates'],
                 worker_id__in=data['worker_ids'],
                 is_approved=False,
@@ -817,9 +839,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     for wd in list_wd
                 ]
             )
-            wds = WorkerDay.objects.exclude(
-                is_vacancy=True,
-            ).filter(
+            wds = WorkerDay.objects.filter(
                 dt__in=data['dates'],
                 worker_id__in=data['worker_ids'],
                 is_approved=False,

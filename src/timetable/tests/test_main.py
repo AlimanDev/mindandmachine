@@ -2067,15 +2067,23 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         )
 
         resp = self.client.post(f'/rest_api/worker_day/{self.vacancy.id}/approve_vacancy/')
+        self.vacancy.refresh_from_db()
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertTrue(WorkerDay.objects.filter(id=wd.id).exists())
+        self.assertTrue(WorkerDay.objects.filter(id=self.vacancy.id, is_approved=True).exists())
 
         WorkerDay.objects.filter(id=self.vacancy.id).update(worker=wd.worker, is_approved=False)
 
         resp = self.client.post(f'/rest_api/worker_day/{self.vacancy.id}/approve_vacancy/')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertFalse(WorkerDay.objects.filter(id=wd.id).exists())
-        self.assertTrue(WorkerDay.objects.filter(id=self.vacancy.id).exists())
+        self.assertTrue(WorkerDay.objects.filter(id=self.vacancy.id, is_approved=True).exists())
+        self.assertTrue(WorkerDay.objects.filter(
+            dt=self.vacancy.dt,
+            worker_id=self.vacancy.worker_id,
+            is_fact=self.vacancy.is_fact,
+            is_approved=True,
+        ).exists())
 
 
 class TestAditionalFunctions(APITestCase):
