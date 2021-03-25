@@ -942,6 +942,7 @@ class Employment(AbstractActiveModel):
     tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired'])
 
     objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
+    objects_with_excluded = models.Manager.from_queryset(EmploymentQuerySet)()
 
     def has_permission(self, permission, method='GET'):
         group = self.function_group or (self.position.group if self.position else None)

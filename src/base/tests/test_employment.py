@@ -515,3 +515,10 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 self.assertEqual(resp2_delete.status_code, 204)
                 wd.refresh_from_db()
                 self.assertEqual(wd.employment_id, empl1.id)
+
+                resp2_put2 = self.client.put(
+                    path=self.get_url('Employment-detail', 'code2'),
+                    data=self.dump_data(put_data2),
+                    content_type='application/json',
+                )
+                self.assertEqual(resp2_put2.status_code, 200)
