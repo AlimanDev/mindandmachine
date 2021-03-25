@@ -7,9 +7,9 @@ from django.db.models import (
 )
 from django.db.models.functions import Extract, Coalesce, Cast
 
-from src.base.models import Break
 from src.base.models import (
     Employment,
+    Break,
 )
 from src.timetable.models import (
     AttendanceRecords

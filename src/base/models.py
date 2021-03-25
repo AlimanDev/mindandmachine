@@ -589,6 +589,11 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
 
 class EmploymentManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(
+            models.Q(dttm_deleted__date__gt=timezone.now().date()) | models.Q(dttm_deleted__isnull=True)
+        )
+
     def get_active(self, network_id=None, dt_from=None, dt_to=None, *args, **kwargs):
         """
         hired earlier then dt_from, hired later then dt_to
@@ -956,6 +961,21 @@ class Employment(AbstractActiveModel):
             short_fio_and_position += f', {self.position.name}'
 
         return short_fio_and_position
+
+    def delete(self, **kwargs):
+        from src.timetable.models import WorkerDay
+        from src.celery.tasks import clean_wdays
+        with transaction.atomic():
+            wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
+            WorkerDay.objects.filter(employment=self).update(employment_id=None)
+            if self.user.network.clean_wdays_on_employment_dt_change:
+                transaction.on_commit(lambda: clean_wdays.delay(
+                    only_logging=False,
+                    filter_kwargs=dict(
+                        id__in=wdays_ids,
+                    ),
+                ))
+            return super(Employment, self).delete(**kwargs)
 
     def __init__(self, *args, **kwargs):
         shop_code = kwargs.pop('shop_code', None)
