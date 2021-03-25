@@ -91,11 +91,11 @@ overrides_pk = {
     '/rest_api/receipt/': 'id',
 }
 overrides_order = {
-    'put/rest_api/department/{code}/': 0,
-    'put/rest_api/user/{username}/': 1,
-    'put/rest_api/worker_position/{code}/': 2,
-    'put/rest_api/employment/{username}/': 3,
-    'get/rest_api/worker_day/': 4,
-    'post/rest_api/timeserie_value/': 5,
-    'put/rest_api/receipt/{id}/': 6,
+    '/rest_api/department/{code}/': 0,
+    '/rest_api/user/{username}/': 1,
+    '/rest_api/worker_position/{code}/': 2,
+    '/rest_api/employment/{username}/': 3,
+    '/rest_api/worker_day/': 4,
+    '/rest_api/timeserie_value/': 5,
+    '/rest_api/receipt/{id}/': 6,
 }

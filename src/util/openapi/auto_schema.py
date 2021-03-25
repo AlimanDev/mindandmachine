@@ -104,7 +104,7 @@ class WFMIntegrationAPISchemaGenerator(OpenAPISchemaGenerator):
                     """
                 },
             ]
-            swagger.paths = openapi.Paths(dict(sorted(swagger.paths.items(), key=lambda x: overrides_order.get(x[1].operations[0][0] + x[0], 0)))) #сложная схема кастомной сортировки
+            swagger.paths = openapi.Paths(dict(sorted(swagger.paths.items(), key=lambda x: overrides_order.get(x[0], 0)))) #кастомная сортировка
             return swagger
 
     def get_path_parameters(self, path, view_cls):
