@@ -2,8 +2,8 @@ from drf_yasg.inspectors import SwaggerAutoSchema
 from drf_yasg.generators import OpenAPISchemaGenerator
 from drf_yasg import openapi
 from django.test import override_settings
-from src.conf.djconfig import OPENAPI_INTEGRATION_MODELS_METHODS
-from src.util.openapi.overrides import overrides_info, overrides_pk
+from src.conf.djconfig import OPENAPI_INTEGRATION_MODELS_METHODS, SWAGGER_SETTINGS
+from src.util.openapi.overrides import overrides_info, overrides_pk, overrides_order
 
 
 class WFMAutoSchema(SwaggerAutoSchema):
@@ -70,12 +70,21 @@ class WFMOpenAPISchemaGenerator(OpenAPISchemaGenerator):
 class WFMIntegrationAPISchemaGenerator(OpenAPISchemaGenerator):
     def get_schema(self, request=None, public=False):
         """Generate a :class:`.Swagger` object with custom tags"""
-        SWAGGER_SETTINGS = {
-            'TAGS_SORTER': 'alpha',
-            'OPERATIONS_SORTER': 'alpha',
-            'DEFAULT_AUTO_SCHEMA_CLASS': "src.util.openapi.auto_schema.WFMAutoSchemaIntegration",
+        SWAGGER_SETTINGS_OVERRIDE = SWAGGER_SETTINGS
+        SWAGGER_SETTINGS_OVERRIDE['SECURITY_DEFINITIONS'] = {
+            'Basic': {
+                'type': 'basic',
+                'description': '''Взаимодействия с данными в системе WFM-решением 
+                Mind&Machine осуществляется через пользователей, таким образом любые акторы 
+                (сотрудники или другие корпоративные системы представлены в виде пользователей).\n
+Для того, чтобы выполнить запросы в системе из другой системы необходимо пройти аутентификацию.
+Для этого используется [HTTP Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication) — отправка логина и пароля в заголовке HTTP запроса. 
+            ''',
+            }
         }
-        with override_settings(SWAGGER_SETTINGS=SWAGGER_SETTINGS):
+        SWAGGER_SETTINGS_OVERRIDE['DEFAULT_AUTO_SCHEMA_CLASS'] = "src.util.openapi.auto_schema.WFMAutoSchemaIntegration"
+        SWAGGER_SETTINGS_OVERRIDE['OPERATIONS_SORTER'] = None
+        with override_settings(SWAGGER_SETTINGS=SWAGGER_SETTINGS_OVERRIDE):
             swagger = super().get_schema(request, public)
             swagger.tags = [
                 {
@@ -95,7 +104,7 @@ class WFMIntegrationAPISchemaGenerator(OpenAPISchemaGenerator):
                     """
                 },
             ]
-
+            swagger.paths = openapi.Paths(dict(sorted(swagger.paths.items(), key=lambda x: overrides_order.get(x[1].operations[0][0] + x[0], 0)))) #сложная схема кастомной сортировки
             return swagger
 
     def get_path_parameters(self, path, view_cls):

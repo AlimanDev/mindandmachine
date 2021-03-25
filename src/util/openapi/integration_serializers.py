@@ -21,17 +21,17 @@ class ShopIntegrationSerializer(serializers.Serializer):
             'parent_code': '7F9619FF-8B86-D011-B42D-00CF4FC964FF',
             'timezone': 'Europe/Moscow',
             'by_code': True,
-            'tm_open_dict': {'d0': '10:00:00', 'd3': '11:00:00'},
-            'tm_close_dict': {'d0': '20:00:00', 'd3': '21:00:00'},
+            'tm_open_dict': {'0': '10:00:00', '3': '11:00:00'},
+            'tm_close_dict': {'0': '20:00:00', '3': '21:00:00'},
             'latitude': '55.834244',
             'longitude': '37.513916',
+            'director_code': 'IvanovII',
         }
     code = serializers.CharField(help_text='Идентификатор подразделения (часто GUID из 1C)')
     name = serializers.CharField(help_text='Название подразделения (магазина)')
     address = serializers.CharField(help_text='Адрес')
     parent_code = serializers.CharField(required=False, help_text='Идентификатор подразделения родителя')
     timezone = TimeZoneField(required=False, help_text='Часовой пояс')
-    by_code = serializers.BooleanField(help_text='Необходимо для синхронизации')
     tm_open_dict = serializers.JSONField(required=False, help_text='Словарь времени начала работы подразделений')
     tm_close_dict = serializers.JSONField(
         required=False, 
@@ -41,6 +41,8 @@ class ShopIntegrationSerializer(serializers.Serializer):
     latitude = RoundingDecimalField(decimal_places=6, max_digits=12, allow_null=True, required=False, help_text='Широта (координаты подразделения)')
     longitude = RoundingDecimalField(decimal_places=6, max_digits=12, allow_null=True, required=False, help_text='Долгота (координаты подразделения)')
     email = serializers.EmailField(required=False, help_text='Почта (при наличии)')
+    director_code = serializers.CharField(help_text='Логин пользователя, ответственного за данное подразделение (директора)')
+    by_code = serializers.BooleanField(help_text='Необходимо для синхронизации')
 
 
 class UserIntegrationSerializer(serializers.Serializer):
@@ -49,14 +51,14 @@ class UserIntegrationSerializer(serializers.Serializer):
             'first_name': 'Иван',
             'last_name': 'Иванов',
             'middle_name': 'Иванович',
-            'username': '1111',
+            'username': 'IvanovII',
             'by_code': True,
         }
     first_name = serializers.CharField(help_text='Имя')
     last_name = serializers.CharField(help_text='Фамилия')
     middle_name = serializers.CharField(required=False, help_text='Отчество')
-    username = serializers.CharField(help_text='Логин (табельный номер)')
-    email = serializers.EmailField(required=False, help_text='Почта (при наличии)')
+    username = serializers.CharField(help_text='Логин (табельный номер), уникальное поле для синхронизации')
+    # email = serializers.EmailField(required=False, help_text='Почта (при наличии)')
     by_code = serializers.BooleanField(help_text='Необходимо для синхронизации')
 
 
@@ -77,16 +79,20 @@ class EmploymentIntegrationSerializer(serializers.Serializer):
         examples = {
             'dt_hired': '2019-07-17',
             'dt_fired': '2020-07-17',
-            'username': '1111',
+            'username': 'IvanovII',
             'position_code': '1234',
             'shop_code': '6F9619FF-8B86-D011-B42D-00CF4FC964FF',
+            'tabel_code': '0000-00001',
+            'norm_work_hours': 100,
             'by_code': True,
         }
     dt_hired = serializers.DateField(help_text='Дата начала работы')
     dt_fired = serializers.DateField(help_text='Дата окончания работы')
-    username = serializers.CharField(help_text='логин сотрудника')
-    position_code = serializers.CharField(help_text='внешний идентификатор должности')
-    shop_code = serializers.CharField(help_text='внешний идентификатор магазина')
+    username = serializers.CharField(help_text='Логин сотрудника')
+    position_code = serializers.CharField(help_text='Внешний идентификатор должности')
+    shop_code = serializers.CharField(help_text='Внешний идентификатор магазина')
+    tabel_code = serializers.CharField(help_text='Табельный номер сотрудника')
+    norm_work_hours = serializers.IntegerField(help_text='Ставка сотрудника в процентах')
     by_code = serializers.BooleanField(help_text='Необходимо для синхронизации')
 
 
@@ -101,7 +107,16 @@ class WorkerDayFilterIntegrationSerializer(serializers.Serializer):
             'is_tabel': True,
             'by_code': True,
         }
-    worker__username__in = serializers.ListField(help_text='Список табельных сотрудников, по которым вернуть информацию по графику. Поле не обязательное, если указано shop_code', child=serializers.CharField())
+    worker__username__in = serializers.ListField(
+        help_text='Список табельных сотрудников, по которым вернуть информацию по графику. Поле не обязательное, если указано shop_code', 
+        child=serializers.CharField(), 
+        required=False,
+    )
+    employment__tabel_code__in = serializers.ListField(
+        help_text='Список табельных номеров сотрудников, по которым нужно вернуть информацию по графику. Для случая, когда username НЕ является табельным номером.', 
+        child=serializers.CharField(),
+        required=False,
+    )
     dt__gte = serializers.DateField(help_text='период выгрузки от даты (включительно)')
     dt__lte = serializers.DateField(help_text='период выгрузки до даты (включительно)')
     shop_code = serializers.CharField(help_text='Код магазина (если хотим по определенному магазину посмотреть график). Поле не обязательное, если есть worker__username__in')
@@ -114,6 +129,7 @@ class ReceiptIntegrationSerializer(serializers.Serializer):
     class Meta:
         examples = {
             'data_type': 'bills',
+            'version': 1,
             'data': {
                 "shop_code": 1234,
                 "dttm": "2020-07-20T11:00:00.000Z",
@@ -123,5 +139,38 @@ class ReceiptIntegrationSerializer(serializers.Serializer):
             },
         }
     
-    data_type = serializers.CharField(help_text='Тип события')
+    data_type = serializers.CharField(help_text='Тип события (код)')
+    version = serializers.IntegerField(help_text='Версия данных. Необходимо для того, чтобы не перезаписывать данные, если пришла версия меньшая, чем уже существует.')
     data = serializers.JSONField(help_text='Информация по событию')
+
+
+class TimeSerieValueIntegrationSerializer(serializers.Serializer):
+    class Meta:
+        examples = {
+            'data': {
+                "shop_code": "6F9619FF-8B86-D011-B42D-00CF4FC964FF",
+                "dt_from ": "2020-07-20",
+                "dt_to ": "2020-07-20",
+                "type ": "F",
+                "serie": [
+                    {
+                        "dttm": "2020-07-20T10:00:00.000Z",
+                        "value": 2,
+                        "timeserie_code": "bills",
+                    },
+                    {
+                        "dttm": "2020-07-20T11:00:00.000Z",
+                        "value": 4,
+                        "timeserie_code": " bills",
+                    },
+                    {
+                        "dttm": "2020-07-20T12:00:00.000Z",
+                        "value": 1,
+                        "timeserie_code": " bills",
+                    },
+                ],
+            },
+        }
+    
+    data = serializers.JSONField(help_text='Данные в JSON формате')
+

@@ -1,4 +1,4 @@
-from src.util.openapi.descriptions import SHOP_UPDATE, RECIEPT, WORKER_DAY_LIST
+from src.util.openapi.descriptions import SHOP_UPDATE, RECIEPT, WORKER_DAY_LIST, TIMESERIE_VALUE
 from src.util.openapi.integration_serializers import (
     ShopIntegrationSerializer, 
     UserIntegrationSerializer,
@@ -6,6 +6,7 @@ from src.util.openapi.integration_serializers import (
     EmploymentIntegrationSerializer,
     WorkerDayFilterIntegrationSerializer,
     ReceiptIntegrationSerializer,
+    TimeSerieValueIntegrationSerializer,
 )
 from src.util.openapi.responses import worker_day_list_integration, receipt_integration
 from src.base.shop.serializers import ShopSerializer
@@ -68,9 +69,19 @@ overrides_info = {
     'receipt': {
         'update': {
             'description': RECIEPT,
-            'id': 'Данные для расчета потребности в персонале',
+            'id': 'Создание и изменение произошедших событий',
             'request_body': ReceiptIntegrationSerializer(),
             'responses': receipt_integration,
+        }
+    },
+    'timeserie_value': {
+        'create': {
+            'description': TIMESERIE_VALUE,
+            'id': 'Создание факта (исторических данных по временному ряду)',
+            'request_body': TimeSerieValueIntegrationSerializer(),
+            'responses': {
+                '201': 'Created',
+            }
         }
     }
 }
@@ -78,4 +89,13 @@ overrides_pk = {
     '/rest_api/user/': 'username',
     '/rest_api/employment/': 'username',
     '/rest_api/receipt/': 'id',
+}
+overrides_order = {
+    'put/rest_api/department/{code}/': 0,
+    'put/rest_api/user/{username}/': 1,
+    'put/rest_api/worker_position/{code}/': 2,
+    'put/rest_api/employment/{username}/': 3,
+    'get/rest_api/worker_day/': 4,
+    'post/rest_api/timeserie_value/': 5,
+    'put/rest_api/receipt/{id}/': 6,
 }

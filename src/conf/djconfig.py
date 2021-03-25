@@ -302,7 +302,7 @@ SWAGGER_SETTINGS = {
         'drf_yasg.inspectors.SerializerMethodFieldInspector',
         'drf_yasg.inspectors.SimpleFieldInspector',
         'drf_yasg.inspectors.StringDefaultFieldInspector',
-    ]
+    ],
 }
 
 # какие методы и модели могут попасть в описание интеграции
@@ -312,6 +312,7 @@ OPENAPI_INTEGRATION_MODELS_METHODS = [
     ('employment', 'update'),
     ('worker_position', 'update'),
     ('worker_day', 'list'),
+    ('timeserie_value', 'create'),
     ('receipt', 'update'),
 ]
 
