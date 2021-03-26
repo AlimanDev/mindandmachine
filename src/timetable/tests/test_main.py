@@ -550,6 +550,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                 'first_name': self.user2.first_name,
                 'last_name': self.user2.last_name,
                 'middle_name': None,
+                'has_biometrics': False,
                 'birthday': None,
                 'sex': 'F',
                 'avatar': None,
