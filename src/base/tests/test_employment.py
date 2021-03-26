@@ -522,3 +522,36 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                     content_type='application/json',
                 )
                 self.assertEqual(resp2_put2.status_code, 200)
+
+    def test_delete_employment_with_filter_delete(self):
+        """
+        Проверка, что при удалении через objects.filter(...).delete() тоже чистятся дни
+        """
+        put_data1 = {
+            'position_id': self.worker_position.id,
+            'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
+            'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
+            'shop_id': self.shop2.id,
+            'user_id': self.user2.id,
+            'code': 'code1',
+            'by_code': True,
+        }
+        resp1_put = self.client.put(
+            path=self.get_url('Employment-detail', 'code1'),
+            data=self.dump_data(put_data1),
+            content_type='application/json',
+        )
+        self.assertEqual(resp1_put.status_code, 201)
+        empl1 = Employment.objects.get(id=resp1_put.json()['id'])
+        wd = WorkerDayFactory(
+            dt=date(2021, 1, 1),
+            worker=self.user2,
+            employment=empl1,
+            shop=self.shop2,
+            type=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+        )
+        Employment.objects.filter(id=empl1.id).delete()
+        wd.refresh_from_db()
+        self.assertEqual(wd.employment_id, None)

@@ -896,6 +896,20 @@ class EmploymentQuerySet(QuerySet):
             id=Subquery(last_hired_subq)
         )
 
+    def delete(self):
+        from src.timetable.models import WorkerDay
+        from src.celery.tasks import clean_wdays
+        with transaction.atomic():
+            wdays_ids = list(WorkerDay.objects.filter(employment__in=self).values_list('id', flat=True))
+            WorkerDay.objects.filter(employment__in=self).update(employment_id=None)
+            self.update(dttm_deleted=timezone.now())
+            transaction.on_commit(lambda: clean_wdays.delay(
+                only_logging=False,
+                filter_kwargs=dict(
+                    id__in=wdays_ids,
+                ),
+            ))
+
 
 class Employment(AbstractActiveModel):
     class Meta:
