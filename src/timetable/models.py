@@ -215,7 +215,10 @@ class EmploymentWorkType(AbstractModel):
 
     id = models.BigAutoField(primary_key=True)
 
-    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, related_name="work_types")
+    # DO_NOTHING т.к. реально Employment мы удалять не будем, а только деактивируем проставив dttm_deleted
+    # EmploymentWorkType без Employment вряд ли где-то используется,
+    # поэтому в случае необходимости восстановить трудоустройство, восстановятся и типы работ
+    employment = models.ForeignKey(Employment, on_delete=models.DO_NOTHING, related_name="work_types")
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
 
     is_active = models.BooleanField(default=True)
@@ -560,7 +563,9 @@ class WorkerDay(AbstractModel):
 
     id = models.BigAutoField(primary_key=True, db_index=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
-    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
+
+    # DO_NOTHING т.к. в Employment.delete есть явная чистка рабочих дней для этого трудоустройства
+    employment = models.ForeignKey(Employment, on_delete=models.DO_NOTHING, null=True)
 
     dt = models.DateField()  # todo: make immutable
     dttm_work_start = models.DateTimeField(null=True, blank=True)
