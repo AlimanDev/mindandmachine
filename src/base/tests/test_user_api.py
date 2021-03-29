@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from src.recognition.models import UserConnecter
 from src.base.models import WorkerPosition, Employment, User
 from src.timetable.models import WorkTypeName
 from src.util.mixins.tests import TestsHelperMixin
@@ -110,3 +111,39 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         resp = self.client.get(self.get_url('User-list'), data=params)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.json()), 8)
+
+    def test_has_biometrics(self):
+        UserConnecter.objects.create(
+            user=self.user1,
+            partner_id='1234',
+        )
+        response = self.client.get(
+            self.get_url('User-list'),
+        )
+        data = response.json()
+        user1 = list(filter(lambda x: x['id'] == self.user1.id, data))[0]
+        user2 = list(filter(lambda x: x['id'] == self.user2.id, data))[0]
+        self.assertEqual(user1['has_biometrics'], True)
+        self.assertEqual(user2['has_biometrics'], False)
+
+    
+    def test_delete_biometrics(self):
+        UserConnecter.objects.create(
+            user=self.user1,
+            partner_id='1234',
+        )
+        response = self.client.post(
+            self.get_url('User-delete-biometrics', pk=self.user1.id),
+        )
+        data = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data, {'detail': 'Биометрия сотрудника успешно удалена'})
+        self.assertEqual(UserConnecter.objects.count(), 0)
+
+    def test_delete_non_existing_biometrics(self):
+        response = self.client.post(
+            self.get_url('User-delete-biometrics', pk=self.user1.id),
+        )
+        data = response.json()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(data, {'detail': 'У сотрудника нет биометрии'})

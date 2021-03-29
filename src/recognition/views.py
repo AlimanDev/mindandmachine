@@ -1,6 +1,6 @@
 import io
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 from uuid import UUID
 
 import xlsxwriter
@@ -28,6 +28,7 @@ from src.base.serializers import NetworkSerializer
 from src.recognition.api.recognition import Recognition
 from src.recognition.authentication import TickPointTokenAuthentication
 from src.recognition.models import Tick, TickPhoto, TickPoint, UserConnecter, TickPointToken
+from src.recognition.filters import TickPointFilterSet
 from src.recognition.serializers import (
     HashSigninSerializer,
     TickPointSerializer,
@@ -469,9 +470,10 @@ class TickPointViewSet(BaseModelViewSet):
     basename = ''
     serializer_class = TickPointSerializer
     openapi_tags = ['TickPoint', ]
+    filterset_class = TickPointFilterSet
 
     def get_queryset(self):
-        return TickPoint.objects.filter(network_id=self.request.user.network_id)
+        return TickPoint.objects.filter(network_id=self.request.user.network_id, dttm_deleted__isnull=True)
 
     def perform_create(self, serializer):
         serializer.save(network_id=self.request.user.network_id)

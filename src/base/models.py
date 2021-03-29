@@ -1148,6 +1148,7 @@ class FunctionGroup(AbstractModel):
         'Subscribe',
         'User',
         'User_change_password',
+        'User_delete_biometrics',
         'WorkerConstraint',
         'WorkerDay',
         'WorkerDay_approve',
