@@ -1,6 +1,6 @@
 from rest_framework.test import APITestCase
 from src.util.urv.create_urv_stat import urv_stat_v1
-from src.util.urv.urv_violators import urv_violators_report, urv_violators_report_xlsx
+from src.util.urv.urv_violators import urv_violators_report, urv_violators_report_xlsx, urv_violators_report_xlsx_v2
 from src.util.test import create_departments_and_users
 import pandas as pd
 from datetime import date, datetime, time, timedelta
@@ -83,8 +83,8 @@ class TestUrvFiles(APITestCase):
             'Кол-во отметок факт, УХОД': 1, 
             'Разница, УХОД': 1, 
             'Кол-во часов план': '21:30:00', 
-            'Кол-во часов факт': '10:04:00', 
-            'Разница, ЧАСЫ': '11:26:00',
+            'Кол-во часов факт': '10:05:00', 
+            'Разница, ЧАСЫ': '11:25:00',
             'Разница, ПРОЦЕНТЫ': '47%',
         }
         self.assertEqual(dict(df.iloc[0]), data)
@@ -115,3 +115,19 @@ class TestUrvFiles(APITestCase):
         }
         self.assertEqual(len(df.iloc[:,:]), 1)
         self.assertEqual(dict(df.iloc[0]), data)
+
+
+    def test_urv_violators_report_xlsx_v2(self):
+        data = urv_violators_report_xlsx_v2(self.network.id, dt_from=self.dt, in_memory=True)
+        df = pd.read_excel(data['file'])
+        df.fillna('', inplace=True)
+        data = {
+            'Код магазина': self.shop.code, 
+            'Магазин': 'Shop1', 
+            'Табельный номер': '', 
+            'ФИО': 'Сидоров Иван3 ', 
+            'Должность': '',
+            self.dt.strftime('%d.%m.%Y'): 'Нет ухода'
+        }
+        self.assertEqual(len(df.iloc[:,:]), 1)
+        self.assertEqual(dict(df.iloc[0, :6]), data)

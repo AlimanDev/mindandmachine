@@ -5,7 +5,7 @@ from rest_framework.exceptions import ValidationError, NotFound
 
 from src.base.models import Employment, Shop
 from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
-from src.timetable.serializers import WsPermissionDataSerializer
+from src.timetable.worker_day_permissions.serializers import WsPermissionDataSerializer
 
 
 class Permission(permissions.BasePermission):

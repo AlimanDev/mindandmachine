@@ -5,6 +5,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from src.timetable.models import WorkerDay, WorkTypeName, WorkType
+from src.base.models import Employment
+from src.recognition.models import TickPoint
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -69,3 +71,30 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             data={'dt': self.dt_str, 'worker': self.user3.username},
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+    def test_no_active_employee(self):
+        t = TickPoint.objects.create(
+            network=self.network,
+            name='test',
+            shop=self.shop,
+        )
+
+        response = self.client.post(
+            path='/api/v1/token-auth/',
+            data={
+                'key': t.key,
+            }
+        )
+
+        token = response.json()['token']
+        self.client.defaults['HTTP_AUTHORIZATION'] = 'Token %s' % token
+        resp = self.client.get(
+            self.get_url('TimeAttendanceWorkerDay-list'),
+        )
+        self.assertEqual(len(resp.json()), 5)
+        Employment.objects.all().update(dt_hired=datetime.date.today() + datetime.timedelta(1), dt_fired=None)
+        resp = self.client.get(
+            self.get_url('TimeAttendanceWorkerDay-list'),
+        )
+        self.assertEqual(len(resp.json()), 0)

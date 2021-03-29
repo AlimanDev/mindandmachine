@@ -4,7 +4,7 @@ from unittest import mock
 from django.test import TestCase
 from django.utils import timezone
 
-from src.celery.tasks import sync_mda_user_to_shop_relation
+from src.integration.mda.tasks import sync_mda_user_to_shop_relation
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkTypeName, WorkType
 from src.util.mixins.tests import TestsHelperMixin
 

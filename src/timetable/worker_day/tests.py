@@ -38,7 +38,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.client.force_authenticate(user=self.user1)
 
     def create_worker_day(self, type='W', shop=None, dt=None, user=None, employment=None, is_fact=False,
-                          is_approved=False, parent_worker_day=None, is_vacancy=False):
+                          is_approved=False, parent_worker_day=None, is_vacancy=False, is_blocked=False):
         shop = shop if shop else self.shop
         if type == 'W':
             employment = employment if employment else self.employment2
@@ -60,7 +60,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
             parent_worker_day=parent_worker_day,
             work_hours=datetime.combine(dt, time(20, 0, 0)) - datetime.combine(dt, time(8, 0, 0)),
-            is_vacancy=is_vacancy
+            is_vacancy=is_vacancy,
+            is_blocked=is_blocked,
         )
 
     def create_vacancy(self, shop=None, dt=None, is_approved=False, parent_worker_day=None):
@@ -79,416 +80,6 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             is_vacancy=True,
             is_fact=False
         )
-
-    def test_worker_stat(self):
-        pawd1 = self.create_worker_day(is_approved=True, dt=self.dt_const)
-        pawd2 = self.create_worker_day(is_approved=True, dt=self.dt_const + timedelta(days=1),
-                                       type=WorkerDay.TYPE_BUSINESS_TRIP)
-        pawd4 = self.create_worker_day(shop=self.shop2, is_approved=True, dt=self.dt_const + timedelta(days=3),
-                                       type=WorkerDay.TYPE_WORKDAY)
-        pawd5 = self.create_worker_day(is_approved=True, dt=self.dt_const + timedelta(days=4),
-                                       type=WorkerDay.TYPE_HOLIDAY)
-
-        pnawd1 = self.create_worker_day(dt=self.dt_const, type=WorkerDay.TYPE_HOLIDAY, parent_worker_day=pawd1)
-        pnawd2 = self.create_worker_day(dt=self.dt_const + timedelta(days=1), type=WorkerDay.TYPE_WORKDAY,
-                                        parent_worker_day=pawd2)
-        pnawd3 = self.create_worker_day(shop=self.shop2, dt=self.dt_const + timedelta(days=2),
-                                        type=WorkerDay.TYPE_WORKDAY)
-
-        fawd1 = self.create_worker_day(dt=self.dt_const, is_approved=True, is_fact=True, parent_worker_day=pawd1)
-        fawd1.dttm_work_end = None
-        fawd1.save(update_fields=('dttm_work_end',))
-        # fawd2=self.create_worker_day(is_approved=True, is_fact=True, dt=self.dt_const+timedelta(days=1),parent_worker_day=pawd2)
-        fawd3 = self.create_worker_day(shop=self.shop2, is_approved=True, is_fact=True,
-                                       dt=self.dt_const + timedelta(days=2),
-                                       parent_worker_day=pnawd3)
-        fawd5 = self.create_worker_day(is_approved=True, is_fact=True, dt=self.dt_const + timedelta(days=4),
-                                       parent_worker_day=pawd5)
-
-        fnawd1 = self.create_worker_day(is_approved=False, is_fact=True, dt=self.dt_const, parent_worker_day=fawd1)
-        fnawd2 = self.create_worker_day(is_approved=False, is_fact=True, dt=self.dt_const + timedelta(days=1),
-                                        parent_worker_day=pawd2)
-        fnawd4 = self.create_worker_day(shop=self.shop2, is_approved=False, is_fact=True,
-                                        dt=self.dt_const + timedelta(days=3), parent_worker_day=pawd4)
-
-        dt_to = self.dt_const + timedelta(days=4)
-        response = self.client.get(
-            f"{self.worker_stat_url}?shop_id={self.shop.id}&dt_from={self.dt_const}&dt_to={dt_to}",
-            format='json')
-
-        # TODO: overtime - проверить
-        # paid_hours для командировок
-        stat = {str(self.user2.id): {
-            "plan": {
-                "approved": {
-                    "work_days": {
-                        "total": 2,
-                        "selected_shop": 1,
-                        "other_shops": 1
-                    },
-                    "work_hours": {
-                        "total": 21.5,
-                        "selected_shop": 10.75,
-                        "other_shops": 10.75
-                    },
-                    "work_hours_curr_month": {
-                        "total": 21.5,
-                        "selected_shop": 10.75,
-                        "other_shops": 10.75
-                    },
-                    "work_hours_prev_months": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
-                    },
-                    "work_hours_curr_month_end": {
-                        "value": 21.5
-                    },
-                    "work_hours_until_acc_period_end": {
-                        "total": 21.5,
-                        "selected_shop": 10.75,
-                        "other_shops": 10.75
-                    },
-                    "work_hours_acc_period": {
-                        "value": 21.5
-                    },
-                    "day_type": {
-                        "W": 2,
-                        "T": 1,
-                        "H": 1
-                    },
-                    "norm_hours_curr_month": {
-                        "value": 183.0
-                    },
-                    "norm_hours_prev_months": {
-                        "value": 0.0
-                    },
-                    "norm_hours_curr_month_end": {
-                        "value": 183.0
-                    },
-                    "norm_hours_acc_period": {
-                        "value": 183.0
-                    },
-                    "overtime_curr_month": {
-                        "value": -161.5
-                    },
-                    "overtime_curr_month_end": {
-                        "value": -161.5
-                    },
-                    "overtime_prev_months": {
-                        "value": 0.0
-                    },
-                    "overtime_acc_period": {
-                        "value": -161.5
-                    }
-                },
-                "combined": {
-                    "work_days": {
-                        "total": 3,
-                        "selected_shop": 1,
-                        "other_shops": 2
-                    },
-                    "work_hours": {
-                        "total": 32.25,
-                        "selected_shop": 10.75,
-                        "other_shops": 21.5
-                    },
-                    "work_hours_prev_months": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
-                    },
-                    "work_hours_curr_month": {
-                        "total": 32.25,
-                        "selected_shop": 10.75,
-                        "other_shops": 21.5
-                    },
-                    "work_hours_curr_month_end": {
-                        "value": 32.25
-                    },
-                    "work_hours_until_acc_period_end": {
-                        "total": 32.25,
-                        "selected_shop": 10.75,
-                        "other_shops": 21.5
-                    },
-                    "work_hours_acc_period": {
-                        "value": 32.25
-                    },
-                    "day_type": {
-                        "H": 2,
-                        "W": 3
-                    },
-                    "norm_hours_curr_month": {
-                        "value": 183.0
-                    },
-                    "norm_hours_prev_months": {
-                        "value": 0.0
-                    },
-                    "norm_hours_curr_month_end": {
-                        "value": 183.0
-                    },
-                    "norm_hours_acc_period": {
-                        "value": 183.0
-                    },
-                    "overtime_curr_month": {
-                        "value": -150.75
-                    },
-                    "overtime_curr_month_end": {
-                        "value": -150.75
-                    },
-                    "overtime_prev_months": {
-                        "value": 0.0
-                    },
-                    "overtime_acc_period": {
-                        "value": -150.75
-                    }
-                },
-                "not_approved": {
-                    "work_days": {
-                        "total": 2,
-                        "selected_shop": 1,
-                        "other_shops": 1
-                    },
-                    "work_hours": {
-                        "total": 21.5,
-                        "selected_shop": 10.75,
-                        "other_shops": 10.75
-                    },
-                    "work_hours_prev_months": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
-                    },
-                    "work_hours_curr_month": {
-                        "total": 21.5,
-                        "selected_shop": 10.75,
-                        "other_shops": 10.75
-                    },
-                    "work_hours_curr_month_end": {
-                        "value": 21.5
-                    },
-                    "work_hours_until_acc_period_end": {
-                        "total": 21.5,
-                        "selected_shop": 10.75,
-                        "other_shops": 10.75
-                    },
-                    "work_hours_acc_period": {
-                        "value": 21.5
-                    },
-                    "day_type": {
-                        "H": 1,
-                        "W": 2
-                    },
-                    "norm_hours_curr_month": {
-                        "value": 183.0
-                    },
-                    "norm_hours_prev_months": {
-                        "value": 0.0
-                    },
-                    "norm_hours_curr_month_end": {
-                        "value": 183.0
-                    },
-                    "norm_hours_acc_period": {
-                        "value": 183.0
-                    },
-                    "overtime_curr_month": {
-                        "value": -161.5
-                    },
-                    "overtime_curr_month_end": {
-                        "value": -161.5
-                    },
-                    "overtime_prev_months": {
-                        "value": 0.0
-                    },
-                    "overtime_acc_period": {
-                        "value": -161.5
-                    }
-                }
-            },
-            "fact": {
-                "approved": {
-                    "work_hours_prev_months": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
-                    },
-                    "work_days": {
-                        "total": 2,
-                        "selected_shop": 1,
-                        "other_shops": 1
-                    },
-                    "work_hours": {
-                        "total": 21.5,
-                        "selected_shop": 10.75,
-                        "other_shops": 10.75
-                    },
-                    "work_hours_curr_month": {
-                        "total": 21.5,
-                        "selected_shop": 10.75,
-                        "other_shops": 10.75
-                    },
-                    "work_hours_curr_month_end": {
-                        "value": 21.5
-                    },
-                    "work_hours_until_acc_period_end": {
-                        "total": 21.5,
-                        "selected_shop": 10.75,
-                        "other_shops": 10.75
-                    },
-                    "work_hours_acc_period": {
-                        "value": 21.5
-                    },
-                    "day_type": {
-                        "W": 2
-                    },
-                    "norm_hours_curr_month": {
-                        "value": 183.0
-                    },
-                    "norm_hours_prev_months": {
-                        "value": 0.0
-                    },
-                    "norm_hours_curr_month_end": {
-                        "value": 183.0
-                    },
-                    "norm_hours_acc_period": {
-                        "value": 183.0
-                    },
-                    "overtime_curr_month": {
-                        "value": -161.5
-                    },
-                    "overtime_curr_month_end": {
-                        "value": -161.5
-                    },
-                    "overtime_prev_months": {
-                        "value": 0.0
-                    },
-                    "overtime_acc_period": {
-                        "value": -161.5
-                    }
-                },
-                "combined": {
-                    "work_days": {
-                        "total": 5,
-                        "selected_shop": 3,
-                        "other_shops": 2
-                    },
-                    "work_hours": {
-                        "total": 53.75,
-                        "selected_shop": 32.25,
-                        "other_shops": 21.5
-                    },
-                    "work_hours_prev_months": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
-                    },
-                    "work_hours_curr_month": {
-                        "total": 53.75,
-                        "selected_shop": 32.25,
-                        "other_shops": 21.5
-                    },
-                    "work_hours_curr_month_end": {
-                        "value": 53.75
-                    },
-                    "work_hours_until_acc_period_end": {
-                        "total": 53.75,
-                        "selected_shop": 32.25,
-                        "other_shops": 21.5
-                    },
-                    "work_hours_acc_period": {
-                        "value": 53.75
-                    },
-                    "day_type": {
-                        "W": 5
-                    },
-                    "norm_hours_curr_month": {
-                        "value": 183.0
-                    },
-                    "norm_hours_prev_months": {
-                        "value": 0.0
-                    },
-                    "norm_hours_curr_month_end": {
-                        "value": 183.0
-                    },
-                    "norm_hours_acc_period": {
-                        "value": 183.0
-                    },
-                    "overtime_curr_month": {
-                        "value": -129.25
-                    },
-                    "overtime_curr_month_end": {
-                        "value": -129.25
-                    },
-                    "overtime_prev_months": {
-                        "value": 0.0
-                    },
-                    "overtime_acc_period": {
-                        "value": -129.25
-                    }
-                },
-                "not_approved": {
-                    "work_days": {
-                        "total": 3,
-                        "selected_shop": 2,
-                        "other_shops": 1
-                    },
-                    "work_hours": {
-                        "total": 32.25,
-                        "selected_shop": 21.5,
-                        "other_shops": 10.75
-                    },
-                    "work_hours_prev_months": {
-                        "total": 0,
-                        "selected_shop": 0,
-                        "other_shops": 0
-                    },
-                    "work_hours_curr_month": {
-                        "total": 32.25,
-                        "selected_shop": 21.5,
-                        "other_shops": 10.75
-                    },
-                    "work_hours_curr_month_end": {
-                        "value": 32.25
-                    },
-                    "work_hours_until_acc_period_end": {
-                        "total": 32.25,
-                        "selected_shop": 21.5,
-                        "other_shops": 10.75
-                    },
-                    "work_hours_acc_period": {
-                        "value": 32.25
-                    },
-                    "day_type": {
-                        "W": 3
-                    },
-                    "norm_hours_curr_month": {
-                        "value": 183.0
-                    },
-                    "norm_hours_prev_months": {
-                        "value": 0.0
-                    },
-                    "norm_hours_curr_month_end": {
-                        "value": 183.0
-                    },
-                    "norm_hours_acc_period": {
-                        "value": 183.0
-                    },
-                    "overtime_curr_month": {
-                        "value": -150.75
-                    },
-                    "overtime_curr_month_end": {
-                        "value": -150.75
-                    },
-                    "overtime_prev_months": {
-                        "value": 0.0
-                    },
-                    "overtime_acc_period": {
-                        "value": -150.75
-                    }
-                }
-            }
-        }}
-        self.assertEqual(response.json()[str(self.user2.id)], stat[str(self.user2.id)])
 
     def test_daily_stat(self):
         self.employment3.shop = self.shop2
@@ -672,6 +263,44 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             self.assertEqual(wd_from_db.is_approved, True)
             self.assertIsNotNone(wd_from_db_not_approved)
             self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
+
+    def test_cant_approve_protected_day_without_perm(self):
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt,
+            'is_fact': False,
+        }
+
+        self.create_worker_day(shop=self.shop2, dt=self.dt, is_blocked=True, is_approved=True)
+        self.create_worker_day(shop=self.shop2, dt=self.dt, type=WorkerDay.TYPE_HOLIDAY)
+
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()['detail'], 'У вас нет прав на подтверждение защищенных рабочих дней. '
+                                                   'Обратитесь, пожалуйста, к администратору системы.')
+
+    def test_can_approve_protected_day_with_perm(self):
+        self.admin_group.has_perm_to_change_protected_wdays = True
+        self.admin_group.save()
+
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt,
+            'is_fact': False,
+        }
+
+        protected_day = self.create_worker_day(shop=self.shop2, dt=self.dt, is_blocked=True, is_approved=True)
+        day_to_approve = self.create_worker_day(shop=self.shop2, dt=self.dt, type=WorkerDay.TYPE_HOLIDAY)
+
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertFalse(WorkerDay.objects.filter(id=protected_day.id).exists())
+        self.assertTrue(WorkerDay.objects.get(id=day_to_approve.id).is_approved)
 
 
 class TestUploadDownload(APITestCase):

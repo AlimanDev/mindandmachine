@@ -82,7 +82,11 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         serializer.save(network=self.request.user.network)
 
     def get_queryset(self):
-        qs = Employment.objects.filter(
+        manager = Employment.objects
+        if self.action in ['update']:
+            manager = Employment.objects_with_excluded
+
+        qs = manager.filter(
             shop__network_id=self.request.user.network_id
         ).order_by('-dt_hired')
         if self.action in ['list', 'retrieve']:

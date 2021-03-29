@@ -1,22 +1,27 @@
 import json
-import requests
 from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
+
+import requests
 from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.db.models import F, Count, Sum, Q
 from django.db.models.functions import Coalesce, Extract
-from django.core.serializers.json import DjangoJSONEncoder
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets
-from rest_framework.response import Response
+from rest_framework.authentication import BaseAuthentication
 from rest_framework.decorators import action
-from src.celery.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
-from src.base.permissions import Permission
+from rest_framework.exceptions import ValidationError, AuthenticationFailed
+from rest_framework.response import Response
 
-from src.forecast.models import PeriodClients
 from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings, WorkerPosition
+from src.base.permissions import Permission
+from src.celery.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
+from src.forecast.models import PeriodClients
 from src.timetable.models import (
     ShopMonthStat,
     WorkType,
@@ -28,19 +33,18 @@ from src.timetable.models import (
     UserWeekdaySlot,
 )
 
-from src.timetable.serializers import AutoSettingsCreateSerializer, AutoSettingsDeleteSerializer, AutoSettingsSetSerializer
+from src.timetable.auto_settings.serializers import (
+    AutoSettingsCreateSerializer,
+    AutoSettingsDeleteSerializer,
+    AutoSettingsSetSerializer,
+)
+from src.timetable.worker_day.stat import CalendarPaidDays, WorkersStatsGetter
 from src.util.models_converter import (
     WorkTypeConverter,
     EmploymentConverter,
     WorkerDayConverter,
     Converter,
 )
-
-from src.timetable.worker_day.stat import CalendarPaidDays
-from rest_framework.exceptions import ValidationError, AuthenticationFailed
-from rest_framework.authentication import BaseAuthentication
-
-from drf_yasg.utils import swagger_auto_schema
 
 
 class TokenAuthentication(BaseAuthentication):
@@ -56,6 +60,7 @@ class TokenAuthentication(BaseAuthentication):
 
         return (user, None)
 
+
 class AutoSettingsViewSet(viewsets.ViewSet):
     error_messages = {
         "tt_create_past": _("Timetable should be built at least from {num} day from now."),
@@ -66,6 +71,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         "tt_server_error": _("Fail sending data to server."),
         "tt_delete_past": _("You can't delete timetable in the past."),
         "settings_not_exists": _("You need to select auto-scheduling settings for the department."),
+        "tt_different_acc_periods": _("Небходимо выбрать интервал в рамках одного учетного периода."),
     }
     serializer_class = AutoSettingsCreateSerializer
     permission_classes = [Permission]
@@ -269,6 +275,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         dt_from = form['dt_from']
         dt_to = form['dt_to']
 
+        if not (self.request.user.network.get_acc_period_range(dt_to) == self.request.user.network.get_acc_period_range(dt_from)):
+            raise ValidationError(self.error_messages["tt_different_acc_periods"])
+
         dt_min = datetime.now().date() + timedelta(days=settings.REBUILD_TIMETABLE_MIN_DELTA)
 
         if dt_from < dt_min:
@@ -302,6 +311,14 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         ).select_related('user', 'position')
 
         user_ids = employments.values_list('user_id', flat=True)
+
+        worker_stats_cls = WorkersStatsGetter(
+            shop_id=shop_id,
+            dt_from=dt_from,
+            dt_to=dt_to,
+            worker_id__in=list(user_ids),
+        )
+        stats = worker_stats_cls.run()
 
         users = User.objects.filter(id__in=user_ids)
         user_dict = {u.id: u for u in users}
@@ -417,6 +434,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
                     created_by_id=wd['created_by_id'],
+                    shop_id=wd.get('shop_id'),
                 )
                 wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
                 array.append(wd_mod)
@@ -444,6 +462,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'dttm_work_end',
             'work_types__id',
             'created_by_id',
+            'shop_id',
         )
         fill_wd_array(worker_days_db, new_worker_days, prev_data=form.get('is_remaking', False))
 
@@ -549,6 +568,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             key = worker_d.worker_id
             if key not in worker_day:
                 worker_day[key] = []
+            # дни отработанные в других отделах
+            if worker_d.shop_id and worker_d.shop_id != shop_id:
+                worker_d.type = 'R'
             worker_day[key].append(worker_d)
 
         # Расписание за прошлую неделю от даты составления
@@ -560,18 +582,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             prev_data[key].append(worker_d)
 
         employment_stat_dict = count_prev_paid_days(dt_from - timedelta(days=1), employments, shop.region_id)
-        # статистика за период до даты составления в текущем месяце
-        month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_start=dt_from, is_approved=not form['use_not_approved'])
-        # статистика за период составления графика
-        month_stat_prev = count_prev_paid_days(dt_from, employments, shop.region_id, dt_start=dt_first, is_approved=not form['use_not_approved'])
-        # статистика за период после даты составления в текущем месяце
-        month_stat_next = count_prev_paid_days(
-            (dt_first + relativedelta(day=31)) + timedelta(1), 
-            employments, 
-            shop.region_id, 
-            dt_start=dt_to + timedelta(days=1), 
-            is_approved=not form['use_not_approved'],
-        )
+        # month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_start=dt_from, is_approved=not form['use_not_approved'])
+        # month_stat_prev = count_prev_paid_days(dt_from, employments, shop.region_id, dt_start=dt_first, is_approved=not form['use_not_approved'])
 
         ##################################################################
 
@@ -699,24 +711,14 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             type__in=ProductionDay.WORK_TYPES,
             region_id=shop.region_id,
         ))
-        work_hours = sum(
-            [
-                ProductionDay.WORK_NORM_HOURS[wd.type]
-                for wd in work_days
-            ]
-        ) 
-        #* (dt_to - dt_from).days / len(work_days) # норма рабочего времени за оставшийся период период (за месяц)
-        work_hours = shop.settings.fot if shop.settings.fot else work_hours  # fixme: tmp, special for 585
         init_params['n_working_days_optimal'] = len(work_days)
         days_in_month = ((dt_first + relativedelta(day=31)) - dt_first).days + 1
 
         for e in employments:
-            fot = work_hours * e.norm_work_hours / 100
-            fot = fot * (days_in_month - (month_stat[e.id]['vacations'] + month_stat_prev[e.id]['vacations'] + month_stat_next[e.id]['vacations'])) / days_in_month
-            employment_stat_dict[e.id]['norm_work_amount'] = \
-            (fot - (month_stat_prev[e.id]['paid_hours'] + month_stat_next[e.id]['paid_hours'])) * \
-            (days_in_month - (month_stat_prev[e.id]['no_data'] + month_stat_next[e.id]['no_data'])) / days_in_month
-
+            norm_work_amount = shop.settings.norm_hours_coeff * stats[e.user_id]['employments'][e.id][
+                'sawh_hours_plan_not_approved_selected_period' if form[
+                    'use_not_approved'] else 'sawh_hours_plan_approved_selected_period']
+            employment_stat_dict[e.id]['norm_work_amount'] = norm_work_amount
 
         ##################################################################
         breaks = {
@@ -786,8 +788,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     # ),
                     'workdays': WorkerDayConverter.convert(worker_day.get(e.user_id, []), out_array=True),
                     'prev_data': WorkerDayConverter.convert(prev_data.get(e.user_id, []), out_array=True),
-                    'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),
-                    'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),
+                    'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),  # не учитывается
+                    'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),  # не учитывается
                     'norm_work_amount': employment_stat_dict[e.id]['norm_work_amount'],
                     'required_coupled_hol_in_hol': employment_stat_dict[e.id].get('required_coupled_hol_in_hol', 0),
                     'min_shift_len': e.shift_hours_length_min if e.shift_hours_length_min else 0,
@@ -905,6 +907,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         #неподтвержденная версия
                         if False in wdays:
                             wd_obj = wdays[False]
+                            # дни отработанные в других магазинах
+                            if wd_obj.shop_id and wd_obj.shop_id != shop.id and wd_obj.type != WorkerDay.TYPE_EMPTY:
+                                continue
                             if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
                                 wd_obj.type = wd['type']
                                 wd_obj.created_by_id = None
