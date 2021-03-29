@@ -19,6 +19,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.pagination import LimitOffsetPagination
 
 from src.base.auth.authentication import CsrfExemptSessionAuthentication
 from src.base.models import User, Network
@@ -471,6 +472,7 @@ class TickPointViewSet(BaseModelViewSet):
     serializer_class = TickPointSerializer
     openapi_tags = ['TickPoint', ]
     filterset_class = TickPointFilterSet
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
         return TickPoint.objects.filter(network_id=self.request.user.network_id, dttm_deleted__isnull=True)

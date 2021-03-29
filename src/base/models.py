@@ -1146,6 +1146,7 @@ class FunctionGroup(AbstractModel):
         'Shop_stat',
         'Shop_tree',
         'Subscribe',
+        'TickPoint',
         'User',
         'User_change_password',
         'User_delete_biometrics',
