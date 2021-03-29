@@ -1518,6 +1518,16 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         wd = WorkerDay.objects.filter(
             dt=self.dt,
             is_fact=True,
+            is_approved=False,
+            dttm_work_start=datetime.combine(self.dt, time(6, 0, 0)),
+            dttm_work_end=None,
+            worker=self.user3
+        )
+
+        self.assertTrue(wd.exists())
+        wd = WorkerDay.objects.filter(
+            dt=self.dt,
+            is_fact=True,
             is_approved=True,
             dttm_work_start=datetime.combine(self.dt, time(6, 0, 0)),
             dttm_work_end=None,
