@@ -1128,7 +1128,6 @@ class AttendanceRecords(AbstractModel):
                 ]
             )
 
-
     def save(self, *args, **kwargs):
         """
         Создание WorkerDay при занесении отметок.
@@ -1178,6 +1177,7 @@ class AttendanceRecords(AbstractModel):
                 if not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl)
                 fact_approved.save()
+                self._create_or_update_not_approved_fact(fact_approved)
             else:
                 if self.type == self.TYPE_LEAVING:
                     prev_fa_wd = WorkerDay.objects.filter(
