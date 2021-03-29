@@ -1076,6 +1076,58 @@ class AttendanceRecords(AbstractModel):
                     worker_day=fact_approved,
                     work_type_id=employment_work_type.work_type_id,
                 )
+    
+    def _create_or_update_not_approved_fact(self, fact_approved):
+        try:
+            not_approved = WorkerDay.objects.get(
+                dt=fact_approved.dt,
+                worker_id=fact_approved.worker_id,
+                is_fact=fact_approved.is_fact,
+                is_approved=False,
+            )
+        except WorkerDay.DoesNotExist:
+            not_approved = WorkerDay.objects.create(
+                shop=fact_approved.shop,
+                worker_id=fact_approved.worker_id,
+                employment=fact_approved.employment,
+                dttm_work_start=fact_approved.dttm_work_start,
+                dttm_work_end=fact_approved.dttm_work_end,
+                dt=fact_approved.dt,
+                is_fact=fact_approved.is_fact,
+                is_approved=False,
+                type=fact_approved.type,
+                is_vacancy=fact_approved.is_vacancy,
+                is_outsource=fact_approved.is_outsource,
+            )
+            WorkerDayCashboxDetails.objects.bulk_create(
+                [
+                    WorkerDayCashboxDetails(
+                        work_part=details.work_part,
+                        worker_day=not_approved,
+                        work_type_id=details.work_type_id,
+                    )
+                    for details in fact_approved.worker_day_details.all()
+                ]
+            )
+            return
+        
+        if not not_approved.created_by_id:
+            not_approved.dttm_work_start = fact_approved.dttm_work_start
+            not_approved.dttm_work_end = fact_approved.dttm_work_end
+            not_approved.save()
+        
+        if fact_approved.worker_day_details.exists() and not not_approved.worker_day_details.exists():
+            WorkerDayCashboxDetails.objects.bulk_create(
+                [
+                    WorkerDayCashboxDetails(
+                        work_part=details.work_part,
+                        worker_day=not_approved,
+                        work_type_id=details.work_type_id,
+                    )
+                    for details in fact_approved.worker_day_details.all()
+                ]
+            )
+
 
     def save(self, *args, **kwargs):
         """
@@ -1148,6 +1200,7 @@ class AttendanceRecords(AbstractModel):
                             prev_fa_wd.save()
                             self.dt = prev_fa_wd.dt # логично дату предыдущую ставить, так как это значение в отчетах используется
                             super(AttendanceRecords, self).save(update_fields=['dt',])
+                            self._create_or_update_not_approved_fact(prev_fa_wd)
                             return
 
                     if settings.MDA_SKIP_LEAVING_TICK:
@@ -1168,6 +1221,7 @@ class AttendanceRecords(AbstractModel):
                 )
                 if _wd_created or not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl)
+                self._create_or_update_not_approved_fact(fact_approved)
 
         return res
 
