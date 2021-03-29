@@ -117,10 +117,20 @@ class FunctionGroupAdmin(admin.ModelAdmin):
 
 @admin.register(Employment)
 class EmploymentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'shop', 'user')
+    list_display = ('id', 'shop', 'user', 'function_group', 'dt_hired_formated', 'dt_fired_formated')
+    list_select_related = ('user', 'shop', 'function_group')
     list_filter = ('shop', 'user')
     search_fields = ('user__first_name', 'user__last_name', 'shop__name', 'shop__parent__name', 'tabel_code')
     raw_id_fields = ('shop', 'user', 'position')
+    def dt_hired_formated(self, obj):
+        return obj.dt_hired.strftime('%d.%m.%Y') if obj.dt_hired else '-'
+    
+    dt_hired_formated.short_description = 'dt hired'
+
+    def dt_fired_formated(self, obj):
+        return obj.dt_fired.strftime('%d.%m.%Y') if obj.dt_fired else '-'
+    
+    dt_fired_formated.short_description = 'dt fired'
 
 
 @admin.register(ProductionDay)

@@ -34,8 +34,8 @@ class TestsHelperMixin:
         create_departments_and_users(cls)
 
     @staticmethod
-    def get_url(view_name, **kwargs: dict):
-        return reverse(view_name, kwargs=kwargs)
+    def get_url(view_name, *args, **kwargs: dict):
+        return reverse(view_name, args=args, kwargs=kwargs)
 
     def print_resp(self, resp):
         try:
