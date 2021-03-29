@@ -67,6 +67,7 @@ class WorkerDayListSerializer(serializers.Serializer):
     parent_worker_day_id = serializers.IntegerField()
     shop_code = serializers.CharField(required=False, read_only=True)
     user_login = serializers.CharField(required=False, read_only=True)
+    employment_tabel_code = serializers.CharField(required=False, read_only=True)
     created_by_id = serializers.IntegerField(read_only=True)
     last_edited_by = UserListSerializer(read_only=True)
     dttm_modified = serializers.DateTimeField(read_only=True)
@@ -101,6 +102,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     type = serializers.CharField(required=True)
     shop_code = serializers.CharField(required=False)
     user_login = serializers.CharField(required=False, read_only=True)
+    employment_tabel_code = serializers.CharField(required=False, read_only=True)
     username = serializers.CharField(required=False, write_only=True)
     created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     last_edited_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
@@ -110,7 +112,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by', 'last_edited_by',
-                  'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked']
+                  'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked',
+                  'employment_tabel_code']
         read_only_fields = ['work_hours', 'parent_worker_day_id', 'is_blocked']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
