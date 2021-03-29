@@ -406,7 +406,7 @@ class TestAutoWorkerExchange(TestCase):
 
         workers_exchange()
 
-        worker_days = WorkerDay.objects.all()
+        worker_days = WorkerDay.objects.filter(is_approved=True)
         self.assertEqual(len(worker_days), 4)
         self.assertIsNotNone(worker_days.filter(is_vacancy=True).first().worker_id)
 
@@ -473,7 +473,7 @@ class TestAutoWorkerExchange(TestCase):
             worker_day=vacancy,
         )
         holiday_workers_exchange()
-        vacancy = WorkerDay.objects.get(is_vacancy=True)
+        vacancy = WorkerDay.objects.get(is_vacancy=True, is_approved=True)
         self.assertEqual(vacancy.employment, employment2)
 
     def test_workers_hard_exchange_holidays_2days_last(self):
@@ -507,7 +507,7 @@ class TestAutoWorkerExchange(TestCase):
             worker_day=vacancy,
         )
         holiday_workers_exchange()
-        vacancy = WorkerDay.objects.get(is_vacancy=True)
+        vacancy = WorkerDay.objects.get(is_vacancy=True, is_approved=True)
         self.assertEqual(vacancy.employment, employment2)
 
     def test_workers_hard_exchange_holidays_1day(self):
@@ -538,7 +538,7 @@ class TestAutoWorkerExchange(TestCase):
             worker_day=vacancy,
         )
         holiday_workers_exchange()
-        vacancy = WorkerDay.objects.get(is_vacancy=True)
+        vacancy = WorkerDay.objects.get(is_vacancy=True, is_approved=True)
         self.assertEqual(vacancy.employment, employment2)
 
     def test_worker_exchange_cant_apply_vacancy(self):
