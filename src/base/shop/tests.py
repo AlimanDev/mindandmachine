@@ -246,9 +246,10 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'settings_id': self.shop_settings.id,
             'forecast_step_minutes': '00:30:00',
             'is_active': False,
-            'latitude': '52.229675',
-            'longitude': '21.012228',
+            'latitude': '52.22967541',
+            'longitude': '21.01222831',
             'director_code': 'nonexistent',
+            'fias_code': '09d9d44f-044b-4b9a-97b0-c70f0e327e9f',
         }
         # response = self.client.put(self.shop_url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -262,7 +263,6 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['area'] = 0.0
         data['load_template_id'] = None
         data['exchange_settings_id'] = None
-        data['fias_code'] = ''
         data['distance'] = None
         data['load_template_status'] = 'R'
         data.pop('nonstandard_schedule')
