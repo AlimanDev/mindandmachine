@@ -72,8 +72,8 @@ class ShopSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(required=False, default=True)
     director_code = serializers.CharField(required=False)
     distance = serializers.SerializerMethodField(label='Расстояние до магазина (км)')
-    latitude = RoundingDecimalField(decimal_places=6, max_digits=12, allow_null=True, required=False)
-    longitude = RoundingDecimalField(decimal_places=6, max_digits=12, allow_null=True, required=False)
+    latitude = RoundingDecimalField(decimal_places=8, max_digits=12, allow_null=True, required=False)
+    longitude = RoundingDecimalField(decimal_places=8, max_digits=12, allow_null=True, required=False)
 
     def get_distance(self, shop):
         if self.context.get('request', False):
@@ -88,7 +88,8 @@ class ShopSerializer(serializers.ModelSerializer):
                   'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id',
                   'network_id', 'restricted_start_times', 'restricted_end_times', 'exchange_settings_id',
                   'load_template_id', 'area', 'forecast_step_minutes', 'load_template_status', 'is_active',
-                  'director_code', 'latitude', 'longitude', 'director_id', 'distance', 'nonstandard_schedule', 'email']
+                  'director_code', 'latitude', 'longitude', 'director_id', 'distance', 'nonstandard_schedule', 'email',
+                  'fias_code',]
         extra_kwargs = {
             'restricted_start_times': {
                 'validators': [RestrictedTimeValidator()]
