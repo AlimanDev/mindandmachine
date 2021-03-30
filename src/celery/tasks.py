@@ -16,6 +16,7 @@ from django_celery_beat.models import CrontabSchedule
 from src.main.demand.utils import create_predbills_request_function
 from src.main.operation_template.utils import build_period_clients
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
+from tzwhere import tzwhere
 
 from src.base.models import (
     Shop,
@@ -816,7 +817,7 @@ def fill_shop_schedule(shop_id, dt_from, periods=90):
 
 
 @app.task
-def fill_shop_city(shop_id):
+def fill_shop_city_from_coords(shop_id):
     shop = Shop.objects.filter(id=shop_id).first()
     if shop and shop.latitude and shop.longitude and settings.DADATA_TOKEN:
         from dadata import Dadata
@@ -825,6 +826,42 @@ def fill_shop_city(shop_id):
         if result and result[0].get('data') and result[0].get('data').get('city'):
             shop.city = result[0]['data']['city']
             shop.save(update_fields=['city'])
+
+
+@app.task
+def fill_city_coords_address_timezone_from_fias_code(shop_id):
+    shop = Shop.objects.filter(id=shop_id).first()
+    if shop and shop.fias_code and settings.DADATA_TOKEN:
+        from dadata import Dadata
+        dadata = Dadata(settings.DADATA_TOKEN)
+        result = dadata.find_by_id("address", shop.fias_code)
+        if result and result[0].get('data'):
+            update_fields = []
+            if result[0].get('value'):
+                shop.address = result[0].get('value')
+                update_fields.append('address')
+            data = result[0].get('data')
+            if data.get('city'):
+                shop.city = result[0]['data']['city']
+                update_fields.append('city')
+            if data.get('geo_lat'):
+                shop.latitude = data.get('geo_lat')
+                update_fields.append('latitude')
+            if data.get('geo_lon'):
+                shop.longitude = data.get('geo_lon')
+                update_fields.append('longitude')
+            if data.get('geo_lat') and data.get('geo_lon'):
+                tz = tzwhere.tzwhere()
+                timezone = tz.tzNameAt(float(data.get('geo_lat')), float(data.get('geo_lon')))
+                if timezone:
+                    shop.timezone = timezone
+                else:
+                    tz = tzwhere.tzwhere(forceTZ=True)
+                    timezone = tz.tzNameAt(float(data.get('geo_lat')), float(data.get('geo_lon')), forceTZ=True)
+                    shop.timezone = timezone
+                update_fields.append('timezone')
+            if update_fields:
+                shop.save(update_fields=update_fields)
 
 
 @app.task
