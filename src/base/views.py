@@ -81,6 +81,9 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     def perform_create(self, serializer):
         serializer.save(network=self.request.user.network)
 
+    def perform_update(self, serializer):
+        serializer.save(dttm_deleted=None, network=self.request.user.network)
+
     def get_queryset(self):
         manager = Employment.objects
         if self.action in ['update']:
