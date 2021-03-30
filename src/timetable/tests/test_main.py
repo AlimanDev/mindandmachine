@@ -1903,7 +1903,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(wd_not_approved.dttm_work_end, datetime.combine(self.dt, time(19, 54)))
         self.assertEqual(wd_not_approved.dttm_work_start, wd_approved.dttm_work_start)
 
-    
+    @override_settings(MDA_SKIP_LEAVING_TICK=False)
     def test_create_record_no_replace_not_approved_fact(self):
         wd = WorkerDay.objects.create(
             dt=self.dt,
