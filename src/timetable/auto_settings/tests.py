@@ -1,6 +1,7 @@
 import json
 import uuid
 from datetime import datetime, time, date, timedelta
+from dateutil.relativedelta import relativedelta
 from unittest.mock import patch
 
 import pandas as pd
@@ -392,12 +393,13 @@ class TestAutoSettings(APITestCase):
     def test_no_settings(self):
         self.shop.settings = None
         self.shop.save()
+        dt_next_month = date.today() + relativedelta(day=31)
         response = self.client.post(
             path='/rest_api/auto_settings/create_timetable/',
             data={
                 'shop_id': self.shop.id,
-                'dt_from': datetime.now().date() + timedelta(days=2),
-                'dt_to': datetime.now().date() + timedelta(days=5),
+                'dt_from': dt_next_month + timedelta(days=2),
+                'dt_to': dt_next_month + timedelta(days=5),
             },
         )
         self.assertEqual(response.json(), ['Необходимо выбрать шаблон смен.'])
@@ -494,7 +496,9 @@ class TestAutoSettings(APITestCase):
         self.assertIsNone(data['algo_params']['breaks_triplets'].get(str(self.unused_position.id)))
 
     def test_create_tt_wd_in_other_shops(self):
-        dt_from = date.today() + timedelta(days=1)
+        dt_from = (date.today() + timedelta(days=31)).replace(day=1) + timedelta(days=1)
+        dt_from_tt = dt_from + timedelta(days=1)
+        dt_to = dt_from + relativedelta(day=31)
 
         for day in range(2):
             dt_from = dt_from + timedelta(days=1)
@@ -524,12 +528,7 @@ class TestAutoSettings(APITestCase):
             )
         self.employment6.position = self.position
         self.employment6.save()
-        EmploymentWorkType.objects.create(employment=self.employment2, work_type=self.work_type)
-        EmploymentWorkType.objects.create(employment=self.employment3, work_type=self.work_type)
-        EmploymentWorkType.objects.create(employment=self.employment4, work_type=self.work_type)
         EmploymentWorkType.objects.create(employment=self.employment6, work_type=self.work_type)
-        EmploymentWorkType.objects.create(employment=self.employment7, work_type=self.work_type)
-        dt_to = date.today() + timedelta(31)
         wd = WorkerDay.objects.create(
             employment=self.employment3,
             worker=self.employment3.user,
@@ -544,24 +543,10 @@ class TestAutoSettings(APITestCase):
             work_type=self.work_type,
             worker_day=wd
         )
-        class res:
-            def json(self):
-                return {'task_id': 1}
-        with patch.object(requests, 'post', return_value=res()) as mock_post:
-            response = self.client.post(
-                '/rest_api/auto_settings/create_timetable/',
-                {
-                    'shop_id': self.shop.id,
-                    'dt_from': date.today() + timedelta(days=2),
-                    'dt_to': dt_to,
-                    'use_not_approved': True,
-                }
-            )
-            data = json.loads(mock_post.call_args[1]['data'])
-            self.assertEqual(response.status_code, 200)
+        data = self._test_create_tt(dt_from_tt, dt_to)
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id,data['cashiers']))[0]
         self.assertEqual(len(employment2Info['workdays']), 2)
-        self.assertEqual(employment2Info['workdays'][0]['dt'], (date.today() + timedelta(days=2)).strftime('%Y-%m-%d'))
+        self.assertEqual(employment2Info['workdays'][0]['dt'], dt_from_tt.strftime('%Y-%m-%d'))
         self.assertEqual(employment2Info['workdays'][1]['type'], 'R')
 
     def test_set_timetable_not_replace_wds_in_other_shops(self):

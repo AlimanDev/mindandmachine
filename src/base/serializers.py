@@ -69,11 +69,18 @@ class UserListSerializer(serializers.Serializer):
     tabel_code = serializers.CharField()
     username = serializers.CharField()
     network_id = serializers.IntegerField()
+    has_biometrics = serializers.SerializerMethodField()
 
     def get_avatar_url(self, obj) -> str:
         if obj.avatar:
             return obj.avatar.url
         return None
+
+    def get_has_biometrics(self, obj) -> bool:
+        if getattr(obj, 'userconnecter_id', None):
+            return True
+        else:
+            return False
 
 
 class UserSerializer(BaseNetworkSerializer):

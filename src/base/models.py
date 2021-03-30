@@ -299,6 +299,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     code = models.CharField(max_length=64, null=True, blank=True)
     # From supershop
     address = models.CharField(max_length=256, blank=True, null=True)
+    fias_code = models.CharField(max_length=300, blank=True)
     type = models.CharField(max_length=1, choices=DEPARTMENT_TYPES, default=TYPE_SHOP)
 
     dt_opened = models.DateField(null=True, blank=True)
@@ -337,12 +338,13 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True, blank=True)
 
-    latitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Широта')
-    longitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Долгота')
+    latitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True, verbose_name='Широта')
+    longitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True, verbose_name='Долгота')
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
     city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
 
-    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude'])
+    tracker = FieldTracker(
+        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code'])
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(
@@ -430,10 +432,15 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                 new_dict[key.replace('d', '')] = new_dict.pop(key)
         return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
 
-    def _fill_city_from_dadata(self):
+    def _fill_city_from_coords(self):
         if not self.city and self.latitude and self.longitude and settings.DADATA_TOKEN:
-            from src.celery.tasks import fill_shop_city
-            fill_shop_city.delay(shop_id=self.id)
+            from src.celery.tasks import fill_shop_city_from_coords
+            fill_shop_city_from_coords.delay(shop_id=self.id)
+
+    def _fill_city_coords_address_timezone_from_fias_code(self):
+        if self.fias_code and settings.DADATA_TOKEN:
+            from src.celery.tasks import fill_city_coords_address_timezone_from_fias_code
+            fill_city_coords_address_timezone_from_fias_code.delay(shop_id=self.id)
 
     def _handle_new_shop_created(self):
         from src.util.models_converter import Converter
@@ -495,8 +502,11 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             )
 
         if is_new or (self.tracker.has_changed('latitude') or self.tracker.has_changed('longitude')) and \
-                settings.FILL_SHOP_CITY_FROM_DADATA:
-            transaction.on_commit(self._fill_city_from_dadata)
+                settings.FILL_SHOP_CITY_FROM_COORDS:
+            transaction.on_commit(self._fill_city_from_coords)
+
+        if is_new or self.tracker.has_changed('fias_code') and settings.FILL_SHOP_CITY_COORDS_ADDRESS_TIMEZONE_FROM_FIAS_CODE:
+            transaction.on_commit(self._fill_city_coords_address_timezone_from_fias_code)
 
         return res
 
@@ -1146,8 +1156,10 @@ class FunctionGroup(AbstractModel):
         'Shop_stat',
         'Shop_tree',
         'Subscribe',
+        'TickPoint',
         'User',
         'User_change_password',
+        'User_delete_biometrics',
         'WorkerConstraint',
         'WorkerDay',
         'WorkerDay_approve',
