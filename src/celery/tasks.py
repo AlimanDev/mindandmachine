@@ -57,6 +57,8 @@ from src.timetable.vacancy.utils import (
 )
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
 from src.util.models_converter import Converter
+from src.recognition.utils import get_worker_days_with_no_ticks
+from src.recognition.events import EMPLOYEE_NOT_CHECKED_IN
 
 
 @app.task
@@ -881,3 +883,48 @@ def cron_event():
             user_author_id=None,
             context={},
         )
+
+
+@app.task
+def employee_not_checked_in():
+    dttm = datetime.now()
+    no_comming, no_leaving = get_worker_days_with_no_ticks(dttm)
+    events = EventEmailNotification.objects.filter(
+        event_type__code=EMPLOYEE_NOT_CHECKED_IN,
+    )
+    for event in events:
+        for no_comming_record in no_comming:
+            send_event_email_notifications.delay(
+                event_email_notification_id=event.id,
+                user_author_id=None,
+                context={
+                    'user': {
+                        'last_name': no_comming_record.worker.last_name,
+                        'first_name': no_comming_record.worker.first_name,
+                    },
+                    'director': {
+                        'email': no_comming_record.shop.director.email if no_comming_record.shop.director else no_comming_record.shop.email,
+                        'name': no_comming_record.shop.director.first_name if no_comming_record.shop.director else no_comming_record.shop.name,
+                    },
+                    'dttm': no_comming_record.dttm_work_start_plan,
+                    'type': 'приход',
+                },
+            )
+
+        for no_leaving_record in no_leaving:
+            send_event_email_notifications.delay(
+                event_email_notification_id=event.id,
+                user_author_id=None,
+                context={
+                    'user':{
+                        'last_name': no_leaving_record.worker.last_name,
+                        'first_name': no_leaving_record.worker.first_name,
+                    },
+                    'director': {
+                        'email': no_leaving_record.shop.director.email if no_leaving_record.shop.director else no_leaving_record.shop.email,
+                        'name': no_leaving_record.shop.director.first_name if no_leaving_record.shop.director else no_leaving_record.shop.name,
+                    },
+                    'dttm': no_leaving_record.dttm_work_end_plan,
+                    'type': 'уход',
+                },
+            )

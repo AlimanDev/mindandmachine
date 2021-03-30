@@ -1,6 +1,7 @@
 from src.events.registry import BaseRegisteredEvent
 
 from datetime import date, timedelta
+from uuid import uuid4
 
 
 URV_STAT = 'urv_stat'
@@ -65,4 +66,5 @@ class EmployeeNotCheckedInEvent(BaseRegisteredEvent):
     write_history = False
 
     def get_recipients(self):
-        return self.context.get('director')
+        from src.base.models import User
+        return [User(id=uuid4(), email=self.context.get('director', {}).get('email'), first_name=self.context.get('director', {}).get('name', '')), ]
