@@ -483,3 +483,29 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].body, body1)
             body2 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_dir.last_name} {self.user_dir.first_name} не отметился на уход в {dttm}.\n\nПисьмо отправлено роботом.'
             self.assertEqual(mail.outbox[1].body, body2)
+
+    
+    def test_employee_not_checked_in_notification_sent_only_one(self):
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            type=AttendanceRecords.TYPE_LEAVING,
+            user=self.user_dir,
+            dttm=self.now,
+        )
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            subject = 'Сотрудник не отметился'
+            event_email_notification = EventEmailNotification.objects.create(
+                event_type=self.event,
+                subject=subject,
+                system_email_template='notifications/email/employee_not_checked_in.html',
+                get_recipients_from_event_type=True,
+            )
+            
+            employee_not_checked_in()
+            
+            self.assertEqual(len(mail.outbox), 1)
+            self.assertEqual(mail.outbox[0].subject, subject)
+            self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
+            dttm = (self.now - timedelta(minutes=1)).replace(second=0).strftime('%Y-%m-%dT%H:%M:%S')
+            body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
+            self.assertEqual(mail.outbox[0].body, body1)
