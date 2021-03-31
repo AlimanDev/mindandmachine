@@ -28,4 +28,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(create_or_replace_metabase_views),
     ]
