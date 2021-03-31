@@ -516,12 +516,15 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 wd.refresh_from_db()
                 self.assertEqual(wd.employment_id, empl1.id)
 
+                # при повтором put для empl с тем же code -- признак удаленности должен пропасть
                 resp2_put2 = self.client.put(
                     path=self.get_url('Employment-detail', 'code2'),
                     data=self.dump_data(put_data2),
                     content_type='application/json',
                 )
                 self.assertEqual(resp2_put2.status_code, 200)
+                empl2.refresh_from_db()
+                self.assertEqual(empl2.dttm_deleted, None)
 
     def test_delete_employment_with_filter_delete(self):
         """
