@@ -410,9 +410,11 @@ class TestAutoSettings(APITestCase):
         EmploymentWorkType.objects.create(employment=self.employment4, work_type=self.work_type)
         EmploymentWorkType.objects.create(employment=self.employment6, work_type=self.work_type)
         EmploymentWorkType.objects.create(employment=self.employment7, work_type=self.work_type)
+        EmploymentWorkType.objects.create(employment=self.employment8_old, work_type=self.work_type)
+        EmploymentWorkType.objects.create(employment=self.employment8, work_type=self.work_type)
 
-    def _test_create_tt(self, dt_from, dt_to, use_not_approved=True):
-        ShopMonthStat.objects.filter(shop=self.employment2.shop).update(status=ShopMonthStat.NOT_DONE)
+    def _test_create_tt(self, dt_from, dt_to, use_not_approved=True, shop_id=None):
+        ShopMonthStat.objects.filter(shop_id=shop_id or self.employment2.shop_id).update(status=ShopMonthStat.NOT_DONE)
         # так переопределяем, чтобы можно было константные значения дат из прошлого использовать
         with self.settings(REBUILD_TIMETABLE_MIN_DELTA=-9999):
             class res:
@@ -423,7 +425,7 @@ class TestAutoSettings(APITestCase):
                 response = self.client.post(
                     '/rest_api/auto_settings/create_timetable/',
                     {
-                        'shop_id': self.shop.id,
+                        'shop_id': shop_id or self.shop.id,
                         'dt_from': dt_from,
                         'dt_to': dt_to,
                         'use_not_approved': use_not_approved,
@@ -1329,3 +1331,55 @@ class TestAutoSettings(APITestCase):
                 'Небходимо выбрать интервал в рамках одного учетного периода.'
             ]
         )
+
+    def test_create_tt_division_by_zero_not_raised_with_2_empls(self):
+        Employment.objects.filter(id=self.employment8_old.id).update(dt_hired='2020-01-10', dt_fired='2021-03-04')
+        Employment.objects.filter(id=self.employment8.id).update(dt_hired='2021-03-05', dt_fired='3999-12-31')
+
+        for dt in pd.date_range(date(2021, 3, 1), date(2021, 3, 4)):
+            wd = WorkerDay.objects.create(
+                employment=self.employment8_old,
+                worker=self.employment8_old.user,
+                shop=self.employment8_old.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(19)),
+                is_approved=True,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd,
+            )
+
+        for dt in (date(2021, 3, 5), date(2021, 3, 17)):
+            wd = WorkerDay.objects.create(
+                employment=self.employment8,
+                worker=self.employment8.user,
+                shop=self.employment8.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(19)),
+                is_approved=True,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd,
+            )
+
+        for dt in (date(2021, 3, 18), date(2021, 3, 31)):
+            WorkerDay.objects.create(
+                employment=self.employment8,
+                worker=self.employment8.user,
+                dt=dt,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_approved=True,
+            )
+
+        dt_from = date(2021, 3, 1)
+        dt_to = date(2021, 3, 7)
+        data = self._test_create_tt(dt_from, dt_to, shop_id=self.employment8.shop_id)
+
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.employment8_old.user.id, data['cashiers']))[0]
+        self.assertEqual(employment2Info['norm_work_amount'], 32.0)  # TODO-devx: не уверен, что верное значение, надо будет проверить
