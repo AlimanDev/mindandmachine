@@ -749,7 +749,7 @@ class WorkersStatsGetter:
                         fot3 = fot1 * (days_count_outside_of_selected_period - vacations_or_sick_count_outside_of_selected_period_pa) / days_count_in_month
 
                         # TODO: workdays_count_outside_of_selected_period_pa смотрится по сотруднику, а empty_days_pa по трудоустройству, некорректное сравнение
-                        if workdays_count_outside_of_selected_period_pa == 0 or (workdays_count_outside_of_selected_period_pa + empty_days_pa) == 0:
+                        if workdays_count_outside_of_selected_period_pa == 0 or (workdays_count_outside_of_selected_period_pa + empty_days_pa) == 0 or (days_count_selected_period + empty_days_pa) == 0:
                             norm_work_amount = fot2
                         else:
                             had_to_work_outside_of_period = fot3 * (
@@ -780,7 +780,7 @@ class WorkersStatsGetter:
                                     days_count_outside_of_selected_period - vacations_or_sick_count_outside_of_selected_period_npa) / days_count_in_month
 
                         # TODO: workdays_count_outside_of_selected_period_npa смотрится по сотруднику, а empty_days_npa по трудоустройству, некорректное сравнение
-                        if workdays_count_outside_of_selected_period_npa == 0 or (workdays_count_outside_of_selected_period_npa + empty_days_npa) == 0:
+                        if workdays_count_outside_of_selected_period_npa == 0 or (workdays_count_outside_of_selected_period_npa + empty_days_npa) == 0 or (days_count_selected_period + empty_days_npa) == 0:
                             norm_work_amount = fot2
                         else:
                             had_to_work_outside_of_period = fot3 * (
