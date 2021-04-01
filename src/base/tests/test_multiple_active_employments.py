@@ -1,5 +1,6 @@
-from datetime import date, time, datetime
+from datetime import date, time, datetime, timedelta
 
+import pandas as pd
 from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -71,18 +72,22 @@ class MultipleActiveEmploymentsSupportMixin(TestsHelperMixin):
         cls.employment1_1_1 = EmploymentFactory(
             user=cls.user1, shop=cls.shop1, function_group=cls.group1, network=cls.network,
             work_types__work_type=cls.work_type1_cachier,
+            tabel_code='employment1_1_1',
         )
         cls.employment1_1_2 = EmploymentFactory(
             user=cls.user1, shop=cls.shop1, function_group=cls.group1, network=cls.network, norm_work_hours=50,
             work_types__work_type=cls.work_type1_cleaner,
+            tabel_code='employment1_1_2',
         )
         cls.employment2_2_1 = EmploymentFactory(
             user=cls.user2, shop=cls.shop2, function_group=cls.group1, network=cls.network,
             work_types__work_type=cls.work_type2_cachier,
+            tabel_code='employment2_2_1',
         )
         cls.employment2_3_1 = EmploymentFactory(
             user=cls.user2, shop=cls.shop3, function_group=cls.group1, network=cls.network, norm_work_hours=50,
             work_types__work_type=cls.work_type3_cachier,
+            tabel_code='employment2_3_1',
         )
         cls.dt = date.today()
 
@@ -245,3 +250,105 @@ class TestConfirmVacancy(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
         vacancy.refresh_from_db()
         self.assertEqual(vacancy.employment_id, self.employment2_3_1.id)
+
+
+class TestGetWorkerDaysForTabel(MultipleActiveEmploymentsSupportMixin, APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super(TestGetWorkerDaysForTabel, cls).setUpTestData()
+        cls.dt_now = date.today()
+        cls.add_group_perm(cls.group1, 'WorkerDay', 'GET')
+        for dt in pd.date_range(cls.dt_now, cls.dt_now + timedelta(days=4)):
+            WorkerDayFactory(
+                dt=dt,
+                worker=cls.user1,
+                employment=cls.employment1_1_1,
+                shop=cls.shop1,
+                type=WorkerDay.TYPE_WORKDAY,
+                is_fact=True,
+                is_approved=True,
+                cashbox_details__work_type=cls.work_type1_cachier,
+            )
+
+        for dt in pd.date_range(cls.dt_now + timedelta(days=5), cls.dt_now + timedelta(days=9)):
+            WorkerDayFactory(
+                dt=dt,
+                worker=cls.user1,
+                employment=cls.employment1_1_1,
+                shop=cls.shop1,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_fact=False,
+                is_approved=True,
+            )
+
+        for dt in pd.date_range(cls.dt_now + timedelta(days=10), cls.dt_now + timedelta(days=14)):
+            WorkerDayFactory(
+                dt=dt,
+                worker=cls.user1,
+                employment=cls.employment1_1_2,
+                shop=cls.shop1,
+                type=WorkerDay.TYPE_WORKDAY,
+                is_fact=True,
+                is_approved=True,
+                cashbox_details__work_type=cls.work_type1_cleaner,
+            )
+
+        for dt in pd.date_range(cls.dt_now + timedelta(days=15), cls.dt_now + timedelta(days=19)):
+            WorkerDayFactory(
+                dt=dt,
+                worker=cls.user1,
+                shop=cls.shop1,
+                type=WorkerDay.TYPE_VACATION,
+                is_fact=False,
+                is_approved=True,
+            )
+
+        for dt in pd.date_range(cls.dt_now + timedelta(days=20), cls.dt_now + timedelta(days=24)):
+            WorkerDayFactory(
+                dt=dt,
+                worker=cls.user1,
+                employment=cls.employment1_1_2,
+                shop=cls.shop1,
+                type=WorkerDay.TYPE_WORKDAY,
+                is_fact=True,
+                is_approved=True,
+                cashbox_details__work_type=cls.work_type1_cleaner,
+            )
+
+    def test_get_tabel_data_by_tabel_code(self):
+        """
+        Проверка получения дней по табельному коду трудоустройства
+        TODO: может ли быть такое, что у 1 пользователя отпуска по разным трудоустройствам будут в разные периоды?
+        """
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get(
+            self.get_url('WorkerDay-list'),
+            data={
+                'dt__gte': self.dt_now,
+                'dt__lte': self.dt_now + timedelta(days=24),
+                'fact_tabel': True,
+                'employment__tabel_code__in': 'employment1_1_1',
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 15)
+        self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_WORKDAY, resp_data))), 5)
+        self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_HOLIDAY, resp_data))), 5)
+        self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_VACATION, resp_data))), 5)
+
+        resp = self.client.get(
+            self.get_url('WorkerDay-list'),
+            data={
+                'dt__gte': self.dt_now,
+                'dt__lte': self.dt_now + timedelta(days=24),
+                'fact_tabel': True,
+                'employment__tabel_code__in': 'employment1_1_2',
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 20)
+        self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_WORKDAY, resp_data))), 10)
+        self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_HOLIDAY, resp_data))), 5)
+        self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_VACATION, resp_data))), 5)

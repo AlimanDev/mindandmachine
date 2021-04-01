@@ -1,7 +1,7 @@
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from django.db.models import Subquery, OuterRef, Q
+from django.db.models import Subquery, OuterRef, Q, Exists
 from django_filters.rest_framework import (
     FilterSet,
     BooleanFilter,
@@ -12,6 +12,7 @@ from django_filters.rest_framework import (
     OrderingFilter,
 )
 
+from src.base.models import Employment
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
 
 
@@ -19,10 +20,31 @@ class WorkerDayFilter(FilterSet):
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода")  # aa: fixme: delete
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода') # aa: fixme: delete
     fact_tabel = BooleanFilter(method='filter_fact_tabel', label="Выгрузка табеля")
+    employment__tabel_code__in = CharFilter(method='filter_employment__tabel_code__in')
 
     def filter_fact_tabel(self, queryset, name, value):
         if value:
             return queryset.get_tabel()
+
+        return queryset
+
+    def filter_employment__tabel_code__in(self, queryset, name, value):
+        if value:
+            empl_tabel_codes = value.split(',')
+            queryset = queryset.annotate(
+                worker_has_active_employment_with_tabel_code_from_list=Exists(
+                    Employment.objects.get_active(
+                        network_id=OuterRef('worker__network_id'),
+                        user_id=OuterRef('worker_id'),
+                        dt_from=OuterRef('dt'),
+                        dt_to=OuterRef('dt'),
+                        tabel_code__in=empl_tabel_codes,
+                    )
+                )
+            ).filter(
+                Q(Q(type=WorkerDay.TYPE_WORKDAY) & Q(employment__tabel_code__in=empl_tabel_codes)) |
+                Q(~Q(type=WorkerDay.TYPE_WORKDAY) & Q(worker_has_active_employment_with_tabel_code_from_list=True))
+            ).distinct()
 
         return queryset
 
@@ -32,7 +54,6 @@ class WorkerDayFilter(FilterSet):
             # 'shop_id':['exact'],
             'worker_id': ['in', 'exact'],
             'worker__username': ['in', 'exact'],
-            'employment__tabel_code': ['in', 'exact'],  # TODO: пока простой вариант, надо подумать что с этим делать
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
             'is_fact': ['exact'],
