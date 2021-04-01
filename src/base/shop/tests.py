@@ -269,7 +269,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(shop, data)
         self.assertIsNotNone(Shop.objects.get(id=shop['id']).dttm_deleted)
 
-    def test_404_resp_for_unexistent_parent_code(self):
+    def test_400_resp_for_unexistent_parent_code(self):
         data = {
             "parent_code": 'nonexistent',
             "name": 'Title 2',
@@ -292,7 +292,8 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'director_code': 'nonexistent',
         }
         response = self.client.put(self.shop_url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {'message': "Подразделение с parent_code=nonexistent не найдено"})
 
     def test_cant_save_with_invalid_restricted_times(self):
         data = {

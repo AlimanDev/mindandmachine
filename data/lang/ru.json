@@ -43,5 +43,6 @@
   "load_template_undefined_types": "Данные типы операций не существуют: {types}",
   "triplet_bad_type": "Некорректный формат перерыва {triplet}, должно быть [[int, int, [int, int,]],].",
   "triplet_bad_value_gt": "Первое значение периода не может быть больше второго значения: {triplet}",
-  "triplet_bad_value": "Значение перерыва не может быть больше значения периода: {triplet}"
+  "triplet_bad_value": "Значение перерыва не может быть больше значения периода: {triplet}",
+  "no_such_parent": "Подразделение с parent_code={code} не найдено"
 }
