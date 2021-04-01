@@ -636,22 +636,21 @@ class EmploymentManager(models.Manager):
 
         order_by = []
 
-        if priority_shop_id:
-            qs = qs.annotate_value_equality(
-                'is_equal_shops', 'shop_id', priority_shop_id,
-            )
-            order_by.append('-is_equal_shops')
-
         if priority_employment_id:
             qs = qs.annotate_value_equality(
                 'is_equal_employments', 'id', priority_employment_id,
             )
             order_by.append('-is_equal_employments')
 
-        if order_by:
-            qs = qs.order_by(*order_by)
+        if priority_shop_id:
+            qs = qs.annotate_value_equality(
+                'is_equal_shops', 'shop_id', priority_shop_id,
+            )
+            order_by.append('-is_equal_shops')
 
-        return qs
+        order_by.append('-norm_work_hours')
+
+        return qs.order_by(*order_by)
 
 
 class Group(AbstractActiveNetworkSpecificCodeNamedModel):
