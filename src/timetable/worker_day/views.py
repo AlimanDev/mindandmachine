@@ -316,8 +316,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                 same_approved_exists=Exists(
                     WorkerDay.objects.filter(
                         Q(shop_id=OuterRef('shop_id')) | Q(shop__isnull=True),
-                        Q(dttm_work_start=OuterRef('dttm_work_start')) | Q(dttm_work_start__isnull=True),
-                        Q(dttm_work_end=OuterRef('dttm_work_end')) | Q(dttm_work_end__isnull=True),
+                        Q(dttm_work_start=OuterRef('dttm_work_start')),
+                        Q(dttm_work_end=OuterRef('dttm_work_end')),
                         Q(work_types=OuterRef('work_types')) | Q(work_types__isnull=True),
                         worker_id=OuterRef('worker_id'),
                         dt=OuterRef('dt'),
