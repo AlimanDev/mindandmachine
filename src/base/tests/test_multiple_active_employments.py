@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 from src.base.tests.factories import ShopFactory, UserFactory, GroupFactory, EmploymentFactory, NetworkFactory
 from src.recognition.models import Tick
 from src.timetable.models import WorkerDay
-from src.timetable.tests.factories import WorkerDayFactory
+from src.timetable.tests.factories import WorkerDayFactory, WorkTypeFactory
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -36,18 +36,53 @@ class MultipleActiveEmploymentsSupportMixin(TestsHelperMixin):
 
         cls.group1 = GroupFactory(network=cls.network)
 
+        cls.work_type3_other = WorkTypeFactory(
+            shop=cls.shop3,
+            work_type_name__name='Другое',
+        )
+
+        cls.work_type1_cachier = WorkTypeFactory(
+            shop=cls.shop1,
+            work_type_name__name='Продавец-кассир',
+        )
+        cls.work_type2_cachier = WorkTypeFactory(
+            shop=cls.shop2,
+            work_type_name__name='Продавец-кассир',
+        )
+        cls.work_type3_cachier = WorkTypeFactory(
+            shop=cls.shop3,
+            work_type_name__name='Продавец-кассир',
+        )
+
+        cls.work_type1_cleaner = WorkTypeFactory(
+            shop=cls.shop1,
+            work_type_name__name='Уборщик',
+        )
+        cls.work_type2_cleaner = WorkTypeFactory(
+            shop=cls.shop2,
+            work_type_name__name='Уборщик',
+        )
+        cls.work_type3_cleaner = WorkTypeFactory(
+            shop=cls.shop3,
+            work_type_name__name='Уборщик',
+        )
+
         # первая цифра -- user_id, вторая цифра -- shop_id, третья -- порядковый номер
         cls.employment1_1_1 = EmploymentFactory(
-            user=cls.user1, shop=cls.shop1, function_group=cls.group1, network=cls.network
+            user=cls.user1, shop=cls.shop1, function_group=cls.group1, network=cls.network,
+            work_types__work_type=cls.work_type1_cachier,
         )
         cls.employment1_1_2 = EmploymentFactory(
-            user=cls.user1, shop=cls.shop2, function_group=cls.group1, network=cls.network, norm_work_hours=50
+            user=cls.user1, shop=cls.shop1, function_group=cls.group1, network=cls.network, norm_work_hours=50,
+            work_types__work_type=cls.work_type1_cleaner,
         )
         cls.employment2_2_1 = EmploymentFactory(
-            user=cls.user2, shop=cls.shop2, function_group=cls.group1, network=cls.network
+            user=cls.user2, shop=cls.shop2, function_group=cls.group1, network=cls.network,
+            work_types__work_type=cls.work_type2_cachier,
         )
         cls.employment2_3_1 = EmploymentFactory(
-            user=cls.user2, shop=cls.shop3, function_group=cls.group1, network=cls.network, norm_work_hours=50
+            user=cls.user2, shop=cls.shop3, function_group=cls.group1, network=cls.network, norm_work_hours=50,
+            work_types__work_type=cls.work_type3_cachier,
         )
         cls.dt = date.today()
 
@@ -133,3 +168,80 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.client.force_authenticate(user=self.user1)
         fact_approved = self._make_tick_requests(self.user1, self.shop1)
         self.assertEqual(fact_approved.employment_id, self.employment1_1_1.id)
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, TRUST_TICK_REQUEST=True)
+class TestConfirmVacancy(MultipleActiveEmploymentsSupportMixin, APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super(TestConfirmVacancy, cls).setUpTestData()
+        cls.dt_now = date.today()
+        cls.add_group_perm(cls.group1, 'WorkerDay_confirm_vacancy', 'POST')
+        WorkerDayFactory(
+            dt=cls.dt_now,
+            worker=cls.user1,
+            is_fact=False,
+            is_approved=True,
+            type=WorkerDay.TYPE_HOLIDAY,
+        )
+        WorkerDayFactory(
+            dt=cls.dt_now,
+            worker=cls.user2,
+            is_fact=False,
+            is_approved=True,
+            type=WorkerDay.TYPE_HOLIDAY,
+        )
+
+    def test_empl_received_by_cashier_work_type(self):
+        vacancy = WorkerDayFactory(
+            worker=None,
+            employment=None,
+            shop=self.shop1,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            is_vacancy=True,
+            is_fact=False,
+            is_approved=True,
+            cashbox_details__work_type=self.work_type1_cachier,
+        )
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.post(self.get_url('WorkerDay-confirm-vacancy', pk=vacancy.pk))
+        self.assertEqual(resp.status_code, 200)
+        vacancy.refresh_from_db()
+        self.assertEqual(vacancy.employment_id, self.employment1_1_1.id)
+
+    def test_empl_received_by_cleaner_work_type(self):
+        vacancy = WorkerDayFactory(
+            worker=None,
+            employment=None,
+            shop=self.shop1,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            is_vacancy=True,
+            is_fact=False,
+            is_approved=True,
+            cashbox_details__work_type=self.work_type1_cleaner,
+        )
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.post(self.get_url('WorkerDay-confirm-vacancy', pk=vacancy.pk))
+        self.assertEqual(resp.status_code, 200)
+        vacancy.refresh_from_db()
+        self.assertEqual(vacancy.employment_id, self.employment1_1_2.id)
+
+    def test_empl_received_by_shop_if_no_equal_work_type(self):
+        vacancy = WorkerDayFactory(
+            worker=None,
+            employment=None,
+            shop=self.shop3,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            is_vacancy=True,
+            is_fact=False,
+            is_approved=True,
+            cashbox_details__work_type=self.work_type3_other,
+        )
+        self.client.force_authenticate(user=self.user2)
+        resp = self.client.post(self.get_url('WorkerDay-confirm-vacancy', pk=vacancy.pk))
+        self.assertEqual(resp.status_code, 200)
+        vacancy.refresh_from_db()
+        self.assertEqual(vacancy.employment_id, self.employment2_3_1.id)

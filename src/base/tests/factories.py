@@ -1,5 +1,6 @@
 import random
 from datetime import datetime, timedelta, time
+
 import factory
 
 from src.base.models import (
@@ -14,6 +15,7 @@ from src.base.models import (
     ShopSettings,
     ShopSchedule,
 )
+from src.timetable.tests.factories import EmploymentWorkTypeFactory
 from .factories_abstract import AbstractActiveNamedModelFactory
 
 
@@ -88,6 +90,17 @@ class EmploymentFactory(factory.django.DjangoModelFactory):
 
     class Meta:
         model = Employment
+
+    @factory.post_generation
+    def work_types(self, create, *args, **kwargs):
+        if not create:
+            return
+
+        EmploymentWorkTypeFactory(
+            employment=self,
+            work_type__shop=self.shop,
+            **kwargs,
+        )
 
 
 class UserFactory(factory.django.DjangoModelFactory):

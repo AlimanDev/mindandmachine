@@ -494,6 +494,7 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
         active_employment = Employment.objects.get_active_empl_for_user(
             network_id=user.network_id, user_id=user.id, dt=vacancy.dt,
             priority_shop_id=vacancy.shop_id,
+            priority_work_type_id=vacancy.work_types.values_list('id', flat=True).first(),
         ).select_related(
             'shop',
         ).first()
