@@ -501,13 +501,13 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
         # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
         # TODO: сделать более информативные сообщения об ошибках
         if not active_employment:
-            res['code'] = 'cant_apply_vacancy'
+            res['code'] = 'cant_apply_vacancy_no_active_employement'
             res['status_code'] = 400
             return res
 
         # сотрудник из другой сети не может принять вакансию если это не аутсорс вакансия
         if not vacancy.is_outsource and active_employment.shop.network_id != vacancy_shop.network_id:
-            res['code'] = 'cant_apply_vacancy'
+            res['code'] = 'cant_apply_vacancy_not_outsource'
             res['status_code'] = 400
             return res
 
