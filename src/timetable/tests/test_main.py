@@ -381,6 +381,33 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         # self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         # self.assertEqual(response.json(), {'error': f"У сотрудника уже существует рабочий день."})
 
+    def test_approve_fact_when_approved_and_not_approved_version_differs_only_by_end_time(self):
+        WorkerDay.objects.filter(
+            id=self.worker_day_fact_approved.id,
+        ).update(
+            dttm_work_start=datetime.combine(self.worker_day_fact_approved.dt, time(10)),
+            dttm_work_end=None,
+        )
+        WorkerDay.objects.filter(
+            id=self.worker_day_fact_not_approved.id,
+        ).update(
+            dttm_work_start=datetime.combine(self.worker_day_fact_not_approved.dt, time(10)),
+            dttm_work_end=datetime.combine(self.worker_day_fact_not_approved.dt, time(19)),
+        )
+
+        data_approve = {
+            'shop_id': self.shop.id,
+            'dt_from': self.worker_day_fact_approved.dt,
+            'dt_to': self.worker_day_fact_approved.dt,
+            'is_fact': True,
+            'wd_types': WorkerDay.TYPES_USED,
+        }
+
+        response = self.client.post(self.url_approve, data_approve, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).is_approved, True)
+        self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).exists())
+
     def test_empty_params(self):
         data = {
             "shop_id": self.shop.id,
