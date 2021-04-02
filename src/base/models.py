@@ -853,6 +853,7 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     )
     breaks = models.ForeignKey(Break, on_delete=models.PROTECT, null=True, blank=True)
     hours_in_a_week = models.PositiveSmallIntegerField(default=40, verbose_name='Часов в рабочей неделе')
+    ordering = models.PositiveSmallIntegerField(default=9999, verbose_name='Индекс должности для сортировки')
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
