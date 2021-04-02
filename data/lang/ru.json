@@ -3,6 +3,8 @@
   "no_vacancy": "Такой вакансии не существует",
   "vacancy_success": "Вакансия успешно принята.",
   "cant_apply_vacancy": "Вы не можете выйти на эту смену.",
+  "cant_apply_vacancy_no_active_employement": "Вы не можете выйти на эту смену, так как у вас нет активного трудоустройства на дату смены.",
+  "cant_apply_vacancy_not_outsource": "Вы не можете выйти на эту смену, так как данная вакансия находится в другой сети и не подразумевает возможность аутсорсинга.",
   "no_timetable": "График на этот период еще не составлен.",
   "shift_elongation": "Вам была автоматически расширена смена связи с нехваткой сотрудников с {worker_day.dttm_work_start} до {worker_day.dttm_work_end}, дата {worker_day.dt}",
   "holiday_exchange": "Вам была автоматически назначена смена вместо выходного в связи с нехваткой сотрудников в магазин {shop.name} с {worker_day.dttm_work_start} по {worker_day.dttm_work_end}, дата {worker_day.dt}",
