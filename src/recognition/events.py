@@ -1,12 +1,14 @@
 from src.events.registry import BaseRegisteredEvent
 
 from datetime import date, timedelta
+from uuid import uuid4
 
 
 URV_STAT = 'urv_stat'
 URV_STAT_TODAY = 'urv_stat_today'
 URV_VIOLATORS_REPORT = 'urv_violators_report'
 URV_STAT_V2 = 'urv_stat_v2'
+EMPLOYEE_NOT_CHECKED_IN = 'employee_not_checked_in'
 
 
 class UrvStatEvent(BaseRegisteredEvent):
@@ -56,3 +58,13 @@ class UrvStatV2Event(BaseRegisteredEvent):
         title = f'URV_users_{dt}.xlsx'
 
         return urv_stat_v2(dt, dt, title=title, network_id=self.network_id, in_memory=True)
+
+
+class EmployeeNotCheckedInEvent(BaseRegisteredEvent):
+    name = 'Уведомление об отсутствии отметки у работника.'
+    code = EMPLOYEE_NOT_CHECKED_IN
+    write_history = False
+
+    def get_recipients(self):
+        from src.base.models import User
+        return [User(id=uuid4(), email=self.context.get('director', {}).get('email'), first_name=self.context.get('director', {}).get('name', '')), ]
