@@ -2186,6 +2186,70 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             is_approved=True,
         ).exists())
 
+    def test_get_only_available(self):
+        '''
+        Создаем дополнительно 3 вакансии на 3 дня вперед
+        Вернется только одна вакансия, так как:
+        1. У сотрудника подтвержденный рабочий день
+        2. У сотрудника нет подтвержденного плана
+        3. Сотрудник уволен до даты вакансии
+        '''
+        WorkerDay.objects.create(
+            worker=self.user1,
+            type=WorkerDay.TYPE_HOLIDAY,
+            dt=self.dt_now,
+            is_approved=True,
+        )
+        WorkerDay.objects.create(
+            shop=self.shop,
+            worker=self.user1,
+            employment=self.employment1,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt_now + timedelta(1), time(hour=11, minute=30)),
+            dttm_work_end=datetime.combine(self.dt_now + timedelta(1), time(hour=20, minute=30)),
+            dt=self.dt_now + timedelta(1),
+            is_approved=False,
+        )
+        WorkerDay.objects.create(
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt_now + timedelta(1), time(9)),
+            dttm_work_end=datetime.combine(self.dt_now + timedelta(1), time(17)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now + timedelta(1),
+            is_vacancy=True,
+            is_approved=True,
+        )
+        WorkerDay.objects.create(
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt_now + timedelta(2), time(9)),
+            dttm_work_end=datetime.combine(self.dt_now + timedelta(2), time(17)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now + timedelta(2),
+            is_vacancy=True,
+            is_approved=True,
+        )
+        WorkerDay.objects.create(
+            worker=self.user1,
+            type=WorkerDay.TYPE_HOLIDAY,
+            dt=self.dt_now + timedelta(3),
+            is_approved=True,
+        )
+        WorkerDay.objects.create(
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt_now + timedelta(2), time(9)),
+            dttm_work_end=datetime.combine(self.dt_now + timedelta(2), time(17)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now + timedelta(3),
+            is_vacancy=True,
+            is_approved=True,
+        )
+        self.employment1.dt_fired = self.dt_now + timedelta(2)
+        self.employment1.save()
+        resp = self.client.get('/rest_api/worker_day/vacancy/?only_available=true&offset=0&limit=10&is_vacant=true')
+        self.assertEqual(resp.json()['count'], 1)
+        self.assertEqual(resp.json()['results'][0]['dt'], self.dt_now.strftime('%Y-%m-%d'))
+
+
 
 class TestAditionalFunctions(APITestCase):
     USER_USERNAME = "user1"
