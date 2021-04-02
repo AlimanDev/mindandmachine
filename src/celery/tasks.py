@@ -945,6 +945,7 @@ def employee_not_checked_in():
                     },
                     'dttm': no_comming_record.dttm_work_start_plan,
                     'type': 'приход',
+                    'shop_id': no_comming_record.shop_id,
                 },
             )
 
@@ -963,5 +964,6 @@ def employee_not_checked_in():
                     },
                     'dttm': no_leaving_record.dttm_work_end_plan,
                     'type': 'уход',
+                    'shop_id': no_leaving_record.shop_id,
                 },
             )
