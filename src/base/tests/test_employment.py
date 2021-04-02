@@ -560,7 +560,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(wd.employment_id, None)
 
 
-    def _test_get_employment_ordered_by_position(self, ordering='desc'):
+    def _test_get_employment_ordered_by_position(self, ordering):
         self.wp1 = WorkerPosition.objects.create(
             name='Администатор',
             network=self.network,
@@ -590,10 +590,10 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.employment6.save()
         self.employment7.save()
         
-        return self.client.get(f'/rest_api/employment/?shop_id={self.shop.id}&order_by_worker_position={ordering}')
+        return self.client.get(f'/rest_api/employment/?shop_id={self.shop.id}&order_by={ordering}')
 
     def test_get_employment_ordered_by_position_asc(self):
-        data = self._test_get_employment_ordered_by_position(ordering='asc')
+        data = self._test_get_employment_ordered_by_position(ordering='position__ordering,position__name')
         assert_data = [
             (self.user2.id, self.wp1.id),
             (self.user3.id, self.wp2.id),
@@ -604,7 +604,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertSequenceEqual(list(map(lambda x: (x['user']['id'], x['position_id']), data.json())), assert_data)
 
     def test_get_employment_ordered_by_position_desc(self):
-        data = self._test_get_employment_ordered_by_position()
+        data = self._test_get_employment_ordered_by_position(ordering='-position__ordering,position__name')
         assert_data = [
             (self.user6.id, self.wp4.id),
             (self.user7.id, self.wp4.id),

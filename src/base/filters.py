@@ -24,8 +24,7 @@ class EmploymentFilter(FilterSet):
     shop_code = CharFilter(field_name='shop__code', label='Код магазина')
     username = CharFilter(field_name='user__username', label='Логин сотрудника')
     mine = BooleanFilter(method='filter_mine', label='Сотрудники моих магазинов')
-    order_by = OrderingFilter(fields=('user__last_name', 'user__first_name'))
-    order_by_worker_position = CharFilter(method='order_worker_position')
+    order_by = OrderingFilter(fields=('user__last_name', 'user__first_name', 'position__ordering', 'position__name'))
 
     def gte_or_null(self, queryset, name, value):
         return queryset.filter(
@@ -46,14 +45,6 @@ class EmploymentFilter(FilterSet):
                 )
             )
         return queryset
-
-    def order_worker_position(self, queryset, name, value):
-        if value == 'desc':
-            ordering = ['-position__ordering', 'position__name']
-        else:
-            ordering = ['position__ordering', 'position__name']
-        
-        return queryset.order_by(*ordering)
 
 
     class Meta:
