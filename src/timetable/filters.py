@@ -155,6 +155,7 @@ class VacancyFilter(FilterSetWithInitial):
                 active_employment_exists=True,
                 worker_day_type_paid=False,
             )
+        return queryset
 
     class Meta:
         model = WorkerDay
