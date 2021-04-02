@@ -19,7 +19,6 @@ from django.db import transaction
 from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
-from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.functional import cached_property
 from model_utils import FieldTracker
@@ -395,11 +394,17 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     def get_department(self):
         return self
 
+    def _get_parent_or_400(self, parent_code):
+        try:
+            return Shop.objects.get(code=parent_code)
+        except Shop.DoesNotExist:
+            raise MessageError(code='no_such_parent', params={'code': parent_code})
+
     def __init__(self, *args, **kwargs):
         parent_code = kwargs.pop('parent_code', None)
         super().__init__(*args, **kwargs)
         if parent_code:
-            self.parent = get_object_or_404(Shop, code=parent_code)
+            self.parent = self._get_parent_or_400(parent_code)
 
     @property
     def director_code(self):
@@ -481,7 +486,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         self.tm_open_dict = self.clean_time_dict(self.open_times)
         self.tm_close_dict = self.clean_time_dict(self.close_times)
         if hasattr(self, 'parent_code'):
-            self.parent = get_object_or_404(Shop, code=self.parent_code)
+            self.parent = self._get_parent_or_400(self.parent_code)
         load_template_changed = self.tracker.has_changed('load_template')
         if load_template_changed and self.load_template_status == self.LOAD_TEMPLATE_PROCESS:
             raise MessageError(code='cant_change_load_template')
