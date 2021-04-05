@@ -2723,7 +2723,6 @@ class TestAditionalFunctions(APITestCase):
         response = self.client.post(self.url + 'copy_range/', data=data)
         self.assertEqual(response.json(), ['Начало периода с которого копируются дни не может быть больше начала периода куда копируются дни.'])
 
-
     def test_block_worker_day(self):
         dt_now = date.today()
         wd = WorkerDayFactory(
@@ -2732,14 +2731,17 @@ class TestAditionalFunctions(APITestCase):
             is_approved=False,
             is_fact=True,
         )
-        data = [
-            {
-                'worker_username': wd.worker.username,
-                'shop_code': wd.shop.code,
-                'dt': Converter.convert_date(dt_now),
-                'is_fact': True,
-            },
-        ]
+        data = {
+            'worker_days': [
+                {
+                    'worker_username': wd.worker.username,
+                    'shop_code': wd.shop.code,
+                    'dt': Converter.convert_date(dt_now),
+                    'is_fact': True,
+                },
+            ]
+        }
+
         response = self.client.post(self.url + 'block/', data=json.dumps(data), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         wd.refresh_from_db()
@@ -2754,14 +2756,16 @@ class TestAditionalFunctions(APITestCase):
             is_fact=True,
             is_blocked=True,
         )
-        data = [
-            {
-                'worker_username': wd.worker.username,
-                'shop_code': wd.shop.code,
-                'dt': Converter.convert_date(dt_now),
-                'is_fact': True,
-            },
-        ]
+        data = {
+            'worker_days': [
+                {
+                    'worker_username': wd.worker.username,
+                    'shop_code': wd.shop.code,
+                    'dt': Converter.convert_date(dt_now),
+                    'is_fact': True,
+                },
+            ]
+        }
         response = self.client.post(self.url + 'unblock/', data=json.dumps(data), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         wd.refresh_from_db()
