@@ -2378,18 +2378,25 @@ class TestAditionalFunctions(APITestCase):
 
     def test_cant_exchange_approved_and_protected_without_perm(self):
         dt_from = date.today()
+        dates = [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)]
         data = {
             'worker1_id': self.user2.id,
             'worker2_id': self.user3.id,
-            'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
+            'dates': dates,
         }
         self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True, is_blocked=True)
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True, is_blocked=True)
         url = f'{self.url}exchange_approved/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json()['detail'], 'У вас нет прав на подтверждение защищенных рабочих дней.'
-                                                    ' Обратитесь, пожалуйста, к администратору системы.')
+        dates_str = ','.join(dates)
+        self.assertEqual(
+            response.json()['detail'],
+            'У вас нет прав на подтверждение защищенных рабочих дней ('
+            f'{self.user2.last_name} {self.user2.first_name} ({self.user2.username}): {dates_str}, '
+            f'{self.user3.last_name} {self.user3.first_name} ({self.user3.username}): {dates_str}'
+            '). Обратитесь, пожалуйста, к администратору системы.',
+        )
 
     def test_can_exchange_approved_and_protected_with_perm(self):
         self.admin_group.has_perm_to_change_protected_wdays = True

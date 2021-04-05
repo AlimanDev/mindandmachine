@@ -2,10 +2,12 @@ import datetime
 import time
 
 import pandas as pd
-from django.db.models import Q, F
+from django.contrib.postgres.aggregates import StringAgg
 from django.db import transaction
-from rest_framework.response import Response
+from django.db.models import Q, F, Value, CharField
+from django.db.models.functions import Concat, Cast
 from rest_framework.exceptions import ValidationError, PermissionDenied
+from rest_framework.response import Response
 
 from src.base.exceptions import MessageError
 from src.base.models import (
@@ -486,15 +488,27 @@ def exchange(data, error_messages):
             has_perm_to_change_protected_wdays=True,
         ).exists()
         if not has_permission_to_change_protected_wdays:
-            protected_wdays_exists = WorkerDay.objects.filter(
+            protected_wdays = list(WorkerDay.objects.filter(
                 worker_id__in=(data['worker1_id'], data['worker2_id']),
                 dt__in=data['dates'],
                 is_approved=data['is_approved'],
                 is_fact=False,
                 is_blocked=True,
-            ).exists()
-            if protected_wdays_exists:
-                raise PermissionDenied(error_messages['has_no_perm_to_approve_protected_wdays'])
+            ).annotate(
+                worker_fio=Concat(
+                    F('worker__last_name'), Value(' '),
+                    F('worker__first_name'), Value(' ('),
+                    F('worker__username'), Value(')'),
+                ),
+            ).values(
+                'worker_fio',
+            ).annotate(
+                dates=StringAgg(Cast('dt', CharField()), delimiter=','),
+            ))
+            if protected_wdays:
+                raise PermissionDenied(error_messages['has_no_perm_to_approve_protected_wdays'].format(
+                    protected_wdays=', '.join(f'{d["worker_fio"]}: {d["dates"]}' for d in protected_wdays),
+                ))
 
         WorkerDay.objects_with_excluded.filter(
             worker_id__in=(data['worker1_id'], data['worker2_id']),

@@ -278,8 +278,12 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         response = self.client.post(f"{self.url_approve}", data, format='json')
 
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json()['detail'], 'У вас нет прав на подтверждение защищенных рабочих дней. '
-                                                   'Обратитесь, пожалуйста, к администратору системы.')
+        self.assertEqual(
+            response.json()['detail'],
+            f'У вас нет прав на подтверждение защищенных рабочих дней '
+            f'({self.user2.last_name} {self.user2.first_name} ({self.user2.username}): {self.dt.strftime("%Y-%m-%d")}). '
+            'Обратитесь, пожалуйста, к администратору системы.'
+        )
 
     def test_can_approve_protected_day_with_perm(self):
         self.admin_group.has_perm_to_change_protected_wdays = True
