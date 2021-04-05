@@ -3,7 +3,9 @@ from itertools import groupby
 
 import pandas as pd
 from django.db import transaction
-from django.db.models import OuterRef, Subquery, Q, F, Exists
+from django.db.models import OuterRef, Subquery, Q, F, Exists, Value, CharField
+from django.db.models.functions import Concat, Cast
+from django.contrib.postgres.aggregates import StringAgg
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.encoding import escape_uri_path
@@ -76,7 +78,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                                                'в выбранные даты. '
                                                'Необходимо изменить интервал для подтверждения. '
                                                'Разрешенный интевал для подтверждения: {dt_interval}'),
-        'has_no_perm_to_approve_protected_wdays': _('У вас нет прав на подтверждение защищенных рабочих дней. '
+        'has_no_perm_to_approve_protected_wdays': _('У вас нет прав на подтверждение защищенных рабочих дней ({protected_wdays}). '
                                                    'Обратитесь, пожалуйста, к администратору системы.'),
     }
 
@@ -346,14 +348,26 @@ class WorkerDayViewSet(BaseModelViewSet):
                     has_perm_to_change_protected_wdays=True,
                 ).exists()
                 if not has_permission_to_change_protected_wdays:
-                    protected_wdays_exists = WorkerDay.objects.filter(
+                    protected_wdays = list(WorkerDay.objects.filter(
                         worker_days_q, is_fact=serializer.data['is_fact'],
                         is_blocked=True,
                     ).exclude(
                         id__in=wdays_to_approve.values_list('id', flat=True),
-                    ).exists()
-                    if protected_wdays_exists:
-                        raise PermissionDenied(self.error_messages['has_no_perm_to_approve_protected_wdays'])
+                    ).annotate(
+                        worker_fio=Concat(
+                            F('worker__last_name'), Value(' '),
+                            F('worker__first_name'), Value(' ('),
+                            F('worker__username'), Value(')'),
+                        ),
+                    ).values(
+                        'worker_fio',
+                    ).annotate(
+                        dates=StringAgg(Cast('dt', CharField()), delimiter=','),
+                    ))
+                    if protected_wdays:
+                        raise PermissionDenied(self.error_messages['has_no_perm_to_approve_protected_wdays'].format(
+                            protected_wdays=', '.join(f'{d["worker_fio"]}: {d["dates"]}' for d in protected_wdays),
+                        ))
 
                 WorkerDay.objects_with_excluded.filter(
                     worker_days_q, is_fact=serializer.data['is_fact'],
@@ -392,6 +406,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             comment=wd.comment,
                             canceled=wd.canceled,
                             need_count_wh=True,
+                            is_blocked=wd.is_blocked,
                         )
                         for wd in list_wd
                     ]
