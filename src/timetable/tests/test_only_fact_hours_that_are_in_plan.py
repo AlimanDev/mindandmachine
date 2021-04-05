@@ -1,4 +1,4 @@
-from datetime import time, datetime
+from datetime import time, datetime, timedelta
 
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
@@ -176,3 +176,40 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
         self.assertEqual(fact_approved.work_hours.total_seconds(), 5 * 3600)
         fact_not_approved.refresh_from_db()
         self.assertEqual(fact_not_approved.work_hours.total_seconds(), 5 * 3600)
+
+
+    def test_crop_work_hours_and_use_break_from_plan(self):
+        breaks = self.shop_settings.breaks
+        breaks.breaks = [[0, 359, [0,]], [359, 720, [72,]]]
+        breaks.save()
+        self.shop_settings.refresh_from_db()
+        self.shop.refresh_from_db()
+        wd_plan = WorkerDay.objects.create(
+            worker=self.user,
+            employment=self.employment,
+            is_fact=False,
+            is_approved=True,
+            shop=self.shop,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(12)),
+            dttm_work_end=datetime.combine(self.dt, time(18)),
+        )
+        wd_fact = WorkerDay.objects.create(
+            worker=self.user,
+            employment=self.employment,
+            is_fact=True,
+            is_approved=True,
+            shop=self.shop,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(13, 2)),
+            dttm_work_end=datetime.combine(self.dt, time(19, 4)),
+        )
+        breaks.breaks = [[0, 2040, [60]]]
+        breaks.save()
+        self.shop_settings.refresh_from_db()
+        self.shop.refresh_from_db()
+        self.assertGreaterEqual(wd_plan.work_hours, wd_fact.work_hours)
+        work_hours = ((wd_fact.dttm_work_end_tabel - wd_fact.dttm_work_start_tabel).total_seconds() / 60) - 72
+        self.assertEqual(wd_fact.work_hours, timedelta(minutes=work_hours))
