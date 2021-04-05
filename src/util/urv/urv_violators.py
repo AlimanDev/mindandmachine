@@ -11,6 +11,9 @@ NO_RECORDS = 'R'
 NO_COMMING = 'C'
 NO_LEAVING = 'L'
 NO_COMING_PROBABLY = 'CP'
+BAD_FACT = 'BF'
+BAD_FACT_NO_COMMING = 'BFC'
+BAD_FACT_NO_LEAVING = 'BFL'
 
 NO_COMMING_HOURS = 4
 
@@ -19,10 +22,13 @@ text = {
     NO_COMMING: 'Нет прихода',
     NO_LEAVING: 'Нет ухода',
     NO_COMING_PROBABLY: 'Предположительно нет отметки о приходе',
+    BAD_FACT: 'Выход не по плану',
+    BAD_FACT_NO_COMMING: 'Выход не по плану\nНет прихода',
+    BAD_FACT_NO_LEAVING: 'Выход не по плану\nНет ухода',
 }
 
 
-def urv_violators_report(network_id, dt_from=None, dt_to=None):
+def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_by=False):
     if not dt_from or not dt_to:
         dt_from = date.today() - timedelta(1)
         dt_to = date.today() - timedelta(1)
@@ -32,22 +38,52 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None):
         dt_from=dt_from,
         dt_to=dt_to,
     ).values_list('user_id', flat=True)
-    no_comming =  bad_records = WorkerDay.objects.filter(
+    no_comming = WorkerDay.objects.filter(
         worker_id__in=user_ids,
         dt__gte=dt_from,
         dt__lte=dt_to,
         is_fact=True,
         is_approved=True,
-        dttm_work_start__isnull=True,
     )
-    no_leaving =  bad_records = WorkerDay.objects.filter(
+    if exclude_created_by:
+        no_comming = no_comming.annotate(
+            exist_records=Exists(
+            AttendanceRecords.objects.filter(
+                    user_id=OuterRef('worker_id'),
+                    dt=OuterRef('dt'),
+                    type=AttendanceRecords.TYPE_COMING,
+                )
+            )
+        ).filter(
+            exist_records=False,
+        )
+    else:
+        no_comming = no_comming.filter(
+            dttm_work_start__isnull=True,
+        )
+    no_leaving = WorkerDay.objects.filter(
         worker_id__in=user_ids,
         dt__gte=dt_from,
         dt__lte=dt_to,
         is_fact=True,
         is_approved=True,
-        dttm_work_end__isnull=True,
     )
+    if exclude_created_by:
+        no_leaving = no_leaving.annotate(
+            exist_records=Exists(
+            AttendanceRecords.objects.filter(
+                    user_id=OuterRef('worker_id'),
+                    dt=OuterRef('dt'),
+                    type=AttendanceRecords.TYPE_LEAVING,
+                )
+            )
+        ).filter(
+            exist_records=False,
+        )
+    else:
+        no_leaving = no_leaving.filter(
+            dttm_work_end__isnull=True,
+        )
     worker_days = WorkerDay.objects.filter(
         dt__gte=dt_from,
         dt__lte=dt_to,
@@ -70,16 +106,61 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None):
             'type': NO_LEAVING,
         }
     
-    no_records = worker_days.annotate(
-        exist_records=Exists(
-            AttendanceRecords.objects.filter(
-                user_id=OuterRef('worker_id'),
-                dttm__date=OuterRef('dt'),
+    fact_without_plan = WorkerDay.objects.filter(
+        dt__gte=dt_from,
+        dt__lte=dt_to,
+        shop__network_id=network_id,
+        type=WorkerDay.TYPE_WORKDAY,
+        is_approved=True,
+        is_fact=True,
+        worker_id__in=user_ids,
+    ).annotate(
+        exist_plan=Exists(
+            WorkerDay.objects.filter(
+                worker_id=OuterRef('worker_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=True
             )
         )
     ).filter(
-        exist_records=False,
+        exist_plan=False,
     )
+    for record in fact_without_plan:
+        type = data.get(record.worker_id, {}).get(record.dt, {}).get('type', BAD_FACT)
+        if type == NO_COMMING:
+            type = BAD_FACT_NO_COMMING
+        elif type == NO_LEAVING:
+            type = BAD_FACT_NO_LEAVING
+        data.setdefault(record.worker_id, {})[record.dt] = {
+            'shop_id': record.shop_id,
+            'type': type,
+        }
+
+    if exclude_created_by:
+        no_records = worker_days.annotate(
+            exist_records=Exists(
+                AttendanceRecords.objects.filter(
+                    user_id=OuterRef('worker_id'),
+                    dt=OuterRef('dt'),
+                )
+            )
+        ).filter(
+            exist_records=False,
+        )
+    else:
+        no_records = worker_days.annotate(
+            exist_fact=Exists(
+                WorkerDay.objects.filter(
+                    worker_id=OuterRef('worker_id'),
+                    dt=OuterRef('dt'),
+                    is_fact=True,
+                    is_approved=True
+                )
+            )
+        ).filter(
+            exist_fact=False,
+        )
     for record in no_records:
         first_key = record.worker_id
         second_key = record.dt
@@ -104,7 +185,7 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
     shops = { 
         s.id: s for s in Shop.objects.all()
     }
-    data = urv_violators_report(network_id, dt_from=dt, dt_to=dt)
+    data = urv_violators_report(network_id, dt_from=dt, dt_to=dt, exclude_created_by=True)
     users = {
         u.id: f"{u.last_name} {u.first_name} {u.middle_name if u.middle_name else ''}" for u in User.objects.filter(
             id__in=data.keys(),
@@ -182,7 +263,7 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
         }
     
 
-def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=None, in_memory=False):
+def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=None, in_memory=False, exclude_created_by=False):
     if not dt_from:
         dt_from = date.today().replace(day=1)
     if not dt_to:
@@ -197,7 +278,7 @@ def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=Non
     shops = { 
         s.id: s for s in Shop.objects.all()
     }
-    data = urv_violators_report(network_id, dt_from=dt_from, dt_to=dt_to)
+    data = urv_violators_report(network_id, dt_from=dt_from, dt_to=dt_to, exclude_created_by=exclude_created_by)
 
     users = {
         u.id: f"{u.last_name} {u.first_name} {u.middle_name if u.middle_name else ''}" for u in User.objects.filter(

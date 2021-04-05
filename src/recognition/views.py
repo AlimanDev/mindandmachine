@@ -498,8 +498,9 @@ class DownloadViolatorsReportAdminView(SuperuserRequiredMixin, FormView):
         network = form.cleaned_data['network']
         dt_from = form.cleaned_data['dt_from']
         dt_to = form.cleaned_data['dt_to']
+        exclude_created_by = form.cleaned_data['exclude_created_by']
         
-        return form.get_file(network=network, dt_from=dt_from, dt_to=dt_to)
+        return form.get_file(network=network, dt_from=dt_from, dt_to=dt_to, exclude_created_by=exclude_created_by)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
