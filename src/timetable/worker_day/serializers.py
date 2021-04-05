@@ -505,3 +505,7 @@ class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
                 raise NotFound(detail=f'Пользователь "{username}" не найден')
 
         return attrs
+
+
+class BlockOrUnblockWorkerDayWrapperSerializer(serializers.Serializer):
+    worker_days = BlockOrUnblockWorkerDaySerializer(many=True)
