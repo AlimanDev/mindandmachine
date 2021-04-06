@@ -179,16 +179,9 @@ class Break(AbstractActiveNetworkSpecificCodeNamedModel):
         verbose_name_plural = 'Перерывы'
     value = models.CharField(max_length=1024, default='[]')
 
-    def __getattribute__(self, attr):
-        if attr in ['breaks']:
-            try:
-                return super().__getattribute__(attr)
-            except:
-                try:
-                    self.__setattr__(attr, json.loads(self.value))
-                except:
-                    return []
-        return super().__getattribute__(attr)
+    @property
+    def breaks(self):
+        return json.loads(self.value)
 
     @classmethod
     def get_break_triplets(cls, network_id):
