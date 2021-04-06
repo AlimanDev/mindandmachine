@@ -25,6 +25,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('base', '0088_auto_20210330_1140'),
+        ('timetable', '0033_shopmonthstat_is_approved'),
     ]
 
     operations = [

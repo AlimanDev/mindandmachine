@@ -9,6 +9,7 @@ URV_STAT_TODAY = 'urv_stat_today'
 URV_VIOLATORS_REPORT = 'urv_violators_report'
 URV_STAT_V2 = 'urv_stat_v2'
 EMPLOYEE_NOT_CHECKED_IN = 'employee_not_checked_in'
+EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN = 'employee_working_not_according_to_plan'
 
 
 class UrvStatEvent(BaseRegisteredEvent):
@@ -68,3 +69,13 @@ class EmployeeNotCheckedInEvent(BaseRegisteredEvent):
     def get_recipients(self):
         from src.base.models import User
         return [User(id=uuid4(), email=self.context.get('director', {}).get('email'), first_name=self.context.get('director', {}).get('name', '')), ]
+
+class EmployeeWorkingNotAccordingToPlanEvent(BaseRegisteredEvent):
+    name = 'Уведомление о выходе сотрудника не по плану'
+    code = EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
+    write_history = False
+
+    def get_recipients(self):
+        from src.base.models import User
+        return [User(id=uuid4(), email=self.context.get('director', {}).get('email'), first_name=self.context.get('director', {}).get('name', '')), ]
+

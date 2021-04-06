@@ -17,6 +17,8 @@ from django.db.models.query import QuerySet
 from django.utils import timezone
 from model_utils import FieldTracker
 
+from src.events.signals import event_signal
+from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
@@ -1221,6 +1223,32 @@ class AttendanceRecords(AbstractModel):
                 )
                 if _wd_created or not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl)
+                if _wd_created:
+                    plan_wd = WorkerDay.objects.filter(
+                        dt=self.dt,
+                        worker=self.user,
+                        is_fact=False,
+                        is_approved=True,
+                        shop_id=self.shop_id,
+                    )
+                    if not plan_wd.exists():
+                        transaction.on_commit(lambda: event_signal.send(
+                            sender=None,
+                            network_id=self.user.network_id,
+                            event_code=EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN,
+                            context={
+                                'director':{
+                                    'email': self.shop.director.email if self.shop.director else self.shop.email,
+                                    'name': self.shop.director.first_name if self.shop.director else self.shop.name, 
+                                },
+                                'user':{
+                                    'last_name': self.user.last_name,
+                                    'first_name': self.user.first_name,
+                                },
+                                'dttm': self.dttm.strftime('%Y-%m-%d %H:%M:%S'),
+                                'shop_id': self.shop_id,
+                            },
+                        ))
                 self._create_or_update_not_approved_fact(fact_approved)
 
         return res
