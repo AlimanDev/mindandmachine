@@ -43,6 +43,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('forecast', '0036_merge_20201231_0751'),
+        ('timetable', '0055_auto_20210315_1825'),
     ]
 
     operations = [
