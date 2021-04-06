@@ -28,7 +28,12 @@ text = {
 }
 
 
-def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_by=False):
+def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_by=False, shop_ids=None, user_ids=None):
+    filter_values = {}
+    if shop_ids:
+        filter_values['shop_id__in'] = shop_ids
+    if user_ids:
+        filter_values['user_id__in'] = user_ids
     if not dt_from or not dt_to:
         dt_from = date.today() - timedelta(1)
         dt_to = date.today() - timedelta(1)
@@ -37,13 +42,16 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
         network_id,
         dt_from=dt_from,
         dt_to=dt_to,
+        **filter_values,
     ).values_list('user_id', flat=True)
+    filter_values.pop('user_id__in', None)
     no_comming = WorkerDay.objects.filter(
         worker_id__in=user_ids,
         dt__gte=dt_from,
         dt__lte=dt_to,
         is_fact=True,
         is_approved=True,
+        **filter_values,
     )
     if exclude_created_by:
         no_comming = no_comming.annotate(
@@ -67,6 +75,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
         dt__lte=dt_to,
         is_fact=True,
         is_approved=True,
+        **filter_values,
     )
     if exclude_created_by:
         no_leaving = no_leaving.annotate(
@@ -92,6 +101,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
         is_approved=True,
         is_fact=False,
         worker_id__in=user_ids,
+        **filter_values,
     )
     
     for record in no_comming:
@@ -114,6 +124,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
         is_approved=True,
         is_fact=True,
         worker_id__in=user_ids,
+        **filter_values,
     ).annotate(
         exist_plan=Exists(
             WorkerDay.objects.filter(
@@ -263,7 +274,7 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
         }
     
 
-def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=None, in_memory=False, exclude_created_by=False):
+def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=None, in_memory=False, exclude_created_by=False, user_ids=None, shop_ids=None):
     if not dt_from:
         dt_from = date.today().replace(day=1)
     if not dt_to:
@@ -278,7 +289,7 @@ def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=Non
     shops = { 
         s.id: s for s in Shop.objects.all()
     }
-    data = urv_violators_report(network_id, dt_from=dt_from, dt_to=dt_to, exclude_created_by=exclude_created_by)
+    data = urv_violators_report(network_id, dt_from=dt_from, dt_to=dt_to, exclude_created_by=exclude_created_by, user_ids=user_ids, shop_ids=shop_ids)
 
     users = {
         u.id: f"{u.last_name} {u.first_name} {u.middle_name if u.middle_name else ''}" for u in User.objects.filter(
