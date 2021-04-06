@@ -56,7 +56,7 @@ class TestAutoSettings(APITestCase):
         self.breaks = Break.objects.create(
             network=self.network,
             name='Перерывы для должности',
-            value='[[0, 540, [30]]'
+            value='[[0, 540, [30]]]'
         )
 
         self.position = WorkerPosition.objects.create(
