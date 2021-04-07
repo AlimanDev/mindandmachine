@@ -11,7 +11,7 @@ server {
     server_name  %s.mindandmachine.ru;
 
     location /static/ {
-        alias /var/www/servers/%s/;
+        alias /var/www/servers/%s/static/;
     }
 
     location / {
