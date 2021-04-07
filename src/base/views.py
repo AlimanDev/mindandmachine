@@ -159,6 +159,7 @@ class UserViewSet(UpdateorCreateViewSet):
 
     @action(detail=True, methods=['post'])
     def delete_biometrics(self, request, pk=None):
+        from src.recognition.api.recognition import Recognition
         user = self.get_object()
         
         try:
@@ -166,6 +167,8 @@ class UserViewSet(UpdateorCreateViewSet):
         except:
             return Response({"detail": "У сотрудника нет биометрии"}, status=status.HTTP_400_BAD_REQUEST)
 
+        recognition = Recognition()
+        recognition.delete_person(user.userconnecter.partner_id)
         UserConnecter.objects.filter(user_id=user.id).delete()
             
         return Response({"detail": "Биометрия сотрудника успешно удалена"}, status=status.HTTP_200_OK)

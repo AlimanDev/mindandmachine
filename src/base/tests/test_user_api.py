@@ -2,7 +2,9 @@ from datetime import timedelta
 
 from django.utils import timezone
 from rest_framework.test import APITestCase
+from unittest import mock
 
+from src.recognition.api import recognition
 from src.recognition.models import UserConnecter
 from src.base.models import WorkerPosition, Employment, User
 from src.timetable.models import WorkTypeName
@@ -132,9 +134,13 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             user=self.user1,
             partner_id='1234',
         )
-        response = self.client.post(
-            self.get_url('User-delete-biometrics', pk=self.user1.id),
-        )
+        class TevianMock:
+            def delete_person(self, person_id):
+                return 200
+        with mock.patch.object(recognition, 'Tevian', TevianMock):
+            response = self.client.post(
+                self.get_url('User-delete-biometrics', pk=self.user1.id),
+            )
         data = response.json()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(data, {'detail': 'Биометрия сотрудника успешно удалена'})

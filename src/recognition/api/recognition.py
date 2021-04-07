@@ -57,6 +57,9 @@ class Recognition:
     def detect_and_match(self, partner_id, image):
         return self.partner.detect_and_match(partner_id, image)
 
+    def delete_person(self, partner_id):
+        return self.partner.delete_person(partner_id)
+
 
 class Tevian:
     def __init__(self):
