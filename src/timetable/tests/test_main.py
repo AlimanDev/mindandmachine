@@ -104,11 +104,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.shop.tm_open_dict = f'{{"all":"00:00:00"}}'
         self.shop.tm_close_dict = f'{{"all":"00:00:00"}}'
         self.shop.save()
-        self.shop.settings.breaks.value = '[[0, 2000, [30, 30]]]'
-        self.shop.settings.breaks.save()
-
-        self.shop.network.refresh_from_db()
-        self.shop.settings.refresh_from_db()
 
     def test_get_list(self):
         dt = Converter.convert_date(self.dt)
