@@ -1,4 +1,9 @@
 from django.contrib import admin
+from django.utils.translation import gettext as _
+from rangefilter.filter import DateRangeFilter, DateTimeRangeFilter
+from django_admin_listfilter_dropdown.filters import RelatedOnlyDropdownFilter, DropdownFilter, ChoiceDropdownFilter
+
+
 
 from src.timetable.models import (
     Cashbox,
@@ -115,12 +120,30 @@ class WorkerConstraintAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerDay)
 class WorkerDayAdmin(admin.ModelAdmin):
-    list_display = ('worker_last_name', 'shop_title', 'parent_title', 'dt', 'type', 'id', 'dttm_work_start',
-                    'dttm_work_end', 'dttm_modified')
+    list_display = (
+        'shop_title', 
+        'worker_last_name', 
+        'graph_type', 
+        'type', 
+        'dt_formated', 
+        'tm_work_start',
+        'tm_work_end', 
+        'dttm_modified', 
+        'created_by_last_name',
+        'id', 
+    )
     search_fields = ('worker__last_name', 'shop__name', 'shop__parent__name', 'id', 'dt')
-    list_filter = ('shop', 'type', 'dttm_modified')
+    list_filter = (
+        ('dt', DateRangeFilter), 
+        'is_fact', 
+        'is_approved', 
+        ('shop', RelatedOnlyDropdownFilter), 
+        ('type', ChoiceDropdownFilter), 
+        ('dttm_modified', DateTimeRangeFilter), 
+        ('created_by', RelatedOnlyDropdownFilter),
+    )
     raw_id_fields = ('parent_worker_day', 'employment', 'created_by', 'last_edited_by', 'worker', 'shop')
-    list_select_related = ('worker', 'shop', 'shop__parent')
+    list_select_related = ('worker', 'shop', 'created_by')
     readonly_fields = ('dttm_modified',)
     change_list_template = 'worker_day_change_list.html'
 
@@ -130,12 +153,36 @@ class WorkerDayAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_title(instance: WorkerDay):
-        return instance.shop.name if instance.shop else ''
+        return instance.shop.name if instance.shop else '-'
 
     @staticmethod
-    def parent_title(instance: WorkerDay):
-        return instance.shop.parent_title() if instance.shop else ''
+    def tm_work_start(instance: WorkerDay):
+        return instance.dttm_work_start.strftime('%H:%M:%S') if instance.dttm_work_start else '-'
+    
+    @staticmethod
+    def tm_work_end(instance: WorkerDay):
+        return instance.dttm_work_end.strftime('%H:%M:%S') if instance.dttm_work_end else '-'
 
+    @staticmethod
+    def graph_type(instance: WorkerDay):
+        graph_type = _('Not approved plan')
+        if instance.is_approved and instance.is_plan:
+            graph_type = _('Approved plan')
+        elif instance.is_approved and instance.is_fact:
+            graph_type = _('Approved fact')
+        elif instance.is_fact:
+            graph_type = _('Not approved fact')
+        return graph_type
+
+    def dt_formated(self, obj):
+        return obj.dt.strftime('%d.%m.%Y')
+    
+    dt_formated.short_description = 'dt'
+
+    def created_by_last_name(self, instance: WorkerDay):
+        return instance.created_by.last_name if instance.created_by else 'Автоматически'
+    
+    created_by_last_name.short_description = 'created by'
 
 @admin.register(WorkerDayCashboxDetails)
 class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
