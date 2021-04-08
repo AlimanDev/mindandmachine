@@ -5,6 +5,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from etc.scripts import fill_calendar
 from src.base.tests.factories import ShopFactory, UserFactory, GroupFactory, EmploymentFactory, NetworkFactory
 from src.recognition.models import Tick
 from src.timetable.models import WorkerDay
@@ -90,6 +91,7 @@ class MultipleActiveEmploymentsSupportMixin(TestsHelperMixin):
             tabel_code='employment2_3_1',
         )
         cls.dt = date.today()
+        fill_calendar.fill_days('2021.01.01', '2021.12.31', cls.shop1.region_id)
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, TRUST_TICK_REQUEST=True)
@@ -252,74 +254,80 @@ class TestConfirmVacancy(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertEqual(vacancy.employment_id, self.employment2_3_1.id)
 
 
-class TestGetWorkerDaysForTabel(MultipleActiveEmploymentsSupportMixin, APITestCase):
+class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestCase):
+    maxDiff = None
+
     @classmethod
     def setUpTestData(cls):
-        super(TestGetWorkerDaysForTabel, cls).setUpTestData()
+        super(TestGetWorkersStatAndTabel, cls).setUpTestData()
         cls.dt_now = date.today()
         cls.add_group_perm(cls.group1, 'WorkerDay', 'GET')
-        for dt in pd.date_range(cls.dt_now, cls.dt_now + timedelta(days=4)):
+        cls.add_group_perm(cls.group1, 'WorkerDay_worker_stat', 'GET')
+
+    def _create_wdays(self, dt_now):
+        for dt in pd.date_range(dt_now, dt_now + timedelta(days=4)):
             WorkerDayFactory(
                 dt=dt,
-                worker=cls.user1,
-                employment=cls.employment1_1_1,
-                shop=cls.shop1,
+                worker=self.user1,
+                employment=self.employment1_1_1,
+                shop=self.shop1,
                 type=WorkerDay.TYPE_WORKDAY,
                 is_fact=True,
                 is_approved=True,
-                cashbox_details__work_type=cls.work_type1_cachier,
+                cashbox_details__work_type=self.work_type1_cachier,
             )
 
-        for dt in pd.date_range(cls.dt_now + timedelta(days=5), cls.dt_now + timedelta(days=9)):
+        for dt in pd.date_range(dt_now + timedelta(days=5), dt_now + timedelta(days=9)):
             WorkerDayFactory(
                 dt=dt,
-                worker=cls.user1,
-                employment=cls.employment1_1_1,
-                shop=cls.shop1,
+                worker=self.user1,
+                employment=self.employment1_1_1,
+                shop=self.shop1,
                 type=WorkerDay.TYPE_HOLIDAY,
                 is_fact=False,
                 is_approved=True,
             )
 
-        for dt in pd.date_range(cls.dt_now + timedelta(days=10), cls.dt_now + timedelta(days=14)):
+        for dt in pd.date_range(dt_now + timedelta(days=10), dt_now + timedelta(days=14)):
             WorkerDayFactory(
                 dt=dt,
-                worker=cls.user1,
-                employment=cls.employment1_1_2,
-                shop=cls.shop1,
+                worker=self.user1,
+                employment=self.employment1_1_2,
+                shop=self.shop1,
                 type=WorkerDay.TYPE_WORKDAY,
                 is_fact=True,
                 is_approved=True,
-                cashbox_details__work_type=cls.work_type1_cleaner,
+                cashbox_details__work_type=self.work_type1_cleaner,
             )
 
-        for dt in pd.date_range(cls.dt_now + timedelta(days=15), cls.dt_now + timedelta(days=19)):
+        for dt in pd.date_range(dt_now + timedelta(days=15), dt_now + timedelta(days=19)):
             WorkerDayFactory(
                 dt=dt,
-                worker=cls.user1,
-                shop=cls.shop1,
+                worker=self.user1,
+                shop=self.shop1,
                 type=WorkerDay.TYPE_VACATION,
                 is_fact=False,
                 is_approved=True,
             )
 
-        for dt in pd.date_range(cls.dt_now + timedelta(days=20), cls.dt_now + timedelta(days=24)):
+        for dt in pd.date_range(dt_now + timedelta(days=20), dt_now + timedelta(days=24)):
             WorkerDayFactory(
                 dt=dt,
-                worker=cls.user1,
-                employment=cls.employment1_1_2,
-                shop=cls.shop1,
+                worker=self.user1,
+                employment=self.employment1_1_2,
+                shop=self.shop1,
                 type=WorkerDay.TYPE_WORKDAY,
                 is_fact=True,
                 is_approved=True,
-                cashbox_details__work_type=cls.work_type1_cleaner,
+                cashbox_details__work_type=self.work_type1_cleaner,
             )
 
     def test_get_tabel_data_by_tabel_code(self):
         """
         Проверка получения дней по табельному коду трудоустройства
-        TODO: может ли быть такое, что у 1 пользователя отпуска по разным трудоустройствам будут в разные периоды?
+        TODO: может ли быть такое, что у 1 пользователя отпуска по разным трудоустройствам будут в разные периоды? -- может!
         """
+        self._create_wdays(self.dt_now)
         self.client.force_authenticate(user=self.user1)
         resp = self.client.get(
             self.get_url('WorkerDay-list'),
@@ -352,3 +360,253 @@ class TestGetWorkerDaysForTabel(MultipleActiveEmploymentsSupportMixin, APITestCa
         self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_WORKDAY, resp_data))), 10)
         self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_HOLIDAY, resp_data))), 5)
         self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_VACATION, resp_data))), 5)
+
+    def test_get_worker_stat_by_tabel_code(self):
+        """
+        Проверка возможности получения статистики по табельному
+        """
+        self._create_wdays(date(2021, 3, 1))
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get(
+            self.get_url('WorkerDay-worker-stat'),
+            data={
+                'dt_from': date(2021, 3, 1),
+                'dt_to': date(2021, 3, 31),
+                'shop_id': self.shop1.id,
+                'worker_id': self.user1.id,
+            },
+        )
+        resp_data = resp.json()
+        worker_data = resp_data.get(str(self.user1.id))
+        empl_tabel_codes = worker_data.get('empl_tabel_codes')
+        self.assertIn(self.employment1_1_1.tabel_code, empl_tabel_codes)
+        self.assertDictEqual(
+            empl_tabel_codes[self.employment1_1_1.tabel_code],
+            {
+                "fact": {
+                    "approved": {
+                        "work_days": {
+                            "selected_shop": 5,
+                            "other_shops": 0,
+                            "total": 5
+                        },
+                        "work_hours": {
+                            "selected_shop": 43.75,
+                            "other_shops": 0.0,
+                            "total": 43.75,
+                            "until_acc_period_end": 43.75,
+                            "acc_period": 43.75
+                        },
+                        "day_type": {
+                            "W": 5
+                        },
+                        "norm_hours": {
+                            "acc_period": 144.0,
+                            "prev_months": 0.0,
+                            "curr_month": 144.0,
+                            "curr_month_end": 144.0
+                        },
+                        "overtime": {
+                            "acc_period": -100.25,
+                            "prev_months": 0.0,
+                            "curr_month": -100.25,
+                            "curr_month_end": -100.25
+                        },
+                        "sawh_hours": {
+                            "by_months": {
+                                "3": 147.61290322580646
+                            },
+                            "selected_period": 147.61290322580646,
+                            "curr_month": 147.61290322580646
+                        }
+                    },
+                    "not_approved": {
+                        "norm_hours": {
+                            "acc_period": 144.0,
+                            "prev_months": 0.0,
+                            "curr_month": 144.0,
+                            "curr_month_end": 144.0
+                        },
+                        "overtime": {
+                            "acc_period": -144.0,
+                            "prev_months": 0.0,
+                            "curr_month": -144.0,
+                            "curr_month_end": -144.0
+                        },
+                        "sawh_hours": {
+                            "by_months": {
+                                "3": 147.61290322580646
+                            },
+                            "selected_period": 147.61290322580646,
+                            "curr_month": 147.61290322580646
+                        }
+                    }
+                },
+                "plan": {
+                    "approved": {
+                        "work_days": {
+                            "selected_shop": 0,
+                            "other_shops": 0,
+                            "total": 0
+                        },
+                        "work_hours": {
+                            "selected_shop": 0.0,
+                            "other_shops": 0.0,
+                            "total": 0.0,
+                            "until_acc_period_end": 0.0,
+                            "prev_months": 0,
+                            "acc_period": 0.0
+                        },
+                        "norm_hours": {
+                            "acc_period": 144.0,
+                            "prev_months": 0.0,
+                            "curr_month": 144.0,
+                            "curr_month_end": 144.0
+                        },
+                        "overtime": {
+                            "acc_period": -144.0,
+                            "prev_months": 0.0,
+                            "curr_month": -144.0,
+                            "curr_month_end": -144.0
+                        },
+                        "sawh_hours": {
+                            "by_months": {
+                                "3": 147.61290322580646
+                            },
+                            "selected_period": 147.61290322580646,
+                            "curr_month": 147.61290322580646
+                        }
+                    },
+                    "not_approved": {
+                        "norm_hours": {
+                            "acc_period": 176.0,
+                            "prev_months": 0.0,
+                            "curr_month": 176.0,
+                            "curr_month_end": 176.0
+                        },
+                        "overtime": {
+                            "acc_period": -176.0,
+                            "prev_months": 0.0,
+                            "curr_month": -176.0,
+                            "curr_month_end": -176.0
+                        },
+                        "sawh_hours": {
+                            "by_months": {
+                                "3": 176.0
+                            },
+                            "selected_period": 176.0,
+                            "curr_month": 176.0
+                        }
+                    }
+                }
+            }
+        )
+        self.assertIn(self.employment1_1_2.tabel_code, empl_tabel_codes)
+        self.assertDictEqual(
+            empl_tabel_codes[self.employment1_1_2.tabel_code],
+            {
+                "fact": {
+                    "approved": {
+                        "work_days": {
+                            "selected_shop": 10,
+                            "other_shops": 0,
+                            "total": 10
+                        },
+                        "work_hours": {
+                            "selected_shop": 87.5,
+                            "other_shops": 0.0,
+                            "total": 87.5,
+                            "until_acc_period_end": 87.5,
+                            "acc_period": 87.5
+                        },
+                        "day_type": {
+                            "W": 10
+                        },
+                        "norm_hours": {
+                            "acc_period": 72.0,
+                            "prev_months": 0.0,
+                            "curr_month": 72.0,
+                            "curr_month_end": 72.0
+                        },
+                        "overtime": {
+                            "acc_period": 15.5,
+                            "prev_months": 0.0,
+                            "curr_month": 15.5,
+                            "curr_month_end": 15.5
+                        },
+                        "sawh_hours": {
+                            "by_months": {
+                                "3": 73.80645161290323
+                            },
+                            "selected_period": 73.80645161290323,
+                            "curr_month": 73.80645161290323
+                        }
+                    },
+                    "not_approved": {
+                        "norm_hours": {
+                            "acc_period": 72.0,
+                            "prev_months": 0.0,
+                            "curr_month": 72.0,
+                            "curr_month_end": 72.0
+                        },
+                        "overtime": {
+                            "acc_period": -72.0,
+                            "prev_months": 0.0,
+                            "curr_month": -72.0,
+                            "curr_month_end": -72.0
+                        },
+                        "sawh_hours": {
+                            "by_months": {
+                                "3": 73.80645161290323
+                            },
+                            "selected_period": 73.80645161290323,
+                            "curr_month": 73.80645161290323
+                        }
+                    }
+                },
+                "plan": {
+                    "approved": {
+                        "norm_hours": {
+                            "acc_period": 72.0,
+                            "prev_months": 0.0,
+                            "curr_month": 72.0,
+                            "curr_month_end": 72.0
+                        },
+                        "overtime": {
+                            "acc_period": -72.0,
+                            "prev_months": 0.0,
+                            "curr_month": -72.0,
+                            "curr_month_end": -72.0
+                        },
+                        "sawh_hours": {
+                            "by_months": {
+                                "3": 73.80645161290323
+                            },
+                            "selected_period": 73.80645161290323,
+                            "curr_month": 73.80645161290323
+                        }
+                    },
+                    "not_approved": {
+                        "norm_hours": {
+                            "acc_period": 88.0,
+                            "prev_months": 0.0,
+                            "curr_month": 88.0,
+                            "curr_month_end": 88.0
+                        },
+                        "overtime": {
+                            "acc_period": -88.0,
+                            "prev_months": 0.0,
+                            "curr_month": -88.0,
+                            "curr_month_end": -88.0
+                        },
+                        "sawh_hours": {
+                            "by_months": {
+                                "3": 88.0
+                            },
+                            "selected_period": 88.0,
+                            "curr_month": 88.0
+                        }
+                    }
+                }
+            }
+        )
