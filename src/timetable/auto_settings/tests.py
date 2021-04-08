@@ -1383,3 +1383,47 @@ class TestAutoSettings(APITestCase):
 
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.employment8_old.user.id, data['cashiers']))[0]
         self.assertEqual(employment2Info['norm_work_amount'], 32.0)  # TODO-devx: не уверен, что верное значение, надо будет проверить
+
+    
+    def test_create_timetable_with_fired(self):
+        dt_from = date(2021, 2, 1)
+        dt_to = date(2021, 2, 28)
+
+        dt = dt_from
+        for day in range(4):
+            dt = dt + timedelta(days=1)
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(9)),
+                dttm_work_end=datetime.combine(dt, time(22)),
+                is_approved=False,
+            )
+            WorkerDayCashboxDetails.objects.create(
+                work_type=self.work_type,
+                worker_day=wd
+            )
+        for day in range(3):
+            dt = dt + timedelta(days=1)
+            WorkerDay.objects.create(
+                employment=self.employment2,
+                worker=self.employment2.user,
+                shop=self.employment2.shop,
+                dt=dt,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_approved=False,
+            )
+        self.employment2.dt_fired = date(2021, 2, 3)
+        self.employment2.save()
+
+        data = self._test_create_tt(dt_from, dt_to)
+
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.user2.id, data['cashiers']))[0]
+        self.assertEqual(len(employment2Info['workdays']), 27)
+        self.assertEqual(employment2Info['workdays'][1]['type'], 'W')
+        self.assertEqual(employment2Info['workdays'][1]['dt'], '2021-02-03')
+        self.assertEqual(employment2Info['workdays'][2]['type'], 'H')
+        self.assertEqual(employment2Info['workdays'][2]['dt'], '2021-02-04')
