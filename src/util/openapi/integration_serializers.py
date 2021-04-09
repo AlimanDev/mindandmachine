@@ -26,6 +26,7 @@ class ShopIntegrationSerializer(serializers.Serializer):
             'latitude': '55.834244',
             'longitude': '37.513916',
             'director_code': 'IvanovII',
+            'fias_code': '4aca8845-1c0a-41af-9c1e-4c3e16da5287',
         }
     code = serializers.CharField(help_text='Идентификатор подразделения (часто GUID из 1C)')
     name = serializers.CharField(help_text='Название подразделения (магазина)')
@@ -42,6 +43,7 @@ class ShopIntegrationSerializer(serializers.Serializer):
     longitude = RoundingDecimalField(decimal_places=6, max_digits=12, allow_null=True, required=False, help_text='Долгота (координаты подразделения)')
     email = serializers.EmailField(required=False, help_text='Почта (при наличии)')
     director_code = serializers.CharField(help_text='Логин пользователя, ответственного за данное подразделение (директора)')
+    fias_code = serializers.CharField(help_text='Код ФИАС адреса подразделения. Опциональное поле. Если передается, то передавать поля address, timezone, latitude, longitude не обязательно (они будут вычислены на основе кода ФИАС).')
     by_code = serializers.BooleanField(help_text='Необходимо для синхронизации')
 
 
@@ -84,6 +86,7 @@ class EmploymentIntegrationSerializer(serializers.Serializer):
             'shop_code': '6F9619FF-8B86-D011-B42D-00CF4FC964FF',
             'tabel_code': '0000-00001',
             'norm_work_hours': 100,
+            'code': 'НМЗН-04676:baedae01-977e-11eb-83e6-00155d01881a:baedae01-977e-11eb-83e6-00155d01881a',
             'by_code': True,
         }
     dt_hired = serializers.DateField(help_text='Дата начала работы')
@@ -93,6 +96,7 @@ class EmploymentIntegrationSerializer(serializers.Serializer):
     shop_code = serializers.CharField(help_text='Внешний идентификатор магазина')
     tabel_code = serializers.CharField(help_text='Табельный номер сотрудника')
     norm_work_hours = serializers.IntegerField(help_text='Ставка сотрудника в процентах')
+    code = serializers.CharField(help_text='Уникальный идентификатор записи трудоустройства. Вариант формирования: <табельный номер>:<UID регистратора записи>:<UID регистратора события>.')
     by_code = serializers.BooleanField(help_text='Необходимо для синхронизации')
 
 
@@ -104,7 +108,7 @@ class WorkerDayFilterIntegrationSerializer(serializers.Serializer):
             'dt__lte': '2019-07-17',
             'shop_code': '6F9619FF-8B86-D011-B42D-00CF4FC964FF',
             'hours_details': True,
-            'is_tabel': True,
+            'fact_tabel': True,
             'by_code': True,
         }
     worker__username__in = serializers.ListField(
@@ -121,7 +125,7 @@ class WorkerDayFilterIntegrationSerializer(serializers.Serializer):
     dt__lte = serializers.DateField(help_text='период выгрузки до даты (включительно)')
     shop_code = serializers.CharField(help_text='Код магазина (если хотим по определенному магазину посмотреть график). Поле не обязательное, если есть worker__username__in')
     hours_details = serializers.BooleanField(help_text='Возвращать ли детали по часам работы (для табеля)')
-    is_tabel = serializers.BooleanField(help_text='Получить данные для табеля. При этом добавлять is_approved и is_fact не нужно.')
+    fact_tabel = serializers.BooleanField(help_text='Получить данные для табеля. При этом добавлять is_approved и is_fact не нужно.')
     by_code = serializers.BooleanField(help_text='Возвращать ли данные по данным кодам синхронизации')
 
 
