@@ -61,9 +61,9 @@ class ShopViewSet(UpdateorCreateViewSet):
     openapi_tags = ['Shop',]
 
     @swagger_auto_schema(responses={200: ShopSerializer(many=True)}, operation_description='GET /rest_api/department/')
-    def list(self, *args, **kwargs):
+    def list(self, request):
         data = list(self.filter_queryset(self.get_queryset()))
-        return Response([serialize_shop(s) for s in data])
+        return Response([serialize_shop(s, request) for s in data])
 
     @swagger_auto_schema(request_body=ShopSerializer, responses={201: ShopSerializer}, operation_description='POST /rest_api/department/')
     def create(self, *args, **kwargs):

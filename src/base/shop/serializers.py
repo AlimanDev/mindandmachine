@@ -55,7 +55,13 @@ class NonstandardShopScheduleSerializer(serializers.ModelSerializer):
         )
 
 
-def serialize_shop(shop: Shop):
+def serialize_shop(shop: Shop, request):
+    distance = None
+    if request:
+        lat = request.META.get('X-LAT')
+        lon = request.META.get('X-LON')
+        if lat and lon and shop.latitude and shop.longitude:
+            distance = round(geopy.distance.distance((lat, lon), (shop.latitude, shop.longitude)).km, 2)
     return {
         'id': shop.id,
         'name': shop.name,
@@ -70,6 +76,7 @@ def serialize_shop(shop: Shop):
         'settings_id': shop.settings_id,
         'load_template_id': shop.load_template_id,
         'parent_id': shop.parent_id,
+        'distance': distance,
     }
 
 
