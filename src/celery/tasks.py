@@ -16,6 +16,7 @@ from django_celery_beat.models import CrontabSchedule
 from src.main.demand.utils import create_predbills_request_function
 from src.main.operation_template.utils import build_period_clients
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
+from tzwhere import tzwhere
 
 from src.base.models import (
     Shop,
@@ -57,6 +58,8 @@ from src.timetable.vacancy.utils import (
 )
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
 from src.util.models_converter import Converter
+from src.recognition.utils import get_worker_days_with_no_ticks
+from src.recognition.events import EMPLOYEE_NOT_CHECKED_IN
 
 
 @app.task
@@ -816,7 +819,7 @@ def fill_shop_schedule(shop_id, dt_from, periods=90):
 
 
 @app.task
-def fill_shop_city(shop_id):
+def fill_shop_city_from_coords(shop_id):
     shop = Shop.objects.filter(id=shop_id).first()
     if shop and shop.latitude and shop.longitude and settings.DADATA_TOKEN:
         from dadata import Dadata
@@ -825,6 +828,42 @@ def fill_shop_city(shop_id):
         if result and result[0].get('data') and result[0].get('data').get('city'):
             shop.city = result[0]['data']['city']
             shop.save(update_fields=['city'])
+
+
+@app.task
+def fill_city_coords_address_timezone_from_fias_code(shop_id):
+    shop = Shop.objects.filter(id=shop_id).first()
+    if shop and shop.fias_code and settings.DADATA_TOKEN:
+        from dadata import Dadata
+        dadata = Dadata(settings.DADATA_TOKEN)
+        result = dadata.find_by_id("address", shop.fias_code)
+        if result and result[0].get('data'):
+            update_fields = []
+            if result[0].get('value'):
+                shop.address = result[0].get('value')
+                update_fields.append('address')
+            data = result[0].get('data')
+            if data.get('city'):
+                shop.city = result[0]['data']['city']
+                update_fields.append('city')
+            if data.get('geo_lat'):
+                shop.latitude = data.get('geo_lat')
+                update_fields.append('latitude')
+            if data.get('geo_lon'):
+                shop.longitude = data.get('geo_lon')
+                update_fields.append('longitude')
+            if data.get('geo_lat') and data.get('geo_lon'):
+                tz = tzwhere.tzwhere()
+                timezone = tz.tzNameAt(float(data.get('geo_lat')), float(data.get('geo_lon')))
+                if timezone:
+                    shop.timezone = timezone
+                else:
+                    tz = tzwhere.tzwhere(forceTZ=True)
+                    timezone = tz.tzNameAt(float(data.get('geo_lat')), float(data.get('geo_lon')), forceTZ=True)
+                    shop.timezone = timezone
+                update_fields.append('timezone')
+            if update_fields:
+                shop.save(update_fields=update_fields)
 
 
 @app.task
@@ -881,3 +920,50 @@ def cron_event():
             user_author_id=None,
             context={},
         )
+
+
+@app.task
+def employee_not_checked_in():
+    dttm = datetime.now()
+    no_comming, no_leaving = get_worker_days_with_no_ticks(dttm)
+    events = EventEmailNotification.objects.filter(
+        event_type__code=EMPLOYEE_NOT_CHECKED_IN,
+    )
+    for event in events:
+        for no_comming_record in no_comming:
+            send_event_email_notifications.delay(
+                event_email_notification_id=event.id,
+                user_author_id=None,
+                context={
+                    'user': {
+                        'last_name': no_comming_record.worker.last_name,
+                        'first_name': no_comming_record.worker.first_name,
+                    },
+                    'director': {
+                        'email': no_comming_record.shop.director.email if no_comming_record.shop.director else no_comming_record.shop.email,
+                        'name': no_comming_record.shop.director.first_name if no_comming_record.shop.director else no_comming_record.shop.name,
+                    },
+                    'dttm': no_comming_record.dttm_work_start_plan,
+                    'type': 'приход',
+                    'shop_id': no_comming_record.shop_id,
+                },
+            )
+
+        for no_leaving_record in no_leaving:
+            send_event_email_notifications.delay(
+                event_email_notification_id=event.id,
+                user_author_id=None,
+                context={
+                    'user':{
+                        'last_name': no_leaving_record.worker.last_name,
+                        'first_name': no_leaving_record.worker.first_name,
+                    },
+                    'director': {
+                        'email': no_leaving_record.shop.director.email if no_leaving_record.shop.director else no_leaving_record.shop.email,
+                        'name': no_leaving_record.shop.director.first_name if no_leaving_record.shop.director else no_leaving_record.shop.name,
+                    },
+                    'dttm': no_leaving_record.dttm_work_end_plan,
+                    'type': 'уход',
+                    'shop_id': no_leaving_record.shop_id,
+                },
+            )

@@ -19,7 +19,6 @@ from django.db import transaction
 from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
-from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.functional import cached_property
 from model_utils import FieldTracker
@@ -180,16 +179,9 @@ class Break(AbstractActiveNetworkSpecificCodeNamedModel):
         verbose_name_plural = 'Перерывы'
     value = models.CharField(max_length=1024, default='[]')
 
-    def __getattribute__(self, attr):
-        if attr in ['breaks']:
-            try:
-                return super().__getattribute__(attr)
-            except:
-                try:
-                    self.__setattr__(attr, json.loads(self.value))
-                except:
-                    return []
-        return super().__getattribute__(attr)
+    @property
+    def breaks(self):
+        return json.loads(self.value)
 
     @classmethod
     def get_break_triplets(cls, network_id):
@@ -299,6 +291,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     code = models.CharField(max_length=64, null=True, blank=True)
     # From supershop
     address = models.CharField(max_length=256, blank=True, null=True)
+    fias_code = models.CharField(max_length=300, blank=True)
     type = models.CharField(max_length=1, choices=DEPARTMENT_TYPES, default=TYPE_SHOP)
 
     dt_opened = models.DateField(null=True, blank=True)
@@ -337,12 +330,13 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     settings = models.ForeignKey(ShopSettings, on_delete=models.PROTECT, null=True, blank=True)
 
-    latitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Широта')
-    longitude = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True, verbose_name='Долгота')
+    latitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True, verbose_name='Широта')
+    longitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True, verbose_name='Долгота')
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
     city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
 
-    tracker = FieldTracker(fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude'])
+    tracker = FieldTracker(
+        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code'])
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(
@@ -393,11 +387,17 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     def get_department(self):
         return self
 
+    def _get_parent_or_400(self, parent_code):
+        try:
+            return Shop.objects.get(code=parent_code)
+        except Shop.DoesNotExist:
+            raise MessageError(code='no_such_parent', params={'code': parent_code})
+
     def __init__(self, *args, **kwargs):
         parent_code = kwargs.pop('parent_code', None)
         super().__init__(*args, **kwargs)
         if parent_code:
-            self.parent = get_object_or_404(Shop, code=parent_code)
+            self.parent = self._get_parent_or_400(parent_code)
 
     @property
     def director_code(self):
@@ -430,10 +430,15 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                 new_dict[key.replace('d', '')] = new_dict.pop(key)
         return json.dumps(new_dict, cls=DjangoJSONEncoder)  # todo: actually values should be time object, so  django json serializer should be used
 
-    def _fill_city_from_dadata(self):
+    def _fill_city_from_coords(self):
         if not self.city and self.latitude and self.longitude and settings.DADATA_TOKEN:
-            from src.celery.tasks import fill_shop_city
-            fill_shop_city.delay(shop_id=self.id)
+            from src.celery.tasks import fill_shop_city_from_coords
+            fill_shop_city_from_coords.delay(shop_id=self.id)
+
+    def _fill_city_coords_address_timezone_from_fias_code(self):
+        if self.fias_code and settings.DADATA_TOKEN:
+            from src.celery.tasks import fill_city_coords_address_timezone_from_fias_code
+            fill_city_coords_address_timezone_from_fias_code.delay(shop_id=self.id)
 
     def _handle_new_shop_created(self):
         from src.util.models_converter import Converter
@@ -474,7 +479,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         self.tm_open_dict = self.clean_time_dict(self.open_times)
         self.tm_close_dict = self.clean_time_dict(self.close_times)
         if hasattr(self, 'parent_code'):
-            self.parent = get_object_or_404(Shop, code=self.parent_code)
+            self.parent = self._get_parent_or_400(self.parent_code)
         load_template_changed = self.tracker.has_changed('load_template')
         if load_template_changed and self.load_template_status == self.LOAD_TEMPLATE_PROCESS:
             raise MessageError(code='cant_change_load_template')
@@ -495,8 +500,11 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             )
 
         if is_new or (self.tracker.has_changed('latitude') or self.tracker.has_changed('longitude')) and \
-                settings.FILL_SHOP_CITY_FROM_DADATA:
-            transaction.on_commit(self._fill_city_from_dadata)
+                settings.FILL_SHOP_CITY_FROM_COORDS:
+            transaction.on_commit(self._fill_city_from_coords)
+
+        if is_new or self.tracker.has_changed('fias_code') and settings.FILL_SHOP_CITY_COORDS_ADDRESS_TIMEZONE_FROM_FIAS_CODE:
+            transaction.on_commit(self._fill_city_coords_address_timezone_from_fias_code)
 
         return res
 
@@ -838,6 +846,7 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     )
     breaks = models.ForeignKey(Break, on_delete=models.PROTECT, null=True, blank=True)
     hours_in_a_week = models.PositiveSmallIntegerField(default=40, verbose_name='Часов в рабочей неделе')
+    ordering = models.PositiveSmallIntegerField(default=9999, verbose_name='Индекс должности для сортировки')
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
@@ -1146,6 +1155,7 @@ class FunctionGroup(AbstractModel):
         'Shop_stat',
         'Shop_tree',
         'Subscribe',
+        'TickPoint',
         'User',
         'User_change_password',
         'User_delete_biometrics',

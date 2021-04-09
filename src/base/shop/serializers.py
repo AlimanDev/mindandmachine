@@ -55,6 +55,31 @@ class NonstandardShopScheduleSerializer(serializers.ModelSerializer):
         )
 
 
+def serialize_shop(shop: Shop, request):
+    distance = None
+    if request:
+        lat = request.META.get('X-LAT')
+        lon = request.META.get('X-LON')
+        if lat and lon and shop.latitude and shop.longitude:
+            distance = round(geopy.distance.distance((lat, lon), (shop.latitude, shop.longitude)).km, 2)
+    return {
+        'id': shop.id,
+        'name': shop.name,
+        'forecast_step_minutes': shop.forecast_step_minutes,
+        'tm_open_dict': shop.open_times,
+        'tm_close_dict': shop.close_times,
+        'address': shop.address,
+        'timezone': str(six.text_type(shop.timezone)),
+        'code': shop.code,
+        'longitude': shop.longitude,
+        'latitude': shop.latitude,
+        'settings_id': shop.settings_id,
+        'load_template_id': shop.load_template_id,
+        'parent_id': shop.parent_id,
+        'distance': distance,
+    }
+
+
 class ShopSerializer(serializers.ModelSerializer):
     parent_id = serializers.IntegerField(required=False)
     parent_code = serializers.CharField(required=False)
@@ -72,8 +97,8 @@ class ShopSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(required=False, default=True)
     director_code = serializers.CharField(required=False)
     distance = serializers.SerializerMethodField(label='Расстояние до магазина (км)')
-    latitude = RoundingDecimalField(decimal_places=6, max_digits=12, allow_null=True, required=False)
-    longitude = RoundingDecimalField(decimal_places=6, max_digits=12, allow_null=True, required=False)
+    latitude = RoundingDecimalField(decimal_places=8, max_digits=12, allow_null=True, required=False)
+    longitude = RoundingDecimalField(decimal_places=8, max_digits=12, allow_null=True, required=False)
 
     def get_distance(self, shop):
         if self.context.get('request', False):
@@ -88,7 +113,8 @@ class ShopSerializer(serializers.ModelSerializer):
                   'code', 'address', 'type', 'dt_opened', 'dt_closed', 'timezone', 'region_id',
                   'network_id', 'restricted_start_times', 'restricted_end_times', 'exchange_settings_id',
                   'load_template_id', 'area', 'forecast_step_minutes', 'load_template_status', 'is_active',
-                  'director_code', 'latitude', 'longitude', 'director_id', 'distance', 'nonstandard_schedule', 'email']
+                  'director_code', 'latitude', 'longitude', 'director_id', 'distance', 'nonstandard_schedule', 'email',
+                  'fias_code',]
         extra_kwargs = {
             'restricted_start_times': {
                 'validators': [RestrictedTimeValidator()]

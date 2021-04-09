@@ -18,54 +18,62 @@ class TestUrvFiles(APITestCase):
         super().setUp()
         create_departments_and_users(self)
         self.dt = date.today()
-
-        WorkerDay.objects.create(
-            worker_id=self.employment2.user_id,
-            employment=self.employment2,
-            shop_id=self.employment2.shop_id,
-            dt=self.dt,
+        self._create_worker_day(
+            self.employment2,
             dttm_work_start=datetime.combine(self.dt, time(13)),
             dttm_work_end=datetime.combine(self.dt + timedelta(1), time(1)),
             is_approved=True,
-            type=WorkerDay.TYPE_WORKDAY,
         )
-        
-        WorkerDay.objects.create(
-            worker_id=self.employment3.user_id,
-            employment=self.employment3,
-            shop_id=self.employment3.shop_id,
-            dt=self.dt,
+        self._create_worker_day(
+            self.employment3,
             dttm_work_start=datetime.combine(self.dt, time(8)),
             dttm_work_end=datetime.combine(self.dt, time(20)),
             is_approved=True,
-            type=WorkerDay.TYPE_WORKDAY,
         )
-        
-        AttendanceRecords.objects.create(
-            shop_id=self.employment2.shop_id,
-            dttm=datetime.combine(self.dt, time(12, 54)),
-            user_id=self.employment2.user_id,
-            type=AttendanceRecords.TYPE_COMING,
+        self._create_att_record(
+            self.employment2,
+            datetime.combine(self.dt, time(12, 54)),
+            AttendanceRecords.TYPE_COMING,
         )
-        AttendanceRecords.objects.create(
-            shop_id=self.employment2.shop_id,
-            dttm=datetime.combine(self.dt + timedelta(1), time(0, 13)),
-            user_id=self.employment2.user_id,
-            type=AttendanceRecords.TYPE_LEAVING,
+        self._create_att_record(
+            self.employment2,
+            datetime.combine(self.dt + timedelta(1), time(0, 13)),
+            AttendanceRecords.TYPE_LEAVING,
         )
-        AttendanceRecords.objects.create(
-            shop_id=self.employment2.shop_id,
-            dttm=datetime.combine(self.dt + timedelta(1), time(0, 14)),
-            user_id=self.employment2.user_id,
-            type=AttendanceRecords.TYPE_LEAVING,
+        self._create_att_record(
+            self.employment2,
+            datetime.combine(self.dt + timedelta(1), time(0, 14)),
+            AttendanceRecords.TYPE_LEAVING,
         )
-        AttendanceRecords.objects.create(
-            shop_id=self.employment3.shop_id,
-            dttm=datetime.combine(self.dt, time(8, 54)),
-            user_id=self.employment3.user_id,
-            type=AttendanceRecords.TYPE_COMING,
+        self._create_att_record(
+            self.employment3,
+            datetime.combine(self.dt, time(8, 54)),
+            AttendanceRecords.TYPE_COMING,
         )
 
+
+    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
+        if not dt:
+            dt = self.dt
+        return WorkerDay.objects.create(
+            shop_id=employment.shop_id,
+            type=type,
+            employment=employment,
+            worker_id=employment.user_id,
+            dt=dt,
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+            is_fact=is_fact,
+            is_approved=is_approved,
+        )
+
+    def _create_att_record(self, employment, dttm, type):
+        return AttendanceRecords.objects.create(
+            shop_id=employment.shop_id,
+            user_id=employment.user_id,
+            dttm=dttm,
+            type=type,
+        )
 
     def test_urv_stat(self):
         data = urv_stat_v1(self.dt, self.dt, network_id=self.network.id, in_memory=True)
@@ -91,12 +99,93 @@ class TestUrvFiles(APITestCase):
 
 
     def test_urv_violators_report(self):
+        self._create_att_record(
+            self.employment4,
+            datetime.combine(self.dt, time(8, 45)),
+            AttendanceRecords.TYPE_COMING,
+        )
+        data = urv_violators_report(self.network.id, dt_from=self.dt, dt_to=self.dt, exclude_created_by=True)
+        assert_data = {
+            self.employment3.user_id: {
+                self.dt: {
+                    'shop_id': self.employment3.shop_id, 
+                    'type': 'L'
+                }
+            },
+            self.employment4.user_id: {
+                self.dt: {
+                    'shop_id': self.employment4.shop_id, 
+                    'type': 'BFL'
+                }
+            }
+        }
+        self.assertEqual(data, assert_data)
+
+    
+    def test_urv_violators_report_exclude_created_by(self):
+        self._create_att_record(
+            self.employment4,
+            datetime.combine(self.dt, time(8, 45)),
+            AttendanceRecords.TYPE_COMING,
+        )
+        WorkerDay.objects.filter(
+            worker_id=self.employment4.user_id,
+            is_fact=True,
+            is_approved=True,
+        ).delete()
+        self._create_worker_day(
+            self.employment4,
+            dttm_work_start=datetime.combine(self.dt, time(8, 45)),
+            dttm_work_end=datetime.combine(self.dt, time(19)),
+            is_approved=True,
+            is_fact=True,
+        )
+        self._create_worker_day(
+            self.employment5,
+            dttm_work_start=datetime.combine(self.dt, time(9)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
+            is_approved=True,
+        )
+        self._create_worker_day(
+            self.employment5,
+            dttm_work_start=datetime.combine(self.dt, time(7, 45)),
+            dttm_work_end=datetime.combine(self.dt, time(18, 3)),
+            is_approved=True,
+            is_fact=True,
+        )
+        data = urv_violators_report(self.network.id, dt_from=self.dt, dt_to=self.dt, exclude_created_by=True)
+        assert_data = {
+            self.employment3.user_id: {
+                self.dt: {
+                    'shop_id': self.employment3.shop_id, 
+                    'type': 'L'
+                }
+            },
+            self.employment4.user_id: {
+                self.dt: {
+                    'shop_id': self.employment4.shop_id, 
+                    'type': 'BFL'
+                }
+            },
+            self.employment5.user_id: {
+                self.dt: {
+                    'shop_id': self.employment5.shop_id, 
+                    'type': 'R'
+                }
+            }
+        }
         data = urv_violators_report(self.network.id, dt_from=self.dt, dt_to=self.dt)
         assert_data = {
             self.employment3.user_id: {
                 self.dt: {
                     'shop_id': self.employment3.shop_id, 
                     'type': 'L'
+                }
+            },
+            self.employment4.user_id: {
+                self.dt: {
+                    'shop_id': self.employment4.shop_id, 
+                    'type': 'BF'
                 }
             }
         }

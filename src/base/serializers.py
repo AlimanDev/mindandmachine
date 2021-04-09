@@ -254,7 +254,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
         super(EmploymentSerializer, self).__init__(*args, **kwargs)
 
         show_constraints = None
-        if self.context['request']:
+        if self.context.get('request'):
             show_constraints = self.context['request'].query_params.get('show_constraints')
 
         if not show_constraints:
@@ -317,7 +317,7 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
 
     def __init__(self, *args, **kwargs):
         super(WorkerPositionSerializer, self).__init__(*args, **kwargs)
-        if getattr(self.context.get('view', None), 'swagger_fake_view', False):
+        if not self.context.get('request'):
             return
         self.fields['code'].validators.append(
             UniqueValidator(

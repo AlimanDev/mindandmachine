@@ -2,7 +2,9 @@ from datetime import timedelta
 
 from django.utils import timezone
 from rest_framework.test import APITestCase
+from unittest import mock
 
+from src.recognition.api import recognition
 from src.recognition.models import UserConnecter
 from src.base.models import WorkerPosition, Employment, User
 from src.timetable.models import WorkTypeName
@@ -128,17 +130,27 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
 
     
     def test_delete_biometrics(self):
+        self.user1.avatar = 'test/path/avatar.jpg'
+        self.user1.save()
+        self.assertIsNotNone(self.user1.avatar.url)
+        self.assertTrue(bool(self.user1.avatar))
         UserConnecter.objects.create(
             user=self.user1,
             partner_id='1234',
         )
-        response = self.client.post(
-            self.get_url('User-delete-biometrics', pk=self.user1.id),
-        )
+        class TevianMock:
+            def delete_person(self, person_id):
+                return 200
+        with mock.patch.object(recognition, 'Tevian', TevianMock):
+            response = self.client.post(
+                self.get_url('User-delete-biometrics', pk=self.user1.id),
+            )
         data = response.json()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(data, {'detail': 'Биометрия сотрудника успешно удалена'})
         self.assertEqual(UserConnecter.objects.count(), 0)
+        self.user1.refresh_from_db()
+        self.assertFalse(bool(self.user1.avatar))
 
     def test_delete_non_existing_biometrics(self):
         response = self.client.post(

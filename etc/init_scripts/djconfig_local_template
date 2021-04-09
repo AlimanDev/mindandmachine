@@ -26,8 +26,8 @@ DATABASES = {
     }
 }
 
-MEDIA_ROOT = '/var/www/media/%s/'
-STATIC_ROOT = '/var/www/servers/%s/'
+MEDIA_ROOT = '/var/www/servers/%s/media/'
+STATIC_ROOT = '/var/www/servers/%s/static/'
 
 
 QOS_DEV_MODE_ENABLED = True

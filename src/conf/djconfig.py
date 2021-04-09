@@ -290,7 +290,33 @@ SWAGGER_SETTINGS = {
     'TAGS_SORTER': 'alpha',
     'OPERATIONS_SORTER': 'alpha',
     'DEFAULT_AUTO_SCHEMA_CLASS': "src.util.openapi.auto_schema.WFMAutoSchema",
+    'DEFAULT_FIELD_INSPECTORS': [
+        'src.util.openapi.inspectors.OverrideExampleInspector',
+        'drf_yasg.inspectors.CamelCaseJSONFilter',
+        'drf_yasg.inspectors.ReferencingSerializerInspector',
+        'drf_yasg.inspectors.RelatedFieldInspector',
+        'drf_yasg.inspectors.ChoiceFieldInspector',
+        'drf_yasg.inspectors.FileFieldInspector',
+        'drf_yasg.inspectors.DictFieldInspector',
+        'drf_yasg.inspectors.JSONFieldInspector',
+        'drf_yasg.inspectors.HiddenFieldInspector',
+        'drf_yasg.inspectors.RecursiveFieldInspector',
+        'drf_yasg.inspectors.SerializerMethodFieldInspector',
+        'drf_yasg.inspectors.SimpleFieldInspector',
+        'drf_yasg.inspectors.StringDefaultFieldInspector',
+    ],
 }
+
+# какие методы и модели могут попасть в описание интеграции
+OPENAPI_INTEGRATION_MODELS_METHODS = [
+    ('user', 'update'),
+    ('department', 'update'),
+    ('employment', 'update'),
+    ('worker_position', 'update'),
+    ('worker_day', 'list'),
+    ('timeserie_value', 'create'),
+    ('receipt', 'update'),
+]
 
 # DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
 
@@ -381,7 +407,8 @@ CALCULATE_LOAD_TEMPLATE = False # параметр отключающий авт
 CLIENT_TIMEZONE = 3
 
 DADATA_TOKEN = None
-FILL_SHOP_CITY_FROM_DADATA = False
+FILL_SHOP_CITY_FROM_COORDS = False
+FILL_SHOP_CITY_COORDS_ADDRESS_TIMEZONE_FROM_FIAS_CODE = False
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 
@@ -489,6 +516,11 @@ CELERY_BEAT_SCHEDULE = {
     'task-calculate-shop-load-at-night': {
         'task': 'src.celery.tasks.calculate_shop_load_at_night',
         'schedule': crontab(hour=0, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-send-employee-not-checked-in-notification': {
+        'task': 'src.celery.tasks.employee_not_checked_in',
+        'schedule': crontab(minute='*/5'),
         'options': {'queue': BACKEND_QUEUE}
     },
 }

@@ -57,6 +57,9 @@ class Recognition:
     def detect_and_match(self, partner_id, image):
         return self.partner.detect_and_match(partner_id, image)
 
+    def delete_person(self, partner_id):
+        return self.partner.delete_person(partner_id)
+
 
 class Tevian:
     def __init__(self):
@@ -193,7 +196,7 @@ class Tevian:
     def delete_person(self, tevian_id):
         return self._call(
             'DELETE',
-            TEVIAN_URL + "persons/" + tevian_id,
+            TEVIAN_URL + "persons/" + str(tevian_id),
         )
 
     @authenticate
@@ -216,10 +219,10 @@ class Tevian:
         return res['id']
 
     @authenticate
-    def delete_person(self, photo_id):
+    def delete_photo(self, photo_id):
         return self._call(
             'DELETE',
-            TEVIAN_URL + "photos/" + photo_id,
+            TEVIAN_URL + "photos/" + str(photo_id),
         )
 
     @authenticate

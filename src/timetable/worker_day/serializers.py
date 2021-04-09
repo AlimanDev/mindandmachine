@@ -300,6 +300,7 @@ class VacancySerializer(serializers.Serializer):
     is_approved = serializers.BooleanField()
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
+    dt = serializers.DateField()
     type = serializers.CharField()
     is_outsource = serializers.BooleanField()
     avatar = serializers.SerializerMethodField('get_avatar_url')
@@ -505,3 +506,7 @@ class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
                 raise NotFound(detail=f'Пользователь "{username}" не найден')
 
         return attrs
+
+
+class BlockOrUnblockWorkerDayWrapperSerializer(serializers.Serializer):
+    worker_days = BlockOrUnblockWorkerDaySerializer(many=True)

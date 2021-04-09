@@ -1,7 +1,7 @@
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from django.db.models import Subquery, OuterRef, Q
+from django.db.models import Subquery, OuterRef, Q, Exists
 from django_filters.rest_framework import (
     FilterSet,
     BooleanFilter,
@@ -13,6 +13,7 @@ from django_filters.rest_framework import (
 )
 
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
+from src.base.models import Employment
 
 
 class WorkerDayFilter(FilterSet):
@@ -88,6 +89,7 @@ class VacancyFilter(FilterSetWithInitial):
     work_type_name = CharFilter(field_name='work_types', method='filter_by_name')
     ordering = OrderingFilter(fields=('dt', 'id', 'dttm_work_start', 'dttm_work_end'), initial='dttm_work_start')
     approved_first = BooleanFilter(method='filter_approved_first')
+    only_available = BooleanFilter(method='filter_only_available')
 
     def filter_include_outsource(self, queryset, name, value):
         if value:
@@ -120,6 +122,39 @@ class VacancyFilter(FilterSetWithInitial):
                 ),
             )
 
+        return queryset
+
+    def filter_only_available(self, queryset, name, value):
+        if value:
+            approved_subq = WorkerDay.objects.filter(
+                dt=OuterRef('dt'),
+                worker_id=self.request.user.id,
+                is_approved=True,
+                is_fact=False,
+            )
+            active_employment_subq = Employment.objects.filter(
+                Q(dt_hired__lte=OuterRef('dt')) | Q(dt_hired__isnull=True),
+                Q(dt_fired__gte=OuterRef('dt')) | Q(dt_fired__isnull=True),
+                user_id=self.request.user.id,
+                network_id=self.request.user.network_id,
+            )
+            worker_day_paid_subq = WorkerDay.objects.filter(
+                dt=OuterRef('dt'),
+                worker_id=self.request.user.id,
+                is_approved=True,
+                is_fact=False,
+                type__in=WorkerDay.TYPES_PAID,
+            )
+            return queryset.annotate(
+                approved_exists=Exists(approved_subq),
+                active_employment_exists=Exists(active_employment_subq),
+                worker_day_type_paid=Exists(worker_day_paid_subq),
+            ).filter(
+                # Q(shop__network_id=self.request.user.network_id) | Q(is_outsource=True), # аутсорс фильтр
+                approved_exists=True,
+                active_employment_exists=True,
+                worker_day_type_paid=False,
+            )
         return queryset
 
     class Meta:

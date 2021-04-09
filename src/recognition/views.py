@@ -19,6 +19,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.pagination import LimitOffsetPagination
 
 from src.base.auth.authentication import CsrfExemptSessionAuthentication
 from src.base.models import User, Network
@@ -471,6 +472,7 @@ class TickPointViewSet(BaseModelViewSet):
     serializer_class = TickPointSerializer
     openapi_tags = ['TickPoint', ]
     filterset_class = TickPointFilterSet
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
         return TickPoint.objects.filter(network_id=self.request.user.network_id, dttm_deleted__isnull=True)
@@ -496,8 +498,11 @@ class DownloadViolatorsReportAdminView(SuperuserRequiredMixin, FormView):
         network = form.cleaned_data['network']
         dt_from = form.cleaned_data['dt_from']
         dt_to = form.cleaned_data['dt_to']
+        exclude_created_by = form.cleaned_data['exclude_created_by']
+        users = [u.id for u in form.cleaned_data['users']]
+        shops = [s.id for s in form.cleaned_data['shops']]
         
-        return form.get_file(network=network, dt_from=dt_from, dt_to=dt_to)
+        return form.get_file(network=network, dt_from=dt_from, dt_to=dt_to, exclude_created_by=exclude_created_by, user_ids=users, shop_ids=shops)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

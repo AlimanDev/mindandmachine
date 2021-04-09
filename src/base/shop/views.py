@@ -13,7 +13,7 @@ from rest_framework import serializers
 from src.base.filters import BaseActiveNamedModelFilter
 from src.base.models import Employment, Shop, Region
 from src.base.permissions import Permission
-from src.base.shop.serializers import ShopSerializer, ShopStatSerializer
+from src.base.shop.serializers import ShopSerializer, ShopStatSerializer, serialize_shop
 from src.base.views_abstract import UpdateorCreateViewSet
 from src.util.openapi.responses import shop_tree_response_schema_dict as tree_response_schema_dict
 
@@ -61,8 +61,9 @@ class ShopViewSet(UpdateorCreateViewSet):
     openapi_tags = ['Shop',]
 
     @swagger_auto_schema(responses={200: ShopSerializer(many=True)}, operation_description='GET /rest_api/department/')
-    def list(self, *args, **kwargs):
-       return super().list(*args, **kwargs)
+    def list(self, request):
+        data = list(self.filter_queryset(self.get_queryset()))
+        return Response([serialize_shop(s, request) for s in data])
 
     @swagger_auto_schema(request_body=ShopSerializer, responses={201: ShopSerializer}, operation_description='POST /rest_api/department/')
     def create(self, *args, **kwargs):
@@ -74,7 +75,7 @@ class ShopViewSet(UpdateorCreateViewSet):
 
     @swagger_auto_schema(responses={200: ShopSerializer}, request_body=ShopSerializer, operation_description='PUT /rest_api/department/{id}/')
     def update(self, *args, **kwargs):
-       return super().update(*args, **kwargs)
+        return super().update(*args, **kwargs)
 
     @swagger_auto_schema(operation_description='DELETE /rest_api/department/{id}/')
     def destroy(self, *args, **kwargs):

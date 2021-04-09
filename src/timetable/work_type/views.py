@@ -44,7 +44,7 @@ class EfficiencySerializer(serializers.Serializer):
     shop_id = serializers.IntegerField()
     graph_type = serializers.ChoiceField(
         default='plan_approved', label='Тип графика',
-        choices=['plan_edit', 'plan_approved'],
+        choices=['plan_edit', 'plan_approved', 'fact_approved', 'fact_edit'],
     )
     efficiency = serializers.BooleanField(default=True)
     indicators = serializers.BooleanField(default=False)

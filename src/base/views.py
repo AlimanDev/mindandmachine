@@ -77,10 +77,13 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
-    openapi_tags = ['Employment',]
+    openapi_tags = ['Employment', 'Integration',]
 
     def perform_create(self, serializer):
         serializer.save(network=self.request.user.network)
+
+    def perform_update(self, serializer):
+        serializer.save(dttm_deleted=None, network=self.request.user.network)
 
     def get_queryset(self):
         manager = Employment.objects
@@ -125,7 +128,7 @@ class UserViewSet(UpdateorCreateViewSet):
     serializer_class = UserSerializer
     filterset_class = UserFilter
     get_object_field = 'username'
-    openapi_tags = ['User',]
+    openapi_tags = ['User', 'Integration',]
 
     def get_queryset(self):
         user = self.request.user
@@ -156,6 +159,7 @@ class UserViewSet(UpdateorCreateViewSet):
 
     @action(detail=True, methods=['post'])
     def delete_biometrics(self, request, pk=None):
+        from src.recognition.api.recognition import Recognition
         user = self.get_object()
         
         try:
@@ -163,7 +167,11 @@ class UserViewSet(UpdateorCreateViewSet):
         except:
             return Response({"detail": "У сотрудника нет биометрии"}, status=status.HTTP_400_BAD_REQUEST)
 
+        recognition = Recognition()
+        recognition.delete_person(user.userconnecter.partner_id)
         UserConnecter.objects.filter(user_id=user.id).delete()
+        user.avatar = None
+        user.save()
             
         return Response({"detail": "Биометрия сотрудника успешно удалена"}, status=status.HTTP_200_OK)
 
@@ -210,7 +218,7 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
     serializer_class = WorkerPositionSerializer
     pagination_class = LimitOffsetPagination
     filterset_class = BaseActiveNamedModelFilter
-    openapi_tags = ['WorkerPosition',]
+    openapi_tags = ['WorkerPosition', 'Integration',]
 
     def get_queryset(self):
         return WorkerPosition.objects.filter(
