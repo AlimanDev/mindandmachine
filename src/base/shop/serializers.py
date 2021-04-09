@@ -55,6 +55,24 @@ class NonstandardShopScheduleSerializer(serializers.ModelSerializer):
         )
 
 
+def serialize_shop(shop: Shop):
+    return {
+        'id': shop.id,
+        'name': shop.name,
+        'forecast_step_minutes': shop.forecast_step_minutes,
+        'tm_open_dict': shop.open_times,
+        'tm_close_dict': shop.close_times,
+        'address': shop.address,
+        'timezone': str(six.text_type(shop.timezone)),
+        'code': shop.code,
+        'longitude': shop.longitude,
+        'latitude': shop.latitude,
+        'settings_id': shop.settings_id,
+        'load_template_id': shop.load_template_id,
+        'parent_id': shop.parent_id,
+    }
+
+
 class ShopSerializer(serializers.ModelSerializer):
     parent_id = serializers.IntegerField(required=False)
     parent_code = serializers.CharField(required=False)
