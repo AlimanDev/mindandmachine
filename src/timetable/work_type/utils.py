@@ -109,6 +109,10 @@ def get_efficiency(shop_id, form, consider_vacancies=False,):
     graph_type = form.get('graph_type', 'plan_approved')
     if graph_type == 'plan_edit':
         qs_for_covering = qs_for_covering.get_plan_not_approved()
+    elif graph_type == 'fact_approved':
+        qs_for_covering = qs_for_covering.get_fact_approved()
+    elif graph_type == 'fact_edit':
+        qs_for_covering = qs_for_covering.get_fact_not_approved()
     else:
         qs_for_covering = qs_for_covering.get_plan_approved()
 
