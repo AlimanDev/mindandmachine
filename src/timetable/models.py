@@ -17,6 +17,8 @@ from django.db.models.query import QuerySet
 from django.utils import timezone
 from model_utils import FieldTracker
 
+from src.events.signals import event_signal
+from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
@@ -517,7 +519,7 @@ class WorkerDay(AbstractModel):
                         (dt + datetime.timedelta(days=1)) if close_at_0 else dt, shop_schedule['tm_close'])
                     if self.dttm_work_end > dttm_shop_close:
                         dttm_work_end = dttm_shop_close
-
+            break_time = None
             if self.shop.network.only_fact_hours_that_in_approved_plan and \
                     self.type in WorkerDay.TYPES_WITH_TM_RANGE and self.is_fact:
                 plan_approved = WorkerDay.objects.filter(
@@ -549,10 +551,19 @@ class WorkerDay(AbstractModel):
                         dttm_work_end = plan_approved.dttm_work_end
                     else:
                         dttm_work_end = min(dttm_work_end, plan_approved.dttm_work_end)
+                    # учитываем перерыв плана, если факт получился больше
+                    fact_hours = self.count_work_hours(breaks, dttm_work_start, dttm_work_end)
+                    plan_hours = plan_approved.work_hours
+                    if fact_hours > plan_hours:
+                        work_hours = (plan_approved.dttm_work_end - plan_approved.dttm_work_start).total_seconds() / 60
+                        for break_triplet in breaks:
+                            if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
+                                break_time = sum(break_triplet[2])
+                                break
                 else:
                     return dttm_work_start, dttm_work_end, datetime.timedelta(0)
 
-            return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end)
+            return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time)
 
         return self.dttm_work_start, self.dttm_work_end, datetime.timedelta(0)
 
@@ -621,8 +632,11 @@ class WorkerDay(AbstractModel):
         return t in cls.TYPES_WITH_TM_RANGE
 
     @staticmethod
-    def count_work_hours(break_triplets, dttm_work_start, dttm_work_end):
+    def count_work_hours(break_triplets, dttm_work_start, dttm_work_end, break_time=None):
         work_hours = (dttm_work_end - dttm_work_start).total_seconds() / 60
+        if break_time:
+            work_hours = work_hours - break_time
+            return datetime.timedelta(minutes=work_hours)
         for break_triplet in break_triplets:
             if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
                 work_hours = work_hours - sum(break_triplet[2])
@@ -1221,6 +1235,32 @@ class AttendanceRecords(AbstractModel):
                 )
                 if _wd_created or not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl)
+                if _wd_created:
+                    plan_wd = WorkerDay.objects.filter(
+                        dt=self.dt,
+                        worker=self.user,
+                        is_fact=False,
+                        is_approved=True,
+                        shop_id=self.shop_id,
+                    )
+                    if not plan_wd.exists():
+                        transaction.on_commit(lambda: event_signal.send(
+                            sender=None,
+                            network_id=self.user.network_id,
+                            event_code=EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN,
+                            context={
+                                'director':{
+                                    'email': self.shop.director.email if self.shop.director else self.shop.email,
+                                    'name': self.shop.director.first_name if self.shop.director else self.shop.name, 
+                                },
+                                'user':{
+                                    'last_name': self.user.last_name,
+                                    'first_name': self.user.first_name,
+                                },
+                                'dttm': self.dttm.strftime('%Y-%m-%d %H:%M:%S'),
+                                'shop_id': self.shop_id,
+                            },
+                        ))
                 self._create_or_update_not_approved_fact(fact_approved)
 
         return res

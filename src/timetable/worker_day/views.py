@@ -506,7 +506,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=False, methods=['get'], filterset_class=VacancyFilter)
     def vacancy(self, request):
-        filterset_class = VacancyFilter(request.query_params)
+        filterset_class = VacancyFilter(request.query_params, request=request)
         if not filterset_class.form.is_valid():
             raise utils.translate_validation(filterset_class.errors)
         

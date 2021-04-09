@@ -1,4 +1,4 @@
-from datetime import time, datetime
+from datetime import time, datetime, timedelta
 
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
@@ -38,6 +38,9 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
         fill_shop_schedule(shop_id=cls.shop.id, dt_from=cls.dt, periods=1)
         cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
         cls.work_type = WorkType.objects.create(work_type_name=cls.work_type_name, shop=cls.shop)
+
+    def setUp(self):
+        self.shop_settings.breaks.refresh_from_db(fields=['value'])
 
     def test_zero_work_hours_if_there_is_no_plan_approved_workday(self):
         fact_approved = WorkerDayFactory(
@@ -176,3 +179,33 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
         self.assertEqual(fact_approved.work_hours.total_seconds(), 5 * 3600)
         fact_not_approved.refresh_from_db()
         self.assertEqual(fact_not_approved.work_hours.total_seconds(), 5 * 3600)
+
+    def test_crop_work_hours_and_use_break_from_plan(self):
+        breaks = self.shop_settings.breaks
+        breaks.value = '[[0, 359, [0]], [359, 720, [72]]]'
+        breaks.save()
+        wd_plan = WorkerDay.objects.create(
+            worker=self.user,
+            employment=self.employment,
+            is_fact=False,
+            is_approved=True,
+            shop=self.shop,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(12)),
+            dttm_work_end=datetime.combine(self.dt, time(18)),
+        )
+        wd_fact = WorkerDay.objects.create(
+            worker=self.user,
+            employment=self.employment,
+            is_fact=True,
+            is_approved=True,
+            shop=self.shop,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(13, 2)),
+            dttm_work_end=datetime.combine(self.dt, time(19, 4)),
+        )
+        self.assertGreaterEqual(wd_plan.work_hours, wd_fact.work_hours)
+        work_hours = ((wd_fact.dttm_work_end_tabel - wd_fact.dttm_work_start_tabel).total_seconds() / 60) - 72
+        self.assertEqual(wd_fact.work_hours, timedelta(minutes=work_hours))

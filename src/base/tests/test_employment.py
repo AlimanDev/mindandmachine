@@ -558,3 +558,58 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         Employment.objects.filter(id=empl1.id).delete()
         wd.refresh_from_db()
         self.assertEqual(wd.employment_id, None)
+
+
+    def _test_get_employment_ordered_by_position(self, ordering):
+        self.wp1 = WorkerPosition.objects.create(
+            name='Администатор',
+            network=self.network,
+            ordering=1,
+        )
+        self.wp2 = WorkerPosition.objects.create(
+            name='Директор',
+            network=self.network,
+            ordering=2,
+        )
+        self.wp3 = WorkerPosition.objects.create(
+            name='Уборщик',
+            network=self.network,
+        )
+        self.wp4 = WorkerPosition.objects.create(
+            name='Кассир',
+            network=self.network,
+        )
+        self.employment2.position = self.wp1
+        self.employment3.position = self.wp2
+        self.employment4.position = self.wp3
+        self.employment6.position = self.wp4
+        self.employment7.position = self.wp4
+        self.employment2.save()
+        self.employment3.save()
+        self.employment4.save()
+        self.employment6.save()
+        self.employment7.save()
+        
+        return self.client.get(f'/rest_api/employment/?shop_id={self.shop.id}&order_by={ordering}')
+
+    def test_get_employment_ordered_by_position_asc(self):
+        data = self._test_get_employment_ordered_by_position(ordering='position__ordering,position__name')
+        assert_data = [
+            (self.user2.id, self.wp1.id),
+            (self.user3.id, self.wp2.id),
+            (self.user6.id, self.wp4.id),
+            (self.user7.id, self.wp4.id),
+            (self.user4.id, self.wp3.id),
+        ]
+        self.assertSequenceEqual(list(map(lambda x: (x['user']['id'], x['position_id']), data.json())), assert_data)
+
+    def test_get_employment_ordered_by_position_desc(self):
+        data = self._test_get_employment_ordered_by_position(ordering='-position__ordering,position__name')
+        assert_data = [
+            (self.user6.id, self.wp4.id),
+            (self.user7.id, self.wp4.id),
+            (self.user4.id, self.wp3.id),
+            (self.user3.id, self.wp2.id),
+            (self.user2.id, self.wp1.id),
+        ]
+        self.assertSequenceEqual(list(map(lambda x: (x['user']['id'], x['position_id']), data.json())), assert_data)
