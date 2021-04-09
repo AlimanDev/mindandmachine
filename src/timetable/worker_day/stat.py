@@ -339,6 +339,13 @@ class WorkersStatsGetter:
             workers_dict.setdefault(e.user_id, []).append(e)
         return workers_dict
 
+    @cached_property
+    def empls_grouped_by_tabel_code(self):
+        empls_dict = {}
+        for empl in self.employments_list:
+            empls_dict.setdefault(empl.tabel_code, []).append(empl)
+        return empls_dict
+
     def _get_is_fact_key(self, is_fact):
         return 'fact' if is_fact else 'plan'
 
@@ -384,6 +391,7 @@ class WorkersStatsGetter:
         ).values(
             'worker_id',
             'employment_id',
+            'employment__tabel_code',
             'is_fact',
             'is_approved',
             'dt__month',
@@ -433,24 +441,45 @@ class WorkersStatsGetter:
             ).setdefault(
                 self._get_is_approved_key(wd_dict['is_approved']), {}
             )
-            work_days = data.setdefault('work_days', {})
-            work_days['selected_shop'] = work_days.get('selected_shop', 0) + wd_dict['work_days_selected_shop']
-            work_days['other_shops'] = work_days.get('other_shops', 0) + wd_dict['work_days_other_shops']
-            work_days['total'] = work_days.get('total', 0) + wd_dict['work_days_selected_period']
+            empl_tabel_code_dict = None
+            data_tabel_code = None
+            if wd_dict['employment__tabel_code']:
+                empl_tabel_code_dict = res.setdefault(
+                    wd_dict['worker_id'], {}).setdefault('empl_tabel_codes', {}).setdefault(wd_dict['employment__tabel_code'], {})
+                data_tabel_code = empl_tabel_code_dict.setdefault(
+                    self._get_is_fact_key(wd_dict['is_fact']), {}
+                ).setdefault(
+                    self._get_is_approved_key(wd_dict['is_approved']), {}
+                )
+            work_days_dict = data.setdefault('work_days', {})
+            work_days_dicts = [work_days_dict]
+            if wd_dict['employment__tabel_code']:
+                work_days_dicts.append(data_tabel_code.setdefault('work_days', {}))
+            for work_days in work_days_dicts:
+                work_days['selected_shop'] = work_days.get('selected_shop', 0) + wd_dict['work_days_selected_shop']
+                work_days['other_shops'] = work_days.get('other_shops', 0) + wd_dict['work_days_other_shops']
+                work_days['total'] = work_days.get('total', 0) + wd_dict['work_days_selected_period']
 
-            work_hours = data.setdefault('work_hours', {})
-            work_hours['selected_shop'] = work_hours.get('selected_shop', 0) + wd_dict['work_hours_selected_shop']
-            work_hours['other_shops'] = work_hours.get('other_shops', 0) + wd_dict['work_hours_other_shops']
-            work_hours['total'] = work_hours.get('total', 0) + wd_dict['work_hours_selected_period']
-            work_hours['until_acc_period_end'] = work_hours.get(
-                'until_acc_period_end', 0) + wd_dict['work_hours_until_acc_period_end']
+            work_hours_dict = data.setdefault('work_hours', {})
+            work_hours_dicts = [work_hours_dict]
+            if wd_dict['employment__tabel_code']:
+                work_hours_dicts.append(data_tabel_code.setdefault('work_hours', {}))
+            for work_hours in work_hours_dicts:
+                work_hours['selected_shop'] = work_hours.get('selected_shop', 0) + wd_dict['work_hours_selected_shop']
+                work_hours['other_shops'] = work_hours.get('other_shops', 0) + wd_dict['work_hours_other_shops']
+                work_hours['total'] = work_hours.get('total', 0) + wd_dict['work_hours_selected_period']
+                work_hours['until_acc_period_end'] = work_hours.get(
+                    'until_acc_period_end', 0) + wd_dict['work_hours_until_acc_period_end']
 
             # за прошлые месяцы отработанные часы берем из факта подтвержденного
             if wd_dict['is_fact'] and wd_dict['is_approved'] and wd_dict['dt__month'] in prev_months:
-                work_hours['prev_months'] = work_hours.get(
-                'prev_months', 0) + wd_dict['work_hours_total']
-                empl_dict['work_hours_prev_months'] = empl_dict.get(
-                'work_hours_prev_months', 0) + wd_dict['work_hours_total']
+                for work_hours in work_hours_dicts:
+                    work_hours['prev_months'] = work_hours.get('prev_months', 0) + wd_dict['work_hours_total']
+                empl_dict['work_hours_prev_months'] = empl_dict.get('work_hours_prev_months', 0) + wd_dict[
+                    'work_hours_total']
+                if wd_dict['employment__tabel_code']:
+                    empl_tabel_code_dict['work_hours_prev_months'] = empl_tabel_code_dict.get(
+                    'work_hours_prev_months', 0) + wd_dict['work_hours_total']
 
             if not wd_dict['is_fact'] and wd_dict['is_approved']:
                 empl_dict.setdefault('work_hours_outside_of_selected_period_plan_approved', {})[wd_dict['dt__month']] = empl_dict.get(
@@ -464,23 +493,39 @@ class WorkersStatsGetter:
             worker_dict = res.setdefault(
                 worker_id, {}
             )
-            work_hours_prev_months = worker_dict.get(
+            worker_work_hours_prev_months = worker_dict.get(
                 'fact', {}).get('approved', {}).get('work_hours', {}).get('prev_months', 0)
 
             for is_fact_key in ['plan', 'fact']:
                 for is_approved_key in ['approved', 'not_approved']:
-                    data = worker_dict.setdefault(
+                    worker_data = worker_dict.setdefault(
                         is_fact_key, {}
                     ).setdefault(
                         is_approved_key, {}
                     )
-                    work_hours = data.setdefault('work_hours', {})
 
-                    if is_fact_key == 'fact' and is_approved_key == 'approved':
-                        pass
-                    else:
-                        work_hours['prev_months'] = work_hours_prev_months
-                    work_hours['acc_period'] = work_hours_prev_months + work_hours.get('until_acc_period_end', 0)
+                    data_list = [(worker_data, worker_work_hours_prev_months)]
+
+                    empl_tabel_codes = worker_dict.get('empl_tabel_codes', {})
+                    for empl_key, empl_dict in empl_tabel_codes.items():
+                        empl_work_hours_prev_months = empl_dict.get(
+                            'fact', {}).get('approved', {}).get('work_hours', {}).get('prev_months', 0)
+
+                        empl_data = empl_dict.get(
+                            is_fact_key, {}
+                        ).get(
+                            is_approved_key, {}
+                        )
+                        if empl_data:
+                            data_list.append((empl_data, empl_work_hours_prev_months))
+
+                    for data, work_hours_prev_months in data_list:
+                        work_hours = data.setdefault('work_hours', {})
+                        if is_fact_key == 'fact' and is_approved_key == 'approved':
+                            pass
+                        else:
+                            work_hours['prev_months'] = work_hours_prev_months
+                        work_hours['acc_period'] = work_hours_prev_months + work_hours.get('until_acc_period_end', 0)
 
         work_days = WorkerDay.objects.filter(
             dt__gte=acc_period_dt_from,
@@ -488,6 +533,7 @@ class WorkersStatsGetter:
             worker_id__in=self.workers_dict.keys(),
         ).values(
             'worker_id',
+            'employment__tabel_code',
             'is_fact',
             'is_approved',
             'type',
@@ -507,9 +553,26 @@ class WorkersStatsGetter:
             ).setdefault(
                 self._get_is_approved_key(wd_dict['is_approved']), {}
             )
+            empl_tabel_code_data = None
+            if wd_dict['employment__tabel_code'] and wd_dict['type'] in WorkerDay.TYPES_WITH_TM_RANGE:
+                empl_tabel_code_data = res.setdefault(
+                    wd_dict['worker_id'], {}
+                ).setdefault(
+                    'empl_tabel_codes', {}
+                ).setdefault(
+                    wd_dict['employment__tabel_code'], {}
+                ).setdefault(
+                    self._get_is_fact_key(wd_dict['is_fact']), {}
+                ).setdefault(
+                    self._get_is_approved_key(wd_dict['is_approved']), {}
+                )
+
             if wd_dict['dt__month'] == curr_month:
                 day_type = data.setdefault('day_type', {})
                 day_type[wd_dict['type']] = wd_dict['day_type_count']
+                if wd_dict['employment__tabel_code'] and wd_dict['type'] in WorkerDay.TYPES_WITH_TM_RANGE:
+                    empl_tabel_code_day_type = empl_tabel_code_data.setdefault('day_type', {})
+                    empl_tabel_code_day_type[wd_dict['type']] = wd_dict['day_type_count']
 
             if not wd_dict['is_fact']:
                 days_count_outside_of_selected_period = data.setdefault('workdays_count_outside_of_selected_period', {})
@@ -526,6 +589,7 @@ class WorkersStatsGetter:
         ).values(
             'user_id',
             'employment_id',
+            'employment__tabel_code',
             'dt__month',
         ).annotate(
             period_start=Greatest('employment__dt_hired', Value(acc_period_dt_from)),
@@ -598,25 +662,40 @@ class WorkersStatsGetter:
                         is_approved_key, {}
                     )
 
-                    norm_hours = data.setdefault('norm_hours', {})
+                    empl_tabel_code_data = res.setdefault(
+                        pc_dict['user_id'], {}
+                    ).setdefault(
+                        'empl_tabel_codes', {}
+                    ).setdefault(
+                        pc_dict['employment__tabel_code'], {}
+                    ).setdefault(
+                        is_fact_key, {}
+                    ).setdefault(
+                        is_approved_key, {}
+                    )
+
+                    worker_norm_hours = data.setdefault('norm_hours', {})
+                    empl_tabel_code_norm_hours = empl_tabel_code_data.setdefault('norm_hours', {})
                     empl_dict = res.setdefault(
                         pc_dict['user_id'], {}).setdefault('employments', {}).setdefault(pc_dict['employment_id'], {})
+
                     if is_fact_key == 'plan' and is_approved_key == 'not_approved':
                         if pc_dict['has_vacation_or_sick_plan_not_approved'] is False:
-                            norm_hours['acc_period'] = norm_hours.get('acc_period', 0) + pc_dict[
-                                'norm_hours_acc_period']
-                            norm_hours['prev_months'] = norm_hours.get('prev_months', 0) + pc_dict[
-                                'norm_hours_prev_months']
-                            norm_hours['curr_month'] = norm_hours.get('curr_month', 0) + pc_dict[
-                                'norm_hours_curr_month']
-                            norm_hours['curr_month_end'] = norm_hours.get('curr_month_end', 0) + pc_dict[
-                                'norm_hours_prev_months'] + pc_dict['norm_hours_curr_month']
+                            for norm_hours in [worker_norm_hours, empl_tabel_code_norm_hours]:
+                                norm_hours['acc_period'] = norm_hours.get('acc_period', 0) + pc_dict[
+                                    'norm_hours_acc_period']
+                                norm_hours['prev_months'] = norm_hours.get('prev_months', 0) + pc_dict[
+                                    'norm_hours_prev_months']
+                                norm_hours['curr_month'] = norm_hours.get('curr_month', 0) + pc_dict[
+                                    'norm_hours_curr_month']
+                                norm_hours['curr_month_end'] = norm_hours.get('curr_month_end', 0) + pc_dict[
+                                    'norm_hours_prev_months'] + pc_dict['norm_hours_curr_month']
 
                         empl_dict.setdefault('vacation_or_sick_plan_not_approved_count', {})[pc_dict['dt__month']] = \
-                            norm_hours.get('vacation_or_sick_plan_not_approved_count', 0) + \
+                            worker_norm_hours.get('vacation_or_sick_plan_not_approved_count', 0) + \
                             pc_dict['vacation_or_sick_plan_not_approved_count']
                         empl_dict.setdefault('vacation_or_sick_plan_not_approved_count_selected_period', {})[pc_dict['dt__month']] = \
-                            norm_hours.get('vacation_or_sick_plan_not_approved_count_selected_period', 0) + \
+                            worker_norm_hours.get('vacation_or_sick_plan_not_approved_count_selected_period', 0) + \
                             pc_dict['vacation_or_sick_plan_not_approved_count_selected_period']
                         empl_dict.setdefault('vacation_or_sick_plan_not_approved_count_outside_of_selected_period', {})[
                             pc_dict['dt__month']] = empl_dict.setdefault('vacation_or_sick_plan_not_approved_count', {})[
@@ -624,20 +703,21 @@ class WorkersStatsGetter:
                             'vacation_or_sick_plan_not_approved_count_selected_period', {})[pc_dict['dt__month']]
                     else:
                         if pc_dict['has_vacation_or_sick_plan_approved'] is False:
-                            norm_hours['acc_period'] = norm_hours.get('acc_period', 0) + pc_dict[
-                                'norm_hours_acc_period']
-                            norm_hours['prev_months'] = norm_hours.get('prev_months', 0) + pc_dict[
-                                'norm_hours_prev_months']
-                            norm_hours['curr_month'] = norm_hours.get('curr_month', 0) + pc_dict[
-                                'norm_hours_curr_month']
-                            norm_hours['curr_month_end'] = norm_hours.get('curr_month_end', 0) + pc_dict[
-                                'norm_hours_prev_months'] + pc_dict['norm_hours_curr_month']
+                            for norm_hours in [worker_norm_hours, empl_tabel_code_norm_hours]:
+                                norm_hours['acc_period'] = norm_hours.get('acc_period', 0) + pc_dict[
+                                    'norm_hours_acc_period']
+                                norm_hours['prev_months'] = norm_hours.get('prev_months', 0) + pc_dict[
+                                    'norm_hours_prev_months']
+                                norm_hours['curr_month'] = norm_hours.get('curr_month', 0) + pc_dict[
+                                    'norm_hours_curr_month']
+                                norm_hours['curr_month_end'] = norm_hours.get('curr_month_end', 0) + pc_dict[
+                                    'norm_hours_prev_months'] + pc_dict['norm_hours_curr_month']
 
                         empl_dict.setdefault('vacation_or_sick_plan_approved_count', {})[pc_dict['dt__month']] = \
-                            norm_hours.get('vacation_or_sick_plan_approved_count', 0) + \
+                            worker_norm_hours.get('vacation_or_sick_plan_approved_count', 0) + \
                             pc_dict['vacation_or_sick_plan_approved_count']
                         empl_dict.setdefault('vacation_or_sick_plan_approved_count_selected_period', {})[pc_dict['dt__month']] = \
-                            norm_hours.get('vacation_or_sick_plan_approved_count_selected_period', 0) + \
+                            worker_norm_hours.get('vacation_or_sick_plan_approved_count_selected_period', 0) + \
                             pc_dict['vacation_or_sick_plan_approved_count_selected_period']
                         empl_dict.setdefault('vacation_or_sick_plan_approved_count_outside_of_selected_period', {})[
                             pc_dict['dt__month']] = empl_dict.setdefault('vacation_or_sick_plan_approved_count', {})[
@@ -800,6 +880,72 @@ class WorkersStatsGetter:
             work_hours_prev_months = worker_dict.get(
                 'fact', {}).get('approved', {}).get('work_hours', {}).get('prev_months', 0)
 
+            empl_tabel_codes_dict = worker_dict.setdefault('empl_tabel_codes', {})
+            for empl_tabel_code, empl_tabel_code_dict in empl_tabel_codes_dict.items():
+                empl_tabel_code_ids = [e.id for e in self.empls_grouped_by_tabel_code.get(empl_tabel_code)]
+                for is_fact_key in ['plan', 'fact']:
+                    for is_approved_key in ['approved', 'not_approved']:
+                        overtime = empl_tabel_code_dict.setdefault(
+                            is_fact_key, {}
+                        ).setdefault(
+                            is_approved_key, {}
+                        ).setdefault(
+                            'overtime', {}
+                        )
+
+                        sawh_hours = empl_tabel_code_dict.setdefault(
+                            is_fact_key, {}
+                        ).setdefault(
+                            is_approved_key, {}
+                        ).setdefault(
+                            'sawh_hours', {}
+                        )
+
+                        if is_fact_key == 'plan' and is_approved_key == 'not_approved':
+                            for empl_id, empl_dict in worker_dict.get('employments', {}).items():
+                                if empl_id in empl_tabel_code_ids:
+                                    for month_num in acc_period_months:
+                                        sawh_hours.setdefault('by_months', {})[month_num] = \
+                                            sawh_hours.get('by_months', {}).get(month_num, 0) + \
+                                            empl_dict.get('sawh_hours_by_months_plan_not_approved', {}).get(month_num, 0)
+
+                                    sawh_hours['selected_period'] = sawh_hours.get('selected_period', 0) + \
+                                                                    empl_dict.get(
+                                                                        'sawh_hours_plan_not_approved_selected_period', 0)
+
+                        else:
+                            for empl_id, empl_dict in worker_dict.get('employments', {}).items():
+                                if empl_id in empl_tabel_code_ids:
+                                    for month_num in acc_period_months:
+                                        sawh_hours.setdefault('by_months', {})[month_num] = \
+                                            sawh_hours.get('by_months', {}).get(month_num, 0) + \
+                                            empl_dict.get('sawh_hours_by_months_plan_approved', {}).get(month_num, 0)
+
+                                    sawh_hours['selected_period'] = sawh_hours.get('selected_period', 0) + \
+                                                                    empl_dict.get(
+                                                                        'sawh_hours_plan_approved_selected_period', 0)
+
+                        sawh_hours['curr_month'] = sawh_hours['by_months'].get(curr_month)
+                        work_hours_curr_month = empl_tabel_code_dict.get(
+                            is_fact_key).get(is_approved_key).get('work_hours', {}).get('total', 0)
+                        work_hours_until_acc_period_end = empl_tabel_code_dict.get(
+                            is_fact_key).get(is_approved_key).get('work_hours', {}).get('until_acc_period_end', 0)
+                        norm_hours_acc_period = empl_tabel_code_dict.get(
+                            is_fact_key).get(is_approved_key).get('norm_hours', {}).get('acc_period', 0)
+                        norm_hours_curr_month = empl_tabel_code_dict.get(
+                            is_fact_key).get(is_approved_key).get('norm_hours', {}).get('curr_month', 0)
+                        norm_hours_prev_months = empl_tabel_code_dict.get(
+                            is_fact_key).get(is_approved_key).get('norm_hours', {}).get('prev_months', 0)
+                        norm_hours_curr_month_end = empl_tabel_code_dict.get(
+                            is_fact_key).get(is_approved_key).get('norm_hours', {}).get('curr_month_end', 0)
+
+                        overtime['acc_period'] = (
+                                                         work_hours_prev_months + work_hours_until_acc_period_end) - norm_hours_acc_period
+                        overtime['prev_months'] = work_hours_prev_months - norm_hours_prev_months
+                        overtime['curr_month'] = work_hours_curr_month - norm_hours_curr_month
+                        overtime['curr_month_end'] = (
+                                                             work_hours_prev_months + work_hours_curr_month) - norm_hours_curr_month_end
+
             for is_fact_key in ['plan', 'fact']:
                 for is_approved_key in ['approved', 'not_approved']:
                     overtime = worker_dict.setdefault(
@@ -817,6 +963,7 @@ class WorkersStatsGetter:
                     ).setdefault(
                         'sawh_hours', {}
                     )
+
                     if is_fact_key == 'plan' and is_approved_key == 'not_approved':
                         for empl_id, empl_dict in worker_dict.get('employments', {}).items():
                             for month_num in acc_period_months:

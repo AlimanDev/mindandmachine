@@ -629,16 +629,11 @@ class EmploymentManager(models.Manager):
         return qs.filter(*args, **kwargs)
 
     def get_active_empl_for_user(
-            self, network_id, user_id, dt=None, priority_shop_id=None, priority_employment_id=None):
+            self, network_id, user_id, dt=None, priority_shop_id=None, priority_employment_id=None,
+            priority_work_type_id=None):
         qs = self.get_active(network_id, dt_from=dt, dt_to=dt, user_id=user_id)
 
         order_by = []
-
-        if priority_shop_id:
-            qs = qs.annotate_value_equality(
-                'is_equal_shops', 'shop_id', priority_shop_id,
-            )
-            order_by.append('-is_equal_shops')
 
         if priority_employment_id:
             qs = qs.annotate_value_equality(
@@ -646,10 +641,21 @@ class EmploymentManager(models.Manager):
             )
             order_by.append('-is_equal_employments')
 
-        if order_by:
-            qs = qs.order_by(*order_by)
+        if priority_shop_id:
+            qs = qs.annotate_value_equality(
+                'is_equal_shops', 'shop_id', priority_shop_id,
+            )
+            order_by.append('-is_equal_shops')
 
-        return qs
+        if priority_work_type_id:
+            qs = qs.annotate_value_equality(
+                'is_equal_work_types', 'work_types__work_type_id', priority_work_type_id,
+            ).distinct()
+            order_by.append('-is_equal_work_types')
+
+        order_by.append('-norm_work_hours')
+
+        return qs.order_by(*order_by)
 
 
 class Group(AbstractActiveNetworkSpecificCodeNamedModel):

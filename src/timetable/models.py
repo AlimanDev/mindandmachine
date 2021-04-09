@@ -1053,7 +1053,7 @@ class AttendanceRecords(AbstractModel):
             worker=self.user,
             is_fact=False,
             is_approved=True,
-            work_types__isnull=False,
+            worker_day_details__isnull=False,
         ).first()
         if plan_approved:
             if fact_approved.shop_id == plan_approved.shop_id:
@@ -1163,10 +1163,21 @@ class AttendanceRecords(AbstractModel):
                 is_approved=True,
             ).select_for_update().first()
 
+            plan_approved = WorkerDay.objects.filter(
+                dt=self.dt,
+                worker=self.user,
+                is_fact=False,
+                is_approved=True,
+                shop=self.shop,  # TODO: смотрим же только для того подразделения где идет отметка?
+                type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                employment__isnull=False,
+            ).prefetch_related('work_types').first()
+
             active_user_empl = Employment.objects.get_active_empl_for_user(
                 network_id=self.user.network_id, user_id=self.user_id,
                 dt=self.dt,
                 priority_shop_id=self.shop_id,
+                priority_employment_id=plan_approved.employment_id if plan_approved else None,
             ).first()
 
             # для случаев когда сотрудник перепутал магазины, отметился сначала в одном, потом еще раз в другом

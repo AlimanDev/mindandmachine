@@ -4,11 +4,10 @@ from datetime import datetime, time
 import factory
 
 from src.base.tests.factories_abstract import AbstractActiveNamedModelFactory
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkType, WorkTypeName
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkType, WorkTypeName, EmploymentWorkType
 
 
 class WorkTypeNameFactory(AbstractActiveNamedModelFactory):
-    network = factory.SubFactory('src.base.tests.factories.NetworkFactory')
     name = factory.LazyFunction(lambda: random.choice(['Кассир', 'Директор']))
 
     class Meta:
@@ -50,7 +49,7 @@ class WorkerDayFactory(factory.django.DjangoModelFactory):
         model = WorkerDay
 
     @factory.post_generation
-    def create_work_type(self, create, *args, **kwargs):
+    def cashbox_details(self, create, *args, **kwargs):
         if not create:
             return
 
@@ -58,4 +57,13 @@ class WorkerDayFactory(factory.django.DjangoModelFactory):
             WorkerDayCashboxDetailsFactory(
                 worker_day=self,
                 work_type__shop=self.shop,
+                **kwargs,
             )
+
+
+class EmploymentWorkTypeFactory(factory.django.DjangoModelFactory):
+    work_type = factory.SubFactory('src.timetable.tests.factories.WorkTypeFactory')
+
+    class Meta:
+        model = EmploymentWorkType
+        django_get_or_create = ('employment', 'work_type')
