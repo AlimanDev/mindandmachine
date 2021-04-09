@@ -170,6 +170,8 @@ class UserViewSet(UpdateorCreateViewSet):
         recognition = Recognition()
         recognition.delete_person(user.userconnecter.partner_id)
         UserConnecter.objects.filter(user_id=user.id).delete()
+        user.avatar = None
+        user.save()
             
         return Response({"detail": "Биометрия сотрудника успешно удалена"}, status=status.HTTP_200_OK)
 
