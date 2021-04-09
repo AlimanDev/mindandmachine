@@ -68,6 +68,7 @@ class TestTickPointViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(resp_data['key'], str(created_tick_point.key))
         self.assertEqual('Точка отметок', created_tick_point.name)
         self.assertEqual('tick_point', created_tick_point.code)
+        self.assertEqual(self.shop.id, created_tick_point.shop_id)
 
         # update
         tick_point_data['name'] = 'Точка отметок2'

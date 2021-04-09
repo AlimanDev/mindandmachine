@@ -37,6 +37,8 @@ class HashSigninSerializer(serializers.Serializer):
 
 
 class TickPointSerializer(serializers.ModelSerializer):
+    shop_id = serializers.IntegerField()
+
     class Meta:
         model = TickPoint
         fields = ['id', 'shop_id', 'name', 'code', 'key']
