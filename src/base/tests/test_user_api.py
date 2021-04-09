@@ -130,6 +130,10 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
 
     
     def test_delete_biometrics(self):
+        self.user1.avatar = 'test/path/avatar.jpg'
+        self.user1.save()
+        self.assertIsNotNone(self.user1.avatar.url)
+        self.assertTrue(bool(self.user1.avatar))
         UserConnecter.objects.create(
             user=self.user1,
             partner_id='1234',
@@ -145,6 +149,8 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(data, {'detail': 'Биометрия сотрудника успешно удалена'})
         self.assertEqual(UserConnecter.objects.count(), 0)
+        self.user1.refresh_from_db()
+        self.assertFalse(bool(self.user1.avatar))
 
     def test_delete_non_existing_biometrics(self):
         response = self.client.post(
