@@ -31,10 +31,11 @@ def update_urv_views(apps, schema_editor):
                 (count(*) FILTER (WHERE wd.is_fact is True and wd.dttm_work_end is not null))::int as ticks_leaving_fact_count,
                 count(*) FILTER (WHERE wd.is_fact is False and wd.created_by_id is NULL) as auto_created_plan,
                 count(*) FILTER (WHERE wd.is_fact is True and wd.created_by_id is NULL) as auto_created_fact,
-                coalesce(wd.employment_id, (select id from base_employment e where (e.dt_hired is null or e.dt_hired <= wd.dt) and (e.dt_fired is null or e.dt_fired >= wd.dt) and e.user_id = wd.worker_id limit 1)) AS employment_id
+                coalesce(e.tabel_code, (select tabel_code from base_employment e where (e.dt_hired is null or e.dt_hired <= wd.dt) and (e.dt_fired is null or e.dt_fired >= wd.dt) and e.user_id = wd.worker_id limit 1)) AS tabel_code
         from timetable_workerday wd
             inner join base_shop s on wd.shop_id = s.id
             inner join base_user u on wd.worker_id = u.id
+            inner join base_employment e on wd.employment_id = e.id
             inner join base_network network on s.network_id = network.id
             left join timetable_workerdaycashboxdetails wd_details on wd.id = wd_details.worker_day_id and wd_details.id = (
                 SELECT max(wd_details2.id)
@@ -53,7 +54,7 @@ def update_urv_views(apps, schema_editor):
                 )
         group by wd.dt,
                     wd.worker_id,
-                    coalesce(wd.employment_id, (select id from base_employment e where (e.dt_hired is null or e.dt_hired <= wd.dt) and (e.dt_fired is null or e.dt_fired >= wd.dt) and e.user_id = wd.worker_id limit 1)),
+                    coalesce(e.tabel_code, (select tabel_code from base_employment e where (e.dt_hired is null or e.dt_hired <= wd.dt) and (e.dt_fired is null or e.dt_fired >= wd.dt) and e.user_id = wd.worker_id limit 1)),
                     wd.type,
                     u.username,
                     concat(u.last_name, ' ', u.first_name, ' ', u.middle_name),
@@ -85,9 +86,8 @@ def update_urv_views(apps, schema_editor):
                tt_pf.work_type_name as "Тип работ",
                tt_pf.auto_created_plan as "Авт-ки созданный план",
                tt_pf.auto_created_fact as "Авт-ки созданный факт",
-                e.tabel_code AS "Табельный номер трудоустройства"
+               tt_pf.tabel_code AS "Табельный номер трудоустройства"
         from timetable_plan_and_fact_hours tt_pf
-        inner join base_employment e on tt_pf.worker_id = e.user_id
         where tt_pf.wd_type = 'W'""")
 
 class Migration(migrations.Migration):

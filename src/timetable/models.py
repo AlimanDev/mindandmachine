@@ -1410,7 +1410,7 @@ class PlanAndFactHours(models.Model):
     shop_name = models.CharField(max_length=512)
     shop_code = models.CharField(max_length=512)
     worker = models.ForeignKey('base.User', on_delete=models.DO_NOTHING)
-    employment = models.ForeignKey('base.Employment', on_delete=models.DO_NOTHING)
+    tabel_code = models.CharField(max_length=64)
     wd_type = models.CharField(max_length=4, choices=WorkerDay.TYPES)
     worker_fio = models.CharField(max_length=512, choices=WorkerDay.TYPES)
     fact_work_hours = models.DecimalField(max_digits=4, decimal_places=2)

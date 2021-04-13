@@ -214,7 +214,7 @@ class MtsTabelDataGetter(BaseTabelDataGetter):
                 wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE,
                 dt__gte=self.dt_from,
                 dt__lte=self.dt_to,
-            ).select_related('employment').distinct(),
+            ).distinct(),
         }
 
 
