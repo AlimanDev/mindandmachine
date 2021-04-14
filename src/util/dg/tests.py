@@ -1,13 +1,13 @@
 import uuid
 from calendar import monthrange
 from datetime import datetime, timedelta
-import pandas as pd
 
 from django.test import TestCase
+from django.db.models import Q
 
 from src.base.models import Employment
 from src.timetable.models import WorkTypeName, WorkType, WorkerDay
-from src.util.dg.tabel import T13TabelGenerator, CustomT13TabelGenerator, MTSTabelGenerator, AigulTabelGenerator
+from src.util.dg.tabel import T13TabelDataGetter, MtsTabelDataGetter
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -20,7 +20,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         for e in Employment.objects.all():
             e.tabel_code = f'A000{e.id}'
             e.save()
-        Employment.objects.create(
+        cls.second_empl = Employment.objects.create(
             network=cls.network,
             code=f'{cls.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
             user=cls.user2,
@@ -46,15 +46,14 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         cls.network.okpo = '44412749'
 
     def test_generate_mts_tabel(self):
-        g = MTSTabelGenerator(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
-        df = pd.read_excel(g.generate(convert_to='xlsx')).fillna('')
-        rows = df.sample(10)
-        for _, r in rows.iterrows():
-            dt = r['Дата']
-            shop_code = r['Код ОП']
-            tabel_code = r['Табельный номер']
-            fact_h = r['Факт, ч']
-            plan_h = r['План, ч']
+        g = MtsTabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        for pfh in data['plan_and_fact_hours']:
+            dt = pfh.dt
+            shop_code = pfh.shop_code
+            tabel_code = pfh.tabel_code
+            fact_h = pfh.fact_work_hours
+            plan_h = pfh.plan_work_hours
             wdays = WorkerDay.objects.filter(
                 shop__code=shop_code,
                 dt=dt,
@@ -73,23 +72,87 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             else:
                 self.assertIsNotNone(plan)
                 self.assertEqual(plan.work_hours, timedelta(seconds=plan_h * 3600))
+        self.second_empl.dt_fired = self.dt_from + timedelta(10)
+        self.second_empl.save()
+        Employment.objects.create(
+            network=self.network,
+            code=f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
+            user=self.user2,
+            shop=self.shop,
+            function_group=self.employee_group,
+            dt_hired=self.dt_from + timedelta(12),
+            salary=100,
+            tabel_code='A00001234',
+        )
+        g = MtsTabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        second_data = g.get_data()
+        self.assertEqual(len(data['plan_and_fact_hours']), len(second_data['plan_and_fact_hours']))
 
 
     def test_generate_custom_t13_tabel(self):
-        g = CustomT13TabelGenerator(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
-        df = pd.read_excel(g.generate(convert_to='xlsx'))
-        df = df.dropna(axis=1, how='all')
-        df = df.dropna(axis=0, how='all')
-        df = df.loc[1:, :]
-        df.columns = df.iloc[0]
-        df = df.drop(1).reset_index(drop=True)
-        self.assertEqual(df.loc[12, df.columns[1]], df.loc[16, df.columns[1]])
-        
+        g = T13TabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['users']), 6)
+        for user in data['users']:
+            dt_first = self.dt_from - timedelta(1)
+            tabel_code = user['tabel_code']
+            first_half_month_wdays = 0
+            first_half_month_whours = 0
+            second_half_month_wdays = 0
+            second_half_month_whours = 0
+            worker = Employment.objects.get(tabel_code=tabel_code).user
+            for day_code, values in user['days'].items():
+                dt = dt_first + timedelta(int(day_code.replace('d', '')))
+                if dt > self.dt_to:
+                    continue
+                if values['code'] == '':
+                    self.assertIsNone(
+                        WorkerDay.objects.filter(
+                            Q(is_fact=True) | Q(type=WorkerDay.TYPE_HOLIDAY),
+                            Q(worker=worker) & (Q(employment__tabel_code=tabel_code) | Q(employment__isnull=True)),
+                            dt=dt, 
+                            is_approved=True,
+                        ).first()
+                    )
+                    continue
+                type = WorkerDay.TYPE_WORKDAY if values['code'] == 'Я' else WorkerDay.TYPE_HOLIDAY
+                fact_filter = {}
+                if type == WorkerDay.TYPE_WORKDAY:
+                    fact_filter['is_fact'] = True
+                wd = WorkerDay.objects.filter(dt=dt, type=type, worker=worker, is_approved=True, **fact_filter).first()
+                self.assertIsNotNone(wd)
+                if wd.type == WorkerDay.TYPE_WORKDAY:
+                    self.assertEqual(wd.rounded_work_hours, values['value'])
+                    if wd.dt.day <= 15:
+                        first_half_month_wdays += 1
+                        first_half_month_whours += wd.rounded_work_hours
+                    else:
+                        second_half_month_wdays += 1
+                        second_half_month_whours += wd.rounded_work_hours
+                else:
+                    self.assertEqual(values['value'], '')
+            self.assertEqual(user['first_half_month_wdays'], first_half_month_wdays)
+            self.assertEqual(user['first_half_month_whours'], first_half_month_whours)
+            self.assertEqual(user['second_half_month_wdays'], second_half_month_wdays)
+            self.assertEqual(user['second_half_month_whours'], second_half_month_whours)
 
-    def test_generate_aigul_tabel(self):
-        g = AigulTabelGenerator(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
-        df = pd.read_excel(g.generate(convert_to='xlsx')).fillna('')
-        df = df.drop(columns=df.columns[0]).loc[2:, :]
-        df.columns = df.iloc[0]
-        df = df.drop(2).reset_index(drop=True)
-        self.assertEqual(df.loc[2, 'ФИО'], df.loc[3, 'ФИО'])
+        self.assertEqual(data['users'][2]['fio'], data['users'][3]['fio'])
+        self.assertNotEqual(data['users'][2]['tabel_code'], data['users'][3]['tabel_code'])
+
+
+    def test_generate_custom_t13_tabel_fired_hired(self):
+        self.second_empl.dt_fired = self.dt_from + timedelta(10)
+        self.second_empl.save()
+        Employment.objects.create(
+            network=self.network,
+            code=f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
+            user=self.user2,
+            shop=self.shop,
+            function_group=self.employee_group,
+            dt_hired=self.dt_from + timedelta(12),
+            salary=100,
+            tabel_code='A00001234',
+        )
+        g = T13TabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['users']), 6)
