@@ -1,12 +1,15 @@
 import uuid
 from datetime import timedelta, date, datetime, time
+from unittest import mock
 
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from src.base.models import WorkerPosition, Employment, Break
 from src.celery.tasks import delete_inactive_employment_groups
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
+from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 
@@ -446,3 +449,112 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             user_id=put_data['user_id'],
             position_id=put_data['position_id'],
         ).count() == 1)
+
+    def test_delete_employment_by_code(self):
+        """
+        создание 2 одновременно активных трудоустройств для 1 пользователя
+        создание рабочих дней для одного из трудоустройств
+        удаление одного из трудоустройств -> рабочие дни должны перекрепиться на другое активное трудоустройство
+        # TODO: правильна ли такая логика для случая, когда логин пользователя не табельный номер (нужна настройка?)
+        """
+        self.network.clean_wdays_on_employment_dt_change = True
+        self.network.save()
+
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                put_data1 = {
+                    'position_id': self.worker_position.id,
+                    'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
+                    'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
+                    'shop_id': self.shop2.id,
+                    'user_id': self.user2.id,
+                    'code': 'code1',
+                    'by_code': True,
+                }
+                resp1_put = self.client.put(
+                    path=self.get_url('Employment-detail', 'code1'),
+                    data=self.dump_data(put_data1),
+                    content_type='application/json',
+                )
+                self.assertEqual(resp1_put.status_code, 201)
+                empl1 = Employment.objects.get(id=resp1_put.json()['id'])
+                self.assertEqual(empl1.code, 'code1')
+                put_data2 = {
+                    'position_id': self.worker_position.id,
+                    'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
+                    'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
+                    'shop_id': self.shop2.id,
+                    'user_id': self.user2.id,
+                    'code': 'code2',
+                    'by_code': True,
+                }
+                resp2_put = self.client.put(
+                    path=self.get_url('Employment-detail', 'code2'),
+                    data=self.dump_data(put_data2),
+                    content_type='application/json',
+                )
+                self.assertEqual(resp2_put.status_code, 201)
+                empl2 = Employment.objects.get(id=resp2_put.json()['id'])
+                self.assertEqual(empl2.code, 'code2')
+
+                wd = WorkerDayFactory(
+                    dt=date(2021, 1, 1),
+                    worker=self.user2,
+                    employment=empl1,
+                    shop=self.shop2,
+                    type=WorkerDay.TYPE_WORKDAY,
+                    is_fact=False,
+                    is_approved=True,
+                )
+
+                resp2_delete = self.client.delete(
+                    path=self.get_url('Employment-detail', 'code2'),
+                    data=self.dump_data({'by_code': True}),
+                    content_type='application/json',
+                )
+                self.assertEqual(resp2_delete.status_code, 204)
+                wd.refresh_from_db()
+                self.assertEqual(wd.employment_id, empl1.id)
+
+                # при повтором put для empl с тем же code -- признак удаленности должен пропасть
+                resp2_put2 = self.client.put(
+                    path=self.get_url('Employment-detail', 'code2'),
+                    data=self.dump_data(put_data2),
+                    content_type='application/json',
+                )
+                self.assertEqual(resp2_put2.status_code, 200)
+                empl2.refresh_from_db()
+                self.assertEqual(empl2.dttm_deleted, None)
+
+    def test_delete_employment_with_filter_delete(self):
+        """
+        Проверка, что при удалении через objects.filter(...).delete() тоже чистятся дни
+        """
+        put_data1 = {
+            'position_id': self.worker_position.id,
+            'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
+            'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
+            'shop_id': self.shop2.id,
+            'user_id': self.user2.id,
+            'code': 'code1',
+            'by_code': True,
+        }
+        resp1_put = self.client.put(
+            path=self.get_url('Employment-detail', 'code1'),
+            data=self.dump_data(put_data1),
+            content_type='application/json',
+        )
+        self.assertEqual(resp1_put.status_code, 201)
+        empl1 = Employment.objects.get(id=resp1_put.json()['id'])
+        wd = WorkerDayFactory(
+            dt=date(2021, 1, 1),
+            worker=self.user2,
+            employment=empl1,
+            shop=self.shop2,
+            type=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+        )
+        Employment.objects.filter(id=empl1.id).delete()
+        wd.refresh_from_db()
+        self.assertEqual(wd.employment_id, None)

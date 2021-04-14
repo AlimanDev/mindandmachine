@@ -87,6 +87,7 @@ class VacancyFilter(FilterSetWithInitial):
     shop_id = CharFilter(field_name='shop_id', method='filter_include_outsource')
     work_type_name = CharFilter(field_name='work_types', method='filter_by_name')
     ordering = OrderingFilter(fields=('dt', 'id', 'dttm_work_start', 'dttm_work_end'), initial='dttm_work_start')
+    approved_first = BooleanFilter(method='filter_approved_first')
 
     def filter_include_outsource(self, queryset, name, value):
         if value:
@@ -104,10 +105,28 @@ class VacancyFilter(FilterSetWithInitial):
             work_types__work_type_name_id__in=names,
         )
 
+    def filter_approved_first(self, queryset, name, value):
+        if value:
+            return queryset.filter(
+                id=Subquery(
+                    WorkerDay.objects.filter(
+                        Q(Q(worker__isnull=True) & Q(id=OuterRef('id'))) | Q(worker_id=OuterRef('worker_id')),
+                        dt=OuterRef('dt'),
+                        is_fact=OuterRef('is_fact'),
+                        is_vacancy=OuterRef('is_vacancy'),
+                        dttm_work_start=OuterRef('dttm_work_start'),
+                        dttm_work_end=OuterRef('dttm_work_end'),
+                    ).order_by('-is_approved').values_list('id')[:1]
+                ),
+            )
+
+        return queryset
+
     class Meta:
         model = WorkerDay
         fields = {
             'work_types__id': ['exact', 'in'],
+            'is_fact': ['exact', ],
             'is_approved': ['exact', ],
             'is_outsource': ['exact', ],
         }

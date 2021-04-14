@@ -27,6 +27,24 @@ class TestTickPointViewSet(TestsHelperMixin, APITestCase):
         resp_data = resp.json()
         self.assertEqual(len(resp_data), 1)
 
+    def test_list_tick_point_filtered(self):
+        self.add_group_perm(self.group, 'TickPoint', 'GET')
+        self.shop2 = ShopFactory(network=self.network)
+        self.shop3 = ShopFactory(network=self.network)
+        TickPointFactory(shop=self.shop2)
+        TickPointFactory(shop=self.shop3)
+
+        resp = self.client.get(self.get_url('TickPoint-list'))
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 3)
+        resp = self.client.get(self.get_url('TickPoint-list') + f'?shop_id={self.shop.id}')
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 1)
+        resp = self.client.get(self.get_url('TickPoint-list') + f'?shop_id__in={self.shop.id},{self.shop2.id}')
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 2)
+
+
     def test_get_tick_point(self):
         self.add_group_perm(self.group, 'TickPoint', 'GET')
 

@@ -10,11 +10,14 @@ from django.db import transaction
 from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField,
 )
+from django.db.models import (
+    Sum,
+)
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from model_utils import FieldTracker
 
-from src.base.models import Shop, Employment, User, Event, Network, Break
+from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
 
@@ -212,7 +215,10 @@ class EmploymentWorkType(AbstractModel):
 
     id = models.BigAutoField(primary_key=True)
 
-    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, related_name="work_types")
+    # DO_NOTHING т.к. реально Employment мы удалять не будем, а только деактивируем проставив dttm_deleted
+    # EmploymentWorkType без Employment вряд ли где-то используется,
+    # поэтому в случае необходимости восстановить трудоустройство, восстановятся и типы работ
+    employment = models.ForeignKey(Employment, on_delete=models.DO_NOTHING, related_name="work_types")
     work_type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
 
     is_active = models.BooleanField(default=True)
@@ -461,6 +467,14 @@ class WorkerDay(AbstractModel):
         TYPE_BUSINESS_TRIP,
     )
 
+    TYPES_REDUCING_NORM_HOURS = (
+        TYPE_VACATION,
+        TYPE_SICK,
+        TYPE_SELF_VACATION,
+        TYPE_MATERNITY,
+        TYPE_MATERNITY_CARE,
+    )
+
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
             self.worker.last_name if self.worker else 'No worker',
@@ -549,7 +563,9 @@ class WorkerDay(AbstractModel):
 
     id = models.BigAutoField(primary_key=True, db_index=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
-    employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
+
+    # DO_NOTHING т.к. в Employment.delete есть явная чистка рабочих дней для этого трудоустройства
+    employment = models.ForeignKey(Employment, on_delete=models.DO_NOTHING, null=True)
 
     dt = models.DateField()  # todo: make immutable
     dttm_work_start = models.DateTimeField(null=True, blank=True)
@@ -564,6 +580,7 @@ class WorkerDay(AbstractModel):
 
     is_approved = models.BooleanField(default=False)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
+    last_edited_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_edited')
 
     comment = models.TextField(null=True, blank=True)
     parent_worker_day = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child') # todo: remove
@@ -576,6 +593,11 @@ class WorkerDay(AbstractModel):
     is_outsource = models.BooleanField(default=False)
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=True, verbose_name='Обрезать рабочие часы по времени работы магазина')
+    is_blocked = models.BooleanField(
+        default=False,
+        verbose_name='Защищенный день',
+        help_text='Доступен для изменения/подтверждения только определенным группам доступа (настраивается)',
+    )
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
@@ -647,6 +669,9 @@ class WorkerDay(AbstractModel):
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours  = self._calc_wh()
 
+        if self.last_edited_by is None:
+            self.last_edited_by = self.created_by
+
         is_new = self.id is None
 
         res = super().save(*args, **kwargs)
@@ -672,7 +697,7 @@ class WorkerDay(AbstractModel):
 
         if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and \
                 (self.is_vacancy or self.type == WorkerDay.TYPE_QUALIFICATION) and self.worker and self.shop:
-            from src.celery.tasks import create_mda_user_to_shop_relation
+            from src.integration.mda.tasks import create_mda_user_to_shop_relation
             create_mda_user_to_shop_relation.delay(
                 username=self.worker.username,
                 shop_code=self.shop.code,
@@ -982,12 +1007,14 @@ class AttendanceRecords(AbstractModel):
     TYPE_LEAVING = 'L'
     TYPE_BREAK_START = 'S'
     TYPE_BREAK_END = 'E'
+    TYPE_NO_TYPE = 'N'
 
     RECORD_TYPES = (
         (TYPE_COMING, 'coming'),
         (TYPE_LEAVING, 'leaving'),
         (TYPE_BREAK_START, 'break start'),
-        (TYPE_BREAK_END, 'break_end')
+        (TYPE_BREAK_END, 'break_end'),
+        (TYPE_NO_TYPE, 'no_type')
     )
 
     TYPE_2_DTTM_FIELD = {
@@ -1049,6 +1076,57 @@ class AttendanceRecords(AbstractModel):
                     worker_day=fact_approved,
                     work_type_id=employment_work_type.work_type_id,
                 )
+    
+    def _create_or_update_not_approved_fact(self, fact_approved):
+        try:
+            not_approved = WorkerDay.objects.get(
+                dt=fact_approved.dt,
+                worker_id=fact_approved.worker_id,
+                is_fact=fact_approved.is_fact,
+                is_approved=False,
+            )
+        except WorkerDay.DoesNotExist:
+            not_approved = WorkerDay.objects.create(
+                shop=fact_approved.shop,
+                worker_id=fact_approved.worker_id,
+                employment=fact_approved.employment,
+                dttm_work_start=fact_approved.dttm_work_start,
+                dttm_work_end=fact_approved.dttm_work_end,
+                dt=fact_approved.dt,
+                is_fact=fact_approved.is_fact,
+                is_approved=False,
+                type=fact_approved.type,
+                is_vacancy=fact_approved.is_vacancy,
+                is_outsource=fact_approved.is_outsource,
+            )
+            WorkerDayCashboxDetails.objects.bulk_create(
+                [
+                    WorkerDayCashboxDetails(
+                        work_part=details.work_part,
+                        worker_day=not_approved,
+                        work_type_id=details.work_type_id,
+                    )
+                    for details in fact_approved.worker_day_details.all()
+                ]
+            )
+            return
+        
+        if not not_approved.created_by_id:
+            not_approved.dttm_work_start = fact_approved.dttm_work_start
+            not_approved.dttm_work_end = fact_approved.dttm_work_end
+            not_approved.save()
+        
+        if fact_approved.worker_day_details.exists() and not not_approved.worker_day_details.exists():
+            WorkerDayCashboxDetails.objects.bulk_create(
+                [
+                    WorkerDayCashboxDetails(
+                        work_part=details.work_part,
+                        worker_day=not_approved,
+                        work_type_id=details.work_type_id,
+                    )
+                    for details in fact_approved.worker_day_details.all()
+                ]
+            )
 
     def save(self, *args, **kwargs):
         """
@@ -1059,6 +1137,9 @@ class AttendanceRecords(AbstractModel):
         """
         self.dt = self.dt or self.dttm.date()
         res = super(AttendanceRecords, self).save(*args, **kwargs)
+
+        if self.type == self.TYPE_NO_TYPE:
+            return res
 
         with transaction.atomic():
             fact_approved = WorkerDay.objects.filter(
@@ -1096,6 +1177,7 @@ class AttendanceRecords(AbstractModel):
                 if not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl)
                 fact_approved.save()
+                self._create_or_update_not_approved_fact(fact_approved)
             else:
                 if self.type == self.TYPE_LEAVING:
                     prev_fa_wd = WorkerDay.objects.filter(
@@ -1107,7 +1189,7 @@ class AttendanceRecords(AbstractModel):
                     ).order_by('dt').last()
 
                     # Если предыдущая смена не закрыта.
-                    if prev_fa_wd and prev_fa_wd.dttm_work_start and prev_fa_wd.dttm_work_end is None:
+                    if prev_fa_wd and prev_fa_wd.dttm_work_start:
                         close_prev_work_shift_cond = (
                             self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
                         # Если с момента открытия предыдущей смены прошло менее MAX_WORK_SHIFT_SECONDS,
@@ -1116,6 +1198,9 @@ class AttendanceRecords(AbstractModel):
                             setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
                             setattr(prev_fa_wd, 'type', WorkerDay.TYPE_WORKDAY)
                             prev_fa_wd.save()
+                            self.dt = prev_fa_wd.dt # логично дату предыдущую ставить, так как это значение в отчетах используется
+                            super(AttendanceRecords, self).save(update_fields=['dt',])
+                            self._create_or_update_not_approved_fact(prev_fa_wd)
                             return
 
                     if settings.MDA_SKIP_LEAVING_TICK:
@@ -1136,6 +1221,7 @@ class AttendanceRecords(AbstractModel):
                 )
                 if _wd_created or not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl)
+                self._create_or_update_not_approved_fact(fact_approved)
 
         return res
 
@@ -1282,6 +1368,8 @@ class PlanAndFactHours(models.Model):
     is_vacancy = models.BooleanField()
     ticks_fact_count = models.PositiveSmallIntegerField()
     ticks_plan_count = models.PositiveSmallIntegerField()
+    ticks_comming_fact_count = models.PositiveSmallIntegerField()
+    ticks_leaving_fact_count = models.PositiveSmallIntegerField()
     worker_username = models.CharField(max_length=512)
     work_type_name = models.CharField(max_length=512)
     dttm_work_start_plan = models.DateTimeField()
@@ -1313,3 +1401,40 @@ class PlanAndFactHours(models.Model):
     @property
     def tm_work_end_fact_str(self):
         return str(self.dttm_work_end_fact.time()) if self.dttm_work_end_fact else ''
+
+    @property
+    def plan_work_hours_timedelta(self):
+        return datetime.timedelta(seconds=int(self.plan_work_hours * 60 * 60))
+
+    @property
+    def fact_work_hours_timedelta(self):
+        return datetime.timedelta(seconds=int(self.fact_work_hours * 60 * 60))
+
+
+class ProdCal(models.Model):
+    id = models.CharField(max_length=256, primary_key=True)
+    dt = models.DateField()
+    shop = models.ForeignKey('base.Shop', on_delete=models.DO_NOTHING)
+    user = models.ForeignKey('base.User', on_delete=models.DO_NOTHING)
+    employment = models.ForeignKey('base.Employment', on_delete=models.DO_NOTHING)
+    norm_hours = models.FloatField()
+
+    class Meta:
+        managed = False
+        db_table = 'prod_cal'
+
+    @classmethod
+    def get_workers_prod_cal_hours(cls, user_ids, dt_from, dt_to):
+        prod_cal_qs = cls.objects.filter(
+            user__id__in=user_ids,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+        ).values(
+            'user_id',
+            'employment_id',
+            'dt__month',
+        ).annotate(
+            norm_hours_sum=Sum('norm_hours'),
+        ).order_by()
+
+        return {(pc['user_id'], pc['employment_id'], pc['dt__month']): pc['norm_hours_sum'] for pc in prod_cal_qs}

@@ -52,6 +52,7 @@ from src.base.models import (
     Break,
     ShopSchedule,
 )
+from src.recognition.models import UserConnecter
 
 from src.base.filters import UserFilter
 from src.base.views_abstract import (
@@ -81,8 +82,15 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     def perform_create(self, serializer):
         serializer.save(network=self.request.user.network)
 
+    def perform_update(self, serializer):
+        serializer.save(dttm_deleted=None, network=self.request.user.network)
+
     def get_queryset(self):
-        qs = Employment.objects.filter(
+        manager = Employment.objects
+        if self.action in ['update']:
+            manager = Employment.objects_with_excluded
+
+        qs = manager.filter(
             shop__network_id=self.request.user.network_id
         ).order_by('-dt_hired')
         if self.action in ['list', 'retrieve']:
@@ -126,6 +134,8 @@ class UserViewSet(UpdateorCreateViewSet):
         user = self.request.user
         return User.objects.filter(
             network_id=user.network_id
+        ).annotate(
+            userconnecter_id=F('userconnecter'),
         ).distinct()
 
     def perform_create(self, serializer):
@@ -146,6 +156,19 @@ class UserViewSet(UpdateorCreateViewSet):
             return Response()
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def delete_biometrics(self, request, pk=None):
+        user = self.get_object()
+        
+        try:
+            user.userconnecter
+        except:
+            return Response({"detail": "У сотрудника нет биометрии"}, status=status.HTTP_400_BAD_REQUEST)
+
+        UserConnecter.objects.filter(user_id=user.id).delete()
+            
+        return Response({"detail": "Биометрия сотрудника успешно удалена"}, status=status.HTTP_200_OK)
 
 
     def get_serializer_class(self):
@@ -185,7 +208,7 @@ class FunctionGroupView(BaseModelViewSet):
         return Response(FunctionGroup.FUNCS)
 
 
-class WorkerPositionViewSet(BaseActiveNamedModelViewSet):
+class WorkerPositionViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = WorkerPositionSerializer
     pagination_class = LimitOffsetPagination

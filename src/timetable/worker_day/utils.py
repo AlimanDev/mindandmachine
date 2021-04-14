@@ -4,10 +4,12 @@ import time
 
 import pandas as pd
 from django.conf import settings
+from django.contrib.postgres.aggregates import StringAgg
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Q, F
-from rest_framework.exceptions import ValidationError
+from django.db.models import Q, F, Value, CharField
+from django.db.models.functions import Concat, Cast
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.response import Response
 
 from src.base.exceptions import MessageError
@@ -481,6 +483,36 @@ def exchange(data, error_messages):
                 raise ValidationError(error_messages['worker_days_mismatch'])
             day_pairs.append(day_pair)
 
+        # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
+        # что в списке изменяемых дней нету защищенных дней, если есть, то выдаем ошибку
+        has_permission_to_change_protected_wdays = Group.objects.filter(
+            id__in=data['user'].get_group_ids(
+                data['user'].network, day_pairs[0][0].shop),
+            has_perm_to_change_protected_wdays=True,
+        ).exists()
+        if not has_permission_to_change_protected_wdays:
+            protected_wdays = list(WorkerDay.objects.filter(
+                worker_id__in=(data['worker1_id'], data['worker2_id']),
+                dt__in=data['dates'],
+                is_approved=data['is_approved'],
+                is_fact=False,
+                is_blocked=True,
+            ).annotate(
+                worker_fio=Concat(
+                    F('worker__last_name'), Value(' '),
+                    F('worker__first_name'), Value(' ('),
+                    F('worker__username'), Value(')'),
+                ),
+            ).values(
+                'worker_fio',
+            ).annotate(
+                dates=StringAgg(Cast('dt', CharField()), delimiter=','),
+            ))
+            if protected_wdays:
+                raise PermissionDenied(error_messages['has_no_perm_to_approve_protected_wdays'].format(
+                    protected_wdays=', '.join(f'{d["worker_fio"]}: {d["dates"]}' for d in protected_wdays),
+                ))
+
         if data['is_approved'] and settings.SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE:
             from src.celery.tasks import send_doctors_schedule_to_mis
 
@@ -536,3 +568,81 @@ def exchange(data, error_messages):
             create_worker_day(day_pair[0], day_pair[1])
             create_worker_day(day_pair[1], day_pair[0])
     return new_wds
+
+
+def copy_as_excel_cells(main_worker_days, to_worker_id, to_dates, created_by=None):
+    main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
+        worker_day__in=main_worker_days,
+    ).select_related('work_type'))
+
+    main_worker_days_details = {}
+    for detail in main_worker_days_details_set:
+        key = detail.worker_day_id
+        if key not in main_worker_days_details:
+            main_worker_days_details[key] = []
+        main_worker_days_details[key].append(detail)
+
+    trainee_worker_days = WorkerDay.objects_with_excluded.filter(
+        worker_id=to_worker_id,
+        dt__in=to_dates,
+        is_approved=False,
+        is_fact=False,
+    )
+    trainee_worker_days.delete()
+
+    created_wds = []
+    wdcds_list_to_create = []
+    length_main_wds = len(main_worker_days)
+    for i, dt in enumerate(to_dates):
+        i = i % length_main_wds
+        blank_day = main_worker_days[i]
+
+        worker_active_empl = Employment.objects.get_active_empl_for_user(
+            network_id=blank_day.worker.network_id, user_id=to_worker_id,
+            dt=dt,
+            priority_shop_id=blank_day.shop_id,
+        ).select_related(
+            'position__breaks',
+        ).first()
+
+        # не создавать день, если нету активного трудоустройства на эту дату
+        if not worker_active_empl:
+            raise ValidationError(
+                'Невозможно создать дни в выбранные даты. '
+                'Пожалуйста, проверьте наличие активного трудоустройства у сотрудника.'
+            )
+
+        new_wd = WorkerDay.objects.create(
+            worker_id=to_worker_id,
+            employment=worker_active_empl,
+            dt=dt,
+            shop=blank_day.shop,
+            type=blank_day.type,
+            dttm_work_start=datetime.datetime.combine(
+                dt, blank_day.dttm_work_start.timetz()) if blank_day.dttm_work_start else None,
+            dttm_work_end=datetime.datetime.combine(
+                dt, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
+            is_approved=False,
+            is_fact=False,
+            created_by_id=created_by,
+        )
+        created_wds.append(new_wd)
+
+        new_wdcds = main_worker_days_details.get(blank_day.id, [])
+        for new_wdcd in new_wdcds:
+            wdcds_list_to_create.append(
+                WorkerDayCashboxDetails(
+                    worker_day=new_wd,
+                    work_type_id=new_wdcd.work_type_id,
+                    work_part=new_wdcd.work_part,
+                )
+            )
+
+    WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
+
+    work_types = [
+        (wdcds.work_type.shop_id, wdcds.work_type_id)
+        for wdcds in main_worker_days_details_set
+    ]
+
+    return created_wds, work_types

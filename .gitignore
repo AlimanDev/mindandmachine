@@ -22,6 +22,7 @@ qos_backend.log*
 clean_wdays.log*
 
 venv/*
+venv3.6/*
 ./celerybeat*
 docs/_*
 docs/qos*
@@ -29,3 +30,4 @@ docs/qos*
 *DS_STORE
 
 update.sh
+tmp/

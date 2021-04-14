@@ -1,12 +1,14 @@
 from datetime import datetime
+from decimal import Decimal
 from unittest import mock
 
+from dadata import Dadata
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import Shop, ShopSettings, ShopSchedule
+from src.base.models import Shop, ShopSchedule
 from src.forecast.tests.factories import LoadTemplateFactory
 from src.timetable.models import ShopMonthStat
 from src.util.mixins.tests import TestsHelperMixin
@@ -205,6 +207,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['load_template_id'] = None
         data['load_template_status'] = 'R'
         data['exchange_settings_id'] = None
+        data['fias_code'] = ''
         data['latitude'] = None
         data['longitude'] = None
         data['distance'] = None
@@ -243,9 +246,10 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'settings_id': self.shop_settings.id,
             'forecast_step_minutes': '00:30:00',
             'is_active': False,
-            'latitude': '52.229675',
-            'longitude': '21.012228',
+            'latitude': '52.22967541',
+            'longitude': '21.01222831',
             'director_code': 'nonexistent',
+            'fias_code': '09d9d44f-044b-4b9a-97b0-c70f0e327e9f',
         }
         # response = self.client.put(self.shop_url, data, format='json')
         # self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -399,7 +403,6 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(len(response[0]['children'][0]['children']), 0)
         self.assertEqual(len(response[0]['children'][1]['children']), 1)
 
-
     def test_get_shops_ordered_by_name(self):
         response = self.client.get(self.url + 'tree/')
         response = response.json()
@@ -429,3 +432,123 @@ class TestDepartment(TestsHelperMixin, APITestCase):
                     network=self.network,
                 )
         self.assertEqual(ShopSchedule.objects.filter(shop=shop).count(), 120)
+
+    def test_shop_city_filled_on_creation_from_dadata(self):
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True, DADATA_TOKEN='dummy', FILL_SHOP_CITY_FROM_COORDS=True):
+            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                with mock.patch.object(Dadata, 'geolocate') as mock_geolocate:
+                    mock_geolocate.return_value = [
+                        {
+                            "data": {"city": "city_name",}
+                        },
+                    ]
+                    shop = Shop.objects.create(
+                        parent=self.reg_shop1,
+                        name='New shop',
+                        tm_open_dict='{"all":"07:00:00"}',
+                        tm_close_dict='{"all":"23:00:00"}',
+                        region=self.region,
+                        settings=self.shop_settings,
+                        network=self.network,
+                        latitude=56,
+                        longitude=35,
+                        city=None,
+                    )
+        shop.refresh_from_db(fields=['city'])
+        self.assertEqual(shop.city, 'city_name')
+
+    def test_shop_city_not_filled_if_no_results(self):
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True, DADATA_TOKEN='dummy', FILL_SHOP_CITY_FROM_COORDS=True):
+            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                with mock.patch.object(Dadata, 'geolocate') as mock_geolocate:
+                    mock_geolocate.return_value = []
+                    shop = Shop.objects.create(
+                        parent=self.reg_shop1,
+                        name='New shop',
+                        tm_open_dict='{"all":"07:00:00"}',
+                        tm_close_dict='{"all":"23:00:00"}',
+                        region=self.region,
+                        settings=self.shop_settings,
+                        network=self.network,
+                        latitude=56,
+                        longitude=35,
+                        city=None,
+                    )
+        shop.refresh_from_db(fields=['city'])
+        self.assertEqual(shop.city, None)
+
+    def test_shop_city_filled_after_coords_adding(self):
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True, DADATA_TOKEN='dummy', FILL_SHOP_CITY_FROM_COORDS=True):
+            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                with mock.patch.object(Dadata, 'geolocate') as mock_geolocate:
+                    mock_geolocate.return_value = [
+                        {
+                            "data": {"city": "city_name",}
+                        },
+                    ]
+                    shop = Shop.objects.create(
+                        parent=self.reg_shop1,
+                        name='New shop',
+                        tm_open_dict='{"all":"07:00:00"}',
+                        tm_close_dict='{"all":"23:00:00"}',
+                        region=self.region,
+                        settings=self.shop_settings,
+                        network=self.network,
+                        city=None,
+                    )
+                    mock_geolocate.assert_not_called()
+                    shop.refresh_from_db(fields=['city'])
+                    self.assertEqual(shop.city, None)
+
+                    shop.latitude = 56
+                    shop.longitude = 35
+                    shop.save()
+                    mock_geolocate.called_once_with(latitude=56, longitude=35)
+
+        shop.refresh_from_db(fields=['city'])
+        self.assertEqual(shop.city, 'city_name')
+
+    def test_city_coords_address_timezone_filled_from_dadata_by_fias_code(self):
+        with self.settings(
+                CELERY_TASK_ALWAYS_EAGER=True,
+                DADATA_TOKEN='dummy',
+                FILL_SHOP_CITY_COORDS_ADDRESS_TIMEZONE_FROM_FIAS_CODE=True
+        ):
+            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                with mock.patch.object(Dadata, 'find_by_id') as mock_find_by_id:
+                    mock_find_by_id.return_value = [
+                        {
+                            "data": {
+                                "city": "Новосибирск",
+                                "geo_lat": "55.0286283",
+                                "geo_lon": "82.9102479",
+                            },
+                            "value": "г Новосибирск, ул Ленина, д 15",
+                        },
+                    ]
+                    shop = Shop.objects.create(
+                        parent=self.reg_shop1,
+                        name='New shop',
+                        tm_open_dict='{"all":"07:00:00"}',
+                        tm_close_dict='{"all":"23:00:00"}',
+                        region=self.region,
+                        settings=self.shop_settings,
+                        network=self.network,
+                        city=None,
+                        address='новосибирск ленина 15',
+                        fias_code='',
+                    )
+                    mock_find_by_id.assert_not_called()
+                    shop.refresh_from_db()
+                    self.assertEqual(shop.city, None)
+
+                    shop.fias_code = '09d9d44f-044b-4b9a-97b0-c70f0e327e9f'
+                    shop.save()
+                    mock_find_by_id.called_once_with("address", "09d9d44f-044b-4b9a-97b0-c70f0e327e9f")
+
+        shop.refresh_from_db()
+        self.assertEqual(shop.city, 'Новосибирск')
+        self.assertEqual(shop.latitude, Decimal('55.0286283'))
+        self.assertEqual(shop.longitude, Decimal('82.9102479'))
+        self.assertEqual(shop.address, 'г Новосибирск, ул Ленина, д 15')
+        self.assertEqual(shop.timezone.zone, 'Asia/Novosibirsk')

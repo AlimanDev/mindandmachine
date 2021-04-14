@@ -25,8 +25,8 @@ from src.base.models import (
     Break,
     ShopSchedule,
 )
-from src.timetable.serializers import EmploymentWorkTypeSerializer, WorkerConstraintSerializer, \
-    WorkerConstraintListSerializer, EmploymentWorkTypeListSerializer
+from src.timetable.serializers import EmploymentWorkTypeSerializer, EmploymentWorkTypeListSerializer
+from src.timetable.worker_constraint.serializers import WorkerConstraintSerializer, WorkerConstraintListSerializer
 
 
 class BaseNetworkSerializer(serializers.ModelSerializer):
@@ -52,6 +52,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'secondary_color',
             'allowed_geo_distance_km',
             'enable_camera_ticks',
+            'show_worker_day_additional_info',
         ]
 
 
@@ -68,11 +69,18 @@ class UserListSerializer(serializers.Serializer):
     tabel_code = serializers.CharField()
     username = serializers.CharField()
     network_id = serializers.IntegerField()
+    has_biometrics = serializers.SerializerMethodField()
 
     def get_avatar_url(self, obj) -> str:
         if obj.avatar:
             return obj.avatar.url
         return None
+
+    def get_has_biometrics(self, obj) -> bool:
+        if getattr(obj, 'userconnecter_id', None):
+            return True
+        else:
+            return False
 
 
 class UserSerializer(BaseNetworkSerializer):

@@ -300,6 +300,59 @@ class TestWorkType(APITestCase):
         self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 51.0)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(dt_now)], 9.0)
 
+        wd = WorkerDay.objects.create(
+            dttm_work_start=datetime.combine(dt_now, time(hour=8)),
+            dttm_work_end=datetime.combine(dt_now, time(hour=15)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=dt_now,
+            worker=self.user2,
+            employment=self.employment2,
+            is_approved=True,
+            is_fact=True,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=wd,
+            work_type=self.work_type1,
+        )
+        wd = WorkerDay.objects.create(
+            dttm_work_start=datetime.combine(dt_now, time(hour=9)),
+            dttm_work_end=datetime.combine(dt_now, time(hour=18)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=dt_now,
+            worker=self.user2,
+            employment=self.employment2,
+            is_approved=False,
+            is_fact=True,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=wd,
+            work_type=self.work_type1,
+        )
+
+        get_params['graph_type'] = 'fact_approved'
+        response = self.client.get(url, data=get_params)
+        data = response.json()
+        self.assertEqual(len(data['tt_periods']['real_cashiers']), 72)
+        self.assertEqual(len(data['tt_periods']['predict_cashier_needs']), 72)
+        self.assertEqual(data['tt_periods']['real_cashiers'][8]['amount'], 1.0)
+        self.assertEqual(data['tt_periods']['real_cashiers'][15]['amount'], 0.0)
+        day_stats = data['day_stats']
+        self.assertEqual(day_stats['covering'][Converter.convert_date(dt_now)], 0.13725490196078433)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 51.0)
+        self.assertEqual(day_stats['graph_hours'][Converter.convert_date(dt_now)], 7.0)
+
+        get_params['graph_type'] = 'fact_edit'
+        response = self.client.get(url, data=get_params)
+        data = response.json()
+        self.assertEqual(len(data['tt_periods']['real_cashiers']), 72)
+        self.assertEqual(len(data['tt_periods']['predict_cashier_needs']), 72)
+        self.assertEqual(data['tt_periods']['real_cashiers'][8]['amount'], 0.0)
+        self.assertEqual(data['tt_periods']['real_cashiers'][9]['amount'], 1.0)
+        day_stats = data['day_stats']
+        self.assertEqual(day_stats['covering'][Converter.convert_date(dt_now)], 0.17647058823529413)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 51.0)
+        self.assertEqual(day_stats['graph_hours'][Converter.convert_date(dt_now)], 9.0)
+
         get_params['graph_type'] = 'plan_edit'
         response = self.client.get(url, data=get_params)
         data = response.json()

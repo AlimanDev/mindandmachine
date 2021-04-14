@@ -1,6 +1,6 @@
 import io
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 from uuid import UUID
 
 import xlsxwriter
@@ -19,6 +19,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.pagination import LimitOffsetPagination
 
 from src.base.auth.authentication import CsrfExemptSessionAuthentication
 from src.base.models import User, Network
@@ -28,6 +29,7 @@ from src.base.serializers import NetworkSerializer
 from src.recognition.api.recognition import Recognition
 from src.recognition.authentication import TickPointTokenAuthentication
 from src.recognition.models import Tick, TickPhoto, TickPoint, UserConnecter, TickPointToken
+from src.recognition.filters import TickPointFilterSet
 from src.recognition.serializers import (
     HashSigninSerializer,
     TickPointSerializer,
@@ -165,7 +167,7 @@ class TickViewSet(BaseModelViewSet):
         raise NotImplementedError
 
     def get_serializer_class(self):
-        if self.request.method == 'POST':
+        if self.request.method == 'POST' or self.request.method == 'PUT':
             return self.strategy.get_serializer_class()
         else:
             return TickSerializer
@@ -272,6 +274,33 @@ class TickViewSet(BaseModelViewSet):
 
         return Response(TickSerializer(tick).data)
 
+    def update(self, request, *args, **kwargs):
+        try:
+            tick = Tick.objects.get(pk=kwargs['pk'])
+        except Tick.DoesNotExist as e:
+            return Response({"error": "Отметка не существует"}, 404)
+
+        data = self.get_serializer_class()(data=request.data, context=self.get_serializer_context())
+        data.is_valid(raise_exception=True)
+
+        type = data.validated_data.get('type', Tick.TYPE_NO_TYPE)
+
+        if tick.type == Tick.TYPE_NO_TYPE:
+            tick.type = type
+            tick.save()
+            if settings.TRUST_TICK_REQUEST:
+                record, _ = AttendanceRecords.objects.get_or_create(
+                    user_id=tick.user_id,
+                    dttm=tick.dttm,
+                    verified=True,
+                    shop_id=tick.tick_point.shop_id,
+                    type=AttendanceRecords.TYPE_NO_TYPE,
+                )
+                record.type = type
+                record.save()
+        
+        return Response(TickSerializer(tick).data)
+
 
 class TickPhotoViewSet(BaseModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -348,7 +377,7 @@ class TickPhotoViewSet(BaseModelViewSet):
                     partner_id = recognition.create_person({"id": tick.user_id})
                     photo_id = recognition.upload_photo(partner_id, image)
                 except HTTPError as e:
-                    return Response({"error": str(e)}, e.response.status_code)
+                    return Response({"error": "Сервис распознавания временно недоступен. Пожалуйста, обратитесь к администратору системы."}, e.response.status_code)
 
                 user_connecter = UserConnecter.objects.create(
                     user_id=tick.user_id,
@@ -361,7 +390,7 @@ class TickPhotoViewSet(BaseModelViewSet):
             try:
                 res = recognition.detect_and_match(user_connecter.partner_id, image)
             except HTTPError as e:
-                r = Response({"error": str(e)})
+                r = Response({"error": "Сервис распознавания временно недоступен. Пожалуйста, обратитесь к администратору системы."})
                 r.status_code = e.response.status_code
                 return r
 
@@ -375,7 +404,7 @@ class TickPhotoViewSet(BaseModelViewSet):
         if (type == TickPhoto.TYPE_SELF) and (tick_photo.verified_score > 0):
             AttendanceRecords.objects.create(
                 user_id=tick.user_id,
-                dttm=check_time,
+                dttm=tick.dttm,
                 verified=True,
                 shop_id=tick.tick_point.shop_id,
                 type=tick.type,
@@ -442,9 +471,11 @@ class TickPointViewSet(BaseModelViewSet):
     basename = ''
     serializer_class = TickPointSerializer
     openapi_tags = ['TickPoint', ]
+    filterset_class = TickPointFilterSet
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
-        return TickPoint.objects.filter(network_id=self.request.user.network_id)
+        return TickPoint.objects.filter(network_id=self.request.user.network_id, dttm_deleted__isnull=True)
 
     def perform_create(self, serializer):
         serializer.save(network_id=self.request.user.network_id)

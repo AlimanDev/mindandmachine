@@ -1,24 +1,23 @@
 import json
-import logging
 import os
 import time as time_in_secs
 from datetime import date, timedelta, datetime
-from src.util.models_converter import Converter
+
 import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
-from django.db.models import Q
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
+from django.db.models import Q
 from django.utils.timezone import now
-from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
-
 from django_celery_beat.models import CrontabSchedule
-
+from src.main.demand.utils import create_predbills_request_function
+from src.main.operation_template.utils import build_period_clients
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
+from tzwhere import tzwhere
 
-from src.base.message import Message
 from src.base.models import (
     Shop,
     User,
@@ -28,9 +27,11 @@ from src.base.models import (
     Network,
     Employment,
 )
+from src.base.models import ShopSchedule
 from src.celery.celery import app
 from src.conf.djconfig import EMAIL_HOST_USER, TIMETABLE_IP, QOS_DATETIME_FORMAT
 from src.events.signals import event_signal
+from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
 from src.forecast.models import (
     OperationTemplate,
     LoadTemplate,
@@ -39,9 +40,8 @@ from src.forecast.models import (
     OperationType,
     OperationTypeName
 )
-from src.main.demand.utils import create_predbills_request_function
-from src.main.operation_template.utils import build_period_clients
-from django.core.serializers.json import DjangoJSONEncoder
+from src.notifications.models import EventEmailNotification
+from src.notifications.tasks import send_event_email_notifications
 from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
@@ -57,10 +57,8 @@ from src.timetable.vacancy.utils import (
     workers_exchange,
 )
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
-from src.base.models import ShopSchedule
+from src.util.models_converter import Converter
 
-from src.notifications.models import EventEmailNotification
-from src.notifications.tasks import send_event_email_notifications
 
 @app.task
 def create_notifications_for_event(event_id):
@@ -713,36 +711,6 @@ def clean_timeserie_actions():
 
 
 @app.task
-def create_mda_user_to_shop_relation(username, shop_code, debug_info=None):
-    logger = logging.getLogger('django.request')
-    resp = requests.post(
-        url=settings.MDA_PUBLIC_API_HOST + '/api/public/v1/mindandmachine/userToShop/',
-        json={'login': username, 'sap': shop_code},
-        headers={'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN},
-        timeout=(3, 5),
-    )
-    try:
-        resp.raise_for_status()
-    except requests.RequestException:
-        logger.exception(f'text:{resp.text}, headers: {resp.headers}, debug_info: {debug_info}')
-
-
-@app.task
-def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
-    dt = dt or now().today()
-    wdays = WorkerDay.objects.filter(
-        Q(is_vacancy=True) | Q(type=WorkerDay.TYPE_QUALIFICATION),
-        is_fact=False, is_approved=True,
-        shop__isnull=False, worker__isnull=False,
-        dt=dt,
-    ).values('worker__username', 'shop__code').distinct()
-    for wd in wdays:
-        create_mda_user_to_shop_relation(username=wd['worker__username'], shop_code=wd['shop__code'])
-        if delay_sec:
-            time_in_secs.sleep(delay_sec)
-
-
-@app.task
 def clean_wdays(filter_kwargs: dict = None, exclude_kwargs: dict = None, only_logging=True, clean_plan_empl=False):
     clean_wdays_helper = CleanWdaysHelper(
         filter_kwargs=filter_kwargs,
@@ -846,6 +814,54 @@ def fill_shop_schedule(shop_id, dt_from, periods=90):
             )
 
     return {'created': len(to_create), 'updated': len(to_update), 'skipped': skipped}
+
+
+@app.task
+def fill_shop_city_from_coords(shop_id):
+    shop = Shop.objects.filter(id=shop_id).first()
+    if shop and shop.latitude and shop.longitude and settings.DADATA_TOKEN:
+        from dadata import Dadata
+        dadata = Dadata(settings.DADATA_TOKEN)
+        result = dadata.geolocate(name="address", lat=float(shop.latitude), lon=float(shop.longitude))
+        if result and result[0].get('data') and result[0].get('data').get('city'):
+            shop.city = result[0]['data']['city']
+            shop.save(update_fields=['city'])
+
+
+@app.task
+def fill_city_coords_address_timezone_from_fias_code(shop_id):
+    shop = Shop.objects.filter(id=shop_id).first()
+    if shop and shop.fias_code and settings.DADATA_TOKEN:
+        from dadata import Dadata
+        dadata = Dadata(settings.DADATA_TOKEN)
+        result = dadata.find_by_id("address", shop.fias_code)
+        if result and result[0].get('data'):
+            update_fields = []
+            if result[0].get('value'):
+                shop.address = result[0].get('value')
+                update_fields.append('address')
+            data = result[0].get('data')
+            if data.get('city'):
+                shop.city = result[0]['data']['city']
+                update_fields.append('city')
+            if data.get('geo_lat'):
+                shop.latitude = data.get('geo_lat')
+                update_fields.append('latitude')
+            if data.get('geo_lon'):
+                shop.longitude = data.get('geo_lon')
+                update_fields.append('longitude')
+            if data.get('geo_lat') and data.get('geo_lon'):
+                tz = tzwhere.tzwhere()
+                timezone = tz.tzNameAt(float(data.get('geo_lat')), float(data.get('geo_lon')))
+                if timezone:
+                    shop.timezone = timezone
+                else:
+                    tz = tzwhere.tzwhere(forceTZ=True)
+                    timezone = tz.tzNameAt(float(data.get('geo_lat')), float(data.get('geo_lon')), forceTZ=True)
+                    shop.timezone = timezone
+                update_fields.append('timezone')
+            if update_fields:
+                shop.save(update_fields=update_fields)
 
 
 @app.task
