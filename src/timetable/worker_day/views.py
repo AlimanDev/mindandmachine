@@ -433,7 +433,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
                 # если план, то отмечаем, что график подтвержден
                 if not serializer.data['is_fact']:
-                    from src.celery.tasks import recalc_wdays
+                    from src.timetable.worker_day.tasks import recalc_wdays
 
                     ShopMonthStat.objects.filter(
                         shop_id=serializer.data['shop_id'],

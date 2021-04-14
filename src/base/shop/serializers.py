@@ -169,7 +169,7 @@ class ShopSerializer(serializers.ModelSerializer):
 
     def _update_or_create_nested_data(self, instance, nonstandard_schedule):
         if nonstandard_schedule:
-            from src.celery.tasks import recalc_wdays
+            from src.timetable.worker_day.tasks import recalc_wdays
             from src.util.models_converter import Converter
             user = getattr(self.context.get('request', {}), 'user', None)
             dates = [sch['dt'] for sch in nonstandard_schedule]

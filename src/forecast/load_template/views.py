@@ -13,7 +13,7 @@ from src.forecast.models import LoadTemplate
 from src.forecast.load_template.utils import create_load_template_for_shop, download_load_template, upload_load_template
 from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
 
-from src.celery.tasks import calculate_shops_load, apply_load_template_to_shops
+from src.forecast.load_template.tasks import calculate_shops_load, apply_load_template_to_shops
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.base.exceptions import FieldError
 from src.base.serializers import BaseNetworkSerializer

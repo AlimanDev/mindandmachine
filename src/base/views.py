@@ -319,7 +319,7 @@ class ShopScheduleViewSet(UpdateorCreateViewSet):
             shop_id=self.kwargs.get('department_pk'), shop__network_id=self.request.user.network_id)
 
     def _perform_create_or_update(self, serializer):
-        from src.celery.tasks import recalc_wdays
+        from src.timetable.worker_day.tasks import recalc_wdays
         serializer.save(
             modified_by=self.request.user,
             shop_id=self.kwargs.get('department_pk'),
