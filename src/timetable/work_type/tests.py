@@ -315,6 +315,19 @@ class TestWorkType(APITestCase):
             work_type=self.work_type1,
         )
         wd = WorkerDay.objects.create(
+            dttm_work_start=datetime.combine(dt_now, time(hour=8)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=dt_now,
+            worker=self.user3,
+            employment=self.employment3,
+            is_approved=True,
+            is_fact=True,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=wd,
+            work_type=self.work_type1,
+        )
+        wd = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(dt_now, time(hour=9)),
             dttm_work_end=datetime.combine(dt_now, time(hour=18)),
             type=WorkerDay.TYPE_WORKDAY,
