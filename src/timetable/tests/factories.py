@@ -8,7 +8,7 @@ from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkType, W
 
 
 class WorkTypeNameFactory(AbstractActiveNamedModelFactory):
-    name = factory.LazyFunction(lambda: random.choice(['Кассир', 'Директор']))
+    name = factory.LazyFunction(lambda: random.choice(['Кассир', 'Директор', 'Врач']))
 
     class Meta:
         model = WorkTypeName
