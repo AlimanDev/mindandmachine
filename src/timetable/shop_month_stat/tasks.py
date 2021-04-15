@@ -3,6 +3,7 @@ from src.timetable.models import ShopMonthStat
 from datetime import date, datetime
 from django.conf import settings
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
+from src.base.models import Shop
 
 
 @app.task

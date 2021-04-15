@@ -1,3 +1,5 @@
+from django.db import transaction
+
 from src.celery.celery import app
 from src.timetable.utils import CleanWdaysHelper
 from src.timetable.models import WorkerDay

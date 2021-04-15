@@ -334,7 +334,18 @@ MOBILE_USER_AGENTS = ('QoS_mobile_app', 'okhttp',)
 METABASE_SITE_URL = 'metabase-url'
 METABASE_SECRET_KEY = 'secret-key'
 
-CELERY_IMPORTS = ('src.celery.tasks', 'src.integration.tasks', 'src.integration.mda.tasks')
+CELERY_IMPORTS = (
+    'src.celery.tasks', 
+    'src.integration.tasks', 
+    'src.integration.mda.tasks',
+    'src.base.shop.tasks',
+    'src.event.tasks',
+    'src.forecast.load_template.tasks',
+    'src.forecast.receipt.tasks',
+    'src.timetable.shop_month_stat.tasks',
+    'src.timetable.vacancy.tasks',
+    'src.timetable.worker_day.tasks',
+)
 CELERY_BROKER_URL = 'redis://localhost:6379'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379'
 CELERY_ACCEPT_CONTENT = ['application/json']
