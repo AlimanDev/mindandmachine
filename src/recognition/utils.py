@@ -1,6 +1,8 @@
 from src.timetable.models import PlanAndFactHours, WorkerDay
 from datetime import timedelta, datetime
-from src.base.models import Shop
+from src.base.models import Shop, User
+from src.recognition.api.recognition import Recognition
+from src.recognition.models import UserConnecter
 
 
 def get_worker_days_with_no_ticks(dttm: datetime):
@@ -46,4 +48,14 @@ def get_worker_days_with_no_ticks(dttm: datetime):
             )
         )
     return no_comming, no_leaving
-    
+
+
+def check_duplicate_biometrics(image, user: User):
+    from src.celery.tasks import send_event_email_notifications
+    r = Recognition()
+    person_id = r.identify(image)
+    if person_id:
+        try:
+            user_connecter = UserConnecter.objects.get(person_id=person_id)
+        except UserConnecter.DoesNotExist:
+            return 'User from other system'
