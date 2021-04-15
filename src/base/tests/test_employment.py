@@ -579,11 +579,15 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             name='Кассир',
             network=self.network,
         )
+        self.wp5 = WorkerPosition.objects.create(
+            name='Провизор',
+            network=self.network,
+        )
         self.employment2.position = self.wp1
         self.employment3.position = self.wp2
         self.employment4.position = self.wp3
         self.employment6.position = self.wp4
-        self.employment7.position = self.wp4
+        self.employment7.position = self.wp5
         self.employment2.save()
         self.employment3.save()
         self.employment4.save()
@@ -598,7 +602,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             (self.user2.id, self.wp1.id),
             (self.user3.id, self.wp2.id),
             (self.user6.id, self.wp4.id),
-            (self.user7.id, self.wp4.id),
+            (self.user7.id, self.wp5.id),
             (self.user4.id, self.wp3.id),
         ]
         self.assertSequenceEqual(list(map(lambda x: (x['user']['id'], x['position_id']), data.json())), assert_data)
@@ -607,7 +611,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         data = self._test_get_employment_ordered_by_position(ordering='-position__ordering,position__name')
         assert_data = [
             (self.user6.id, self.wp4.id),
-            (self.user7.id, self.wp4.id),
+            (self.user7.id, self.wp5.id),
             (self.user4.id, self.wp3.id),
             (self.user3.id, self.wp2.id),
             (self.user2.id, self.wp1.id),
