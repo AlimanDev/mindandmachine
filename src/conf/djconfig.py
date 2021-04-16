@@ -359,7 +359,7 @@ CELERY_IMPORTS = (
     'src.integration.tasks',
     'src.integration.mda.tasks',
     'src.base.shop.tasks',
-    'src.event.tasks',
+    'src.events.tasks',
     'src.forecast.load_template.tasks',
     'src.forecast.receipt.tasks',
     'src.timetable.shop_month_stat.tasks',
