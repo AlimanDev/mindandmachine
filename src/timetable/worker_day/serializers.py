@@ -113,7 +113,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by', 'last_edited_by',
                   'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked',
-                  'employment_tabel_code']
+                  'employment_tabel_code', 'tabel_code']
         read_only_fields = ['work_hours', 'parent_worker_day_id', 'is_blocked']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
@@ -126,7 +126,10 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             },
             'is_blocked': {
                 'read_only': True,
-            }
+            },
+            'tabel_code': {
+                'write_only': True,
+            },
         }
 
     def validate(self, attrs):
@@ -212,9 +215,11 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
     def _create_update_clean(self, validated_data, instance=None):
         worker_id = validated_data.get('worker_id', instance.worker_id if instance else None)
+        tabel_code = validated_data.get('tabel_code', instance.tabel_code if instance else None)
         if worker_id:
             wdays_qs = WorkerDay.objects_with_excluded.filter(
                 worker_id=worker_id,
+                tabel_code=tabel_code,
                 dt=validated_data.get('dt'),
                 is_approved=validated_data.get(
                     'is_approved',
@@ -227,21 +232,21 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 wdays_qs = wdays_qs.exclude(id=instance.id)
             wdays_qs.delete()
 
-            if validated_data.get('type') in WorkerDay.TYPES_WITH_TM_RANGE:
-                worker_active_empl = Employment.objects.get_active_empl_for_user(
-                    network_id=self.context['request'].user.network_id,
-                    user_id=worker_id,
-                    dt=validated_data.get('dt'),
-                    priority_shop_id=validated_data.get('shop_id'),
-                    priority_employment_id=validated_data.get('employment_id'),
-                ).first()
+            worker_active_empl = Employment.objects.get_active_empl_for_user(
+                network_id=self.context['request'].user.network_id,
+                user_id=worker_id,
+                dt=validated_data.get('dt'),
+                priority_shop_id=validated_data.get('shop_id'),
+                priority_employment_id=validated_data.get('employment_id'),
+                priority_tabel_code=validated_data.get('tabel_code'),
+            ).first()
 
-                if not worker_active_empl:
-                    raise self.fail('no_active_employments')
+            if not worker_active_empl:
+                raise self.fail('no_active_employments')
 
-                validated_data['employment_id'] = worker_active_empl.id
-                validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
-                    or not worker_active_empl.is_equal_shops
+            validated_data['employment_id'] = worker_active_empl.id
+            validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
+                or not worker_active_empl.is_equal_shops
 
     def create(self, validated_data):
         with transaction.atomic():
@@ -251,6 +256,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             worker_day, _created = WorkerDay.objects.update_or_create(
                 dt=validated_data.get('dt'),
                 worker_id=validated_data.get('worker_id'),
+                employment_id=validated_data.get('employment_id'),
                 is_fact=validated_data.get('is_fact'),
                 is_approved=validated_data.get('is_approved'),
                 defaults=validated_data,

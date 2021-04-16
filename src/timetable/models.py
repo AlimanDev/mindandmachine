@@ -314,8 +314,7 @@ class WorkerDayQuerySet(QuerySet):
 
 class WorkerDayManager(models.Manager):
     def get_queryset(self):
-        return super().get_queryset().exclude(
-            type=WorkerDay.TYPE_WORKDAY, employment_id__isnull=True, worker_id__isnull=False)
+        return super().get_queryset().exclude(employment_id__isnull=True, worker_id__isnull=False)
 
     def qos_current_version(self, approved_only=False):
         if approved_only:
@@ -389,7 +388,7 @@ class WorkerDay(AbstractModel):
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
         unique_together = (
-            ('dt', 'worker', 'is_fact', 'is_approved'),
+            ('dt', 'worker', 'employment', 'is_fact', 'is_approved'),
         )
 
     TYPE_HOLIDAY = 'H'
@@ -577,6 +576,10 @@ class WorkerDay(AbstractModel):
 
     # DO_NOTHING т.к. в Employment.delete есть явная чистка рабочих дней для этого трудоустройства
     employment = models.ForeignKey(Employment, on_delete=models.DO_NOTHING, null=True)
+
+    # поле необходимо для того, чтобы была связь между днем работника и эмплойментом в случае,
+    # если эмплоймент был удален, а позднее был восстановлен
+    tabel_code = models.CharField(max_length=150, verbose_name='Табельный номер', null=True, blank=True)
 
     dt = models.DateField()  # todo: make immutable
     dttm_work_start = models.DateTimeField(null=True, blank=True)

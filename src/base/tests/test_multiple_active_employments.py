@@ -287,6 +287,15 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 is_fact=False,
                 is_approved=True,
             )
+            WorkerDayFactory(
+                dt=dt,
+                worker=self.user1,
+                employment=self.employment1_1_2,
+                shop=self.shop1,
+                type=WorkerDay.TYPE_HOLIDAY,
+                is_fact=False,
+                is_approved=True,
+            )
 
         for dt in pd.date_range(dt_now + timedelta(days=10), dt_now + timedelta(days=14)):
             WorkerDayFactory(
@@ -304,6 +313,16 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
             WorkerDayFactory(
                 dt=dt,
                 worker=self.user1,
+                employment=self.employment1_1_1,
+                shop=self.shop1,
+                type=WorkerDay.TYPE_VACATION,
+                is_fact=False,
+                is_approved=True,
+            )
+            WorkerDayFactory(
+                dt=dt,
+                worker=self.user1,
+                employment=self.employment1_1_2,
                 shop=self.shop1,
                 type=WorkerDay.TYPE_VACATION,
                 is_fact=False,
@@ -325,7 +344,6 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
     def test_get_tabel_data_by_tabel_code(self):
         """
         Проверка получения дней по табельному коду трудоустройства
-        TODO: может ли быть такое, что у 1 пользователя отпуска по разным трудоустройствам будут в разные периоды? -- может!
         """
         self._create_wdays(self.dt_now)
         self.client.force_authenticate(user=self.user1)

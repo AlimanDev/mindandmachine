@@ -1,6 +1,7 @@
 from django.db import models, transaction
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
 
+
 def copy_approved(dt_from, dt_to=None):
     dt_filter = {
         'dt__gte': dt_from,
@@ -8,13 +9,14 @@ def copy_approved(dt_from, dt_to=None):
     if dt_to:
         dt_filter['dt__lte'] = dt_to
     with transaction.atomic():
-        not_approved_subq = WorkerDay.objects_with_excluded.filter(
+        not_approved_subq = WorkerDay.objects.filter(
             worker_id=models.OuterRef('worker_id'),
+            employment_id=models.OuterRef('employment_id'),
             dt=models.OuterRef('dt'),
             is_approved=False,
             is_fact=models.OuterRef('is_fact'),
         )
-        worker_days_to_copy = list(WorkerDay.objects_with_excluded.filter(
+        worker_days_to_copy = list(WorkerDay.objects.filter(
             worker__isnull=False,
             **dt_filter,
         ).annotate(

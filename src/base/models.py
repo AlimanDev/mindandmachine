@@ -630,7 +630,7 @@ class EmploymentManager(models.Manager):
 
     def get_active_empl_for_user(
             self, network_id, user_id, dt=None, priority_shop_id=None, priority_employment_id=None,
-            priority_work_type_id=None):
+            priority_work_type_id=None, priority_tabel_code=None):
         qs = self.get_active(network_id, dt_from=dt, dt_to=dt, user_id=user_id)
 
         order_by = []
@@ -640,6 +640,12 @@ class EmploymentManager(models.Manager):
                 'is_equal_employments', 'id', priority_employment_id,
             )
             order_by.append('-is_equal_employments')
+
+        if priority_tabel_code:
+            qs = qs.annotate_value_equality(
+                'is_equal_tabel_codes', 'tabel_code', priority_tabel_code,
+            )
+            order_by.append('-is_equal_tabel_codes')
 
         if priority_shop_id:
             qs = qs.annotate_value_equality(
@@ -656,6 +662,7 @@ class EmploymentManager(models.Manager):
         order_by.append('-norm_work_hours')
 
         return qs.order_by(*order_by)
+
 
 
 class Group(AbstractActiveNetworkSpecificCodeNamedModel):
@@ -940,7 +947,7 @@ class Employment(AbstractActiveModel):
     id = models.BigAutoField(primary_key=True)
     code = models.CharField(max_length=128, null=True, blank=True)
     network = models.ForeignKey('base.Network', on_delete=models.PROTECT, null=True)
-    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="employments")
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="employments")  # TODO: пока оставить для обратной совместимости и чтобы не нужно было во всем местах это менять
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name="employments")
     function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True, related_name="employments")
     dt_to_function_group = models.DateField(verbose_name='Дата до которой действуют права function_group', null=True, blank=True)

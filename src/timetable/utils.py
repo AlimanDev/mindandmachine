@@ -176,6 +176,7 @@ class CleanWdaysHelper:
                 worker_active_empl = Employment.objects.get_active_empl_for_user(
                     network_id=wd.worker.network_id, user_id=wd.worker_id, dt=wd.dt,
                     priority_shop_id=wd.shop_id, priority_employment_id=wd.employment_id,
+                    priority_tabel_code=wd.tabel_code,
                 ).first()
 
                 if not worker_active_empl:
