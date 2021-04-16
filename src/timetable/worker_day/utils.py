@@ -1,8 +1,11 @@
 import datetime
+import json
 import time
 
 import pandas as pd
+from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.db.models import Q, F, Value, CharField
 from django.db.models.functions import Concat, Cast
@@ -428,27 +431,27 @@ def download_tabel_util(request, workbook, form):
 
 def exchange(data, error_messages):
     new_wds = []
-    def create_worker_day(wd_parent, wd_swap):
-        employment = wd_parent.employment
-        if (wd_swap.type == WorkerDay.TYPE_WORKDAY and employment is None):
+    def create_worker_day(wd_target, wd_source):
+        employment = wd_target.employment
+        if (wd_source.type == WorkerDay.TYPE_WORKDAY and employment is None):
             employment = Employment.objects.get_active_empl_for_user(
-                network_id=wd_swap.worker.network_id, user_id=wd_parent.worker_id,
-                dt=wd_swap.dt,
-                priority_shop_id=wd_swap.shop_id,
+                network_id=wd_source.worker.network_id, user_id=wd_target.worker_id,
+                dt=wd_source.dt,
+                priority_shop_id=wd_source.shop_id,
             ).select_related(
                 'position__breaks',
             ).first()
         wd_new = WorkerDay(
-            type=wd_swap.type,
-            dttm_work_start=wd_swap.dttm_work_start,
-            dttm_work_end=wd_swap.dttm_work_end,
-            worker_id=wd_parent.worker_id,
-            employment=employment if wd_swap.employment_id else None,
-            dt=wd_parent.dt,
+            type=wd_source.type,
+            dttm_work_start=wd_source.dttm_work_start,
+            dttm_work_end=wd_source.dttm_work_end,
+            worker_id=wd_target.worker_id,
+            employment=employment if wd_source.employment_id else None,
+            dt=wd_target.dt,
             created_by=data['user'],
             is_approved=data['is_approved'],
-            is_vacancy=wd_swap.is_vacancy,
-            shop_id=wd_swap.shop_id,
+            is_vacancy=wd_source.is_vacancy,
+            shop_id=wd_source.shop_id,
         )
         wd_new.save()
         new_wds.append(wd_new)
@@ -458,24 +461,24 @@ def exchange(data, error_messages):
                 work_type_id=wd_cashbox_details_parent.work_type_id,
                 work_part=wd_cashbox_details_parent.work_part,
             )
-            for wd_cashbox_details_parent in wd_swap.worker_day_details.all()
+            for wd_cashbox_details_parent in wd_source.worker_day_details.all()
         ])
 
     days = len(data['dates'])
     with transaction.atomic():
-        wd_parent_list = list(WorkerDay.objects.filter(
+        wd_list = list(WorkerDay.objects.filter(
             worker_id__in=(data['worker1_id'], data['worker2_id']),
             dt__in=data['dates'],
             is_approved=data['is_approved'],
             is_fact=False,
-        ).prefetch_related('worker_day_details').select_related('worker', 'employment').order_by('dt'))
+        ).prefetch_related('worker_day_details__work_type__work_type_name').select_related('worker', 'employment').order_by('dt'))
 
-        if len(wd_parent_list) != days * 2:
+        if len(wd_list) != days * 2:
             raise ValidationError(error_messages['no_timetable'])
 
         day_pairs = []
         for day_ind in range(days):
-            day_pair = [wd_parent_list[day_ind * 2], wd_parent_list[day_ind * 2 + 1]]
+            day_pair = [wd_list[day_ind * 2], wd_list[day_ind * 2 + 1]]
             if day_pair[0].dt != day_pair[1].dt:
                 raise ValidationError(error_messages['worker_days_mismatch'])
             day_pairs.append(day_pair)
@@ -509,6 +512,50 @@ def exchange(data, error_messages):
                 raise PermissionDenied(error_messages['has_no_perm_to_approve_protected_wdays'].format(
                     protected_wdays=', '.join(f'{d["worker_fio"]}: {d["dates"]}' for d in protected_wdays),
                 ))
+
+        if data['is_approved'] and settings.SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE:
+            from src.celery.tasks import send_doctors_schedule_to_mis
+
+            # если смотреть по аналогии с подтверждением, то wd_target - подтв. версия wd_source - неподтв.
+            def append_mis_data(mis_data, wd_target, wd_source):
+                action = None
+                if wd_target.type == WorkerDay.TYPE_WORKDAY or wd_source.type == WorkerDay.TYPE_WORKDAY:
+                    wd_target_has_doctor_work_type = any(
+                        wd_detail.work_type.work_type_name.code == 'doctor' for wd_detail in
+                        wd_target.worker_day_details.all())
+                    wd_source_has_doctor_work_type = any(
+                        wd_detail.work_type.work_type_name.code == 'doctor' for wd_detail in
+                        wd_source.worker_day_details.all())
+                    if wd_target.type != WorkerDay.TYPE_WORKDAY and wd_source.type == WorkerDay.TYPE_WORKDAY and wd_source_has_doctor_work_type:
+                        action = 'create'
+                    elif wd_target.type == WorkerDay.TYPE_WORKDAY and wd_source.type != WorkerDay.TYPE_WORKDAY and wd_target_has_doctor_work_type:
+                        action = 'delete'
+                    elif wd_source.type == wd_target.type:
+                        if wd_source_has_doctor_work_type and wd_target_has_doctor_work_type:
+                            action = 'update'
+                        elif wd_source_has_doctor_work_type and not wd_target_has_doctor_work_type:
+                            action = 'create'
+                        elif wd_target_has_doctor_work_type and not wd_source_has_doctor_work_type:
+                            action = 'delete'
+
+                if action:
+                    mis_data.append({
+                        'dt': wd_target.dt,
+                        'worker__username': wd_target.worker.username,
+                        'shop__code': wd_target.shop.code if wd_target.shop else wd_source.shop.code,
+                        'dttm_work_start': wd_target.dttm_work_start if action == 'delete' else wd_source.dttm_work_start,
+                        'dttm_work_end': wd_target.dttm_work_end if action == 'delete' else wd_source.dttm_work_end,
+                        'action': action,
+                    })
+
+            mis_data = []
+            for day_pair in day_pairs:
+                append_mis_data(mis_data, day_pair[0], day_pair[1])
+                append_mis_data(mis_data, day_pair[1], day_pair[0])
+
+            if mis_data:
+                json_data = json.dumps(mis_data, indent=4, ensure_ascii=False, cls=DjangoJSONEncoder)
+                send_doctors_schedule_to_mis.delay(json_data=json_data)
 
         WorkerDay.objects_with_excluded.filter(
             worker_id__in=(data['worker1_id'], data['worker2_id']),
