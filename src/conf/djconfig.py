@@ -218,6 +218,12 @@ LOGGING = {
             'filename': 'clean_wdays.log',
             'formatter': 'simple',
         },
+        'send_doctors_schedule_to_mis': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.WatchedFileHandler',
+            'filename': 'clean_wdays.log',
+            'formatter': 'simple',
+        },
         'mail_admins': {
             'level': 'ERROR',
             'class': 'django.utils.log.AdminEmailHandler',
@@ -240,6 +246,11 @@ LOGGING = {
         },
         'clean_wdays': {
             'handlers': ['clean_wdays'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'send_doctors_schedule_to_mis': {
+            'handlers': ['send_doctors_schedule_to_mis'],
             'level': 'DEBUG',
             'propagate': True,
         },
@@ -422,6 +433,10 @@ FILL_SHOP_CITY_FROM_COORDS = False
 FILL_SHOP_CITY_COORDS_ADDRESS_TIMEZONE_FROM_FIAS_CODE = False
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
+
+SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE = False  # посылать в МИС событийно расписание врачей при его изменении
+MIS_USERNAME = None
+MIS_PASSWORD = None
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
