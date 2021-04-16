@@ -53,6 +53,7 @@ from src.base.models import (
     ShopSchedule,
 )
 from src.recognition.models import UserConnecter
+from src.recognition.api.recognition import Recognition
 
 from src.base.filters import UserFilter
 from src.base.views_abstract import (
@@ -61,6 +62,7 @@ from src.base.views_abstract import (
     BaseModelViewSet,
 )
 from django.middleware.csrf import rotate_token
+from src.timetable.worker_day.tasks import recalc_wdays
 
 
 class EmploymentViewSet(UpdateorCreateViewSet):
@@ -159,7 +161,6 @@ class UserViewSet(UpdateorCreateViewSet):
 
     @action(detail=True, methods=['post'])
     def delete_biometrics(self, request, pk=None):
-        from src.recognition.api.recognition import Recognition
         user = self.get_object()
         
         try:
@@ -319,7 +320,6 @@ class ShopScheduleViewSet(UpdateorCreateViewSet):
             shop_id=self.kwargs.get('department_pk'), shop__network_id=self.request.user.network_id)
 
     def _perform_create_or_update(self, serializer):
-        from src.celery.tasks import recalc_wdays
         serializer.save(
             modified_by=self.request.user,
             shop_id=self.kwargs.get('department_pk'),

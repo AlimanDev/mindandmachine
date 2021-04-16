@@ -345,7 +345,18 @@ MOBILE_USER_AGENTS = ('QoS_mobile_app', 'okhttp',)
 METABASE_SITE_URL = 'metabase-url'
 METABASE_SECRET_KEY = 'secret-key'
 
-CELERY_IMPORTS = ('src.celery.tasks', 'src.integration.tasks', 'src.integration.mda.tasks')
+CELERY_IMPORTS = (
+    'src.celery.tasks', 
+    'src.integration.tasks', 
+    'src.integration.mda.tasks',
+    'src.base.shop.tasks',
+    'src.event.tasks',
+    'src.forecast.load_template.tasks',
+    'src.forecast.receipt.tasks',
+    'src.timetable.shop_month_stat.tasks',
+    'src.timetable.vacancy.tasks',
+    'src.timetable.worker_day.tasks',
+)
 CELERY_BROKER_URL = 'redis://localhost:6379'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379'
 CELERY_ACCEPT_CONTENT = ['application/json']
@@ -465,23 +476,18 @@ CELERY_BEAT_SCHEDULE = {
     # },
 
     'task-vacancies_create_and_cancel': {
-        'task': 'src.celery.tasks.vacancies_create_and_cancel',
+        'task': 'src.timetable.vacancy.tasks.vacancies_create_and_cancel',
         'schedule': crontab(minute='*/30'),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-workers_hard_exchange': {
-        'task': 'src.celery.tasks.workers_hard_exchange',
+        'task': 'src.timetable.vacancy.tasks.workers_hard_exchange',
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-allocation-of-time-for-work-on-cashbox': {
         'task': 'src.celery.tasks.allocation_of_time_for_work_on_cashbox',
         'schedule': crontab(day_of_month='1', hour=4, minute=0)
-    },
-    'task-create-pred-bills': {
-        'task': 'src.celery.tasks.create_pred_bills',
-        'schedule': crontab(hour=23, minute=0, day_of_month='1'),
-        'options': {'queue': BACKEND_QUEUE}
     },
     'task-clean-camera-stats': {
         'task': 'src.celery.tasks.clean_camera_stats',
@@ -494,7 +500,7 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-update-shop-stats': {
-        'task': 'src.celery.tasks.update_shop_stats_2_months',
+        'task': 'src.timetable.shop_month_stat.tasks.update_shop_stats_2_months',
         'schedule': crontab(hour=3, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
@@ -504,17 +510,17 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-aggregate-receipts': {
-        'task': 'src.celery.tasks.aggregate_timeserie_value',
+        'task': 'src.forecast.receipt.tasks.aggregate_timeserie_value',
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
-    'task-delete-old=receipts': {
-        'task': 'src.celery.tasks.clean_timeserie_actions',
+    'task-delete-old-receipts': {
+        'task': 'src.forecast.receipt.tasks.clean_timeserie_actions',
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-trigger-cron-event': {
-        'task': 'src.celery.tasks.cron_event',
+        'task': 'src.events.tasks.cron_event',
         'schedule': crontab(minute='*/1'),
         'options': {'queue': BACKEND_QUEUE}
     },
@@ -524,12 +530,12 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-fill-active-shops-schedule': {
-        'task': 'src.celery.tasks.fill_active_shops_schedule',
+        'task': 'src.base.shop.tasks.fill_active_shops_schedule',
         'schedule': crontab(hour=1, minute=30),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-calculate-shop-load-at-night': {
-        'task': 'src.celery.tasks.calculate_shop_load_at_night',
+        'task': 'src.forecast.load_template.tasks.calculate_shop_load_at_night',
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
