@@ -9,7 +9,7 @@ set -e
 #export REGISTRY_PASSWORD=
 
 function build_and_push() {
-  docker build -t ${REGISTRY_URL}/${REGISTRY_NAMESPACE}/$1 . -f ./etc/compose/$1/Dockerfile
+  docker build --pull -t ${REGISTRY_URL}/${REGISTRY_NAMESPACE}/$1 . -f ./etc/compose/$1/Dockerfile
   docker push ${REGISTRY_URL}/${REGISTRY_NAMESPACE}/$1
 }
 
