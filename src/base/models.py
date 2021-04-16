@@ -453,7 +453,8 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     def _handle_schedule_change(self):
         from src.util.models_converter import Converter
-        from src.base.shop.tasks import fill_shop_schedule, recalc_wdays
+        from src.base.shop.tasks import fill_shop_schedule
+        from src.timetable.worker_day.tasks import recalc_wdays
         dt_now = datetime.datetime.now().date()
         ch = chain(
             fill_shop_schedule.si(shop_id=self.id, dt_from=Converter.convert_date(dt_now)),
