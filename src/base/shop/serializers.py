@@ -14,6 +14,7 @@ from src.base.models import Shop, ShopSchedule
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.drf.fields import RoundingDecimalField
 from src.util.models_converter import Converter
+from src.timetable.worker_day.tasks import recalc_wdays
 
 POSSIBLE_KEYS = [
     '0', '1', '2', '3', '4', '5', '6', 'all',
@@ -169,8 +170,6 @@ class ShopSerializer(serializers.ModelSerializer):
 
     def _update_or_create_nested_data(self, instance, nonstandard_schedule):
         if nonstandard_schedule:
-            from src.celery.tasks import recalc_wdays
-            from src.util.models_converter import Converter
             user = getattr(self.context.get('request', {}), 'user', None)
             dates = [sch['dt'] for sch in nonstandard_schedule]
             ss_dict = {}
