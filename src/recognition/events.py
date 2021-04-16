@@ -22,7 +22,7 @@ class UrvStatEvent(BaseRegisteredEvent):
         dt = date.today() - timedelta(days=1)
         title = f'URV_{dt}.xlsx'
 
-        return urv_stat_v1(dt, dt, title=title, network_id=self.network_id, in_memory=True)
+        return urv_stat_v1(dt, dt, title=title, shop_ids=self.context.get('shop_ids', []), network_id=self.network_id, in_memory=True)
         
 
 class UrvStatTodayEvent(BaseRegisteredEvent):
@@ -35,7 +35,7 @@ class UrvStatTodayEvent(BaseRegisteredEvent):
         dt = date.today()
         title = f'URV_today_{dt}.xlsx'
 
-        return urv_stat_v1(dt, dt, title=title, network_id=self.network_id, comming_only=True, in_memory=True)
+        return urv_stat_v1(dt, dt, title=title, shop_ids=self.context.get('shop_ids', []), network_id=self.network_id, comming_only=True, in_memory=True)
 
 class UrvViolatorsReportEvent(BaseRegisteredEvent):
     name = 'Отправка отчета по нарушителям УРВ за вчерашний день'
@@ -45,7 +45,7 @@ class UrvViolatorsReportEvent(BaseRegisteredEvent):
     def get_file(self):
         from src.util.urv.urv_violators import urv_violators_report_xlsx
 
-        return urv_violators_report_xlsx(self.network_id, in_memory=True)
+        return urv_violators_report_xlsx(self.network_id, shop_ids=self.context.get('shop_ids', []), in_memory=True)
 
 
 class UrvStatV2Event(BaseRegisteredEvent):
@@ -58,7 +58,7 @@ class UrvStatV2Event(BaseRegisteredEvent):
         dt = date.today() - timedelta(days=1)
         title = f'URV_users_{dt}.xlsx'
 
-        return urv_stat_v2(dt, dt, title=title, network_id=self.network_id, in_memory=True)
+        return urv_stat_v2(dt, dt, title=title, network_id=self.network_id, shop_ids=self.context.get('shop_ids', []), in_memory=True)
 
 
 class EmployeeNotCheckedInEvent(BaseRegisteredEvent):
@@ -69,6 +69,7 @@ class EmployeeNotCheckedInEvent(BaseRegisteredEvent):
     def get_recipients(self):
         from src.base.models import User
         return [User(id=uuid4(), email=self.context.get('director', {}).get('email'), first_name=self.context.get('director', {}).get('name', '')), ]
+
 
 class EmployeeWorkingNotAccordingToPlanEvent(BaseRegisteredEvent):
     name = 'Уведомление о выходе сотрудника не по плану'

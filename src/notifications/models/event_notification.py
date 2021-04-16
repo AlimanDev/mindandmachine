@@ -17,6 +17,9 @@ class AbstractEventNotification(AbstractModel):
 
     class Meta:
         abstract = True
+    
+    def __str__(self):
+        return self.event_type.name
 
 
 class AbstractEventNotificationWithRecipients(AbstractEventNotification):
@@ -121,6 +124,12 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
     
         return recipients
 
+    def __str__(self):
+        return '{}, {} получателей'.format(
+            self.event_type.name,
+            self.shops.count() + self.users.count(),
+        )
+
 
 class EventEmailNotification(AbstractEventNotificationWithRecipients):
     email_addresses = models.CharField(
@@ -168,6 +177,17 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
             subject = self.get_system_email_template_display()
 
         return subject
+
+    def __str__(self):
+        cron_str = ''
+        if self.cron:
+            cron_str = f', расписание {self.cron}'
+        return '{}, {} получателей{}'.format(
+            self.event_type.name,
+            self.shops.count() + self.users.count()\
+            + (len(self.email_addresses.split(',')) if self.email_addresses else 0),
+            cron_str,
+        )
 
 
 class EventOnlineNotification(AbstractEventNotificationWithRecipients):

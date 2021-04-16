@@ -918,7 +918,9 @@ def cron_event():
         send_event_email_notifications.delay(
             event_email_notification_id=event_email_notification.id,
             user_author_id=None,
-            context={},
+            context={
+                'shop_ids': list(event_email_notification.shops.all().values_list('id', flat=True)),
+            },
         )
 
 
