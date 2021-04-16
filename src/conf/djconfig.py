@@ -9,7 +9,10 @@ config importance
 import os
 import sys
 
+import environ
 from celery.schedules import crontab
+
+env = environ.Env()
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -28,8 +31,9 @@ UPLOAD_TT_MATCH_EMPLOYMENT = True
 
 QOS_CAMERA_KEY = '1'
 
-HOST = 'http://127.0.0.1:8000' # dev
-TIMETABLE_IP = "127.0.0.1:5000"
+HOST = env.str('HOST', default='http://127.0.0.1:8000')
+EXTERNAL_HOST = env.str('EXTERNAL_HOST', default=HOST)
+TIMETABLE_IP = env.str('TIMETABLE_IP', default='127.0.0.1:5000')
 
 # доменное имя проекта, используется в src.timetable.vacancy в письмах
 DOMAIN = '' 
@@ -45,7 +49,7 @@ MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS = (60 * 60) + 10  # 1 час + 10 сек
 MDA_PUBLIC_API_HOST = 'https://example.com'
 MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
 
-DEBUG = True
+DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
 ALLOWED_HOSTS = ['*']
 
@@ -139,8 +143,12 @@ WSGI_APPLICATION = 'wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env.str('DB_NAME', default='qos'),
+        'USER': env.str('DB_USER', default='root'),
+        'PASSWORD': env.str('DB_PASSWORD', default='root'),
+        'HOST': env.str('DB_HOST', default='localhost'),
+        'PORT': '5432',
     }
 }
 
@@ -207,7 +215,7 @@ LOGGING = {
         'file': {
             'level': 'INFO',  # use INFO for not logging sql queries
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'qos_backend.log',  # directory with logs must be already created
+            'filename': 'logs/qos_backend.log',  # directory with logs must be already created
             'maxBytes': 5 * 1024 * 1024,
             'backupCount': 10,
             'formatter': 'simple',
@@ -215,7 +223,7 @@ LOGGING = {
         'clean_wdays': {
             'level': 'DEBUG',
             'class': 'logging.handlers.WatchedFileHandler',
-            'filename': 'clean_wdays.log',
+            'filename': 'logs/clean_wdays.log',
             'formatter': 'simple',
         },
         'mail_admins': {
@@ -274,10 +282,11 @@ LOCALE_PATHS = [
     os.path.join(BASE_DIR,  'data/locale')
 ]
 
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 STATIC_URL = '/static/'
-
 MEDIA_URL = '/_i/media/'
-
 
 SESSION_COOKIE_SECURE = True
 
@@ -331,19 +340,22 @@ ALLOWED_UPLOAD_EXTENSIONS = ['xlsx', 'xls']
 
 MOBILE_USER_AGENTS = ('QoS_mobile_app', 'okhttp',)
 
-METABASE_SITE_URL = 'metabase-url'
-METABASE_SECRET_KEY = 'secret-key'
+METABASE_SITE_URL = env.str('METABASE_SITE_URL', default='metabase-url')
+METABASE_SECRET_KEY = env.str('METABASE_SECRET_KEY', default='secret-key')
 
 CELERY_IMPORTS = ('src.celery.tasks', 'src.integration.tasks', 'src.integration.mda.tasks')
-CELERY_BROKER_URL = 'redis://localhost:6379'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379'
+
+REDIS_HOST = env.str('REDIS_HOST', default='localhost')
+CELERY_BROKER_URL = 'redis://' + REDIS_HOST + ':6379'
+CELERY_RESULT_BACKEND = 'redis://' + REDIS_HOST + ':6379'
+
 CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERYD_CONCURRENCY = 2
 CELERYD_PREFETCH_MULTIPLIER = 1
-BACKEND_QUEUE = 'backend_queue'
+BACKEND_QUEUE = env.str('BACKEND_QUEUE', default='backend_queue')
 
 # for change celery configs must be before (for BACKEND_QUEUE)
 # todo: do normal parameters changer
@@ -369,10 +381,10 @@ MDA_SKIP_LEAVING_TICK = False
 # 	-p 8030:8080 \
 #   -d \
 # 	eugenmayer/kontextwork-converter:production
-JOD_CONVERTER_URL = 'http://localhost:8030'
+JOD_CONVERTER_URL = env.str('JOD_CONVERTER_URL', default='http://localhost:8030')
 
 # docker run --restart unless-stopped -p 3001:3000 -d thecodingmachine/gotenberg:6
-GOTENBERG_URL = 'http://localhost:3001'
+GOTENBERG_URL = env.str('GOTENBERG_URL', default='http://localhost:3001')
 
 ZKTECO_HOST = ''
 ZKTECO_KEY = ''

@@ -15,10 +15,12 @@ server {
     }
 
     location / {
-         add_header Cache-Control 'no-cache, no-store, must-revalidate';
-         add_header Pragma no-cache;
-         add_header Expires 0;
-         root /var/www/servers/%s/frontend/dist/;
+        location /index.html {
+             add_header Cache-Control 'no-cache, no-store, must-revalidate';
+             add_header Pragma no-cache;
+             add_header Expires 0;
+        }
+        root /var/www/servers/%s/frontend/dist/;
     }
 
     location /_i/media/ {
