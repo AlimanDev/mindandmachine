@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import time as time_in_secs
 from datetime import date, timedelta, datetime
@@ -13,6 +14,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils.timezone import now
 from django_celery_beat.models import CrontabSchedule
+from requests.auth import HTTPBasicAuth
 from src.main.demand.utils import create_predbills_request_function
 from src.main.operation_template.utils import build_period_clients
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
@@ -918,3 +920,66 @@ def cron_event():
             user_author_id=None,
             context={},
         )
+
+
+SET_SCHEDULE_METHODS = {
+    'create': 'CreateGrafic',
+    'update': 'UpdateGrafic',
+    'delete': 'DeleteGrafic',
+}
+
+
+@app.task
+def send_doctors_schedule_to_mis(json_data, logger=logging.getLogger('send_doctors_schedule_to_mis')):
+    """
+    Таск для отправки расписания по врачам в МИС
+    :param json_data: json строка
+    Пример данных:
+    [
+        {
+            "dt": "2021-03-09",
+            "worker__username": "user2",
+            "shop__code": "code-237",
+            "dttm_work_start": "2021-03-09T10:00:00",
+            "dttm_work_end": "2021-03-09T20:00:00",
+            "action": "create"
+        },
+        {
+            "dt": "2021-03-10",
+            "worker__username": "user2",
+            "shop__code": "code-237",
+            "dttm_work_start": "2021-03-10T08:00:00",
+            "dttm_work_end": "2021-03-10T21:00:00",
+            "action": "update"
+        },
+        {
+            "dt": "2021-03-11",
+            "worker__username": "user2",
+            "shop__code": "code-237",
+            "dttm_work_start": "2021-03-11T08:00:00",
+            "dttm_work_end": "2021-03-11T12:00:00",
+            "action": "delete"
+        }
+    ]
+    :return:
+    """
+    if settings.MIS_USERNAME is None or settings.MIS_PASSWORD is None:
+        raise Exception('no auth settings')
+
+    for wd_data in json_data:
+        mis_data = {
+            'TabelNumber': wd_data['worker__username'],
+            'KodSalona': wd_data['shop__code'],
+            'DataS': wd_data['dttm_work_start'],
+            'DataPo': wd_data['dttm_work_end'],
+            'Metod': SET_SCHEDULE_METHODS.get(wd_data['action']),
+        }
+        resp = requests.post(
+            url='https://star.nikamed.ru/mc/hs/Telemed/SetSchedule/',
+            data=mis_data,
+            auth=HTTPBasicAuth(settings.MIS_USERNAME, settings.MIS_PASSWORD)
+        )
+        try:
+            resp.raise_for_status()
+        except requests.RequestException:
+            logger.exception(f'text:{resp.text}, wd_data: {wd_data}', )
