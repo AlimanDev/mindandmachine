@@ -3,8 +3,7 @@ from django.db import models
 from django.db.models import Q
 from django.template import loader as template_loader, Template
 
-from django_celery_beat.models import CrontabSchedule
-
+from src.reports.models import ReportConfig
 from src.base.models import User, Employment, Shop
 from src.base.models_abstract import AbstractModel
 from src.events.registry import EventRegistryHolder
@@ -146,10 +145,7 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
         help_text='По умолчанию берется из названия "Системный E-mail шаблон"'
     )
 
-    cron = models.ForeignKey(
-        CrontabSchedule, null=True, blank=True,
-        verbose_name='Расписание для отправки', on_delete=models.PROTECT,
-    )
+    report_config = models.ForeignKey(ReportConfig, on_delete=models.PROTECT, null=True, blank=True, verbose_name='Конфигурация отчета')
 
     class Meta:
         verbose_name = 'Email оповещение о событиях'
@@ -180,8 +176,8 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
 
     def __str__(self):
         cron_str = ''
-        if self.cron:
-            cron_str = f', расписание {self.cron}'
+        if self.report_config:
+            cron_str = f', расписание {self.report_config.cron}'
         return '{}, {} получателей{}'.format(
             self.event_type.name,
             self.shops.count() + self.users.count()\

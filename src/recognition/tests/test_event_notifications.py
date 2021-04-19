@@ -13,13 +13,16 @@ from src.base.tests.factories import ShopFactory, UserFactory, GroupFactory, Emp
 from src.events.models import EventType
 from src.notifications.models import EventEmailNotification
 from src.recognition.events import (
-    URV_STAT, 
-    URV_STAT_TODAY, 
-    URV_VIOLATORS_REPORT, 
-    URV_STAT_V2, 
     EMPLOYEE_NOT_CHECKED_IN,
     EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN,
 )
+from src.reports.events import (
+    URV_STAT, 
+    URV_STAT_TODAY, 
+    URV_VIOLATORS_REPORT, 
+    URV_STAT_V2,
+)
+from src.reports.models import ReportConfig
 from src.timetable.models import WorkerDay, AttendanceRecords
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
@@ -67,6 +70,10 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             code=URV_STAT, network=cls.network)
         
         cls.cron = CrontabSchedule.objects.create()
+        cls.report_config = ReportConfig.objects.create(
+            cron=cls.cron,
+            name='Test',
+        )
         cls.dt = datetime.now().date() - timedelta(1)
         cls.plan_approved = WorkerDayFactory(
             is_approved=True,
@@ -97,12 +104,11 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
                 event_type=self.urv_stat_event,
                 subject=subject,
                 custom_email_template='Отчет УРВ',
-                cron=self.cron,
+                report_config=self.report_config,
             )
             event_email_notification.users.add(self.user_dir)
             event_email_notification.users.add(self.user_urs)
             event_email_notification.shops.add(self.shop)
-            event_email_notification.shops.add(self.shop2)
             
             cron_event()
             
@@ -156,14 +162,15 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
     def test_urv_stat_email_notification_sent_to_one_shop(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             subject = 'Отчет УРВ'
+            self.report_config.shops.add(self.shop2)
             event_email_notification = EventEmailNotification.objects.create(
                 event_type=self.urv_stat_event,
                 subject=subject,
                 custom_email_template='Отчет УРВ',
-                cron=self.cron,
+                report_config=self.report_config,
             )
             event_email_notification.users.add(self.user_dir)
-            event_email_notification.shops.add(self.shop2)
+            
             
             cron_event()
             self.assertEqual(len(mail.outbox), 1)
@@ -232,6 +239,10 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             code=URV_STAT_TODAY, network=cls.network)
         
         cls.cron = CrontabSchedule.objects.create()
+        cls.report_config = ReportConfig.objects.create(
+            cron=cls.cron,
+            name='Test',
+        )
         cls.dt = datetime.now().date()
         cls.plan_approved = WorkerDayFactory(
             is_approved=True,
@@ -262,14 +273,15 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
                 event_type=self.urv_stat_event,
                 subject=subject,
                 custom_email_template='Отчет УРВ за сегодня',
-                cron=self.cron,
+                report_config=self.report_config,
             )
             event_email_notification.users.add(self.user_dir)
             event_email_notification.users.add(self.user_urs)
+            event_email_notification.shops.add(self.shop)
             
             cron_event()
             
-            self.assertEqual(len(mail.outbox), 2)
+            self.assertEqual(len(mail.outbox), 3)
             self.assertEqual(mail.outbox[0].subject, subject)
             emails = sorted(
                 [
@@ -277,7 +289,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
                     for outbox in mail.outbox
                 ]
             )
-            self.assertEqual(emails, [self.user_dir.email, self.user_urs.email])
+            self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
             data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
             df = pd.read_excel(data, engine='xlrd')
             data = [
@@ -301,14 +313,14 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
     def test_urv_stat_today_email_notification_sent_to_shop(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             subject = 'Отчет УРВ за сегодня'
+            self.report_config.shops.add(self.shop2)
             event_email_notification = EventEmailNotification.objects.create(
                 event_type=self.urv_stat_event,
                 subject=subject,
                 custom_email_template='Отчет УРВ за сегодня',
-                cron=self.cron,
+                report_config=self.report_config,
             )
             event_email_notification.users.add(self.user_dir)
-            event_email_notification.shops.add(self.shop2)
             
             cron_event()
             
@@ -370,6 +382,10 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             code=URV_VIOLATORS_REPORT, network=cls.network)
         
         cls.cron = CrontabSchedule.objects.create()
+        cls.report_config = ReportConfig.objects.create(
+            cron=cls.cron,
+            name='Test',
+        )
         cls.dt = datetime.now().date() - timedelta(1)
         cls.plan_approved = WorkerDayFactory(
             is_approved=True,
@@ -416,14 +432,15 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
                 event_type=self.urv_violators_event,
                 subject=subject,
                 custom_email_template='Отчет о нарушителях УРВ',
-                cron=self.cron,
+                report_config=self.report_config,
             )
             event_email_notification.users.add(self.user_dir)
             event_email_notification.users.add(self.user_urs)
+            event_email_notification.shops.add(self.shop)
             
             cron_event()
             
-            self.assertEqual(len(mail.outbox), 2)
+            self.assertEqual(len(mail.outbox), 3)
             self.assertEqual(mail.outbox[0].subject, subject)
             emails = sorted(
                 [
@@ -431,7 +448,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
                     for outbox in mail.outbox
                 ]
             )
-            self.assertEqual(emails, [self.user_dir.email, self.user_urs.email])
+            self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
             data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
             df = pd.read_excel(data, engine='xlrd').fillna('')
             data = [
@@ -462,14 +479,14 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
     def test_urv_violators_email_notification_sent_to_shop(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             subject = 'Отчет о нарушителях УРВ'
+            self.report_config.shops.add(self.shop2)
             event_email_notification = EventEmailNotification.objects.create(
                 event_type=self.urv_violators_event,
                 subject=subject,
                 custom_email_template='Отчет о нарушителях УРВ',
-                cron=self.cron,
+                report_config=self.report_config,
             )
             event_email_notification.users.add(self.user_dir)
-            event_email_notification.shops.add(self.shop2)
             
             cron_event()
             
@@ -530,6 +547,10 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             code=URV_STAT_V2, network=cls.network)
         
         cls.cron = CrontabSchedule.objects.create()
+        cls.report_config = ReportConfig.objects.create(
+            cron=cls.cron,
+            name='Test',
+        )
         cls.dt = datetime.now().date() - timedelta(1)
         AttendanceRecords.objects.create(
             shop=cls.shop,
@@ -566,14 +587,15 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
                 event_type=self.urv_stat_event,
                 subject=subject,
                 custom_email_template='Отчет УРВ версия 2',
-                cron=self.cron,
+                report_config=self.report_config,
             )
             event_email_notification.users.add(self.user_dir)
             event_email_notification.users.add(self.user_urs)
+            event_email_notification.shops.add(self.shop)
             
             cron_event()
             
-            self.assertEqual(len(mail.outbox), 2)
+            self.assertEqual(len(mail.outbox), 3)
             self.assertEqual(mail.outbox[0].subject, subject)
             emails = sorted(
                 [
@@ -581,7 +603,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
                     for outbox in mail.outbox
                 ]
             )
-            self.assertEqual(emails, [self.user_dir.email, self.user_urs.email])
+            self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
             df = pd.read_excel(mail.outbox[0].attachments[0][1])
             data = [
                 {
@@ -622,14 +644,14 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
     def test_urv_stat_email_notification_sent_to_shop(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             subject = 'Отчет УРВ версия 2'
+            self.report_config.shops.add(self.shop2)
             event_email_notification = EventEmailNotification.objects.create(
                 event_type=self.urv_stat_event,
                 subject=subject,
                 custom_email_template='Отчет УРВ версия 2',
-                cron=self.cron,
+                report_config=self.report_config,
             )
             event_email_notification.users.add(self.user_dir)
-            event_email_notification.shops.add(self.shop2)
             
             cron_event()
             

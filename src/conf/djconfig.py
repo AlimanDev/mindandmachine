@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     'src.integration',
     'src.events',
     'src.notifications',
+    'src.reports',
 ]
 
 REST_FRAMEWORK = {
