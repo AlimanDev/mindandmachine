@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.test import TestCase
 from django.utils import timezone
 
-from src.celery.tasks import (
+from src.forecast.receipt.tasks import (
     aggregate_timeserie_value,
     clean_timeserie_actions,
 )

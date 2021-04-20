@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 
 from src.base.models import ShopSchedule
 from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, EmploymentFactory, GroupFactory
-from src.celery.tasks import fill_shop_schedule
+from src.base.shop.tasks import fill_shop_schedule
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 

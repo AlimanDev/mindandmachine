@@ -102,7 +102,22 @@ class TestsHelperMixin:
                             kwargs['dttm_work_start'] = datetime.combine(
                                 day, plan_start_time) + timedelta(minutes=start_minutes)
                             kwargs['dttm_work_end'] = datetime.combine(day, plan_end_time) + timedelta(minutes=end_minutes)
-                            WorkerDay.objects.create(**kwargs)
+                            wd = WorkerDay.objects.create(**kwargs)
+                            WorkerDayCashboxDetails.objects.create(
+                                worker_day=wd,
+                                work_type=work_type,
+                            )
+                else:
+                    change_empl = random.randint(0,1) == 1
+                    if change_empl:
+                        wd.employment = empl
+                        wd.save()
+                        fact = WorkerDay.objects.filter(worker_id=wd.worker_id, dt=wd.dt, is_fact=True, is_approved=True).first()
+                        change_fact = random.randint(0, 100) < 90
+                        if change_fact and fact:
+                            fact.employment = empl
+                            fact.save()
+
 
     def clean_cached_props(self, cached_props=None):
         cached_props = cached_props or (
