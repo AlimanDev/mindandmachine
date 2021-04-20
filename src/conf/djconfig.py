@@ -419,6 +419,9 @@ TEVIAN_DATABASE_ID = 26  # TESTURV database
 TEVIAN_FD_THRESHOLD = 0.8
 TEVIAN_FR_THRESHOLD = 0.8
 
+# после какого времени (в днях) удалять биометрию уволенных сотрудников
+URV_DELETE_BIOMETRICS_DAYS_AFTER_FIRED = 365 * 3
+
 TRUST_TICK_REQUEST = False
 USERS_WITH_SCHEDULE_ONLY = False
 # игнорировать отметку без активного трудоустройства или вакансии
@@ -542,6 +545,11 @@ CELERY_BEAT_SCHEDULE = {
     'task-send-employee-not-checked-in-notification': {
         'task': 'src.celery.tasks.employee_not_checked_in',
         'schedule': crontab(minute='*/5'),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-auto-delete-biometrics': {
+        'task': 'src.celery.tasks.auto_delete_biometrics',
+        'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
 }
