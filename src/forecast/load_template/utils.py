@@ -260,6 +260,8 @@ def apply_load_template(load_template_id, shop_id, dt_from=None):
                 shop_id=shop_id,
                 work_type_name_id=operation_type_template.operation_type_name.work_type_name_id,
             )
+            work_type.dttm_deleted = None
+            work_type.save()
         '''
         Создаём или обновляем тип операций в соответсвии с шаблоном.
         '''

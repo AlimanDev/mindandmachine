@@ -180,7 +180,11 @@ class TestLoadTemplate(APITestCase):
             self.assertEqual(response.status_code, 200)
 
             self.assertEqual(OperationType.objects.filter(shop=self.shop).count(), 2)
-            self.assertEqual(WorkType.objects.filter(shop=self.shop).count(), 1)
+            self.assertEqual(WorkType.objects.filter(shop=self.shop, dttm_deleted__isnull=True).count(), 1)
+            WorkType.objects.filter(shop=self.shop).update(dttm_deleted=datetime.now())
+            self.assertEqual(WorkType.objects.filter(shop=self.shop, dttm_deleted__isnull=True).count(), 0)
+            response = self.client.post(f'{self.url}apply/', data, format='json')
+            self.assertEqual(WorkType.objects.filter(shop=self.shop, dttm_deleted__isnull=True).count(), 1)
 
 
     def test_prepare_load_template_request(self):
