@@ -7,7 +7,7 @@ from django.conf import settings
 from django.db.models import Q, Sum
 from django.utils import timezone
 
-from src.celery.tasks import cancel_shop_vacancies, create_shop_vacancies_and_notify
+from src.timetable.vacancy.tasks import cancel_shop_vacancies, create_shop_vacancies_and_notify
 
 from src.base.models import (
     Employment,

@@ -3,7 +3,7 @@ import datetime
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from src.celery.tasks import (
+from src.timetable.shop_month_stat.tasks import (
     update_shop_stats,
 )
 from src.forecast.models import (

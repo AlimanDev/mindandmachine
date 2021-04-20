@@ -20,7 +20,7 @@ from rest_framework.response import Response
 
 from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings, WorkerPosition
 from src.base.permissions import Permission
-from src.celery.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
+from src.timetable.vacancy.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
 from src.forecast.models import PeriodClients
 from src.timetable.models import (
     ShopMonthStat,
@@ -791,6 +791,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),  # не учитывается
                     'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),  # не учитывается
                     'norm_work_amount': employment_stat_dict[e.id]['norm_work_amount'],
+                    'norm_work_hours': e.norm_work_hours,
                     'required_coupled_hol_in_hol': employment_stat_dict[e.id].get('required_coupled_hol_in_hol', 0),
                     'min_shift_len': e.shift_hours_length_min if e.shift_hours_length_min else 0,
                     'max_shift_len': e.shift_hours_length_max if e.shift_hours_length_max else 24,

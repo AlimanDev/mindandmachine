@@ -26,7 +26,8 @@ from src.reports.models import ReportConfig
 from src.timetable.models import WorkerDay, AttendanceRecords
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
-from src.celery.tasks import cron_event, employee_not_checked_in
+from src.events.tasks import cron_event
+from src.celery.tasks import employee_not_checked_in
 from xlrd import open_workbook
 
 

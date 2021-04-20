@@ -1,11 +1,14 @@
 import datetime
+import json
 from itertools import groupby
 
 import pandas as pd
-from django.db import transaction
-from django.db.models import OuterRef, Subquery, Q, F, Exists, Value, CharField
-from django.db.models.functions import Concat, Cast
+from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
+from django.core.serializers.json import DjangoJSONEncoder
+from django.db import transaction
+from django.db.models import OuterRef, Subquery, Q, F, Exists, Case, When, Value, CharField
+from django.db.models.functions import Concat, Cast
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.encoding import escape_uri_path
@@ -13,7 +16,7 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError, PermissionDenied
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 
@@ -53,6 +56,7 @@ from src.timetable.worker_day.serializers import (
     BlockOrUnblockWorkerDayWrapperSerializer,
 )
 from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
+from src.timetable.worker_day.tasks import recalc_wdays
 from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util, exchange, copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
@@ -370,6 +374,103 @@ class WorkerDayViewSet(BaseModelViewSet):
                             protected_wdays=', '.join(f'{d["worker_fio"]}: {d["dates"]}' for d in protected_wdays),
                         ))
 
+                if not serializer.data['is_fact'] and settings.SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE:
+                    from src.celery.tasks import send_doctors_schedule_to_mis
+                    mis_data_qs = wdays_to_approve.annotate(
+                        approved_wd_type=Subquery(WorkerDay.objects.filter(
+                            dt=OuterRef('dt'),
+                            worker_id=OuterRef('worker_id'),
+                            is_fact=serializer.data['is_fact'],
+                            is_approved=True,
+                        ).values('type')[:1]),
+                        approved_wd_has_doctor_work_type=Exists(WorkerDayCashboxDetails.objects.filter(
+                            worker_day__dt=OuterRef('dt'),
+                            worker_day__worker_id=OuterRef('worker_id'),
+                            worker_day__is_fact=serializer.data['is_fact'],
+                            worker_day__is_approved=True,
+                            work_type__work_type_name__code='doctor',
+                        )),
+                        approved_wd_dttm_work_start=Subquery(WorkerDay.objects.filter(
+                            dt=OuterRef('dt'),
+                            worker_id=OuterRef('worker_id'),
+                            is_fact=serializer.data['is_fact'],
+                            is_approved=True,
+                        ).values('dttm_work_start')[:1]),
+                        approved_wd_dttm_work_end=Subquery(WorkerDay.objects.filter(
+                            dt=OuterRef('dt'),
+                            worker_id=OuterRef('worker_id'),
+                            is_fact=serializer.data['is_fact'],
+                            is_approved=True,
+                        ).values('dttm_work_end')[:1]),
+                    ).filter(
+                        Q(type=WorkerDay.TYPE_WORKDAY) | Q(approved_wd_type=WorkerDay.TYPE_WORKDAY),
+                    ).annotate(
+                        action=Case(
+                            When(
+                                Q(
+                                    Q(approved_wd_type__isnull=True) | ~Q(approved_wd_type=WorkerDay.TYPE_WORKDAY),
+                                    type=WorkerDay.TYPE_WORKDAY,
+                                    work_types__work_type_name__code='doctor',
+                                ),
+                                then=Value('create', output_field=CharField())
+                            ),
+                            When(
+                                Q(
+                                    ~Q(type=WorkerDay.TYPE_WORKDAY),
+                                    approved_wd_type=WorkerDay.TYPE_WORKDAY,
+                                    approved_wd_has_doctor_work_type=True,
+                                ),
+                                then=Value('delete', output_field=CharField()),
+                            ),
+                            When(
+                                type=F('approved_wd_type'),
+                                work_types__work_type_name__code='doctor',
+                                approved_wd_has_doctor_work_type=True,
+                                then=Value('update', output_field=CharField()),
+                            ),
+                            When(
+                                type=F('approved_wd_type'),
+                                work_types__work_type_name__code='doctor',
+                                approved_wd_has_doctor_work_type=False,
+                                then=Value('create', output_field=CharField()),
+                            ),
+                            When(
+                                Q(
+                                    ~Q(work_types__work_type_name__code='doctor'),
+                                    type=F('approved_wd_type'),
+                                    approved_wd_has_doctor_work_type=True,
+                                ),
+                                then=Value('delete', output_field=CharField()),
+                            ),
+                            default=None, output_field=CharField()
+                        ),
+                    ).filter(
+                        action__isnull=False,
+                    ).values(
+                        'dt',
+                        'worker__username',
+                        'action',
+                        'shop__code',
+                        'dttm_work_start',
+                        'dttm_work_end',
+                        'approved_wd_dttm_work_start',
+                        'approved_wd_dttm_work_end',
+                    )
+
+                    mis_data = []
+                    for d in list(mis_data_qs):
+                        if d['action'] == 'delete':
+                            d['dttm_work_start'] = d['approved_wd_dttm_work_start']
+                            d['dttm_work_end'] = d['approved_wd_dttm_work_end']
+                        d.pop('approved_wd_dttm_work_start')
+                        d.pop('approved_wd_dttm_work_end')
+                        mis_data.append(d)
+
+                    if mis_data:
+                        json_data = json.dumps(mis_data, indent=4, ensure_ascii=False, cls=DjangoJSONEncoder)
+                        transaction.on_commit(
+                            lambda f_json_data=json_data: send_doctors_schedule_to_mis.delay(json_data=f_json_data))
+
                 WorkerDay.objects_with_excluded.filter(
                     worker_days_q, is_fact=serializer.data['is_fact'],
                 ).exclude(
@@ -433,7 +534,6 @@ class WorkerDayViewSet(BaseModelViewSet):
 
                 # если план, то отмечаем, что график подтвержден
                 if not serializer.data['is_fact']:
-                    from src.celery.tasks import recalc_wdays
 
                     ShopMonthStat.objects.filter(
                         shop_id=serializer.data['shop_id'],

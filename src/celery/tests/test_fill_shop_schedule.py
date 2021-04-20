@@ -4,7 +4,7 @@ from django.test import TestCase
 
 from src.base.models import ShopSchedule
 from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory
-from src.celery.tasks import fill_shop_schedule
+from src.base.shop.tasks import fill_shop_schedule
 from src.util.mixins.tests import TestsHelperMixin
 
 
