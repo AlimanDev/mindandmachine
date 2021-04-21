@@ -5,6 +5,7 @@ from src.recognition.api.recognition import Recognition
 from src.recognition.models import UserConnecter
 from src.recognition.events import DUPLICATE_BIOMETRICS
 from src.notifications.models.event_notification import EventEmailNotification
+from src.events.signals import event_signal
 from django.conf import settings
 
 
@@ -65,25 +66,23 @@ def check_duplicate_biometrics(image, user: User):
         if user.id == user_connecter.user_id:
             return
         user2 = user_connecter.user
-        notifications = EventEmailNotification.objects.filter(
-            code=DUPLICATE_BIOMETRICS,
-        )
         active_employments = Employment.objects.get_active(
             dt_from=date.today(), 
             dt_to=date.today(),
         )
         employment1 = active_employments.filtter(user=user).first() or Employment.objects.filter(user=user).order_by('-dttm_fired').first()
         employment2 = active_employments.filtter(user=user2).first() or Employment.objects.filter(user=user2).order_by('-dttm_fired').first()
-        for notification in notifications:
-            send_event_email_notifications.delay(
-                notification.id, 
-                None, 
-                {
-                    'fio1': f"{user.last_name} {user.first_name}",
-                    'fio2': f"{user2.last_name} {user2.last_name}",
-                    'url1': settings.HOST + user.avatar.url,
-                    'url2': settings.HOST + user2.avatar.url,
-                    'tabel_code1': (employment1.tabel_code if employment1 else user.tabel_code) or user.username,
-                    'tabel_code2': (employment2.tabel_code if employment2 else user2.tabel_code) or user2.username,
-                },
-            )
+        event_signal.send(
+            sender=None,
+            network_id=user.network_id,
+            event_code=DUPLICATE_BIOMETRICS,
+            user_author_id=None,
+            context={
+                'fio1': f"{user.last_name} {user.first_name}",
+                'fio2': f"{user2.last_name} {user2.last_name}",
+                'url1': settings.HOST + user.avatar.url,
+                'url2': settings.HOST + user2.avatar.url,
+                'tabel_code1': (employment1.tabel_code if employment1 else user.tabel_code) or user.username,
+                'tabel_code2': (employment2.tabel_code if employment2 else user2.tabel_code) or user2.username,
+            },
+        )
