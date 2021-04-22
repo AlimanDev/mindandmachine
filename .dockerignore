@@ -1,0 +1,6 @@
+tmp/
+venv/
+
+*.log
+etc/_old_code
+src/conf/djconfig_local.py
