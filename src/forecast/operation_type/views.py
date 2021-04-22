@@ -2,6 +2,8 @@ from rest_framework.validators import UniqueTogetherValidator
 from rest_framework import serializers
 from django_filters.rest_framework import FilterSet
 from django_filters import NumberFilter
+from django.db.models import Q
+from datetime import datetime
 
 from src.base.permissions import FilteredListPermission
 from src.base.views_abstract import BaseModelViewSet
@@ -124,5 +126,5 @@ class OperationTypeViewSet(BaseModelViewSet):
 
     def get_queryset(self):
         return OperationType.objects.select_related('operation_type_name').filter(
-                dttm_deleted__isnull=True
+            Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=datetime.now()),
         )

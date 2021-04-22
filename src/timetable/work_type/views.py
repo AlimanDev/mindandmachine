@@ -11,6 +11,8 @@ from rest_framework.validators import UniqueTogetherValidator
 from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 from src.util.openapi.responses import efficieny_response_schema_dict as response_schema_dict
+from django.db.models import Q
+from datetime import datetime
 
 
 
@@ -176,7 +178,9 @@ class WorkTypeViewSet(BaseModelViewSet):
 
     def get_queryset(self):
         return self.filter_queryset(
-            WorkType.objects.select_related('work_type_name').filter(dttm_deleted__isnull=True)
+            WorkType.objects.select_related('work_type_name').filter(
+                Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=datetime.now()),
+            )
         )
 
     @swagger_auto_schema(
