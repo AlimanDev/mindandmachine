@@ -22,6 +22,10 @@ class WorkerDayFilter(FilterSet):
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода') # aa: fixme: delete
     fact_tabel = BooleanFilter(method='filter_fact_tabel', label="Выгрузка табеля")
 
+    # параметры для совместимости с существующими интеграциями
+    worker_id = NumberFilter(field_name='employee__user_id')
+    worker__username__in = CharFilter(field_name='employee__user__username', lookup_expr='in')
+
     def filter_fact_tabel(self, queryset, name, value):
         if value:
             return queryset.get_tabel()
@@ -32,8 +36,7 @@ class WorkerDayFilter(FilterSet):
         model = WorkerDay
         fields = {
             # 'shop_id':['exact'],
-            'worker_id': ['in', 'exact'],
-            'worker__username': ['in', 'exact'],
+            'employee_id': ['in', 'exact'],
             'employment__tabel_code': ['in', 'exact'],
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
@@ -50,7 +53,7 @@ class WorkerDayStatFilter(FilterSet):
     class Meta:
         model = WorkerDay
         fields = {
-            'worker_id': ['exact', 'in'],
+            'employee_id': ['exact', 'in'],
         }
 
 
@@ -84,7 +87,7 @@ class VacancyFilter(FilterSetWithInitial):
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', initial=datetime.datetime.today)
     dt_to = DateFilter(
         field_name='dt', lookup_expr='lte', initial=lambda: datetime.datetime.today() + relativedelta(months=1))
-    is_vacant = BooleanFilter(field_name='worker', lookup_expr='isnull')
+    is_vacant = BooleanFilter(field_name='employee', lookup_expr='isnull')
     shift_length_min = TimeFilter(field_name='work_hours', lookup_expr='gte')
     shift_length_max = TimeFilter(field_name='work_hours', lookup_expr='lte')
     shop_id = CharFilter(field_name='shop_id', method='filter_include_outsource')
@@ -114,7 +117,7 @@ class VacancyFilter(FilterSetWithInitial):
             return queryset.filter(
                 id=Subquery(
                     WorkerDay.objects.filter(
-                        Q(Q(worker__isnull=True) & Q(id=OuterRef('id'))) | Q(worker_id=OuterRef('worker_id')),
+                        Q(Q(employee__isnull=True) & Q(id=OuterRef('id'))) | Q(employee_id=OuterRef('employee_id')),
                         dt=OuterRef('dt'),
                         is_fact=OuterRef('is_fact'),
                         is_vacancy=OuterRef('is_vacancy'),
@@ -130,19 +133,19 @@ class VacancyFilter(FilterSetWithInitial):
         if value:
             approved_subq = WorkerDay.objects.filter(
                 dt=OuterRef('dt'),
-                worker_id=self.request.user.id,
+                employee__user_id=self.request.user.id,
                 is_approved=True,
                 is_fact=False,
             )
             active_employment_subq = Employment.objects.filter(
                 Q(dt_hired__lte=OuterRef('dt')) | Q(dt_hired__isnull=True),
                 Q(dt_fired__gte=OuterRef('dt')) | Q(dt_fired__isnull=True),
-                user_id=self.request.user.id,
-                network_id=self.request.user.network_id,
+                employee__user_id=self.request.user.id,
+                employee__user__network_id=self.request.user.network_id,
             )
             worker_day_paid_subq = WorkerDay.objects.filter(
                 dt=OuterRef('dt'),
-                worker_id=self.request.user.id,
+                employee__user_id=self.request.user.id,
                 is_approved=True,
                 is_fact=False,
                 type__in=WorkerDay.TYPES_PAID,

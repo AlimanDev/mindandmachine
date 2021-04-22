@@ -26,14 +26,14 @@ class Permission(permissions.BasePermission):
 
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
-            user=request.user
+            employee__user=request.user,
         ).select_related('position')
         return self.check_employment_permission(employments, request, view)
 
     def has_object_permission(self, request, view, obj):
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
-            user=request.user
+            employee__user=request.user,
         ).select_related('position')
 
         return self.check_employment_permission(employments, request, view)
@@ -115,7 +115,8 @@ class FilteredListPermission(Permission):
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
             shop__in=department.get_ancestors(include_self=True, ascending=True),
-            user=request.user)
+            employee__user=request.user,
+        )
 
         return self.check_employment_permission(employments, request, view)
 
@@ -141,9 +142,9 @@ class EmploymentFilteredListPermission(Permission):
         department = employment.shop
 
         employments = Employment.objects.get_active(
-            employment.user.network_id,
+            employment.employee.user.network_id,
             shop__in=department.get_ancestors(include_self=True, ascending=True),
-            user=request.user,
+            employee__user=request.user,
         )
 
         return self.check_employment_permission(employments, request, view)

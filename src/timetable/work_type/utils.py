@@ -102,7 +102,7 @@ def get_efficiency(shop_id, form, consider_vacancies=False,):
         dt__lte=to_dt,
     )
     if not consider_vacancies:
-        base_wd_q &= Q(worker__isnull=False)
+        base_wd_q &= Q(employee__isnull=False)
 
     qs_for_covering = WorkerDay.objects.filter(base_wd_q)
 

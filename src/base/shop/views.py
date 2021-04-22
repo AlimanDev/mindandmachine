@@ -21,10 +21,11 @@ from src.util.openapi.responses import shop_tree_response_schema_dict as tree_re
 class ShopFilter(BaseActiveNamedModelFilter):
     id = NumberFilter(field_name='id', lookup_expr='exact')
     ordering = OrderingFilter(fields=('name', 'code'))
+
     class Meta:
         model = Shop
         fields = {
-            'load_template_id': ['exact',],
+            'load_template_id': ['exact'],
             'load_template_status': ['exact'],
         }
 
@@ -148,7 +149,7 @@ class ShopViewSet(UpdateorCreateViewSet):
         # aa: fixme: refactor code
         employments = Employment.objects.get_active(
             network_id=user.network_id,
-            user=user,
+            employee__user=user,
         )
 
         shops = self.filter_queryset(self.get_queryset())

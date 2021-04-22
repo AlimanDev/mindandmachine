@@ -77,17 +77,17 @@ def import_urv_zkteco():
             users[user.id].append((dttm, shop))
 
     wds = WorkerDay.objects.filter(
-        worker_id__in=users.keys(),
+        employee__user__in=users.keys(),
         dt__gte=max_date - timedelta(1),
         dt__lte=date.today() + timedelta(1),
         is_fact=False,
         is_approved=True,
         type__in=WorkerDay.TYPES_WITH_TM_RANGE,
-    )
+    ).select_related('employee')
 
     worker_days = {}
     for wd in wds:
-        worker_days.setdefault(wd.worker_id, {})[wd.dt] = wd
+        worker_days.setdefault(wd.employee.user_id, {})[wd.dt] = wd
 
     attrs = AttendanceRecords.objects.filter(
         user_id__in=users.keys(),
@@ -212,7 +212,7 @@ def export_workers_zkteco():
     for user in users:
         employments = Employment.objects.get_active(
             user.network_id,
-            user=user,
+            employee__user=user,
             position__isnull=False,
         )
         if not employments:
@@ -263,7 +263,7 @@ def delete_workers_zkteco():
     for user in users:
         employments = Employment.objects.get_active(
             user.network_id,
-            user=user,
+            employee__user=user,
             position__isnull=False
         )
         if employments:
@@ -275,7 +275,7 @@ def delete_workers_zkteco():
         )
 
         employments = Employment.objects.filter(
-            user=user,
+            employee__user=user,
             dt_fired__lt=dt_max,
         )
 

@@ -31,6 +31,7 @@ from src.base.serializers import (
     AutoTimetableSerializer,
     BreakSerializer,
     ShopScheduleSerializer,
+    EmployeeSerializer,
 )
 from src.base.filters import (
     NotificationFilter,
@@ -51,10 +52,11 @@ from src.base.models import (
     Group,
     Break,
     ShopSchedule,
+    Employee,
 )
 from src.recognition.models import UserConnecter
 
-from src.base.filters import UserFilter
+from src.base.filters import UserFilter, EmployeeFilter
 from src.base.views_abstract import (
     BaseActiveNamedModelViewSet,
     UpdateorCreateViewSet,
@@ -79,11 +81,8 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     filterset_class = EmploymentFilter
     openapi_tags = ['Employment', 'Integration',]
 
-    def perform_create(self, serializer):
-        serializer.save(network=self.request.user.network)
-
     def perform_update(self, serializer):
-        serializer.save(dttm_deleted=None, network=self.request.user.network)
+        serializer.save(dttm_deleted=None)
 
     def get_queryset(self):
         manager = Employment.objects
@@ -94,7 +93,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
             shop__network_id=self.request.user.network_id
         ).order_by('-dt_hired')
         if self.action in ['list', 'retrieve']:
-            qs = qs.select_related('user', 'shop').prefetch_related('work_types', 'worker_constraints')
+            qs = qs.select_related('employee__user', 'shop').prefetch_related('work_types', 'worker_constraints')
         return qs
 
     def get_serializer_class(self):
@@ -133,14 +132,14 @@ class UserViewSet(UpdateorCreateViewSet):
     def get_queryset(self):
         user = self.request.user
         return User.objects.filter(
-            network_id=user.network_id
+            network_id=user.network_id,
         ).annotate(
             userconnecter_id=F('userconnecter'),
         ).distinct()
 
     def perform_create(self, serializer):
         if 'username' not in serializer.validated_data:
-            instance = serializer.save(username = timezone.now())
+            instance = serializer.save(username=timezone.now())
             instance.username = 'user_' + str(instance.id)
             instance.save()
         else:
@@ -183,6 +182,20 @@ class UserViewSet(UpdateorCreateViewSet):
             return UserSerializer
 
 
+class EmployeeViewSet(UpdateorCreateViewSet):
+    page_size = 10
+    pagination_class = LimitOffsetPagination
+    permission_classes = [Permission]
+    serializer_class = EmployeeSerializer
+    filterset_class = EmployeeFilter
+    openapi_tags = ['Employee', ]
+
+    def get_queryset(self):
+        return Employee.objects.filter(
+            user__network_id=self.request.user.network_id
+        )
+
+
 class AuthUserView(UserDetailsView):
     serializer_class = AuthUserSerializer
     openapi_tags = ['Auth',]
@@ -203,7 +216,8 @@ class FunctionGroupView(BaseModelViewSet):
 
         groups = Employment.objects.get_active(
             network_id=user.network_id,
-            user=user).annotate(
+            employee__user=user,
+        ).annotate(
             group_id=Coalesce(F('function_group_id'),F('position__group_id'))
         ).values_list("group_id", flat=True)
         return FunctionGroup.objects.filter(group__in=groups).distinct('func')

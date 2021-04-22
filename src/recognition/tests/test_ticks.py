@@ -16,7 +16,7 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         WorkerDay.objects.create(
             dt=date.today(),
             type=WorkerDay.TYPE_WORKDAY,
-            worker=cls.user2,
+            employee=cls.employee2,
             employment=cls.employment2,
             shop=cls.shop2,
             is_approved=True,

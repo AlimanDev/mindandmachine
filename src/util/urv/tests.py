@@ -59,7 +59,7 @@ class TestUrvFiles(APITestCase):
             shop_id=employment.shop_id,
             type=type,
             employment=employment,
-            worker_id=employment.user_id,
+            employee=employment.employee,
             dt=dt,
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,
@@ -70,7 +70,7 @@ class TestUrvFiles(APITestCase):
     def _create_att_record(self, employment, dttm, type):
         return AttendanceRecords.objects.create(
             shop_id=employment.shop_id,
-            user_id=employment.user_id,
+            user_id=employment.employee.user_id,
             dttm=dttm,
             type=type,
         )

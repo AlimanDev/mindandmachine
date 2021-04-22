@@ -16,6 +16,7 @@ from src.base.tests.factories import (
     EmploymentFactory,
     GroupFactory,
     WorkerPositionFactory,
+    EmployeeFactory,
 )
 from src.timetable.models import WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
@@ -41,9 +42,10 @@ class SawhSettingsHelperMixin(TestsHelperMixin):
         cls.group = GroupFactory(network=cls.network)
         cls.worker_position = WorkerPositionFactory(group=cls.group)
         cls.worker = UserFactory(network=cls.network)
+        cls.employee = EmployeeFactory(user=cls.worker)
         cls.employment = EmploymentFactory(
             dt_hired='2001-01-01', dt_fired='3999-12-12',
-            network=cls.network, user=cls.worker, shop=cls.shop, position=cls.worker_position)
+            employee=cls.employee, shop=cls.shop, position=cls.worker_position)
         cls.dt = date(2021, 1, 1)
         cls.add_group_perm(cls.group, 'ShopSchedule', 'GET')
         cls.add_group_perm(cls.group, 'ShopSchedule', 'PUT')
@@ -80,13 +82,13 @@ class SawhSettingsHelperMixin(TestsHelperMixin):
             self, dt_from, dt_to, expected_norm_hours, hours_k='sawh_hours', plan_fact_k='plan',
             approved_k='approved', period_k='selected_period'):
         workers_stats_getter = WorkersStatsGetter(
-            worker_id=self.worker.id,
+            employee_id=self.employee.id,
             shop_id=self.shop.id,
             dt_from=dt_from,
             dt_to=dt_to,
         )
         workers_stats = workers_stats_getter.run()
-        norm_hours = workers_stats[self.worker.id][plan_fact_k][approved_k][hours_k][period_k]
+        norm_hours = workers_stats[self.employee.id][plan_fact_k][approved_k][hours_k][period_k]
         self.assertEqual(norm_hours, expected_norm_hours)
         return norm_hours
 
@@ -126,7 +128,7 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
         # часть новогодн. праздников
         for day_num in range(1, 5):
             WorkerDayFactory(
-                worker=self.worker,
+                employee=self.employee,
                 employment=self.employment,
                 shop=self.shop,
                 type=WorkerDay.TYPE_SICK,
@@ -138,7 +140,7 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
         # выходные
         for day_num in range(30, 32):
             WorkerDayFactory(
-                worker=self.worker,
+                employee=self.employee,
                 employment=self.employment,
                 shop=self.shop,
                 type=WorkerDay.TYPE_SICK,
@@ -153,7 +155,7 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
         # рабочая неделя
         for day_num in range(25, 30):
             WorkerDayFactory(
-                worker=self.worker,
+                employee=self.employee,
                 employment=self.employment,
                 shop=self.shop,
                 type=WorkerDay.TYPE_SICK,
@@ -169,7 +171,7 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
         # часть новогодн. праздников
         for day_num in range(1, 5):
             WorkerDayFactory(
-                worker=self.worker,
+                employee=self.employee,
                 employment=self.employment,
                 shop=self.shop,
                 type=WorkerDay.TYPE_SICK,
@@ -239,7 +241,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         sawh_settings_mapping2.positions.add(worker_position2)
         EmploymentFactory(
             dt_hired='2021-02-10', dt_fired='3999-12-12',
-            network=self.network, user=self.worker, shop=self.shop, position=worker_position2)
+            employee=self.employee, shop=self.shop, position=worker_position2)
         res = self._test_hours_for_period(
             dt_from=date(2021, 1, 1),
             dt_to=date(2021, 1, 31),
@@ -281,7 +283,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         sawh_settings_mapping2.positions.add(worker_position2)
         EmploymentFactory(
             dt_hired='2021-02-10', dt_fired='2021-03-20',
-            network=self.network, user=self.worker, shop=self.shop, position=worker_position2)
+            employee=self.employee, shop=self.shop, position=worker_position2)
         res = self._test_hours_for_period(
             dt_from=date(2021, 1, 1),
             dt_to=date(2021, 1, 31),

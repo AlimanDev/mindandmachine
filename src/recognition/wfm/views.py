@@ -1,6 +1,6 @@
 import logging
 from datetime import timedelta
-
+from django_filters import utils
 from django.conf import settings
 from django.db.models import Prefetch, Q, Exists, OuterRef
 from django.utils.timezone import now
@@ -13,15 +13,16 @@ from rest_framework import (
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import action
 from rest_framework.response import Response
-
+from rest_framework.exceptions import PermissionDenied
 from src.base.models import (
     Employment,
+    Employee,
     User as WFMUser
 )
 from src.recognition.authentication import TickPointTokenAuthentication
 from src.recognition.wfm.serializers import WorkerDaySerializer, WorkShiftSerializer
 from src.timetable.models import WorkerDay
-
+from .filters import WorkShiftFilter
 logger = logging.getLogger('django')
 USERS_WITH_SCHEDULE_ONLY = getattr(settings, 'USERS_WITH_SCHEDULE_ONLY', True)
 
@@ -60,7 +61,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
         dt_to = dt_from + timedelta(days=1)
 
         wd_cond = WorkerDay.objects.filter(
-            worker_id=OuterRef('pk'),
+            employee__user_id=OuterRef('pk'),
             shop_id=tick_point.shop_id,
             dttm_work_start__gte=dt_from,
             dttm_work_end__lte=dt_to,
@@ -69,17 +70,17 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
         emp_cond = Employment.objects.get_active(
             self.request.user.network_id,
             dt_from, dt_from, # чтобы не попались трудоустройства с завтрашнего дня
-            user_id=OuterRef('pk'),
+            employee__user_id=OuterRef('pk'),
         )
         shop_emp_cond = Employment.objects.get_active(
             self.request.user.network_id,
             dt_from, dt_from, # чтобы не попались трудоустройства с завтрашнего дня
-            user_id=OuterRef('pk'),
+            employee__user_id=OuterRef('pk'),
             shop_id=tick_point.shop_id,
         )
 
         queryset = WFMUser.objects.all().prefetch_related(
-            Prefetch('worker_day',
+            Prefetch('employees__worker_days',
                      queryset=WorkerDay.objects.filter(
                          shop_id=tick_point.shop_id,
                          dttm_work_start__gte=dt_from,
@@ -101,13 +102,22 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['get'])
     def work_shift(self, request, *args, **kwargs):
-        query_params_serializer = WorkShiftSerializer(
-            data=self.request.query_params, context=self.get_serializer_context())
-        query_params_serializer.is_valid(raise_exception=True)
-        work_shift = WorkerDay.objects.filter(
-            **query_params_serializer.validated_data,
-            is_fact=True, is_approved=True,
-        ).last()
+        filterset = WorkShiftFilter(request.query_params)
+        if filterset.form.is_valid():
+            data = filterset.form.cleaned_data
+        else:
+            raise utils.translate_validation(filterset.errors)
+
+        if not Employee.objects.filter(user__username=data.get('worker'), user_id=self.request.user.id).exists():
+            raise PermissionDenied()
+
+        wd_kwargs = dict(
+            employee__user__username=data.get('worker'),
+            dt=data.get('dt'),
+        )
+        if data.get('shop'):
+            wd_kwargs['shop__code'] = data.get('shop')
+        work_shift = WorkerDay.objects.filter(**wd_kwargs, is_fact=True, is_approved=True).last()
         if work_shift is None:
             resp_dict = self.request.query_params.dict()
             resp_dict['dttm_work_start'] = None

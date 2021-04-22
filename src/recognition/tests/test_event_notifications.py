@@ -9,7 +9,14 @@ from rest_framework.test import APITestCase
 from django_celery_beat.models import CrontabSchedule
 
 from src.base.models import FunctionGroup
-from src.base.tests.factories import ShopFactory, UserFactory, GroupFactory, EmploymentFactory, NetworkFactory
+from src.base.tests.factories import (
+    ShopFactory,
+    UserFactory,
+    GroupFactory,
+    EmploymentFactory,
+    NetworkFactory,
+    EmployeeFactory,
+)
 from src.events.models import EventType
 from src.notifications.models import EventEmailNotification
 from src.recognition.events import (
@@ -39,19 +46,22 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             email='shop@example.com',
         )
         cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.urv_stat_event, _created = EventType.objects.get_or_create(
             code=URV_STAT, network=cls.network)
@@ -63,7 +73,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_worker,
-            worker=cls.user_worker,
+            employee=cls.employee_worker,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
@@ -128,19 +138,22 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             email='shop@example.com',
         )
         cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.urv_stat_event, _created = EventType.objects.get_or_create(
             code=URV_STAT_TODAY, network=cls.network)
@@ -152,7 +165,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_worker,
-            worker=cls.user_worker,
+            employee=cls.employee_worker,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
@@ -208,19 +221,22 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             email='shop@example.com',
         )
         cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.urv_violators_event, _created = EventType.objects.get_or_create(
             code=URV_VIOLATORS_REPORT, network=cls.network)
@@ -232,7 +248,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_worker,
-            worker=cls.user_worker,
+            employee=cls.employee_worker,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
@@ -241,7 +257,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_dir,
-            worker=cls.user_dir,
+            employee=cls.employee_dir,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
@@ -313,19 +329,22 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             email='shop@example.com',
         )
         cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.urv_stat_event, _created = EventType.objects.get_or_create(
             code=URV_STAT_V2, network=cls.network)
@@ -422,18 +441,21 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
             director=cls.user_dir,
         )
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.event, _created = EventType.objects.get_or_create(
             code=EMPLOYEE_NOT_CHECKED_IN, network=cls.network)
@@ -445,7 +467,7 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_worker,
-            worker=cls.user_worker,
+            employee=cls.employee_worker,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=cls.now - timedelta(minutes=1),
@@ -456,7 +478,7 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_dir,
-            worker=cls.user_dir,
+            employee=cls.employee_dir,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=cls.now - timedelta(hours=6),
@@ -475,7 +497,7 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
     def test_employee_not_checked_in_notification_sent(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             subject = 'Сотрудник не отметился'
-            event_email_notification = EventEmailNotification.objects.create(
+            EventEmailNotification.objects.create(
                 event_type=self.event,
                 subject=subject,
                 system_email_template='notifications/email/employee_not_checked_in.html',
@@ -533,19 +555,22 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
             email='shop@example.com',
             director=cls.user_dir,
         )
-        cls.group_dir = GroupFactory(name='Директор', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
+        cls.group_dir = GroupFactory(name='Директор', network=cls.network)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.event, _created = EventType.objects.get_or_create(
             code=EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN, network=cls.network)
@@ -557,7 +582,7 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_dir,
-            worker=cls.user_dir,
+            employee=cls.employee_dir,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(cls.dt, time(8)),

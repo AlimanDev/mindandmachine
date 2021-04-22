@@ -112,7 +112,7 @@ class WFMTokenLoginView(GenericAPIView):
             employments = Employment.objects.filter(
                 Q(dt_fired__gt=timezone.now().date())| Q(dt_fired__isnull=True),
                 dt_hired__lte=timezone.now().date(),
-                user=request.user,
+                employee__user=request.user,
             )
 
         user = User.objects.get(id=request.user.id)

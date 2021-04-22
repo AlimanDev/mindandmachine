@@ -5,9 +5,9 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError, NotFound
 
-from src.base.models import Employment, User, Shop
+from src.base.models import Employment, User, Shop, Employee
 from src.base.shop.serializers import ShopSerializer
-from src.base.serializers import UserListSerializer
+from src.base.serializers import UserShorSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import (
     WorkerDay,
@@ -50,7 +50,8 @@ class WorkerDayCashboxDetailsListSerializer(serializers.Serializer):
 
 class WorkerDayListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
-    worker_id = serializers.IntegerField()
+    worker_id = serializers.IntegerField(source='employee.user_id')
+    employee_id = serializers.IntegerField()
     shop_id = serializers.IntegerField()
     employment_id = serializers.IntegerField()
     type = serializers.CharField()
@@ -69,7 +70,7 @@ class WorkerDayListSerializer(serializers.Serializer):
     user_login = serializers.CharField(required=False, read_only=True)
     employment_tabel_code = serializers.CharField(required=False, read_only=True)
     created_by_id = serializers.IntegerField(read_only=True)
-    last_edited_by = UserListSerializer(read_only=True)
+    last_edited_by = UserShorSerializer(read_only=True)
     dttm_modified = serializers.DateTimeField(read_only=True)
     is_blocked = serializers.BooleanField(read_only=True)
 
@@ -93,7 +94,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     }
 
     worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
-    worker_id = serializers.IntegerField(required=False, allow_null=True)
+    employee_id = serializers.IntegerField(required=False, allow_null=True)
     employment_id = serializers.IntegerField(required=False, allow_null=True)
     shop_id = serializers.IntegerField(required=False)
     parent_worker_day_id = serializers.IntegerField(required=False, read_only=True)
@@ -109,11 +110,11 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WorkerDay
-        fields = ['id', 'worker_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
+        fields = ['id', 'employee_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by', 'last_edited_by',
                   'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked',
-                  'employment_tabel_code', 'tabel_code']
+                  'employment_tabel_code']
         read_only_fields = ['work_hours', 'parent_worker_day_id', 'is_blocked']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
@@ -126,9 +127,6 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             },
             'is_blocked': {
                 'read_only': True,
-            },
-            'tabel_code': {
-                'write_only': True,
             },
         }
 
@@ -166,11 +164,12 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             else:
                 self.fail('no_shop', amount=len(shops), code=shop_code)
 
-        if (attrs.get('worker_id') is None) and ('username' in attrs):
+        if (attrs.get('employee_id') is None) and ('username' in attrs):
             username = attrs.pop('username')
             users = list(User.objects.filter(username=username, network_id=self.context['request'].user.network_id))
             if len(users) == 1:
-                attrs['worker_id'] = users[0].id
+                employee = Employee.objects.filter(user=users[0]).first()
+                attrs['employee_id'] = employee.id
             else:
                 self.fail('no_user', amount=len(users), username=username)
 
@@ -188,8 +187,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                         "worker_day_details": self.error_messages['wd_details_shop_mismatch']
                     })
 
-        if attrs.get('worker_id') and attrs.get('employment_id'):
-            if not Employment.objects.filter(id=attrs.get('employment_id'), user_id=attrs.get('worker_id')).exists():
+        if attrs.get('employee_id') and attrs.get('employment_id'):
+            if not Employment.objects.filter(id=attrs.get('employment_id'), employee_id=attrs.get('employee_id')).exists():
                 raise ValidationError({
                     "employment": self.error_messages['user_mismatch']
                 })
@@ -214,12 +213,10 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         return attrs
 
     def _create_update_clean(self, validated_data, instance=None):
-        worker_id = validated_data.get('worker_id', instance.worker_id if instance else None)
-        tabel_code = validated_data.get('tabel_code', instance.tabel_code if instance else None)
-        if worker_id:
+        employee_id = validated_data.get('employee_id', instance.employee_id if instance else None)
+        if employee_id:
             wdays_qs = WorkerDay.objects_with_excluded.filter(
-                worker_id=worker_id,
-                tabel_code=tabel_code,
+                employee_id=employee_id,
                 dt=validated_data.get('dt'),
                 is_approved=validated_data.get(
                     'is_approved',
@@ -232,21 +229,20 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 wdays_qs = wdays_qs.exclude(id=instance.id)
             wdays_qs.delete()
 
-            worker_active_empl = Employment.objects.get_active_empl_for_user(
+            employee_active_empl = Employment.objects.get_active_empl_by_priority(
                 network_id=self.context['request'].user.network_id,
-                user_id=worker_id,
+                employee_id=employee_id,
                 dt=validated_data.get('dt'),
                 priority_shop_id=validated_data.get('shop_id'),
                 priority_employment_id=validated_data.get('employment_id'),
-                priority_tabel_code=validated_data.get('tabel_code'),
             ).first()
 
-            if not worker_active_empl:
+            if not employee_active_empl:
                 raise self.fail('no_active_employments')
 
-            validated_data['employment_id'] = worker_active_empl.id
+            validated_data['employment_id'] = employee_active_empl.id
             validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
-                or not worker_active_empl.is_equal_shops
+                or not employee_active_empl.is_equal_shops
 
     def create(self, validated_data):
         with transaction.atomic():
@@ -255,7 +251,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             details = validated_data.pop('worker_day_details', None)
             worker_day, _created = WorkerDay.objects.update_or_create(
                 dt=validated_data.get('dt'),
-                worker_id=validated_data.get('worker_id'),
+                employee_id=validated_data.get('employee_id'),
                 employment_id=validated_data.get('employment_id'),
                 is_fact=validated_data.get('is_fact'),
                 is_approved=validated_data.get('is_approved'),
@@ -303,7 +299,7 @@ class VacancySerializer(serializers.Serializer):
     id = serializers.IntegerField()
     first_name = serializers.CharField()
     last_name = serializers.CharField()
-    worker_id = serializers.IntegerField()
+    employee_id = serializers.IntegerField()
     worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True, required=False)
     is_fact = serializers.BooleanField()
     is_approved = serializers.BooleanField()
@@ -320,8 +316,8 @@ class VacancySerializer(serializers.Serializer):
         self.fields['shop'] = ShopSerializer(context=self.context)
 
     def get_avatar_url(self, obj) -> str:
-        if obj.worker_id and obj.worker.avatar:
-            return obj.worker.avatar.url
+        if obj.employee_id and obj.employee.user and obj.employee.user.avatar:
+            return obj.employee.user.avatar.url
         return None
 
 
@@ -365,12 +361,7 @@ class ChangeRangeSerializer(serializers.Serializer):
             WorkerDay.TYPE_VACATION,
         ]
     )
-
-    def __init__(self, *args, **kwargs):
-        super(ChangeRangeSerializer, self).__init__(*args, **kwargs)
-        if self.context.get('request'):
-            self.fields['worker'] = serializers.SlugRelatedField(
-                slug_field='tabel_code', queryset=User.objects.filter(network=self.context['request'].user.network))
+    worker = serializers.CharField(allow_null=False, allow_blank=False)  # табельный номер
 
     def validate(self, data):
         if not data['dt_to'] >= data['dt_from']:
@@ -489,7 +480,7 @@ class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkerDay
         fields = (
-            'worker_id',
+            'employee_id',
             'worker_username',
             'shop_id',
             'shop_code',
@@ -506,11 +497,12 @@ class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
             else:
                 raise NotFound(detail=f'Подразделение с кодом "{shop_code}" не найдено')
 
-        if (attrs.get('worker_id') is None) and ('worker_username' in attrs):
+        if (attrs.get('employee_id') is None) and ('worker_username' in attrs):
             username = attrs.pop('worker_username')
             users = list(User.objects.filter(username=username, network_id=self.context['request'].user.network_id))
             if len(users) == 1:
-                attrs['worker_id'] = users[0].id
+                employee = Employee.objects.filter(user=users[0]).first()
+                attrs['employee_id'] = employee.id
             else:
                 raise NotFound(detail=f'Пользователь "{username}" не найден')
 

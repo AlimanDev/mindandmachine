@@ -21,7 +21,6 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             e.tabel_code = f'A000{e.id}'
             e.save()
         cls.second_empl = Employment.objects.create(
-            network=cls.network,
             code=f'{cls.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
             user=cls.user2,
             shop=cls.shop,

@@ -108,12 +108,12 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
     row = 1
     for shop in shops:
         for date in dates:
-            user_ids = list(Employment.objects.get_active(shop.network_id, dt_from=date, dt_to=date).values_list('user_id', flat=True))
+            employee_ids = list(Employment.objects.get_active(shop.network_id, dt_from=date, dt_to=date).values_list('employee_id', flat=True))
             worksheet.write_string(row, SHOP, shop.name, def_format)
             worker_days_stat = PlanAndFactHours.objects.filter(
                 shop=shop, 
                 dt=date,
-                worker_id__in=user_ids,
+                employee_id__in=employee_ids,
                 wd_type=WorkerDay.TYPE_WORKDAY,
             ).aggregate(
                 plan_ticks=Sum('ticks_plan_count'),

@@ -115,22 +115,22 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         dt_now = date.today()
         self.assertEqual(len(response.json()), 8)
         WorkerDay.objects.create(
-            worker=self.user1,
+            employee=self.employee1,
             type=WorkerDay.TYPE_HOLIDAY,
             dt=dt_now,
         )
         WorkerDay.objects.create(
-            worker=self.user2,
+            employee=self.employee2,
             type=WorkerDay.TYPE_HOLIDAY,
             dt=dt_now,
         )
         WorkerDay.objects.create(
-            worker=self.user3,
+            employee=self.employee3,
             type=WorkerDay.TYPE_WORKDAY,
             dt=dt_now,
         )
         WorkerDay.objects.create(
-            worker=self.user4,
+            employee=self.employee4,
             type=WorkerDay.TYPE_HOLIDAY,
             dt=dt_now + timedelta(days=1),
         )

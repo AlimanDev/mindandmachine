@@ -956,7 +956,7 @@ def employee_not_checked_in():
                 event_email_notification_id=event.id,
                 user_author_id=None,
                 context={
-                    'user':{
+                    'user': {
                         'last_name': no_leaving_record.worker.last_name,
                         'first_name': no_leaving_record.worker.first_name,
                     },
@@ -987,7 +987,7 @@ def send_doctors_schedule_to_mis(json_data, logger=logging.getLogger('send_docto
     [
         {
             "dt": "2021-03-09",
-            "worker__username": "user2",
+            "employee__user__username": "user2",
             "shop__code": "code-237",
             "dttm_work_start": "2021-03-09T10:00:00",
             "dttm_work_end": "2021-03-09T20:00:00",
@@ -995,7 +995,7 @@ def send_doctors_schedule_to_mis(json_data, logger=logging.getLogger('send_docto
         },
         {
             "dt": "2021-03-10",
-            "worker__username": "user2",
+            "employee__user__username": "user2",
             "shop__code": "code-237",
             "dttm_work_start": "2021-03-10T08:00:00",
             "dttm_work_end": "2021-03-10T21:00:00",
@@ -1003,7 +1003,7 @@ def send_doctors_schedule_to_mis(json_data, logger=logging.getLogger('send_docto
         },
         {
             "dt": "2021-03-11",
-            "worker__username": "user2",
+            "employee__user__username": "user2",
             "shop__code": "code-237",
             "dttm_work_start": "2021-03-11T08:00:00",
             "dttm_work_end": "2021-03-11T12:00:00",
@@ -1017,7 +1017,7 @@ def send_doctors_schedule_to_mis(json_data, logger=logging.getLogger('send_docto
 
     for wd_data in json_data:
         mis_data = {
-            'TabelNumber': wd_data['worker__username'],
+            'TabelNumber': wd_data['employee__user__username'],
             'KodSalona': wd_data['shop__code'],
             'DataS': wd_data['dttm_work_start'],
             'DataPo': wd_data['dttm_work_end'],

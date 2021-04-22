@@ -76,7 +76,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(len(resp.json()), 8)
 
     def test_get_users_only_with_active_employment(self):
-        Employment.objects.exclude(user=self.user1).update(
+        Employment.objects.exclude(employee=self.employee1).update(
             dt_hired=self.dt_now, dt_fired=self.dt_now + timedelta(days=60))
         params = {
             'employments__dt_from': Converter.convert_date(self.dt_now - timedelta(days=1)),
@@ -94,7 +94,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.json()), 8)
 
-        Employment.objects.filter(user=self.user2).update(
+        Employment.objects.filter(employee=self.employee2).update(
             dt_hired=self.dt_now + timedelta(days=60), dt_fired=self.dt_now + timedelta(days=90))
 
         params = {

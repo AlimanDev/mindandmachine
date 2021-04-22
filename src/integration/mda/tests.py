@@ -101,12 +101,12 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
     def test_correct_director_login_in_data(self):
         shop = ShopFactory(parent=self.region1, code='shop')
         director = EmploymentFactory(shop=shop)
-        shop.director = director.user
+        shop.director = director.employee.user
         shop.save()
         mda_integration_helper = MdaIntegrationHelper()
         data = mda_integration_helper._get_data()
         s_data = list(filter(lambda s: shop.id == s['id'], data['shops']))[0]
-        self.assertEqual(s_data['directorLogin'], director.user.username)
+        self.assertEqual(s_data['directorLogin'], director.employee.user.username)
 
     def test_correct_regionId_in_data(self):
         shop = ShopFactory(parent=self.region1, code='shop')

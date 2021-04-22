@@ -623,15 +623,15 @@ class EmploymentManager(models.Manager):
         if network_id:
             q &= models.Q(
                 shop__network_id=network_id,
-                user__network_id=network_id,
+                employee__user__network_id=network_id,
             )
         qs = self.filter(q)
         return qs.filter(*args, **kwargs)
 
-    def get_active_empl_for_user(
-            self, network_id, user_id, dt=None, priority_shop_id=None, priority_employment_id=None,
-            priority_work_type_id=None, priority_tabel_code=None):
-        qs = self.get_active(network_id, dt_from=dt, dt_to=dt, user_id=user_id)
+    def get_active_empl_by_priority(
+            self, network_id, dt=None, priority_shop_id=None, priority_employment_id=None,
+            priority_work_type_id=None, **kwargs):
+        qs = self.get_active(network_id, dt_from=dt, dt_to=dt, **kwargs)
 
         order_by = []
 
@@ -640,12 +640,6 @@ class EmploymentManager(models.Manager):
                 'is_equal_employments', 'id', priority_employment_id,
             )
             order_by.append('-is_equal_employments')
-
-        if priority_tabel_code:
-            qs = qs.annotate_value_equality(
-                'is_equal_tabel_codes', 'tabel_code', priority_tabel_code,
-            )
-            order_by.append('-is_equal_tabel_codes')
 
         if priority_shop_id:
             qs = qs.annotate_value_equality(
@@ -829,14 +823,20 @@ class User(DjangoAbstractUser, AbstractModel):
     def fio(self):
         return self.get_fio()
 
-    def get_active_employments(self, network, shop=None):
-        kwargs = {'network_id': network.id}
+    def get_active_employments(self, shop=None):
+        kwargs = {
+            'employee__user__network_id': self.network_id,
+            'shop__network_id': self.network_id,
+        }
         if shop:
             kwargs['shop__in'] = shop.get_ancestors(include_self=True)
-        return self.employments.get_active(**kwargs)
+        return Employment.objects.filter(
+            employee__user=self,
+            **kwargs,
+        )
 
-    def get_group_ids(self, network, shop=None):
-        return self.get_active_employments(network, shop).annotate(
+    def get_group_ids(self, shop=None):
+        return self.get_active_employments(shop=shop).annotate(
             group_id=Coalesce(F('function_group_id'), F('position__group_id')),
         ).values_list('group_id', flat=True)
 
@@ -933,21 +933,37 @@ class EmploymentQuerySet(QuerySet):
             ))
 
 
+class Employee(AbstractModel):
+    code = models.CharField(max_length=128, null=True, blank=True, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="employees")
+    tabel_code = models.CharField(max_length=64, null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Сотрудник'
+        verbose_name_plural = 'Сотрудники'
+        unique_together = (
+            ('tabel_code', 'user'),
+        )
+
+    def __str__(self):
+        s = self.user.fio
+        if self.tabel_code:
+            s += f' ({self.tabel_code})'
+        return s
+
+
 class Employment(AbstractActiveModel):
     class Meta:
         verbose_name = 'Трудоустройство'
         verbose_name_plural = 'Трудоустройства'
-        unique_together = (
-            ('code', 'network'),
-        )
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.id, self.shop, self.user)
+        return '{}, {}, {}'.format(self.id, self.shop, self.employee)
 
     id = models.BigAutoField(primary_key=True)
-    code = models.CharField(max_length=128, null=True, blank=True)
-    network = models.ForeignKey('base.Network', on_delete=models.PROTECT, null=True)
-    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="employments")  # TODO: пока оставить для обратной совместимости и чтобы не нужно было во всем местах это менять
+    code = models.CharField(max_length=128, null=True, blank=True, unique=True)
+    employee = models.ForeignKey(
+        'base.Employee', on_delete=models.CASCADE, related_name="employments", null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name="employments")
     function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True, related_name="employments")
     dt_to_function_group = models.DateField(verbose_name='Дата до которой действуют права function_group', null=True, blank=True)
@@ -969,7 +985,7 @@ class Employment(AbstractActiveModel):
 
     auto_timetable = models.BooleanField(default=True)
 
-    tabel_code = models.CharField(max_length=64, null=True, blank=True)
+    tabel_code = models.CharField(max_length=64, null=True, blank=True)  # FIXME: кажется, что поле избыточно (есть employee.tabel_code), удалить?
     is_ready_for_overworkings = models.BooleanField(default=False)
 
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
@@ -1005,7 +1021,7 @@ class Employment(AbstractActiveModel):
         with transaction.atomic():
             wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
-            if self.user.network.clean_wdays_on_employment_dt_change:
+            if self.employee.user.network.clean_wdays_on_employment_dt_change:
                 transaction.on_commit(lambda: clean_wdays.delay(
                     only_logging=False,
                     filter_kwargs=dict(
@@ -1033,7 +1049,8 @@ class Employment(AbstractActiveModel):
         if hasattr(self, 'shop_code'):
             self.shop = Shop.objects.get(code=self.shop_code)
         if hasattr(self, 'username'):
-            self.user = User.objects.get(username=self.username)
+            self.employee, _employee_created = Employee.objects.get_or_create(
+                user=User.objects.get(username=self.username), tabel_code=self.tabel_code)
         if hasattr(self, 'position_code'):
             self.position = WorkerPosition.objects.get(code=self.position_code)
 
@@ -1080,7 +1097,7 @@ class Employment(AbstractActiveModel):
                 wd.save()
 
         if (is_new or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
-                self.network and self.network.clean_wdays_on_employment_dt_change:
+                self.employee.user.network and self.employee.user.network.clean_wdays_on_employment_dt_change:
             from src.celery.tasks import clean_wdays
             from src.timetable.models import WorkerDay
             from src.util.models_converter import Converter
@@ -1091,7 +1108,7 @@ class Employment(AbstractActiveModel):
             if is_new:
                 kwargs['filter_kwargs'] = {
                     'type': WorkerDay.TYPE_WORKDAY,
-                    'worker_id': self.user_id,
+                    'employee_id': self.employee_id,
                 }
                 if self.dt_hired:
                     kwargs['filter_kwargs']['dt__gte'] = Converter.convert_date(self.dt_hired)
@@ -1105,7 +1122,7 @@ class Employment(AbstractActiveModel):
                     dt__gte = self.dt_hired
                 kwargs['filter_kwargs'] = {
                     'type': WorkerDay.TYPE_WORKDAY,
-                    'worker_id': self.user_id,
+                    'employee_id': self.employee_id,
                     'dt__gte': Converter.convert_date(dt__gte),
                 }
 

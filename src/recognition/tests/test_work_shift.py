@@ -55,7 +55,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             is_approved=True,
             dt=self.dt_str,
             shop=self.work_type1.shop,
-            worker=self.user2,
+            employee=self.employee2,
             employment=self.employment2,
         )
         self._test_work_shift(self.dt_str, self.user2.username, dttm_start, None, self.shop2.code)

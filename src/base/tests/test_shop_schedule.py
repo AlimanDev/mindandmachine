@@ -4,7 +4,14 @@ from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from src.base.models import ShopSchedule
-from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, EmploymentFactory, GroupFactory
+from src.base.tests.factories import (
+    NetworkFactory,
+    ShopFactory,
+    UserFactory,
+    EmploymentFactory,
+    GroupFactory,
+    EmployeeFactory,
+)
 from src.celery.tasks import fill_shop_schedule
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
@@ -22,7 +29,9 @@ class TestShopScheduleViewSet(TestsHelperMixin, APITestCase):
             tm_close_dict='{"0": "20:00:00","1": "20:00:00","2": "20:00:00","3": "20:00:00","4": "19:00:00"}',
         )
         cls.group = GroupFactory(network=cls.network)
-        cls.employment = EmploymentFactory(network=cls.network, user=cls.user, shop=cls.shop, function_group=cls.group)
+        cls.employee = EmployeeFactory(user=cls.user)
+        cls.employment = EmploymentFactory(
+            employee=cls.employee, shop=cls.shop, function_group=cls.group)
         cls.dt = datetime(2021, 1, 1)
         fill_shop_schedule(cls.shop.id, cls.dt, 31)
         cls.add_group_perm(cls.group, 'ShopSchedule', 'GET')

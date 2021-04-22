@@ -10,6 +10,7 @@ from src.base.tests.factories import (
     ShopSettingsFactory,
     ShopFactory,
     GroupFactory,
+    EmployeeFactory,
 )
 from src.timetable.models import (
     WorkType,
@@ -30,11 +31,12 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             crop_work_hours_by_shop_schedule=False,
         )
         cls.user = UserFactory(network=cls.network)
+        cls.employee = EmployeeFactory(user=cls.user)
         cls.shop_settings = ShopSettingsFactory(
             breaks__value='[[0, 2040, [60]]]')
         cls.shop = ShopFactory(network=cls.network, settings=cls.shop_settings)
         cls.group = GroupFactory(network=cls.network)
-        cls.employment = EmploymentFactory(network=cls.network, user=cls.user, shop=cls.shop, function_group=cls.group)
+        cls.employment = EmploymentFactory(employee=cls.employee, shop=cls.shop, function_group=cls.group)
         fill_shop_schedule(shop_id=cls.shop.id, dt_from=cls.dt, periods=1)
         cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
         cls.work_type = WorkType.objects.create(work_type_name=cls.work_type_name, shop=cls.shop)
@@ -47,7 +49,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=True,
             is_approved=True,
             dt=self.dt,
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type=WorkerDay.TYPE_WORKDAY,
@@ -61,7 +63,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=False,
             is_approved=True,
             dt=self.dt,
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type=WorkerDay.TYPE_WORKDAY,
@@ -72,7 +74,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=True,
             is_approved=True,
             dt=self.dt,
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type=WorkerDay.TYPE_WORKDAY,
@@ -86,7 +88,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=False,
             is_approved=True,
             dt=self.dt,
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type=WorkerDay.TYPE_WORKDAY,
@@ -97,7 +99,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=True,
             is_approved=False,
             dt=self.dt,
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type=WorkerDay.TYPE_WORKDAY,
@@ -111,7 +113,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=True,
             is_approved=True,
             dt=self.dt,
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type=WorkerDay.TYPE_WORKDAY,
@@ -122,7 +124,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=False,
             is_approved=True,
             dt=self.dt,
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type=WorkerDay.TYPE_WORKDAY,
@@ -137,7 +139,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=False,
             is_approved=True,
             dt=self.dt,
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type=WorkerDay.TYPE_WORKDAY,
@@ -149,7 +151,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=True,
             is_approved=True,
             dt=self.dt,
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type=WorkerDay.TYPE_WORKDAY,
@@ -162,7 +164,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=True,
             is_approved=False,
             dt=self.dt,
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type=WorkerDay.TYPE_WORKDAY,
@@ -185,7 +187,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
         breaks.value = '[[0, 359, [0]], [359, 720, [72]]]'
         breaks.save()
         wd_plan = WorkerDay.objects.create(
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             is_fact=False,
             is_approved=True,
@@ -196,7 +198,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(18)),
         )
         wd_fact = WorkerDay.objects.create(
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             is_fact=True,
             is_approved=True,

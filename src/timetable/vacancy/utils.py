@@ -94,7 +94,7 @@ def search_candidates(vacancy, **kwargs):
 
     depart_filter = Q(shop_id__in=shops)
     worker_days = WorkerDay.objects.filter(
-        worker=OuterRef('user_id'),
+        employee_id=OuterRef('employee_id'),
         dttm_work_start__lte=vacancy.dttm_work_start,
         dttm_work_end__gte=vacancy.dttm_work_end,
         dt=vacancy.dt,
@@ -115,14 +115,14 @@ def search_candidates(vacancy, **kwargs):
     )
     user_ids = list(employments.annotate(
         no_wdays=~Exists(worker_days)
-    ).filter(no_wdays=True).values_list('user_id', flat=True))
+    ).filter(no_wdays=True).values_list('employee__user_id', flat=True))
 
     user_ids = set(
         user_ids + list(employments.filter(
             shop=shop
         ).annotate(
             no_wdays=~Exists(worker_days.filter(shop=shop))
-        ).filter(no_wdays=True).values_list('user_id', flat=True))
+        ).filter(no_wdays=True).values_list('employee__user_id', flat=True))
     )
 
     return User.objects.filter(id__in=user_ids)
@@ -134,15 +134,15 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
     work_hours = vacancy.work_hours
     work_types = vacancy.work_types.all().values_list('work_type_name_id', flat=True)
     workers = User.objects.filter(
-        Q(employments__dt_fired__isnull=True) | Q(employments__dt_fired__gt=vacancy_dt),
-        Q(employments__dt_hired__isnull=True) | Q(employments__dt_hired__lte=vacancy_dt),
-        employments__shop__in=shop.exchange_shops.filter(dttm_deleted__isnull=True),
+        Q(employees__employments__dt_fired__isnull=True) | Q(employees__employments__dt_fired__gt=vacancy_dt),
+        Q(employees__employments__dt_hired__isnull=True) | Q(employees__employments__dt_hired__lte=vacancy_dt),
+        employees__employments__shop__in=shop.exchange_shops.filter(dttm_deleted__isnull=True),
     ).exclude(
-        employments__position__in=exclude_positions,
+        employees__employments__position__in=exclude_positions,
     ).annotate(
         workerdays_exists=Exists(
             WorkerDay.objects.filter(
-                worker=OuterRef('pk'), 
+                employee__user_id=OuterRef('pk'),
                 type=WorkerDay.TYPE_HOLIDAY,
                 dt=vacancy_dt,
                 is_fact=False,
@@ -152,7 +152,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         ),
         work_types_exists=Exists(
             EmploymentWorkType.objects.filter(
-                employment=OuterRef('employments'), 
+                employment=OuterRef('employees__employments'),
                 work_type__work_type_name_id__in=work_types,
             )
         ),
@@ -161,13 +161,13 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         work_types_exists=True,
     ).annotate(
         work_hours=Subquery(WorkerDay.objects.filter(
-            worker_id=OuterRef('pk'),
+            employee__user_id=OuterRef('pk'),
             dt__gte=vacancy_dt.replace(day=1),
             dt__lte=vacancy_dt.replace(day=1) + relativedelta(months=+1) - timedelta(days=1),
             type__in=WorkerDay.TYPES_PAID,
             is_fact=False,
             is_approved=True,
-        ).order_by().values('worker_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=DurationField()) + work_hours,
+        ).order_by().values('employee__user_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=DurationField()) + work_hours,
     ).filter(
         work_hours__lte=max_working_hours,
     ).order_by('work_hours')
@@ -186,7 +186,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         for worker_day in WorkerDay.objects.filter(
             dt__gte=vacancy_dt - timedelta(days=2),
             dt__lte=vacancy_dt + timedelta(days=2),
-            worker_id=worker.id,
+            employee__user_id=worker.id,
         ).order_by('dt'):
             if worker_day.type == WorkerDay.TYPE_HOLIDAY:
                 max_holidays += 1
@@ -211,7 +211,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         for worker_day in WorkerDay.objects.qos_current_version().filter(
             dt__gte=vacancy_dt - timedelta(days=7),
             dt__lte=vacancy_dt + timedelta(days=7),
-            worker_id=worker['worker'].id,
+            employee__user_id=worker['worker'].id,
         ).order_by('dt'):
             if worker_day.type in WorkerDay.TYPES_PAID:
                 tmp_hours += worker_day.work_hours.seconds // 3600
@@ -244,7 +244,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         for worker_day in WorkerDay.objects.qos_current_version().filter(
             dt__gte=vacancy_dt - timedelta(days=7),
             dt__lte=vacancy_dt + timedelta(days=7),
-            worker_id=worker['worker'].id,
+            employee__user_id=worker['worker'].id,
         ).order_by('dt'):
             if worker_day.type in WorkerDay.TYPES_PAID:
                 tmp_hours += worker_day.work_hours.seconds // 3600
@@ -395,18 +395,18 @@ def do_shift_elongation(vacancy, max_working_hours):
 
 
 def notify_about_canceled_vacancy(vacancy):
-    if vacancy.worker_id:
-        user = vacancy.worker
+    if vacancy.employee_id:
+        employee = vacancy.employee
         shop = vacancy.shop
         create_event_and_notify(
-            [user],
+            [employee.user],
             type='vacancy_canceled',
             shop=shop,
             params={'vacancy': vacancy, 'shop': shop},
         )
         if shop.email:
             message = f'Это автоматическое уведомление для {shop.name} об изменениях в графике:\n\n' + \
-                    f'У сотрудника {user.last_name} {user.first_name} ' + \
+                    f'У сотрудника {employee.user.last_name} {employee.user.first_name} ' + \
                     f'отменена вакансия на {vacancy.dt}.\n\n' + \
                     f'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
             msg = EmailMultiAlternatives(
@@ -449,14 +449,14 @@ def cancel_vacancy(vacancy_id):
 def confirm_vacancy(vacancy_id, user, exchange=False):
     """
     :param vacancy_id:
-    :param user: сотрудник, откликнувшийся на вакансию
+    :param user: пользователь, откликнувшийся на вакансию
     :param exchange:
     """
     with transaction.atomic():
         vacancy = WorkerDay.objects.get_plan_approved(
             id=vacancy_id,
             is_vacancy=True,
-            worker__isnull=True,
+            employee__isnull=True,
         ).select_for_update().first()
         res = {
             'status_code': 200,
@@ -480,27 +480,28 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             res['status_code'] = 400
             return res
 
-        user_worker_day = WorkerDay.objects.get_plan_approved(
-            worker=user,
-            dt=vacancy.dt,
-        ).select_related('shop', 'employment__shop').first()
-
-        # нельзя откликнуться на вакансию если для сотрудника не составлен график на этот день
-        if not user_worker_day:
-            res['code'] = 'no_timetable'
-            res['status_code'] = 400
-            return res
-
-        active_employment = Employment.objects.get_active_empl_for_user(
-            network_id=user.network_id, user_id=user.id, dt=vacancy.dt,
+        # TODO: добавить возврат ошибки если невозможно однозначно определить активное трудоустройство
+        # TODO: на клиенте должен быть явный выбор и передача сотрудника или трудоустройства
+        active_employment = Employment.objects.get_active_empl_by_priority(
+            network_id=user.network_id, employee__user_id=user.id, dt=vacancy.dt,
             priority_shop_id=vacancy.shop_id,
             priority_work_type_id=vacancy.work_types.values_list('id', flat=True).first(),
         ).select_related(
             'shop',
         ).first()
 
+        employee_worker_day = WorkerDay.objects.get_plan_approved(
+            employee_id=active_employment.employee_id,
+            dt=vacancy.dt,
+        ).select_related('shop').first()
+
+        # нельзя откликнуться на вакансию если для сотрудника не составлен график на этот день
+        if not employee_worker_day:
+            res['code'] = 'no_timetable'
+            res['status_code'] = 400
+            return res
+
         # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
-        # TODO: сделать более информативные сообщения об ошибках
         if not active_employment:
             res['code'] = 'cant_apply_vacancy_no_active_employement'
             res['status_code'] = 400
@@ -513,7 +514,7 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             return res
 
         # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
-        update_condition = user_worker_day.type not in WorkerDay.TYPES_PAID
+        update_condition = employee_worker_day.type not in WorkerDay.TYPES_PAID
         if active_employment.shop_id != vacancy_shop.id and not exchange:
             try:
                 tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
@@ -526,15 +527,21 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
                 update_condition = False
 
         if update_condition or exchange:
-            user_worker_day.delete()
+            employee_worker_day.delete()
 
-            vacancy.worker = user
+            # TODO: добавить проверку на пересечение с рабочими днями у этого же пользователя
+            vacancy.employee = active_employment.employee
             vacancy.employment = active_employment
-            vacancy.save(update_fields=('worker', 'employment'))
+            vacancy.save(
+                update_fields=(
+                    'employee',
+                    'employment',
+                )
+            )
 
             WorkerDay.objects_with_excluded.filter(
                 dt=vacancy.dt,
-                worker_id=vacancy.worker_id,
+                employee_id=vacancy.employee_id,
                 is_fact=vacancy.is_fact,
                 is_approved=False,
             ).delete()
@@ -554,8 +561,7 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
                 ) for details in vacancy_details
             )
 
-            # TODO: создать событие об отклике на вакансию,
-            # TODO: сделать возможность отправки email на почту подразделения через систему уведомлений о событиях
+            # TODO: создать событие об отклике на вакансию
 
             Event.objects.filter(worker_day=vacancy).delete()
             res['code'] = 'vacancy_success'
@@ -786,7 +792,7 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
 
 
     vacancies = WorkerDay.objects.filter(
-        (Q(worker__id__isnull=False) & Q(dttm_work_start__gte=min_dttm)) | Q(worker__id__isnull=True),
+        (Q(employee__user__id__isnull=False) & Q(dttm_work_start__gte=min_dttm)) | Q(employee__user__id__isnull=True),
         dt__gte=from_dt,
         dt__lte=to_dt,
         work_types__id=work_type_id,
@@ -834,7 +840,7 @@ def holiday_workers_exchange():
             is_approved=True,
             shop=shop,
             is_vacancy=True,
-            worker__isnull=True,
+            employee__isnull=True,
         ).select_related('shop')
         for vacancy in vacancies:
             candidate = search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_positions=exclude_positions)
@@ -884,7 +890,7 @@ def worker_shift_elongation():
             shop=shop,
             is_approved=True,
             is_vacancy=True,
-            worker__isnull=True,
+            employee__isnull=True,
         ).select_related('shop', 'shop__settings')
         for vacancy in vacancies:
             do_shift_elongation(vacancy, max_working_hours)
@@ -946,7 +952,7 @@ def workers_exchange():
                 dt__lte=to_dt,
                 work_types__id=work_type.id,
                 is_vacancy=True,
-                worker__isnull=True,
+                employee__isnull=True,
                 is_approved=True,
             ).order_by('dt')
 
@@ -981,7 +987,7 @@ def workers_exchange():
                             candidate_to_change = worker_day
                     print ('worker lack: {}; wd_detail: {}; work type: {}'.format(worker_lack, worker_day, worker_day.work_type_id))
                     if  worker_lack < -exchange_settings.automatic_worker_select_overflow_min:
-                        user = candidate_to_change.worker_day.worker
+                        user = candidate_to_change.worker_day.employee.user
                         print('hard exchange date {} worker_lack {} vacancy_lack {} shop_to {} shop_from {} candidate_to_change {} to vac {} user {}'.format(
                             vacancy.dt, worker_lack, vacancy_lack,
                             work_type, candidate_to_change.work_type,

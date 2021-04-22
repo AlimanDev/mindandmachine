@@ -24,6 +24,7 @@ from src.base.models import (
     Group,
     Break,
     ShopSchedule,
+    Employee,
 )
 from src.timetable.serializers import EmploymentWorkTypeSerializer, EmploymentWorkTypeListSerializer
 from src.timetable.worker_constraint.serializers import WorkerConstraintSerializer, WorkerConstraintListSerializer
@@ -83,6 +84,19 @@ class UserListSerializer(serializers.Serializer):
             return False
 
 
+class UserShorSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    middle_name = serializers.CharField()
+    avatar = serializers.SerializerMethodField('get_avatar_url')
+
+    def get_avatar_url(self, obj) -> str:
+        if obj.avatar:
+            return obj.avatar.url
+        return None
+
+
 class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
@@ -96,6 +110,15 @@ class UserSerializer(BaseNetworkSerializer):
         if obj.avatar:
             return obj.avatar.url
         return None
+
+
+class EmployeeSerializer(BaseNetworkSerializer):
+    user = UserSerializer(read_only=True)
+    user_id = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = Employee
+        fields = ['id', 'user', 'user_id', 'tabel_code', ]
 
 
 class AuthUserSerializer(UserSerializer):
@@ -149,7 +172,8 @@ class AutoTimetableSerializer(serializers.Serializer):
 
 class EmploymentListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
-    user_id = serializers.IntegerField(required=False)
+    employee_id = serializers.IntegerField(required=False)
+    user_id = serializers.IntegerField(source='employee.user_id')
     shop_id = serializers.IntegerField(required=False)
     position_id = serializers.IntegerField()
     is_fixed_hours = serializers.BooleanField()
@@ -165,7 +189,6 @@ class EmploymentListSerializer(serializers.Serializer):
     tabel_code = serializers.CharField()
     is_ready_for_overworkings = serializers.BooleanField()
     dt_new_week_availability_from = serializers.DateField()
-    user = UserListSerializer()
     is_visible = serializers.BooleanField()
     worker_constraints = WorkerConstraintListSerializer(many=True)
     work_types = EmploymentWorkTypeListSerializer(many=True)
@@ -174,21 +197,23 @@ class EmploymentListSerializer(serializers.Serializer):
 class EmploymentSerializer(serializers.ModelSerializer):
     default_error_messages = {
         "emp_check_dates": _("Employment from {dt_hired} to {dt_fired} already exists."),
-        "no_user": _("There is {amount} models of user with username: {username}."),
+        "no_user_with_username": _("There is {amount} models of user with username: {username}."),
+        "no_user_with_user_id": _("There is {amount} models of user with user_id: {user_id}."),
         "no_shop": _("There is {amount} models of shop with code: {code}."),
         "no_position": _("There is {amount} models of position with code: {code}."),
     }
 
-    user = UserSerializer(read_only=True)
     position_id = serializers.IntegerField(required=False)
     position_code = serializers.CharField(required=False, source='position.code')
     shop_id = serializers.IntegerField(required=False)
     shop_code = serializers.CharField(required=False, source='shop.code')
-    user_id = serializers.IntegerField(required=False)
+    user_id = serializers.IntegerField(required=False, source='employee.user_id')
+    employee_id = serializers.IntegerField(required=False)
+    #employee = EmployeeSerializer(read_only=True)
     function_group_id = serializers.IntegerField(required=False, allow_null=True)
     work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
-    username = serializers.CharField(required=False, source='user.username')
+    username = serializers.CharField(required=False, source='employee.user.username')
     dt_hired = serializers.DateField(required=True)
     dt_fired = serializers.DateField(required=False, default=None)
 
@@ -197,11 +222,12 @@ class EmploymentSerializer(serializers.ModelSerializer):
         fields = ['id', 'user_id', 'shop_id', 'position_id', 'is_fixed_hours', 'dt_hired', 'dt_fired',
                   'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
                   'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
-                  'dt_new_week_availability_from', 'user', 'is_visible',  'worker_constraints', 'work_types',
+                  'dt_new_week_availability_from', 'is_visible',  'worker_constraints', 'work_types',
                   'shop_code', 'position_code', 'username', 'code', 'function_group_id', 'dt_to_function_group',
+                  'employee', 'employee_id',
         ]
-        create_only_fields = ['user_id', 'user']
-        read_only_fields = ['user']
+        create_only_fields = ['employee_id', 'employee']
+        read_only_fields = ['employee']
         extra_kwargs = {
             'auto_timetable': {
                 'default': True,
@@ -218,15 +244,31 @@ class EmploymentSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if self.instance:
             # Нельзя обновить пользователя по коду
-            attrs['user_id'] = self.instance.user_id
+            attrs['employee_id'] = self.instance.employee_id  # TODO: правильно?
         else:
-            if not attrs.get('user_id'):
-                user = attrs.pop('user')
-                users = list(User.objects.filter(username=user['username'], network_id=self.context['request'].user.network_id))
+            if not attrs.get('employee_id'):
+                employee = attrs.pop('employee', {})
+                user = employee.pop('user', None)
+                user_id = employee.pop('user_id', None)
+                user_kwargs = {}
+                if user:
+                    user_kwargs['username'] = user['username']
+                if user_id:
+                    user_kwargs['id'] = user_id
+
+                users = list(User.objects.filter(
+                    network_id=self.context['request'].user.network_id, **user_kwargs,
+                ))
                 if len(users) == 1:
-                    attrs['user_id'] = users[0].id
+                    employee, _employee_created = Employee.objects.get_or_create(
+                        user=users[0],
+                        tabel_code=attrs.get('tabel_code'),
+                    )
+                    attrs['employee_id'] = employee.id
                 else:
-                    self.fail('no_user', amount=len(users), username=user['username'])
+                    if user:
+                        self.fail('no_user_with_username', amount=len(users), username=user['username'])
+                    self.fail('no_user_with_user_id', amount=len(users), user_id=user_id)
 
         if (attrs.get('shop_id') is None) and ('code' in attrs.get('position', {})):
             position = attrs.pop('position', None)
@@ -275,8 +317,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
         else:
             if 'shop_id' not in data and 'shop' not in data and 'code' not in data['shop']:
                 raise ValidationError({'shop_id': self.error_messages['required']})
-            if 'user_id' not in data and 'user' not in data:
-                raise ValidationError({'user_id': self.error_messages['required']})
+            if 'employee_id' not in data and 'employee' not in data:
+                raise ValidationError({'employee_id': self.error_messages['required']})
             if 'position_id' not in data and 'position' not in data:
                 raise ValidationError({'position_id': self.error_messages['required']})
 
@@ -290,13 +332,13 @@ class EmploymentSerializer(serializers.ModelSerializer):
             group_from_perm = True
             if group_from:
                 group_from_perm = Group.objects.filter(
-                    Q(employments__user=user) | Q(workerposition__employment__user=user),
+                    Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
                     subordinates__id=group_from,
                 ).exists()
             group_to_perm = True
             if group_to:
                 group_to_perm = Group.objects.filter(
-                    Q(employments__user=user) | Q(workerposition__employment__user=user),
+                    Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
                     subordinates__id=group_to,
                 ).exists()
             has_perm = group_from_perm and group_to_perm
@@ -305,7 +347,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
         if instance.is_visible != validated_data.get('is_visible', True):
             Employment.objects.filter(
                 shop_id=instance.shop_id, 
-                user_id=instance.user_id
+                employee_id=instance.employee_id,
             ).update(is_visible=validated_data.get('is_visible', True))
         return super().update(instance, validated_data, *args, **kwargs)
 

@@ -17,7 +17,7 @@ def copy_approved(dt_from, dt_to=None):
             is_fact=models.OuterRef('is_fact'),
         )
         worker_days_to_copy = list(WorkerDay.objects.filter(
-            worker__isnull=False,
+            employee__isnull=False,
             **dt_filter,
         ).annotate(
             not_approved_exist=models.Exists(not_approved_subq),

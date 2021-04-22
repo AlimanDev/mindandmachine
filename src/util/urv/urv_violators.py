@@ -33,20 +33,20 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
     if shop_ids:
         filter_values['shop_id__in'] = shop_ids
     if user_ids:
-        filter_values['user_id__in'] = user_ids
+        filter_values['employee__user_id__in'] = user_ids
     if not dt_from or not dt_to:
         dt_from = date.today() - timedelta(1)
         dt_to = date.today() - timedelta(1)
     data = {}
-    user_ids = Employment.objects.get_active(
+    employee_ids = Employment.objects.get_active(
         network_id,
         dt_from=dt_from,
         dt_to=dt_to,
         **filter_values,
-    ).values_list('user_id', flat=True)
-    filter_values.pop('user_id__in', None)
+    ).values_list('employee_id', flat=True)
+    filter_values.pop('employee__user_id__in', None)
     no_comming = WorkerDay.objects.filter(
-        worker_id__in=user_ids,
+        employee_id__in=employee_ids,
         dt__gte=dt_from,
         dt__lte=dt_to,
         is_fact=True,
@@ -57,7 +57,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
         no_comming = no_comming.annotate(
             exist_records=Exists(
             AttendanceRecords.objects.filter(
-                    user_id=OuterRef('worker_id'),
+                    user_id=OuterRef('employee__user_id'),
                     dt=OuterRef('dt'),
                     type=AttendanceRecords.TYPE_COMING,
                 )
@@ -70,7 +70,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
             dttm_work_start__isnull=True,
         )
     no_leaving = WorkerDay.objects.filter(
-        worker_id__in=user_ids,
+        employee_id__in=employee_ids,
         dt__gte=dt_from,
         dt__lte=dt_to,
         is_fact=True,
@@ -81,7 +81,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
         no_leaving = no_leaving.annotate(
             exist_records=Exists(
             AttendanceRecords.objects.filter(
-                    user_id=OuterRef('worker_id'),
+                    user_id=OuterRef('employee__user_id'),
                     dt=OuterRef('dt'),
                     type=AttendanceRecords.TYPE_LEAVING,
                 )
@@ -100,7 +100,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
         type=WorkerDay.TYPE_WORKDAY,
         is_approved=True,
         is_fact=False,
-        worker_id__in=user_ids,
+        employee__user_id__in=user_ids,
         **filter_values,
     )
     

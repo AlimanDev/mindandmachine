@@ -44,7 +44,7 @@ class WrappedWorkerConstraintSerializer(serializers.Serializer):
                 constraint = WorkerConstraint(
                     **item,
                     employment_id=employment_id,
-                    worker_id=employment.user_id,
+                    worker_id=employment.employee.user_id,
                     shop_id=employment.shop_id,
                 )
                 to_create.append(constraint)

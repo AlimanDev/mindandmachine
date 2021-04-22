@@ -12,6 +12,7 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
     Для этого получается список сотрудников магазина, список всех трудоустройств этих сотрудников,
     и расписание для всех трудоустройств
     """
+
     def filter_queryset(self, request, queryset, view):
         if view.detail:
             return super().filter_queryset(request, queryset, view)
@@ -35,9 +36,8 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
         dt = form.get('dt')  # | request.data.get('dt')
         dt_from = form.get('dt__gte')  # | request.data.get('dt_from')
         dt_to = form.get('dt__lte')  # | request.data.get('dt_to')
-        worker_id__in=form.get('worker_id__in')
-        worker__username__in=form.get('worker__username__in')
-
+        worker_id__in = form.get('worker_id__in')
+        worker__username__in = form.get('worker__username__in')
 
         if not dt_from:
             dt_from = dt if dt else datetime.date.today()
@@ -50,22 +50,22 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
             network_id=request.user.network_id,
             dt_from=dt_from, dt_to=dt_to,
             **shop_filter,
-        ).values('user_id')
+        ).values('employee__user_id')
 
         if worker_id__in:
-            ids=ids.filter(
-            user_id__in=worker_id__in
+            ids = ids.filter(
+                employee__user__id__in=worker_id__in
             )
         if worker__username__in:
-            ids=ids.filter(
-            user__username__in=worker__username__in
+            ids = ids.filter(
+                employee__user__username__in=worker__username__in
             )
 
         # all_employments_for_users = Employment.objects.get_active(dt_from, dt_to).filter(user_id__in=ids)
 
         return super().filter_queryset(
-                request, queryset, view
-            ).filter(
-                worker_id__in=ids,
-                # employment__in=all_employments_for_users\
-            ).order_by('worker_id','dt','dttm_work_start')
+            request, queryset, view
+        ).filter(
+            employee__user__id__in=ids,
+            # employment__in=all_employments_for_users\
+        ).order_by('employee__user_id', 'dt', 'dttm_work_start')

@@ -37,7 +37,7 @@ class WorkerDayPermissionsAPIView(GenericAPIView):
         )
         s.is_valid(raise_exception=True)
         groups_wd_perms_qs = GroupWorkerDayPermission.objects.filter(
-            group__in=self.request.user.get_group_ids(s.validated_data['shop'].network, s.validated_data['shop']),
+            group__in=self.request.user.get_group_ids(shop=s.validated_data['shop']),
         )
         if s.validated_data.get('action'):
             groups_wd_perms_qs = groups_wd_perms_qs.filter(

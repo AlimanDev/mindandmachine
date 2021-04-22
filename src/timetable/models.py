@@ -19,7 +19,7 @@ from model_utils import FieldTracker
 
 from src.events.signals import event_signal
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
-from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay
+from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
 
@@ -285,7 +285,7 @@ class WorkerDayQuerySet(QuerySet):
     def get_last_ordered(self, is_fact, order_by, **kwargs):
         ordered_subq = self.filter(
             dt=OuterRef('dt'),
-            worker_id=OuterRef('worker_id'),
+            employee_id=OuterRef('employee_id'),
             is_fact=is_fact,
         ).order_by(*order_by).values_list('id')[:1]
         return self.filter(
@@ -300,7 +300,7 @@ class WorkerDayQuerySet(QuerySet):
     def get_tabel(self, **kwargs):
         ordered_subq = self.filter(
             dt=OuterRef('dt'),
-            worker_id=OuterRef('worker_id'),
+            employee_id=OuterRef('employee_id'),
             is_approved=True,
         ).exclude(type=WorkerDay.TYPE_EMPTY).order_by('-is_fact', '-work_hours').values_list('id')[:1]
         return self.filter(
@@ -314,7 +314,8 @@ class WorkerDayQuerySet(QuerySet):
 
 class WorkerDayManager(models.Manager):
     def get_queryset(self):
-        return super().get_queryset().exclude(employment_id__isnull=True, worker_id__isnull=False)
+        return super().get_queryset().exclude(
+            type=WorkerDay.TYPE_WORKDAY, employment_id__isnull=True, employee_id__isnull=False)
 
     def qos_current_version(self, approved_only=False):
         if approved_only:
@@ -347,11 +348,11 @@ class WorkerDayManager(models.Manager):
         super().get_queryset()
         subq_kwargs = kwargs.copy()
         subq_kwargs.pop('dt', None)
-        subq_kwargs.pop('worker_id', None)
+        subq_kwargs.pop('employee_id', None)
         subq_kwargs.pop('is_fact', None)
         max_dt_subq = WorkerDay.objects.filter(
             dt=OuterRef('dt'),
-            worker_id=OuterRef('worker_id'),
+            employee_id=OuterRef('employee_id'),
             is_fact=False,
             **subq_kwargs,
             # shop_id=OuterRef('shop_id')
@@ -388,7 +389,7 @@ class WorkerDay(AbstractModel):
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
         unique_together = (
-            ('dt', 'worker', 'employment', 'is_fact', 'is_approved'),
+            ('dt', 'employee', 'is_fact', 'is_approved'),
         )
 
     TYPE_HOLIDAY = 'H'
@@ -478,7 +479,7 @@ class WorkerDay(AbstractModel):
 
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
-            self.worker.last_name if self.worker else 'No worker',
+            self.employee.user.last_name if (self.employee and self.employee.user_id) else 'No worker',
             self.shop.name if self.shop else '',
             self.shop.parent.name if self.shop and self.shop.parent else '',
             self.dt,
@@ -523,7 +524,7 @@ class WorkerDay(AbstractModel):
                     self.type in WorkerDay.TYPES_WITH_TM_RANGE and self.is_fact:
                 plan_approved = WorkerDay.objects.filter(
                     dt=self.dt,
-                    worker_id=self.worker_id,
+                    employee_id=self.employee_id,
                     is_fact=False,
                     is_approved=True,
                     type__in=WorkerDay.TYPES_WITH_TM_RANGE,
@@ -574,12 +575,12 @@ class WorkerDay(AbstractModel):
     id = models.BigAutoField(primary_key=True, db_index=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
 
+    employee = models.ForeignKey(
+        'base.Employee', null=True, blank=True, on_delete=models.PROTECT, related_name='worker_days',
+        verbose_name='Сотрудник',
+    )
     # DO_NOTHING т.к. в Employment.delete есть явная чистка рабочих дней для этого трудоустройства
     employment = models.ForeignKey(Employment, on_delete=models.DO_NOTHING, null=True)
-
-    # поле необходимо для того, чтобы была связь между днем работника и эмплойментом в случае,
-    # если эмплоймент был удален, а позднее был восстановлен
-    tabel_code = models.CharField(max_length=150, verbose_name='Табельный номер', null=True, blank=True)
 
     dt = models.DateField()  # todo: make immutable
     dttm_work_start = models.DateTimeField(null=True, blank=True)
@@ -587,7 +588,6 @@ class WorkerDay(AbstractModel):
     dttm_work_start_tabel = models.DateTimeField(null=True, blank=True)
     dttm_work_end_tabel = models.DateTimeField(null=True, blank=True)
 
-    worker = models.ForeignKey(User, null=True, on_delete=models.PROTECT, related_name='worker_day', related_query_name='worker_day')  # todo: make immutable
     type = models.CharField(choices=TYPES, max_length=2, default=TYPE_EMPTY)
 
     work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')
@@ -699,7 +699,7 @@ class WorkerDay(AbstractModel):
                 self.type in WorkerDay.TYPES_WITH_TM_RANGE and self.is_plan and self.is_approved:
             fact_qs = WorkerDay.objects.filter(
                 dt=self.dt,
-                worker_id=self.worker_id,
+                employee_id=self.employee_id,
                 is_fact=True,
                 type__in=WorkerDay.TYPES_WITH_TM_RANGE
             ).select_related(
@@ -1043,6 +1043,10 @@ class AttendanceRecords(AbstractModel):
     dttm = models.DateTimeField()
     type = models.CharField(max_length=1, choices=RECORD_TYPES)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
+    # employee = models.ForeignKey(
+    #     Employee, on_delete=models.PROTECT,
+    #     help_text='Если заполнено, то мы знаем для какого Сотрудника была отметка (скорее всего явный выбор), '
+    #               'если пусто -- не знаем для какого Сотрудника отметка')
     verified = models.BooleanField(default=True)
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo: or should be to shop? fucking logic
@@ -1053,7 +1057,7 @@ class AttendanceRecords(AbstractModel):
     def _create_wd_details(self, dt, fact_approved, active_user_empl):
         plan_approved = WorkerDay.objects.filter(
             dt=dt,
-            worker=self.user,
+            employee=active_user_empl.employee,
             is_fact=False,
             is_approved=True,
             worker_day_details__isnull=False,
@@ -1098,14 +1102,14 @@ class AttendanceRecords(AbstractModel):
         try:
             not_approved = WorkerDay.objects.get(
                 dt=fact_approved.dt,
-                worker_id=fact_approved.worker_id,
+                employee_id=fact_approved.employee_id,
                 is_fact=fact_approved.is_fact,
                 is_approved=False,
             )
         except WorkerDay.DoesNotExist:
             not_approved = WorkerDay.objects.create(
                 shop=fact_approved.shop,
-                worker_id=fact_approved.worker_id,
+                employee_id=fact_approved.employee_id,
                 employment=fact_approved.employment,
                 dttm_work_start=fact_approved.dttm_work_start,
                 dttm_work_end=fact_approved.dttm_work_end,
@@ -1159,25 +1163,26 @@ class AttendanceRecords(AbstractModel):
             return res
 
         with transaction.atomic():
+            # TODO: ошибка + явный выбор если есть неоднозначность в выборе Сотрудника для которого идет отметка
             fact_approved = WorkerDay.objects.filter(
                 dt=self.dt,
-                worker=self.user,
+                employee__user=self.user,
                 is_fact=True,
                 is_approved=True,
             ).select_for_update().first()
 
             plan_approved = WorkerDay.objects.filter(
                 dt=self.dt,
-                worker=self.user,
+                employee__user=self.user,
                 is_fact=False,
                 is_approved=True,
-                shop=self.shop,  # TODO: смотрим же только для того подразделения где идет отметка?
+                shop=self.shop,
                 type__in=WorkerDay.TYPES_WITH_TM_RANGE,
                 employment__isnull=False,
             ).prefetch_related('work_types').first()
 
-            active_user_empl = Employment.objects.get_active_empl_for_user(
-                network_id=self.user.network_id, user_id=self.user_id,
+            active_user_empl = Employment.objects.get_active_empl_by_priority(
+                network_id=self.user.network_id, employee__user_id=self.user_id,
                 dt=self.dt,
                 priority_shop_id=self.shop_id,
                 priority_employment_id=plan_approved.employment_id if plan_approved else None,
@@ -1210,7 +1215,7 @@ class AttendanceRecords(AbstractModel):
                 if self.type == self.TYPE_LEAVING:
                     prev_fa_wd = WorkerDay.objects.filter(
                         shop_id=self.shop_id,
-                        worker=self.user,
+                        employee__user=self.user,
                         dt__lt=self.dt,
                         is_fact=True,
                         is_approved=True,
@@ -1236,7 +1241,7 @@ class AttendanceRecords(AbstractModel):
 
                 fact_approved, _wd_created = WorkerDay.objects.update_or_create(
                     dt=self.dt,
-                    worker=self.user,
+                    employee=active_user_empl.employee,
                     is_fact=True,
                     is_approved=True,
                     defaults={
@@ -1250,14 +1255,7 @@ class AttendanceRecords(AbstractModel):
                 if _wd_created or not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl)
                 if _wd_created:
-                    plan_wd = WorkerDay.objects.filter(
-                        dt=self.dt,
-                        worker=self.user,
-                        is_fact=False,
-                        is_approved=True,
-                        shop_id=self.shop_id,
-                    )
-                    if not plan_wd.exists():
+                    if not plan_approved:
                         transaction.on_commit(lambda: event_signal.send(
                             sender=None,
                             network_id=self.user.network_id,
@@ -1399,7 +1397,7 @@ class GroupWorkerDayPermission(AbstractModel):
         return cls.objects.filter(
             Q(limit_days_in_past__isnull=True) | Q(limit_days_in_past__gte=(today - wd_dt).days),
             Q(limit_days_in_future__isnull=True) | Q(limit_days_in_future__gte=(wd_dt - today).days),
-            group__in=user.get_group_ids(user.network),  # добавить shop ?
+            group__in=user.get_group_ids(),  # добавить shop ?
             worker_day_permission__action=action,
             worker_day_permission__graph_type=graph_type,
             worker_day_permission__wd_type=wd_type,
@@ -1413,6 +1411,7 @@ class PlanAndFactHours(models.Model):
     shop_name = models.CharField(max_length=512)
     shop_code = models.CharField(max_length=512)
     worker = models.ForeignKey('base.User', on_delete=models.DO_NOTHING)
+    employee = models.ForeignKey('base.Employee', on_delete=models.DO_NOTHING)
     tabel_code = models.CharField(max_length=64)
     wd_type = models.CharField(max_length=4, choices=WorkerDay.TYPES)
     worker_fio = models.CharField(max_length=512, choices=WorkerDay.TYPES)
@@ -1471,25 +1470,10 @@ class ProdCal(models.Model):
     dt = models.DateField()
     shop = models.ForeignKey('base.Shop', on_delete=models.DO_NOTHING)
     user = models.ForeignKey('base.User', on_delete=models.DO_NOTHING)
+    employee = models.ForeignKey('base.Employee', on_delete=models.DO_NOTHING)
     employment = models.ForeignKey('base.Employment', on_delete=models.DO_NOTHING)
     norm_hours = models.FloatField()
 
     class Meta:
         managed = False
         db_table = 'prod_cal'
-
-    @classmethod
-    def get_workers_prod_cal_hours(cls, user_ids, dt_from, dt_to):
-        prod_cal_qs = cls.objects.filter(
-            user__id__in=user_ids,
-            dt__gte=dt_from,
-            dt__lte=dt_to,
-        ).values(
-            'user_id',
-            'employment_id',
-            'dt__month',
-        ).annotate(
-            norm_hours_sum=Sum('norm_hours'),
-        ).order_by()
-
-        return {(pc['user_id'], pc['employment_id'], pc['dt__month']): pc['norm_hours_sum'] for pc in prod_cal_qs}

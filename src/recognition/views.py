@@ -216,14 +216,14 @@ class TickViewSet(BaseModelViewSet):
         employment = Employment.objects.get_active(
             request.user.network.id,
             dttm_from.date(), dttm_from.date(),
-            user_id=user_id,
+            employee__user_id=user_id,
             shop_id=tick_point.shop_id
         ).first()
 
         if (not employment) and settings.USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY:
             # есть ли вакансия в этом магазине
             wd = WorkerDay.objects.filter(
-                worker_id=user_id,
+                employee__user_id=user_id,
                 shop_id=tick_point.shop_id,
                 dt__gte=dttm_from - timedelta(1),
                 dt__lte=dttm_to.date(),
@@ -242,7 +242,7 @@ class TickViewSet(BaseModelViewSet):
                 )
 
         wd = WorkerDay.objects.all().filter(
-            worker_id=user_id,
+            employee__user_id=user_id,
             shop_id=tick_point.shop_id,
             employment=employment,
             dttm_work_start__gte=dttm_from,
@@ -256,7 +256,6 @@ class TickViewSet(BaseModelViewSet):
         tick = Tick.objects.create(
             user_id=user_id,
             tick_point_id=tick_point.id,
-            # worker_day=wd,
             lateness=check_time - wd.dttm_work_start if wd else timedelta(seconds=0),
             dttm=check_time,
             type=data['type'],
