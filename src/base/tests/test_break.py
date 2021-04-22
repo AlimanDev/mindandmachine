@@ -31,7 +31,7 @@ class TestBreakValidation(TestsHelperMixin, APITestCase):
                 value='[[0, 100, [30]], [101, 200]]',
             )
         except ValidationError as e:
-            self.assertEqual(e.detail, {'message': 'Некорректный формат перерыва [101, 200], должно быть [[int, int, [int, int,]],].'})
+            self.assertEqual(e.detail, ['Некорректный формат перерыва [101, 200], должно быть [[int, int, [int, int,]],].'])
 
         self.assertIsNone(b)
         
@@ -43,7 +43,7 @@ class TestBreakValidation(TestsHelperMixin, APITestCase):
                 value='[[0, 100, [30]], [101, 200, 300]]',
             )
         except ValidationError as e:
-            self.assertEqual(e.detail, {'message': 'Некорректный формат перерыва [101, 200, 300], должно быть [[int, int, [int, int,]],].'})
+            self.assertEqual(e.detail, ['Некорректный формат перерыва [101, 200, 300], должно быть [[int, int, [int, int,]],].'])
 
         self.assertIsNone(b)
 
@@ -55,7 +55,7 @@ class TestBreakValidation(TestsHelperMixin, APITestCase):
                 value='[[0, 100, [30]], ["101", 200, [40]]]',
             )
         except ValidationError as e:
-            self.assertEqual(e.detail, {'message': 'Некорректный формат перерыва [\'101\', 200, [40]], должно быть [[int, int, [int, int,]],].'})
+            self.assertEqual(e.detail, ['Некорректный формат перерыва [\'101\', 200, [40]], должно быть [[int, int, [int, int,]],].'])
 
         self.assertIsNone(b)
 
@@ -67,7 +67,7 @@ class TestBreakValidation(TestsHelperMixin, APITestCase):
                 value='[[0, 100, [30]], [101, 200, [40, "10"]]]',
             )
         except ValidationError as e:
-            self.assertEqual(e.detail, {'message': 'Некорректный формат перерыва [101, 200, [40, \'10\']], должно быть [[int, int, [int, int,]],].'})
+            self.assertEqual(e.detail, ['Некорректный формат перерыва [101, 200, [40, \'10\']], должно быть [[int, int, [int, int,]],].'])
 
         self.assertIsNone(b)
 
@@ -79,7 +79,7 @@ class TestBreakValidation(TestsHelperMixin, APITestCase):
                 value='[0, 100, [30]]',
             )
         except ValidationError as e:
-            self.assertEqual(e.detail, {'message': 'Некорректный формат перерыва 0, должно быть [[int, int, [int, int,]],].'})
+            self.assertEqual(e.detail, ['Некорректный формат перерыва 0, должно быть [[int, int, [int, int,]],].'])
 
         self.assertIsNone(b)
 
@@ -92,7 +92,7 @@ class TestBreakValidation(TestsHelperMixin, APITestCase):
                 value='[[0, 100, [30]], [200, 101, [40]]]',
             )
         except ValidationError as e:
-            self.assertEqual(e.detail, {'message': 'Первое значение периода не может быть больше второго значения: [200, 101, [40]]'})
+            self.assertEqual(e.detail, ['Первое значение периода не может быть больше второго значения: [200, 101, [40]]'])
 
         self.assertIsNone(b)
 
@@ -105,6 +105,6 @@ class TestBreakValidation(TestsHelperMixin, APITestCase):
                 value='[[0, 100, [30]], [101, 200, [300]]]',
             )
         except ValidationError as e:
-            self.assertEqual(e.detail, {'message': 'Значение перерыва не может быть больше значения периода: [101, 200, [300]]'})
+            self.assertEqual(e.detail, ['Значение перерыва не может быть больше значения периода: [101, 200, [300]]'])
 
         self.assertIsNone(b)

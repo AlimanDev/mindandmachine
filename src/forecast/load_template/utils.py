@@ -16,12 +16,12 @@ from src.forecast.operation_type_template.views import OperationTypeTemplateSeri
 from src.base.shop.serializers import ShopSerializer
 from django.db.models import F, Case, When, TimeField, Q
 from django.db.models.functions import Least, Greatest
+from django.utils.translation import gettext as _
 from src.util.models_converter import Converter
 from src.conf.djconfig import HOST
 import json
 import pandas as pd
 from rest_framework.response import Response
-from src.base.exceptions import MessageError
 from src.util.download import xlsx_method
 from dateutil.relativedelta import relativedelta
 
@@ -505,7 +505,7 @@ def upload_load_template(template_file, form, lang='ru'):
     o_types_db_set = set(o_types.keys())
     undefined_o_types = set(df[O_TYPE_COL].dropna()).difference(o_types_db_set)
     if len(undefined_o_types):
-        raise MessageError(code='load_template_undefined_types', lang=lang, params={'types': undefined_o_types})
+        raise serializers.ValidationError(_('These operation types do not exist: {types}.').format(types=undefined_o_types))
     lt = LoadTemplate.objects.create(name=form['name'], network_id=network_id)
     df = df.fillna('')
     forecast_steps = {

@@ -417,7 +417,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.shop.load_template_status = Shop.LOAD_TEMPLATE_PROCESS
         self.shop.save()
         response = self.client.put(f'{self.url}{self.shop.id}/', data={'load_template_id': self.load_template.id, 'name': 'Shop Test'})
-        self.assertEqual(response.json(), {'message': 'Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета.'})
+        self.assertEqual(response.json(), ['Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета.'])
 
     def test_shop_schedule_filled_on_shop_creating(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
