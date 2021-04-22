@@ -14,8 +14,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='workerday',
             name='employee',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT,
-                                    related_name='employees', to='base.Employee', verbose_name='Сотрудник'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='worker_days', to='base.Employee', verbose_name='Сотрудник'),
         ),
         migrations.AlterUniqueTogether(
             name='workerday',
