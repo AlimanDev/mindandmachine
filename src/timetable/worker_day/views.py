@@ -56,6 +56,7 @@ from src.timetable.worker_day.serializers import (
     BlockOrUnblockWorkerDayWrapperSerializer,
 )
 from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
+from src.timetable.worker_day.tasks import recalc_wdays
 from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util, exchange, copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
@@ -531,7 +532,6 @@ class WorkerDayViewSet(BaseModelViewSet):
 
                 # если план, то отмечаем, что график подтвержден
                 if not serializer.data['is_fact']:
-                    from src.celery.tasks import recalc_wdays
 
                     ShopMonthStat.objects.filter(
                         shop_id=serializer.data['shop_id'],

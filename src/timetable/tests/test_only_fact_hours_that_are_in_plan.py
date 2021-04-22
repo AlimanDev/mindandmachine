@@ -24,7 +24,7 @@ from src.util.mixins.tests import TestsHelperMixin
 class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from src.celery.tasks import fill_shop_schedule
+        from src.base.shop.tasks import fill_shop_schedule
         cls.dt = now().date()
         cls.network = NetworkFactory(
             only_fact_hours_that_in_approved_plan=True,

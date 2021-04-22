@@ -20,7 +20,7 @@ from rest_framework.response import Response
 
 from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings, WorkerPosition, Employee
 from src.base.permissions import Permission
-from src.celery.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
+from src.timetable.vacancy.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
 from src.forecast.models import PeriodClients
 from src.timetable.models import (
     ShopMonthStat,

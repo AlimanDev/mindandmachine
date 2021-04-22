@@ -12,7 +12,7 @@ from src.base.tests.factories import (
     GroupFactory,
     EmployeeFactory,
 )
-from src.celery.tasks import fill_shop_schedule
+from src.base.shop.tasks import fill_shop_schedule
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 

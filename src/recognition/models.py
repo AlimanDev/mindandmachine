@@ -145,19 +145,19 @@ class Tick(AbstractActiveModel):
     def first_tick_photo_image_url(self):
         tick_photo = self.get_tick_photo(TickPhoto.TYPE_FIRST)
         if tick_photo:
-            return settings.HOST + tick_photo.image.url
+            return settings.EXTERNAL_HOST + tick_photo.image.url
 
     @property
     def last_tick_photo_image_url(self):
         tick_photo = self.get_tick_photo(TickPhoto.TYPE_LAST)
         if tick_photo:
-            return settings.HOST + tick_photo.image.url
+            return settings.EXTERNAL_HOST + tick_photo.image.url
 
     @property
     def self_tick_photo_image_url(self):
         tick_photo = self.get_tick_photo(TickPhoto.TYPE_SELF)
         if tick_photo:
-            return settings.HOST + tick_photo.image.url
+            return settings.EXTERNAL_HOST + tick_photo.image.url
 
 
 class TickPhoto(AbstractActiveModel):

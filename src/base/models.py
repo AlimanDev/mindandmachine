@@ -432,17 +432,17 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     def _fill_city_from_coords(self):
         if not self.city and self.latitude and self.longitude and settings.DADATA_TOKEN:
-            from src.celery.tasks import fill_shop_city_from_coords
+            from src.base.shop.tasks import fill_shop_city_from_coords
             fill_shop_city_from_coords.delay(shop_id=self.id)
 
     def _fill_city_coords_address_timezone_from_fias_code(self):
         if self.fias_code and settings.DADATA_TOKEN:
-            from src.celery.tasks import fill_city_coords_address_timezone_from_fias_code
+            from src.base.shop.tasks import fill_city_coords_address_timezone_from_fias_code
             fill_city_coords_address_timezone_from_fias_code.delay(shop_id=self.id)
 
     def _handle_new_shop_created(self):
         from src.util.models_converter import Converter
-        from src.celery.tasks import fill_shop_schedule
+        from src.base.shop.tasks import fill_shop_schedule
         dt_now = datetime.datetime.now().date()
         if self.open_times and self.close_times:
             fill_shop_schedule.delay(
@@ -453,7 +453,8 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     def _handle_schedule_change(self):
         from src.util.models_converter import Converter
-        from src.celery.tasks import fill_shop_schedule, recalc_wdays
+        from src.base.shop.tasks import fill_shop_schedule
+        from src.timetable.worker_day.tasks import recalc_wdays
         dt_now = datetime.datetime.now().date()
         ch = chain(
             fill_shop_schedule.si(shop_id=self.id, dt_from=Converter.convert_date(dt_now)),
@@ -490,7 +491,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             transaction.on_commit(self._handle_schedule_change)
         if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
-            from src.celery.tasks import calculate_shops_load
+            from src.forecast.load_template.tasks import calculate_shops_load
             apply_load_template(self.load_template_id, self.id)
             calculate_shops_load.delay(
                 self.load_template_id,
@@ -920,7 +921,7 @@ class EmploymentQuerySet(QuerySet):
 
     def delete(self):
         from src.timetable.models import WorkerDay
-        from src.celery.tasks import clean_wdays
+        from src.timetable.worker_day.tasks import clean_wdays
         with transaction.atomic():
             wdays_ids = list(WorkerDay.objects.filter(employment__in=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment__in=self).update(employment_id=None)
@@ -1017,7 +1018,7 @@ class Employment(AbstractActiveModel):
 
     def delete(self, **kwargs):
         from src.timetable.models import WorkerDay
-        from src.celery.tasks import clean_wdays
+        from src.timetable.worker_day.tasks import clean_wdays
         with transaction.atomic():
             wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
@@ -1098,7 +1099,7 @@ class Employment(AbstractActiveModel):
 
         if (is_new or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
                 self.employee.user.network and self.employee.user.network.clean_wdays_on_employment_dt_change:
-            from src.celery.tasks import clean_wdays
+            from src.timetable.worker_day.tasks import clean_wdays
             from src.timetable.models import WorkerDay
             from src.util.models_converter import Converter
             kwargs = {
@@ -1488,7 +1489,7 @@ class ShopSchedule(AbstractModel):
         recalc_wdays = kwargs.pop('recalc_wdays', False)
 
         if recalc_wdays and any(self.tracker.has_changed(f) for f in ['opens', 'closes', 'type']):
-            from src.celery.tasks import recalc_wdays
+            from src.timetable.worker_day.tasks import recalc_wdays
             from src.util.models_converter import Converter
             dt_str = Converter.convert_date(self.dt)
             recalc_wdays.delay(

@@ -137,3 +137,4 @@ zipp==0.6.0
 git+https://devxplorer@bitbucket.org/devxplorer/relatorio.git@89e7e2d37a27d81088ce3d7e40e09682bb39ade0
 dadata==0.3.0
 tzwhere==3.0.3
+django-environ==0.4.5
