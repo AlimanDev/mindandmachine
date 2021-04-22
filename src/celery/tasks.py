@@ -21,7 +21,7 @@ from src.base.models import (
     Employment,
 )
 from src.celery.celery import app
-from src.conf.djconfig import EMAIL_HOST_USER
+from src.conf.djconfig import EMAIL_HOST_USER, URV_DELETE_BIOMETRICS_DAYS_AFTER_FIRED
 from src.forecast.models import OperationTemplate
 from src.notifications.models import EventEmailNotification
 from src.notifications.tasks import send_event_email_notifications
@@ -402,3 +402,41 @@ def send_doctors_schedule_to_mis(json_data, logger=logging.getLogger('send_docto
             resp.raise_for_status()
         except requests.RequestException:
             logger.exception(f'text:{resp.text}, wd_data: {wd_data}', )
+
+
+@app.task
+def auto_delete_biometrics():
+    from django.db.models import Exists, OuterRef, Subquery
+    from src.recognition.api.recognition import Recognition
+    from src.recognition.models import UserConnecter
+    from requests.exceptions import HTTPError
+    dt_now = date.today()
+    dt = dt_now - timedelta(days=URV_DELETE_BIOMETRICS_DAYS_AFTER_FIRED)
+    users = User.objects.annotate(
+        active_employment_exists=Exists(
+            Employment.objects.get_active(
+                dt_from=dt_now,
+                dt_to=dt_now,
+                user_id=OuterRef('pk')
+            )
+        )
+    ).filter(
+        active_employment_exists=False,
+    ).annotate(
+        last_dt_fired=Subquery(
+            Employment.objects.filter(
+                user_id=OuterRef('pk')
+            ).order_by('-dt_fired').values('dt_fired')[:1]
+        )
+    ).filter(
+        last_dt_fired__lte=dt,
+    )
+    r = Recognition()
+    deleted_uc = []
+    for uc in UserConnecter.objects.filter(user__in=users):
+        try:
+            r.delete_person(uc.partner_id)
+            deleted_uc.append(uc.user_id)
+        except HTTPError:
+            return
+    UserConnecter.objects.filter(user_id__in=deleted_uc).delete()
