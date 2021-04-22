@@ -47,6 +47,7 @@ from src.timetable.models import (
     Employment,
 )
 from src.recognition.forms import DownloadViolatorsReportForm
+from src.recognition.utils import check_duplicate_biometrics
 from src.timetable.mixins import SuperuserRequiredMixin
 from django.views.generic.edit import FormView
 
@@ -375,6 +376,7 @@ class TickPhotoViewSet(BaseModelViewSet):
                 try:
                     partner_id = recognition.create_person({"id": tick.user_id})
                     photo_id = recognition.upload_photo(partner_id, image)
+                    check_duplicate_biometrics(image, tick.user)
                 except HTTPError as e:
                     return Response({"error": "Сервис распознавания временно недоступен. Пожалуйста, обратитесь к администратору системы."}, e.response.status_code)
 
