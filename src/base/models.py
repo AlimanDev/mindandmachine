@@ -1156,6 +1156,7 @@ class FunctionGroup(AbstractModel):
         'AuthUserView',
         'Break',
         'Employment',
+        'Employee',
         'Employment_auto_timetable',
         'Employment_timetable',
         'EmploymentWorkType',
