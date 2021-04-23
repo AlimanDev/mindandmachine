@@ -76,7 +76,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.employment_worker2 = EmploymentFactory(
-            user=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker, network=cls.network
+            employee=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker, network=cls.network
         )
         cls.urv_stat_event, _created = EventType.objects.get_or_create(
             code=URV_STAT, network=cls.network)
@@ -249,7 +249,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.employment_worker2 = EmploymentFactory(
-            user=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker, network=cls.network
+            employee=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker, network=cls.network
         )
         cls.urv_stat_event, _created = EventType.objects.get_or_create(
             code=URV_STAT_TODAY, network=cls.network)
@@ -396,7 +396,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.employment_worker2 = EmploymentFactory(
-            user=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker, network=cls.network
+            employee=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker, network=cls.network
         )
         cls.urv_violators_event, _created = EventType.objects.get_or_create(
             code=URV_VIOLATORS_REPORT, network=cls.network)
@@ -565,7 +565,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.employment_worker2 = EmploymentFactory(
-            user=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker2, shop=cls.shop2, function_group=cls.group_worker, network=cls.network
         )
         cls.urv_stat_event, _created = EventType.objects.get_or_create(
             code=URV_STAT_V2, network=cls.network)
