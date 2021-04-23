@@ -168,7 +168,7 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
         }
 
 
-def urv_stat_v2(dt_from, dt_to, title=None, network_id=None, in_memory=False):
+def urv_stat_v2(dt_from, dt_to, title=None, shop_ids=None, network_id=None, in_memory=False):
     DTTM = 0
     SHOP_CODE = 1
     SHOP = 2
@@ -202,6 +202,10 @@ def urv_stat_v2(dt_from, dt_to, title=None, network_id=None, in_memory=False):
     worksheet.write_string(0, TYPE, 'Тип события', workbook.add_format(def_format))
     worksheet.set_column(TYPE, TYPE, 11)
     
+    shop_filter = {}
+    if shop_ids:
+        shop_filter['shop_id__in'] = shop_ids
+
     records = AttendanceRecords.objects.select_related(
         'shop',
         'user',
@@ -209,6 +213,7 @@ def urv_stat_v2(dt_from, dt_to, title=None, network_id=None, in_memory=False):
         dt__gte=dt_from,
         dt__lte=dt_to,
         shop__network_id=network_id,
+        **shop_filter,
     ).order_by(
         'shop_id',
         'dttm',
