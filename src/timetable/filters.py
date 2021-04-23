@@ -22,9 +22,10 @@ class WorkerDayFilter(FilterSet):
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода') # aa: fixme: delete
     fact_tabel = BooleanFilter(method='filter_fact_tabel', label="Выгрузка табеля")
 
-    # параметры для совместимости с существующими интеграциями
+    # параметры для совместимости с существующими интеграциями, не удалять
     worker_id = NumberFilter(field_name='employee__user_id')
     worker__username__in = CharFilter(field_name='employee__user__username', lookup_expr='in')
+    employment__tabel_code__in = CharFilter(field_name='employee__tabel_code', lookup_expr='in')
 
     def filter_fact_tabel(self, queryset, name, value):
         if value:
@@ -37,7 +38,7 @@ class WorkerDayFilter(FilterSet):
         fields = {
             # 'shop_id':['exact'],
             'employee_id': ['in', 'exact'],
-            'employment__tabel_code': ['in', 'exact'],
+            'employee__tabel_code': ['in', 'exact'],
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
             'is_fact': ['exact'],

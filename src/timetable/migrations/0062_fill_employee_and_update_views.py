@@ -64,7 +64,7 @@ def update_views(apps, schema_editor):
                 (count(*) FILTER (WHERE wd.is_fact is True and wd.dttm_work_end is not null))::int as ticks_leaving_fact_count,
                 count(*) FILTER (WHERE wd.is_fact is False and wd.created_by_id is NULL) as auto_created_plan,
                 count(*) FILTER (WHERE wd.is_fact is True and wd.created_by_id is NULL) as auto_created_fact,
-                e.tabel_code,
+                employee.tabel_code,
                 wd.employee_id
         from timetable_workerday wd
             inner join base_shop s on wd.shop_id = s.id
@@ -80,7 +80,7 @@ def update_views(apps, schema_editor):
             left join timetable_worktype wd_details_wt on wd_details.work_type_id = wd_details_wt.id
             left join timetable_worktypename wd_details_wt_name on wd_details_wt.work_type_name_id = wd_details_wt_name.id
         where wd.is_approved is True
-            and NOT (wd.employment_id IS NULL AND wd.type = 'W' AND wd.worker_id IS NOT NULL)
+            and NOT (wd.employment_id IS NULL AND wd.type = 'W' AND wd.employee_id IS NOT NULL)
             and wd.employee_id in (
                 select be.employee_id from base_employment be
                 where be.employee_id = wd.employee_id and 
@@ -89,7 +89,7 @@ def update_views(apps, schema_editor):
                 )
         group by wd.dt,
             employee.user_id,
-            e.tabel_code,
+            employee.tabel_code,
             wd.type,
             u.username,
             concat(u.last_name, ' ', u.first_name, ' ', u.middle_name),
@@ -126,6 +126,37 @@ def update_views(apps, schema_editor):
                tt_pf.worker_id AS "ID Пользователя"
         from timetable_plan_and_fact_hours tt_pf
         where tt_pf.wd_type = 'W'""")
+
+    schema_editor.execute("""\
+         create or replace view prod_cal_work_hours as
+         SELECT date_trunc('month'::text, pd.dt::timestamp with time zone)::date AS dt,
+            employee.user_id,
+            u.username,
+            e.shop_id,
+            s.code AS shop_code,
+            sum(
+                CASE
+                    WHEN pd.type::text = 'W'::text THEN 8
+                    WHEN pd.type::text = 'S'::text THEN 7
+                    WHEN pd.type::text = 'H'::text THEN 0
+                    ELSE 0
+                END::double precision * COALESCE(wp.hours_in_a_week::integer, 40)::double precision / 40::double precision * e.norm_work_hours::double precision / 100::double precision) AS norm_hours,
+           wtn.name as work_type_name
+           FROM base_productionday pd
+             JOIN base_employment e ON pd.dt >= e.dt_hired AND pd.dt <= e.dt_fired
+             JOIN base_employee employee ON e.employee_id = employee.id
+             JOIN base_user u ON employee.user_id = u.id
+             JOIN base_shop s ON e.shop_id = s.id
+             LEFT JOIN timetable_employmentworktype ewt on e.id = ewt.employment_id AND ewt.id = (
+                SELECT min(ewt2.id)
+                FROM timetable_employmentworktype ewt2
+                inner join timetable_worktype wt2 on ewt2.work_type_id = wt2.id
+                WHERE e.id = ewt2.employment_id
+             )
+             LEFT JOIN timetable_worktype wt on ewt.work_type_id = wt.id and wt.shop_id = e.shop_id and wt.dttm_deleted is null
+             LEFT JOIN timetable_worktypename wtn on wt.work_type_name_id = wtn.id
+             LEFT JOIN base_workerposition wp ON e.position_id = wp.id
+          GROUP BY (date_trunc('month'::text, pd.dt::timestamp with time zone)::date), employee.user_id, u.username, e.shop_id, s.code, wtn.name;""")
 
 
 class Migration(migrations.Migration):

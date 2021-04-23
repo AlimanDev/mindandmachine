@@ -1,7 +1,7 @@
 from django.db.models import Q
 from django_filters.rest_framework import FilterSet, DateFilter, NumberFilter, CharFilter, BooleanFilter, OrderingFilter
 
-from src.base.models import Employment, User, Notification, Subscribe, Shop, ShopSchedule
+from src.base.models import Employment, User, Notification, Subscribe, Shop, ShopSchedule, Employee
 
 
 class BaseActiveNamedModelFilter(FilterSet):
@@ -114,8 +114,9 @@ class EmployeeFilter(FilterSet):
     shop_id__in = CharFilter(field_name='employments__shop_id', method='field_in')
     shop_code = CharFilter(field_name='employments__shop__code', label='Код магазина')
     shop_code__in = CharFilter(field_name='employments__shop__code', method='field_in')
-    last_name = CharFilter(field_name='last_name', lookup_expr='icontains')
-    first_name = CharFilter(field_name='first_name', lookup_expr='icontains')
+    last_name = CharFilter(field_name='user__last_name', lookup_expr='icontains')
+    first_name = CharFilter(field_name='user__first_name', lookup_expr='icontains')
+    username = CharFilter(field_name='user__username', lookup_expr='icontains')
     position_id__in = CharFilter(field_name='employments__position_id', method='field_in')
     work_type_id__in = CharFilter(field_name='employments__work_types__work_type__work_type_name_id',
                                   method='field_in')
@@ -146,6 +147,13 @@ class EmployeeFilter(FilterSet):
         }
         return queryset.filter(**filt)
 
+    class Meta:
+        model = Employee
+        fields = {
+            'id': ['exact', 'in'],
+            'tabel_code': ['exact', 'in'],
+        }
+
 
 class NotificationFilter(FilterSet):
     class Meta:
@@ -153,8 +161,10 @@ class NotificationFilter(FilterSet):
         fields = ['worker_id', 'is_read']
 
 
+
 class SubscribeFilter(FilterSet):
     shop_id = NumberFilter(field_name='employments__shop_id')
+
     class Meta:
         model = Subscribe
         fields = ('user_id', 'shop_id')
