@@ -23,7 +23,9 @@ class EmploymentFilter(FilterSet):
     dt_to = DateFilter(field_name='dt_hired', lookup_expr='lte', label='Окончание периода')
     shop_code = CharFilter(field_name='shop__code', label='Код магазина')
     user_id = CharFilter(field_name='employee__user_id', label='ID пользователя')
+    user_id__in = CharFilter(field_name='employee__user_id', label='ID пользователя', method='field_in')
     username = CharFilter(field_name='employee__user__username', label='Логин пользователя')
+    username__in = CharFilter(field_name='employee__user__username', label='Логин пользователя', method='field_in')
     mine = BooleanFilter(method='filter_mine', label='Сотрудники моих магазинов')
     order_by = OrderingFilter(fields=('user__last_name', 'user__first_name', 'position__ordering', 'position__name'))
 
@@ -47,15 +49,18 @@ class EmploymentFilter(FilterSet):
             )
         return queryset
 
+    def field_in(self, queryset, name, value):
+        filt = {
+            f'{name}__in': value.split(',')
+        }
+        return queryset.filter(**filt)
+
     class Meta:
         model = Employment
         fields = {
             'id': ['in'],
             'shop_id': ['exact', 'in'],
-            'shop_code': ['exact', 'in'],
             'employee_id': ['exact', 'in'],
-            'user_id': ['exact', 'in'],
-            'username': ['exact', 'in'],
             'tabel_code': ['exact', 'in'],
             'is_visible': ['exact',]
         }

@@ -95,7 +95,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
             shop__network_id=self.request.user.network_id
         ).order_by('-dt_hired')
         if self.action in ['list', 'retrieve']:
-            qs = qs.select_related('employee__user', 'shop').prefetch_related('work_types', 'worker_constraints')
+            qs = qs.select_related('employee', 'employee__user', 'shop').prefetch_related('work_types', 'worker_constraints')
         return qs
 
     def get_serializer_class(self):
