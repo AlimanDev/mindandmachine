@@ -158,6 +158,55 @@ def update_views(apps, schema_editor):
              LEFT JOIN base_workerposition wp ON e.position_id = wp.id
           GROUP BY (date_trunc('month'::text, pd.dt::timestamp with time zone)::date), employee.user_id, u.username, e.shop_id, s.code, wtn.name;""")
 
+    schema_editor.execute("""\
+        create or replace view v_mda_users as
+        SELECT DISTINCT u.id,
+        u.username,
+        u.last_name,
+        u.first_name,
+        u.middle_name,
+        u.email,
+        e.dt_hired,
+        e.dt_fired,
+        e.dttm_deleted IS NULL AND e.dt_hired <= CURRENT_TIMESTAMP::date AND (e.dt_fired IS NULL OR e.dt_fired >= CURRENT_TIMESTAMP::date) AS active,
+            CASE
+                WHEN s.level = 0 THEN 'COMPANY'::text
+                WHEN s.level = 1 THEN 'DIVISION'::text
+                WHEN s.level = 2 THEN 'REGION'::text
+                WHEN s.level = 3 THEN 'SHOP'::text
+                ELSE NULL::text
+            END AS level,
+            CASE
+                WHEN (EXISTS ( SELECT s2.id
+                   FROM base_shop s2
+                  WHERE s2.id = s.id AND s2.director_id = u.id)) AND (g.code::text = 'director'::text OR fg.code::text = 'director'::text) THEN 'DIR'::text
+                WHEN g.code::text = 'worker'::text AND fg.code IS NULL THEN 'MANAGER'::text
+                ELSE NULL::text
+            END AS role,
+        s.name AS shop_name,
+        s.code AS shop_code,
+        wp.name AS position_name,
+        wp.code AS position_code,
+        g.name AS position_group_name,
+        g.code AS position_group_code,
+        fg.name AS func_group_name,
+        fg.code AS func_group_code,
+        u.dttm_modified AS user_last_modified,
+        e.dttm_modified AS employment_last_modified,
+        wp.dttm_modified AS position_last_modified,
+        GREATEST(u.dttm_modified, e.dttm_modified, wp.dttm_modified) AS last_modified
+       FROM base_employment e
+         JOIN base_employee employee ON e.employee_id = employee.id
+         JOIN base_user u ON employee.user_id = u.id
+         JOIN base_shop s ON e.shop_id = s.id
+         LEFT JOIN base_workerposition wp ON e.position_id = wp.id
+         LEFT JOIN base_group fg ON e.function_group_id = fg.id
+         LEFT JOIN base_group g ON wp.group_id = g.id
+         LEFT JOIN timetable_workerday wdpa ON employee.id = wdpa.employee_id AND wdpa.dt = now()::date AND wdpa.is_fact = false AND wdpa.is_approved = true
+         LEFT JOIN timetable_workerday wdpna ON employee.id = wdpna.employee_id AND wdpna.dt = now()::date AND wdpna.is_fact = false AND wdpna.is_approved = false
+      WHERE (e.dttm_deleted IS NULL OR e.dttm_deleted >= (CURRENT_TIMESTAMP - '60 days'::interval)) AND (s.dttm_deleted IS NULL OR s.dttm_deleted >= (CURRENT_TIMESTAMP - '60 days'::interval)) AND (s.dt_closed IS NULL OR s.dt_closed >= (CURRENT_TIMESTAMP - '60 days'::interval)) AND e.dt_hired < e.dt_fired AND (fg.code IS NULL OR (fg.code::text <> ALL (ARRAY['admin'::text, 'controller'::text]))) AND (employee.user_id <> ALL (ARRAY[1::bigint, 2::bigint])) AND e.dt_fired > '2020-10-01'::date AND e.dt_hired <= CURRENT_TIMESTAMP::date AND (NOT wp.group_id = 3 OR wp.group_id IS NULL OR wp.group_id = 3 AND (wdpa.type IS NULL OR (wdpa.type::text <> ALL (ARRAY['M'::text, 'S'::text]))) AND (wdpna.type IS NULL OR (wdpna.type::text <> ALL (ARRAY['M'::text, 'S'::text]))));
+             ;""")
+
 
 class Migration(migrations.Migration):
     dependencies = [
