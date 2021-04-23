@@ -110,7 +110,41 @@ class UserFilter(FilterSet):
 
 
 class EmployeeFilter(FilterSet):
-    pass
+    shop_id = NumberFilter(field_name='employments__shop_id')
+    shop_id__in = CharFilter(field_name='employments__shop_id', method='field_in')
+    shop_code = CharFilter(field_name='employments__shop__code', label='Код магазина')
+    shop_code__in = CharFilter(field_name='employments__shop__code', method='field_in')
+    last_name = CharFilter(field_name='last_name', lookup_expr='icontains')
+    first_name = CharFilter(field_name='first_name', lookup_expr='icontains')
+    position_id__in = CharFilter(field_name='employments__position_id', method='field_in')
+    work_type_id__in = CharFilter(field_name='employments__work_types__work_type__work_type_name_id',
+                                  method='field_in')
+    worker_day_type__in = CharFilter(field_name='worker_days__type', method='field_in')
+    worker_day_dt__in = CharFilter(field_name='worker_days__dt', method='field_in')
+
+    employments__dt_from = DateFilter(method='employments_dt_from')
+    employments__dt_to = DateFilter(method='employments_dt_to')
+
+    def employments_dt_from(self, queryset, name, value):
+        return queryset.filter(
+            Q(employments__dt_fired__gte=value) | Q(employments__dt_fired__isnull=True),
+        )
+
+    def employments_dt_to(self, queryset, name, value):
+        return queryset.filter(
+            Q(employments__dt_hired__lte=value) | Q(employments__dt_hired__isnull=True),
+        )
+
+    def shop_id_in(self, queryset, name, value):
+        return queryset.filter(
+            employments__shop_id__in=value.split(','),
+        )
+
+    def field_in(self, queryset, name, value):
+        filt = {
+            f'{name}__in': value.split(',')
+        }
+        return queryset.filter(**filt)
 
 
 class NotificationFilter(FilterSet):
