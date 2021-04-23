@@ -194,7 +194,7 @@ class EmployeeViewSet(UpdateorCreateViewSet):
     def get_queryset(self):
         return Employee.objects.filter(
             user__network_id=self.request.user.network_id
-        )
+        ).distinct()
 
 
 class AuthUserView(UserDetailsView):
