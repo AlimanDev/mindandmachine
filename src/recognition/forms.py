@@ -3,7 +3,7 @@ from datetime import date
 from django.db.models import Q
 from src.base.models import Network, User, Shop, Employment
 from django.contrib.admin.widgets import AdminDateWidget, FilteredSelectMultiple
-from src.util.urv.urv_violators import urv_violators_report_xlsx_v2
+from src.reports.utils.urv_violators import urv_violators_report_xlsx_v2
 from dateutil.relativedelta import relativedelta
 from django.http.response import HttpResponse
 

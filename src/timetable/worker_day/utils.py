@@ -9,10 +9,10 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.db.models import Q, F, Value, CharField
 from django.db.models.functions import Concat, Cast
+from django.utils.translation import gettext as _
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.response import Response
 
-from src.base.exceptions import MessageError
 from src.base.models import (
     User,
     Shop,
@@ -54,7 +54,7 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
     try:
         df = pd.read_excel(timetable_file)
     except KeyError:
-        raise MessageError(code='xlsx_no_active_list', lang=form.get('lang', 'ru'))
+        raise ValidationError(_('Failed to open active sheet.'))
     ######################### сюда писать логику чтения из экселя ######################################################
 
     users = []
@@ -98,7 +98,8 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
             continue
         position = positions.get(data[position_column].lower().strip())
         if not position:
-            raise MessageError('xlsx_no_worker_position', lang=form.get('lang', 'ru'), params={'position':data[position_column]})
+            # Нет такой должности {position}
+            raise ValidationError(_('There is no such position {position}.').format(position=data[position_column]))
         names = data[name_column].split()
         tabel_code = str(data[number_column]).split('.')[0]
         created = False
@@ -203,7 +204,7 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
         for w in WorkType.objects.select_related('work_type_name').filter(shop_id=shop_id, dttm_deleted__isnull=True)
     }
     if (len(work_types) == 0):
-        raise MessageError(code='no_active_work_types', lang=form.get('lang', 'ru'))
+        raise ValidationError(_('There are no active work types in this shop.'))
 
     first_type = next(iter(work_types.values()))
     timetable_df = df[df.columns[:3 + len(dates)]]
@@ -250,7 +251,7 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
                 else:
                     continue
             except:
-                raise MessageError(code='xlsx_undefined_cell', lang=form.get('lang', 'ru'), params={'employee': employee, 'dt': dt, 'value': str(data[i + 3])})
+                raise ValidationError(_('The employee {user.first_name} {user.last_name} in the cell for {dt} has the wrong value: {value}.').format(user=employee.user, dt=dt, value=str(data[i + 3])))
 
             WorkerDay.objects.filter(dt=dt, employee=employee, is_fact=is_fact, is_approved=False).delete()
           
@@ -324,7 +325,7 @@ def download_timetable_util(request, workbook, form):
         timetable.change_for_inspection(timetable.prod_month.get('norm_work_hours', 0), workdays)
 
     timetable.format_cells(len(employments))
-    
+
     # construct weekday
     timetable.construct_dates('%w', 8, 4)
 

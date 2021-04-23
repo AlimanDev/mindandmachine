@@ -27,12 +27,14 @@ def cron_event():
         ):
             posible_crons.append(cron)
     events = EventEmailNotification.objects.filter(
-        cron__in=posible_crons,
+        report_config__cron__in=posible_crons,
     )
     for event_email_notification in events:
         send_event_email_notifications.delay(
             event_email_notification_id=event_email_notification.id,
             user_author_id=None,
-            context={},
+            context={
+                'shop_ids': list(event_email_notification.report_config.shops.all().values_list('id', flat=True)),
+            },
         )
 
