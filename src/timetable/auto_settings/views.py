@@ -71,7 +71,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         "tt_server_error": _("Fail sending data to server."),
         "tt_delete_past": _("You can't delete timetable in the past."),
         "settings_not_exists": _("You need to select auto-scheduling settings for the department."),
-        "tt_different_acc_periods": _("Небходимо выбрать интервал в рамках одного учетного периода."),
+        "tt_different_acc_periods": _("You need to select an interval within a single accounting period."),
     }
     serializer_class = AutoSettingsCreateSerializer
     permission_classes = [Permission]

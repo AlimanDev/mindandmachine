@@ -1,7 +1,8 @@
+from django.utils.translation import gettext as _
+from rest_framework.serializers import ValidationError
 from src.conf.djconfig import ALLOWED_UPLOAD_EXTENSIONS
 from django.utils.datastructures import MultiValueDictKeyError
 from functools import wraps
-from src.base.exceptions import MessageError
 
 
 def get_uploaded_file(func):
@@ -19,12 +20,12 @@ def get_uploaded_file(func):
         try:
             file = request.FILES['file']
         except MultiValueDictKeyError:
-            raise MessageError(code='upload_no_files', lang=request.user.lang)
+            raise ValidationError(_('No files were transferred.'))
 
         if not file:
-            raise MessageError(code='upload_no_file', lang=request.user.lang)
+            raise ValidationError(_('The file was not uploaded.'))
         if not file.name.split('/')[-1].split('.', file.name.split('/')[-1].count('.'))[-1] in ALLOWED_UPLOAD_EXTENSIONS:
-            raise MessageError(code='upload_incorrect_extension', lang=request.user.lang)
+            raise ValidationError(_('Files with this extension are not supported.'))
 
         return func(view, request, file, *args, **kwargs)
     return wrapper
