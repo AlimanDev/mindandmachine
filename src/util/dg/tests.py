@@ -153,7 +153,6 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             function_group=self.employee_group,
             dt_hired=self.dt_from + timedelta(12),
             salary=100,
-            tabel_code='A00001234',
         )
         g = T13TabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         data = g.get_data()
