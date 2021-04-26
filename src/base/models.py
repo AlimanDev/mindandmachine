@@ -1010,7 +1010,7 @@ class Employment(AbstractActiveModel):
         return self.shop
 
     def get_short_fio_and_position(self):
-        short_fio_and_position = f'{self.user.get_short_fio()}'
+        short_fio_and_position = f'{self.employee.user.get_short_fio()}'
         if self.position and self.position.name:
             short_fio_and_position += f', {self.position.name}'
 

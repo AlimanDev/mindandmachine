@@ -1002,7 +1002,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         data = DuplicateSrializer(data=request.data, context={'request': request})
         data.is_valid(raise_exception=True)
         data = data.validated_data
-        to_worker_id = data['to_worker_id']
+        to_employee_id = data['to_employee_id']
 
         with transaction.atomic():
             main_worker_days = list(WorkerDay.objects.filter(
@@ -1014,7 +1014,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             ).order_by('dt'))
             created_wds, work_types = copy_as_excel_cells(
                 main_worker_days,
-                to_worker_id,
+                to_employee_id,
                 data['to_dates'],
                 created_by=request.user.id
             )
@@ -1043,13 +1043,13 @@ class WorkerDayViewSet(BaseModelViewSet):
             data['to_copy_dt_from'] + datetime.timedelta(i)
             for i in range((data['to_copy_dt_to'] - data['to_copy_dt_from']).days + 1)
         ]
-        worker_ids = data.get('worker_ids')
+        employee_ids = data.get('employee_ids')
         created_wds = []
         work_types = []
         with transaction.atomic():
-            for worker_id in worker_ids:
+            for employee_id in employee_ids:
                 main_worker_days = list(WorkerDay.objects.filter(
-                    employee__user_id=worker_id,
+                    employee_id=employee_id,
                     dt__in=from_dates,
                     is_fact=False,
                     is_approved=data['is_approved'],
@@ -1057,7 +1057,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     'employee__user',
                     'shop__settings__breaks',
                 ).order_by('dt'))
-                wds, w_types = copy_as_excel_cells(main_worker_days, worker_id, to_dates, created_by=request.user.id)
+                wds, w_types = copy_as_excel_cells(main_worker_days, employee_id, to_dates, created_by=request.user.id)
 
                 created_wds.extend(wds)
                 work_types.extend(w_types)

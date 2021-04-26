@@ -417,7 +417,7 @@ def auto_delete_biometrics():
             Employment.objects.get_active(
                 dt_from=dt_now,
                 dt_to=dt_now,
-                user_id=OuterRef('pk')
+                employee__user_id=OuterRef('pk')
             )
         )
     ).filter(
@@ -425,7 +425,7 @@ def auto_delete_biometrics():
     ).annotate(
         last_dt_fired=Subquery(
             Employment.objects.filter(
-                user_id=OuterRef('pk')
+                employee__user_id=OuterRef('pk')
             ).order_by('-dt_fired').values('dt_fired')[:1]
         )
     ).filter(

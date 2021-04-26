@@ -68,7 +68,6 @@ def update_views(apps, schema_editor):
                 wd.employee_id
         from timetable_workerday wd
             inner join base_shop s on wd.shop_id = s.id
-            inner join base_employment e on wd.employment_id = e.id
             inner join base_employee employee on wd.employee_id = employee.id
             inner join base_user u on employee.user_id = u.id
             inner join base_network network on s.network_id = network.id

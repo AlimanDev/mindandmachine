@@ -2641,7 +2641,7 @@ class TestAditionalFunctions(APITestCase):
         self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
         data = {
             'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
-            'to_worker_id': self.user3.id,
+            'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
         }
         url = f'{self.url}duplicate/'
@@ -2656,7 +2656,7 @@ class TestAditionalFunctions(APITestCase):
         self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
         data = {
             'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
-            'to_worker_id': self.user3.id,
+            'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
         }
         url = f'{self.url}duplicate/'
@@ -2671,7 +2671,7 @@ class TestAditionalFunctions(APITestCase):
         self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
         data = {
             'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
-            'to_worker_id': self.user3.id,
+            'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(8)],
         }
         url = f'{self.url}duplicate/'
@@ -2685,7 +2685,7 @@ class TestAditionalFunctions(APITestCase):
         self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
         data = {
             'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
-            'to_worker_id': self.user3.id,
+            'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from2 + timedelta(i)) for i in range(8)],
         }
         url = f'{self.url}duplicate/'
@@ -2700,7 +2700,7 @@ class TestAditionalFunctions(APITestCase):
 
         data = {
             'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
-            'to_worker_id': self.user3.id,
+            'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from2 + timedelta(i)) for i in range(8)],
         }
         url = f'{self.url}duplicate/'
@@ -2720,7 +2720,7 @@ class TestAditionalFunctions(APITestCase):
         self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
         data = {
             'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
-            'to_worker_id': self.user3.id,
+            'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from2 + timedelta(i)) for i in range(8)],
         }
         url = f'{self.url}duplicate/'
@@ -2761,7 +2761,7 @@ class TestAditionalFunctions(APITestCase):
 
         data = {
             'from_workerday_ids': [wd_dt_now.id, wd_dt_tomorrow.id],
-            'to_worker_id': self.user3.id,
+            'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_to + timedelta(days=i)) for i in range(2)],
         }
         url = f'{self.url}duplicate/'
@@ -2924,9 +2924,9 @@ class TestAditionalFunctions(APITestCase):
             )
 
         data = {
-            'worker_ids': [  # TODO: заменять на employee_ids
-                self.employment2.employee.user_id,
-                self.employment4.employee.user_id,
+            'employee_ids': [
+                self.employment2.employee_id,
+                self.employment4.employee_id,
             ],
             'from_copy_dt_from': dt_from_first,
             'from_copy_dt_to': dt_from_last,
@@ -2961,9 +2961,9 @@ class TestAditionalFunctions(APITestCase):
         dt_to_first = dt_from_first - timedelta(1)
         dt_to_last = dt_to_first + relativedelta(day=31)
         data = {
-            'worker_ids': [
-                self.employment2.employee.user_id,
-                self.employment4.employee.user_id,
+            'employee_ids': [
+                self.employment2.employee_id,
+                self.employment4.employee_id,
             ],
             'from_copy_dt_from': dt_from_first,
             'from_copy_dt_to': dt_from_last,

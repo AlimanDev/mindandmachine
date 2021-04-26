@@ -395,14 +395,14 @@ class DuplicateSrializer(serializers.Serializer):
     default_error_messages = {
         'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")
     }
-    to_worker_id = serializers.IntegerField()
+    to_employee_id = serializers.IntegerField()
     from_workerday_ids = serializers.ListField(child=serializers.IntegerField(), allow_null=False, allow_empty=False)
     to_dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
-        if not User.objects.filter(id=self.data['to_worker_id']).exists():
-            raise ValidationError({'to_worker_id': self.error_messages['not_exist'].format(pk_value=self.validated_data['to_worker_id'])})
+        if not Employee.objects.filter(id=self.data['to_employee_id']).exists():
+            raise ValidationError({'to_employee_id': self.error_messages['not_exist'].format(pk_value=self.validated_data['to_employee_id'])})
         return True
 
 
@@ -435,7 +435,7 @@ class CopyRangeSerializer(serializers.Serializer):
         'check_periods': _('Start of first period can\'t be greater than start of second period'),
     }
 
-    worker_ids = serializers.ListField(child=serializers.IntegerField())
+    employee_ids = serializers.ListField(child=serializers.IntegerField())
     from_copy_dt_from = serializers.DateField()
     from_copy_dt_to = serializers.DateField()
     to_copy_dt_from = serializers.DateField()

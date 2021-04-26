@@ -73,7 +73,7 @@ class TestsHelperMixin:
                     type='W' if is_workday else 'H',
                     is_fact=False,
                     is_approved=True,
-                    worker_id=empl.user_id,
+                    employee_id=empl.employee_id,
                     employment_id=empl.id,
                 )
                 if is_workday:
@@ -84,7 +84,7 @@ class TestsHelperMixin:
                     dt=day,
                     is_fact=False,
                     is_approved=True,
-                    worker_id=empl.user_id,
+                    employee_id=empl.employee_id,
                     defaults=kwargs
                 )
                 if _wd_created:
@@ -115,7 +115,7 @@ class TestsHelperMixin:
                     if change_empl:
                         wd.employment = empl
                         wd.save()
-                        fact = WorkerDay.objects.filter(worker_id=wd.worker_id, dt=wd.dt, is_fact=True, is_approved=True).first()
+                        fact = WorkerDay.objects.filter(employee_id=wd.employee_id, dt=wd.dt, is_fact=True, is_approved=True).first()
                         change_fact = random.randint(0, 100) < 90
                         if change_fact and fact:
                             fact.employment = empl

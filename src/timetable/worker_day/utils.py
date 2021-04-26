@@ -567,7 +567,7 @@ def exchange(data, error_messages):
     return new_wds
 
 
-def copy_as_excel_cells(main_worker_days, to_worker_id, to_dates, created_by=None):
+def copy_as_excel_cells(main_worker_days, to_employee_id, to_dates, created_by=None):
     main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
         worker_day__in=main_worker_days,
     ).select_related('work_type'))
@@ -580,7 +580,7 @@ def copy_as_excel_cells(main_worker_days, to_worker_id, to_dates, created_by=Non
         main_worker_days_details[key].append(detail)
 
     trainee_worker_days = WorkerDay.objects_with_excluded.filter(
-        employee__user_id=to_worker_id,
+        employee_id=to_employee_id,
         dt__in=to_dates,
         is_approved=False,
         is_fact=False,
@@ -595,7 +595,7 @@ def copy_as_excel_cells(main_worker_days, to_worker_id, to_dates, created_by=Non
         blank_day = main_worker_days[i]
 
         worker_active_empl = Employment.objects.get_active_empl_by_priority(
-            network_id=blank_day.employee.user.network_id, employee__user_id=to_worker_id,
+            network_id=blank_day.employee.user.network_id, employee_id=to_employee_id,
             dt=dt,
             priority_shop_id=blank_day.shop_id,
         ).select_related(
