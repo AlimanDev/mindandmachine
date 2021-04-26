@@ -127,7 +127,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             data=self.dump_data(put_data),
             content_type='application/json',
         )
-        self.print_resp(resp)
         self.assertEqual(resp.status_code, 201)  # created
         e = Employment.objects.filter(
             code=empl_code,
