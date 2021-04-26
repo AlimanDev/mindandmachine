@@ -99,7 +99,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             return queryset.annotate(
                 shop_code=F('shop__code'),
                 user_login=F('employee__user__username'),
-                employment_tabel_code=F('employment__tabel_code'),
+                employment_tabel_code=F('employee__tabel_code'),
             )
 
         return queryset

@@ -38,7 +38,6 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             "birthday": "2000-07-20",
             "avatar": "string",
             "phone_number": "string",
-            "tabel_code": username,
             "username": username,
             "by_code": True,
         }
@@ -63,7 +62,6 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             "birthday": "2000-07-20",
             "avatar": "string",
             "phone_number": "string",
-            "tabel_code": username,
             "username": username,
             "by_code": True,
         }

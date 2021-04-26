@@ -85,22 +85,18 @@ class MultipleActiveEmploymentsSupportMixin(TestsHelperMixin):
         cls.employment1_1_1 = EmploymentFactory(
             employee=cls.employee1_1, shop=cls.shop1, function_group=cls.group1,
             work_types__work_type=cls.work_type1_cachier,
-            tabel_code='employee1_1',
         )
         cls.employment1_2_1 = EmploymentFactory(
             employee=cls.employee1_2, shop=cls.shop1, function_group=cls.group1, norm_work_hours=50,
             work_types__work_type=cls.work_type1_cleaner,
-            tabel_code='employee1_2',
         )
         cls.employment2_1_2 = EmploymentFactory(
             employee=cls.employee2_1, shop=cls.shop2, function_group=cls.group1,
             work_types__work_type=cls.work_type2_cachier,
-            tabel_code='employee2_1',
         )
         cls.employment2_2_3 = EmploymentFactory(
             employee=cls.employee2_2, shop=cls.shop3, function_group=cls.group1, norm_work_hours=50,
             work_types__work_type=cls.work_type3_cachier,
-            tabel_code='employee2_2',
         )
         cls.dt = date.today()
         fill_calendar.fill_days('2021.01.01', '2021.12.31', cls.shop1.region_id)

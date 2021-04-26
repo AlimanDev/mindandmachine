@@ -76,7 +76,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.employment_worker2 = EmploymentFactory(
-            employee=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker,
+            employee=cls.employee_worker2, shop=cls.shop2, function_group=cls.group_worker,
         )
         cls.urv_stat_event, _created = EventType.objects.get_or_create(
             code=URV_STAT, network=cls.network)
@@ -101,7 +101,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop2,
             employment=cls.employment_worker2,
-            worker=cls.user_worker2,
+            employee=cls.employee_worker2,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
@@ -249,7 +249,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.employment_worker2 = EmploymentFactory(
-            employee=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker,
+            employee=cls.employee_worker2, shop=cls.shop2, function_group=cls.group_worker,
         )
         cls.urv_stat_event, _created = EventType.objects.get_or_create(
             code=URV_STAT_TODAY, network=cls.network)
@@ -274,7 +274,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop2,
             employment=cls.employment_worker2,
-            worker=cls.user_worker2,
+            employee=cls.employee_worker2,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
@@ -396,7 +396,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.employment_worker2 = EmploymentFactory(
-            employee=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker,
+            employee=cls.employee_worker2, shop=cls.shop2, function_group=cls.group_worker,
         )
         cls.urv_violators_event, _created = EventType.objects.get_or_create(
             code=URV_VIOLATORS_REPORT, network=cls.network)
@@ -430,7 +430,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop2,
             employment=cls.employment_worker2,
-            worker=cls.user_worker2,
+            employee=cls.employee_worker2,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )

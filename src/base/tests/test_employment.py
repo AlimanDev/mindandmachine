@@ -165,9 +165,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 200)  # updated
-        e.refresh_from_db(fields=['shop', 'tabel_code'])
+        e.refresh_from_db(fields=['shop', 'employee'])
         self.assertEqual(e.shop.id, self.shop3.id)
-        self.assertEqual(e.tabel_code, 'new_tabel_code')
+        self.assertEqual(e.employee.tabel_code, None)  # cant change tabel_code for existing employment
 
     def test_auto_timetable(self):
         employment_ids = list(Employment.objects.filter(shop=self.shop).values_list('id', flat=True))
@@ -314,6 +314,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     def test_change_function_group_tmp(self):
         self.admin_group.subordinates.add(self.chief_group)
         self.admin_group.subordinates.add(self.employee_group)
+
         put_data = {
             'function_group_id': self.chief_group.id,
             'dt_to_function_group': (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'),

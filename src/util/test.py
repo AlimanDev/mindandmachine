@@ -667,7 +667,6 @@ def create_departments_and_users(self, dt=None):
         function_group=self.employee_group,
     )
     Shop.objects.all().update(code=Concat(Value('code-', output_field=CharField()), F('id')), network=self.network)
-    User.objects.all().update(tabel_code=F('username'))
     for s in [self.root_shop, self.shop, self.shop2, self.shop3, self.reg_shop1, self.reg_shop2]:
         s.refresh_from_db()
     for s in [self.user1, self.user2, self.user3, self.user4, self.user5, self.user6, self.user7, self.user8]:

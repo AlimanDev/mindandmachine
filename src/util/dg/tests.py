@@ -35,7 +35,6 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             function_group=cls.employee_group,
             dt_hired=cls.dt_from,
             salary=100,
-            tabel_code='A00001234',
         )
         _weekday, days_in_month = monthrange(cls.dt_now.year, cls.dt_now.month)
         cls.dt_to = cls.dt_now.replace(day=days_in_month)
@@ -87,7 +86,6 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             function_group=self.employee_group,
             dt_hired=self.dt_from + timedelta(2),
             salary=100,
-            tabel_code='A00001234',
         )
         g = MtsTabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         second_data = g.get_data()

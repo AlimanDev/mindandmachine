@@ -401,11 +401,11 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     @property
     def director_code(self):
-        return getattr(self.director, 'tabel_code', None)
+        return getattr(self.director, 'username', None)
 
     @director_code.setter
     def director_code(self, val):
-        self.director = User.objects.filter(tabel_code=val).first()
+        self.director = User.objects.filter(username=val).first()
 
     def _parse_times(self, attr):
         return {
@@ -793,7 +793,6 @@ class User(DjangoAbstractUser, AbstractModel):
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     access_token = models.CharField(max_length=64, blank=True, null=True)
-    tabel_code = models.CharField(blank=True, max_length=64, null=True, unique=True)
     lang = models.CharField(max_length=2, default='ru')
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     black_list_symbol = models.CharField(max_length=128, null=True, blank=True)
@@ -986,7 +985,6 @@ class Employment(AbstractActiveModel):
 
     auto_timetable = models.BooleanField(default=True)
 
-    tabel_code = models.CharField(max_length=64, null=True, blank=True)  # FIXME: кажется, что поле избыточно (есть employee.tabel_code), удалить?
     is_ready_for_overworkings = models.BooleanField(default=False)
 
     dt_new_week_availability_from = models.DateField(null=True, blank=True)

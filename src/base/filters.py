@@ -61,7 +61,7 @@ class EmploymentFilter(FilterSet):
             'id': ['in'],
             'shop_id': ['exact', 'in'],
             'employee_id': ['exact', 'in'],
-            'tabel_code': ['exact', 'in'],
+            'employee__tabel_code': ['exact', 'in'],
             'is_visible': ['exact',]
         }
 
@@ -80,6 +80,9 @@ class UserFilter(FilterSet):
 
     employments__dt_from = DateFilter(method='employments_dt_from')
     employments__dt_to = DateFilter(method='employments_dt_to')
+
+    tabel_code = CharFilter(field_name='employees__tabel_code')
+    tabel_code__in = CharFilter(field_name='employees__tabel_code', method='field_in')
 
     def employments_dt_from(self, queryset, name, value):
         return queryset.filter(
@@ -106,7 +109,6 @@ class UserFilter(FilterSet):
         model = User
         fields = {
             'id': ['exact', 'in'],
-            'tabel_code': ['exact', 'in'],
             'username': ['exact', 'in'],
             'last_name': ['in', ],
             'shop_id': ['exact', 'in'],

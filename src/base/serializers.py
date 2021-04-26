@@ -67,7 +67,6 @@ class UserListSerializer(serializers.Serializer):
     avatar = serializers.SerializerMethodField('get_avatar_url')
     email = serializers.CharField()
     phone_number = serializers.CharField()
-    tabel_code = serializers.CharField()
     username = serializers.CharField()
     network_id = serializers.IntegerField()
     has_biometrics = serializers.SerializerMethodField()
@@ -105,7 +104,8 @@ class UserSerializer(BaseNetworkSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'tabel_code', 'username' ]
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username' ]
+
     def get_avatar_url(self, obj) -> str:
         if obj.avatar:
             return obj.avatar.url
@@ -186,7 +186,7 @@ class EmploymentListSerializer(serializers.Serializer):
     shift_hours_length_min = serializers.IntegerField()
     shift_hours_length_max = serializers.IntegerField()
     auto_timetable = serializers.BooleanField(default=True)
-    tabel_code = serializers.CharField()
+    tabel_code = serializers.CharField(source='employee.tabel_code')
     is_ready_for_overworkings = serializers.BooleanField()
     dt_new_week_availability_from = serializers.DateField()
     is_visible = serializers.BooleanField()
@@ -209,13 +209,13 @@ class EmploymentSerializer(serializers.ModelSerializer):
     shop_code = serializers.CharField(required=False, source='shop.code')
     user_id = serializers.IntegerField(required=False, source='employee.user_id')
     employee_id = serializers.IntegerField(required=False)
-    #employee = EmployeeSerializer(read_only=True)
     function_group_id = serializers.IntegerField(required=False, allow_null=True)
     work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
     username = serializers.CharField(required=False, source='employee.user.username')
     dt_hired = serializers.DateField(required=True)
     dt_fired = serializers.DateField(required=False, default=None)
+    tabel_code = serializers.CharField(required=False, source='employee.tabel_code')
 
     class Meta:
         model = Employment
@@ -249,6 +249,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
             if not attrs.get('employee_id'):
                 employee = attrs.pop('employee', {})
                 user = employee.pop('user', None)
+                tabel_code = employee.pop('tabel_code', None)
                 user_id = employee.pop('user_id', None)
                 user_kwargs = {}
                 if user:
@@ -262,7 +263,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 if len(users) == 1:
                     employee, _employee_created = Employee.objects.get_or_create(
                         user=users[0],
-                        tabel_code=attrs.get('tabel_code'),
+                        tabel_code=tabel_code,
                     )
                     attrs['employee_id'] = employee.id
                 else:

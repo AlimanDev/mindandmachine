@@ -123,7 +123,6 @@ class EmploymentConverter(Converter):
             'salary': float(obj.salary),
             'is_fixed_hours': obj.is_fixed_hours,
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
-            'tabel_code': obj.tabel_code,
             'position': obj.position.name if obj.position_id is not None else '',
             'position_id': obj.position_id if obj.position_id is not None else '',
         })

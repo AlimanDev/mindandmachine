@@ -118,7 +118,6 @@ class UserFactory(factory.django.DjangoModelFactory):
     middle_name = factory.Faker('middle_name', locale='ru_RU')
     last_name = factory.Faker('last_name', locale='ru_RU')
     phone_number = factory.Faker('phone_number')
-    tabel_code = factory.LazyAttribute(lambda u: u.username)
 
     class Meta:
         model = User
