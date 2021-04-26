@@ -19,9 +19,9 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
+from rest_framework.serializers import ValidationError
 
 from src.base.exceptions import FieldError
-from src.base.exceptions import MessageError
 from src.base.message import Message
 from src.base.models import Employment, Shop, ProductionDay, Group
 from src.base.permissions import WdPermission
@@ -77,13 +77,13 @@ class WorkerDayViewSet(BaseModelViewSet):
         "no_timetable": _("Workers don't have timetable."),
         'cannot_delete': _("Cannot_delete approved version."),
         'na_worker_day_exists': _("Not approved version already exists."),
-        'no_perm_to_approve_wd_types': _('У вас нет прав на подтверждение типа дня "{wd_type_str}"'),
-        'approve_days_interval_restriction': _('У вас нет прав на подтверждения типа дня "{wd_type_str}" '
-                                               'в выбранные даты. '
-                                               'Необходимо изменить интервал для подтверждения. '
-                                               'Разрешенный интевал для подтверждения: {dt_interval}'),
-        'has_no_perm_to_approve_protected_wdays': _('У вас нет прав на подтверждение защищенных рабочих дней ({protected_wdays}). '
-                                                   'Обратитесь, пожалуйста, к администратору системы.'),
+        'no_perm_to_approve_wd_types': _('You do not have rights to confirm the day type "{wd_type_str}"'),
+        'approve_days_interval_restriction': _('You do not have the rights to confirm the type of day "{wd_type_str}" '
+                                               'on the selected dates. '
+                                               'You need to change the interval for approve. '
+                                               'Allowed inteval for approve: {dt_interval}'),
+        'has_no_perm_to_approve_protected_wdays': _('You do not have rights to approve protected worker days ({protected_wdays}). '
+                                                   'Please contact your system administrator.'),
     }
 
     permission_classes = [WdPermission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
@@ -661,7 +661,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         with transaction.atomic():
             vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True, is_approved=False).select_for_update().first()
             if vacancy is None:
-                raise MessageError(code='no_vacancy_or_approved', lang=request.user.lang)
+                raise ValidationError(_('This vacancy does not exist or has already been approved.'))
 
             if vacancy.employee_id:
                 WorkerDay.objects_with_excluded.filter(
@@ -702,11 +702,11 @@ class WorkerDayViewSet(BaseModelViewSet):
     def editable_vacancy(self, request, pk=None):
         vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True).first()
         if vacancy is None:
-            raise MessageError(code='no_vacancy', lang=request.user.lang)
+            raise ValidationError(_('There is no such vacancy.'))
         if not vacancy.is_approved:
             return Response(WorkerDaySerializer(vacancy).data)
         if vacancy.worker_id:
-            raise MessageError(code='cant_edit_vacancy', lang=request.user.lang)
+            raise ValidationError(_('The vacancy cannot be edited because it has already been responded.'))
         editable_vacancy = WorkerDay.objects.filter(parent_worker_day=vacancy).first()
         if editable_vacancy is None:
             editable_vacancy = WorkerDay.objects.create(

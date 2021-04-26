@@ -63,7 +63,6 @@ class TestRequestApproveEventNotifications(TestsHelperMixin, APITestCase):
             event_email_notification.shop_groups.add(self.group_urs)
             with mock.patch.object(transaction, 'on_commit', lambda t: t()):
                 resp = self.client.post(self.get_url('WorkerDay-request-approve'), data={'shop_id': self.shop.id})
-            self.print_resp(resp)
             self.assertEqual(resp.status_code, status.HTTP_200_OK)
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)

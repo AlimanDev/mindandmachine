@@ -1,5 +1,6 @@
 import pandas as pd
 from rest_framework.response import Response
+from rest_framework.serializers import ValidationError
 from src.forecast.models import (
     OperationType,
     PeriodClients,
@@ -12,6 +13,7 @@ from src.util.download import xlsx_method
 from django.apps import apps
 import json
 from django.db import transaction
+from django.utils.translation import gettext as _
 from src.base.models import (
     Shop,
 )
@@ -20,7 +22,6 @@ from src.timetable.models import (
 )
 
 from django.db.models import Q
-from src.base.exceptions import MessageError
 from src.util.models_converter import Converter
 
 def upload_demand_util_v1(df, shop_id, lang):
@@ -41,7 +42,7 @@ def upload_demand_util_v1(df, shop_id, lang):
     for work_type in work_types:
         operation_type = op_types.get(work_type)
         if not operation_type:
-            raise MessageError(code='xlsx_undefined_work_type', lang=lang, params={'work_type': work_type})
+            raise ValidationError(_('There is no such work type or it is not associated with the operation type {work_type}.').format(work_type=worktype))
         work_type_df = df[df['Тип работ'] == work_type]
         dttms = list(work_type_df['Время'])
         period_clients_to_delete_ids += list(PeriodClients.objects.filter(
@@ -80,7 +81,7 @@ def upload_demand_util_v2(new_workload, shop_id, lang):
     for worktype in set(new_workload.columns) - {'dttm'}:
         operation = op_types.get(worktype)
         if not operation:
-            raise MessageError(code='xlsx_undefined_work_type', lang=lang, params={'work_type': worktype})
+            raise ValidationError(_('There is no such work type or it is not associated with the operation type {work_type}.').format(work_type=worktype))
         period_clients += [
             PeriodClients(
                 dttm_forecast=row['dttm'],
@@ -104,7 +105,7 @@ def upload_demand_util(demand_file, shop_id, lang='ru'):
     try:
         df = pd.read_excel(demand_file)
     except KeyError:
-        raise MessageError(code='xlsx_no_active_list', lang=lang)
+        raise ValidationError(_('Failed to open active sheet.'))
 
     if 'dttm' in df.columns:
         return upload_demand_util_v2(df, shop_id, lang)
@@ -133,7 +134,7 @@ def download_demand_xlsx_util(request, workbook, form):
     timestep = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute  # minutes
 
     if (to_dt - from_dt).days > 90:
-        raise MessageError(code='xlsx_long_period', lang=request.user.lang)
+        raise ValidationError(_('Please select a period of no more than 90 days.'))
 
     worksheet = workbook.add_worksheet('{}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d')))
     worksheet.set_column(0, 3, 30)

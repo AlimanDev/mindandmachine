@@ -1,6 +1,6 @@
 from rest_framework.test import APITestCase
-from src.util.urv.create_urv_stat import urv_stat_v1
-from src.util.urv.urv_violators import urv_violators_report, urv_violators_report_xlsx, urv_violators_report_xlsx_v2
+from src.reports.utils.create_urv_stat import urv_stat_v1
+from src.reports.utils.urv_violators import urv_violators_report, urv_violators_report_xlsx, urv_violators_report_xlsx_v2
 from src.util.test import create_departments_and_users
 import pandas as pd
 from datetime import date, datetime, time, timedelta

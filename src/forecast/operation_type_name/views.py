@@ -2,9 +2,9 @@ from rest_framework import serializers, viewsets, permissions
 from rest_framework.pagination import LimitOffsetPagination
 from src.forecast.models import OperationTypeName
 from src.base.serializers import BaseNetworkSerializer
-from src.base.exceptions import MessageError
 from src.base.views import BaseActiveNamedModelViewSet
 from django_filters.rest_framework import BooleanFilter
+from django.utils.translation import gettext as _
 from src.base.filters import BaseActiveNamedModelFilter
 
 
@@ -24,10 +24,10 @@ class OperationTypeNameSerializer(BaseNetworkSerializer):
             exclude_filter['pk'] = self.instance.id
         self.validated_data['code'] = None if self.validated_data.get('code') == '' else self.validated_data.get('code')
         if self.validated_data.get('code') and OperationTypeName.objects.filter(code=self.validated_data.get('code')).exclude(**exclude_filter).exists():
-            raise MessageError('unique_name_code', params={'code': self.validated_data.get('code')}, lang=self.context['request'].user.lang)
+            raise serializers.ValidationError(_('Name with code {code} already exists.').format(code=self.validated_data.get('code')))
         
         if OperationTypeName.objects.filter(name=self.validated_data.get('name')).exclude(**exclude_filter).exists():
-            raise MessageError('unique_name_name', params={'name': self.validated_data.get('name')}, lang=self.context['request'].user.lang)
+            raise serializers.ValidationError(_('The name {name} is already in the system').format(name=self.validated_data.get('name')))
 
         return True
 

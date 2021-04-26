@@ -9,14 +9,13 @@ def copy_approved(dt_from, dt_to=None):
     if dt_to:
         dt_filter['dt__lte'] = dt_to
     with transaction.atomic():
-        not_approved_subq = WorkerDay.objects.filter(
-            worker_id=models.OuterRef('worker_id'),
-            employment_id=models.OuterRef('employment_id'),
+        not_approved_subq = WorkerDay.objects_with_excluded.filter(
+            employee_id=models.OuterRef('employee_id'),
             dt=models.OuterRef('dt'),
             is_approved=False,
             is_fact=models.OuterRef('is_fact'),
         )
-        worker_days_to_copy = list(WorkerDay.objects.filter(
+        worker_days_to_copy = list(WorkerDay.objects_with_excluded.filter(
             employee__isnull=False,
             **dt_filter,
         ).annotate(

@@ -24,14 +24,20 @@ class WorkerDayFilter(FilterSet):
 
     # параметры для совместимости с существующими интеграциями, не удалять
     worker_id = NumberFilter(field_name='employee__user_id')
-    worker__username__in = CharFilter(field_name='employee__user__username', lookup_expr='in')
-    employment__tabel_code__in = CharFilter(field_name='employee__tabel_code', lookup_expr='in')
+    worker__username__in = CharFilter(field_name='employee__user__username', method='field_in')
+    employment__tabel_code__in = CharFilter(field_name='employee__tabel_code', method='field_in')
 
     def filter_fact_tabel(self, queryset, name, value):
         if value:
             return queryset.get_tabel()
 
         return queryset
+
+    def field_in(self, queryset, name, value):
+        filt = {
+            f'{name}__in': value.split(',')
+        }
+        return queryset.filter(**filt)
 
     class Meta:
         model = WorkerDay
@@ -174,7 +180,8 @@ class VacancyFilter(FilterSetWithInitial):
 
 
 class EmploymentWorkTypeFilter(FilterSet):
-    shop_id=NumberFilter(field_name='work_type__shop_id')
+    shop_id = NumberFilter(field_name='work_type__shop_id')
+
     class Meta:
         model = EmploymentWorkType
         fields = {
