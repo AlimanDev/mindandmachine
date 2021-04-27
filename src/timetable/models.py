@@ -1050,6 +1050,49 @@ class AttendanceRecords(AbstractModel):
     def __str__(self):
         return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
+    @staticmethod
+    def get_day_data(dttm: datetime.datetime, user_id, shop):
+        worker_days = WorkerDay.objects.filter(
+            employee__user_id=user_id,
+            dt__gte=dttm.date() - datetime.timedelta(1),
+            dt__lte=dttm.date() + datetime.timedelta(1),
+            is_approved=True,
+            is_fact=False,
+            shop=shop,
+            type=WorkerDay.TYPE_WORKDAY,
+        )
+        diff_to_wd_mapping = {}
+        for wd in worker_days:
+            diff_to_wd_mapping[abs((dttm - wd.dttm_work_start).total_seconds())] = {
+                'worker_day': wd,
+                'type': AttendanceRecords.TYPE_COMING,
+            }
+            diff_to_wd_mapping[abs((dttm - wd.dttm_work_end).total_seconds())] = {
+                'worker_day': wd,
+                'type': AttendanceRecords.TYPE_LEAVING,
+            }
+        if len(diff_to_wd_mapping.keys()) == 0 or min(diff_to_wd_mapping.keys()) > settings.ZKTECO_MAX_DIFF_IN_SECONDS:
+            employee_id = Employment.objects.get_active(
+                dt_from=dttm.date(),
+                dt_to=dttm.date(),
+                network_id=shop.network_id,
+                employee__user_id=user_id,
+            ).first().employee_id
+            dt = dttm.date()
+            type = AttendanceRecords.TYPE_COMING
+            record = AttendanceRecords.objects.filter(shop=shop, user_id=user_id, dt=dttm.date(), employee_id=employee_id).order_by('dttm').first()
+            if record and record.dttm < dttm:
+                type = AttendanceRecords.TYPE_LEAVING
+        else:
+            min_diff = min(diff_to_wd_mapping.keys())
+            data = diff_to_wd_mapping[min_diff]
+            employee_id = data['worker_day'].employee_id
+            dt = data['worker_day'].dt
+            type = data['type']
+        
+        return employee_id, dt, type
+
+
     def _create_wd_details(self, dt, fact_approved, active_user_empl):
         plan_approved = WorkerDay.objects.filter(
             dt=dt,
@@ -1152,7 +1195,11 @@ class AttendanceRecords(AbstractModel):
         При создании отметки время о приходе или уходе заносится в фактический подтвержденный график WorkerDay.
         Если подтвержденного факта нет - создаем новый подтвержденный факт.
         """
-        self.dt = self.dt or self.dttm.date()
+        if not self.employee_id or not self.dt or not self.type:
+            employee_id, dt, type = self.get_day_data(self.dttm, self.user_id, self.shop)
+        self.dt = self.dt or dt
+        self.type = self.type or type
+        self.employee_id = self.employee_id or employee_id
         res = super(AttendanceRecords, self).save(*args, **kwargs)
 
         if self.type == self.TYPE_NO_TYPE:

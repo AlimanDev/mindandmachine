@@ -18,7 +18,7 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
             return obj.work_type.work_type_name.name
 
 
-class WorkerDaySerializer(serializers.Serializer):
+class WorkerDayListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     dttm_work_start = serializers.DateTimeField()
     dttm_work_end = serializers.DateTimeField()
@@ -31,7 +31,7 @@ class WorkerDaySerializer(serializers.Serializer):
 class EmployeeSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     tabel_code = serializers.CharField()
-    worker_days = WorkerDaySerializer(many=True)
+    worker_days = WorkerDayListSerializer(many=True)
 
 
 class WorkerDaySerializer(serializers.ModelSerializer):
