@@ -84,7 +84,7 @@ def check_duplicate_biometrics(image, user: User):
                 'fio2': f"{user2.last_name} {user2.first_name}",
                 'url1': settings.HOST + user.avatar.url,
                 'url2': settings.HOST + user2.avatar.url,
-                'tabel_code1': (employment1.employee.tabel_code if employment1 else user.tabel_code) or user.username,
-                'tabel_code2': (employment2.employee.tabel_code if employment2 else user2.tabel_code) or user2.username,
+                'tabel_code1': employment1.employee.tabel_code if employment1 else user.username,
+                'tabel_code2': employment2.employee.tabel_code if employment2 else user2.username,
             },
         )

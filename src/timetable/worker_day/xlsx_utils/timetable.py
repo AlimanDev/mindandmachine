@@ -7,6 +7,7 @@ from src.base.models import (
     Employment,
     User,
     ProductionDay,
+    Employee,
 )
 from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
 from src.timetable.models import (
@@ -139,7 +140,7 @@ class Timetable_xlsx(Tabel_xlsx):
         n_workdays = len(workdays)
         for row_shift, employment in enumerate(employments):
             for day in range(len(self.prod_days)):
-                if (it < n_workdays) and (workdays[it].worker_id == employment.user_id) and (day + 1 == workdays[it].dt.day):
+                if (it < n_workdays) and (workdays[it].employee_id == employment.employee_id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
 
                     if wd.type == WorkerDay.TYPE_WORKDAY:
@@ -187,11 +188,11 @@ class Timetable_xlsx(Tabel_xlsx):
             format_text = self.workbook.add_format(fmt(font_size=12, border=1, bold=True))
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 1,
-                str(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('work_days', {}).get('total', 0)),
+                str(stat.get(str(employment.employee_id), {}).get('plan', {}).get(stat_type, {}).get('work_days', {}).get('total', 0)),
                 format_text
             )
             
-            plan_hours = int(round(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
+            plan_hours = int(round(stat.get(str(employment.employee_id), {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 2,
@@ -199,7 +200,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 format_text
             )
 
-            norm_hours = int(round(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('norm_hours_curr_month', {}).get('value', 0)))
+            norm_hours = int(round(stat.get(str(employment.employee_id), {}).get('plan', {}).get(stat_type, {}).get('norm_hours_curr_month', {}).get('value', 0)))
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 3,
@@ -227,13 +228,13 @@ class Timetable_xlsx(Tabel_xlsx):
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 7,
-                str(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('H', 0)),
+                str(stat.get(str(employment.employee_id), {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('H', 0)),
                 format_text
             )
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 8,
-                str(stat.get(str(employment.user_id), {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('V', 0)),
+                str(stat.get(str(employment.employee_id), {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('V', 0)),
                 format_text
             )
 
@@ -275,11 +276,11 @@ class Timetable_xlsx(Tabel_xlsx):
         employments = Employment.objects.get_active(
             network_id=shop.network_id,
             dt_from=dt_from,dt_to=dt_to,
-            shop_id=shop.id).values_list('user_id', flat=True)
-        workers = User.objects.filter(id__in=employments).order_by('id')
-        last_worker = len(workers) - 1
-        for i, worker in enumerate(workers):
-            worker_days = {x.dt: x for x in workdays if x.worker_id == worker.id}
+            shop_id=shop.id).values_list('employee_id', flat=True)
+        employees = Employee.objects.filter(id__in=employments).select_related('user').order_by('id')
+        last_worker = len(employees) - 1
+        for i, employee in enumerate(employees):
+            worker_days = {x.dt: x for x in workdays if x.employee_id == employee.id}
             user_data = [weekdays]
             dt = dt_from - timedelta(days=dt_from.weekday())
             while dt <= dt_to:
@@ -323,8 +324,8 @@ class Timetable_xlsx(Tabel_xlsx):
                             [
                                 Cell('', format_common_top_left),
                                 Cell('', format_common_top),
-                                Cell('{} {} {}'.format(worker.last_name, worker.first_name or '',
-                                                       worker.middle_name or ''), format_fio),
+                                Cell('{} {} {}'.format(employee.user.last_name, employee.user.first_name or '',
+                                                       employee.user.middle_name or ''), format_fio),
                             ] + [
                                 Cell('', format_common_top) for _ in range(len(user_data[0]) - 3)
                             ]

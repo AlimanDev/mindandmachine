@@ -292,7 +292,11 @@ def download_timetable_util(request, workbook, form):
         dt_from=timetable.prod_days[0].dt,
         dt_to=timetable.prod_days[-1].dt,
         shop=shop,
-    ).order_by('user__last_name', 'user__first_name', 'user__middle_name', 'user_id')
+    ).select_related(
+        'employee', 
+        'employee__user', 
+        'position',
+    ).order_by('employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id')
     employee_ids = employments.values_list('employee_id', flat=True)
     stat = WorkersStatsGetter(
         dt_from=timetable.prod_days[0].dt,
@@ -302,7 +306,7 @@ def download_timetable_util(request, workbook, form):
     ).run()
     stat_type = 'approved' if form['is_approved'] else 'not_approved'
 
-    workdays = WorkerDay.objects.select_related('worker', 'shop').filter(
+    workdays = WorkerDay.objects.select_related('employee', 'employee__user', 'shop').filter(
         Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
         (Q(dt__gte=F('employment__dt_hired')) | Q(employment__isnull=True)) & Q(dt__gte=timetable.prod_days[0].dt),
         employee_id__in=employee_ids,
@@ -310,7 +314,7 @@ def download_timetable_util(request, workbook, form):
         is_approved=form['is_approved'],
         is_fact=False,
     ).order_by(
-        'employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'worker_id', 'dt')
+        'employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id', 'dt')
 
     workdays = workdays.get_last_ordered(
         is_fact=False,

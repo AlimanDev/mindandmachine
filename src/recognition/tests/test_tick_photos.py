@@ -25,10 +25,10 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
         cls.user2.save()
         UserConnecter.objects.create(user=cls.user2, partner_id=2)
         cls.dt = date.today()
-        cls.employment1.dt_fired = cls.dt - timedelta(days=366 * 3)
-        cls.employment1.save()
-        cls.employment2.dt_fired = cls.dt - timedelta(days=364 * 3)
-        cls.employment2.save()
+        cls.employee1.tabel_code = 'A00001'
+        cls.employee1.save()
+        cls.employee3.tabel_code = 'A00001'
+        cls.employee3.save()
         cls.duplicate_biometrics_event, _created = EventType.objects.get_or_create(
             code=DUPLICATE_BIOMETRICS, network=cls.network)
 
@@ -48,7 +48,7 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
                 check_duplicate_biometrics(None, self.user3)
         self.assertEqual(len(mail.outbox), 1)
         body = f'Здравствуйте, {self.user2.first_name}!\n\nОдинаковые биометрические параметры сотрудников.\n' +\
-        f'Первый сотрудник: {self.user3.last_name} {self.user3.first_name}\nТабельный номер: {self.user3.tabel_code}\nСсылка на биошаблон: http://127.0.0.1:8000/_i/media/photo/3\n' +\
-        f'Второй сотрудник: {self.user1.last_name} {self.user1.first_name}\nТабельный номер: {self.user1.tabel_code}\nСсылка на биошаблон: http://127.0.0.1:8000/_i/media/photo/1' +\
+        f'Первый сотрудник: {self.user3.last_name} {self.user3.first_name}\nТабельный номер: {self.employee3.tabel_code}\nСсылка на биошаблон: http://127.0.0.1:8000/_i/media/photo/3\n' +\
+        f'Второй сотрудник: {self.user1.last_name} {self.user1.first_name}\nТабельный номер: {self.employee1.tabel_code}\nСсылка на биошаблон: http://127.0.0.1:8000/_i/media/photo/1' +\
         '\n\nПисьмо отправлено роботом.'
         self.assertEqual(mail.outbox[0].body, body)
