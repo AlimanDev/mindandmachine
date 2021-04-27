@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 from src.recognition.models import Tick
 from src.util.mixins.tests import TestsHelperMixin
 from src.timetable.models import WorkerDay, AttendanceRecords
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, time
 
 
 @override_settings(TRUST_TICK_REQUEST=True)
@@ -21,6 +21,8 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
             shop=cls.shop2,
             is_approved=True,
             is_vacancy=True,
+            dttm_work_start=datetime.combine(date.today(), time(10)),
+            dttm_work_end=datetime.combine(date.today(), time(20)),
         )
 
     def setUp(self):
