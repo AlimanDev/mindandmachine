@@ -18,16 +18,29 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
             return obj.work_type.work_type_name.name
 
 
+class WorkerDaySerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    dttm_work_start = serializers.DateTimeField()
+    dttm_work_end = serializers.DateTimeField()
+    position = serializers.SerializerMethodField()
+
+    def get_position(self, obj):
+        return obj.employment.position.name if obj.employment and obj.employment.position else ''
+
+
+class EmployeeSerializer(serializers.Serializer):
+    tabel_code = serializers.CharField()
+    worker_days = WorkerDaySerializer(many=True)
+
+
 class WorkerDaySerializer(serializers.ModelSerializer):
     user_id = serializers.SerializerMethodField()
-    dttm_work_start = serializers.SerializerMethodField()
-    dttm_work_end = serializers.SerializerMethodField()
-    worker_day_id = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
+    employees = EmployeeSerializer(many=True)
 
     class Meta:
         model = User
-        fields = ['worker_day_id', 'user_id', 'first_name', 'last_name', 'dttm_work_start', 'dttm_work_end', 'avatar']
+        fields = ['user_id', 'employees', 'first_name', 'last_name', 'avatar']
 
     def get_user_id(self, obj) -> int:
         return obj.id
@@ -36,19 +49,6 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         if obj.avatar:
             return obj.avatar.url
         return None
-
-    def get_worker_day_id(self, obj) -> int:
-        # method all() uses prefetch_related, but first() doesn't
-        wd = WorkerDay.objects.filter(employee__user=obj)
-        return wd[0].id if wd else None
-
-    def get_dttm_work_start(self, obj) -> datetime:
-        wd = WorkerDay.objects.filter(employee__user=obj)
-        return wd[0].dttm_work_start if wd else None
-
-    def get_dttm_work_end(self, obj) -> datetime:
-        wd = list(WorkerDay.objects.filter(employee__user=obj))
-        return wd[0].dttm_work_end if wd else None
 
 
 class ShopSerializer(serializers.ModelSerializer):

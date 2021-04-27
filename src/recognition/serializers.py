@@ -64,6 +64,7 @@ class TickSerializer(serializers.ModelSerializer):
             'is_verified',
             'type',
             'user_id',
+            'employee_id',
             'tick_point_id',
         ]
         fields = read_only_fields
@@ -82,19 +83,21 @@ class TickSerializer(serializers.ModelSerializer):
 
 class PostTickSerializer_point(serializers.ModelSerializer):
     user_id = serializers.IntegerField()
+    employee_id = serializers.IntegerField()
     dttm = serializers.DateTimeField(required=False)
 
     class Meta:
         model = Tick
-        fields = ['user_id', 'type', 'dttm']
+        fields = ['user_id', 'employee_id', 'type', 'dttm']
 
 
 class PostTickSerializer_user(serializers.ModelSerializer):
     dttm = serializers.DateTimeField(required=False)
+    employee_id = serializers.IntegerField()
 
     class Meta:
         model = Tick
-        fields = ['type', 'dttm']
+        fields = ['type', 'dttm', 'employee_id']
 
     def __init__(self, *args, **kwargs):
         super(PostTickSerializer_user, self).__init__(*args, **kwargs)

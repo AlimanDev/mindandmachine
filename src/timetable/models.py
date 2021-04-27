@@ -1042,10 +1042,7 @@ class AttendanceRecords(AbstractModel):
     dttm = models.DateTimeField()
     type = models.CharField(max_length=1, choices=RECORD_TYPES)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
-    # employee = models.ForeignKey(
-    #     Employee, on_delete=models.PROTECT,
-    #     help_text='Если заполнено, то мы знаем для какого Сотрудника была отметка (скорее всего явный выбор), '
-    #               'если пусто -- не знаем для какого Сотрудника отметка')
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True)
     verified = models.BooleanField(default=True)
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo: or should be to shop? fucking logic

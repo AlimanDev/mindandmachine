@@ -118,14 +118,14 @@ class UserAuthTickViewStrategy(TickViewStrategy):
         )
         return queryset
 
-    def get_user_id_and_tick_point(self, data):
+    def get_user_id_employee_id_and_tick_point(self, data):
         user_id = self.view.request.user.id
         shop = data['shop_code']
         tick_point = TickPoint.objects.filter(shop=shop, dttm_deleted__isnull=True).first()
         if tick_point is None:
             tick_point = TickPoint.objects.create(name=f'autocreate tickpoint {shop.id}', shop=shop)
 
-        return user_id, tick_point
+        return user_id, data['employee_id'], tick_point
 
 
 class TickPointAuthTickViewStrategy(TickViewStrategy):
@@ -139,10 +139,10 @@ class TickPointAuthTickViewStrategy(TickViewStrategy):
         )
         return queryset
 
-    def get_user_id_and_tick_point(self, data):
+    def get_user_id_employee_id_and_tick_point(self, data):
         tick_point = self.view.request.user
         user_id = data['user_id']
-        return user_id, tick_point
+        return user_id, data['employee_id'], tick_point
 
 
 class TickViewSet(BaseModelViewSet):
@@ -203,7 +203,7 @@ class TickViewSet(BaseModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data
-        user_id, tick_point = self.strategy.get_user_id_and_tick_point(data)
+        user_id, employee_id, tick_point = self.strategy.get_user_id_employee_id_and_tick_point(data)
         check_time = now() + timedelta(hours=tick_point.shop.get_tz_offset())
 
         is_front = False
@@ -217,14 +217,14 @@ class TickViewSet(BaseModelViewSet):
         employment = Employment.objects.get_active(
             request.user.network.id,
             dttm_from.date(), dttm_from.date(),
-            employee__user_id=user_id,
+            employee_id=employee_id,
             shop_id=tick_point.shop_id
         ).first()
 
         if (not employment) and settings.USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY:
             # есть ли вакансия в этом магазине
             wd = WorkerDay.objects.filter(
-                employee__user_id=user_id,
+                employee_id=employee_id,
                 shop_id=tick_point.shop_id,
                 dt__gte=dttm_from - timedelta(1),
                 dt__lte=dttm_to.date(),
@@ -243,7 +243,7 @@ class TickViewSet(BaseModelViewSet):
                 )
 
         wd = WorkerDay.objects.all().filter(
-            employee__user_id=user_id,
+            employee_id=employee_id,
             shop_id=tick_point.shop_id,
             employment=employment,
             dttm_work_start__gte=dttm_from,
@@ -256,6 +256,7 @@ class TickViewSet(BaseModelViewSet):
 
         tick = Tick.objects.create(
             user_id=user_id,
+            employee_id=employee_id,
             tick_point_id=tick_point.id,
             lateness=check_time - wd.dttm_work_start if wd else timedelta(seconds=0),
             dttm=check_time,
@@ -266,6 +267,7 @@ class TickViewSet(BaseModelViewSet):
         if settings.TRUST_TICK_REQUEST:
             AttendanceRecords.objects.create(
                 user_id=tick.user_id,
+                employee_id=employee_id,
                 dttm=check_time,
                 verified=True,
                 shop_id=tick.tick_point.shop_id,
@@ -291,6 +293,7 @@ class TickViewSet(BaseModelViewSet):
             if settings.TRUST_TICK_REQUEST:
                 record, _ = AttendanceRecords.objects.get_or_create(
                     user_id=tick.user_id,
+                    employee_id=tick.employee_id,
                     dttm=tick.dttm,
                     verified=True,
                     shop_id=tick.tick_point.shop_id,
@@ -405,6 +408,7 @@ class TickPhotoViewSet(BaseModelViewSet):
         if (type == TickPhoto.TYPE_SELF) and (tick_photo.verified_score > 0):
             AttendanceRecords.objects.create(
                 user_id=tick.user_id,
+                employee_id=tick.employee_id,
                 dttm=tick.dttm,
                 verified=True,
                 shop_id=tick.tick_point.shop_id,

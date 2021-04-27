@@ -61,7 +61,6 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
         dt_to = dt_from + timedelta(days=1)
 
         wd_cond = WorkerDay.objects.filter(
-            employee__user_id=OuterRef('pk'),
             shop_id=tick_point.shop_id,
             dttm_work_start__gte=dt_from,
             dttm_work_end__lte=dt_to,
@@ -70,32 +69,39 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
         emp_cond = Employment.objects.get_active(
             self.request.user.network_id,
             dt_from, dt_from, # чтобы не попались трудоустройства с завтрашнего дня
-            employee__user_id=OuterRef('pk'),
         )
         shop_emp_cond = Employment.objects.get_active(
             self.request.user.network_id,
             dt_from, dt_from, # чтобы не попались трудоустройства с завтрашнего дня
-            employee__user_id=OuterRef('pk'),
             shop_id=tick_point.shop_id,
-        )
-
-        queryset = WFMUser.objects.all().prefetch_related(
-            Prefetch('employees__worker_days',
-                     queryset=WorkerDay.objects.filter(
-                         shop_id=tick_point.shop_id,
-                         dttm_work_start__gte=dt_from,
-                         dttm_work_end__lte=dt_to,
-                         child__id__isnull=True,
-                     )
-                     )
-        ).annotate(
-            has_wdays=Exists(wd_cond),
-            has_employments=Exists(emp_cond),
-            has_shop_employments=Exists(shop_emp_cond)
         )
         q = Q(has_wdays=True, has_employments=True)
         if not USERS_WITH_SCHEDULE_ONLY:
             q = q | Q(has_shop_employments=True)
+        queryset = WFMUser.objects.all().prefetch_related(
+            Prefetch(
+                'employees',
+                queryset=Employee.objects.annotate(
+                    has_wdays=Exists(wd_cond.filter(employee_id=OuterRef('pk'))),
+                    has_employments=Exists(emp_cond.filter(employee_id=OuterRef('pk'))),
+                    has_shop_employments=Exists(shop_emp_cond.filter(employee_id=OuterRef('pk'))),
+                ).filter(q)
+            ),
+            Prefetch(
+                'employees__worker_days',
+                queryset=WorkerDay.objects.filter(
+                    shop_id=tick_point.shop_id,
+                    dttm_work_start__gte=dt_from,
+                    dttm_work_end__lte=dt_to,
+                    is_fact=False,
+                    is_approved=True,
+                ).select_related('employment__position')
+            )
+        ).annotate(
+            has_wdays=Exists(wd_cond.filter(employee__user_id=OuterRef('pk'))),
+            has_employments=Exists(emp_cond.filter(employee__user_id=OuterRef('pk'))),
+            has_shop_employments=Exists(shop_emp_cond.filter(employee__user_id=OuterRef('pk')))
+        )
         queryset = queryset.filter(q)
 
         return queryset
