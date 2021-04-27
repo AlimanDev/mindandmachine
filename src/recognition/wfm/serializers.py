@@ -29,6 +29,7 @@ class WorkerDaySerializer(serializers.Serializer):
 
 
 class EmployeeSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
     tabel_code = serializers.CharField()
     worker_days = WorkerDaySerializer(many=True)
 

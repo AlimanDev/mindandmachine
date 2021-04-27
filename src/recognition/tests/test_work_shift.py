@@ -157,7 +157,8 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             'user_id': self.user2.id, 
             'employees': [
                 {
-                    'tabel_code': '1235', 
+                    'id': self.employee2.id,
+                    'tabel_code': self.employee2.tabel_code, 
                     'worker_days': [
                         {
                             'id': wd1.id, 
@@ -168,7 +169,8 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     ]
                 }, 
                 {
-                    'tabel_code': '1234', 
+                    'id': self.second_employee.id,
+                    'tabel_code': self.second_employee.tabel_code, 
                     'worker_days': [
                         {
                             'id': wd2.id, 
