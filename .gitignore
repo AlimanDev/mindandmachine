@@ -30,3 +30,4 @@ docs/qos*
 
 update.sh
 tmp/
+etc/compose/build-custom.sh
