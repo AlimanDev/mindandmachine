@@ -83,7 +83,7 @@ class TickSerializer(serializers.ModelSerializer):
 
 class PostTickSerializer_point(serializers.ModelSerializer):
     user_id = serializers.IntegerField()
-    employee_id = serializers.IntegerField()
+    employee_id = serializers.IntegerField(required=False)
     dttm = serializers.DateTimeField(required=False)
 
     class Meta:
@@ -93,7 +93,7 @@ class PostTickSerializer_point(serializers.ModelSerializer):
 
 class PostTickSerializer_user(serializers.ModelSerializer):
     dttm = serializers.DateTimeField(required=False)
-    employee_id = serializers.IntegerField()
+    employee_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = Tick

@@ -2350,7 +2350,7 @@ class TestAditionalFunctions(APITestCase):
 
         url = f'{self.url}delete_worker_days/'
         data = {
-            'worker_ids':[self.employment2.employee.user_id, self.employment3.employee.user_id],
+            'employee_ids':[self.employment2.employee_id, self.employment3.employee_id],
             'dates':[
                 dt_from + timedelta(i)
                 for i in range(3)
@@ -2373,7 +2373,7 @@ class TestAditionalFunctions(APITestCase):
 
         url = f'{self.url}delete_worker_days/'
         data = {
-            'worker_ids': [self.employment2.employee.user_id, self.employment3.employee.user_id],
+            'employee_ids': [self.employment2.employee_id, self.employment3.employee_id],
             'dates': [
                 dt_from + timedelta(i)
                 for i in range(3)
@@ -2395,8 +2395,8 @@ class TestAditionalFunctions(APITestCase):
     def test_exchange_approved(self):
         dt_from = date.today()
         data = {
-            'worker1_id': self.user2.id,
-            'worker2_id': self.user3.id,
+            'employee1_id': self.employee2.id,
+            'employee2_id': self.employee3.id,
             'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
         }
         self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
@@ -2411,8 +2411,8 @@ class TestAditionalFunctions(APITestCase):
         dt_from = date.today()
         dates = [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)]
         data = {
-            'worker1_id': self.user2.id,
-            'worker2_id': self.user3.id,
+            'employee1_id': self.employee2.id,
+            'employee2_id': self.employee3.id,
             'dates': dates,
         }
         self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True, is_blocked=True)
@@ -2435,13 +2435,12 @@ class TestAditionalFunctions(APITestCase):
 
         dt_from = date.today()
         data = {
-            'worker1_id': self.user2.id,
-            'worker2_id': self.user3.id,
+            'employee1_id': self.employee2.id,
+            'employee2_id': self.employee3.id,
             'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
         }
         self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True, is_blocked=True)
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True, is_blocked=True)
-        url = f'{self.url}exchange_approved/'
         url = f'{self.url}exchange_approved/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 8)
@@ -2454,8 +2453,8 @@ class TestAditionalFunctions(APITestCase):
             with mock.patch.object(send_doctors_schedule_to_mis, 'delay') as send_doctors_schedule_to_mis_delay:
                 dt_from = date.today()
                 data = {
-                    'worker1_id': self.user2.id,
-                    'worker2_id': self.user3.id,
+                    'employee1_id': self.employee2.id,
+                    'employee2_id': self.employee3.id,
                     'dates': [
                         Converter.convert_date(dt_from + timedelta(i)) for i in range(-2, 4)
                     ],
@@ -2632,8 +2631,8 @@ class TestAditionalFunctions(APITestCase):
     def test_exchange_with_holidays(self):
         dt_from = date.today()
         data = {
-            'worker1_id': self.user2.id,
-            'worker2_id': self.user3.id,
+            'employee1_id': self.employee2.id,
+            'employee2_id': self.employee3.id,
             'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(2)],
         }
         self.create_worker_days(self.employment2, dt_from, 1, 10, 20, True)
@@ -2652,8 +2651,8 @@ class TestAditionalFunctions(APITestCase):
     def test_exchange_not_approved(self):
         dt_from = date.today()
         data = {
-            'worker1_id': self.user2.id,
-            'worker2_id': self.user3.id,
+            'employee1_id': self.employee2.id,
+            'employee2_id': self.employee3.id,
             'dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
         }
         self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
@@ -2824,9 +2823,9 @@ class TestAditionalFunctions(APITestCase):
         self.update_or_create_holidays(self.employment3, dt_now + timedelta(days=4), 2, True)
 
         data = {
-            'worker_ids': [
-                self.employment1.employee.user_id,
-                self.employment3.employee.user_id,
+            'employee_ids': [
+                self.employment1.employee_id,
+                self.employment3.employee_id,
             ],
             'dates': [
                 dt_now + timedelta(days=i)
@@ -2858,9 +2857,9 @@ class TestAditionalFunctions(APITestCase):
             is_fact=True,
         )
         data = {
-            'worker_ids': [
-                self.employment1.employee.user_id,
-                self.employment3.employee.user_id,
+            'employee_ids': [
+                self.employment1.employee_id,
+                self.employment3.employee_id,
             ],
             'dates': [
                 dt_now + timedelta(days=i)
@@ -2891,9 +2890,9 @@ class TestAditionalFunctions(APITestCase):
             is_fact=True,
         )
         data = {
-            'worker_ids': [
-                self.employment1.employee.user_id,
-                self.employment3.employee.user_id,
+            'employee_ids': [
+                self.employment1.employee_id,
+                self.employment3.employee_id,
             ],
             'dates': [
                 dt_now + timedelta(days=i)

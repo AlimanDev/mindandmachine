@@ -14,8 +14,9 @@ class Migration(migrations.Migration):
             model_name='employment',
             name='tabel_code',
         ),
-        migrations.RemoveField(
+        migrations.RenameField(
             model_name='user',
-            name='tabel_code',
+            old_name='tabel_code',
+            new_name='code',
         ),
     ]

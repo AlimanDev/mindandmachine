@@ -193,23 +193,6 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                     "employment": self.error_messages['user_mismatch']
                 })
 
-        # if is_fact and wd_type == WorkerDay.TYPE_WORKDAY \
-        #         and attrs.get('worker_id') and attrs.get('shop_id') and attrs.get('created_by'):
-        #     similar_plan_exists = WorkerDay.objects.filter(
-        #         type=WorkerDay.TYPE_WORKDAY,
-        #         is_fact=False,
-        #         is_approved=True,
-        #         dt=attrs.get('dt'),
-        #         worker_id=attrs.get('worker_id'),
-        #         shop_id=attrs.get('shop_id'),
-        #     ).exists()
-        #     if not similar_plan_exists:
-        #         raise ValidationError({
-        #             "error": "Не существует рабочего дня в плановом подтвержденном графике. "
-        #                      "Необходимо создать и подтвердить рабочий день в плановом графике, "
-        #                      "или проверить, что магазины в плановом и фактическом графиках совпадают."
-        #         })
-
         return attrs
 
     def _create_update_clean(self, validated_data, instance=None):
@@ -385,7 +368,7 @@ class CopyApprovedSerializer(serializers.Serializer):
         (TYPE_FACT_TO_FACT, 'Факт в факт'),
     ]
 
-    worker_ids = serializers.ListField(child=serializers.IntegerField())
+    employee_ids = serializers.ListField(child=serializers.IntegerField())
     dates = serializers.ListField(child=serializers.DateField())
     type = serializers.ChoiceField(choices=TYPES, default=TYPE_PLAN_TO_PLAN)
     to_fact = serializers.BooleanField(default=False)
@@ -407,7 +390,7 @@ class DuplicateSrializer(serializers.Serializer):
 
 
 class DeleteWorkerDaysSerializer(serializers.Serializer):
-    worker_ids = serializers.ListField(child=serializers.IntegerField())
+    employee_ids = serializers.ListField(child=serializers.IntegerField())
     dates = serializers.ListField(child=serializers.DateField())
     is_fact = serializers.BooleanField(default=False)
     exclude_created_by = serializers.BooleanField(default=True)
@@ -418,14 +401,14 @@ class ExchangeSerializer(serializers.Serializer):
         'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")
     }
 
-    worker1_id = serializers.IntegerField()
-    worker2_id = serializers.IntegerField()
+    employee1_id = serializers.IntegerField()
+    employee2_id = serializers.IntegerField()
     dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
-        for key in ['worker1_id', 'worker2_id']:
-            if not User.objects.filter(id=self.validated_data[key]).exists():
+        for key in ['employee1_id', 'employee2_id']:
+            if not Employee.objects.filter(id=self.validated_data[key]).exists():
                 raise ValidationError({key: self.error_messages['not_exist'].format(pk_value=self.validated_data[key])})
 
 

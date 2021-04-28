@@ -8,9 +8,11 @@ from src.timetable.models import WorkerDay, WorkTypeName, WorkType
 from src.base.models import Employment, Employee, WorkerPosition
 from src.recognition.models import TickPoint
 from src.util.mixins.tests import TestsHelperMixin
-
+from src.util.models_converter import Converter
 
 class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
+    maxDiff = None
+
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
@@ -162,8 +164,8 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'worker_days': [
                         {
                             'id': wd1.id, 
-                            'dttm_work_start': datetime.combine(self.today, time(8)).strftime('%Y-%m-%dT%H:%M:%S'), 
-                            'dttm_work_end': datetime.combine(self.today, time(14)).strftime('%Y-%m-%dT%H:%M:%S'), 
+                            'dttm_work_start': Converter.convert_datetime(wd1.dttm_work_start),
+                            'dttm_work_end': Converter.convert_datetime(wd1.dttm_work_end),
                             'position': ''
                         }
                     ]
@@ -174,8 +176,8 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'worker_days': [
                         {
                             'id': wd2.id, 
-                            'dttm_work_start': datetime.combine(self.today, time(15)).strftime('%Y-%m-%dT%H:%M:%S'), 
-                            'dttm_work_end': datetime.combine(self.today, time(20)).strftime('%Y-%m-%dT%H:%M:%S'), 
+                            'dttm_work_start': Converter.convert_datetime(wd2.dttm_work_start),
+                            'dttm_work_end': Converter.convert_datetime(wd2.dttm_work_end),
                             'position': 'Работник'
                         }
                     ]
