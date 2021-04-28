@@ -1208,10 +1208,9 @@ class AttendanceRecords(AbstractModel):
             return res
 
         with transaction.atomic():
-            # TODO: ошибка + явный выбор если есть неоднозначность в выборе Сотрудника для которого идет отметка
             fact_approved = WorkerDay.objects.filter(
                 dt=self.dt,
-                employee__user=self.user,
+                employee_id=self.employee_id,
                 is_fact=True,
                 is_approved=True,
             ).select_for_update().first()
@@ -1243,7 +1242,7 @@ class AttendanceRecords(AbstractModel):
                 if self.type == self.TYPE_LEAVING:
                     prev_fa_wd = WorkerDay.objects.filter(
                         shop_id=self.shop_id,
-                        employee__user=self.user,
+                        employee_id=self.employee_id,
                         dt__lt=self.dt,
                         is_fact=True,
                         is_approved=True,
@@ -1269,7 +1268,7 @@ class AttendanceRecords(AbstractModel):
 
                 fact_approved, _wd_created = WorkerDay.objects.update_or_create(
                     dt=self.dt,
-                    employee_id=employee_id,
+                    employee_id=self.employee_id,
                     is_fact=True,
                     is_approved=True,
                     defaults={
