@@ -1062,6 +1062,7 @@ class AttendanceRecords(AbstractModel):
             type=WorkerDay.TYPE_WORKDAY,
         )
         diff_to_wd_mapping = {}
+        plan_exists = False
         for wd in worker_days:
             diff_to_wd_mapping[abs((dttm - wd.dttm_work_start).total_seconds())] = {
                 'worker_day': wd,
@@ -1072,12 +1073,12 @@ class AttendanceRecords(AbstractModel):
                 'type': AttendanceRecords.TYPE_LEAVING,
             }
         if len(diff_to_wd_mapping.keys()) == 0 or min(diff_to_wd_mapping.keys()) > settings.ZKTECO_MAX_DIFF_IN_SECONDS:
-            employee_id = Employment.objects.get_active(
-                dt_from=dttm.date(),
-                dt_to=dttm.date(),
-                network_id=shop.network_id,
-                employee__user_id=user_id,
-            ).first().employee_id
+            employment = Employment.objects.get_active_empl_by_priority(
+                network_id=shop.network_id, employee__user_id=user_id,
+                dt=dttm.date(),
+                priority_shop_id=shop.id,
+            ).first()
+            employee_id = employment.employee_id
             dt = dttm.date()
             type = AttendanceRecords.TYPE_COMING
             record = AttendanceRecords.objects.filter(shop=shop, user_id=user_id, dt=dttm.date(), employee_id=employee_id).order_by('dttm').first()
@@ -1087,10 +1088,12 @@ class AttendanceRecords(AbstractModel):
             min_diff = min(diff_to_wd_mapping.keys())
             data = diff_to_wd_mapping[min_diff]
             employee_id = data['worker_day'].employee_id
+            employment = data['worker_day'].employment
             dt = data['worker_day'].dt
             type = data['type']
+            plan_exists = True
         
-        return employee_id, dt, type
+        return employee_id, employment, dt, type, plan_exists
 
 
     def _create_wd_details(self, dt, fact_approved, active_user_empl):
@@ -1195,8 +1198,7 @@ class AttendanceRecords(AbstractModel):
         При создании отметки время о приходе или уходе заносится в фактический подтвержденный график WorkerDay.
         Если подтвержденного факта нет - создаем новый подтвержденный факт.
         """
-        if not self.employee_id or not self.dt or not self.type:
-            employee_id, dt, type = self.get_day_data(self.dttm, self.user_id, self.shop)
+        employee_id, active_user_empl, dt, type, plan_exists = self.get_day_data(self.dttm, self.user_id, self.shop)
         self.dt = self.dt or dt
         self.type = self.type or type
         self.employee_id = self.employee_id or employee_id
@@ -1213,23 +1215,6 @@ class AttendanceRecords(AbstractModel):
                 is_fact=True,
                 is_approved=True,
             ).select_for_update().first()
-
-            plan_approved = WorkerDay.objects.filter(
-                dt=self.dt,
-                employee__user=self.user,
-                is_fact=False,
-                is_approved=True,
-                shop=self.shop,
-                type__in=WorkerDay.TYPES_WITH_TM_RANGE,
-                employment__isnull=False,
-            ).prefetch_related('work_types').first()
-
-            active_user_empl = Employment.objects.get_active_empl_by_priority(
-                network_id=self.user.network_id, employee__user_id=self.user_id,
-                dt=self.dt,
-                priority_shop_id=self.shop_id,
-                priority_employment_id=plan_approved.employment_id if plan_approved else None,
-            ).first()
 
             # для случаев когда сотрудник перепутал магазины, отметился сначала в одном, потом еще раз в другом
             if fact_approved and fact_approved.shop_id != self.shop_id:
@@ -1284,7 +1269,7 @@ class AttendanceRecords(AbstractModel):
 
                 fact_approved, _wd_created = WorkerDay.objects.update_or_create(
                     dt=self.dt,
-                    employee=active_user_empl.employee,
+                    employee_id=employee_id,
                     is_fact=True,
                     is_approved=True,
                     defaults={
@@ -1298,7 +1283,7 @@ class AttendanceRecords(AbstractModel):
                 if _wd_created or not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl)
                 if _wd_created:
-                    if not plan_approved:
+                    if not plan_exists:
                         transaction.on_commit(lambda: event_signal.send(
                             sender=None,
                             network_id=self.user.network_id,

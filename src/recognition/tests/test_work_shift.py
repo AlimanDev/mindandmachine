@@ -162,8 +162,8 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'worker_days': [
                         {
                             'id': wd1.id, 
-                            'dttm_work_start': '2021-04-27T08:00:00', 
-                            'dttm_work_end': '2021-04-27T14:00:00', 
+                            'dttm_work_start': datetime.combine(self.today, time(8)).strftime('%Y-%m-%dT%H:%M:%S'), 
+                            'dttm_work_end': datetime.combine(self.today, time(14)).strftime('%Y-%m-%dT%H:%M:%S'), 
                             'position': ''
                         }
                     ]
@@ -174,8 +174,8 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'worker_days': [
                         {
                             'id': wd2.id, 
-                            'dttm_work_start': '2021-04-27T15:00:00', 
-                            'dttm_work_end': '2021-04-27T20:00:00', 
+                            'dttm_work_start': datetime.combine(self.today, time(15)).strftime('%Y-%m-%dT%H:%M:%S'), 
+                            'dttm_work_end': datetime.combine(self.today, time(20)).strftime('%Y-%m-%dT%H:%M:%S'), 
                             'position': 'Работник'
                         }
                     ]
