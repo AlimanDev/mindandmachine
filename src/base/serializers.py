@@ -173,6 +173,7 @@ class AutoTimetableSerializer(serializers.Serializer):
 class EmploymentListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     employee_id = serializers.IntegerField(required=False)
+    employee = EmployeeSerializer(required=False, read_only=True)
     user_id = serializers.IntegerField(source='employee.user_id')
     shop_id = serializers.IntegerField(required=False)
     position_id = serializers.IntegerField()
@@ -209,6 +210,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
     shop_code = serializers.CharField(required=False, source='shop.code')
     user_id = serializers.IntegerField(required=False, source='employee.user_id')
     employee_id = serializers.IntegerField(required=False)
+    employee = EmployeeSerializer(required=False, read_only=True)
     function_group_id = serializers.IntegerField(required=False, allow_null=True)
     work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
@@ -238,7 +240,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
         }
         timetable_fields = [
             'function_group_id', 'is_fixed_hours', 'salary', 'week_availability', 'norm_work_hours', 'shift_hours_length_min', 
-            'shift_hours_length_max', 'min_time_btw_shifts', 'tabel_code', 'is_ready_for_overworkings', 'is_visible',
+            'shift_hours_length_max', 'min_time_btw_shifts', 'is_ready_for_overworkings', 'is_visible',
         ]
 
     def validate(self, attrs):
