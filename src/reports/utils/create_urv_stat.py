@@ -209,6 +209,7 @@ def urv_stat_v2(dt_from, dt_to, title=None, shop_ids=None, network_id=None, in_m
     records = AttendanceRecords.objects.select_related(
         'shop',
         'user',
+        'employee',
     ).filter(
         dt__gte=dt_from,
         dt__lte=dt_to,
@@ -219,16 +220,12 @@ def urv_stat_v2(dt_from, dt_to, title=None, shop_ids=None, network_id=None, in_m
         'dttm',
     )
 
-    employments = {}
-    for e in Employment.objects.get_active(network_id, dt_from=dt_from, dt_to=dt_to):
-        employments.setdefault(e.user_id, {})[e.shop_id] = e
-
     row = 1
     for record in records:
         worksheet.write(row, SHOP_CODE, record.shop.code or 'Без кода')
         worksheet.write(row, SHOP, record.shop.name)
         worksheet.write(row, DTTM, str(record.dttm.replace(microsecond=0)))
-        worksheet.write(row, USER_CODE, employments.get(record.user_id, {}).get(record.shop_id, Employment()).tabel_code or 'Без табельного номера')
+        worksheet.write(row, USER_CODE, record.employee.tabel_code or 'Без табельного номера')
         worksheet.write(row, USER, f'{record.user.last_name} {record.user.first_name} {record.user.middle_name or ""}')
         worksheet.write(row, TYPE, RECORD_TYPES.get(record.type, 'Неизвестно'))
         row += 1

@@ -106,13 +106,13 @@ class TestUrvFiles(APITestCase):
         )
         data = urv_violators_report(self.network.id, dt_from=self.dt, dt_to=self.dt, exclude_created_by=True)
         assert_data = {
-            self.employment3.user_id: {
+            self.employment3.employee_id: {
                 self.dt: {
                     'shop_id': self.employment3.shop_id, 
                     'type': 'L'
                 }
             },
-            self.employment4.user_id: {
+            self.employment4.employee_id: {
                 self.dt: {
                     'shop_id': self.employment4.shop_id, 
                     'type': 'BFL'
@@ -129,7 +129,7 @@ class TestUrvFiles(APITestCase):
             AttendanceRecords.TYPE_COMING,
         )
         WorkerDay.objects.filter(
-            worker_id=self.employment4.user_id,
+            employee_id=self.employment4.employee_id,
             is_fact=True,
             is_approved=True,
         ).delete()
@@ -155,19 +155,19 @@ class TestUrvFiles(APITestCase):
         )
         data = urv_violators_report(self.network.id, dt_from=self.dt, dt_to=self.dt, exclude_created_by=True)
         assert_data = {
-            self.employment3.user_id: {
+            self.employment3.employee_id: {
                 self.dt: {
                     'shop_id': self.employment3.shop_id, 
                     'type': 'L'
                 }
             },
-            self.employment4.user_id: {
+            self.employment4.employee_id: {
                 self.dt: {
                     'shop_id': self.employment4.shop_id, 
                     'type': 'BFL'
                 }
             },
-            self.employment5.user_id: {
+            self.employment5.employee_id: {
                 self.dt: {
                     'shop_id': self.employment5.shop_id, 
                     'type': 'R'
@@ -176,13 +176,13 @@ class TestUrvFiles(APITestCase):
         }
         data = urv_violators_report(self.network.id, dt_from=self.dt, dt_to=self.dt)
         assert_data = {
-            self.employment3.user_id: {
+            self.employment3.employee_id: {
                 self.dt: {
                     'shop_id': self.employment3.shop_id, 
                     'type': 'L'
                 }
             },
-            self.employment4.user_id: {
+            self.employment4.employee_id: {
                 self.dt: {
                     'shop_id': self.employment4.shop_id, 
                     'type': 'BF'
@@ -199,7 +199,7 @@ class TestUrvFiles(APITestCase):
             'Код объекта': self.shop.code,
             'Название объекта': self.shop.name, 
             'Табельный номер': '',
-            'ФИО': 'Сидоров Иван3 ', 
+            'ФИО': 'Сидоров Иван3', 
             'Нарушение': 'Нет ухода'
         }
         self.assertEqual(len(df.iloc[:,:]), 1)
@@ -214,7 +214,7 @@ class TestUrvFiles(APITestCase):
             'Код магазина': self.shop.code, 
             'Магазин': 'Shop1', 
             'Табельный номер': '', 
-            'ФИО': 'Сидоров Иван3 ', 
+            'ФИО': 'Сидоров Иван3', 
             'Должность': '',
             self.dt.strftime('%d.%m.%Y'): 'Нет ухода'
         }
