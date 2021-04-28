@@ -1051,7 +1051,7 @@ class AttendanceRecords(AbstractModel):
         return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
     @staticmethod
-    def get_day_data(dttm: datetime.datetime, user_id, shop):
+    def get_day_data(dttm: datetime.datetime, user_id, shop, initial_type=None):
         worker_days = WorkerDay.objects.filter(
             employee__user_id=user_id,
             dt__gte=dttm.date() - datetime.timedelta(1),
@@ -1064,14 +1064,23 @@ class AttendanceRecords(AbstractModel):
         diff_to_wd_mapping = {}
         plan_exists = False
         for wd in worker_days:
-            diff_to_wd_mapping[abs((dttm - wd.dttm_work_start).total_seconds())] = {
-                'worker_day': wd,
-                'type': AttendanceRecords.TYPE_COMING,
-            }
-            diff_to_wd_mapping[abs((dttm - wd.dttm_work_end).total_seconds())] = {
-                'worker_day': wd,
-                'type': AttendanceRecords.TYPE_LEAVING,
-            }
+            '''
+            list потому что может быть два дня
+            с одинаковым окончанием и началом
+            пример: окончание 1 дня 12:00 - начало 2 дня 12:00
+            '''
+            diff_to_wd_mapping.setdefault(abs((dttm - wd.dttm_work_start).total_seconds()), []).append(
+                {
+                    'worker_day': wd,
+                    'type': AttendanceRecords.TYPE_COMING,
+                }
+            )
+            diff_to_wd_mapping.setdefault(abs((dttm - wd.dttm_work_end).total_seconds()), []).append(
+                {
+                    'worker_day': wd,
+                    'type': AttendanceRecords.TYPE_LEAVING,
+                }
+            )
         if len(diff_to_wd_mapping.keys()) == 0 or min(diff_to_wd_mapping.keys()) > settings.ZKTECO_MAX_DIFF_IN_SECONDS:
             employment = Employment.objects.get_active_empl_by_priority(
                 network_id=shop.network_id, employee__user_id=user_id,
@@ -1087,10 +1096,36 @@ class AttendanceRecords(AbstractModel):
         else:
             min_diff = min(diff_to_wd_mapping.keys())
             data = diff_to_wd_mapping[min_diff]
+            if len(data) > 1:
+                if not initial_type:
+                    # для терминалов определяем тип, если есть "стык"
+                    records = AttendanceRecords.objects.filter(
+                        shop_id=data[0]['worker_day'].shop_id,
+                        user_id=user_id,
+                        dttm__lt=dttm,
+                        dt__in=[data[0]['worker_day'].dt, data[1]['worker_day'].dt],
+                    )
+                    earlier_comming_attrs = records.filter(type=AttendanceRecords.TYPE_COMING).exists()
+                    earlier_leaving_attrs = records.filter(type=AttendanceRecords.TYPE_LEAVING).exists()
+                    if earlier_leaving_attrs or not earlier_comming_attrs:
+                        type = AttendanceRecords.TYPE_COMING
+                    else:
+                        type = AttendanceRecords.TYPE_LEAVING
+                data = list(filter(lambda x: x['type'] == initial_type, data))
+            elif initial_type and data[0]['type'] != initial_type:
+                # если передан тип и он не совпадает с подобранным днем
+                # пытаемся найти подходящий
+                filtered_diffs = dict(filter(lambda x: x[1][0]['type'] == initial_type or len(x[1]) > 1, diff_to_wd_mapping.items()))
+                min_diff = min(filtered_diffs.keys())
+                if min_diff > settings.ZKTECO_MAX_DIFF_IN_SECONDS:
+                    data = diff_to_wd_mapping[min_diff] 
+                    if len(data) > 1:
+                        data = list(filter(lambda x: x['type'] == initial_type, data))
+            data = data[0]
+            type = data['type']
             employee_id = data['worker_day'].employee_id
             employment = data['worker_day'].employment
             dt = data['worker_day'].dt
-            type = data['type']
             plan_exists = True
         
         return employee_id, employment, dt, type, plan_exists
@@ -1198,7 +1233,7 @@ class AttendanceRecords(AbstractModel):
         При создании отметки время о приходе или уходе заносится в фактический подтвержденный график WorkerDay.
         Если подтвержденного факта нет - создаем новый подтвержденный факт.
         """
-        employee_id, active_user_empl, dt, type, plan_exists = self.get_day_data(self.dttm, self.user_id, self.shop)
+        employee_id, active_user_empl, dt, type, plan_exists = self.get_day_data(self.dttm, self.user_id, self.shop, self.type)
         self.dt = self.dt or dt
         self.type = self.type or type
         self.employee_id = self.employee_id or employee_id
