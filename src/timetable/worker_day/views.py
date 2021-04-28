@@ -705,7 +705,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             raise ValidationError(_('There is no such vacancy.'))
         if not vacancy.is_approved:
             return Response(WorkerDaySerializer(vacancy).data)
-        if vacancy.worker_id:
+        if vacancy.empoyee_id:
             raise ValidationError(_('The vacancy cannot be edited because it has already been responded.'))
         editable_vacancy = WorkerDay.objects.filter(parent_worker_day=vacancy).first()
         if editable_vacancy is None:
@@ -920,7 +920,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             list_wd = list(
                 WorkerDay.objects.filter(
                     dt__in=data['dates'],
-                    employee__user_id__in=data['worker_ids'],
+                    employee_id__in=data['employee_ids'],
                     is_approved=True,
                     **fact_filter,
                 ).select_related(
@@ -936,7 +936,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             fact_filter['is_fact'] = True if data['type'] in (CopyApprovedSerializer.TYPE_PLAN_TO_FACT, CopyApprovedSerializer.TYPE_FACT_TO_FACT) else False
             WorkerDay.objects_with_excluded.filter(
                 dt__in=data['dates'],
-                employee__user_id__in=data['worker_ids'],
+                employee_id__in=data['employee_ids'],
                 is_approved=False,
                 **fact_filter,
             ).delete()
@@ -965,7 +965,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             )
             wds = WorkerDay.objects.filter(
                 dt__in=data['dates'],
-                employee__user_id__in=data['worker_ids'],
+                employee_id__in=data['employee_ids'],
                 is_approved=False,
                 **fact_filter,
             )
@@ -1085,7 +1085,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         WorkerDay.objects_with_excluded.filter(
             is_approved=False,
             is_fact=data['is_fact'], 
-            employee__user_id__in=data['worker_ids'],
+            employee_id__in=data['employee_ids'],
             dt__in=data['dates'],
             **filt,
         ).delete()

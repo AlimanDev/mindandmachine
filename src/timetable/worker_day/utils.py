@@ -470,11 +470,16 @@ def exchange(data, error_messages):
     days = len(data['dates'])
     with transaction.atomic():
         wd_list = list(WorkerDay.objects.filter(
-            employee__user_id__in=(data['worker1_id'], data['worker2_id']),  # TODO: переделать на employee_id
+            employee_id__in=(data['employee1_id'], data['employee2_id']),
             dt__in=data['dates'],
             is_approved=data['is_approved'],
             is_fact=False,
-        ).prefetch_related('worker_day_details__work_type__work_type_name').select_related('employee__user', 'employment').order_by('dt'))
+        ).prefetch_related(
+            'worker_day_details__work_type__work_type_name',
+        ).select_related(
+            'employee__user',
+            'employment',
+        ).order_by('dt'))
 
         if len(wd_list) != days * 2:
             raise ValidationError(error_messages['no_timetable'])
@@ -494,7 +499,7 @@ def exchange(data, error_messages):
         ).exists()
         if not has_permission_to_change_protected_wdays:
             protected_wdays = list(WorkerDay.objects.filter(
-                employee__user__in=(data['worker1_id'], data['worker2_id']),
+                employee_id__in=(data['employee1_id'], data['employee2_id']),
                 dt__in=data['dates'],
                 is_approved=data['is_approved'],
                 is_fact=False,
@@ -560,7 +565,7 @@ def exchange(data, error_messages):
                 send_doctors_schedule_to_mis.delay(json_data=json_data)
 
         WorkerDay.objects_with_excluded.filter(
-            employee__user_id__in=(data['worker1_id'], data['worker2_id']),
+            employee_id__in=(data['employee1_id'], data['employee2_id']),
             dt__in=data['dates'],
             is_approved=data['is_approved'],
             is_fact=False,

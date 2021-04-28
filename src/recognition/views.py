@@ -125,7 +125,7 @@ class UserAuthTickViewStrategy(TickViewStrategy):
         if tick_point is None:
             tick_point = TickPoint.objects.create(name=f'autocreate tickpoint {shop.id}', shop=shop)
 
-        return user_id, data['employee_id'], tick_point
+        return user_id, data.get('employee_id'), tick_point
 
 
 class TickPointAuthTickViewStrategy(TickViewStrategy):
@@ -213,18 +213,23 @@ class TickViewSet(BaseModelViewSet):
         dttm_from = check_time.replace(hour=0, minute=0, second=0)
         dttm_to = dttm_from + timedelta(days=1)
 
+        employee_lookup = {}
+        if employee_id:
+            employee_lookup['employee_id'] = employee_id
+        else:
+            employee_lookup['employee__user_id'] = user_id
+
         # Проверка на принадлежность пользователя правильному магазину
         employment = Employment.objects.get_active(
             request.user.network.id,
             dttm_from.date(), dttm_from.date(),
-            employee_id=employee_id,
-            shop_id=tick_point.shop_id
+            shop_id=tick_point.shop_id,
+            **employee_lookup,
         ).first()
 
         if (not employment) and settings.USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY:
             # есть ли вакансия в этом магазине
             wd = WorkerDay.objects.filter(
-                employee_id=employee_id,
                 shop_id=tick_point.shop_id,
                 dt__gte=dttm_from - timedelta(1),
                 dt__lte=dttm_to.date(),
@@ -232,6 +237,7 @@ class TickViewSet(BaseModelViewSet):
                 is_approved=True,
                 is_fact=False,
                 is_vacancy=True,
+                **employee_lookup,
             ).first()
             if not wd:
                 return Response(
@@ -243,7 +249,7 @@ class TickViewSet(BaseModelViewSet):
                 )
 
         wd = WorkerDay.objects.all().filter(
-            employee_id=employee_id,
+            **employee_lookup,
             shop_id=tick_point.shop_id,
             employment=employment,
             dttm_work_start__gte=dttm_from,
