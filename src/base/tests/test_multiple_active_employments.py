@@ -117,7 +117,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.client.force_authenticate(user=user)
 
         with mock.patch('src.recognition.views.now') as _now_mock:
-            _now_mock.return_value = dttm_coming or datetime.now()
+            _now_mock.return_value = (dttm_coming - timedelta(hours=shop.get_tz_offset())) if dttm_coming else datetime.now()
             resp_coming = self.client.post(
                 self.get_url('Tick-list'),
                 data=self.dump_data({
@@ -129,7 +129,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertEqual(resp_coming.status_code, status.HTTP_200_OK)
 
         with mock.patch('src.recognition.views.now') as _now_mock:
-            _now_mock.return_value = dttm_leaving or datetime.now()
+            _now_mock.return_value = (dttm_leaving - timedelta(hours=shop.get_tz_offset())) if dttm_leaving else datetime.now()
             resp_leaving = self.client.post(
                 self.get_url('Tick-list'),
                 data=self.dump_data({
@@ -239,18 +239,18 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
 
         fact_approved1_list = self._make_tick_requests(
             self.user1, self.shop1,
-            dttm_coming=datetime.combine(self.dt, time(9, 53, 0)),
-            dttm_leaving=datetime.combine(self.dt, time(15, 41, 0)),
+            dttm_coming=datetime.combine(self.dt, time(8, 53, 0)),
+            dttm_leaving=datetime.combine(self.dt, time(14, 41, 0)),
         )
         self.assertEqual(len(fact_approved1_list), 1)
         fact_approved1 = fact_approved1_list[0]
         self.assertEqual(fact_approved1.employment_id, self.employment1_1_1.id)
-        self.assertEqual(fact_approved1.dttm_work_start, datetime.combine(self.dt, time(11, 53, 0)))
-        self.assertEqual(fact_approved1.dttm_work_end, datetime.combine(self.dt, time(17, 41, 0)))
+        self.assertEqual(fact_approved1.dttm_work_start, datetime.combine(self.dt, time(8, 53, 0)))
+        self.assertEqual(fact_approved1.dttm_work_end, datetime.combine(self.dt, time(14, 41, 0)))
 
         fact_approved2_list = self._make_tick_requests(
             self.user1, self.shop1,
-            dttm_coming=datetime.combine(self.dt, time(15, 42, 0)),
+            dttm_coming=datetime.combine(self.dt, time(14, 42, 0)),
             dttm_leaving=datetime.combine(self.dt, time(19, 57, 0)),
         )
         self.assertEqual(len(fact_approved2_list), 2)
@@ -258,8 +258,8 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertEqual(len(fact_approved2_list), 1)
         fact_approved2 = fact_approved2_list[0]
         self.assertEqual(fact_approved2.employment_id, self.employment1_2_1.id)
-        self.assertEqual(fact_approved2.dttm_work_start, datetime.combine(self.dt, time(18, 42, 0)))
-        self.assertEqual(fact_approved2.dttm_work_end, datetime.combine(self.dt, time(22, 57, 0)))
+        self.assertEqual(fact_approved2.dttm_work_start, datetime.combine(self.dt, time(14, 42, 0)))
+        self.assertEqual(fact_approved2.dttm_work_end, datetime.combine(self.dt, time(19, 57, 0)))
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, TRUST_TICK_REQUEST=True)
