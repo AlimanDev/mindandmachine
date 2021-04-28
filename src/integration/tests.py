@@ -864,7 +864,6 @@ class TestIntegration(APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_start, dttm_third)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_end, dttm_fourth)
 
-    @expectedFailure
     @override_settings(ZKTECO_MAX_DIFF_IN_SECONDS=4*60*60)
     def test_import_urv_tick_in_middle_of_shift_with_bad_diff(self):
         ShopExternalCode.objects.create(
@@ -933,7 +932,6 @@ class TestIntegration(APITestCase):
 
         self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 2)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
-        # FIXME пока что ошибка, нужен фикс
         self.assertEqual(AttendanceRecords.objects.count(), 2)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_start, dttm_first)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_end, dttm_second)

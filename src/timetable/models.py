@@ -8,20 +8,18 @@ from django.contrib.auth.models import (
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField,
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField
 )
-from django.db.models import (
-    Sum,
-)
+from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from model_utils import FieldTracker
 
-from src.events.signals import event_signal
-from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
+from src.events.signals import event_signal
+from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 
 
 class WorkerManager(UserManager):
@@ -726,6 +724,47 @@ class WorkerDay(AbstractModel):
 
         return res
 
+    @classmethod
+    def get_closest_plan_approved(cls, user_id, shop_id, dttm, record_type=None):
+        dt = dttm.date()
+
+        plan_approved_wdays = cls.objects.filter(
+            employee__user_id=user_id,
+            dt__gte=dt - datetime.timedelta(1),
+            dt__lte=dt + datetime.timedelta(1),
+            is_approved=True,
+            is_fact=False,
+            shop_id=shop_id,
+            type=WorkerDay.TYPE_WORKDAY,
+        ).annotate(
+            dttm_work_start_diff=Abs(Cast(Extract(dttm - F('dttm_work_start'), 'epoch'), IntegerField())),
+            dttm_work_end_diff=Abs(Cast(Extract(dttm - F('dttm_work_end'), 'epoch'), IntegerField())),
+            dttm_diff_min=Least(
+                F('dttm_work_start_diff'),
+                F('dttm_work_end_diff'),
+            ),
+        ).filter(
+            dttm_diff_min__lt=settings.ZKTECO_MAX_DIFF_IN_SECONDS,
+        )
+
+        order_by = []
+        if record_type == AttendanceRecords.TYPE_COMING:
+            order_by.append('dttm_work_start_diff')
+        if record_type == AttendanceRecords.TYPE_LEAVING:
+            order_by.append('dttm_work_end_diff')
+        order_by.append('dttm_diff_min')
+
+        closest_plan_approved = plan_approved_wdays.order_by(*order_by).first()
+
+        if not record_type and closest_plan_approved:
+            if closest_plan_approved.dttm_diff_min == closest_plan_approved.dttm_work_start_diff:
+                record_type = AttendanceRecords.TYPE_COMING
+
+            if closest_plan_approved.dttm_diff_min == closest_plan_approved.dttm_work_end_diff:
+                record_type = AttendanceRecords.TYPE_LEAVING
+
+        return closest_plan_approved, record_type
+
 
 class WorkerDayCashboxDetailsManager(models.Manager):
     def qos_current_version(self):
@@ -1051,85 +1090,42 @@ class AttendanceRecords(AbstractModel):
         return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
     @staticmethod
-    def get_day_data(dttm: datetime.datetime, user_id, shop, initial_type=None):
-        worker_days = WorkerDay.objects.filter(
-            employee__user_id=user_id,
-            dt__gte=dttm.date() - datetime.timedelta(1),
-            dt__lte=dttm.date() + datetime.timedelta(1),
-            is_approved=True,
-            is_fact=False,
-            shop=shop,
-            type=WorkerDay.TYPE_WORKDAY,
+    def get_day_data(dttm: datetime.datetime, user_id, shop, initial_record_type=None):
+        dt = dttm.date()
+
+        closest_plan_approved, calculated_record_type = WorkerDay.get_closest_plan_approved(
+            user_id=user_id,
+            shop_id=shop.id,
+            dttm=dttm,
+            record_type=initial_record_type,
         )
-        diff_to_wd_mapping = {}
-        plan_exists = False
-        for wd in worker_days:
-            '''
-            list потому что может быть два дня
-            с одинаковым окончанием и началом
-            пример: окончание 1 дня 12:00 - начало 2 дня 12:00
-            '''
-            diff_to_wd_mapping.setdefault(abs((dttm - wd.dttm_work_start).total_seconds()), []).append(
-                {
-                    'worker_day': wd,
-                    'type': AttendanceRecords.TYPE_COMING,
-                }
-            )
-            diff_to_wd_mapping.setdefault(abs((dttm - wd.dttm_work_end).total_seconds()), []).append(
-                {
-                    'worker_day': wd,
-                    'type': AttendanceRecords.TYPE_LEAVING,
-                }
-            )
-        if len(diff_to_wd_mapping.keys()) == 0 or min(diff_to_wd_mapping.keys()) > settings.ZKTECO_MAX_DIFF_IN_SECONDS:
+
+        if closest_plan_approved is None:
             employment = Employment.objects.get_active_empl_by_priority(
                 network_id=shop.network_id, employee__user_id=user_id,
-                dt=dttm.date(),
+                dt=dt,
                 priority_shop_id=shop.id,
             ).first()
             employee_id = employment.employee_id
-            dt = dttm.date()
-            type = AttendanceRecords.TYPE_COMING
-            record = AttendanceRecords.objects.filter(shop=shop, user_id=user_id, dt=dttm.date(), employee_id=employee_id).order_by('dttm').first()
-            if record and record.dttm < dttm:
-                type = AttendanceRecords.TYPE_LEAVING
+            if not initial_record_type:
+                record_type = AttendanceRecords.TYPE_COMING
+                record = AttendanceRecords.objects.filter(
+                    shop=shop,
+                    user_id=user_id,
+                    dt=dt,
+                    employee_id=employee_id,
+                ).order_by('dttm').first()
+                if record and record.dttm < dttm:
+                    record_type = AttendanceRecords.TYPE_LEAVING
+            else:
+                record_type = initial_record_type
         else:
-            min_diff = min(diff_to_wd_mapping.keys())
-            data = diff_to_wd_mapping[min_diff]
-            if len(data) > 1:
-                if not initial_type:
-                    # для терминалов определяем тип, если есть "стык"
-                    records = AttendanceRecords.objects.filter(
-                        shop_id=data[0]['worker_day'].shop_id,
-                        user_id=user_id,
-                        dttm__lt=dttm,
-                        dt__in=[data[0]['worker_day'].dt, data[1]['worker_day'].dt],
-                    )
-                    earlier_comming_attrs = records.filter(type=AttendanceRecords.TYPE_COMING).exists()
-                    earlier_leaving_attrs = records.filter(type=AttendanceRecords.TYPE_LEAVING).exists()
-                    if earlier_leaving_attrs or not earlier_comming_attrs:
-                        type = AttendanceRecords.TYPE_COMING
-                    else:
-                        type = AttendanceRecords.TYPE_LEAVING
-                data = list(filter(lambda x: x['type'] == initial_type, data))
-            elif initial_type and data[0]['type'] != initial_type:
-                # если передан тип и он не совпадает с подобранным днем
-                # пытаемся найти подходящий
-                filtered_diffs = dict(filter(lambda x: x[1][0]['type'] == initial_type or len(x[1]) > 1, diff_to_wd_mapping.items()))
-                min_diff = min(filtered_diffs.keys())
-                if min_diff > settings.ZKTECO_MAX_DIFF_IN_SECONDS:
-                    data = diff_to_wd_mapping[min_diff] 
-                    if len(data) > 1:
-                        data = list(filter(lambda x: x['type'] == initial_type, data))
-            data = data[0]
-            type = data['type']
-            employee_id = data['worker_day'].employee_id
-            employment = data['worker_day'].employment
-            dt = data['worker_day'].dt
-            plan_exists = True
-        
-        return employee_id, employment, dt, type, plan_exists
+            record_type = initial_record_type or calculated_record_type
+            employee_id = closest_plan_approved.employee_id
+            employment = closest_plan_approved.employment
+            dt = closest_plan_approved.dt
 
+        return employee_id, employment, dt, record_type, closest_plan_approved is not None
 
     def _create_wd_details(self, dt, fact_approved, active_user_empl):
         plan_approved = WorkerDay.objects.filter(
@@ -1233,9 +1229,10 @@ class AttendanceRecords(AbstractModel):
         При создании отметки время о приходе или уходе заносится в фактический подтвержденный график WorkerDay.
         Если подтвержденного факта нет - создаем новый подтвержденный факт.
         """
-        employee_id, active_user_empl, dt, type, plan_exists = self.get_day_data(self.dttm, self.user_id, self.shop, self.type)
+        employee_id, active_user_empl, dt, record_type, plan_exists = self.get_day_data(
+            self.dttm, self.user_id, self.shop, self.type)
         self.dt = self.dt or dt
-        self.type = self.type or type
+        self.type = self.type or record_type
         self.employee_id = self.employee_id or employee_id
         res = super(AttendanceRecords, self).save(*args, **kwargs)
 

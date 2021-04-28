@@ -3,6 +3,7 @@ from unittest import mock
 
 import pandas as pd
 from django.test import override_settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -99,7 +100,7 @@ class MultipleActiveEmploymentsSupportMixin(TestsHelperMixin):
             employee=cls.employee2_2, shop=cls.shop3, function_group=cls.group1, norm_work_hours=50,
             work_types__work_type=cls.work_type3_cachier,
         )
-        cls.dt = date.today()
+        cls.dt = timezone.now().date()
         fill_calendar.fill_days('2021.01.01', '2021.12.31', cls.shop1.region_id)
 
 
@@ -114,10 +115,11 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         cls.add_group_perm(cls.group1, 'Tick', 'POST')
 
     def _make_tick_requests(self, user, shop, dttm_coming=None, dttm_leaving=None):
+        # TODO: разобраться с таймзонами
         self.client.force_authenticate(user=user)
 
         with mock.patch('src.recognition.views.now') as _now_mock:
-            _now_mock.return_value = (dttm_coming - timedelta(hours=shop.get_tz_offset())) if dttm_coming else datetime.now()
+            _now_mock.return_value = (dttm_coming - timedelta(hours=shop.get_tz_offset())) if dttm_coming else timezone.now()
             resp_coming = self.client.post(
                 self.get_url('Tick-list'),
                 data=self.dump_data({
@@ -129,7 +131,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertEqual(resp_coming.status_code, status.HTTP_200_OK)
 
         with mock.patch('src.recognition.views.now') as _now_mock:
-            _now_mock.return_value = (dttm_leaving - timedelta(hours=shop.get_tz_offset())) if dttm_leaving else datetime.now()
+            _now_mock.return_value = (dttm_leaving - timedelta(hours=shop.get_tz_offset())) if dttm_leaving else timezone.now()
             resp_leaving = self.client.post(
                 self.get_url('Tick-list'),
                 data=self.dump_data({
@@ -208,7 +210,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
 
         В плане
         1 рабочий день с 09:00 до 15:00
-        2 рабочий день с 15:00 до 20:00
+        2 рабочий день с 15:01 до 20:00
 
         Если сотрудник закончит по 1 смене чуть раньше в 15:40 и переоткроет смену,
         то должны привязаться к началу следующего дня
@@ -233,7 +235,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
             employment=self.employment1_2_1,
             shop=self.shop1,
             type=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(self.dt, time(15, 0, 0)),
+            dttm_work_start=datetime.combine(self.dt, time(15, 0, 1)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
 
