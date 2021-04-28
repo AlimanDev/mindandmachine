@@ -10,7 +10,7 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup, Network, Employment, ShopSchedule, Shop
+from src.base.models import FunctionGroup, Network, Employment, ShopSchedule, Shop, Employee
 from src.timetable.models import (
     WorkerDay,
     AttendanceRecords,
@@ -1978,6 +1978,58 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             dttm=datetime.combine(self.dt, time(14, 54)),
         )
         self.assertEqual(attr.employee_id, self.employment2.employee_id)
+        self.assertEqual(attr.dt, self.dt)
+        self.assertEqual(attr.type, AttendanceRecords.TYPE_COMING)
+
+    def test_create_attendance_record_with_two_near_workdays(self):
+        WorkerDay.objects.update_or_create(
+            dt=self.dt,
+            employee_id=self.employment2.employee_id,
+            is_approved=True,
+            is_fact=False,
+            defaults={
+                'employment': self.employment2,
+                'type': WorkerDay.TYPE_WORKDAY,
+                'shop': self.shop,
+                'dttm_work_start': datetime.combine(self.dt, time(10)),
+                'dttm_work_end': datetime.combine(self.dt, time(16)),
+            }
+        )
+        self.second_employee = Employee.objects.create(
+            user=self.user2,
+            tabel_code='1234',
+        )
+        self.second_employment = Employment.objects.create(
+            employee=self.second_employee,
+            shop_id=self.employment2.shop_id,
+        )
+        WorkerDay.objects.create(
+            dt=self.dt,
+            employee=self.second_employee,
+            is_approved=True,
+            is_fact=False,
+            employment=self.second_employment,
+            type=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt, time(16)),
+            dttm_work_end=datetime.combine(self.dt, time(22)),
+        )
+        attr = AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=datetime.combine(self.dt, time(15, 40)),
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+        self.assertEqual(attr.employee_id, self.employment2.employee_id)
+        self.assertEqual(attr.dt, self.dt)
+        self.assertEqual(attr.type, AttendanceRecords.TYPE_LEAVING)
+        attr = AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=datetime.combine(self.dt, time(15, 41)),
+            type=AttendanceRecords.TYPE_COMING,
+        )
+        self.assertEqual(attr.employee_id, self.second_employee.id)
         self.assertEqual(attr.dt, self.dt)
         self.assertEqual(attr.type, AttendanceRecords.TYPE_COMING)
 
