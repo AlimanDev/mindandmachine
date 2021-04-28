@@ -264,7 +264,7 @@ class TickViewSet(BaseModelViewSet):
             user_id=user_id,
             employee_id=employee_id,
             tick_point_id=tick_point.id,
-            lateness=check_time - wd.dttm_work_start if wd else timedelta(seconds=0),
+            lateness=check_time - wd.dttm_work_start if wd else timedelta(seconds=0),  # TODO: при 2 днях на 1 дату может некорректно рассчитываться? Нужно ли вообще это поле?
             dttm=check_time,
             type=data['type'],
             is_front=is_front

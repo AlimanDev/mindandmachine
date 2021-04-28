@@ -1,4 +1,5 @@
 from datetime import date, time, datetime, timedelta
+from unittest import mock
 
 import pandas as pd
 from django.test import override_settings
@@ -112,32 +113,41 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         super(TestURVTicks, cls).setUpTestData()
         cls.add_group_perm(cls.group1, 'Tick', 'POST')
 
-    def _make_tick_requests(self, user, shop):
+    def _make_tick_requests(self, user, shop, dttm_coming=None, dttm_leaving=None):
         self.client.force_authenticate(user=user)
-        resp_coming = self.client.post(
-            self.get_url('Tick-list'),
-            data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': shop.code}),
-            content_type='application/json',
-        )
+
+        with mock.patch('src.recognition.views.now') as _now_mock:
+            _now_mock.return_value = dttm_coming or datetime.now()
+            resp_coming = self.client.post(
+                self.get_url('Tick-list'),
+                data=self.dump_data({
+                    'type': Tick.TYPE_COMING,
+                    'shop_code': shop.code,
+                }),
+                content_type='application/json',
+            )
         self.assertEqual(resp_coming.status_code, status.HTTP_200_OK)
 
-        resp_leaving = self.client.post(
-            self.get_url('Tick-list'),
-            data=self.dump_data({'type': Tick.TYPE_LEAVING, 'shop_code': shop.code}),
-            content_type='application/json',
-        )
+        with mock.patch('src.recognition.views.now') as _now_mock:
+            _now_mock.return_value = dttm_leaving or datetime.now()
+            resp_leaving = self.client.post(
+                self.get_url('Tick-list'),
+                data=self.dump_data({
+                    'type': Tick.TYPE_LEAVING,
+                    'shop_code': shop.code,
+                }),
+                content_type='application/json',
+            )
         self.assertEqual(resp_leaving.status_code, status.HTTP_200_OK)
 
-        self.assertEqual(Tick.objects.count(), 2)
-
-        fact_approved = WorkerDay.objects.filter(
+        fact_approved_list = list(WorkerDay.objects.filter(
             employee__user=user,
             dt=self.dt,
             is_fact=True,
             is_approved=True,
-        ).first()
-        self.assertIsNotNone(fact_approved)
-        return fact_approved
+        ))
+        self.assertNotEqual(len(fact_approved_list), 0)
+        return fact_approved_list
 
     def test_get_employment_from_plan(self):
         """
@@ -155,7 +165,9 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
-        fact_approved = self._make_tick_requests(self.user1, self.shop1)
+        fact_approved_list = self._make_tick_requests(self.user1, self.shop1)
+        self.assertEqual(len(fact_approved_list), 1)
+        fact_approved = fact_approved_list[0]
         self.assertEqual(fact_approved.employment_id, self.employment1_2_1.id)
         self.assertIsNotNone(fact_approved.dttm_work_start)
         self.assertIsNotNone(fact_approved.dttm_work_end)
@@ -165,7 +177,9 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         Получение трудоустройства с приоритетом по подразделению в случае если нету плана (shop2)
         """
         self.client.force_authenticate(user=self.user2)
-        fact_approved = self._make_tick_requests(self.user2, self.shop2)
+        fact_approved_list = self._make_tick_requests(self.user2, self.shop2)
+        self.assertEqual(len(fact_approved_list), 1)
+        fact_approved = fact_approved_list[0]
         self.assertEqual(fact_approved.employment_id, self.employment2_1_2.id)
 
     def test_get_employment_for_user2_by_shop3(self):
@@ -173,7 +187,9 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         Получение трудоустройства с приоритетом по подразделению в случае если нету плана (shop3)
         """
         self.client.force_authenticate(user=self.user2)
-        fact_approved = self._make_tick_requests(self.user2, self.shop3)
+        fact_approved_list = self._make_tick_requests(self.user2, self.shop3)
+        self.assertEqual(len(fact_approved_list), 1)
+        fact_approved = fact_approved_list[0]
         self.assertEqual(fact_approved.employment_id, self.employment2_2_3.id)
 
     def test_get_employment_by_max_norm_work_hours_when_multiple_active_empls_in_the_same_shop(self):
@@ -181,8 +197,69 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         Получение трудоустройства с наибольшей ставкой
         """
         self.client.force_authenticate(user=self.user1)
-        fact_approved = self._make_tick_requests(self.user1, self.shop1)
+        fact_approved_list = self._make_tick_requests(self.user1, self.shop1)
+        self.assertEqual(len(fact_approved_list), 1)
+        fact_approved = fact_approved_list[0]
         self.assertEqual(fact_approved.employment_id, self.employment1_1_1.id)
+
+    def test_multiple_wdays_for_the_same_user_in_the_same_shop(self):
+        """
+        2 рабочих дня под разными Сотрудниками у 1 Пользователя в одном Подразделении
+
+        В плане
+        1 рабочий день с 09:00 до 15:00
+        2 рабочий день с 15:00 до 20:00
+
+        Если сотрудник закончит по 1 смене чуть раньше в 15:40 и переоткроет смену,
+        то должны привязаться к началу следующего дня
+        """
+        self.client.force_authenticate(user=self.user1)
+        WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee1_1,
+            employment=self.employment1_1_1,
+            shop=self.shop1,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(9, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(15, 0, 0)),
+        )
+        WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee1_2,
+            employment=self.employment1_2_1,
+            shop=self.shop1,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(15, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
+        )
+
+        fact_approved1_list = self._make_tick_requests(
+            self.user1, self.shop1,
+            dttm_coming=datetime.combine(self.dt, time(9, 53, 0)),
+            dttm_leaving=datetime.combine(self.dt, time(15, 41, 0)),
+        )
+        self.assertEqual(len(fact_approved1_list), 1)
+        fact_approved1 = fact_approved1_list[0]
+        self.assertEqual(fact_approved1.employment_id, self.employment1_1_1.id)
+        self.assertEqual(fact_approved1.dttm_work_start, datetime.combine(self.dt, time(11, 53, 0)))
+        self.assertEqual(fact_approved1.dttm_work_end, datetime.combine(self.dt, time(17, 41, 0)))
+
+        fact_approved2_list = self._make_tick_requests(
+            self.user1, self.shop1,
+            dttm_coming=datetime.combine(self.dt, time(15, 42, 0)),
+            dttm_leaving=datetime.combine(self.dt, time(19, 57, 0)),
+        )
+        self.assertEqual(len(fact_approved2_list), 2)
+        fact_approved2_list = list(filter(lambda i: i.id != fact_approved1.id, fact_approved2_list))
+        self.assertEqual(len(fact_approved2_list), 1)
+        fact_approved2 = fact_approved2_list[0]
+        self.assertEqual(fact_approved2.employment_id, self.employment1_2_1.id)
+        self.assertEqual(fact_approved2.dttm_work_start, datetime.combine(self.dt, time(18, 42, 0)))
+        self.assertEqual(fact_approved2.dttm_work_end, datetime.combine(self.dt, time(22, 57, 0)))
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, TRUST_TICK_REQUEST=True)
