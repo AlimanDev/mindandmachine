@@ -406,7 +406,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'min_time_btw_shifts': None,
             'shift_hours_length_min': None,
             'shift_hours_length_max': None,
-            'tabel_code': None,
             'is_ready_for_overworkings': False,
             'is_visible': False,
             'function_group_id': self.employee_group.id,

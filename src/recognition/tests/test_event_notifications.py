@@ -628,7 +628,8 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            df = pd.read_excel(mail.outbox[0].attachments[0][1])
+            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
+            df = pd.read_excel(data, engine='xlrd')
             data = [
                 {
                     'Код магазина': self.shop.code, 
@@ -682,7 +683,8 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            df = pd.read_excel(mail.outbox[0].attachments[0][1])
+            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
+            df = pd.read_excel(data, engine='xlrd')
             data = [
                 {
                     'Код магазина': self.shop2.code,
