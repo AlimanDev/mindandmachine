@@ -47,6 +47,11 @@ class TestRequestApproveEventNotifications(TestsHelperMixin, APITestCase):
         )
         cls.request_approve_event, _created = EventType.objects.get_or_create(
             code=REQUEST_APPROVE_EVENT_TYPE, network=cls.network)
+        FunctionGroup.objects.create(
+            group=cls.group_dir,
+            method='POST',
+            func='WorkerDay_request_approve',
+        )
 
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)

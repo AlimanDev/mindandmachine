@@ -188,11 +188,11 @@ class Timetable_xlsx(Tabel_xlsx):
             format_text = self.workbook.add_format(fmt(font_size=12, border=1, bold=True))
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 1,
-                str(stat.get(str(employment.employee_id), {}).get('plan', {}).get(stat_type, {}).get('work_days', {}).get('total', 0)),
+                str(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('work_days', {}).get('total', 0)),
                 format_text
             )
             
-            plan_hours = int(round(stat.get(str(employment.employee_id), {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
+            plan_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 2,
@@ -200,7 +200,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 format_text
             )
 
-            norm_hours = int(round(stat.get(str(employment.employee_id), {}).get('plan', {}).get(stat_type, {}).get('norm_hours_curr_month', {}).get('value', 0)))
+            norm_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('norm_hours_curr_month', {}).get('value', 0)))
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 3,
@@ -228,13 +228,13 @@ class Timetable_xlsx(Tabel_xlsx):
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 7,
-                str(stat.get(str(employment.employee_id), {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('H', 0)),
+                str(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('H', 0)),
                 format_text
             )
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 8,
-                str(stat.get(str(employment.employee_id), {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('V', 0)),
+                str(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('V', 0)),
                 format_text
             )
 

@@ -551,4 +551,4 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
-        self.assertEqual(tabel[tabel.columns[29]][15], 'В')
+        self.assertEqual(tabel[tabel.columns[27]][15], 'В')
