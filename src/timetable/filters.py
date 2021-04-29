@@ -14,7 +14,7 @@ from django_filters.rest_framework import (
 
 from src.base.models import Employment
 from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
-from src.base.models import Employment
+from src.util.drf.filters import ListFilter
 
 
 class WorkerDayFilter(FilterSet):
@@ -24,20 +24,14 @@ class WorkerDayFilter(FilterSet):
 
     # параметры для совместимости с существующими интеграциями, не удалять
     worker_id = NumberFilter(field_name='employee__user_id')
-    worker__username__in = CharFilter(field_name='employee__user__username', method='field_in')
-    employment__tabel_code__in = CharFilter(field_name='employee__tabel_code', method='field_in')
+    worker__username__in = ListFilter(field_name='employee__user__username', lookup_expr='in')
+    employment__tabel_code__in = ListFilter(field_name='employee__tabel_code', lookup_expr='in')
 
     def filter_fact_tabel(self, queryset, name, value):
         if value:
             return queryset.get_tabel()
 
         return queryset
-
-    def field_in(self, queryset, name, value):
-        filt = {
-            f'{name}__in': value.split(',')
-        }
-        return queryset.filter(**filt)
 
     class Meta:
         model = WorkerDay
@@ -56,12 +50,18 @@ class WorkerDayStatFilter(FilterSet):
     shop_id = NumberFilter(required=True)
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода", required=True)
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода', required=True)
+    employee_id = NumberFilter(field_name='employee_id')
+    employee_id__in = ListFilter(field_name='employee_id', lookup_expr='in')
 
     class Meta:
         model = WorkerDay
-        fields = {
-            'employee_id': ['exact', 'in'],
-        }
+        fields = (
+            'shop_id',
+            'dt_from',
+            'dt_to',
+            'employee_id',
+            'employee_id__in',
+        )
 
 
 class FilterSetWithInitial(FilterSet):

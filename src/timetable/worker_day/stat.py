@@ -219,12 +219,12 @@ def get_month_range(year, month_num, return_days_in_month=False):
 
 
 class WorkersStatsGetter:
-    def __init__(self, shop_id, dt_from, dt_to, employee_id=None, employee_id__in=None, calc_selected_period=False):
+    def __init__(self, shop_id, dt_from, dt_to, employee_id=None, employee_id__in=None):
         self.shop_id = shop_id
         self.dt_from = dt_from
         self.dt_to = dt_to
         self.employee_id = employee_id
-        self.employee_id__in = employee_id__in
+        self.employee_id__in = employee_id__in.split(',') if isinstance(employee_id__in, str) else employee_id__in
         self.year = dt_from.year
         self.month = dt_from.month
 
