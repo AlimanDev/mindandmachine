@@ -8,7 +8,7 @@ from django.contrib.auth.models import (
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists
 )
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
@@ -20,6 +20,7 @@ from src.base.models_abstract import AbstractModel, AbstractActiveModel, Abstrac
     AbstractActiveModelManager
 from src.events.signals import event_signal
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
+from src.timetable.exceptions import WorkTimeOverlap
 
 
 class WorkerManager(UserManager):
@@ -764,6 +765,73 @@ class WorkerDay(AbstractModel):
                 record_type = AttendanceRecords.TYPE_LEAVING
 
         return closest_plan_approved, record_type
+
+    @classmethod
+    def check_work_time_overlap(cls, employee_id=None, employee_id__in=None, user_id=None, user_id__in=None, dt=None,
+                              dt__in=None, raise_exc=True, exc_cls=None):
+        """
+        Проверка наличия пересечения рабочего времени
+        """
+        lookup = {
+            'type__in': WorkerDay.TYPES_WITH_TM_RANGE,
+        }
+        if employee_id:
+            lookup['employee__user__employees__id'] = employee_id
+
+        if employee_id__in:
+            lookup['employee__user__employees__id__in'] = employee_id__in
+
+        if user_id:
+            lookup['employee__user_id'] = user_id
+
+        if user_id__in:
+            lookup['employee__user_id__in'] = user_id__in
+
+        if dt:
+            lookup['dt'] = dt
+
+        if dt__in:
+            lookup['dt__in'] = dt__in
+
+        overlaps_qs = cls.objects.filter(**lookup).annotate(
+            has_overlap=Exists(
+                WorkerDay.objects.filter(
+                    ~Q(id=OuterRef('id')),
+                    Q(
+                        Q(dttm_work_end__lt=OuterRef('dttm_work_start')) &
+                        Q(dttm_work_start__gte=OuterRef('dttm_work_start'))
+                    ) |
+                    Q(
+                        Q(dttm_work_start__lt=OuterRef('dttm_work_end')) &
+                        Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
+                    ) |
+                    Q(
+                        Q(dttm_work_start__gte=OuterRef('dttm_work_start')) &
+                        Q(dttm_work_end__lte=OuterRef('dttm_work_end'))
+                    ) |
+                    Q(
+                        Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
+                        Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
+                    ),
+                    employee__user_id=OuterRef('employee__user_id'),
+                    dt=OuterRef('dt'),
+                    is_fact=OuterRef('is_fact'),
+                    is_approved=OuterRef('is_approved'),
+                )
+            )
+        ).filter(
+            has_overlap=True,
+        ).values('employee__user__last_name', 'employee__user__first_name', 'dt').distinct()
+
+        overlaps = list(overlaps_qs)
+
+        if overlaps and raise_exc:
+            original_exc = WorkTimeOverlap(overlaps=overlaps)
+            if exc_cls:
+                raise exc_cls(str(original_exc))
+            raise original_exc
+
+        return overlaps
 
 
 class WorkerDayCashboxDetailsManager(models.Manager):

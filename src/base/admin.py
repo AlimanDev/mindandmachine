@@ -55,7 +55,8 @@ class QsUserAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_name(instance: User):
-        res = ', '.join(i.shop.name for i in instance.employments.all().select_related('shop'))
+        res = ', '.join(
+            list(Employment.objects.get_active(employee__user=instance).values_list('shop__name', flat=True).distinct()))
         return res
 
     '''

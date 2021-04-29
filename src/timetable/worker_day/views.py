@@ -1,6 +1,6 @@
 import datetime
 import json
-from itertools import groupby
+from itertools import groupby, chain
 
 import pandas as pd
 from django.conf import settings
@@ -29,6 +29,7 @@ from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE
+from src.timetable.exceptions import WorkTimeOverlap
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
     WorkerDay,
@@ -37,6 +38,7 @@ from src.timetable.models import (
     WorkerDayPermission,
     GroupWorkerDayPermission,
 )
+from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
 from src.timetable.worker_day.serializers import (
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
@@ -55,9 +57,8 @@ from src.timetable.worker_day.serializers import (
     CopyRangeSerializer,
     BlockOrUnblockWorkerDayWrapperSerializer,
 )
-from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
-from src.timetable.worker_day.tasks import recalc_wdays
 from src.timetable.worker_day.stat import count_daily_stat
+from src.timetable.worker_day.tasks import recalc_wdays
 from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util, exchange, copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
@@ -562,6 +563,12 @@ class WorkerDayViewSet(BaseModelViewSet):
                     context=event_context,
                 ))
 
+            WorkerDay.check_work_time_overlap(
+                employee_id__in=worker_dates_dict.keys(),
+                dt__in=list(set(chain.from_iterable(worker_dates_dict.values()))),
+                exc_cls=ValidationError,
+            )
+
         return Response()
 
     @swagger_auto_schema(
@@ -987,6 +994,9 @@ class WorkerDayViewSet(BaseModelViewSet):
                     for details in wd.worker_day_details.all()
                 ]
             )
+
+            WorkerDay.check_work_time_overlap(
+                employee_id__in=data['employee_ids'], dt__in=data['dates'], exc_cls=ValidationError)
         
         return Response(WorkerDayListSerializer(wds.prefetch_related('worker_day_details').select_related('last_edited_by'), many=True, context={'request':request}).data)
 
@@ -1020,6 +1030,9 @@ class WorkerDayViewSet(BaseModelViewSet):
             )
             for shop_id, work_type in set(work_types):
                 cancel_vacancies(shop_id, work_type)
+
+            WorkerDay.check_work_time_overlap(
+                employee_id=to_employee_id, dt__in=data['to_dates'], exc_cls=ValidationError)
 
         return Response(WorkerDaySerializer(created_wds, many=True).data)
 
@@ -1076,19 +1089,20 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=False, methods=['post'])
     def delete_worker_days(self, request):
-        data = DeleteWorkerDaysSerializer(data=request.data, context={'request': request})
-        data.is_valid(raise_exception=True)
-        data = data.validated_data
-        filt = {}
-        if data['exclude_created_by']:
-            filt['created_by__isnull'] = True
-        WorkerDay.objects_with_excluded.filter(
-            is_approved=False,
-            is_fact=data['is_fact'], 
-            employee_id__in=data['employee_ids'],
-            dt__in=data['dates'],
-            **filt,
-        ).delete()
+        with transaction.atomic():
+            data = DeleteWorkerDaysSerializer(data=request.data, context={'request': request})
+            data.is_valid(raise_exception=True)
+            data = data.validated_data
+            filt = {}
+            if data['exclude_created_by']:
+                filt['created_by__isnull'] = True
+            WorkerDay.objects_with_excluded.filter(
+                is_approved=False,
+                is_fact=data['is_fact'],
+                employee_id__in=data['employee_ids'],
+                dt__in=data['dates'],
+                **filt,
+            ).delete()
 
         return Response()
 
@@ -1101,12 +1115,22 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=False, methods=['post'])
     def exchange(self, request):
-        data = ExchangeSerializer(data=request.data, context={'request': request})
-        data.is_valid(raise_exception=True)
-        data = data.validated_data
-        data['is_approved'] = False
-        data['user'] = request.user
-        return Response(WorkerDaySerializer(exchange(data, self.error_messages), many=True).data)
+        with transaction.atomic():
+            data = ExchangeSerializer(data=request.data, context={'request': request})
+            data.is_valid(raise_exception=True)
+            data = data.validated_data
+            data['is_approved'] = False
+            data['user'] = request.user
+
+            res = Response(WorkerDaySerializer(exchange(data, self.error_messages), many=True).data)
+
+            WorkerDay.check_work_time_overlap(
+                employee_id__in=[data['employee1_id'], data['employee2_id']],
+                dt__in=data['dates'],
+                exc_cls=ValidationError,
+            )
+
+        return res
 
     @swagger_auto_schema(
         request_body=ExchangeSerializer,
@@ -1117,12 +1141,22 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=False, methods=['post'])
     def exchange_approved(self, request):
-        data = ExchangeSerializer(data=request.data, context={'request': request})
-        data.is_valid(raise_exception=True)
-        data = data.validated_data
-        data['is_approved'] = True
-        data['user'] = request.user
-        return Response(WorkerDaySerializer(exchange(data, self.error_messages), many=True).data)
+        with transaction.atomic():
+            data = ExchangeSerializer(data=request.data, context={'request': request})
+            data.is_valid(raise_exception=True)
+            data = data.validated_data
+            data['is_approved'] = True
+            data['user'] = request.user
+
+            res = Response(WorkerDaySerializer(exchange(data, self.error_messages), many=True).data)
+
+            WorkerDay.check_work_time_overlap(
+                employee_id__in=[data['employee1_id'], data['employee2_id']],
+                dt__in=data['dates'],
+                exc_cls=ValidationError,
+            )
+
+        return res
 
     @swagger_auto_schema(
         request_body=UploadTimetableSerializer,

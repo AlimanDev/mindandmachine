@@ -6,8 +6,8 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError, NotFound
 
 from src.base.models import Employment, User, Shop, Employee
-from src.base.shop.serializers import ShopSerializer
 from src.base.serializers import UserShorSerializer
+from src.base.shop.serializers import ShopSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import (
     WorkerDay,
@@ -227,6 +227,9 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
                 or not employee_active_empl.is_equal_shops
 
+    def _check_overlap(self, employee_id, dt):
+        WorkerDay.check_work_time_overlap(employee_id=employee_id, dt=dt, exc_cls=ValidationError)
+
     def create(self, validated_data):
         with transaction.atomic():
             self._create_update_clean(validated_data)
@@ -245,6 +248,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 for wd_detail in details:
                     WorkerDayCashboxDetails.objects.create(worker_day=worker_day, **wd_detail)
 
+            self._check_overlap(employee_id=worker_day.employee_id, dt=worker_day.dt)
+
             return worker_day
 
     def update(self, instance, validated_data):
@@ -257,7 +262,11 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
             self._create_update_clean(validated_data, instance=instance)
 
-            return super().update(instance, validated_data)
+            res = super().update(instance, validated_data)
+
+            self._check_overlap(employee_id=instance.employee_id, dt=instance.dt)
+
+            return res
 
     def to_internal_value(self, data):
         data = super(WorkerDaySerializer, self).to_internal_value(data)

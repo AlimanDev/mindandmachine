@@ -1274,7 +1274,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(wd.work_hours, timedelta(hours=10, minutes=45))
 
 
-
 class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):

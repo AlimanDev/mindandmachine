@@ -17,7 +17,7 @@ from src.base.tests.factories import (
     EmployeeFactory,
 )
 from src.recognition.models import Tick
-from src.timetable.models import WorkerDay
+from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
 from src.timetable.tests.factories import WorkerDayFactory, WorkTypeFactory
 from src.util.mixins.tests import TestsHelperMixin
 
@@ -759,3 +759,66 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 }
             }
         )
+
+
+class TestWorkTimeOverlap(MultipleActiveEmploymentsSupportMixin, APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.add_group_perm(cls.group1, 'WorkerDay', 'POST')
+        GroupWorkerDayPermission.objects.bulk_create(
+            GroupWorkerDayPermission(
+                group=cls.group1,
+                worker_day_permission=wdp,
+            ) for wdp in WorkerDayPermission.objects.all()
+        )
+
+    def test_time_of_workdays_for_one_user_should_not_overlap(self):
+        """
+        При создании/изменении рабочего дня должна происходить проверка пересечения времени сотрудника
+        """
+        WorkerDayFactory(
+            is_fact=False,
+            is_approved=False,
+            dt=self.dt,
+            employee=self.employee1_1,
+            employment=self.employment1_2_1,
+            shop=self.shop1,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(17, 0, 0)),
+        )
+
+        new_wd_data = {
+            "shop_id": self.shop1.id,
+            "employee_id": self.employee1_2.id,
+            "dt": self.dt,
+            "is_fact": False,
+            "is_approved": False,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(16, 0, 0)),
+            "dttm_work_end": datetime.combine(self.dt, time(22, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type1_cleaner.id}
+            ]
+        }
+
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.post(
+            self.get_url('WorkerDay-list'),
+            data=self.dump_data(new_wd_data),
+            content_type='application/json',
+        )
+        self.assertContains(
+            resp, 'Операция не может быть выполнена. Недопустимое пересечение времени работы.', status_code=400)
+
+        new_wd_data['dttm_work_start'] = datetime.combine(self.dt, time(17, 0, 0))
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-list'),
+            data=self.dump_data(new_wd_data),
+            content_type='application/json',
+        )
+
+        self.assertEqual(resp.status_code, 201)
