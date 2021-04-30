@@ -1130,6 +1130,10 @@ class Employment(AbstractActiveModel):
 
         return res
 
+    def is_active(self, dt=None):
+        dt = dt or timezone.now().date()
+        return (self.dt_hired is None or self.dt_hired <= dt) and (self.dt_fired is None or self.dt_fired >= dt)
+
 
 class FunctionGroup(AbstractModel):
     class Meta:

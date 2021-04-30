@@ -822,3 +822,28 @@ class TestWorkTimeOverlap(MultipleActiveEmploymentsSupportMixin, APITestCase):
         )
 
         self.assertEqual(resp.status_code, 201)
+
+
+class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.add_group_perm(cls.group1, 'Employee', 'GET')
+
+    def test_get_employee_with_employments(self):
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get(self.get_url('Employee-list'), data={'include_employments': True})
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 4)
+        employee_data = resp_data[0]
+        self.assertIn('employments', employee_data)
+
+    def test_get_employee_without_employments(self):
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get(self.get_url('Employee-list'))
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 4)
+        employee_data = resp_data[0]
+        self.assertNotIn('employments', employee_data)

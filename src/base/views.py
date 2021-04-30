@@ -192,9 +192,18 @@ class EmployeeViewSet(UpdateorCreateViewSet):
     openapi_tags = ['Employee', ]
 
     def get_queryset(self):
-        return Employee.objects.filter(
+        qs = Employee.objects.filter(
             user__network_id=self.request.user.network_id
-        ).distinct()
+        ).select_related(
+            'user',
+        )
+
+        if self.request.query_params.get('include_employments'):
+            qs = qs.prefetch_related(
+                'employments',
+            )
+
+        return qs.distinct()
 
 
 class AuthUserView(UserDetailsView):
