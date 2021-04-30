@@ -8,7 +8,6 @@ from django.utils.translation import ugettext_lazy as _
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from src.base.exceptions import MessageError
 from src.base.fields import CurrentUserNetwork
 from src.base.models import Shop, ShopSchedule
 from src.conf.djconfig import QOS_TIME_FORMAT
@@ -120,15 +119,11 @@ class ShopSerializer(serializers.ModelSerializer):
         def validate_time(data):
             for key, value in data.items():
                 if not (key in POSSIBLE_KEYS):
-                    raise MessageError(code='time_shop_error_in_time_keys',
-                                       params={'possible_keys': ', '.join(POSSIBLE_KEYS), 'key': key},
-                                       lang=self.context['request'].user.lang)
+                    raise serializers.ValidationError(_('Invalid key value {key}. Allowed values: {possible_keys}.').format(possible_keys=', '.join(POSSIBLE_KEYS), key=key))
             try:
                 Converter.parse_time(value)
             except:
-                raise MessageError(code='time_shop_error_in_times',
-                                   params={'time': value, 'key': key, 'format': QOS_TIME_FORMAT},
-                                   lang=self.context['request'].user.lang)
+                raise serializers.ValidationError(_('Invalid time format {time} for value {key}. The format must be {format}.').format(time=value, key=key, format=QOS_TIME_FORMAT))
 
         if self.validated_data.get('tm_open_dict'):
             validate_time(self.validated_data.get('tm_open_dict'))

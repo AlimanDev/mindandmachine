@@ -1,12 +1,12 @@
 import json
 
 from django.http.response import Http404
+from django.utils.translation import gettext as _
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from drf_yasg.utils import swagger_auto_schema
 
-from src.base.exceptions import MessageError
 from src.base.models import Shop
 from src.base.permissions import FilteredListPermission
 from src.base.views_abstract import GetObjectByCodeMixin, BaseModelViewSet
@@ -35,8 +35,7 @@ class ReceiptViewSet(GetObjectByCodeMixin, BaseModelViewSet):
         for receive_data_info in settings_values['receive_data_info']:
             if receive_data_info['data_type'] == data_type:
                 return receive_data_info
-
-        raise MessageError(code='receive_data_info_not_found')
+        raise serializers.ValidationError(_('Settings for data processing not found.'))
     
     @swagger_auto_schema(responses={201:'empty_response'})
     def create(self, request, *args, **kwargs):
@@ -53,7 +52,7 @@ class ReceiptViewSet(GetObjectByCodeMixin, BaseModelViewSet):
 
         receipt_codes = [receipt[receive_data_info['receipt_code_field_name']] for receipt in data]
         if Receipt.objects.filter(code__in=receipt_codes).exists():
-            raise MessageError(code='multi_object_unique')
+            raise serializers.ValidationError(_('Data with unique fields already exists.'))
 
         shop_dict = {
             shop.code: shop.id for shop in
@@ -65,8 +64,7 @@ class ReceiptViewSet(GetObjectByCodeMixin, BaseModelViewSet):
         receipts = []
         for receipt in data:
             if shop_dict.get(receipt[receive_data_info['shop_code_field_name']], '') == '':
-                raise MessageError(code='no_such_shop',
-                                   params={'key': receipt[receive_data_info['shop_code_field_name']]})
+                raise serializers.ValidationError(_('There is no department with this identifier: {key}.').format(key=receipt[receive_data_info['shop_code_field_name']]))
 
             receipt = Receipt(
                 shop_id=shop_dict[receipt[receive_data_info['shop_code_field_name']]],
@@ -93,7 +91,7 @@ class ReceiptViewSet(GetObjectByCodeMixin, BaseModelViewSet):
         data[receive_data_info['shop_code_field_name']] = data[receive_data_info['shop_code_field_name']].strip()
         shop = Shop.objects.filter(code=data[receive_data_info['shop_code_field_name']]).first()
         if shop is None:
-            raise MessageError(code='no_such_shop', params={'key': data[receive_data_info['shop_code_field_name']]})
+            raise serializers.ValidationError(_('There is no department with this identifier: {key}.').format(key=data[receive_data_info['shop_code_field_name']]))
 
         try:
             instance = self.get_object()

@@ -12,7 +12,7 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from django.contrib.postgres.fields import JSONField
-from django.core.exceptions import ValidationError
+from rest_framework.serializers import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
@@ -22,11 +22,11 @@ from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.functional import cached_property
+from django.utils.translation import gettext as _
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
 from timezone_field import TimeZoneField
 
-from src.base.exceptions import MessageError
 from src.base.models_abstract import (
     AbstractActiveModel,
     AbstractModel,
@@ -206,16 +206,16 @@ class Break(AbstractActiveNetworkSpecificCodeNamedModel):
         breaks = self.breaks
         for b in breaks:
             if not isinstance(b, list) or len(b) != 3 or ((not isinstance(b[0], int)) or (not isinstance(b[1], int)) or (not isinstance(b[2], list))):
-                raise MessageError(code='triplet_bad_type', params={'triplet': b})
+                raise ValidationError(_('Bad break triplet format {triplet}, should be [[int, int, [int, int,]],].').format(triplet=b))
 
             if b[0] > b[1]:
-                raise MessageError(code='triplet_bad_value_gt', params={'triplet': b})
+                raise ValidationError(_('First value of period can not be greater then second value: {triplet}').format(triplet=b))
             
             if not all([isinstance(v, int) for v in b[2]]):
-                raise MessageError(code='triplet_bad_type', params={'triplet': b})
+                raise ValidationError(_('Bad break triplet format {triplet}, should be [[int, int, [int, int,]],].').format(triplet=b))
             
             if any([v > b[1] for v in b[2]]):
-                raise MessageError(code='triplet_bad_value', params={'triplet': b})
+                raise ValidationError(_('Value of break can not be greater than value of period: {triplet}').format(triplet=b))
 
         self.value = self.clean_value(self.breaks)
         return super().save(*args, **kwargs)
@@ -469,9 +469,9 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     def save(self, *args, **kwargs):
         is_new = self.id is None
         if self.open_times.keys() != self.close_times.keys():
-            raise MessageError(code='time_shop_differerent_keys')
+            raise ValidationError(_('Keys of open times and close times are different.'))
         if self.open_times.get('all') and len(self.open_times) != 1:
-            raise MessageError(code='time_shop_all_or_days')
+            raise ValidationError(_('\'All\' and individual days cannot be specified.'))
         
         #TODO fix
         # for key in open_times.keys():
@@ -484,7 +484,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             self.parent = get_object_or_404(Shop, code=self.parent_code)
         load_template_changed = self.tracker.has_changed('load_template')
         if load_template_changed and self.load_template_status == self.LOAD_TEMPLATE_PROCESS:
-            raise MessageError(code='cant_change_load_template')
+            raise ValidationError(_('It is not possible to change the load template as it is in the calculation process.'))
         res = super().save(*args, **kwargs)
         if is_new:
             transaction.on_commit(self._handle_new_shop_created)
@@ -971,7 +971,7 @@ class Employment(AbstractActiveModel):
     def has_permission(self, permission, method='GET'):
         group = self.function_group or (self.position.group if self.position else None)
         if not group:
-            raise MessageError(code='no_group_or_position')
+            raise ValidationError(_('Unable to define worker access group. Assign an access group to him or a position associated with an access group.'))
         return group.allowed_functions.filter(
             func=permission,
             method=method
