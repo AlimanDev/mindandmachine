@@ -12,8 +12,9 @@ from django_filters.rest_framework import (
     OrderingFilter,
 )
 
+from src.base.filters import BaseActiveNamedModelFilter
 from src.base.models import Employment
-from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
+from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint, WorkTypeName
 from src.util.drf.filters import ListFilter
 
 
@@ -198,3 +199,12 @@ class WorkerConstraintFilter(FilterSet):
         fields = {
             'employment_id': ['exact'],
         }
+
+
+class WorkTypeNameFilter(BaseActiveNamedModelFilter):
+    shop_id = NumberFilter(field_name='work_types__shop_id')
+    shop_id__in = ListFilter(field_name='work_types__shop_id', lookup_expr='in')
+
+    class Meta:
+        model = WorkTypeName
+        fields = []

@@ -37,7 +37,7 @@ def update_shop_stats(dt=None):
         #     continue
 
         if settings.UPDATE_SHOP_STATS_WORK_TYPES_CODES:
-            work_type_ids = list(month_stat.shop.worktype_set.filter(
+            work_type_ids = list(month_stat.shop.work_types.filter(
                 work_type_name__code__in=settings.UPDATE_SHOP_STATS_WORK_TYPES_CODES,
             ).values_list('id', flat=True))
         else:

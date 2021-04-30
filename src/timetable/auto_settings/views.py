@@ -968,7 +968,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                                     ).delete()
                                 wd_obj.save()
 
-                for work_type in shop.worktype_set.all():
+                for work_type in shop.work_types.all():
                     cancel_shop_vacancies.apply_async((shop.id, work_type.id))
                     create_shop_vacancies_and_notify.apply_async((shop.id, work_type.id))
 

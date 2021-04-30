@@ -80,8 +80,8 @@ class WorkType(AbstractActiveModel):
 
     priority = models.PositiveIntegerField(default=100)  # 1--главная касса, 2--линия, 3--экспресс
     dttm_last_update_queue = models.DateTimeField(null=True, blank=True)
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
-    work_type_name = models.ForeignKey(WorkTypeName, on_delete=models.PROTECT)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='work_types')
+    work_type_name = models.ForeignKey(WorkTypeName, on_delete=models.PROTECT, related_name='work_types')
     min_workers_amount = models.IntegerField(default=0, blank=True, null=True)
     max_workers_amount = models.IntegerField(default=20, blank=True, null=True)
 
