@@ -114,7 +114,7 @@ class UserSerializer(BaseNetworkSerializer):
 
 class EmployeeSerializer(BaseNetworkSerializer):
     user = UserSerializer(read_only=True)
-    user_id = serializers.IntegerField(write_only=True)
+    user_id = serializers.IntegerField(required=False, write_only=True)
 
     class Meta:
         model = Employee

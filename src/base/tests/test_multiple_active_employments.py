@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from etc.scripts import fill_calendar
+from src.base.models import Employee
 from src.base.tests.factories import (
     ShopFactory,
     UserFactory,
@@ -167,7 +168,11 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
-        fact_approved_list = self._make_tick_requests(self.user1, self.shop1)
+        fact_approved_list = self._make_tick_requests(
+            self.user1, self.shop1,
+            dttm_coming=datetime.combine(self.dt, time(8, 53, 0)),
+            dttm_leaving=datetime.combine(self.dt, time(21, 15, 0)),
+        )
         self.assertEqual(len(fact_approved_list), 1)
         fact_approved = fact_approved_list[0]
         self.assertEqual(fact_approved.employment_id, self.employment1_2_1.id)
@@ -829,6 +834,7 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.add_group_perm(cls.group1, 'Employee', 'GET')
+        cls.add_group_perm(cls.group1, 'Employee', 'PUT')
 
     def test_get_employee_with_employments(self):
         self.client.force_authenticate(user=self.user1)
@@ -847,3 +853,15 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertEqual(len(resp_data), 4)
         employee_data = resp_data[0]
         self.assertNotIn('employments', employee_data)
+
+    def test_can_update_tabel_code_by_employee_id(self):
+        self.client.force_authenticate(user=self.user1)
+        new_tabel_code = 'new_tabel_code'
+        resp = self.client.put(
+            self.get_url('Employee-detail', pk=self.employee1_1.id),
+            data=self.dump_data({'tabel_code': new_tabel_code}),
+            content_type='application/json',
+        )
+        self.print_resp(resp)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Employee.objects.get(id=self.employee1_1.id).tabel_code, new_tabel_code)
