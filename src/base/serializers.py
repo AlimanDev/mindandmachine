@@ -179,7 +179,6 @@ class AutoTimetableSerializer(serializers.Serializer):
 class EmploymentListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     employee_id = serializers.IntegerField(required=False)
-    employee = EmployeeSerializer(required=False, read_only=True)
     user_id = serializers.IntegerField(source='employee.user_id')
     shop_id = serializers.IntegerField(required=False)
     position_id = serializers.IntegerField()
@@ -200,6 +199,12 @@ class EmploymentListSerializer(serializers.Serializer):
     worker_constraints = WorkerConstraintListSerializer(many=True)
     work_types = EmploymentWorkTypeListSerializer(many=True)
 
+    def __init__(self, *args, **kwargs):
+        super(EmploymentListSerializer, self).__init__(*args, **kwargs)
+
+        request = self.context.get('request')
+        if request and request.query_params.get('include_employee'):
+            self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
 
 class EmploymentSerializer(serializers.ModelSerializer):
     default_error_messages = {
@@ -306,7 +311,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
         request = self.context.get('request')
         if request and request.query_params.get('include_employee'):
-            self.fields['employee'] = EmployeeSerializer(required=False, many=True, read_only=True)
+            self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
 
         show_constraints = None
         if self.context.get('request'):
