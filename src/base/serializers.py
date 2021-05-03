@@ -2,6 +2,8 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import EmailValidator
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -100,11 +102,23 @@ class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
     avatar = serializers.SerializerMethodField('get_avatar_url')
+    email = serializers.CharField(required=False)
 
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
                   'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username' ]
+
+    def validate(self, attrs):
+        email = attrs.get('email')
+        if email:
+            try:
+                EmailValidator()(email)
+            except DjangoValidationError:
+                # TODO: добавить запись в лог?
+                attrs['email'] = ''
+
+        return attrs
 
     def get_avatar_url(self, obj) -> str:
         if obj.avatar:

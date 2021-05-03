@@ -841,6 +841,12 @@ class User(DjangoAbstractUser, AbstractModel):
             group_id=Coalesce(F('function_group_id'), F('position__group_id')),
         ).values_list('group_id', flat=True)
 
+    def save(self, *args, **kwargs):
+        if not self.password and settings.SET_USER_PASSWORD_AS_LOGIN:
+            self.set_password(self.username)
+
+        return super(User, self).save(*args, **kwargs)
+
 
 class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     """

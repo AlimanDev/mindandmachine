@@ -294,11 +294,13 @@ LOCALE_PATHS = [
     os.path.join(BASE_DIR,  'data/locale')
 ]
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 
 STATIC_URL = '/static/'
 MEDIA_URL = '/_i/media/'
+
+FILE_UPLOAD_PERMISSIONS = 0o644
 
 SESSION_COOKIE_SECURE = True
 
@@ -452,6 +454,9 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE = False  # посылать в МИС событийно расписание врачей при его изменении
 MIS_USERNAME = None
 MIS_PASSWORD = None
+
+# Eсли у пользователя пароль пустой, то при сохранении устанавливать пароль как логин
+SET_USER_PASSWORD_AS_LOGIN = False
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

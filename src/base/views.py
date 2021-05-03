@@ -175,7 +175,6 @@ class UserViewSet(UpdateorCreateViewSet):
             
         return Response({"detail": "Биометрия сотрудника успешно удалена"}, status=status.HTTP_200_OK)
 
-
     def get_serializer_class(self):
         if self.action == 'list':
             return UserListSerializer
