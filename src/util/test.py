@@ -5,7 +5,7 @@ from typing import TypeVar
 
 from dateutil.relativedelta import relativedelta
 from django.db import connection
-from django.db.models import Value, F, CharField
+from django.db.models import Value, F, CharField, Subquery, OuterRef
 from django.db.models.functions import Concat
 from django.test import TestCase
 from django.utils.timezone import now
@@ -668,10 +668,16 @@ def create_departments_and_users(self, dt=None):
     )
     Shop.objects.all().update(code=Concat(Value('code-', output_field=CharField()), F('id')), network=self.network)
     User.objects.all().update(tabel_code=F('username'))
+    Employment.objects.all().update(
+        tabel_code=Subquery(User.objects.filter(id=OuterRef('user_id')).values('tabel_code')[:1])
+    )
     for s in [self.root_shop, self.shop, self.shop2, self.shop3, self.reg_shop1, self.reg_shop2]:
         s.refresh_from_db()
-    for s in [self.user1, self.user2, self.user3, self.user4, self.user5, self.user6, self.user7, self.user8]:
-        s.refresh_from_db()
+    for u in [self.user1, self.user2, self.user3, self.user4, self.user5, self.user6, self.user7, self.user8]:
+        u.refresh_from_db()
+    for e in [self.employment1, self.employment2, self.employment3, self.employment4, self.employment5,
+              self.employment6, self.employment7, self.employment8]:
+        e.refresh_from_db()
 
 # def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
 #     CameraCashboxStat.objects.create(

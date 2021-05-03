@@ -1047,10 +1047,17 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             response.json()['employment'][0], 'Сотрудник в трудоустройстве и в рабочем дне должны совпадать.')
 
     def test_change_range(self):
+        Employment.objects.create(
+            user=self.user2,
+            function_group=self.admin_group,
+            shop=self.shop2,
+            tabel_code=self.user2.tabel_code,
+        )
+
         data = {
           "ranges": [
             {
-              "worker": self.user2.tabel_code,
+              "worker": self.employment2.tabel_code,
               "dt_from": self.dt - timedelta(days=10),
               "dt_to": self.dt + timedelta(days=10),
               "type": WorkerDay.TYPE_MATERNITY,
