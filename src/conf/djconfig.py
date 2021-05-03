@@ -300,6 +300,8 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 STATIC_URL = '/static/'
 MEDIA_URL = '/_i/media/'
 
+FILE_UPLOAD_PERMISSIONS = 0o644
+
 SESSION_COOKIE_SECURE = True
 
 REDOC_SETTINGS = {
