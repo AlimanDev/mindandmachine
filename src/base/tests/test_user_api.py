@@ -70,6 +70,9 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         resp = self.client.put(self.get_url('User-detail', pk=username), data=data)
         self.assertEqual(resp.status_code, 201)
 
+        user = User.objects.get(username=username)
+        self.assertTrue(user.password == '')
+
     def test_get_list(self):
         resp = self.client.get(self.get_url('User-list'))
         self.assertEqual(resp.status_code, 200)
@@ -159,3 +162,23 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         data = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(data, {'detail': 'У сотрудника нет биометрии'})
+
+    def test_set_password_as_username_on_user_create(self):
+        with self.settings(SET_USER_PASSWORD_AS_LOGIN=True):
+            username = "НМ00-123456"
+            data = {
+                "first_name": " Иван",
+                "last_name": " Иванов",
+                "middle_name": "Иванович",
+                "birthday": "2000-07-20",
+                "avatar": "string",
+                "phone_number": "string",
+                "tabel_code": username,
+                "username": username,
+                "by_code": True,
+            }
+            resp = self.client.put(self.get_url('User-detail', pk=username), data=data)
+            self.assertEqual(resp.status_code, 201)
+
+            user = User.objects.get(username=username)
+            self.assertTrue(user.check_password(user.username))
