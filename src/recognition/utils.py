@@ -60,7 +60,7 @@ def check_duplicate_biometrics(image, user: User):
     person_id = r.identify(image)
     if person_id:
         try:
-            user_connecter = UserConnecter.objects.get(person_id=person_id)
+            user_connecter = UserConnecter.objects.get(partner_id=person_id)
         except UserConnecter.DoesNotExist:
             return 'User from other system'
         if user.id == user_connecter.user_id:
