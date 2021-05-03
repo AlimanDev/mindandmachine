@@ -64,7 +64,9 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
             shop_id=tick_point.shop_id,
             dttm_work_start__gte=dt_from,
             dttm_work_end__lte=dt_to,
-            child__id__isnull=True
+            child__id__isnull=True,
+            is_fact=False,
+            is_approved=True,
         )
         emp_cond = Employment.objects.get_active(
             self.request.user.network_id,
@@ -85,6 +87,8 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
                          dttm_work_start__gte=dt_from,
                          dttm_work_end__lte=dt_to,
                          child__id__isnull=True,
+                         is_fact=False,
+                         is_approved=True,
                      )
                      )
         ).annotate(
