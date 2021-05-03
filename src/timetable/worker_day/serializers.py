@@ -360,7 +360,7 @@ class ChangeRangeSerializer(serializers.Serializer):
         super(ChangeRangeSerializer, self).__init__(*args, **kwargs)
         if self.context.get('request'):
             self.fields['worker'] = serializers.SlugRelatedField(
-                slug_field='employments__tabel_code', queryset=User.objects.filter(network=self.context['request'].user.network))
+                slug_field='employments__tabel_code', queryset=User.objects.filter(network=self.context['request'].user.network).distinct())
 
     def validate(self, data):
         if not data['dt_to'] >= data['dt_from']:

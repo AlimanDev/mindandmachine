@@ -1056,6 +1056,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             user=self.user2,
             function_group=self.admin_group,
             shop=self.shop2,
+            tabel_code=self.user2.tabel_code,
         )
 
         data = {
