@@ -1070,7 +1070,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertDictEqual(
             response.json(),
-            {self.employment2.tabel_code: {'created_count': 0, 'deleted_count': 0, 'existing_count': 21}}
+            {self.employee2.tabel_code: {'created_count': 0, 'deleted_count': 0, 'existing_count': 21}}
         )
 
         wd = WorkerDay.objects.filter(
