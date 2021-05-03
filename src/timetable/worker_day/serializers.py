@@ -308,7 +308,7 @@ class VacancySerializer(serializers.Serializer):
         self.fields['shop'] = ShopSerializer(context=self.context)
 
     def get_avatar_url(self, obj) -> str:
-        if obj.employee_id and obj.employee.user and obj.employee.user.avatar:
+        if obj.employee_id and obj.employee.user_id and obj.employee.user.avatar:
             return obj.employee.user.avatar.url
         return None
 

@@ -622,7 +622,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 is_vacancy=True,
             ).select_related(
                 'shop',
-                'employee',
+                'employee__user',
             ).prefetch_related(
                 'worker_day_details',
             ).annotate(
