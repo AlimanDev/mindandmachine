@@ -602,7 +602,7 @@ class WorkerDay(AbstractModel):
     is_vacancy = models.BooleanField(default=False)  # вакансия ли это
     dttm_added = models.DateTimeField(default=timezone.now)
     canceled = models.BooleanField(default=False)
-    is_outsource = models.BooleanField(default=False)
+    is_outsource = models.BooleanField(default=False, db_index=True)
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=True, verbose_name='Обрезать рабочие часы по времени работы магазина')
     is_blocked = models.BooleanField(
